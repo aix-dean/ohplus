@@ -1,0 +1,628 @@
+"use client"
+
+import type React from "react"
+
+import { useState, useEffect } from "react"
+import { useParams, useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { CheckCircle, XCircle, Calculator, Loader2, Lock, Eye, Download, ArrowLeft, Share2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import type { CostEstimate } from "@/lib/types/cost-estimate"
+
+const categoryLabels = {
+  media_cost: "Media Cost",
+  production_cost: "Production Cost",
+  installation_cost: "Installation Cost",
+  maintenance_cost: "Maintenance Cost",
+  other: "Other",
+}
+
+// Generate QR code URL for cost estimate
+function generateQRCodeUrl(costEstimateId: string): string {
+  const url = `https://ohplus.aix.ph/cost-estimates/view/${costEstimateId}`
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`
+}
+
+export default function PublicCostEstimateViewPage() {
+  const params = useParams()
+  const router = useRouter()
+  const { toast } = useToast()
+  const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [password, setPassword] = useState("")
+  const [verifying, setVerifying] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [submittingResponse, setSubmittingResponse] = useState(false)
+  const [showQRModal, setShowQRModal] = useState(false)
+
+  useEffect(() => {
+    async function fetchCostEstimate() {
+      if (params.id) {
+        try {
+          const response = await fetch(`/api/cost-estimates/public/${params.id}`)
+
+          if (response.ok) {
+            const data = await response.json()
+            setCostEstimate({
+              ...data,
+              createdAt: new Date(data.createdAt),
+              updatedAt: new Date(data.updatedAt),
+              approvedAt: data.approvedAt ? new Date(data.approvedAt) : undefined,
+              rejectedAt: data.rejectedAt ? new Date(data.rejectedAt) : undefined,
+            })
+            setIsAuthenticated(true)
+
+            // Update status to viewed if it was in sent status
+            if (data.status === "sent") {
+              updateViewedStatus(data.id)
+            }
+          } else if (response.status === 401) {
+            // Password required
+            setIsAuthenticated(false)
+          } else {
+            toast({
+              title: "Error",
+              description: "Cost estimate not found or not available",
+              variant: "destructive",
+            })
+          }
+        } catch (error) {
+          console.error("Error fetching cost estimate:", error)
+          toast({
+            title: "Error",
+            description: "Failed to load cost estimate",
+            variant: "destructive",
+          })
+        } finally {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchCostEstimate()
+  }, [params.id, toast])
+
+  const updateViewedStatus = async (costEstimateId: string) => {
+    try {
+      await fetch(`/api/cost-estimates/update-status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          costEstimateId,
+          status: "viewed",
+          userId: "public_viewer",
+        }),
+      })
+    } catch (error) {
+      console.error("Error updating viewed status:", error)
+    }
+  }
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!password.trim()) return
+
+    setVerifying(true)
+    try {
+      const response = await fetch(`/api/cost-estimates/public/${params.id}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password: password.trim() }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setCostEstimate({
+            ...data.costEstimate,
+            createdAt: new Date(data.costEstimate.createdAt),
+            updatedAt: new Date(data.costEstimate.updatedAt),
+            approvedAt: data.costEstimate.approvedAt ? new Date(data.costEstimate.approvedAt) : undefined,
+            rejectedAt: data.costEstimate.rejectedAt ? new Date(data.costEstimate.rejectedAt) : undefined,
+          })
+          setIsAuthenticated(true)
+
+          // Update status to viewed if it was in sent status
+          if (data.costEstimate.status === "sent") {
+            updateViewedStatus(data.costEstimate.id)
+          }
+
+          toast({
+            title: "Access granted",
+            description: "Cost estimate loaded successfully",
+          })
+        }
+      } else {
+        toast({
+          title: "Invalid access code",
+          description: "Please check your access code and try again",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error verifying password:", error)
+      toast({
+        title: "Error",
+        description: "Failed to verify access code",
+        variant: "destructive",
+      })
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  const handleApprove = async () => {
+    if (!costEstimate) return
+
+    setSubmittingResponse(true)
+    try {
+      const response = await fetch(`/api/cost-estimates/update-status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          costEstimateId: costEstimate.id,
+          status: "approved",
+          userId: "public_viewer",
+        }),
+      })
+
+      if (response.ok) {
+        setCostEstimate({ ...costEstimate, status: "approved", approvedAt: new Date() })
+        toast({
+          title: "Cost estimate approved!",
+          description: "Thank you for your approval. We will proceed with the next steps.",
+        })
+      } else {
+        throw new Error("Failed to approve cost estimate")
+      }
+    } catch (error) {
+      console.error("Error approving cost estimate:", error)
+      toast({
+        title: "Error",
+        description: "Failed to approve cost estimate. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSubmittingResponse(false)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!costEstimate) return
+
+    setSubmittingResponse(true)
+    try {
+      const response = await fetch(`/api/cost-estimates/update-status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          costEstimateId: costEstimate.id,
+          status: "rejected",
+          userId: "public_viewer",
+          rejectionReason: "Rejected by client",
+        }),
+      })
+
+      if (response.ok) {
+        setCostEstimate({ ...costEstimate, status: "rejected", rejectedAt: new Date() })
+        toast({
+          title: "Cost estimate rejected",
+          description: "Your feedback has been recorded. We will contact you to discuss alternatives.",
+        })
+      } else {
+        throw new Error("Failed to reject cost estimate")
+      }
+    } catch (error) {
+      console.error("Error rejecting cost estimate:", error)
+      toast({
+        title: "Error",
+        description: "Failed to reject cost estimate. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSubmittingResponse(false)
+    }
+  }
+
+  const handleDownloadPDF = async () => {
+    if (!costEstimate) return
+
+    // This is a placeholder - in a real implementation, you would generate and download the PDF
+    toast({
+      title: "Download started",
+      description: "Your cost estimate PDF is being prepared for download.",
+    })
+
+    // Simulate PDF download delay
+    setTimeout(() => {
+      toast({
+        title: "Download complete",
+        description: "Cost estimate PDF has been downloaded.",
+      })
+    }, 2000)
+  }
+
+  const copyLinkToClipboard = () => {
+    if (!costEstimate) return
+
+    const url = `https://ohplus.aix.ph/cost-estimates/view/${costEstimate.id}`
+    navigator.clipboard.writeText(url)
+
+    toast({
+      title: "Link copied",
+      description: "Cost estimate link copied to clipboard",
+    })
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">Loading cost estimate...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 mx-auto mb-4 bg-orange-100 rounded-full flex items-center justify-center">
+                <Lock className="h-8 w-8 text-orange-600" />
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Required</h1>
+              <p className="text-gray-600">Please enter your access code to view this cost estimate.</p>
+            </div>
+
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="password">Access Code</Label>
+                <Input
+                  id="password"
+                  type="text"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value.toUpperCase())}
+                  placeholder="Enter access code"
+                  className="text-center text-lg font-mono tracking-wider"
+                  maxLength={8}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={verifying || !password.trim()}>
+                {verifying ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Cost Estimate
+                  </>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  if (!costEstimate) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+            <Calculator className="h-8 w-8 text-gray-400" />
+          </div>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Cost Estimate Not Found</h1>
+          <p className="text-gray-600">The cost estimate you're looking for doesn't exist or may have been removed.</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {/* Fixed header */}
+      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm border-b border-gray-200 shadow-sm">
+        <div className="max-w-[850px] mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Button variant="ghost" size="sm" className="text-gray-600" onClick={() => router.back()}>
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
+            <Badge
+              className={`${
+                costEstimate.status === "approved"
+                  ? "bg-green-100 text-green-800 border-green-200"
+                  : costEstimate.status === "rejected"
+                    ? "bg-red-100 text-red-800 border-red-200"
+                    : "bg-blue-100 text-blue-800 border-blue-200"
+              } border font-medium px-3 py-1`}
+            >
+              {costEstimate.status === "approved" && <CheckCircle className="h-3.5 w-3.5 mr-1" />}
+              {costEstimate.status === "rejected" && <XCircle className="h-3.5 w-3.5 mr-1" />}
+              <span className="capitalize">{costEstimate.status}</span>
+            </Badge>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button variant="outline" size="sm" className="text-gray-600" onClick={() => setShowQRModal(true)}>
+              <Share2 className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Share</span>
+            </Button>
+            <Button variant="outline" size="sm" className="text-gray-600" onClick={handleDownloadPDF}>
+              <Download className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Download</span>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Document Container */}
+      <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 pt-16">
+        <div className="max-w-[850px] mx-auto bg-white shadow-md rounded-sm overflow-hidden">
+          {/* Document Header */}
+          <div className="border-b-2 border-orange-600 p-6 sm:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">COST ESTIMATE</h1>
+                <p className="text-sm text-gray-500">{costEstimate.id}</p>
+              </div>
+              <div className="mt-4 sm:mt-0 flex items-center space-x-4">
+                <div className="text-center">
+                  <img
+                    src={generateQRCodeUrl(costEstimate.id) || "/placeholder.svg"}
+                    alt="QR Code"
+                    className="w-16 h-16 border border-gray-300 bg-white p-1 rounded"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Scan to view online</p>
+                </div>
+                <img src="/oh-plus-logo.png" alt="Company Logo" className="h-8 sm:h-10" />
+              </div>
+            </div>
+          </div>
+
+          {/* Document Content */}
+          <div className="p-6 sm:p-8">
+            {/* Cost Estimate Information */}
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                Cost Estimate Details
+              </h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Title</h3>
+                  <p className="text-base font-medium text-gray-900">{costEstimate.title}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Created Date</h3>
+                  <p className="text-base text-gray-900">{costEstimate.createdAt.toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Status</h3>
+                  <Badge
+                    className={`${
+                      costEstimate.status === "approved"
+                        ? "bg-green-100 text-green-800 border-green-200"
+                        : costEstimate.status === "rejected"
+                          ? "bg-red-100 text-red-800 border-red-200"
+                          : "bg-blue-100 text-blue-800 border-blue-200"
+                    } border font-medium px-3 py-1`}
+                  >
+                    {costEstimate.status === "approved" && <CheckCircle className="h-3.5 w-3.5 mr-1" />}
+                    {costEstimate.status === "rejected" && <XCircle className="h-3.5 w-3.5 mr-1" />}
+                    <span className="capitalize">{costEstimate.status}</span>
+                  </Badge>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Total Amount</h3>
+                  <p className="text-base font-semibold text-gray-900">{costEstimate.totalAmount.toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Cost Breakdown */}
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                Cost Breakdown
+              </h2>
+
+              <div className="border border-gray-300 rounded-sm overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                        Description
+                      </th>
+                      <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                        Category
+                      </th>
+                      <th className="py-2 px-4 text-center font-medium text-gray-700 border-b border-gray-300">Qty</th>
+                      <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
+                        Unit Price
+                      </th>
+                      <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {costEstimate.lineItems.map((item, index) => (
+                      <tr key={item.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                        <td className="py-3 px-4 border-b border-gray-200">
+                          <div className="font-medium text-gray-900">{item.description}</div>
+                        </td>
+                        <td className="py-3 px-4 border-b border-gray-200">
+                          <span className="inline-block px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded">
+                            {categoryLabels[item.category]}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center border-b border-gray-200">{item.quantity}</td>
+                        <td className="py-3 px-4 text-right border-b border-gray-200">
+                          {item.unitPrice.toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4 text-right border-b border-gray-200">
+                          <div className="font-medium text-gray-900">{item.totalPrice.toLocaleString()}</div>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="bg-gray-50">
+                      <td colSpan={4} className="py-3 px-4 text-right font-medium">
+                        Subtotal:
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium">{costEstimate.subtotal.toLocaleString()}</td>
+                    </tr>
+                    <tr className="bg-gray-50">
+                      <td colSpan={4} className="py-3 px-4 text-right font-medium">
+                        VAT ({(costEstimate.taxRate * 100).toFixed(0)}%):
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium">{costEstimate.taxAmount.toLocaleString()}</td>
+                    </tr>
+                    <tr className="bg-orange-50">
+                      <td colSpan={4} className="py-3 px-4 text-right font-bold">
+                        Total Amount:
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold text-orange-600">
+                        {costEstimate.totalAmount.toLocaleString()}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Notes */}
+            {costEstimate.notes && (
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                  Notes
+                </h2>
+                <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
+                  <p className="text-sm text-gray-700 leading-relaxed">{costEstimate.notes}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            {costEstimate.status === "sent" || costEstimate.status === "viewed" ? (
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                  Your Response
+                </h2>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <p className="text-gray-700 mb-4">
+                    Please review the cost estimate above and let us know if you approve or need any modifications.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <Button
+                      onClick={handleApprove}
+                      disabled={submittingResponse}
+                      className="bg-green-600 hover:bg-green-700 flex-1"
+                    >
+                      {submittingResponse ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Approve Cost Estimate
+                    </Button>
+                    <Button
+                      onClick={handleReject}
+                      disabled={submittingResponse}
+                      variant="outline"
+                      className="border-red-300 text-red-700 hover:bg-red-50 flex-1"
+                    >
+                      {submittingResponse ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Request Changes
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : costEstimate.status === "approved" ? (
+              <div className="mb-8">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+                  <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-green-900 mb-2">Cost Estimate Approved</h3>
+                  <p className="text-green-700">
+                    Thank you for approving this cost estimate. We will proceed with the next steps and contact you
+                    soon.
+                  </p>
+                  <p className="text-green-700 text-sm mt-2">
+                    Approved on: {costEstimate.approvedAt?.toLocaleDateString()} at{" "}
+                    {costEstimate.approvedAt?.toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+            ) : costEstimate.status === "rejected" ? (
+              <div className="mb-8">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                  <XCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-red-900 mb-2">Changes Requested</h3>
+                  <p className="text-red-700">
+                    We have received your feedback. Our team will review your requirements and contact you with a
+                    revised estimate.
+                  </p>
+                  <p className="text-red-700 text-sm mt-2">
+                    Rejected on: {costEstimate.rejectedAt?.toLocaleDateString()} at{" "}
+                    {costEstimate.rejectedAt?.toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Document Footer */}
+            <div className="mt-12 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
+              <p>This cost estimate is subject to final approval and may be revised based on project requirements.</p>
+              <p className="mt-1">© {new Date().getFullYear()} OH+ Outdoor Advertising. All rights reserved.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* QR Code Modal */}
+      {showQRModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+            <h3 className="text-lg font-semibold mb-4">Share Cost Estimate</h3>
+            <div className="flex flex-col items-center mb-4">
+              <img
+                src={generateQRCodeUrl(costEstimate.id) || "/placeholder.svg"}
+                alt="QR Code"
+                className="w-48 h-48 border border-gray-300 p-2 mb-2"
+              />
+              <p className="text-sm text-gray-600">Scan to view this cost estimate</p>
+            </div>
+            <div className="flex flex-col space-y-3">
+              <Button onClick={copyLinkToClipboard} className="w-full">
+                <Share2 className="h-4 w-4 mr-2" />
+                Copy Link
+              </Button>
+              <Button variant="outline" onClick={() => setShowQRModal(false)} className="w-full">
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
