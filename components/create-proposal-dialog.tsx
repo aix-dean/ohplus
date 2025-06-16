@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -14,6 +14,8 @@ import { Separator } from "@/components/ui/separator"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs" // Added import
+import { ScrollArea } from "@/components/ui/scroll-area" // Added import
 import { CalendarIcon, MapPin, Download, Eye, Mail, Loader2, CheckCircle } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -21,6 +23,8 @@ import { createProposal } from "@/lib/proposal-service"
 import type { Product } from "@/lib/firebase-service"
 import type { ProposalClient, ProposalProduct } from "@/lib/types/proposal"
 import Image from "next/image"
+import { useDebounce } from "@/hooks/use-debounce" // Added import
+import { getPaginatedClients, createClient, type Client } from "@/lib/client-service" // Added imports
 
 interface CreateProposalDialogProps {
   isOpen: boolean
@@ -61,6 +65,53 @@ export function CreateProposalDialog({
     wasSent: false,
     clientEmail: "",
   })
+
+  // Client selection state
+  const [clientSelectionMode, setClientSelectionMode] = useState<"new" | "existing">("new")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [searchResults, setSearchResults] = useState<Client[]>([])
+  const [isSearchingClients, setIsSearchingClients] = useState(false)
+  const [selectedExistingClient, setSelectedExistingClient] = useState<Client | null>(null)
+
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
+
+  useEffect(() => {
+    const fetchClients = async () => {
+      if (debouncedSearchTerm.trim()) {
+        setIsSearchingClients(true)
+        try {
+          const result = await getPaginatedClients(10, null, debouncedSearchTerm.trim())
+          setSearchResults(result.items)
+        } catch (error) {
+          console.error("Error searching clients:", error)
+          setSearchResults([])
+        } finally {
+          setIsSearchingClients(false)
+        }
+      } else {
+        setSearchResults([])
+      }
+    }
+    fetchClients()
+  }, [debouncedSearchTerm])
+
+  const handleClientSelect = (selectedClient: Client) => {
+    setSelectedExistingClient(selectedClient)
+    // Populate the main client state for the proposal
+    setClient({
+      company: selectedClient.company || "",
+      contactPerson: selectedClient.name || "", // Assuming client.name is contact person
+      email: selectedClient.email || "",
+      phone: selectedClient.phone || "",
+      address: selectedClient.address || "",
+      industry: selectedClient.industry || "",
+      targetAudience: "", // Not available in Client type, keep empty
+      campaignObjective: "", // Not available in Client type, keep empty
+      id: selectedClient.id, // Include the ID for existing clients
+    })
+    setSearchTerm("") // Clear search term after selection
+    setSearchResults([]) // Clear search results
+  }
 
   // Convert products to proposal format with proper defaults
   const proposalProducts: ProposalProduct[] = selectedProducts.map((product) => ({
@@ -105,51 +156,93 @@ export function CreateProposalDialog({
   }, 0)
 
   const handleCreateProposal = async () => {
-    if (!user?.uid) return
+    setIsCreating(true) // Moved to the very beginning
+    setCreationStep("") // Clear any previous step message
 
-    // Validation
-    if (!title.trim()) {
+    if (!user?.uid) {
       toast({
-        title: "Missing title",
-        description: "Please enter a proposal title.",
+        title: "Authentication Required",
+        description: "Please log in to create a proposal.",
         variant: "destructive",
       })
+      setIsCreating(false) // Ensure button is re-enabled
       return
     }
 
-    if (!client.company.trim() || !client.contactPerson.trim() || !client.email.trim()) {
-      toast({
-        title: "Missing client information",
-        description: "Please fill in the required client details.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (proposalProducts.length === 0) {
-      toast({
-        title: "No products selected",
-        description: "Please select at least one product for the proposal.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsCreating(true)
     try {
-      setCreationStep("Validating proposal data...")
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      // Validation
+      if (!title.trim()) {
+        toast({
+          title: "Missing title",
+          description: "Please enter a proposal title.",
+          variant: "destructive",
+        })
+        setIsCreating(false) // Ensure button is re-enabled
+        return
+      }
 
-      // Ensure all client fields have values
-      const cleanClient: ProposalClient = {
-        company: client.company.trim(),
-        contactPerson: client.contactPerson.trim(),
-        email: client.email.trim(),
-        phone: client.phone.trim(),
-        address: client.address?.trim() || "",
-        industry: client.industry?.trim() || "",
-        targetAudience: client.targetAudience?.trim() || "",
-        campaignObjective: client.campaignObjective?.trim() || "",
+      if (proposalProducts.length === 0) {
+        toast({
+          title: "No products selected",
+          description: "Please select at least one product for the proposal.",
+          variant: "destructive",
+        })
+        setIsCreating(false) // Ensure button is re-enabled
+        return
+      }
+
+      let finalClientData: ProposalClient
+
+      if (clientSelectionMode === "new") {
+        // Validate new client fields
+        if (!client.company.trim() || !client.contactPerson.trim() || !client.email.trim()) {
+          toast({
+            title: "Missing client information",
+            description: "Please fill in the required client details.",
+            variant: "destructive",
+          })
+          setIsCreating(false) // Ensure button is re-enabled
+          return // Exit early if validation fails
+        }
+        setCreationStep("Creating new client record...")
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        // Create new client in client_db
+        const newClientId = await createClient({
+          name: client.contactPerson, // Map contactPerson to name for Client type
+          email: client.email,
+          phone: client.phone,
+          company: client.company,
+          address: client.address,
+          city: "", // Not in ProposalClient, default empty
+          state: "", // Not in ProposalClient, default empty
+          zipCode: "", // Not in ProposalClient, default empty
+          industry: client.industry,
+          notes: "", // Not in ProposalClient, default empty
+          status: "lead", // Default status for new clients
+        })
+        finalClientData = { ...client, id: newClientId } // Add the new ID to the client data for the proposal
+      } else {
+        // existing client
+        if (!selectedExistingClient) {
+          toast({
+            title: "No client selected",
+            description: "Please select an existing client.",
+            variant: "destructive",
+          })
+          setIsCreating(false) // Ensure button is re-enabled
+          return // Exit early if validation fails
+        }
+        finalClientData = {
+          company: selectedExistingClient.company || "",
+          contactPerson: selectedExistingClient.name || "",
+          email: selectedExistingClient.email || "",
+          phone: selectedExistingClient.phone || "",
+          address: selectedExistingClient.address || "",
+          industry: selectedExistingClient.industry || "",
+          targetAudience: "", // Not available in Client type
+          campaignObjective: "", // Not available in Client type
+          id: selectedExistingClient.id,
+        }
       }
 
       setCreationStep("Creating proposal document...")
@@ -166,7 +259,7 @@ export function CreateProposalDialog({
         await new Promise((resolve) => setTimeout(resolve, 300))
       }
 
-      await createProposal(title.trim(), cleanClient, proposalProducts, user.uid, {
+      await createProposal(title.trim(), finalClientData, proposalProducts, user.uid, {
         notes: notes.trim(),
         customMessage: customMessage.trim(),
         validUntil,
@@ -177,7 +270,7 @@ export function CreateProposalDialog({
       await new Promise((resolve) => setTimeout(resolve, 300))
 
       // Set success data and show success step
-      setSuccessData({ wasSent: sendEmail, clientEmail: client.email })
+      setSuccessData({ wasSent: sendEmail, clientEmail: finalClientData.email })
       setStep("success")
     } catch (error) {
       console.error("Error creating proposal:", error)
@@ -187,7 +280,7 @@ export function CreateProposalDialog({
         variant: "destructive",
       })
     } finally {
-      setIsCreating(false)
+      setIsCreating(false) // This will always run on success or error
       setCreationStep("")
     }
   }
@@ -219,6 +312,10 @@ export function CreateProposalDialog({
     setStep("details")
     setCreationStep("")
     setSuccessData({ wasSent: false, clientEmail: "" })
+    setClientSelectionMode("new") // Reset client selection mode
+    setSearchTerm("") // Clear search term
+    setSearchResults([]) // Clear search results
+    setSelectedExistingClient(null) // Clear selected existing client
   }
 
   const handleClose = () => {
@@ -275,90 +372,202 @@ export function CreateProposalDialog({
             </div>
 
             {/* Client Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Client Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="company">Company Name *</Label>
-                    <Input
-                      id="company"
-                      value={client.company}
-                      onChange={(e) => setClient((prev) => ({ ...prev, company: e.target.value }))}
-                      placeholder="Company name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="contactPerson">Contact Person *</Label>
-                    <Input
-                      id="contactPerson"
-                      value={client.contactPerson}
-                      onChange={(e) => setClient((prev) => ({ ...prev, contactPerson: e.target.value }))}
-                      placeholder="Contact person name"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={client.email}
-                      onChange={(e) => setClient((prev) => ({ ...prev, email: e.target.value }))}
-                      placeholder="Email address"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
-                    <Input
-                      id="phone"
-                      value={client.phone}
-                      onChange={(e) => setClient((prev) => ({ ...prev, phone: e.target.value }))}
-                      placeholder="Phone number"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="address">Address</Label>
-                  <Input
-                    id="address"
-                    value={client.address}
-                    onChange={(e) => setClient((prev) => ({ ...prev, address: e.target.value }))}
-                    placeholder="Company address"
-                  />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="industry">Industry</Label>
-                    <Input
-                      id="industry"
-                      value={client.industry}
-                      onChange={(e) => setClient((prev) => ({ ...prev, industry: e.target.value }))}
-                      placeholder="Industry type"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="targetAudience">Target Audience</Label>
-                    <Input
-                      id="targetAudience"
-                      value={client.targetAudience}
-                      onChange={(e) => setClient((prev) => ({ ...prev, targetAudience: e.target.value }))}
-                      placeholder="Target audience"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="campaignObjective">Campaign Objective</Label>
-                    <Input
-                      id="campaignObjective"
-                      value={client.campaignObjective}
-                      onChange={(e) => setClient((prev) => ({ ...prev, campaignObjective: e.target.value }))}
-                      placeholder="Campaign objective"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <Tabs
+              value={clientSelectionMode}
+              onValueChange={(value) => {
+                setClientSelectionMode(value as "new" | "existing")
+                // Clear client data when switching modes
+                setClient({
+                  company: "",
+                  contactPerson: "",
+                  email: "",
+                  phone: "",
+                  address: "",
+                  industry: "",
+                  targetAudience: "",
+                  campaignObjective: "",
+                })
+                setSelectedExistingClient(null)
+                setSearchTerm("")
+                setSearchResults([])
+              }}
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="new">New Client</TabsTrigger>
+                <TabsTrigger value="existing">Existing Client</TabsTrigger>
+              </TabsList>
+              <TabsContent value="new" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">New Client Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="company">Company Name *</Label>
+                        <Input
+                          id="company"
+                          value={client.company}
+                          onChange={(e) => setClient((prev) => ({ ...prev, company: e.target.value }))}
+                          placeholder="Company name"
+                          disabled={clientSelectionMode === "existing"}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="contactPerson">Contact Person *</Label>
+                        <Input
+                          id="contactPerson"
+                          value={client.contactPerson}
+                          onChange={(e) => setClient((prev) => ({ ...prev, contactPerson: e.target.value }))}
+                          placeholder="Contact person name"
+                          disabled={clientSelectionMode === "existing"}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email *</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={client.email}
+                          onChange={(e) => setClient((prev) => ({ ...prev, email: e.target.value }))}
+                          placeholder="Email address"
+                          disabled={clientSelectionMode === "existing"}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="phone">Phone</Label>
+                        <Input
+                          id="phone"
+                          value={client.phone}
+                          onChange={(e) => setClient((prev) => ({ ...prev, phone: e.target.value }))}
+                          placeholder="Phone number"
+                          disabled={clientSelectionMode === "existing"}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="address">Address</Label>
+                      <Input
+                        id="address"
+                        value={client.address}
+                        onChange={(e) => setClient((prev) => ({ ...prev, address: e.target.value }))}
+                        placeholder="Company address"
+                        disabled={clientSelectionMode === "existing"}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="industry">Industry</Label>
+                        <Input
+                          id="industry"
+                          value={client.industry}
+                          onChange={(e) => setClient((prev) => ({ ...prev, industry: e.target.value }))}
+                          placeholder="Industry type"
+                          disabled={clientSelectionMode === "existing"}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="targetAudience">Target Audience</Label>
+                        <Input
+                          id="targetAudience"
+                          value={client.targetAudience}
+                          onChange={(e) => setClient((prev) => ({ ...prev, targetAudience: e.target.value }))}
+                          placeholder="Target audience"
+                          disabled={clientSelectionMode === "existing"}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="campaignObjective">Campaign Objective</Label>
+                        <Input
+                          id="campaignObjective"
+                          value={client.campaignObjective}
+                          onChange={(e) => setClient((prev) => ({ ...prev, campaignObjective: e.target.value }))}
+                          placeholder="Campaign objective"
+                          disabled={clientSelectionMode === "existing"}
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              <TabsContent value="existing" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Select Existing Client</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="relative">
+                      <Input
+                        placeholder="Search clients by name, email, company, or phone..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pr-10"
+                      />
+                      {isSearchingClients && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
+                      )}
+                    </div>
+                    {searchTerm.trim() && searchResults.length > 0 && (
+                      <ScrollArea className="h-[200px] rounded-md border">
+                        <div className="p-4">
+                          {searchResults.map((result) => (
+                            <div
+                              key={result.id}
+                              className="flex items-center justify-between py-2 px-3 hover:bg-gray-100 cursor-pointer rounded-md"
+                              onClick={() => handleClientSelect(result)}
+                            >
+                              <div>
+                                <p className="font-medium">
+                                  {result.name} ({result.company})
+                                </p>
+                                <p className="text-sm text-gray-500">{result.email}</p>
+                              </div>
+                              {selectedExistingClient?.id === result.id && (
+                                <CheckCircle className="h-5 w-5 text-green-500" />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                    {searchTerm.trim() && !isSearchingClients && searchResults.length === 0 && (
+                      <p className="text-sm text-gray-500 text-center">No clients found matching your search.</p>
+                    )}
+
+                    {selectedExistingClient && (
+                      <div className="space-y-2 mt-4 p-4 border rounded-md bg-gray-50">
+                        <h4 className="font-semibold">Selected Client:</h4>
+                        <p>
+                          <strong>Company:</strong> {selectedExistingClient.company}
+                        </p>
+                        <p>
+                          <strong>Contact:</strong> {selectedExistingClient.name}
+                        </p>
+                        <p>
+                          <strong>Email:</strong> {selectedExistingClient.email}
+                        </p>
+                        {selectedExistingClient.phone && (
+                          <p>
+                            <strong>Phone:</strong> {selectedExistingClient.phone}
+                          </p>
+                        )}
+                        {selectedExistingClient.address && (
+                          <p>
+                            <strong>Address:</strong> {selectedExistingClient.address}
+                          </p>
+                        )}
+                        {selectedExistingClient.industry && (
+                          <p>
+                            <strong>Industry:</strong> {selectedExistingClient.industry}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
 
             {/* Selected Products */}
             <Card>

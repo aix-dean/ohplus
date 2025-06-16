@@ -28,6 +28,7 @@ export async function createCampaignFromProposal(proposal: Proposal, userId: str
       client: proposal.client,
       status: proposal.status === "sent" ? "proposal_sent" : "proposal_draft",
       proposalId: proposal.id,
+      quotationIds: [], // Initialize empty array for quotation IDs
       totalAmount: proposal.totalAmount,
       createdBy: userId,
       createdAt: serverTimestamp() as any,
@@ -47,9 +48,54 @@ export async function createCampaignFromProposal(proposal: Proposal, userId: str
     }
 
     const docRef = await addDoc(collection(db, "campaigns"), campaignData)
+
+    // Update the proposal with the campaign ID
+    if (proposal.id) {
+      const proposalRef = doc(db, "proposals", proposal.id)
+      await updateDoc(proposalRef, {
+        campaignId: docRef.id,
+        updatedAt: serverTimestamp(),
+      })
+    }
+
     return docRef.id
   } catch (error) {
     console.error("Error creating campaign:", error)
+    throw error
+  }
+}
+
+// Add quotation to campaign
+export async function addQuotationToCampaign(campaignId: string, quotationId: string, userId: string): Promise<void> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const campaignRef = doc(db, "campaigns", campaignId)
+
+    // Add quotation ID to the campaign's quotationIds array
+    await updateDoc(campaignRef, {
+      quotationIds: arrayUnion(quotationId),
+      updatedAt: serverTimestamp(),
+    })
+
+    // Add timeline event
+    const timelineEvent: CampaignTimelineEvent = {
+      id: `timeline_${Date.now()}`,
+      type: "quotation_created",
+      title: "Quotation Created",
+      description: `Quotation ${quotationId} was created and linked to this campaign`,
+      userId: userId || "system",
+      userName: "System",
+      timestamp: new Date(),
+    }
+
+    await updateDoc(campaignRef, {
+      timeline: arrayUnion(timelineEvent),
+    })
+  } catch (error) {
+    console.error("Error adding quotation to campaign:", error)
     throw error
   }
 }
@@ -79,6 +125,7 @@ export async function getCampaignById(campaignId: string): Promise<Campaign | nu
           ...event,
           timestamp: event.timestamp instanceof Timestamp ? event.timestamp.toDate() : new Date(event.timestamp),
         })) || [],
+      quotationIds: data.quotationIds || [],
     } as Campaign
   } catch (error) {
     console.error("Error fetching campaign by ID:", error)
@@ -111,6 +158,7 @@ export async function getCampaignsByUserId(userId: string): Promise<Campaign[]> 
             ...event,
             timestamp: event.timestamp instanceof Timestamp ? event.timestamp.toDate() : new Date(event.timestamp),
           })) || [],
+        quotationIds: data.quotationIds || [],
       } as Campaign)
     })
 
@@ -156,6 +204,7 @@ export async function getCampaigns(filters?: {
             ...event,
             timestamp: event.timestamp instanceof Timestamp ? event.timestamp.toDate() : new Date(event.timestamp),
           })) || [],
+        quotationIds: data.quotationIds || [],
       } as Campaign)
     })
 
@@ -195,6 +244,7 @@ export async function getCampaignByProposalId(proposalId: string): Promise<Campa
           ...event,
           timestamp: event.timestamp instanceof Timestamp ? event.timestamp.toDate() : new Date(event.timestamp),
         })) || [],
+      quotationIds: data.quotationIds || [],
     } as Campaign
   } catch (error) {
     console.error("Error fetching campaign by proposal ID:", error)

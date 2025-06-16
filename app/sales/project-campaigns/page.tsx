@@ -93,7 +93,7 @@ function CampaignsPageContent() {
   const getStatusConfig = (status: Campaign["status"]) => {
     switch (status) {
       case "proposal_draft":
-        return { color: "bg-slate-50 text-slate-700 border-slate-200", icon: Clock, label: "Draft" }
+        return { color: "bg-gray-100 text-gray-700 border-gray-200", icon: Clock, label: "Draft" }
       case "proposal_sent":
         return { color: "bg-blue-50 text-blue-700 border-blue-200", icon: Eye, label: "Proposal Sent" }
       case "proposal_accepted":
@@ -111,9 +111,9 @@ function CampaignsPageContent() {
       case "campaign_active":
         return { color: "bg-indigo-50 text-indigo-700 border-indigo-200", icon: TrendingUp, label: "Active" }
       case "campaign_completed":
-        return { color: "bg-gray-50 text-gray-700 border-gray-200", icon: CheckCircle, label: "Completed" }
+        return { color: "bg-gray-100 text-gray-700 border-gray-200", icon: CheckCircle, label: "Completed" }
       default:
-        return { color: "bg-slate-50 text-slate-700 border-slate-200", icon: Clock, label: "Unknown" }
+        return { color: "bg-gray-100 text-gray-700 border-gray-200", icon: Clock, label: "Unknown" }
     }
   }
 
@@ -133,7 +133,7 @@ function CampaignsPageContent() {
   }
 
   const handleViewCampaign = (campaignId: string) => {
-    router.push(`/sales/campaigns/${campaignId}`)
+    router.push(`/sales/project-campaigns/${campaignId}`)
   }
 
   const formatDate = (date: Date | undefined) => {
@@ -149,7 +149,7 @@ function CampaignsPageContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white">
+      <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto p-6">
           <div className="animate-pulse space-y-8">
             <div className="h-8 bg-gray-200 rounded w-1/4"></div>
@@ -166,43 +166,47 @@ function CampaignsPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-6">
         {/* Header Section */}
         <div className="mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-8">
             <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-3">Campaign Management</h1>
-              <p className="text-lg text-gray-600">Track and manage your campaigns from proposal to completion</p>
+              <h1 className="text-4xl font-bold text-gray-900 mb-3">Project Campaign Management</h1>
+              <p className="text-lg text-gray-600">
+                Track and manage your project campaigns from proposal to completion
+              </p>
             </div>
             <Button
               onClick={() => router.push("/sales/dashboard")}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200 px-6 py-3"
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all duration-200 px-6 py-3"
               size="lg"
             >
               <Plus className="mr-2 h-5 w-5" />
-              Create New Campaign
+              Create New Project Campaign
             </Button>
           </div>
 
           {/* Enhanced Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 hover:shadow-xl transition-all duration-200">
+            <Card className="border shadow-sm bg-white hover:shadow-md transition-all duration-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total Campaigns</p>
+                    <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                      Total Project Campaigns
+                    </p>
                     <p className="text-3xl font-bold text-gray-900 mt-2">{stats.total}</p>
                     <p className="text-sm text-gray-500 mt-1">All time</p>
                   </div>
-                  <div className="h-14 w-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <div className="h-14 w-14 bg-blue-600 rounded-xl flex items-center justify-center shadow-sm">
                     <BarChart3 className="h-7 w-7 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-emerald-50 hover:shadow-xl transition-all duration-200">
+            <Card className="border shadow-sm bg-white hover:shadow-md transition-all duration-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -210,14 +214,14 @@ function CampaignsPageContent() {
                     <p className="text-3xl font-bold text-emerald-600 mt-2">{stats.active}</p>
                     <p className="text-sm text-emerald-600 mt-1">In progress</p>
                   </div>
-                  <div className="h-14 w-14 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <div className="h-14 w-14 bg-emerald-600 rounded-xl flex items-center justify-center shadow-sm">
                     <Activity className="h-7 w-7 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-green-50 hover:shadow-xl transition-all duration-200">
+            <Card className="border shadow-sm bg-white hover:shadow-md transition-all duration-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -225,14 +229,14 @@ function CampaignsPageContent() {
                     <p className="text-3xl font-bold text-green-600 mt-2">{stats.completed}</p>
                     <p className="text-sm text-green-600 mt-1">Finished</p>
                   </div>
-                  <div className="h-14 w-14 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <div className="h-14 w-14 bg-green-600 rounded-xl flex items-center justify-center shadow-sm">
                     <CheckCircle className="h-7 w-7 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-purple-50 hover:shadow-xl transition-all duration-200">
+            <Card className="border shadow-sm bg-white hover:shadow-md transition-all duration-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -240,7 +244,7 @@ function CampaignsPageContent() {
                     <p className="text-3xl font-bold text-purple-600 mt-2">₱{stats.totalValue.toLocaleString()}</p>
                     <p className="text-sm text-purple-600 mt-1">Revenue</p>
                   </div>
-                  <div className="h-14 w-14 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <div className="h-14 w-14 bg-purple-600 rounded-xl flex items-center justify-center shadow-sm">
                     <DollarSign className="h-7 w-7 text-white" />
                   </div>
                 </div>
@@ -249,22 +253,22 @@ function CampaignsPageContent() {
           </div>
 
           {/* Enhanced Filters */}
-          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+          <Card className="border shadow-sm bg-white">
             <CardContent className="p-6">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <Input
-                    placeholder="Search campaigns, clients, or descriptions..."
+                    placeholder="Search project campaigns, clients, or descriptions..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-12 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 bg-white/50"
+                    className="pl-12 h-12 border-gray-200 focus:border-blue-500 focus:ring-blue-500 bg-white"
                   />
                 </div>
                 <div className="flex items-center gap-3">
                   <Filter className="h-5 w-5 text-gray-400" />
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-56 h-12 border-gray-200 bg-white/50">
+                    <SelectTrigger className="w-56 h-12 border-gray-200 bg-white">
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -287,27 +291,27 @@ function CampaignsPageContent() {
 
         {/* Campaigns List */}
         {!filteredCampaigns || filteredCampaigns.length === 0 ? (
-          <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+          <Card className="border shadow-sm bg-white">
             <CardContent className="text-center py-20">
-              <div className="mx-auto w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mb-6">
+              <div className="mx-auto w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-6">
                 <AlertCircle className="h-10 w-10 text-gray-400" />
               </div>
               <h3 className="text-2xl font-semibold text-gray-900 mb-3">
-                {searchTerm || statusFilter !== "all" ? "No campaigns found" : "No campaigns yet"}
+                {searchTerm || statusFilter !== "all" ? "No project campaigns found" : "No project campaigns yet"}
               </h3>
               <p className="text-gray-600 mb-8 max-w-md mx-auto">
                 {searchTerm || statusFilter !== "all"
                   ? "Try adjusting your search or filter criteria to find what you're looking for"
-                  : "Create your first campaign to start tracking your sales pipeline"}
+                  : "Create your first project campaign to start tracking your sales pipeline"}
               </p>
               {!searchTerm && statusFilter === "all" && (
                 <Button
                   onClick={() => router.push("/sales/dashboard")}
-                  className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                  className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
                   size="lg"
                 >
                   <Plus className="mr-2 h-5 w-5" />
-                  Create Your First Campaign
+                  Create Your First Project Campaign
                 </Button>
               )}
             </CardContent>
@@ -322,7 +326,7 @@ function CampaignsPageContent() {
               return (
                 <Card
                   key={campaign.id}
-                  className="border-0 shadow-lg hover:shadow-xl transition-all duration-200 cursor-pointer bg-white/80 backdrop-blur-sm"
+                  className="border shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer bg-white"
                 >
                   <CardContent className="p-6" onClick={() => handleViewCampaign(campaign.id)}>
                     <div className="flex justify-between items-start mb-4">
@@ -369,11 +373,11 @@ function CampaignsPageContent() {
           </div>
         ) : (
           // Enhanced Desktop Table View
-          <Card className="border-0 shadow-lg overflow-hidden bg-white/80 backdrop-blur-sm">
+          <Card className="border shadow-sm overflow-hidden bg-white">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-                  <TableHead className="font-bold text-gray-900 py-4">Campaign</TableHead>
+                <TableRow className="bg-gray-50 border-b border-gray-200">
+                  <TableHead className="font-bold text-gray-900 py-4">Project Campaign</TableHead>
                   <TableHead className="font-bold text-gray-900">Client</TableHead>
                   <TableHead className="font-bold text-gray-900">Status</TableHead>
                   <TableHead className="font-bold text-gray-900 text-center">Products</TableHead>
@@ -389,7 +393,7 @@ function CampaignsPageContent() {
                   return (
                     <TableRow
                       key={campaign.id}
-                      className="cursor-pointer hover:bg-blue-50/50 transition-colors border-b border-gray-100 group"
+                      className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100 group"
                       onClick={() => handleViewCampaign(campaign.id)}
                     >
                       <TableCell className="py-6">
@@ -402,7 +406,7 @@ function CampaignsPageContent() {
                       </TableCell>
                       <TableCell className="py-6">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center">
+                          <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center">
                             <Building2 className="h-5 w-5 text-gray-600" />
                           </div>
                           <div>

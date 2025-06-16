@@ -1,6 +1,7 @@
-import { collection, addDoc, serverTimestamp, getDoc, doc } from "firebase/firestore"
+import { collection, addDoc, serverTimestamp, getDoc, doc, getDocs, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import jsPDF from "jspdf"
+import { addQuotationToCampaign } from "@/lib/campaign-service"
 
 export interface Quotation {
   id?: string
@@ -22,6 +23,8 @@ export interface Quotation {
   created_by?: string
   client_name?: string
   client_email?: string
+  campaignId?: string // Add campaign ID field
+  proposalId?: string // Add proposal ID field
 }
 
 // Create a new quotation
@@ -37,6 +40,17 @@ export async function createQuotation(quotationData: Omit<Quotation, "id">): Pro
 
     const docRef = await addDoc(collection(db, "quotations"), newQuotation)
     console.log("Quotation created with ID:", docRef.id)
+
+    // If there's a campaign ID, add this quotation to the campaign
+    if (quotationData.campaignId) {
+      try {
+        await addQuotationToCampaign(quotationData.campaignId, docRef.id, quotationData.created_by || "system")
+      } catch (error) {
+        console.error("Error linking quotation to campaign:", error)
+        // Don't throw here, as the quotation was created successfully
+      }
+    }
+
     return docRef.id
   } catch (error) {
     console.error("Error creating quotation:", error)
@@ -252,5 +266,29 @@ export async function updateQuotationStatus(quotationId: string, status: string)
   } catch (error) {
     console.error("Error updating quotation status:", error)
     throw error
+  }
+}
+
+// Get quotations by campaign ID
+export async function getQuotationsByCampaignId(campaignId: string): Promise<Quotation[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const quotationsRef = collection(db, "quotations")
+    const q = query(quotationsRef, where("campaignId", "==", campaignId))
+
+    const querySnapshot = await getDocs(q)
+    const quotations: Quotation[] = []
+
+    querySnapshot.forEach((doc) => {
+      quotations.push({ id: doc.id, ...doc.data() } as Quotation)
+    })
+
+    return quotations
+  } catch (error) {
+    console.error("Error fetching quotations by campaign ID:", error)
+    return []
   }
 }

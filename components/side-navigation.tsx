@@ -20,6 +20,7 @@ import {
   ChevronLeft,
   ChevronRight,
   TrendingUp,
+  ClipboardList,
 } from "lucide-react"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
@@ -46,7 +47,7 @@ const navigationItems = [
     icon: BarChart3,
     items: [
       { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
-      { title: "Campaigns", href: "/sales/campaigns", icon: TrendingUp },
+      { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
       { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
       { title: "Clients", href: "/sales/clients", icon: Users },
       { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
@@ -102,7 +103,10 @@ export function SideNavigation() {
   const { unreadCount } = useUnreadMessages()
 
   // Determine the current section from the pathname
-  const currentSection = pathname?.split("/")[1] || "dashboard"
+  let currentSection = pathname?.split("/")[1] || "dashboard"
+  if (pathname?.startsWith("/sales/project-campaigns")) {
+    currentSection = "sales"
+  }
 
   // Find the navigation item for the current section
   const currentNavItem = navigationItems.find((item) => item.section === currentSection)
@@ -171,10 +175,9 @@ export function SideNavigation() {
               </div>
               <div className="p-1">
                 {[
-                  { title: "Campaigns", href: "/sales/campaigns", icon: TrendingUp },
-                  { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
-                  { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
-                  { title: "Clients", href: "/sales/clients", icon: Users },
+                  { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
+                  { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
+                  { title: "Bulletin Board", href: "/sales/bulletin-board", icon: ClipboardList }, // New item
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(item.href)
@@ -211,7 +214,9 @@ export function SideNavigation() {
               </div>
               <div className="p-1">
                 {[
-                  { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
+                  { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
+                  { title: "Clients", href: "/sales/clients", icon: Users },
+                  { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
                   { title: "Planner", href: "/sales/planner", icon: Calendar },
                   { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
                 ].map((item) => {

@@ -143,6 +143,8 @@ export default function GenerateQuotationPage() {
           created_by: "current_user",
           client_name: proposal.client.contactPerson,
           client_email: proposal.client.email,
+          campaignId: proposal.campaignId, // Include campaign ID from proposal
+          proposalId: proposal.id, // Include proposal ID
         }
 
         return await createQuotation(quotationData)
@@ -398,7 +400,7 @@ export default function GenerateQuotationPage() {
                   )}
 
                   {/* Product specs */}
-                  <div className="space-y-1 text-xs">
+                  <div className="space-y-1 text-xs sm:text-sm">
                     <div className="flex items-center flex-wrap gap-1">
                       <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
                         {product.type}

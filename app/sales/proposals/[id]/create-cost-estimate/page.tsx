@@ -30,6 +30,9 @@ export default function CreateCostEstimatePage() {
           setProposal(proposalData)
 
           if (proposalData) {
+            // Clear any existing line items first
+            setLineItems([])
+
             // Generate initial line items from proposal
             const initialItems: CostEstimateLineItem[] = proposalData.products.map((product, index) => ({
               id: `item_${index + 1}`,

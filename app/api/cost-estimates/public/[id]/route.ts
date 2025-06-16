@@ -1,24 +1,37 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { initializeApp, getApps } from "firebase/app"
-import { getFirestore, doc, getDoc } from "firebase/firestore"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 
-// Initialize Firebase for server-side use
-function getFirebaseApp() {
-  const firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  }
+// Server-side Firebase initialization
+async function getFirestoreDb() {
+  try {
+    // Dynamically import Firebase modules
+    const { initializeApp, getApps } = await import("firebase/app")
+    const { getFirestore } = await import("firebase/firestore")
 
-  const existingApps = getApps()
-  if (existingApps.length === 0) {
-    return initializeApp(firebaseConfig)
+    const firebaseConfig = {
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    }
+
+    // Check if Firebase is already initialized
+    const existingApps = getApps()
+    let app
+
+    if (existingApps.length === 0) {
+      app = initializeApp(firebaseConfig)
+    } else {
+      app = existingApps[0]
+    }
+
+    return getFirestore(app)
+  } catch (error) {
+    console.error("Firebase initialization error:", error)
+    throw new Error("Failed to initialize Firebase")
   }
-  return existingApps[0]
 }
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
@@ -29,9 +42,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Cost estimate ID is required" }, { status: 400 })
     }
 
-    // Initialize Firebase app and Firestore
-    const app = getFirebaseApp()
-    const db = getFirestore(app)
+    // Initialize Firestore for server-side use
+    const db = await getFirestoreDb()
+    const { doc, getDoc } = await import("firebase/firestore")
 
     // Get cost estimate directly from Firestore
     const costEstimateDoc = await getDoc(doc(db, "costEstimates", costEstimateId))
@@ -91,9 +104,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       return NextResponse.json({ error: "Cost estimate ID and password are required" }, { status: 400 })
     }
 
-    // Initialize Firebase app and Firestore
-    const app = getFirebaseApp()
-    const db = getFirestore(app)
+    // Initialize Firestore for server-side use
+    const db = await getFirestoreDb()
+    const { doc, getDoc } = await import("firebase/firestore")
 
     // Get cost estimate directly from Firestore
     const costEstimateDoc = await getDoc(doc(db, "costEstimates", costEstimateId))

@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -51,45 +51,48 @@ export function CreateCostEstimateDialog({
   const [step, setStep] = useState<"edit" | "success">("edit")
 
   // Initialize with default line items based on proposal
-  useState(() => {
-    const defaultItems: CostEstimateLineItem[] = proposal.products.map((product, index) => ({
-      id: `item_${index + 1}`,
-      description: `${product.name} - ${product.location}`,
-      quantity: 1,
-      unitPrice: product.price,
-      totalPrice: product.price,
-      category: "media_cost" as const,
-    }))
+  useEffect(() => {
+    if (proposal) {
+      // Generate default line items based on proposal products only
+      const defaultItems: CostEstimateLineItem[] = proposal.products.map((product, index) => ({
+        id: `item_${index + 1}`,
+        description: `${product.name} - ${product.location}`,
+        quantity: 1,
+        unitPrice: product.price,
+        totalPrice: product.price,
+        category: "media_cost" as const,
+      }))
 
-    const additionalItems: CostEstimateLineItem[] = [
-      {
-        id: `item_${defaultItems.length + 1}`,
-        description: "Creative Design & Production",
-        quantity: 1,
-        unitPrice: 0,
-        totalPrice: 0,
-        category: "production_cost" as const,
-      },
-      {
-        id: `item_${defaultItems.length + 2}`,
-        description: "Installation & Setup",
-        quantity: 1,
-        unitPrice: 0,
-        totalPrice: 0,
-        category: "installation_cost" as const,
-      },
-      {
-        id: `item_${defaultItems.length + 3}`,
-        description: "Maintenance & Monitoring",
-        quantity: 1,
-        unitPrice: 0,
-        totalPrice: 0,
-        category: "maintenance_cost" as const,
-      },
-    ]
+      const additionalItems: CostEstimateLineItem[] = [
+        {
+          id: `item_${defaultItems.length + 1}`,
+          description: "Creative Design & Production",
+          quantity: 1,
+          unitPrice: 0,
+          totalPrice: 0,
+          category: "production_cost" as const,
+        },
+        {
+          id: `item_${defaultItems.length + 2}`,
+          description: "Installation & Setup",
+          quantity: 1,
+          unitPrice: 0,
+          totalPrice: 0,
+          category: "installation_cost" as const,
+        },
+        {
+          id: `item_${defaultItems.length + 3}`,
+          description: "Maintenance & Monitoring",
+          quantity: 1,
+          unitPrice: 0,
+          totalPrice: 0,
+          category: "maintenance_cost" as const,
+        },
+      ]
 
-    setLineItems([...defaultItems, ...additionalItems])
-  })
+      setLineItems([...defaultItems, ...additionalItems])
+    }
+  }, [proposal])
 
   const addLineItem = () => {
     const newItem: CostEstimateLineItem = {

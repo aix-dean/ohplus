@@ -80,6 +80,12 @@ const features = [
         description: "Schedule and plan sales activities with weather integration",
         status: "active",
       },
+      {
+        title: "Project Campaigns",
+        href: "/sales/project-campaigns",
+        description: "Manage customer bookings and reservations",
+        status: "active",
+      },
     ],
   },
   {

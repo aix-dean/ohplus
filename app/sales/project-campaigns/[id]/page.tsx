@@ -29,7 +29,9 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { getCampaignById, getCampaignTimeline } from "@/lib/campaign-service"
+import { getQuotationsByCampaignId } from "@/lib/quotation-service"
 import type { Campaign } from "@/lib/types/campaign"
+import type { Quotation } from "@/lib/quotation-service"
 import { useToast } from "@/hooks/use-toast"
 
 export default function CampaignDetailsPage() {
@@ -37,6 +39,7 @@ export default function CampaignDetailsPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [campaign, setCampaign] = useState<Campaign | null>(null)
+  const [quotations, setQuotations] = useState<Quotation[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -54,6 +57,10 @@ export default function CampaignDetailsPage() {
       if (campaignData) {
         const timeline = await getCampaignTimeline(params.id as string)
         setCampaign((prev) => (prev ? { ...prev, timeline } : null))
+
+        // Fetch quotations
+        const quotationsData = await getQuotationsByCampaignId(params.id as string)
+        setQuotations(quotationsData)
       }
     } catch (error) {
       console.error("Error fetching campaign:", error)
@@ -70,47 +77,39 @@ export default function CampaignDetailsPage() {
   const getStatusConfig = (status: Campaign["status"]) => {
     switch (status) {
       case "proposal_draft":
-        return { color: "bg-slate-50 text-slate-700 border-slate-200", icon: FileText, label: "Draft" }
+        return { color: "bg-gray-100 text-gray-700 border-gray-200", icon: FileText, label: "Draft" }
       case "proposal_sent":
-        return { color: "bg-blue-50 text-blue-700 border-blue-200", icon: Eye, label: "Proposal Sent" }
+        return { color: "bg-gray-100 text-gray-700 border-gray-200", icon: Eye, label: "Proposal Sent" }
       case "proposal_accepted":
-        return {
-          color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-          icon: CheckCircle,
-          label: "Proposal Accepted",
-        }
+        return { color: "bg-green-100 text-green-700 border-green-200", icon: CheckCircle, label: "Proposal Accepted" }
       case "cost_estimate_pending":
-        return {
-          color: "bg-amber-50 text-amber-700 border-amber-200",
-          icon: Calculator,
-          label: "Cost Estimate Pending",
-        }
+        return { color: "bg-gray-100 text-gray-700 border-gray-200", icon: Calculator, label: "Cost Estimate Pending" }
       case "cost_estimate_approved":
         return {
-          color: "bg-purple-50 text-purple-700 border-purple-200",
+          color: "bg-green-100 text-green-700 border-green-200",
           icon: CheckCircle,
           label: "Cost Estimate Approved",
         }
       case "quotation_pending":
-        return { color: "bg-indigo-50 text-indigo-700 border-indigo-200", icon: Receipt, label: "Quotation Pending" }
+        return { color: "bg-gray-100 text-gray-700 border-gray-200", icon: Receipt, label: "Quotation Pending" }
       case "quotation_sent":
-        return { color: "bg-blue-50 text-blue-700 border-blue-200", icon: Receipt, label: "Quotation Sent" }
+        return { color: "bg-gray-100 text-gray-700 border-gray-200", icon: Receipt, label: "Quotation Sent" }
       case "quotation_accepted":
-        return { color: "bg-green-50 text-green-700 border-green-200", icon: CheckCircle, label: "Quotation Accepted" }
+        return { color: "bg-green-100 text-green-700 border-green-200", icon: CheckCircle, label: "Quotation Accepted" }
       case "booking_confirmed":
         return {
-          color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+          color: "bg-green-100 text-green-700 border-green-200",
           icon: BookOpen,
           label: "Booking Confirmed",
         }
       case "campaign_active":
-        return { color: "bg-indigo-50 text-indigo-700 border-indigo-200", icon: TrendingUp, label: "Active" }
+        return { color: "bg-blue-100 text-blue-700 border-blue-200", icon: TrendingUp, label: "Active" }
       case "campaign_completed":
-        return { color: "bg-gray-50 text-gray-700 border-gray-200", icon: CheckCircle, label: "Completed" }
+        return { color: "bg-gray-100 text-gray-700 border-gray-200", icon: CheckCircle, label: "Completed" }
       case "campaign_cancelled":
-        return { color: "bg-red-50 text-red-700 border-red-200", icon: AlertCircle, label: "Cancelled" }
+        return { color: "bg-red-100 text-red-700 border-red-200", icon: AlertCircle, label: "Cancelled" }
       default:
-        return { color: "bg-slate-50 text-slate-700 border-slate-200", icon: AlertCircle, label: "Unknown" }
+        return { color: "bg-gray-100 text-gray-700 border-gray-200", icon: AlertCircle, label: "Unknown" }
     }
   }
 
@@ -132,7 +131,7 @@ export default function CampaignDetailsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white">
+      <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto p-4 md:p-6">
           <div className="animate-pulse space-y-6">
             <div className="h-10 bg-gray-200 rounded-lg w-1/4"></div>
@@ -154,22 +153,22 @@ export default function CampaignDetailsPage() {
 
   if (!campaign) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white">
+      <div className="min-h-screen bg-gray-50">
         <div className="max-w-7xl mx-auto p-4 md:p-6">
           <div className="text-center py-16">
             <div className="mx-auto w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mb-4">
               <AlertCircle className="h-8 w-8 text-gray-400" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Campaign Not Found</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Project Campaign Not Found</h2>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              The campaign you're looking for doesn't exist or has been removed.
+              The project campaign you're looking for doesn't exist or has been removed.
             </p>
             <Button
-              onClick={() => router.push("/sales/campaigns")}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md hover:shadow-lg transition-all duration-200"
+              onClick={() => router.push("/sales/project-campaigns")}
+              className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Campaigns
+              Back to Project Campaigns
             </Button>
           </div>
         </div>
@@ -181,7 +180,7 @@ export default function CampaignDetailsPage() {
   const StatusIcon = statusConfig.icon
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-white">
+    <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6">
         {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
@@ -189,17 +188,17 @@ export default function CampaignDetailsPage() {
             variant="ghost"
             size="sm"
             className="h-7 px-2 text-gray-500 hover:text-gray-900"
-            onClick={() => router.push("/sales/campaigns")}
+            onClick={() => router.push("/sales/project-campaigns")}
           >
-            Campaigns
+            Project Campaigns
           </Button>
           <ChevronRight className="h-3 w-3" />
-          <span className="font-medium text-gray-900">Campaign Details</span>
+          <span className="font-medium text-gray-900">Project Campaign Details</span>
         </div>
 
         {/* Header Card */}
-        <Card className="border-0 shadow-md mb-6 overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4">
+        <Card className="border shadow-sm mb-6 overflow-hidden">
+          <div className="bg-blue-600 p-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h1 className="text-xl md:text-2xl font-bold text-white mb-1">{campaign.title}</h1>
@@ -230,7 +229,7 @@ export default function CampaignDetailsPage() {
           {/* Key Campaign Info */}
           <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x">
             <div className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center">
+              <div className="h-10 w-10 bg-white border border-gray-200 rounded-full flex items-center justify-center">
                 <DollarSign className="h-5 w-5 text-green-600" />
               </div>
               <div>
@@ -239,7 +238,7 @@ export default function CampaignDetailsPage() {
               </div>
             </div>
             <div className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
+              <div className="h-10 w-10 bg-white border border-gray-200 rounded-full flex items-center justify-center">
                 <User className="h-5 w-5 text-blue-600" />
               </div>
               <div>
@@ -249,7 +248,7 @@ export default function CampaignDetailsPage() {
               </div>
             </div>
             <div className="p-4 flex items-center gap-3">
-              <div className="h-10 w-10 bg-purple-100 rounded-full flex items-center justify-center">
+              <div className="h-10 w-10 bg-white border border-gray-200 rounded-full flex items-center justify-center">
                 <Activity className="h-5 w-5 text-purple-600" />
               </div>
               <div>
@@ -266,11 +265,11 @@ export default function CampaignDetailsPage() {
           {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
             {/* Campaign Overview */}
-            <Card className="border-0 shadow-md">
+            <Card className="border shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
                   <FileText className="h-4 w-4 text-blue-600" />
-                  Campaign Overview
+                  Project Campaign Overview
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -284,7 +283,7 @@ export default function CampaignDetailsPage() {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-3">
+                  <div className="bg-white border border-gray-200 rounded-lg p-3">
                     <h4 className="text-sm font-medium text-gray-900 mb-1 flex items-center gap-2">
                       <DollarSign className="h-3 w-3 text-green-600" />
                       Total Amount
@@ -292,7 +291,7 @@ export default function CampaignDetailsPage() {
                     <p className="text-lg font-bold text-green-600">₱{(campaign.totalAmount || 0).toLocaleString()}</p>
                   </div>
 
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3">
+                  <div className="bg-white border border-gray-200 rounded-lg p-3">
                     <h4 className="text-sm font-medium text-gray-900 mb-1 flex items-center gap-2">
                       <Activity className="h-3 w-3 text-blue-600" />
                       Current Status
@@ -307,7 +306,7 @@ export default function CampaignDetailsPage() {
             </Card>
 
             {/* Client Information */}
-            <Card className="border-0 shadow-md">
+            <Card className="border shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
                   <User className="h-4 w-4 text-indigo-600" />
@@ -315,9 +314,9 @@ export default function CampaignDetailsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-lg p-4">
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="h-10 w-10 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-full flex items-center justify-center shadow-md">
+                    <div className="h-10 w-10 bg-blue-600 rounded-full flex items-center justify-center shadow-md">
                       <User className="h-5 w-5 text-white" />
                     </div>
                     <div>
@@ -348,11 +347,11 @@ export default function CampaignDetailsPage() {
             </Card>
 
             {/* Timeline */}
-            <Card className="border-0 shadow-md">
+            <Card className="border shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
                   <Clock className="h-4 w-4 text-purple-600" />
-                  Campaign Timeline
+                  Project Campaign Timeline
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -363,9 +362,9 @@ export default function CampaignDetailsPage() {
                         key={event.id || index}
                         className="relative flex items-start gap-3 pb-4 border-b border-gray-100 last:border-b-0"
                       >
-                        <div className="w-3 h-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full mt-1 flex-shrink-0 shadow-md"></div>
+                        <div className="w-3 h-3 bg-blue-500 rounded-full mt-1 flex-shrink-0 shadow-md"></div>
                         <div className="flex-1 min-w-0">
-                          <div className="bg-gradient-to-br from-gray-50 to-white rounded-lg p-3 shadow-sm">
+                          <div className="bg-white border border-gray-200 rounded-lg p-3">
                             <div className="flex items-center gap-2 mb-1">
                               <Clock className="h-3 w-3 text-gray-400 flex-shrink-0" />
                               <p className="text-xs font-medium text-gray-900 truncate">{event.title}</p>
@@ -403,7 +402,7 @@ export default function CampaignDetailsPage() {
                     ))
                   ) : (
                     <div className="text-center py-8">
-                      <div className="mx-auto w-12 h-12 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mb-3">
+                      <div className="mx-auto w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
                         <Clock className="h-6 w-6 text-gray-400" />
                       </div>
                       <p className="text-sm text-gray-500">No timeline events yet</p>
@@ -418,7 +417,7 @@ export default function CampaignDetailsPage() {
           {/* Right Column */}
           <div className="space-y-6">
             {/* Quick Actions */}
-            <Card className="border-0 shadow-md">
+            <Card className="border shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-bold text-gray-900">Quick Actions</CardTitle>
               </CardHeader>
@@ -439,21 +438,21 @@ export default function CampaignDetailsPage() {
                   variant="outline"
                   size="sm"
                   className="w-full justify-start hover:bg-gray-50 hover:border-gray-200 transition-colors"
-                  onClick={() => router.push(`/sales/campaigns`)}
+                  onClick={() => router.push("/sales/project-campaigns")}
                 >
                   <ArrowLeft className="h-3 w-3 mr-2" />
-                  Back to Campaigns
+                  Back to Project Campaigns
                 </Button>
               </CardContent>
             </Card>
 
             {/* Campaign Details */}
-            <Card className="border-0 shadow-md">
+            <Card className="border shadow-sm">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base font-bold text-gray-900">Campaign Details</CardTitle>
+                <CardTitle className="text-base font-bold text-gray-900">Project Campaign Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="bg-gradient-to-br from-gray-50 to-white rounded-lg p-3 space-y-3">
+                <div className="bg-white border border-gray-200 rounded-lg p-3 space-y-3">
                   <div>
                     <span className="text-xs font-medium text-gray-600">Created:</span>
                     <p className="text-sm font-medium text-gray-900 mt-0.5">{formatDate(campaign.createdAt)}</p>
@@ -473,37 +472,70 @@ export default function CampaignDetailsPage() {
             </Card>
 
             {/* Related Documents */}
-            <Card className="border-0 shadow-md">
+            <Card className="border shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-bold text-gray-900">Related Documents</CardTitle>
               </CardHeader>
               <CardContent>
-                {campaign.proposalId ? (
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-blue-600" />
-                        <span className="text-sm font-medium text-gray-900">Proposal</span>
+                <div className="space-y-3">
+                  {campaign.proposalId ? (
+                    <div className="bg-white border border-gray-200 rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-blue-600" />
+                          <span className="text-sm font-medium text-gray-900">Proposal</span>
+                        </div>
+                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                          Document
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                        Document
-                      </Badge>
+                      <p className="text-xs text-gray-600 mb-2">ID: {campaign.proposalId}</p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full text-xs h-7"
+                        onClick={() => router.push(`/sales/proposals/${campaign.proposalId}`)}
+                      >
+                        View Document
+                      </Button>
                     </div>
-                    <p className="text-xs text-gray-600 mb-2">ID: {campaign.proposalId}</p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full text-xs h-7"
-                      onClick={() => router.push(`/sales/proposals/${campaign.proposalId}`)}
-                    >
-                      View Document
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="bg-gray-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-gray-500">No related documents found</p>
-                  </div>
-                )}
+                  ) : null}
+
+                  {quotations.length > 0
+                    ? quotations.map((quotation) => (
+                        <div key={quotation.id} className="bg-white border border-gray-200 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Receipt className="h-4 w-4 text-green-600" />
+                              <span className="text-sm font-medium text-gray-900">Quotation</span>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs ${
+                                quotation.status === "accepted"
+                                  ? "bg-green-50 text-green-700 border-green-200"
+                                  : "bg-gray-50 text-gray-700 border-gray-200"
+                              }`}
+                            >
+                              {quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1)}
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-gray-600 mb-2">
+                            <p>Number: {quotation.quotation_number}</p>
+                            <p>Product: {quotation.product_name}</p>
+                            <p>Amount: ₱{quotation.total_amount.toLocaleString()}</p>
+                          </div>
+                          {/* Add a button to view quotation details when that page exists */}
+                        </div>
+                      ))
+                    : null}
+
+                  {!campaign.proposalId && quotations.length === 0 && (
+                    <div className="bg-gray-50 rounded-lg p-3 text-center">
+                      <p className="text-xs text-gray-500">No related documents found</p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>

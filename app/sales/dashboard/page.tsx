@@ -462,9 +462,21 @@ function SalesDashboardContent() {
   return (
     <div className="flex-1 p-4 md:p-6">
       <div className="flex flex-col gap-4 md:gap-6">
-        {/* Header with title, search, and actions */}
+        {/* Header with title, actions, and search box */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-xl md:text-2xl font-bold">Dashboard</h1>
+          <div className="flex flex-col gap-2">
+            <h1 className="text-xl md:text-2xl font-bold">Dashboard</h1>
+            <div className="w-full sm:w-64 md:w-80">
+              <SearchBox
+                onSearchResults={handleSearchResults}
+                onSearchError={handleSearchError}
+                onSearchLoading={handleSearchLoading}
+                onSearchClear={handleSearchClear}
+                showDropdown={false}
+                userId={user?.uid} // Pass the current user's ID
+              />
+            </div>
+          </div>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
             {/* Selection Mode Controls */}
@@ -484,21 +496,9 @@ function SalesDashboardContent() {
             {!selectionMode && !isSearching && (
               <Button onClick={handleCreateProposal} className="gap-2">
                 <FileText size={16} />
-                Create Proposal
+                Planning & Proposals
               </Button>
             )}
-
-            {/* Search Box */}
-            <div className="w-full sm:w-64 md:w-80">
-              <SearchBox
-                onSearchResults={handleSearchResults}
-                onSearchError={handleSearchError}
-                onSearchLoading={handleSearchLoading}
-                onSearchClear={handleSearchClear}
-                showDropdown={false}
-                userId={user?.uid} // Pass the current user's ID
-              />
-            </div>
 
             {!isMobile && (
               <div className="border rounded-md p-1 flex">

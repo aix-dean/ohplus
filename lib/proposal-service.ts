@@ -42,6 +42,7 @@ export async function createProposal(
     customMessage?: string
     validUntil?: Date
     sendEmail?: boolean
+    campaignId?: string // Add optional campaign ID parameter
   } = {},
 ): Promise<string> {
   try {
@@ -109,23 +110,33 @@ export async function createProposal(
       updatedAt: serverTimestamp(),
       status: options.sendEmail ? "sent" : ("draft" as const),
       password: proposalPassword, // Store the generated password
+      campaignId: options.campaignId || null, // Store campaign ID if provided
     }
 
     const docRef = await addDoc(collection(db, "proposals"), proposalData)
 
-    // Create campaign from proposal
-    try {
-      const proposalWithId = {
-        id: docRef.id,
-        ...proposalData,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        validUntil: proposalData.validUntil,
+    // Create campaign from proposal if no campaign ID was provided
+    let campaignId = options.campaignId
+    if (!campaignId) {
+      try {
+        const proposalWithId = {
+          id: docRef.id,
+          ...proposalData,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          validUntil: proposalData.validUntil,
+        }
+        campaignId = await createCampaignFromProposal(proposalWithId as any, userId)
+
+        // Update the proposal with the new campaign ID
+        await updateDoc(doc(db, "proposals", docRef.id), {
+          campaignId: campaignId,
+          updatedAt: serverTimestamp(),
+        })
+      } catch (campaignError) {
+        console.error("Error creating campaign:", campaignError)
+        // Don't throw - proposal was created successfully
       }
-      await createCampaignFromProposal(proposalWithId as any, userId)
-    } catch (campaignError) {
-      console.error("Error creating campaign:", campaignError)
-      // Don't throw - proposal was created successfully
     }
 
     try {
@@ -145,17 +156,17 @@ export async function createProposal(
           updatedAt: new Date(),
           validUntil: proposalData.validUntil,
           password: proposalPassword, // Include password in email data
+          campaignId: campaignId, // Include campaign ID
         }
 
         await sendProposalEmail(proposalWithId, cleanClient.email)
 
         // Update campaign status to sent and add timeline event
         try {
-          const campaign = await getCampaignByProposalId(docRef.id)
-          if (campaign) {
-            await updateCampaignStatus(campaign.id, "proposal_sent", userId, "Current User")
+          if (campaignId) {
+            await updateCampaignStatus(campaignId, "proposal_sent", userId, "Current User")
             await addCampaignTimelineEvent(
-              campaign.id,
+              campaignId,
               "proposal_sent",
               "Proposal Sent",
               `Proposal "${title}" was sent to ${cleanClient.email}`,
