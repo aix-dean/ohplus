@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   DownloadIcon,
   Send,
-  Edit,
   Eye,
   CheckCircle,
   XCircle,
@@ -318,83 +317,7 @@ export default function ProposalDetailsPage() {
               <History className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Activity</span>
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/sales/proposals/${params.id}/cost-estimates`)}
-              size="sm"
-              className="border-orange-300 text-orange-700 hover:bg-orange-50"
-            >
-              <Calculator className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Cost Estimates</span>
-              <span className="sm:hidden">Estimates</span>
-            </Button>
 
-            {proposal.status === "draft" && (
-              <>
-                <Button
-                  onClick={handleSendToClient}
-                  disabled={sendingEmail}
-                  size="sm"
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  {sendingEmail ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      <span className="hidden sm:inline">Sending...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      <span className="hidden sm:inline">Send</span>
-                    </>
-                  )}
-                </Button>
-                <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-50">
-                  <Edit className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Edit</span>
-                </Button>
-              </>
-            )}
-            {(proposal.status === "sent" || proposal.status === "viewed") && (
-              <Button
-                onClick={handleResendEmail}
-                disabled={resendingEmail}
-                variant="outline"
-                size="sm"
-                className="border-blue-300 text-blue-700 hover:bg-blue-50"
-              >
-                {resendingEmail ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    <span className="hidden sm:inline">Resending...</span>
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Resend</span>
-                  </>
-                )}
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              onClick={handleDownloadPDF}
-              disabled={downloadingPDF}
-              size="sm"
-              className="border-gray-300 hover:bg-gray-50"
-            >
-              {downloadingPDF ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  <span className="hidden sm:inline">Generating...</span>
-                </>
-              ) : (
-                <>
-                  <DownloadIcon className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">Download</span>
-                </>
-              )}
-            </Button>
             {proposal.status === "accepted" && (
               <Button
                 onClick={() => router.push(`/sales/proposals/${params.id}/create-cost-estimate`)}
@@ -423,24 +346,35 @@ export default function ProposalDetailsPage() {
         <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
           <Button
             variant="ghost"
-            className="h-24 w-24 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
           >
-            <LayoutGrid className="h-10 w-10 text-gray-500 mb-1.5" />
-            <span className="text-xs text-gray-700">Templates</span>
+            <LayoutGrid className="h-8 w-8 text-gray-500 mb-1" />
+            <span className="text-[10px] text-gray-700">Templates</span>
           </Button>
           <Button
             variant="ghost"
-            className="h-24 w-24 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
           >
-            <Pencil className="h-10 w-10 text-gray-500 mb-1.5" />
-            <span className="text-xs text-gray-700">Edit</span>
+            <Pencil className="h-8 w-8 text-gray-500 mb-1" />
+            <span className="text-[10px] text-gray-700">Edit</span>
           </Button>
           <Button
             variant="ghost"
-            className="h-24 w-24 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            onClick={handleDownloadPDF}
+            disabled={downloadingPDF}
+            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
           >
-            <DownloadIcon className="h-10 w-10 text-gray-500 mb-1.5" />
-            <span className="text-xs text-gray-700">Download</span>
+            {downloadingPDF ? (
+              <>
+                <Loader2 className="h-8 w-8 text-gray-500 mb-1 animate-spin" />
+                <span className="text-[10px] text-gray-700">Generating...</span>
+              </>
+            ) : (
+              <>
+                <DownloadIcon className="h-8 w-8 text-gray-500 mb-1" />
+                <span className="text-[10px] text-gray-700">Download</span>
+              </>
+            )}
           </Button>
         </div>
 
@@ -734,6 +668,27 @@ export default function ProposalDetailsPage() {
           </div>
         </div>
       </div>
+
+      {/* Floating Send Button */}
+      {proposal.status === "draft" && (
+        <Button
+          onClick={handleSendToClient}
+          disabled={sendingEmail}
+          className="fixed bottom-6 right-32 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+        >
+          {sendingEmail ? (
+            <>
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+              Sending...
+            </>
+          ) : (
+            <>
+              <Send className="h-5 w-5 mr-2" />
+              Send
+            </>
+          )}
+        </Button>
+      )}
 
       {/* Timeline Sidebar */}
       {timelineOpen && (
