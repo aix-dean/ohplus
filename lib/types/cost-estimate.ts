@@ -1,38 +1,31 @@
+import type { ProposalClient } from "./proposal"
+
+export type CostEstimateStatus = "draft" | "sent" | "accepted" | "declined" | "revised"
+
 export interface CostEstimateLineItem {
   id: string
   description: string
   quantity: number
   unitPrice: number
-  totalPrice: number
-  category: "media_cost" | "production_cost" | "installation_cost" | "maintenance_cost" | "other"
+  total: number
+  category: string // e.g., "Billboard Rental", "Production", "Installation", "Maintenance"
+  notes?: string
 }
 
 export interface CostEstimate {
   id: string
-  proposalId: string
+  proposalId: string | null // Nullable if it's a direct cost estimate
   title: string
+  client: ProposalClient // Reusing ProposalClient type for consistency
   lineItems: CostEstimateLineItem[]
-  subtotal: number
-  taxRate: number
-  taxAmount: number
   totalAmount: number
-  notes: string
-  createdBy: string
+  status: CostEstimateStatus
+  notes?: string
+  customMessage?: string
   createdAt: Date
   updatedAt: Date
-  status: "draft" | "sent" | "viewed" | "approved" | "rejected"
-  approvedBy?: string
-  approvedAt?: Date
-  rejectedBy?: string
-  rejectedAt?: Date
-  rejectionReason?: string
-  password?: string
-}
-
-export interface CostEstimateTemplate {
-  id: string
-  name: string
-  description: string
-  defaultLineItems: Omit<CostEstimateLineItem, "id" | "totalPrice">[]
-  isDefault: boolean
+  createdBy: string // User ID of who created it
+  startDate?: Date | null // New field
+  endDate?: Date | null // New field
+  validUntil?: Date | null // Add this new field
 }

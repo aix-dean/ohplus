@@ -222,3 +222,24 @@ export async function getClientsCount(searchTerm = "", statusFilter: string | nu
     return 0
   }
 }
+
+// Get all clients (without pagination)
+export async function getAllClients(): Promise<Client[]> {
+  try {
+    console.log("Getting all clients")
+    const clientsRef = collection(db, "client_db")
+    const q = query(clientsRef, orderBy("name", "asc"))
+    const querySnapshot = await getDocs(q)
+
+    const clients: Client[] = []
+    querySnapshot.forEach((doc) => {
+      clients.push({ id: doc.id, ...doc.data() } as Client)
+    })
+
+    console.log("Retrieved all clients:", clients.length)
+    return clients
+  } catch (error) {
+    console.error("Error fetching all clients:", error)
+    return []
+  }
+}

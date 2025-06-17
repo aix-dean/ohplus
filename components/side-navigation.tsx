@@ -125,12 +125,6 @@ export function SideNavigation() {
 
   return (
     <div className="w-64 h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 overflow-y-auto shadow-sm">
-      <div className="bg-white py-4 px-3 border-b border-gray-200">
-        <div className="flex items-center space-x-3">
-          <SectionIcon className="h-5 w-5 text-gray-700" />
-          <h2 className="text-lg font-semibold text-gray-800">{currentNavItem.title}</h2>
-        </div>
-      </div>
       <nav className="p-3 space-y-4">
         {currentNavItem.section === "sales" ? (
           // Special grouped layout for sales

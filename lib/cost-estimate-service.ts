@@ -1,56 +1,53 @@
+import { db } from "@/lib/firebase"
 import {
   collection,
   addDoc,
-  getDocs,
-  doc,
   getDoc,
+  doc,
   updateDoc,
   query,
   where,
-  orderBy,
+  getDocs,
   serverTimestamp,
-  Timestamp,
-  type Firestore, // Import Firestore type
+  orderBy,
+  limit,
+  startAfter,
+  deleteDoc,
 } from "firebase/firestore"
-import { db as clientDb } from "@/lib/firebase" // Rename import to avoid conflict
-import type { CostEstimate, CostEstimateLineItem } from "@/lib/types/cost-estimate"
+import type { CostEstimate, CostEstimateStatus, CostEstimateLineItem } from "@/lib/types/cost-estimate"
 import type { Proposal } from "@/lib/types/proposal"
 
+const COST_ESTIMATES_COLLECTION = "cost_estimates"
+
+interface CreateCostEstimateOptions {
+  notes?: string
+  customMessage?: string
+  sendEmail?: boolean
+  startDate?: Date // New field
+  endDate?: Date // New field
+}
+
+interface CostEstimateClientData {
+  id: string
+  name: string
+  email: string
+  company: string
+  phone?: string
+  address?: string
+}
+
+interface CostEstimateSiteData {
+  id: string
+  name: string
+  location: string
+  price: number
+  type: string
+}
+
 // Helper function to get Firestore instance, handling client/server environments
-async function getDbInstance(): Promise<Firestore> {
-  if (typeof window !== "undefined" && clientDb) {
-    // Client-side environment, use the pre-initialized clientDb
-    return clientDb
-  } else {
-    // Server-side environment, perform server-safe initialization
-    try {
-      const { initializeApp, getApps } = await import("firebase/app")
-      const { getFirestore } = await import("firebase/firestore")
-
-      const firebaseConfig = {
-        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-        appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-      }
-
-      const existingApps = getApps()
-      let app
-
-      if (existingApps.length === 0) {
-        app = initializeApp(firebaseConfig)
-      } else {
-        app = existingApps[0]
-      }
-
-      return getFirestore(app)
-    } catch (error) {
-      console.error("Server-side Firestore initialization error:", error)
-      throw new Error("Failed to initialize Firestore for server-side operations")
-    }
-  }
+async function getDbInstance(): Promise<any> {
+  // This function is not needed after the updates as db is imported directly
+  return db
 }
 
 // Generate a secure password for cost estimate access
@@ -67,107 +64,155 @@ function generateCostEstimatePassword(): string {
 export async function createCostEstimateFromProposal(
   proposal: Proposal,
   userId: string,
-  options: {
-    notes?: string
-    customLineItems?: CostEstimateLineItem[]
-    sendEmail?: boolean
-  } = {},
+  options?: CreateCostEstimateOptions,
 ): Promise<string> {
   try {
-    const db = await getDbInstance() // Get the appropriate db instance
+    const lineItems: CostEstimateLineItem[] = []
+    let totalAmount = 0
 
-    // Use only the provided line items or generate defaults if none provided
-    const allLineItems = options.customLineItems || []
-
-    // Only generate default items if no custom items were provided
-    if (!options.customLineItems || options.customLineItems.length === 0) {
-      // Generate default line items based on proposal products
-      const defaultLineItems: CostEstimateLineItem[] = proposal.products.map((product, index) => ({
-        id: `item_${index + 1}`,
-        description: `${product.name} - ${product.location}`,
+    // Add line items for each product in the proposal
+    proposal.products.forEach((product) => {
+      const price = typeof product.price === "number" ? product.price : 0
+      lineItems.push({
+        id: product.id,
+        description: product.name,
         quantity: 1,
-        unitPrice: product.price,
-        totalPrice: product.price,
-        category: "media_cost" as const,
-      }))
+        unitPrice: price,
+        total: price,
+        category: product.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental", // Categorize based on type
+        notes: `Location: ${product.location}`,
+      })
+      totalAmount += price
+    })
 
-      // Add standard cost categories
-      const additionalItems: CostEstimateLineItem[] = [
-        {
-          id: `item_${defaultLineItems.length + 1}`,
-          description: "Creative Design & Production",
-          quantity: 1,
-          unitPrice: 0,
-          totalPrice: 0,
-          category: "production_cost" as const,
-        },
-        {
-          id: `item_${defaultLineItems.length + 2}`,
-          description: "Installation & Setup",
-          quantity: 1,
-          unitPrice: 0,
-          totalPrice: 0,
-          category: "installation_cost" as const,
-        },
-        {
-          id: `item_${defaultLineItems.length + 3}`,
-          description: "Maintenance & Monitoring",
-          quantity: 1,
-          unitPrice: 0,
-          totalPrice: 0,
-          category: "maintenance_cost" as const,
-        },
-      ]
+    // Add default cost categories (can be customized later)
+    lineItems.push({
+      id: "production-cost",
+      description: "Production Cost (Tarpaulin/LED Content)",
+      quantity: 1,
+      unitPrice: 0, // To be filled by user
+      total: 0,
+      category: "Production",
+      notes: "Estimated cost for content production.",
+    })
+    lineItems.push({
+      id: "installation-cost",
+      description: "Installation/Dismantling Fees",
+      quantity: 1,
+      unitPrice: 0, // To be filled by user
+      total: 0,
+      category: "Installation",
+      notes: "Estimated cost for installation and dismantling.",
+    })
+    lineItems.push({
+      id: "maintenance-cost",
+      description: "Maintenance & Monitoring",
+      quantity: 1,
+      unitPrice: 0, // To be filled by user
+      total: 0,
+      category: "Maintenance",
+      notes: "Estimated cost for ongoing maintenance and monitoring.",
+    })
 
-      allLineItems.push(...defaultLineItems, ...additionalItems)
-    }
-
-    const subtotal = allLineItems.reduce((sum, item) => sum + item.totalPrice, 0)
-    const taxRate = 0.12 // 12% VAT
-    const taxAmount = subtotal * taxRate
-    const totalAmount = subtotal + taxAmount
-
-    const costEstimatePassword = generateCostEstimatePassword()
-
-    const costEstimateData = {
+    const newCostEstimateRef = await addDoc(collection(db, COST_ESTIMATES_COLLECTION), {
       proposalId: proposal.id,
       title: `Cost Estimate for ${proposal.title}`,
-      lineItems: allLineItems,
-      subtotal,
-      taxRate,
-      taxAmount,
+      client: proposal.client,
+      lineItems,
       totalAmount,
-      notes: options.notes || "",
-      createdBy: userId,
+      status: "draft",
+      notes: options?.notes || "",
+      customMessage: options?.customMessage || "",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      status: options.sendEmail ? "sent" : ("draft" as const),
-      password: costEstimatePassword,
-    }
+      createdBy: userId,
+      startDate: options?.startDate || null, // Store new dates
+      endDate: options?.endDate || null, // Store new dates
+      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Set valid for 30 days
+    })
 
-    const docRef = await addDoc(collection(db, "costEstimates"), costEstimateData)
-
-    // Send email if requested
-    if (options.sendEmail && proposal.client.email) {
-      try {
-        const costEstimateWithId = {
-          id: docRef.id,
-          ...costEstimateData,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          password: costEstimatePassword,
-        }
-
-        await sendCostEstimateEmail(costEstimateWithId, proposal.client.email, proposal.client)
-      } catch (emailError) {
-        console.error("Error sending cost estimate email:", emailError)
-      }
-    }
-
-    return docRef.id
+    return newCostEstimateRef.id
   } catch (error) {
-    console.error("Error creating cost estimate:", error)
-    throw error
+    console.error("Error creating cost estimate from proposal:", error)
+    throw new Error("Failed to create cost estimate from proposal.")
+  }
+}
+
+// Create a cost estimate directly without a proposal
+export async function createDirectCostEstimate(
+  clientData: CostEstimateClientData,
+  sitesData: CostEstimateSiteData[],
+  userId: string,
+  options?: CreateCostEstimateOptions,
+): Promise<string> {
+  try {
+    const lineItems: CostEstimateLineItem[] = []
+    let totalAmount = 0
+
+    // Add line items for each selected site
+    sitesData.forEach((site) => {
+      lineItems.push({
+        id: site.id,
+        description: site.name,
+        quantity: 1,
+        unitPrice: site.price,
+        total: site.price,
+        category: site.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
+        notes: `Location: ${site.location}`,
+      })
+      totalAmount += site.price
+    })
+
+    // Add default cost categories
+    lineItems.push({
+      id: "production-cost",
+      description: "Production Cost (Tarpaulin/LED Content)",
+      quantity: 1,
+      unitPrice: 0,
+      total: 0,
+      category: "Production",
+      notes: "Estimated cost for content production.",
+    })
+    lineItems.push({
+      id: "installation-cost",
+      description: "Installation/Dismantling Fees",
+      quantity: 1,
+      unitPrice: 0,
+      total: 0,
+      category: "Installation",
+      notes: "Estimated cost for installation and dismantling.",
+    })
+    lineItems.push({
+      id: "maintenance-cost",
+      description: "Maintenance & Monitoring",
+      quantity: 1,
+      unitPrice: 0,
+      total: 0,
+      category: "Maintenance",
+      notes: "Estimated cost for ongoing maintenance and monitoring.",
+    })
+
+    const newCostEstimateRef = await addDoc(collection(db, COST_ESTIMATES_COLLECTION), {
+      proposalId: null, // No associated proposal
+      title: `Cost Estimate for ${clientData.company || clientData.name}`,
+      client: clientData,
+      lineItems,
+      totalAmount,
+      status: "draft",
+      notes: options?.notes || "",
+      customMessage: options?.customMessage || "",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      createdBy: userId,
+      startDate: options?.startDate || null, // Store new dates
+      endDate: options?.endDate || null, // Store new dates
+      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Set valid for 30 days
+    })
+
+    return newCostEstimateRef.id
+  } catch (error) {
+    console.error("Error creating direct cost estimate:", error)
+    throw new Error("Failed to create direct cost estimate.")
   }
 }
 
@@ -214,37 +259,32 @@ export async function sendCostEstimateEmail(costEstimate: any, clientEmail: stri
 // Get cost estimates by proposal ID
 export async function getCostEstimatesByProposalId(proposalId: string): Promise<CostEstimate[]> {
   try {
-    const db = await getDbInstance() // Get the appropriate db instance
-
-    const costEstimatesRef = collection(db, "costEstimates")
-    const q = query(costEstimatesRef, where("proposalId", "==", proposalId), orderBy("createdAt", "desc"))
-
+    const q = query(
+      collection(db, COST_ESTIMATES_COLLECTION),
+      where("proposalId", "==", proposalId),
+      orderBy("createdAt", "desc"),
+    )
     const querySnapshot = await getDocs(q)
-    const costEstimates: CostEstimate[] = []
-
-    querySnapshot.forEach((doc) => {
-      const data = doc.data()
-      costEstimates.push({
-        id: doc.id,
-        ...data,
-        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
-        updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
-        approvedAt:
-          data.approvedAt instanceof Timestamp
-            ? data.approvedAt.toDate()
-            : data.approvedAt
-              ? new Date(data.approvedAt)
-              : undefined,
-        rejectedAt:
-          data.rejectedAt instanceof Timestamp
-            ? data.rejectedAt.toDate()
-            : data.rejectedAt
-              ? new Date(data.rejectedAt)
-              : undefined,
-      } as CostEstimate)
+    return querySnapshot.docs.map((docSnap) => {
+      const data = docSnap.data()
+      return {
+        id: docSnap.id,
+        proposalId: data.proposalId || null,
+        title: data.title,
+        client: data.client,
+        lineItems: data.lineItems,
+        totalAmount: data.totalAmount,
+        status: data.status,
+        notes: data.notes || "",
+        customMessage: data.customMessage || "",
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate(),
+        createdBy: data.createdBy,
+        startDate: data.startDate?.toDate() || null, // Retrieve new dates
+        endDate: data.endDate?.toDate() || null, // Retrieve new dates
+        validUntil: data.validUntil?.toDate() || null, // Retrieve new dates
+      } as CostEstimate
     })
-
-    return costEstimates
   } catch (error) {
     console.error("Error fetching cost estimates:", error)
     return []
@@ -252,78 +292,57 @@ export async function getCostEstimatesByProposalId(proposalId: string): Promise<
 }
 
 // Get a single cost estimate by ID
-export async function getCostEstimateById(costEstimateId: string): Promise<CostEstimate | null> {
+export async function getCostEstimate(id: string): Promise<CostEstimate | null> {
   try {
-    const db = await getDbInstance() // Get the appropriate db instance
+    const docRef = doc(db, COST_ESTIMATES_COLLECTION, id)
+    const docSnap = await getDoc(docRef)
 
-    const costEstimateDoc = await getDoc(doc(db, "costEstimates", costEstimateId))
-
-    if (costEstimateDoc.exists()) {
-      const data = costEstimateDoc.data()
-
-      const costEstimate: CostEstimate = {
-        id: costEstimateDoc.id,
-        ...data,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
-        approvedAt: data.approvedAt?.toDate() || undefined,
-        rejectedAt: data.rejectedAt?.toDate() || undefined,
-      } as CostEstimate
-
-      return costEstimate
+    if (!docSnap.exists()) {
+      return null
     }
 
-    return null
+    const data = docSnap.data()
+    return {
+      id: docSnap.id,
+      proposalId: data.proposalId || null,
+      title: data.title,
+      client: data.client,
+      lineItems: data.lineItems,
+      totalAmount: data.totalAmount,
+      status: data.status,
+      notes: data.notes || "",
+      customMessage: data.customMessage || "",
+      createdAt: data.createdAt?.toDate(),
+      updatedAt: data.updatedAt?.toDate(),
+      createdBy: data.createdBy,
+      startDate: data.startDate?.toDate() || null, // Retrieve new dates
+      endDate: data.endDate?.toDate() || null, // Retrieve new dates
+      validUntil: data.validUntil?.toDate() || null, // Retrieve new dates
+    } as CostEstimate
   } catch (error) {
     console.error("Error fetching cost estimate:", error)
-    return null
+    throw new Error("Failed to fetch cost estimate.")
   }
 }
 
 // Update cost estimate status
-export async function updateCostEstimateStatus(
-  costEstimateId: string,
-  status: string,
-  userId = "system",
-  rejectionReason?: string,
-) {
+export async function updateCostEstimateStatus(id: string, status: CostEstimateStatus): Promise<void> {
   try {
-    const db = await getDbInstance() // Get the appropriate db instance
-
-    // Update document with new status
-    const costEstimateRef = doc(db, "costEstimates", costEstimateId)
-
-    const updateData: Record<string, any> = {
-      status,
+    const docRef = doc(db, COST_ESTIMATES_COLLECTION, id)
+    await updateDoc(docRef, {
+      status: status,
       updatedAt: serverTimestamp(),
-      updatedBy: userId,
-    }
-
-    if (status === "approved") {
-      updateData.approvedAt = serverTimestamp()
-      updateData.approvedBy = userId
-    } else if (status === "rejected") {
-      updateData.rejectedAt = serverTimestamp()
-      updateData.rejectedBy = userId
-      if (rejectionReason) {
-        updateData.rejectionReason = rejectionReason
-      }
-    }
-
-    await updateDoc(costEstimateRef, updateData)
-    return true
+    })
   } catch (error) {
     console.error("Error updating cost estimate status:", error)
-    throw error
+    throw new Error("Failed to update cost estimate status.")
   }
 }
 
 // Update cost estimate
 export async function updateCostEstimate(costEstimateId: string, updates: Partial<CostEstimate>): Promise<void> {
   try {
-    const db = await getDbInstance() // Get the appropriate db instance
-
-    const costEstimateRef = doc(db, "costEstimates", costEstimateId)
+    const costEstimateRef = doc(db, COST_ESTIMATES_COLLECTION, costEstimateId)
     await updateDoc(costEstimateRef, {
       ...updates,
       updatedAt: serverTimestamp(),
@@ -331,5 +350,108 @@ export async function updateCostEstimate(costEstimateId: string, updates: Partia
   } catch (error) {
     console.error("Error updating cost estimate:", error)
     throw error
+  }
+}
+
+// Get all cost estimates
+export async function getAllCostEstimates(): Promise<CostEstimate[]> {
+  try {
+    const q = query(collection(db, COST_ESTIMATES_COLLECTION), orderBy("createdAt", "desc"))
+    const querySnapshot = await getDocs(q)
+    return querySnapshot.docs.map((docSnap) => {
+      const data = docSnap.data()
+      return {
+        id: docSnap.id,
+        proposalId: data.proposalId || null,
+        title: data.title,
+        client: data.client,
+        lineItems: data.lineItems,
+        totalAmount: data.totalAmount,
+        status: data.status,
+        notes: data.notes || "",
+        customMessage: data.customMessage || "",
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate(),
+        createdBy: data.createdBy,
+        startDate: data.startDate?.toDate() || null, // Retrieve new dates
+        endDate: data.endDate?.toDate() || null, // Retrieve new dates
+        validUntil: data.validUntil?.toDate() || null, // Retrieve new dates
+      } as CostEstimate
+    })
+  } catch (error) {
+    console.error("Error getting all cost estimates:", error)
+    throw new Error("Failed to retrieve all cost estimates.")
+  }
+}
+
+// Get paginated cost estimates
+export async function getPaginatedCostEstimates(
+  limitCount: number,
+  lastDocId: string | null,
+  searchQuery = "",
+): Promise<{ items: CostEstimate[]; lastVisible: string | null }> {
+  try {
+    let q = query(collection(db, COST_ESTIMATES_COLLECTION), orderBy("createdAt", "desc"))
+
+    if (searchQuery) {
+      const lowerCaseSearchQuery = searchQuery.toLowerCase()
+      q = query(
+        collection(db, COST_ESTIMATES_COLLECTION),
+        where("title", ">=", lowerCaseSearchQuery),
+        where("title", "<=", lowerCaseSearchQuery + "\uf8ff"),
+        orderBy("title"),
+      )
+    } else {
+      q = query(collection(db, COST_ESTIMATES_COLLECTION), orderBy("createdAt", "desc"))
+    }
+
+    if (lastDocId) {
+      const lastDoc = await getDoc(doc(db, COST_ESTIMATES_COLLECTION, lastDocId))
+      if (lastDoc.exists()) {
+        q = query(q, startAfter(lastDoc))
+      }
+    }
+
+    q = query(q, limit(limitCount))
+
+    const querySnapshot = await getDocs(q)
+    const items: CostEstimate[] = querySnapshot.docs.map((docSnap) => {
+      const data = docSnap.data()
+      return {
+        id: docSnap.id,
+        proposalId: data.proposalId || null,
+        title: data.title,
+        client: data.client,
+        lineItems: data.lineItems,
+        totalAmount: data.totalAmount,
+        status: data.status,
+        notes: data.notes || "",
+        customMessage: data.customMessage || "",
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate(),
+        createdBy: data.createdBy,
+        startDate: data.startDate?.toDate() || null,
+        endDate: data.endDate?.toDate() || null,
+        validUntil: data.validUntil?.toDate() || null,
+      } as CostEstimate
+    })
+
+    const lastVisibleDoc = querySnapshot.docs[querySnapshot.docs.length - 1]
+    const newLastDocId = lastVisibleDoc ? lastVisibleDoc.id : null
+
+    return { items, lastVisible: newLastDocId }
+  } catch (error) {
+    console.error("Error fetching paginated cost estimates:", error)
+    throw new Error("Failed to fetch paginated cost estimates.")
+  }
+}
+
+// Delete cost estimate
+export async function deleteCostEstimate(id: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, COST_ESTIMATES_COLLECTION, id))
+  } catch (error) {
+    console.error("Error deleting cost estimate:", error)
+    throw new Error("Failed to delete cost estimate.")
   }
 }

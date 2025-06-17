@@ -14,22 +14,17 @@ import {
   query,
   where,
   orderBy,
+  limit,
+  startAfter,
   serverTimestamp,
   Timestamp,
+  getCountFromServer,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Proposal, ProposalProduct, ProposalClient } from "@/lib/types/proposal"
 import { logProposalCreated, logProposalStatusChanged, logProposalEmailSent } from "@/lib/proposal-activity-service"
 
-// Generate a secure password for proposal access
-function generateProposalPassword(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-  let password = ""
-  for (let i = 0; i < 8; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return password
-}
+// Removed generateProposalPassword function
 
 // Create a new proposal
 export async function createProposal(
@@ -41,7 +36,7 @@ export async function createProposal(
     notes?: string
     customMessage?: string
     validUntil?: Date
-    sendEmail?: boolean
+    // Removed sendEmail option
     campaignId?: string // Add optional campaign ID parameter
   } = {},
 ): Promise<string> {
@@ -94,8 +89,7 @@ export async function createProposal(
       health_percentage: product.health_percentage || 0,
     }))
 
-    // Generate a secure password for the proposal
-    const proposalPassword = generateProposalPassword()
+    // Removed proposalPassword generation
 
     const proposalData = {
       title: title || "",
@@ -108,8 +102,8 @@ export async function createProposal(
       createdBy: userId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      status: options.sendEmail ? "sent" : ("draft" as const),
-      password: proposalPassword, // Store the generated password
+      status: "draft" as const, // Always set to draft now
+      // Removed password field
       campaignId: options.campaignId || null, // Store campaign ID if provided
     }
 
@@ -146,42 +140,7 @@ export async function createProposal(
       // Don't throw - proposal was created successfully
     }
 
-    // Send email if requested
-    if (options.sendEmail && cleanClient.email) {
-      try {
-        const proposalWithId = {
-          id: docRef.id,
-          ...proposalData,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          validUntil: proposalData.validUntil,
-          password: proposalPassword, // Include password in email data
-          campaignId: campaignId, // Include campaign ID
-        }
-
-        await sendProposalEmail(proposalWithId, cleanClient.email)
-
-        // Update campaign status to sent and add timeline event
-        try {
-          if (campaignId) {
-            await updateCampaignStatus(campaignId, "proposal_sent", userId, "Current User")
-            await addCampaignTimelineEvent(
-              campaignId,
-              "proposal_sent",
-              "Proposal Sent",
-              `Proposal "${title}" was sent to ${cleanClient.email}`,
-              userId,
-              "Current User",
-            )
-          }
-        } catch (campaignError) {
-          console.error("Error updating campaign for sent proposal:", campaignError)
-        }
-      } catch (emailError) {
-        console.error("Error sending email:", emailError)
-        // Don't throw error here - proposal was created successfully
-      }
-    }
+    // Removed email sending logic from here
 
     return docRef.id
   } catch (error) {
@@ -191,7 +150,12 @@ export async function createProposal(
 }
 
 // Send proposal email
-export async function sendProposalEmail(proposal: any, clientEmail: string): Promise<void> {
+export async function sendProposalEmail(
+  proposal: any,
+  clientEmail: string,
+  subject?: string, // Added subject parameter
+  body?: string, // Added body parameter
+): Promise<void> {
   try {
     console.log("Sending proposal email to:", clientEmail)
 
@@ -203,6 +167,8 @@ export async function sendProposalEmail(proposal: any, clientEmail: string): Pro
       body: JSON.stringify({
         proposal,
         clientEmail,
+        subject, // Pass subject
+        body, // Pass body
       }),
     })
 
@@ -314,20 +280,7 @@ export async function getProposalById(proposalId: string): Promise<Proposal | nu
   }
 }
 
-// Verify proposal password
-export async function verifyProposalPassword(proposalId: string, password: string): Promise<boolean> {
-  try {
-    const proposal = await getProposalById(proposalId)
-    if (!proposal) {
-      return false
-    }
-
-    return proposal.password === password
-  } catch (error) {
-    console.error("Error verifying proposal password:", error)
-    return false
-  }
-}
+// Removed verifyProposalPassword function
 
 // Update proposal status with optional custom user info for public viewers
 export async function updateProposalStatus(
@@ -469,11 +422,118 @@ export async function deleteProposal(id: string, userId: string, userName: strin
   return { id: id }
 }
 
-export async function getProposals() {
-  // Implementation for getting all proposals
-  console.log("Getting all proposals")
-  return [
-    { id: "fake-proposal-id-1", title: "Fake Proposal 1" },
-    { id: "fake-proposal-id-2", title: "Fake Proposal 2" },
-  ]
+export async function getPaginatedProposals(
+  itemsPerPage: number,
+  lastDoc: any | null,
+  searchTerm = "",
+  statusFilter: string | null = null,
+): Promise<{ items: Proposal[]; lastDoc: any | null; hasMore: boolean }> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    let q = query(collection(db, "proposals"), orderBy("createdAt", "desc"))
+
+    if (searchTerm) {
+      const lowerCaseSearchTerm = searchTerm.toLowerCase()
+      // This is a basic search. For more advanced full-text search, consider Algolia or a similar service.
+      // Firestore doesn't support full-text search directly or OR queries across multiple fields easily.
+      // For now, we'll filter after fetching, which might be inefficient for large datasets.
+      // A more robust solution would involve a dedicated search index.
+    }
+
+    if (statusFilter && statusFilter !== "all") {
+      q = query(q, where("status", "==", statusFilter))
+    }
+
+    if (lastDoc) {
+      q = query(q, startAfter(lastDoc))
+    }
+
+    q = query(q, limit(itemsPerPage + 1)) // Fetch one more to check if there are more items
+
+    const querySnapshot = await getDocs(q)
+    const proposals: Proposal[] = []
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      proposals.push({
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
+        updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
+        validUntil: data.validUntil instanceof Timestamp ? data.validUntil.toDate() : new Date(data.validUntil),
+      } as Proposal)
+    })
+
+    let filteredItems = proposals
+    if (searchTerm) {
+      const lowerCaseSearchTerm = searchTerm.toLowerCase()
+      filteredItems = proposals.filter(
+        (proposal) =>
+          (statusFilter === "all" || !statusFilter || proposal.status === statusFilter) &&
+          (proposal.title.toLowerCase().includes(lowerCaseSearchTerm) ||
+            proposal.client.company.toLowerCase().includes(lowerCaseSearchTerm)),
+      )
+    }
+
+    const hasMore = filteredItems.length > itemsPerPage
+    const itemsToReturn = filteredItems.slice(0, itemsPerPage)
+    const newLastDoc = querySnapshot.docs[itemsToReturn.length] || null
+
+    return { items: itemsToReturn, lastDoc: newLastDoc, hasMore }
+  } catch (error) {
+    console.error("Error fetching paginated proposals:", error)
+    return { items: [], lastDoc: null, hasMore: false }
+  }
+}
+
+export async function getProposalsCount(searchTerm = "", statusFilter: string | null = null): Promise<number> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const q = collection(db, "proposals")
+    let countQuery = query(q)
+
+    if (statusFilter && statusFilter !== "all") {
+      countQuery = query(countQuery, where("status", "==", statusFilter))
+    }
+
+    const snapshot = await getCountFromServer(countQuery)
+    let count = snapshot.data().count
+
+    // If there's a search term, we need to fetch all (or a large subset) and filter client-side
+    // as Firestore count queries don't support complex string matching.
+    if (searchTerm) {
+      const allProposalsQuery = query(collection(db, "proposals"), orderBy("createdAt", "desc"))
+      const allProposalsSnapshot = await getDocs(allProposalsQuery)
+      const allProposals: Proposal[] = []
+      allProposalsSnapshot.forEach((doc) => {
+        const data = doc.data()
+        allProposals.push({
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
+          updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
+          validUntil: data.validUntil instanceof Timestamp ? data.validUntil.toDate() : new Date(data.validUntil),
+        } as Proposal)
+      })
+
+      const lowerCaseSearchTerm = searchTerm.toLowerCase()
+      const filteredProposals = allProposals.filter(
+        (proposal) =>
+          (statusFilter === "all" || !statusFilter || proposal.status === statusFilter) &&
+          (proposal.title.toLowerCase().includes(lowerCaseSearchTerm) ||
+            proposal.client.company.toLowerCase().includes(lowerCaseSearchTerm)),
+      )
+      count = filteredProposals.length
+    }
+
+    return count
+  } catch (error) {
+    console.error("Error getting proposals count:", error)
+    return 0
+  }
 }

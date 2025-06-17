@@ -1,15 +1,10 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { CheckCircle, XCircle, Calculator, Loader2, Lock, Eye, Download, ArrowLeft, Share2 } from "lucide-react"
+import { CheckCircle, XCircle, Calculator, Loader2, Download, ArrowLeft, Share2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 
@@ -33,9 +28,6 @@ export default function PublicCostEstimateViewPage() {
   const { toast } = useToast()
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
   const [loading, setLoading] = useState(true)
-  const [password, setPassword] = useState("")
-  const [verifying, setVerifying] = useState(false)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [submittingResponse, setSubmittingResponse] = useState(false)
   const [showQRModal, setShowQRModal] = useState(false)
 
@@ -53,16 +45,13 @@ export default function PublicCostEstimateViewPage() {
               updatedAt: new Date(data.updatedAt),
               approvedAt: data.approvedAt ? new Date(data.approvedAt) : undefined,
               rejectedAt: data.rejectedAt ? new Date(data.rejectedAt) : undefined,
+              validUntil: data.validUntil ? new Date(data.validUntil) : null, // Ensure validUntil is a Date or null
             })
-            setIsAuthenticated(true)
 
             // Update status to viewed if it was in sent status
             if (data.status === "sent") {
               updateViewedStatus(data.id)
             }
-          } else if (response.status === 401) {
-            // Password required
-            setIsAuthenticated(false)
           } else {
             toast({
               title: "Error",
@@ -101,61 +90,6 @@ export default function PublicCostEstimateViewPage() {
       })
     } catch (error) {
       console.error("Error updating viewed status:", error)
-    }
-  }
-
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!password.trim()) return
-
-    setVerifying(true)
-    try {
-      const response = await fetch(`/api/cost-estimates/public/${params.id}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ password: password.trim() }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          setCostEstimate({
-            ...data.costEstimate,
-            createdAt: new Date(data.costEstimate.createdAt),
-            updatedAt: new Date(data.costEstimate.updatedAt),
-            approvedAt: data.costEstimate.approvedAt ? new Date(data.costEstimate.approvedAt) : undefined,
-            rejectedAt: data.costEstimate.rejectedAt ? new Date(data.costEstimate.rejectedAt) : undefined,
-          })
-          setIsAuthenticated(true)
-
-          // Update status to viewed if it was in sent status
-          if (data.costEstimate.status === "sent") {
-            updateViewedStatus(data.costEstimate.id)
-          }
-
-          toast({
-            title: "Access granted",
-            description: "Cost estimate loaded successfully",
-          })
-        }
-      } else {
-        toast({
-          title: "Invalid access code",
-          description: "Please check your access code and try again",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
-      console.error("Error verifying password:", error)
-      toast({
-        title: "Error",
-        description: "Failed to verify access code",
-        variant: "destructive",
-      })
-    } finally {
-      setVerifying(false)
     }
   }
 
@@ -277,52 +211,6 @@ export default function PublicCostEstimateViewPage() {
     )
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 mx-auto mb-4 bg-orange-100 rounded-full flex items-center justify-center">
-                <Lock className="h-8 w-8 text-orange-600" />
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Required</h1>
-              <p className="text-gray-600">Please enter your access code to view this cost estimate.</p>
-            </div>
-
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="password">Access Code</Label>
-                <Input
-                  id="password"
-                  type="text"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value.toUpperCase())}
-                  placeholder="Enter access code"
-                  className="text-center text-lg font-mono tracking-wider"
-                  maxLength={8}
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={verifying || !password.trim()}>
-                {verifying ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Verifying...
-                  </>
-                ) : (
-                  <>
-                    <Eye className="h-4 w-4 mr-2" />
-                    View Cost Estimate
-                  </>
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
   if (!costEstimate) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -414,6 +302,12 @@ export default function PublicCostEstimateViewPage() {
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-2">Created Date</h3>
                   <p className="text-base text-gray-900">{costEstimate.createdAt.toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Valid Until</h3>
+                  <p className="text-base text-gray-900">
+                    {costEstimate.validUntil ? costEstimate.validUntil.toLocaleDateString() : "N/A"}
+                  </p>
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-2">Status</h3>

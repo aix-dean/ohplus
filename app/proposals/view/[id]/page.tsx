@@ -13,7 +13,6 @@ import { generateProposalPDF } from "@/lib/pdf-service"
 import { logProposalPDFGenerated } from "@/lib/proposal-activity-service"
 import { updateProposalStatus } from "@/lib/proposal-service"
 import { useToast } from "@/hooks/use-toast"
-import { ProposalPasswordProtection } from "@/components/proposal-password-protection"
 
 // Helper function to generate QR code URL
 const generateQRCodeUrl = (proposalId: string) => {
@@ -66,7 +65,6 @@ async function generatePublicProposalPDF(proposal: Proposal) {
 export default function PublicProposalViewPage() {
   const params = useParams()
   const [proposal, setProposal] = useState<Proposal | null>(null)
-  const [isPasswordVerified, setIsPasswordVerified] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
@@ -80,15 +78,41 @@ export default function PublicProposalViewPage() {
     if (!firebaseInit.success) {
       setError(`Firebase initialization failed: ${firebaseInit.error}`)
     }
-    setLoading(false)
-  }, [])
 
-  const handlePasswordVerified = async (verifiedProposal: Proposal) => {
-    setProposal(verifiedProposal)
-    setIsPasswordVerified(true)
-    // Note: View logging is already handled in the password verification API
-    // No need to log again here to prevent duplicates
-  }
+    async function fetchProposal() {
+      if (!params.id) {
+        setError("Proposal ID is missing.")
+        setLoading(false)
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/proposals/public/${params.id}`)
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to fetch proposal.")
+        }
+        const data = await response.json()
+        if (data.success && data.proposal) {
+          setProposal({
+            ...data.proposal,
+            createdAt: new Date(data.proposal.createdAt),
+            updatedAt: new Date(data.proposal.updatedAt),
+            validUntil: new Date(data.proposal.validUntil),
+          })
+        } else {
+          setError("Proposal not found or invalid data.")
+        }
+      } catch (err) {
+        console.error("Error fetching proposal:", err)
+        setError(err instanceof Error ? err.message : "Failed to load proposal.")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProposal()
+  }, [params.id])
 
   const handleDownloadPDF = async () => {
     if (!proposal) return
@@ -205,6 +229,18 @@ ${proposal?.client.contactPerson || "Client"}`)
     }
   }
 
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading proposal...</p>
+        </div>
+      </div>
+    )
+  }
+
   // Show error state
   if (error) {
     return (
@@ -228,18 +264,7 @@ ${proposal?.client.contactPerson || "Client"}`)
     )
   }
 
-  // Show password protection screen if not verified
-  if (!isPasswordVerified) {
-    return (
-      <ProposalPasswordProtection
-        onPasswordVerified={handlePasswordVerified}
-        proposalId={params.id as string}
-        isLoading={loading}
-      />
-    )
-  }
-
-  // Show proposal not found if no proposal after password verification
+  // Show proposal not found if no proposal after loading
   if (!proposal) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">

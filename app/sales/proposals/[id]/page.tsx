@@ -18,14 +18,15 @@ import {
   LayoutGrid,
   Pencil,
 } from "lucide-react"
-import { getProposalById, updateProposalStatus, sendProposalEmail } from "@/lib/proposal-service"
+import { getProposalById, updateProposalStatus } from "@/lib/proposal-service" // Removed sendProposalEmail
 import { generateProposalPDF } from "@/lib/pdf-service"
 import type { Proposal } from "@/lib/types/proposal"
 import { useToast } from "@/hooks/use-toast"
 import { ProposalActivityTimeline } from "@/components/proposal-activity-timeline"
 import { CostEstimatesList } from "@/components/cost-estimates-list"
+import { SendProposalDialog } from "@/components/send-proposal-dialog" // Import the new dialog
 
-// Helper function to generate QR code URL
+// Helper function to generate QR code URL (kept here for consistency with proposal view)
 const generateQRCodeUrl = (proposalId: string) => {
   const proposalViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/proposals/view/${proposalId}`
   return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(proposalViewUrl)}`
@@ -38,11 +39,9 @@ export default function ProposalDetailsPage() {
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
   const [downloadingPDF, setDownloadingPDF] = useState(false)
-  const [sendingEmail, setSendingEmail] = useState(false)
-  const [resendingEmail, setResendingEmail] = useState(false)
-  const [emailStep, setEmailStep] = useState("")
   const [timelineOpen, setTimelineOpen] = useState(false)
   const [lightboxImage, setLightboxImage] = useState<{ url: string; isVideo: boolean } | null>(null)
+  const [isSendDialogOpen, setIsSendDialogOpen] = useState(false) // New state for send dialog
 
   useEffect(() => {
     async function fetchProposal() {
@@ -86,73 +85,10 @@ export default function ProposalDetailsPage() {
     }
   }
 
-  const handleSendToClient = async () => {
-    if (!proposal) return
-
-    setSendingEmail(true)
-    try {
-      setEmailStep("Preparing proposal...")
-      await new Promise((resolve) => setTimeout(resolve, 500)) // Brief pause for UX
-
-      setEmailStep("Generating PDF attachment...")
-      await new Promise((resolve) => setTimeout(resolve, 800))
-
-      setEmailStep("Sending email to client...")
-      await sendProposalEmail(proposal, proposal.client.email)
-
-      setEmailStep("Updating proposal status...")
-      await updateProposalStatus(proposal.id, "sent")
-      setProposal({ ...proposal, status: "sent" })
-
-      toast({
-        title: "Proposal sent successfully!",
-        description: `Your proposal has been sent to ${proposal.client.email}. The client will receive an email with the proposal details and access code.`,
-      })
-    } catch (error) {
-      console.error("Error sending proposal:", error)
-      toast({
-        title: "Error",
-        description: "Failed to send proposal to client",
-        variant: "destructive",
-      })
-    } finally {
-      setSendingEmail(false)
-      setEmailStep("")
-    }
-  }
-
-  const handleResendEmail = async () => {
-    if (!proposal) return
-
-    setResendingEmail(true)
-    try {
-      setEmailStep("Preparing to resend...")
-      await new Promise((resolve) => setTimeout(resolve, 300))
-
-      setEmailStep("Generating fresh PDF...")
-      await new Promise((resolve) => setTimeout(resolve, 600))
-
-      setEmailStep("Sending email to client...")
-      await sendProposalEmail(proposal, proposal.client.email)
-
-      setEmailStep("Logging activity...")
-      await new Promise((resolve) => setTimeout(resolve, 200))
-
-      toast({
-        title: "Proposal resent successfully!",
-        description: `The proposal has been resent to ${proposal.client.email}. The client will receive a new email with the proposal details and access code.`,
-      })
-    } catch (error) {
-      console.error("Error resending proposal:", error)
-      toast({
-        title: "Error",
-        description: "Failed to resend proposal to client",
-        variant: "destructive",
-      })
-    } finally {
-      setResendingEmail(false)
-      setEmailStep("")
-    }
+  // Callback for when the proposal is successfully sent from the dialog
+  const handleProposalSent = (proposalId: string, newStatus: Proposal["status"]) => {
+    setProposal((prev) => (prev ? { ...prev, status: newStatus } : null))
+    // Toast is handled by the dialog itself
   }
 
   const handleDownloadPDF = async () => {
@@ -669,25 +605,25 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
 
-      {/* Floating Send Button */}
+      {/* Floating Send Button - now opens dialog */}
       {proposal.status === "draft" && (
         <Button
-          onClick={handleSendToClient}
-          disabled={sendingEmail}
+          onClick={() => setIsSendDialogOpen(true)} // Open the new dialog
           className="fixed bottom-6 right-32 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
         >
-          {sendingEmail ? (
-            <>
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              Sending...
-            </>
-          ) : (
-            <>
-              <Send className="h-5 w-5 mr-2" />
-              Send
-            </>
-          )}
+          <Send className="h-5 w-5 mr-2" />
+          Send
         </Button>
+      )}
+
+      {/* Send Proposal Dialog */}
+      {proposal && (
+        <SendProposalDialog
+          isOpen={isSendDialogOpen}
+          onClose={() => setIsSendDialogOpen(false)}
+          proposal={proposal}
+          onProposalSent={handleProposalSent}
+        />
       )}
 
       {/* Timeline Sidebar */}

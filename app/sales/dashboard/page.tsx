@@ -20,7 +20,6 @@ import {
   Filter,
   AlertCircle,
   Search,
-  FileText,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -47,6 +46,7 @@ import { useResponsive } from "@/hooks/use-responsive"
 import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
 import { OhliverWelcomeNotification } from "@/components/ohliver-welcome-notification"
 import { cn } from "@/lib/utils"
+import { CeQuoteActionDialog } from "@/components/ce-quote-action-dialog"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -101,6 +101,10 @@ function SalesDashboardContent() {
   const [createProposalOpen, setCreateProposalOpen] = useState(false)
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([])
   const [selectionMode, setSelectionMode] = useState(false)
+
+  const [ceQuoteMode, setCeQuoteMode] = useState(false)
+  const [selectedSites, setSelectedSites] = useState<Product[]>([])
+  const [showActionDialog, setShowActionDialog] = useState(false)
 
   // On mobile, default to grid view
   useEffect(() => {
@@ -238,7 +242,7 @@ function SalesDashboardContent() {
         console.error("Error fetching products:", error)
         toast({
           title: "Error",
-          description: "Failed to load products. Please try again.",
+          description: "Failed to load product count. Please try again.",
           variant: "destructive",
         })
       } finally {
@@ -459,6 +463,58 @@ function SalesDashboardContent() {
     })
   }
 
+  // Handle CE/Quote mode
+  const handleCeQuoteMode = () => {
+    setCeQuoteMode(true)
+    setSelectedSites([])
+  }
+
+  const handleSiteSelect = (product: Product) => {
+    setSelectedSites((prev) => {
+      const isSelected = prev.some((p) => p.id === product.id)
+      if (isSelected) {
+        return prev.filter((p) => p.id !== product.id)
+      } else {
+        return [...prev, product]
+      }
+    })
+  }
+
+  const handleConfirmSiteSelection = () => {
+    if (selectedSites.length > 0) {
+      setShowActionDialog(true)
+    } else {
+      toast({
+        title: "No sites selected",
+        description: "Please select at least one site to proceed.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleCancelCeQuote = () => {
+    setCeQuoteMode(false)
+    setSelectedSites([])
+  }
+
+  const handleCreateCostEstimate = () => {
+    // Navigate to cost estimate creation with selected sites
+    const siteIds = selectedSites.map((site) => site.id).join(",")
+    router.push(`/sales/cost-estimates/create?sites=${siteIds}`)
+    setShowActionDialog(false)
+    setCeQuoteMode(false)
+    setSelectedSites([])
+  }
+
+  const handleCreateQuotation = () => {
+    // Navigate to quotation creation with selected sites
+    const siteIds = selectedSites.map((site) => site.id).join(",")
+    router.push(`/sales/quotations/create?sites=${siteIds}`)
+    setShowActionDialog(false)
+    setCeQuoteMode(false)
+    setSelectedSites([])
+  }
+
   return (
     <div className="flex-1 p-4 md:p-6">
       <div className="flex flex-col gap-4 md:gap-6">
@@ -480,24 +536,45 @@ function SalesDashboardContent() {
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
             {/* Selection Mode Controls */}
-            {selectionMode && (
+            {(selectionMode || ceQuoteMode) && (
               <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                <span className="text-sm text-blue-700">{selectedProducts.length} selected</span>
-                <Button size="sm" onClick={handleConfirmSelection} disabled={selectedProducts.length === 0}>
-                  Create Proposal
-                </Button>
-                <Button size="sm" variant="outline" onClick={handleCancelSelection}>
-                  Cancel
-                </Button>
+                <span className="text-sm text-blue-700">
+                  {selectionMode ? `${selectedProducts.length} selected` : `${selectedSites.length} sites selected`}
+                </span>
+                {selectionMode ? (
+                  <>
+                    <Button size="sm" onClick={handleConfirmSelection} disabled={selectedProducts.length === 0}>
+                      Create Proposal
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleCancelSelection}>
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button size="sm" onClick={handleConfirmSiteSelection} disabled={selectedSites.length === 0}>
+                      Choose Action
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleCancelCeQuote}>
+                      Cancel
+                    </Button>
+                  </>
+                )}
               </div>
             )}
 
-            {/* Create Proposal Button */}
-            {!selectionMode && !isSearching && (
-              <Button onClick={handleCreateProposal} className="gap-2">
-                <FileText size={16} />
-                Planning & Proposals
-              </Button>
+            {/* Action Buttons */}
+            {!selectionMode && !ceQuoteMode && !isSearching && (
+              <div className="flex gap-2">
+                <Button onClick={handleCreateProposal} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
+                  Planning & Proposals
+                </Button>
+                <Button onClick={handleCeQuoteMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
+                  CE/Quote
+                </Button>
+                <Button className="bg-[#ff3333] text-white hover:bg-[#cc2929]">Collab</Button>
+                <Button className="bg-[#ff3333] text-white hover:bg-[#cc2929]">Job Order</Button>
+              </div>
             )}
 
             {!isMobile && (
@@ -505,7 +582,7 @@ function SalesDashboardContent() {
                 <Button
                   variant={viewMode === "grid" ? "default" : "ghost"}
                   size="icon"
-                  className="h-8 w-8"
+                  className={cn("h-8 w-8", viewMode === "grid" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
                   onClick={() => setViewMode("grid")}
                 >
                   <LayoutGrid size={18} />
@@ -513,7 +590,7 @@ function SalesDashboardContent() {
                 <Button
                   variant={viewMode === "list" ? "default" : "ghost"}
                   size="icon"
-                  className="h-8 w-8"
+                  className={cn("h-8 w-8", viewMode === "list" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
                   onClick={() => setViewMode("list")}
                 >
                   <List size={18} />
@@ -726,9 +803,13 @@ function SalesDashboardContent() {
                     onView={() => handleViewDetails(product.id)}
                     onEdit={(e) => handleEditClick(product, e)}
                     onDelete={(e) => handleDeleteClick(product, e)}
-                    isSelected={selectedProducts.some((p) => p.id === product.id)}
-                    onSelect={() => handleProductSelect(product)}
-                    selectionMode={selectionMode}
+                    isSelected={
+                      selectionMode
+                        ? selectedProducts.some((p) => p.id === product.id)
+                        : selectedSites.some((p) => p.id === product.id)
+                    }
+                    onSelect={() => (selectionMode ? handleProductSelect(product) : handleSiteSelect(product))}
+                    selectionMode={selectionMode || ceQuoteMode}
                   />
                 ))}
               </ResponsiveCardGrid>
@@ -756,7 +837,15 @@ function SalesDashboardContent() {
                         <TableRow
                           key={product.id}
                           className={`cursor-pointer hover:bg-gray-50 ${selectionMode ? "opacity-50" : ""}`}
-                          onClick={() => (selectionMode ? handleProductSelect(product) : handleViewDetails(product.id))}
+                          onClick={() => {
+                            if (selectionMode) {
+                              handleProductSelect(product)
+                            } else if (ceQuoteMode) {
+                              handleSiteSelect(product)
+                            } else {
+                              handleViewDetails(product.id)
+                            }
+                          }}
                         >
                           <TableCell>
                             <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
@@ -898,6 +987,18 @@ function SalesDashboardContent() {
           </>
         )}
       </div>
+
+      {/* CE/Quote Action Dialog */}
+      <CeQuoteActionDialog
+        isOpen={showActionDialog}
+        onClose={() => setShowActionDialog(false)}
+        selectedSites={selectedSites}
+        onActionCompleted={() => {
+          setShowActionDialog(false)
+          setCeQuoteMode(false)
+          setSelectedSites([])
+        }}
+      />
 
       {/* Create Proposal Dialog */}
       <CreateProposalDialog
