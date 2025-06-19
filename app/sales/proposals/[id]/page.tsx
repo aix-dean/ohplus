@@ -607,13 +607,25 @@ export default function ProposalDetailsPage() {
 
       {/* Floating Send Button - now opens dialog */}
       {proposal.status === "draft" && (
-        <Button
-          onClick={() => setIsSendDialogOpen(true)} // Open the new dialog
-          className="fixed bottom-6 right-32 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
-        >
-          <Send className="h-5 w-5 mr-2" />
-          Send
-        </Button>
+        <div className="fixed bottom-6 right-6 flex space-x-4">
+          {" "}
+          {/* Use a flex container for both buttons */}
+          <Button
+            onClick={() => handleStatusUpdate("draft")} // Explicitly save as draft
+            variant="outline" // Use outline variant for a secondary action
+            className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+          >
+            <FileText className="h-5 w-5 mr-2" /> {/* Using FileText as a "draft" icon */}
+            Save as Draft
+          </Button>
+          <Button
+            onClick={() => setIsSendDialogOpen(true)}
+            className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+          >
+            <Send className="h-5 w-5 mr-2" />
+            Send
+          </Button>
+        </div>
       )}
 
       {/* Send Proposal Dialog */}

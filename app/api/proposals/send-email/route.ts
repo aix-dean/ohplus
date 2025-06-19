@@ -26,25 +26,42 @@ export async function POST(request: NextRequest) {
       hasProposal: !!body.proposal,
       hasClientEmail: !!body.clientEmail,
       proposalId: body.proposal?.id,
-      customSubject: body.subject, // New: custom subject
-      customBody: body.body, // New: custom body
+      customSubject: body.subject,
+      customBody: body.body,
+      currentUserEmail: body.currentUserEmail,
+      ccEmail: body.ccEmail, // Now a string that might contain multiple emails
     })
 
-    const { proposal, clientEmail, subject, body: customBody } = body // Destructure new fields
+    const { proposal, clientEmail, subject, body: customBody, currentUserEmail, ccEmail } = body
 
     if (!proposal || !clientEmail) {
       console.error("Missing required fields:", { proposal: !!proposal, clientEmail: !!clientEmail })
       return NextResponse.json({ error: "Missing proposal or client email address" }, { status: 400 })
     }
 
-    // Validate email format
+    // Validate email format for 'To'
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(clientEmail)) {
-      console.error("Invalid email format:", clientEmail)
-      return NextResponse.json({ error: "Invalid email address format" }, { status: 400 })
+      console.error("Invalid 'To' email format:", clientEmail)
+      return NextResponse.json({ error: "Invalid 'To' email address format" }, { status: 400 })
     }
 
-    const proposalUrl = `https://ohplus.aix.ph/proposals/view/${proposal.id}`
+    // Process and validate multiple CC emails
+    const ccEmailsArray = ccEmail
+      ? ccEmail
+          .split(",")
+          .map((email: string) => email.trim())
+          .filter(Boolean)
+      : []
+
+    for (const email of ccEmailsArray) {
+      if (!emailRegex.test(email)) {
+        console.error("Invalid 'CC' email format:", email)
+        return NextResponse.json({ error: `Invalid 'CC' email address format: ${email}` }, { status: 400 })
+      }
+    }
+
+    const proposalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/proposals/view/${proposal.id}`
 
     // Generate PDF as base64 for attachment
     let pdfBase64 = null
@@ -284,6 +301,8 @@ export async function POST(request: NextRequest) {
       to: [clientEmail],
       subject: finalSubject, // Use the final subject
       html: finalBody, // Use the final body
+      reply_to: currentUserEmail ? [currentUserEmail] : undefined, // Set reply-to to current user's email
+      cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined, // Add CC if provided
     }
 
     // Add PDF attachment if generated successfully

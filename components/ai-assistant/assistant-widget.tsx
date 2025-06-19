@@ -1,10 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
 import { AssistantChatOptimized } from "./assistant-chat-optimized"
 import { usePathname } from "next/navigation"
-import Image from "next/image"
 
 export function AssistantWidget() {
   const [isOpen, setIsOpen] = useState(false)
@@ -31,21 +29,10 @@ export function AssistantWidget() {
     }
   }, [])
 
+  // The floating button is removed. The chat will only appear if `isOpen` is true,
+  // which can be triggered by the `openOhliverAssistant` event.
   if (!isOpen) {
-    return (
-      <Button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-4 right-4 rounded-full h-14 w-14 p-0 shadow-lg hover:shadow-xl transition-all duration-200 bg-primary hover:bg-primary/90"
-      >
-        <Image
-          src="/ohliver-mascot.png"
-          alt="OHLIVER - OH Plus AI Assistant"
-          width={40}
-          height={40}
-          className="rounded-full"
-        />
-      </Button>
-    )
+    return null // Render nothing if the chat is not open
   }
 
   return (

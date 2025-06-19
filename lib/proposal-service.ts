@@ -155,6 +155,8 @@ export async function sendProposalEmail(
   clientEmail: string,
   subject?: string, // Added subject parameter
   body?: string, // Added body parameter
+  currentUserEmail?: string, // New: current user's email for reply-to
+  ccEmail?: string, // New: CC email
 ): Promise<void> {
   try {
     console.log("Sending proposal email to:", clientEmail)
@@ -169,6 +171,8 @@ export async function sendProposalEmail(
         clientEmail,
         subject, // Pass subject
         body, // Pass body
+        currentUserEmail, // Pass current user's email
+        ccEmail, // Pass CC email
       }),
     })
 

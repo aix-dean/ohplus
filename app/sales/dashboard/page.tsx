@@ -1,13 +1,12 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import {
-  MoreVertical,
   MapPin,
   LayoutGrid,
   List,
@@ -20,14 +19,14 @@ import {
   Filter,
   AlertCircle,
   Search,
+  CheckCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
-import { CreateProposalDialog } from "@/components/create-proposal-dialog"
+// Removed: import { CreateProposalDialog } from "@/components/create-proposal-dialog"
 import {
   getPaginatedUserProducts,
   getUserProductsCount,
@@ -44,9 +43,18 @@ import type { SearchResult } from "@/lib/algolia-service"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useResponsive } from "@/hooks/use-responsive"
 import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
-import { OhliverWelcomeNotification } from "@/components/ohliver-welcome-notification"
 import { cn } from "@/lib/utils"
 import { CeQuoteActionDialog } from "@/components/ce-quote-action-dialog"
+import { SalesChatWidget } from "@/components/sales-chat/sales-chat-widget"
+import { Input } from "@/components/ui/input"
+import { useDebounce } from "@/hooks/use-debounce"
+import { getPaginatedClients, type Client } from "@/lib/client-service"
+import { createProposal } from "@/lib/proposal-service" // Added: Import createProposal
+import type { ProposalClient } from "@/lib/types/proposal"
+// Add the import for ProposalHistory
+import { ProposalHistory } from "@/components/proposal-history"
+// Import Dialog components
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -94,17 +102,33 @@ function SalesDashboardContent() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingCount, setLoadingCount] = useState(false)
 
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
 
-  const [createProposalOpen, setCreateProposalOpen] = useState(false)
+  // Proposal Creation Flow State
+  // Removed: const [createProposalOpen, setCreateProposalOpen] = useState(false)
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([])
-  const [selectionMode, setSelectionMode] = useState(false)
+  const [proposalCreationMode, setProposalCreationMode] = useState(false) // True when client & product selection is active
+  const [selectedClientForProposal, setSelectedClientForProposal] = useState<ProposalClient | null>(null)
+  const [isCreatingProposal, setIsCreatingProposal] = useState(false) // New loading state for proposal creation
 
+  // Client Search/Selection on Dashboard
+  const [dashboardClientSearchTerm, setDashboardClientSearchTerm] = useState("")
+  const [dashboardClientSearchResults, setDashboardClientSearchResults] = useState<Client[]>([])
+  const [isSearchingDashboardClients, setIsSearchingDashboardClients] = useState(false)
+  const debouncedDashboardClientSearchTerm = useDebounce(dashboardClientSearchTerm, 500)
+
+  const clientSearchRef = useRef<HTMLDivElement>(null)
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false)
+
+  // CE/Quote mode
   const [ceQuoteMode, setCeQuoteMode] = useState(false)
   const [selectedSites, setSelectedSites] = useState<Product[]>([])
   const [showActionDialog, setShowActionDialog] = useState(false)
+
+  // State for "Collab Coming Soon" dialog
+  const [isCollabComingSoonOpen, setIsCollabComingSoonOpen] = useState(false)
 
   // On mobile, default to grid view
   useEffect(() => {
@@ -112,6 +136,40 @@ function SalesDashboardContent() {
       setViewMode("grid")
     }
   }, [isMobile])
+
+  // Fetch clients for dashboard client selection
+  useEffect(() => {
+    const fetchClients = async () => {
+      if (proposalCreationMode) {
+        setIsSearchingDashboardClients(true)
+        try {
+          const result = await getPaginatedClients(10, null, debouncedDashboardClientSearchTerm.trim())
+          setDashboardClientSearchResults(result.items)
+        } catch (error) {
+          console.error("Error fetching clients for dashboard:", error)
+          setDashboardClientSearchResults([])
+        } finally {
+          setIsSearchingDashboardClients(false)
+        }
+      } else {
+        setDashboardClientSearchResults([])
+      }
+    }
+    fetchClients()
+  }, [debouncedDashboardClientSearchTerm, proposalCreationMode])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (clientSearchRef.current && !clientSearchRef.current.contains(event.target as Node)) {
+        setIsClientDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
 
   // Check for ongoing bookings
   const checkOngoingBookings = useCallback(
@@ -419,9 +477,40 @@ function SalesDashboardContent() {
     handleSearchClear()
   }
 
-  // Handle proposal creation
-  const handleCreateProposal = () => {
-    setSelectionMode(true)
+  // Handle proposal creation flow
+  const handleInitiateProposalFlow = () => {
+    setProposalCreationMode(true) // Activate the combined client & product selection mode
+    setSelectedClientForProposal(null) // Reset selected client
+    setDashboardClientSearchTerm("") // Clear client search term
+    setSelectedProducts([]) // Clear any previously selected products
+  }
+
+  const handleClientSelectOnDashboard = (client: Client) => {
+    setSelectedClientForProposal({
+      id: client.id,
+      company: client.company || "",
+      contactPerson: client.name || "",
+      email: client.email || "",
+      phone: client.phone || "",
+      address: client.address || "",
+      industry: client.industry || "",
+      targetAudience: "", // These might need to be fetched or added later
+      campaignObjective: "", // These might need to be fetched or added later
+    })
+    setDashboardClientSearchTerm(client.company || client.name || "") // Display selected client in search bar
+    toast({
+      title: "Client Selected",
+      description: `Selected ${client.name} (${client.company}). Now select products.`,
+      variant: "success",
+    })
+    setIsClientDropdownOpen(false) // Close dropdown after selection
+  }
+
+  const handleCancelProposalCreationMode = () => {
+    setProposalCreationMode(false)
+    setSelectedClientForProposal(null)
+    setDashboardClientSearchTerm("")
+    setDashboardClientSearchResults([])
     setSelectedProducts([])
   }
 
@@ -436,32 +525,68 @@ function SalesDashboardContent() {
     })
   }
 
-  const handleConfirmSelection = () => {
-    if (selectedProducts.length > 0) {
-      setCreateProposalOpen(true)
-    } else {
+  const handleConfirmProposalCreation = async () => {
+    if (!selectedClientForProposal) {
       toast({
-        title: "No products selected",
-        description: "Please select at least one product to create a proposal.",
+        title: "No Client Selected",
+        description: "Please select a client first.",
         variant: "destructive",
       })
+      return
+    }
+    if (selectedProducts.length === 0) {
+      toast({
+        title: "No products selected",
+        description: "Please select at least one product for the proposal.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!user?.uid) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to create a proposal.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsCreatingProposal(true) // Set loading state for proposal creation
+    try {
+      // Generate a simple title for the proposal
+      const proposalTitle = `Proposal for ${selectedClientForProposal.company} - ${new Date().toLocaleDateString()}`
+
+      const proposalId = await createProposal(proposalTitle, selectedClientForProposal, selectedProducts, user.uid, {
+        // You can add notes or custom messages here if needed
+        // notes: "Generated from dashboard selection",
+      })
+
+      toast({
+        title: "Proposal Created",
+        description: "Your proposal has been created successfully.",
+      })
+
+      // Redirect to the new proposal's detail page
+      router.push(`/sales/proposals/${proposalId}`)
+
+      // Reset the proposal creation mode and selected items
+      setProposalCreationMode(false)
+      setSelectedProducts([])
+      setSelectedClientForProposal(null)
+    } catch (error) {
+      console.error("Error creating proposal:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create proposal. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsCreatingProposal(false) // Reset loading state
     }
   }
 
-  const handleCancelSelection = () => {
-    setSelectionMode(false)
-    setSelectedProducts([])
-  }
-
-  const handleProposalCreated = () => {
-    setCreateProposalOpen(false)
-    setSelectionMode(false)
-    setSelectedProducts([])
-    toast({
-      title: "Proposal created",
-      description: "Your proposal has been created successfully.",
-    })
-  }
+  // Removed: handleProposalCreated function as it's no longer needed
 
   // Handle CE/Quote mode
   const handleCeQuoteMode = () => {
@@ -517,474 +642,590 @@ function SalesDashboardContent() {
 
   return (
     <div className="flex-1 p-4 md:p-6">
-      <div className="flex flex-col gap-4 md:gap-6">
-        {/* Header with title, actions, and search box */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex flex-col gap-2">
-            <h1 className="text-xl md:text-2xl font-bold">Dashboard</h1>
-            <div className="w-full sm:w-64 md:w-80">
-              <SearchBox
-                onSearchResults={handleSearchResults}
-                onSearchError={handleSearchError}
-                onSearchLoading={handleSearchLoading}
-                onSearchClear={handleSearchClear}
-                showDropdown={false}
-                userId={user?.uid} // Pass the current user's ID
-              />
+      <div
+        className={cn(
+          "grid grid-cols-1 gap-6",
+          proposalCreationMode && "lg:grid-cols-[1fr_300px]", // Apply two-column layout only when proposalCreationMode is true
+        )}
+      >
+        {/* Left Column: Main Dashboard Content */}
+        <div className="flex flex-col gap-4 md:gap-6">
+          {/* Header with title, actions, and search box */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div className="flex flex-col gap-2">
+              <h1 className="text-xl md:text-2xl font-bold">
+                {userData?.first_name ? `${userData.first_name}'s Dashboard` : "Dashboard"}
+              </h1>
+              {/* Conditionally hide the SearchBox when in proposalCreationMode */}
+              {!proposalCreationMode && (
+                <div className="w-full sm:w-64 md:w-80">
+                  <SearchBox
+                    onSearchResults={handleSearchResults}
+                    onSearchError={handleSearchError}
+                    onSearchLoading={handleSearchLoading}
+                    onSearchClear={handleSearchClear}
+                    showDropdown={false}
+                    userId={user?.uid}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+              {/* Proposal Creation Mode Controls (on dashboard) */}
+              {proposalCreationMode && (
+                <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                  <span className="text-sm text-blue-700">
+                    {selectedClientForProposal ? (
+                      <>
+                        Client: <span className="font-semibold">{selectedClientForProposal.company}</span>
+                      </>
+                    ) : (
+                      "Select a client"
+                    )}
+                    {selectedProducts.length > 0 && `, ${selectedProducts.length} products selected`}
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={handleConfirmProposalCreation}
+                    disabled={!selectedClientForProposal || selectedProducts.length === 0 || isCreatingProposal}
+                  >
+                    {isCreatingProposal ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Create Proposal
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleCancelProposalCreationMode}>
+                    Cancel
+                  </Button>
+                </div>
+              )}
+
+              {/* CE/Quote Mode Controls */}
+              {ceQuoteMode && (
+                <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                  <span className="text-sm text-blue-700">{selectedSites.length} sites selected</span>
+                  <Button size="sm" onClick={handleConfirmSiteSelection} disabled={selectedSites.length === 0}>
+                    Choose Action
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleCancelCeQuote}>
+                    Cancel
+                  </Button>
+                </div>
+              )}
+
+              {/* Action Buttons (only visible when not in any selection mode) */}
+              {!ceQuoteMode && !isSearching && (
+                <div className="flex gap-2">
+                  {!proposalCreationMode && ( // Only show these if not in proposal creation mode
+                    <>
+                      <Button
+                        onClick={handleInitiateProposalFlow}
+                        className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
+                      >
+                        Planning & Proposals
+                      </Button>
+                      <Button onClick={handleCeQuoteMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
+                        CE/Quote
+                      </Button>
+                    </>
+                  )}
+                  <Button
+                    className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
+                    onClick={() => setIsCollabComingSoonOpen(true)} // Added onClick handler
+                  >
+                    Collab
+                  </Button>{" "}
+                  {/* This button is now always visible */}
+                  {!proposalCreationMode && ( // Only show this if not in proposal creation mode
+                    <Button className="bg-[#ff3333] text-white hover:bg-[#cc2929]">Job Order</Button>
+                  )}
+                </div>
+              )}
+
+              {!isMobile && (
+                <div className="border rounded-md p-1 flex">
+                  <Button
+                    variant={viewMode === "grid" ? "default" : "ghost"}
+                    size="icon"
+                    className={cn("h-8 w-8", viewMode === "grid" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
+                    onClick={() => setViewMode("grid")}
+                  >
+                    <LayoutGrid size={18} />
+                  </Button>
+                  <Button
+                    variant={viewMode === "list" ? "default" : "ghost"}
+                    size="icon"
+                    className={cn("h-8 w-8", viewMode === "list" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
+                    onClick={() => setViewMode("list")}
+                  >
+                    <List size={18} />
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
-            {/* Selection Mode Controls */}
-            {(selectionMode || ceQuoteMode) && (
-              <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                <span className="text-sm text-blue-700">
-                  {selectionMode ? `${selectedProducts.length} selected` : `${selectedSites.length} sites selected`}
-                </span>
-                {selectionMode ? (
-                  <>
-                    <Button size="sm" onClick={handleConfirmSelection} disabled={selectedProducts.length === 0}>
-                      Create Proposal
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleCancelSelection}>
-                      Cancel
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button size="sm" onClick={handleConfirmSiteSelection} disabled={selectedSites.length === 0}>
-                      Choose Action
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleCancelCeQuote}>
-                      Cancel
-                    </Button>
-                  </>
+          {/* Client Selection UI on Dashboard - Visible when proposalCreationMode is active */}
+          {proposalCreationMode && (
+            <div className="relative w-full max-w-xs" ref={clientSearchRef}>
+              {" "}
+              {/* Added max-w-xs */}
+              <div className="relative">
+                <Input
+                  placeholder="Search clients..."
+                  value={
+                    selectedClientForProposal
+                      ? selectedClientForProposal.company || selectedClientForProposal.contactPerson
+                      : dashboardClientSearchTerm
+                  }
+                  onChange={(e) => {
+                    setDashboardClientSearchTerm(e.target.value)
+                    setSelectedClientForProposal(null) // Clear selected client when typing
+                  }}
+                  onFocus={() => {
+                    setIsClientDropdownOpen(true)
+                    // If a client is selected, clear the search term to allow new search
+                    if (selectedClientForProposal) {
+                      setDashboardClientSearchTerm("")
+                    }
+                  }}
+                  className={cn(
+                    "pr-10 h-9 text-sm",
+                    proposalCreationMode && "border-blue-500 ring-2 ring-blue-200", // Added highlight
+                  )}
+                />
+                {isSearchingDashboardClients && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
                 )}
               </div>
-            )}
-
-            {/* Action Buttons */}
-            {!selectionMode && !ceQuoteMode && !isSearching && (
-              <div className="flex gap-2">
-                <Button onClick={handleCreateProposal} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
-                  Planning & Proposals
-                </Button>
-                <Button onClick={handleCeQuoteMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
-                  CE/Quote
-                </Button>
-                <Button className="bg-[#ff3333] text-white hover:bg-[#cc2929]">Collab</Button>
-                <Button className="bg-[#ff3333] text-white hover:bg-[#cc2929]">Job Order</Button>
-              </div>
-            )}
-
-            {!isMobile && (
-              <div className="border rounded-md p-1 flex">
-                <Button
-                  variant={viewMode === "grid" ? "default" : "ghost"}
-                  size="icon"
-                  className={cn("h-8 w-8", viewMode === "grid" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
-                  onClick={() => setViewMode("grid")}
-                >
-                  <LayoutGrid size={18} />
-                </Button>
-                <Button
-                  variant={viewMode === "list" ? "default" : "ghost"}
-                  size="icon"
-                  className={cn("h-8 w-8", viewMode === "list" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
-                  onClick={() => setViewMode("list")}
-                >
-                  <List size={18} />
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Search Results View */}
-        {isSearching && (
-          <div className="flex flex-col gap-4">
-            {/* Search Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={handleClearSearch} className="h-8 w-8 p-0">
-                  <ArrowLeft size={16} />
-                </Button>
-                <h2 className="text-base md:text-lg font-medium truncate">
-                  Results for "{searchQuery}" ({searchResults.length})
-                </h2>
-              </div>
-              <Button variant="outline" size="sm" className="gap-1 hidden sm:flex">
-                <Filter size={14} />
-                <span>Filter</span>
-              </Button>
-            </div>
-
-            {/* Search Error */}
-            {searchError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{searchError}</AlertDescription>
-              </Alert>
-            )}
-
-            {/* Search Results */}
-            {searchResults.length > 0 ? (
-              <div>
-                {viewMode === "grid" ? (
-                  // Grid View for Search Results
-                  <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
-                    {searchResults.map((result) => (
-                      <Card
-                        key={result.objectID}
-                        className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
-                        onClick={() => handleSearchResultClick(result)}
-                      >
-                        <div className="h-48 bg-gray-200 relative">
-                          <Image
-                            src={result.image_url || "/abstract-geometric-sculpture.png"}
-                            alt={result.name || "Search result"}
-                            fill
-                            className="object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.src = "/abstract-geometric-sculpture.png"
-                              target.className = "opacity-50 object-contain"
-                            }}
-                          />
-                        </div>
-
-                        <CardContent className="p-4">
-                          <div className="flex flex-col">
-                            {result.site_code && (
-                              <span className="text-xs text-gray-700 mb-1">Site Code: {result.site_code}</span>
-                            )}
-
-                            <h3 className="font-semibold line-clamp-1">{result.name}</h3>
-
-                            {result.price && (
-                              <div className="mt-2 text-sm font-medium text-green-700">
-                                ₱{Number(result.price).toLocaleString()}
-                              </div>
-                            )}
-
-                            {result.location && (
-                              <div className="mt-1 text-xs text-gray-500 flex items-center">
-                                <MapPin size={12} className="mr-1 flex-shrink-0" />
-                                <span className="truncate">{result.location}</span>
-                              </div>
+              {/* Results dropdown */}
+              {isClientDropdownOpen &&
+                (dashboardClientSearchTerm.trim() || dashboardClientSearchResults.length > 0) && (
+                  <Card className="absolute top-full z-50 mt-1 w-full max-h-[200px] overflow-auto shadow-lg">
+                    <div className="p-2">
+                      {dashboardClientSearchResults.length > 0 ? (
+                        dashboardClientSearchResults.map((result) => (
+                          <div
+                            key={result.id}
+                            className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
+                            onClick={() => handleClientSelectOnDashboard(result)}
+                          >
+                            <div>
+                              <p className="font-medium">
+                                {result.name} ({result.company})
+                              </p>
+                              <p className="text-xs text-gray-500">{result.email}</p>
+                            </div>
+                            {selectedClientForProposal?.id === result.id && (
+                              <CheckCircle className="h-4 w-4 text-green-500" />
                             )}
                           </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </ResponsiveCardGrid>
-                ) : (
-                  // List View for Search Results - Only show on tablet and desktop
-                  !isMobile && (
-                    <div className="border rounded-lg overflow-hidden">
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-[80px]">Image</TableHead>
-                              <TableHead>Name</TableHead>
-                              <TableHead>Type</TableHead>
-                              <TableHead className="hidden md:table-cell">Location</TableHead>
-                              <TableHead>Price</TableHead>
-                              <TableHead className="hidden md:table-cell">Site Code</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {searchResults.map((result) => (
-                              <TableRow
-                                key={result.objectID}
-                                className="cursor-pointer hover:bg-gray-50"
-                                onClick={() => handleSearchResultClick(result)}
-                              >
-                                <TableCell>
-                                  <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
-                                    {result.image_url ? (
-                                      <Image
-                                        src={result.image_url || "/placeholder.svg"}
-                                        alt={result.name || "Search result"}
-                                        width={48}
-                                        height={48}
-                                        className="h-full w-full object-cover"
-                                        onError={(e) => {
-                                          const target = e.target as HTMLImageElement
-                                          target.src = "/abstract-geometric-sculpture.png"
-                                          target.className = "opacity-50"
-                                        }}
-                                      />
-                                    ) : (
-                                      <div className="h-full w-full flex items-center justify-center bg-gray-100">
-                                        <MapPin size={16} className="text-gray-400" />
-                                      </div>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="font-medium">{result.name}</TableCell>
-                                <TableCell>
-                                  <Badge
-                                    variant="outline"
-                                    className={
-                                      result.type?.toLowerCase() === "product" ||
-                                      result.type?.toLowerCase() === "rental"
-                                        ? "bg-blue-50 text-blue-700 border-blue-200"
-                                        : result.type?.toLowerCase() === "client"
-                                          ? "bg-green-50 text-green-700 border-green-200"
-                                          : "bg-purple-50 text-purple-700 border-purple-200"
-                                    }
-                                  >
-                                    {result.type || "Unknown"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="hidden md:table-cell">
-                                  {result.location || "Unknown location"}
-                                </TableCell>
-                                <TableCell>
-                                  {result.price ? `₱${Number(result.price).toLocaleString()}` : "Not set"}
-                                </TableCell>
-                                <TableCell className="hidden md:table-cell">{result.site_code || "—"}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-gray-500 text-center py-2">
+                          {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
+                            ? "No clients found matching your search."
+                            : "Start typing to search for clients."}
+                        </p>
+                      )}
                     </div>
-                  )
+                  </Card>
                 )}
-              </div>
-            ) : (
-              // No Search Results
-              <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg border border-dashed">
-                <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <Search size={24} className="text-gray-400" />
+            </div>
+          )}
+
+          {/* Search Results View */}
+          {isSearching && (
+            <div className="flex flex-col gap-4">
+              {/* Search Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={handleClearSearch} className="h-8 w-8 p-0">
+                    <ArrowLeft size={16} />
+                  </Button>
+                  <h2 className="text-base md:text-lg font-medium truncate">
+                    Results for "{searchQuery}" ({searchResults.length})
+                  </h2>
                 </div>
-                <h3 className="text-base md:text-lg font-medium mb-2">No results found</h3>
-                <p className="text-sm text-gray-500 mb-4 px-4">
-                  No items match your search for "{searchQuery}". Try using different keywords.
-                </p>
+                <Button variant="outline" size="sm" className="gap-1 hidden sm:flex">
+                  <Filter size={14} />
+                  <span>Filter</span>
+                </Button>
               </div>
-            )}
-          </div>
-        )}
 
-        {/* Regular Dashboard Content - Only show when not searching */}
-        {!isSearching && (
-          <>
-            {/* Loading state */}
-            {loading && (
-              <div className="flex justify-center items-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-2 text-lg">Loading products...</span>
-              </div>
-            )}
+              {/* Search Error */}
+              {searchError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{searchError}</AlertDescription>
+                </Alert>
+              )}
 
-            {/* Empty state */}
-            {!loading && products.length === 0 && (
-              <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg border border-dashed">
-                <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <MapPin size={24} className="text-gray-400" />
-                </div>
-                <h3 className="text-base md:text-lg font-medium mb-2">No products yet</h3>
-                <p className="text-sm text-gray-500 mb-4">Contact an administrator to add products</p>
-              </div>
-            )}
-
-            {/* Grid View */}
-            {!loading && products.length > 0 && viewMode === "grid" && (
-              <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
-                {products.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    hasOngoingBooking={productsWithBookings[product.id] || false}
-                    onView={() => handleViewDetails(product.id)}
-                    onEdit={(e) => handleEditClick(product, e)}
-                    onDelete={(e) => handleDeleteClick(product, e)}
-                    isSelected={
-                      selectionMode
-                        ? selectedProducts.some((p) => p.id === product.id)
-                        : selectedSites.some((p) => p.id === product.id)
-                    }
-                    onSelect={() => (selectionMode ? handleProductSelect(product) : handleSiteSelect(product))}
-                    selectionMode={selectionMode || ceQuoteMode}
-                  />
-                ))}
-              </ResponsiveCardGrid>
-            )}
-
-            {/* List View - Only show on tablet and desktop */}
-            {!loading && products.length > 0 && viewMode === "list" && !isMobile && (
-              <div className="border rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[80px]">Image</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead className="hidden md:table-cell">Location</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead className="hidden md:table-cell">Site Code</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {products.map((product) => (
-                        <TableRow
-                          key={product.id}
-                          className={`cursor-pointer hover:bg-gray-50 ${selectionMode ? "opacity-50" : ""}`}
-                          onClick={() => {
-                            if (selectionMode) {
-                              handleProductSelect(product)
-                            } else if (ceQuoteMode) {
-                              handleSiteSelect(product)
-                            } else {
-                              handleViewDetails(product.id)
-                            }
-                          }}
+              {/* Search Results */}
+              {searchResults.length > 0 ? (
+                <div>
+                  {viewMode === "grid" ? (
+                    // Grid View for Search Results
+                    <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
+                      {searchResults.map((result) => (
+                        <Card
+                          key={result.objectID}
+                          className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
+                          onClick={() => handleSearchResultClick(result)}
                         >
-                          <TableCell>
-                            <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
-                              {product.media && product.media.length > 0 ? (
-                                <>
-                                  <Image
-                                    src={product.media[0].url || "/placeholder.svg"}
-                                    alt={product.name || "Product image"}
-                                    width={48}
-                                    height={48}
-                                    className={`h-full w-full object-cover ${productsWithBookings[product.id] ? "grayscale" : ""}`}
-                                    onError={(e) => {
-                                      const target = e.target as HTMLImageElement
-                                      target.src = "/abstract-geometric-sculpture.png"
-                                      target.className = "opacity-50"
-                                    }}
-                                  />
-                                </>
-                              ) : (
-                                <div className="h-full w-full flex items-center justify-center bg-gray-100">
-                                  <MapPin size={16} className="text-gray-400" />
+                          <div className="h-48 bg-gray-200 relative">
+                            <Image
+                              src={result.image_url || "/abstract-geometric-sculpture.png"}
+                              alt={result.name || "Search result"}
+                              fill
+                              className="object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.src = "/abstract-geometric-sculpture.png"
+                                target.className = "opacity-50 object-contain"
+                              }}
+                            />
+                          </div>
+
+                          <CardContent className="p-4">
+                            <div className="flex flex-col">
+                              {result.site_code && (
+                                <span className="text-xs text-gray-700 mb-1">Site Code: {result.site_code}</span>
+                              )}
+
+                              <h3 className="font-semibold line-clamp-1">{result.name}</h3>
+
+                              {result.price && (
+                                <div className="mt-2 text-sm font-medium text-green-700">
+                                  ₱{Number(result.price).toLocaleString()}
+                                </div>
+                              )}
+
+                              {result.location && (
+                                <div className="mt-1 text-xs text-gray-500 flex items-center">
+                                  <MapPin size={12} className="mr-1 flex-shrink-0" />
+                                  <span className="truncate">{result.location}</span>
                                 </div>
                               )}
                             </div>
-                          </TableCell>
-                          <TableCell className="font-medium">{product.name}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={
-                                product.type?.toLowerCase() === "rental"
-                                  ? "bg-blue-50 text-blue-700 border-blue-200"
-                                  : "bg-purple-50 text-purple-700 border-purple-200"
-                              }
-                            >
-                              {product.type || "Unknown"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell">
-                            {product.specs_rental?.location || product.light?.location || "Unknown location"}
-                          </TableCell>
-                          <TableCell>
-                            {product.price ? `₱${Number(product.price).toLocaleString()}` : "Not set"}
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell">{getSiteCode(product) || "—"}</TableCell>
-                          <TableCell>
-                            {product.type?.toLowerCase() === "rental" &&
-                              (productsWithBookings[product.id] ? (
-                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                                  <Calendar className="mr-1 h-3 w-3" /> Booked
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                  <CheckCircle2 className="mr-1 h-3 w-3" /> Available
-                                </Badge>
-                              ))}
-                          </TableCell>
-                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                            {/* Edit and delete buttons removed */}
-                          </TableCell>
-                        </TableRow>
+                          </CardContent>
+                        </Card>
                       ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
-
-            {/* Loading More Indicator */}
-            {loadingMore && (
-              <div className="flex justify-center my-4">
-                <div className="flex items-center gap-2">
-                  <Loader2 size={18} className="animate-spin" />
-                  <span>Loading more...</span>
-                </div>
-              </div>
-            )}
-
-            {/* Pagination Controls */}
-            {!loading && products.length > 0 && (
-              <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
-                <div className="text-sm text-gray-500 flex items-center">
-                  {loadingCount ? (
-                    <div className="flex items-center">
-                      <Loader2 size={14} className="animate-spin mr-2" />
-                      <span>Calculating pages...</span>
-                    </div>
+                    </ResponsiveCardGrid>
                   ) : (
-                    <span>
-                      Page {currentPage} of {totalPages} ({products.length} items)
-                    </span>
+                    // List View for Search Results - Only show on tablet and desktop
+                    !isMobile && (
+                      <div className="border rounded-lg overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-[80px]">Image</TableHead>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead className="hidden md:table-cell">Location</TableHead>
+                                <TableHead>Price</TableHead>
+                                <TableHead className="hidden md:table-cell">Site Code</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {searchResults.map((result) => (
+                                <TableRow
+                                  key={result.objectID}
+                                  className="cursor-pointer hover:bg-gray-50"
+                                  onClick={() => handleSearchResultClick(result)}
+                                >
+                                  <TableCell>
+                                    <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
+                                      {result.image_url ? (
+                                        <Image
+                                          src={result.image_url || "/placeholder.svg"}
+                                          alt={result.name || "Search result"}
+                                          width={48}
+                                          height={48}
+                                          className="h-full w-full object-cover"
+                                          onError={(e) => {
+                                            const target = e.target as HTMLImageElement
+                                            target.src = "/abstract-geometric-sculpture.png"
+                                            target.className = "opacity-50"
+                                          }}
+                                        />
+                                      ) : (
+                                        <div className="h-full w-full flex items-center justify-center bg-gray-100">
+                                          <MapPin size={16} className="text-gray-400" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="font-medium">{result.name}</TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        result.type?.toLowerCase() === "product" ||
+                                        result.type?.toLowerCase() === "rental"
+                                          ? "bg-blue-50 text-blue-700 border-blue-200"
+                                          : result.type?.toLowerCase() === "client"
+                                            ? "bg-green-50 text-green-700 border-green-200"
+                                            : "bg-purple-50 text-purple-700 border-purple-200"
+                                      }
+                                    >
+                                      {result.type || "Unknown"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell">
+                                    {result.location || "Unknown location"}
+                                  </TableCell>
+                                  <TableCell>
+                                    {result.price ? `₱${Number(result.price).toLocaleString()}` : "Not set"}
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell">{result.site_code || "—"}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )
                   )}
                 </div>
+              ) : (
+                // No Search Results
+                <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg border border-dashed">
+                  <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <Search size={24} className="text-gray-400" />
+                  </div>
+                  <h3 className="text-base md:text-lg font-medium mb-2">No results found</h3>
+                  <p className="text-sm text-gray-500 mb-4 px-4">
+                    No items match your search for "{searchQuery}". Try using different keywords.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={goToPreviousPage}
-                    disabled={currentPage === 1}
-                    className="h-8 w-8 p-0"
-                  >
-                    <ChevronLeft size={16} />
-                  </Button>
+          {/* Regular Dashboard Content - Only show when not searching */}
+          {!isSearching && (
+            <>
+              {/* Loading state */}
+              {loading && (
+                <div className="flex justify-center items-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <span className="ml-2 text-lg">Loading products...</span>
+                </div>
+              )}
 
-                  {/* Page numbers - Hide on mobile */}
-                  <div className="hidden sm:flex items-center gap-1">
-                    {getPageNumbers().map((page, index) =>
-                      page === "..." ? (
-                        <span key={`ellipsis-${index}`} className="px-2">
-                          ...
-                        </span>
-                      ) : (
-                        <Button
-                          key={`page-${page}`}
-                          variant={currentPage === page ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => goToPage(page as number)}
-                          className="h-8 w-8 p-0"
-                        >
-                          {page}
-                        </Button>
-                      ),
+              {/* Empty state */}
+              {!loading && products.length === 0 && (
+                <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg border border-dashed">
+                  <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <MapPin size={24} className="text-gray-400" />
+                  </div>
+                  <h3 className="text-base md:text-lg font-medium mb-2">No products yet</h3>
+                  <p className="text-sm text-gray-500 mb-4">Contact an administrator to add products</p>
+                </div>
+              )}
+
+              {/* Grid View */}
+              {!loading && products.length > 0 && viewMode === "grid" && (
+                <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
+                  {products.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      hasOngoingBooking={productsWithBookings[product.id] || false}
+                      onView={() => handleViewDetails(product.id)}
+                      onEdit={(e) => handleEditClick(product, e)}
+                      onDelete={(e) => handleDeleteClick(product, e)}
+                      isSelected={
+                        proposalCreationMode
+                          ? selectedProducts.some((p) => p.id === product.id)
+                          : selectedSites.some((p) => p.id === product.id)
+                      }
+                      onSelect={() => (proposalCreationMode ? handleProductSelect(product) : handleSiteSelect(product))}
+                      selectionMode={proposalCreationMode || ceQuoteMode}
+                    />
+                  ))}
+                </ResponsiveCardGrid>
+              )}
+
+              {/* List View - Only show on tablet and desktop */}
+              {!loading && products.length > 0 && viewMode === "list" && !isMobile && (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[80px]">Image</TableHead>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead className="hidden md:table-cell">Location</TableHead>
+                          <TableHead>Price</TableHead>
+                          <TableHead className="hidden md:table-cell">Site Code</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {products.map((product) => (
+                          <TableRow
+                            key={product.id}
+                            className={`cursor-pointer hover:bg-gray-50 ${proposalCreationMode || ceQuoteMode ? "opacity-50" : ""}`}
+                            onClick={() => {
+                              if (proposalCreationMode) {
+                                handleProductSelect(product)
+                              } else if (ceQuoteMode) {
+                                handleSiteSelect(product)
+                              } else {
+                                handleViewDetails(product.id)
+                              }
+                            }}
+                          >
+                            <TableCell>
+                              <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
+                                {product.media && product.media.length > 0 ? (
+                                  <>
+                                    <Image
+                                      src={product.media[0].url || "/placeholder.svg"}
+                                      alt={product.name || "Product image"}
+                                      width={48}
+                                      height={48}
+                                      className={`h-full w-full object-cover ${productsWithBookings[product.id] ? "grayscale" : ""}`}
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement
+                                        target.src = "/abstract-geometric-sculpture.png"
+                                        target.className = "opacity-50"
+                                      }}
+                                    />
+                                  </>
+                                ) : (
+                                  <div className="h-full w-full flex items-center justify-center bg-gray-100">
+                                    <MapPin size={16} className="text-gray-400" />
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-medium">{product.name}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  product.type?.toLowerCase() === "rental"
+                                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                                    : "bg-purple-50 text-purple-700 border-purple-200"
+                                }
+                              >
+                                {product.type || "Unknown"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              {product.specs_rental?.location || product.light?.location || "Unknown location"}
+                            </TableCell>
+                            <TableCell>
+                              {product.price ? `₱${Number(product.price).toLocaleString()}` : "Not set"}
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">{getSiteCode(product) || "—"}</TableCell>
+                            <TableCell>
+                              {product.type?.toLowerCase() === "rental" &&
+                                (productsWithBookings[product.id] ? (
+                                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                                    <Calendar className="mr-1 h-3 w-3" /> Booked
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                    <CheckCircle2 className="mr-1 h-3 w-3" /> Available
+                                  </Badge>
+                                ))}
+                            </TableCell>
+                            <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                              {/* Edit and delete buttons removed */}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
+
+              {/* Loading More Indicator */}
+              {loadingMore && (
+                <div className="flex justify-center my-4">
+                  <div className="flex items-center gap-2">
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>Loading more...</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Pagination Controls */}
+              {!loading && products.length > 0 && (
+                <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
+                  <div className="text-sm text-gray-500 flex items-center">
+                    {loadingCount ? (
+                      <div className="flex items-center">
+                        <Loader2 size={14} className="animate-spin mr-2" />
+                        <span>Calculating pages...</span>
+                      </div>
+                    ) : (
+                      <span>
+                        Page {currentPage} of {totalPages} ({products.length} items)
+                      </span>
                     )}
                   </div>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={goToNextPage}
-                    disabled={currentPage >= totalPages}
-                    className="h-8 w-8 p-0"
-                  >
-                    <ChevronRight size={16} />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToPreviousPage}
+                      disabled={currentPage === 1}
+                      className="h-8 w-8 p-0"
+                    >
+                      <ChevronLeft size={16} />
+                    </Button>
+
+                    {/* Page numbers - Hide on mobile */}
+                    <div className="hidden sm:flex items-center gap-1">
+                      {getPageNumbers().map((page, index) =>
+                        page === "..." ? (
+                          <span key={`ellipsis-${index}`} className="px-2">
+                            ...
+                          </span>
+                        ) : (
+                          <Button
+                            key={`page-${page}`}
+                            variant={currentPage === page ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => goToPage(page as number)}
+                            className="h-8 w-8 p-0"
+                          >
+                            {page}
+                          </Button>
+                        ),
+                      )}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={goToNextPage}
+                      disabled={currentPage >= totalPages}
+                      className="h-8 w-8 p-0"
+                    >
+                      <ChevronRight size={16} />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Right Column: Proposal History - Conditionally rendered */}
+        {proposalCreationMode && (
+          <div className="hidden lg:block">
+            <ProposalHistory />
+          </div>
         )}
       </div>
 
@@ -1000,14 +1241,6 @@ function SalesDashboardContent() {
         }}
       />
 
-      {/* Create Proposal Dialog */}
-      <CreateProposalDialog
-        isOpen={createProposalOpen}
-        onClose={() => setCreateProposalOpen(false)}
-        selectedProducts={selectedProducts}
-        onProposalCreated={handleProposalCreated}
-      />
-
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog
         isOpen={deleteDialogOpen}
@@ -1017,42 +1250,22 @@ function SalesDashboardContent() {
         description="This product will be removed from your dashboard. This action cannot be undone."
         itemName={productToDelete?.name}
       />
+
+      {/* Collab Coming Soon Dialog */}
+      <Dialog open={isCollabComingSoonOpen} onOpenChange={setIsCollabComingSoonOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Collab Feature</DialogTitle>
+            <DialogDescription>This feature is coming soon! Stay tuned for updates.</DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
 
 export default function SalesDashboard() {
-  const [showWelcome, setShowWelcome] = useState(false)
-  const [assistantTriggered, setAssistantTriggered] = useState(false)
   const { user } = useAuth()
-
-  // Check if this is a new session
-  useEffect(() => {
-    const hasSeenWelcome = localStorage.getItem("ohliverWelcomeSeen")
-    const lastLoginTime = localStorage.getItem("lastLoginTime")
-    const currentTime = new Date().getTime()
-
-    // Show welcome if:
-    // 1. User hasn't seen it before, or
-    // 2. It's been more than 24 hours since last login
-    if (!hasSeenWelcome || (lastLoginTime && currentTime - Number.parseInt(lastLoginTime) > 24 * 60 * 60 * 1000)) {
-      setShowWelcome(true)
-      // Update last login time
-      localStorage.setItem("lastLoginTime", currentTime.toString())
-    }
-  }, [user])
-
-  const handleDismissWelcome = () => {
-    localStorage.setItem("ohliverWelcomeSeen", "true")
-    setShowWelcome(false)
-  }
-
-  const handleOpenAssistant = () => {
-    // This will be picked up by the global event listener in AssistantWidget
-    const event = new CustomEvent("openOhliverAssistant")
-    window.dispatchEvent(event)
-    setAssistantTriggered(true)
-  }
 
   return (
     <div>
@@ -1060,13 +1273,8 @@ export default function SalesDashboard() {
         <SalesDashboardContent />
       </ProtectedRoute>
 
-      {showWelcome && (
-        <OhliverWelcomeNotification
-          onDismiss={handleDismissWelcome}
-          onOpenAssistant={handleOpenAssistant}
-          delay={2500} // Show after 2.5 seconds
-        />
-      )}
+      {/* Render SalesChatWidget without the floating button */}
+      <SalesChatWidget />
     </div>
   )
 }
@@ -1099,7 +1307,7 @@ function ProductCard({
   const location = product.specs_rental?.location || product.light?.location || "Unknown location"
 
   // Format price if available
-  const formattedPrice = product.price ? `₱${Number(product.price).toLocaleString()}` : "Price not set"
+  const formattedPrice = product.price ? `₱${Number(product.price).toLocaleString()}/month` : "Price not set"
 
   // Get site code
   const siteCode = getSiteCode(product)
@@ -1116,8 +1324,8 @@ function ProductCard({
     <Card
       className={cn(
         "overflow-hidden cursor-pointer border shadow-md rounded-xl transition-all hover:shadow-lg",
-        isSelected ? "border-blue-500 bg-blue-50" : "border-gray-200",
-        selectionMode ? "hover:border-blue-300" : "",
+        isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
+        selectionMode ? "hover:border-green-300" : "",
       )}
       onClick={handleClick}
     >
@@ -1140,7 +1348,7 @@ function ProductCard({
             <div
               className={cn(
                 "w-6 h-6 rounded-full border-2 flex items-center justify-center",
-                isSelected ? "bg-blue-500 border-blue-500" : "bg-white border-gray-300",
+                isSelected ? "bg-green-500 border-green-500" : "bg-white border-gray-300",
               )}
             >
               {isSelected && <CheckCircle2 size={16} className="text-white" />}
@@ -1148,21 +1356,7 @@ function ProductCard({
           </div>
         )}
 
-        {!selectionMode && (
-          <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="secondary" size="icon" className="h-8 w-8 bg-white/80 backdrop-blur-sm">
-                  <MoreVertical size={16} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onView}>View Details</DropdownMenuItem>
-                {/* Edit and delete options removed */}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
+        {/* Removed the DropdownMenu for actions */}
       </div>
 
       <CardContent className="p-4">
@@ -1172,27 +1366,12 @@ function ProductCard({
           <h3 className="font-semibold line-clamp-1">{product.name}</h3>
 
           <div className="mt-2 text-sm font-medium text-green-700">{formattedPrice}</div>
-
-          {/* Booking Status - Only show for rental products */}
-          {product.type?.toLowerCase() === "rental" && (
-            <div className="mt-2">
-              {hasOngoingBooking ? (
-                <Badge
-                  variant="outline"
-                  className="bg-amber-50 text-amber-700 border-amber-200 flex items-center w-fit"
-                >
-                  <Calendar className="mr-1 h-3 w-3" /> Currently Booked
-                </Badge>
-              ) : (
-                <Badge
-                  variant="outline"
-                  className="bg-green-50 text-green-700 border-green-200 flex items-center w-fit"
-                >
-                  <CheckCircle2 className="mr-1 h-3 w-3" /> Available
-                </Badge>
-              )}
-            </div>
-          )}
+          <Button
+            variant="outline"
+            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+          >
+            Create Report
+          </Button>
         </div>
       </CardContent>
     </Card>

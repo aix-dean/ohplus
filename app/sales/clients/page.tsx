@@ -124,46 +124,48 @@ export default function ClientDatabasePage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
-        return <Badge className="bg-green-500">Active</Badge>
+        return <Badge className="bg-green-500 hover:bg-green-500/80 text-white">Active</Badge>
       case "inactive":
-        return <Badge className="bg-gray-500">Inactive</Badge>
+        return <Badge className="bg-gray-500 hover:bg-gray-500/80 text-white">Inactive</Badge>
       case "lead":
-        return <Badge className="bg-blue-500">Lead</Badge>
+        return <Badge className="bg-blue-500 hover:bg-blue-500/80 text-white">Lead</Badge>
       default:
-        return <Badge>{status}</Badge>
+        return <Badge className="bg-gray-200 text-gray-800">{status}</Badge>
     }
   }
 
   return (
-    <div className="flex-1 overflow-auto">
+    <div className="flex-1 overflow-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
       <Toaster />
-      <header className="flex justify-between items-center p-4 border-b border-gray-200">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-6 mb-6 border-b border-gray-200">
         <div>
-          <h1 className="text-xl font-bold">Sales Client Database</h1>
-          <p className="text-sm text-gray-500">
-            Manage your client database ({totalClients} {totalClients === 1 ? "client" : "clients"})
+          <h1 className="text-3xl font-extrabold text-gray-900 leading-tight">Client Database</h1>
+          <p className="text-md text-gray-600 mt-1">
+            Manage your client accounts and relationships. ({totalClients} {totalClients === 1 ? "client" : "clients"})
           </p>
         </div>
-        <ClientDialog onSuccess={() => loadClients(true)} />
+        <div className="mt-4 sm:mt-0">
+          <ClientDialog onSuccess={() => loadClients(true)} />
+        </div>
       </header>
 
-      <main className="p-4">
+      <main>
         {/* Filters */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+        <div className="flex flex-col md:flex-row items-center gap-4 mb-8 p-4 bg-white rounded-lg shadow-sm">
+          <div className="relative flex-1 w-full md:w-auto">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <Input
-              placeholder="Search clients..."
+              placeholder="Search clients by name, email, or company..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8"
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 ease-in-out text-base"
             />
           </div>
           <Select
             value={statusFilter || "all"}
             onValueChange={(value) => setStatusFilter(value === "all" ? null : value)}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full md:w-[200px] h-11 border border-gray-300 rounded-md text-base">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
@@ -176,91 +178,123 @@ export default function ClientDatabasePage() {
         </div>
 
         {/* Clients Table */}
-        <div className="border rounded-md">
+        <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-gray-100">
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead className="hidden md:table-cell">Company</TableHead>
-                <TableHead className="hidden md:table-cell">Email</TableHead>
-                <TableHead className="hidden md:table-cell">Phone</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="hidden md:table-cell">Last Updated</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="py-3 px-4 text-left text-sm font-semibold text-gray-700">Name</TableHead>
+                <TableHead className="hidden md:table-cell py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                  Company
+                </TableHead>
+                <TableHead className="hidden lg:table-cell py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                  Email
+                </TableHead>
+                <TableHead className="hidden sm:table-cell py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                  Phone
+                </TableHead>
+                <TableHead className="py-3 px-4 text-left text-sm font-semibold text-gray-700">Status</TableHead>
+                <TableHead className="hidden md:table-cell py-3 px-4 text-left text-sm font-semibold text-gray-700">
+                  Last Updated
+                </TableHead>
+                <TableHead className="py-3 px-4 text-right text-sm font-semibold text-gray-700">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && clients.length === 0 ? (
                 // Loading skeletons
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={`loading-${i}`}>
-                    <TableCell>
-                      <Skeleton className="h-5 w-[150px]" />
+                Array.from({ length: itemsPerPage }).map((_, i) => (
+                  <TableRow key={`loading-${i}`} className="border-b border-gray-100 last:border-b-0">
+                    <TableCell className="py-3 px-4">
+                      <Skeleton className="h-5 w-[150px] bg-gray-200" />
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <Skeleton className="h-5 w-[120px]" />
+                    <TableCell className="hidden md:table-cell py-3 px-4">
+                      <Skeleton className="h-5 w-[120px] bg-gray-200" />
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <Skeleton className="h-5 w-[180px]" />
+                    <TableCell className="hidden lg:table-cell py-3 px-4">
+                      <Skeleton className="h-5 w-[180px] bg-gray-200" />
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <Skeleton className="h-5 w-[120px]" />
+                    <TableCell className="hidden sm:table-cell py-3 px-4">
+                      <Skeleton className="h-5 w-[120px] bg-gray-200" />
                     </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-5 w-[80px]" />
+                    <TableCell className="py-3 px-4">
+                      <Skeleton className="h-5 w-[80px] bg-gray-200" />
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <Skeleton className="h-5 w-[100px]" />
+                    <TableCell className="hidden md:table-cell py-3 px-4">
+                      <Skeleton className="h-5 w-[100px] bg-gray-200" />
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Skeleton className="h-8 w-8 ml-auto" />
+                    <TableCell className="py-3 px-4 text-right">
+                      <Skeleton className="h-8 w-8 ml-auto rounded-md bg-gray-200" />
                     </TableCell>
                   </TableRow>
                 ))
               ) : clients.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                    No clients found. {debouncedSearchTerm && "Try a different search term."}
+                  <TableCell colSpan={7} className="text-center py-12 text-gray-500 text-lg">
+                    No clients found. {debouncedSearchTerm && "Try a different search term or status."}
                   </TableCell>
                 </TableRow>
               ) : (
                 clients.map((client) => (
-                  <TableRow key={client.id}>
-                    <TableCell className="font-medium">{client.name}</TableCell>
-                    <TableCell className="hidden md:table-cell">{client.company}</TableCell>
-                    <TableCell className="hidden md:table-cell">{client.email}</TableCell>
-                    <TableCell className="hidden md:table-cell">{client.phone}</TableCell>
-                    <TableCell>{getStatusBadge(client.status)}</TableCell>
-                    <TableCell className="hidden md:table-cell">{formatTimestamp(client.updated)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end">
-                        <div className="md:flex space-x-2 hidden">
-                          <Button variant="ghost" size="icon" onClick={() => handleViewClient(client)}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteClient(client)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="md:hidden">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleViewClient(client)}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDeleteClient(client)}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+                  <TableRow
+                    key={client.id}
+                    className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
+                  >
+                    <TableCell className="font-medium text-gray-800 py-3 px-4">{client.name}</TableCell>
+                    <TableCell className="hidden md:table-cell text-gray-600 py-3 px-4">{client.company}</TableCell>
+                    <TableCell className="hidden lg:table-cell text-gray-600 py-3 px-4">{client.email}</TableCell>
+                    <TableCell className="hidden sm:table-cell text-gray-600 py-3 px-4">{client.phone}</TableCell>
+                    <TableCell className="py-3 px-4">{getStatusBadge(client.status)}</TableCell>
+                    <TableCell className="hidden md:table-cell text-gray-600 text-sm py-3 px-4">
+                      {formatTimestamp(client.updated)}
+                    </TableCell>
+                    <TableCell className="text-right py-3 px-4">
+                      <div className="flex justify-end items-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-gray-500 hover:text-blue-600 hover:bg-gray-100"
+                          onClick={() => handleViewClient(client)}
+                        >
+                          <Eye className="h-4 w-4" />
+                          <span className="sr-only">View client</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-gray-500 hover:text-red-600 hover:bg-gray-100"
+                          onClick={() => handleDeleteClient(client)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Delete client</span>
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">More actions</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem
+                              onClick={() => handleViewClient(client)}
+                              className="flex items-center cursor-pointer"
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteClient(client)}
+                              className="flex items-center text-red-600 focus:text-red-600 cursor-pointer"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -272,9 +306,14 @@ export default function ClientDatabasePage() {
 
         {/* Load More Button */}
         {hasMore && (
-          <div className="mt-4 flex justify-center">
-            <Button variant="outline" onClick={loadMore} disabled={loading}>
-              {loading ? "Loading..." : "Load More"}
+          <div className="mt-8 flex justify-center">
+            <Button
+              variant="outline"
+              onClick={loadMore}
+              disabled={loading}
+              className="px-6 py-2 border-2 border-blue-500 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors duration-200 ease-in-out font-semibold"
+            >
+              {loading ? "Loading more clients..." : "Load More Clients"}
             </Button>
           </div>
         )}

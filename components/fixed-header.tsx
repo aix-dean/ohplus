@@ -1,120 +1,207 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { format } from "date-fns"
+import type * as React from "react"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { Menu, Bell, Search, Settings, LogOut, User } from "lucide-react"
 
-export function FixedHeader() {
-  const [currentTime, setCurrentTime] = useState(new Date())
-  const pathname = usePathname()
+import { Button } from "@/components/ui/button"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Input } from "@/components/ui/input"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useAuth } from "@/contexts/auth-context"
+import { useUnreadMessages } from "@/hooks/use-unread-messages"
+import { useIsAdmin } from "@/hooks/use-is-admin"
+import { cn } from "@/lib/utils"
 
-  // Get page title based on current route
-  const pageTitle = getPageTitle(pathname)
-
-  useEffect(() => {
-    // Update time every second
-    const interval = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [])
-
-  return (
-    <div className="fixed top-0 left-0 right-0 bg-gradient-to-r from-[#0a1433] to-[#4bb6ef] border-b border-gray-200 shadow-sm z-50 h-14 flex items-center px-4">
-      <div className="container mx-auto flex justify-between items-center">
-        <div className="flex items-center">
-          <img src="/oh-plus-logo.png" alt="OH Plus Logo" className="h-8 w-auto mr-3" />
-          <h1 className="text-lg font-semibold text-white hidden sm:block">OH Plus</h1>
-        </div>
-
-        {/* Page Title (center) */}
-        <div className="absolute left-1/2 transform -translate-x-1/2 hidden md:block">
-          <h1 className="text-xl font-bold text-white">{pageTitle.title}</h1>
-          {pageTitle.subtitle && <p className="text-sm text-white text-center">{pageTitle.subtitle}</p>}
-        </div>
-
-        <div className="flex items-center space-x-6">
-          <div className="text-sm text-white hidden sm:block">
-            <span className="font-medium">{format(currentTime, "EEEE, MMMM d, yyyy")}</span>
-          </div>
-          <div className="text-sm font-mono text-white">
-            <span className="font-medium">{format(currentTime, "h:mm a")}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+interface FixedHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
+  onMenuClick: () => void
 }
 
-// Function to map routes to page titles
-function getPageTitle(pathname: string): { title: string; subtitle?: string } {
-  // Default title
-  let title = "Dashboard"
-  let subtitle = undefined
+export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderProps) {
+  const { user, userData, signOut } = useAuth()
+  const { unreadCount } = useUnreadMessages()
+  const isAdmin = useIsAdmin()
+  const pathname = usePathname()
 
-  // Map routes to titles
-  if (pathname.startsWith("/dashboard")) {
-    title = "Dashboard"
-  } else if (pathname.startsWith("/sales/dashboard")) {
-    title = "OOH Site Inventory"
-    subtitle = "Manage your static and LED outdoor advertising sites"
-  } else if (pathname.startsWith("/sales/products/")) {
-    title = "Product Details"
-  } else if (pathname.startsWith("/sales/inventory")) {
-    title = "Inventory Management"
-  } else if (pathname.startsWith("/sales")) {
-    title = "Sales"
-  } else if (pathname.startsWith("/operations/dashboard")) {
-    title = "Logistics Dashboard"
-    subtitle = "Manage your outdoor advertising sites"
-  } else if (pathname.startsWith("/operations/assignments")) {
-    title = "Assignments"
-  } else if (pathname.startsWith("/operations/planner")) {
-    title = "Planner"
-  } else if (pathname.startsWith("/operations/alerts")) {
-    title = "Alerts"
-  } else if (pathname.startsWith("/operations")) {
-    title = "Operations & Logistics"
-  } else if (pathname.startsWith("/finance")) {
-    title = "Finance"
-  } else if (pathname.startsWith("/accounting")) {
-    title = "Accounting"
-  } else if (pathname.startsWith("/treasury")) {
-    title = "Treasury"
-  } else if (pathname.startsWith("/procurement")) {
-    title = "Procurement"
-  } else if (pathname.startsWith("/hr")) {
-    title = "HR"
-  } else if (pathname.startsWith("/legal")) {
-    title = "Legal"
-  } else if (pathname.startsWith("/business-development")) {
-    title = "Business Development"
-  } else if (pathname.startsWith("/committees")) {
-    title = "Committees"
-  } else if (pathname.startsWith("/partners")) {
-    title = "Partners"
-  } else if (pathname.startsWith("/corporate")) {
-    title = "Corporate"
-  } else if (pathname.startsWith("/admin-control")) {
-    title = "Admin Control"
-  } else if (pathname.startsWith("/profile")) {
-    title = "Profile"
-  } else if (pathname.startsWith("/admin")) {
-    title = "Admin"
-  } else if (pathname.startsWith("/settings")) {
-    title = "Settings"
-  } else if (pathname.startsWith("/account")) {
-    title = "Account"
-  } else if (pathname.startsWith("/cms/dashboard")) {
-    title = "CMS Dashboard"
-    subtitle = "Manage your content and digital displays"
-  } else if (pathname.startsWith("/cms/planner")) {
-    title = "Content Planner"
-    subtitle = "Schedule and manage your content"
-  } else if (pathname.startsWith("/cms")) {
-    title = "Content Management"
+  const getPageTitle = (path: string) => {
+    const segments = path.split("/").filter(Boolean)
+    if (segments.length === 0) return "Dashboard" // Default for root
+
+    // Handle specific known paths
+    if (path === "/sales/dashboard") return "Sales - Dashboard"
+    if (path === "/logistics/dashboard") return "Logistics - Dashboard"
+    if (path === "/cms/dashboard") return "CMS - Dashboard"
+    if (path === "/admin/dashboard") return "Admin - Dashboard"
+    if (path === "/ai-assistant") return "AI Assistant"
+    if (path === "/account") return "Account Settings"
+    if (path === "/settings") return "Settings"
+    if (path === "/settings/subscription") return "Settings - Subscription"
+    if (path === "/help") return "Help & Support"
+    if (path === "/features") return "Features"
+
+    // Handle dynamic paths and general structure
+    if (segments[0]) {
+      const section = segments[0].charAt(0).toUpperCase() + segments[0].slice(1)
+      let page = ""
+
+      if (segments.length > 1) {
+        page = segments[1].charAt(0).toUpperCase() + segments[1].slice(1)
+        // Special handling for common patterns like [id] or edit/[id]
+        if (segments.length > 2 && segments[2].match(/\[.*\]/)) {
+          page = segments[1].charAt(0).toUpperCase() + segments[1].slice(1) // Keep parent name
+        } else if (segments.length > 2 && segments[1] === "edit" && segments[2].match(/\[.*\]/)) {
+          page = `Edit ${segments[0].slice(0, -1)}` // e.g., Sales - Edit Product
+        } else if (segments.length > 2 && segments[1] === "create") {
+          page = `Create ${segments[0].slice(0, -1)}` // e.g., Admin - Create Product
+        } else if (segments.length > 2 && segments[1] === "new") {
+          page = `New ${segments[0].slice(0, -1)}` // e.g., Sales - New Product
+        } else if (segments.length > 2 && segments[1] === "view") {
+          page = `View ${segments[0].slice(0, -1)}` // e.g., Proposals - View Proposal
+        } else if (segments.length > 2 && segments[1] === "cost-estimates") {
+          page = `Cost Estimates`
+        } else if (segments.length > 2 && segments[1] === "generate-quotation") {
+          page = `Generate Quotation`
+        } else if (segments.length > 2 && segments[1] === "create-cost-estimate") {
+          page = `Create Cost Estimate`
+        } else if (segments.length > 2 && segments[1] === "accept") {
+          page = `Accept Quotation`
+        } else if (segments.length > 2 && segments[1] === "decline") {
+          page = `Decline Quotation`
+        } else if (segments.length > 2 && segments[1] === "chat") {
+          page = `Chat`
+        } else if (segments.length > 2 && segments[1] === "bulletin-board") {
+          page = `Bulletin Board`
+        } else if (segments.length > 2 && segments[1] === "project-campaigns") {
+          page = `Project Campaigns`
+        } else if (segments.length > 2 && segments[1] === "quotation-requests") {
+          page = `Quotation Requests`
+        } else if (segments.length > 2 && segments[1] === "bookings") {
+          page = `Bookings`
+        } else if (segments.length > 2 && segments[1] === "alerts") {
+          page = `Alerts`
+        } else if (segments.length > 2 && segments[1] === "assignments") {
+          page = `Assignments`
+        } else if (segments.length > 2 && segments[1] === "planner") {
+          page = `Planner`
+        } else if (segments.length > 2 && segments[1] === "access-management") {
+          page = `Access Management`
+        } else if (segments.length > 2 && segments[1] === "chat-analytics") {
+          page = `Chat Analytics`
+        }
+
+        // Capitalize and replace hyphens for readability
+        page = page
+          .replace(/-/g, " ")
+          .split(" ")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ")
+      }
+
+      if (page) {
+        return `${section} - ${page}`
+      }
+      return section
+    }
+    return "Dashboard"
   }
 
-  return { title, subtitle }
+  const pageTitle = getPageTitle(pathname)
+
+  return (
+    <header
+      className={cn(
+        "sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent",
+        className,
+      )}
+      {...props}
+    >
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button size="icon" variant="outline" className="sm:hidden" onClick={onMenuClick}>
+            <Menu className="h-5 w-5" />
+            <span className="sr-only">Toggle Menu</span>
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="sm:max-w-xs">
+          {/* Mobile navigation content would go here, if needed */}
+        </SheetContent>
+      </Sheet>
+      <h1 className="text-lg font-semibold md:text-xl">{pageTitle}</h1>
+      <div className="relative ml-auto flex-1 md:grow-0">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="search"
+          placeholder="Search..."
+          className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+        />
+      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="relative rounded-full">
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                {unreadCount}
+              </span>
+            )}
+            <span className="sr-only">Notifications</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>No new notifications</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="overflow-hidden rounded-full">
+            <Avatar>
+              <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} alt="User Avatar" />
+              <AvatarFallback>
+                {userData?.first_name ? userData.first_name.charAt(0) : user?.email?.charAt(0) || "U"}
+              </AvatarFallback>
+            </Avatar>
+            <span className="sr-only">User Menu</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>
+            {userData?.first_name && userData?.last_name
+              ? `${userData.first_name} ${userData.last_name}`
+              : user?.email || "My Account"}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/account">
+              <User className="mr-2 h-4 w-4" />
+              Account
+            </Link>
+          </DropdownMenuItem>
+          {isAdmin && (
+            <DropdownMenuItem asChild>
+              <Link href="/admin">
+                <Settings className="mr-2 h-4 w-4" />
+                Admin
+              </Link>
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={signOut}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </header>
+  )
 }

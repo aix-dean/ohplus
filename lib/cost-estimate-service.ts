@@ -217,7 +217,13 @@ export async function createDirectCostEstimate(
 }
 
 // Send cost estimate email
-export async function sendCostEstimateEmail(costEstimate: any, clientEmail: string, client: any): Promise<void> {
+export async function sendCostEstimateEmail(
+  costEstimate: any,
+  clientEmail: string,
+  client: any,
+  currentUserEmail?: string, // New: current user's email for reply-to
+  ccEmail?: string, // New: CC email
+): Promise<void> {
   try {
     console.log("Sending cost estimate email to:", clientEmail)
 
@@ -230,6 +236,8 @@ export async function sendCostEstimateEmail(costEstimate: any, clientEmail: stri
         costEstimate,
         clientEmail,
         client,
+        currentUserEmail, // Pass current user's email
+        ccEmail, // Pass CC email
       }),
     })
 

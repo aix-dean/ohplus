@@ -20,7 +20,6 @@ import {
   Plus,
   Search,
   Filter,
-  TrendingUp,
   Clock,
   CheckCircle,
   XCircle,
@@ -128,15 +127,6 @@ function ProposalsPageContent() {
     }
   }
 
-  const getStats = () => {
-    const total = proposals.length
-    const accepted = proposals.filter((p) => p.status === "accepted").length
-    const pending = proposals.filter((p) => p.status === "sent" || p.status === "viewed").length
-    const totalValue = proposals.reduce((sum, p) => sum + p.totalAmount, 0)
-
-    return { total, accepted, pending, totalValue }
-  }
-
   const handleViewProposal = (proposalId: string) => {
     router.push(`/sales/proposals/${proposalId}`)
   }
@@ -145,8 +135,6 @@ function ProposalsPageContent() {
     // TODO: Implement PDF download
     console.log("Download PDF for proposal:", proposal.id)
   }
-
-  const stats = getStats()
 
   if (loading) {
     return (
@@ -160,84 +148,17 @@ function ProposalsPageContent() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
         {/* Header Section */}
-        <div className="mb-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+        <div className="mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Proposals</h1>
-              <p className="text-gray-600">Manage and track your sales proposals</p>
+              <h1 className="text-3xl font-bold text-gray-900">Proposals</h1>
+              <p className="text-gray-600 text-lg">Manage and track your sales proposals</p>
             </div>
-            <Button
-              onClick={() => router.push("/sales/dashboard")}
-              className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-              size="lg"
-            >
-              <Plus className="mr-2 h-5 w-5" />
-              Create New Proposal
-            </Button>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Proposals</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-                  </div>
-                  <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <FileText className="h-6 w-6 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Accepted</p>
-                    <p className="text-2xl font-bold text-green-600">{stats.accepted}</p>
-                  </div>
-                  <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Pending</p>
-                    <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
-                  </div>
-                  <div className="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                    <Clock className="h-6 w-6 text-yellow-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Total Value</p>
-                    <p className="text-2xl font-bold text-gray-900">₱{stats.totalValue.toLocaleString()}</p>
-                  </div>
-                  <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="h-6 w-6 text-purple-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Filters */}
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-6">
+          <Card className="border-gray-200 shadow-sm rounded-xl">
+            <CardContent className="p-5">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -245,13 +166,13 @@ function ProposalsPageContent() {
                     placeholder="Search proposals or clients..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                    className="pl-10 border-gray-200 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
                   />
                 </div>
                 <div className="flex items-center gap-2">
                   <Filter className="h-4 w-4 text-gray-400" />
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-40 border-gray-200">
+                    <SelectTrigger className="w-40 border-gray-200 rounded-lg">
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -271,8 +192,8 @@ function ProposalsPageContent() {
 
         {/* Proposals List */}
         {filteredProposals.length === 0 ? (
-          <Card className="border-0 shadow-sm">
-            <CardContent className="text-center py-16">
+          <Card className="border-gray-200 shadow-sm rounded-xl">
+            <CardContent className="text-center py-12">
               <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 <FileText className="h-8 w-8 text-gray-400" />
               </div>
@@ -302,13 +223,13 @@ function ProposalsPageContent() {
               return (
                 <Card
                   key={proposal.id}
-                  className="border-0 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer"
+                  className="border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer rounded-xl"
                 >
-                  <CardContent className="p-6" onClick={() => handleViewProposal(proposal.id)}>
+                  <CardContent className="p-5" onClick={() => handleViewProposal(proposal.id)}>
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 text-lg mb-1 line-clamp-1">{proposal.title}</h3>
-                        <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                        <h3 className="font-semibold text-gray-900 text-base mb-1 line-clamp-1">{proposal.title}</h3>
+                        <div className="flex items-center gap-2 text-xs text-gray-600 mb-2">
                           <Building2 className="h-4 w-4" />
                           <span className="truncate">{proposal.client.company}</span>
                         </div>
@@ -338,7 +259,7 @@ function ProposalsPageContent() {
                           <StatusIcon className="mr-1 h-3 w-3" />
                           {statusConfig.label}
                         </Badge>
-                        <div className="text-sm text-gray-500 flex items-center gap-1">
+                        <div className="text-xs text-gray-500 flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
                           {format(proposal.createdAt, "MMM d, yyyy")}
                         </div>
@@ -381,7 +302,7 @@ function ProposalsPageContent() {
           </div>
         ) : (
           // Desktop Table View
-          <Card className="border-0 shadow-sm overflow-hidden">
+          <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50 border-b border-gray-200">
@@ -405,13 +326,13 @@ function ProposalsPageContent() {
                       className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
                       onClick={() => handleViewProposal(proposal.id)}
                     >
-                      <TableCell className="py-4">
+                      <TableCell className="py-3">
                         <div>
                           <div className="font-semibold text-gray-900 mb-1">{proposal.title}</div>
                           <div className="text-sm text-gray-500">ID: {proposal.id.slice(0, 8)}...</div>
                         </div>
                       </TableCell>
-                      <TableCell className="py-4">
+                      <TableCell className="py-3">
                         <div className="flex items-center gap-2">
                           <div className="h-8 w-8 bg-gray-100 rounded-full flex items-center justify-center">
                             <Building2 className="h-4 w-4 text-gray-600" />
@@ -422,13 +343,13 @@ function ProposalsPageContent() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="py-4">
+                      <TableCell className="py-3">
                         <Badge variant="outline" className={`${statusConfig.color} border font-medium`}>
                           <StatusIcon className="mr-1 h-3 w-3" />
                           {statusConfig.label}
                         </Badge>
                       </TableCell>
-                      <TableCell className="py-4">
+                      <TableCell className="py-3">
                         <div className="text-center">
                           <div className="font-semibold text-gray-900">{proposal.products.length}</div>
                           <div className="text-xs text-gray-500">
@@ -436,16 +357,16 @@ function ProposalsPageContent() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="py-4">
+                      <TableCell className="py-3">
                         <div className="font-bold text-gray-900">₱{proposal.totalAmount.toLocaleString()}</div>
                       </TableCell>
-                      <TableCell className="py-4">
+                      <TableCell className="py-3">
                         <div className="text-sm text-gray-600 flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
                           {format(proposal.createdAt, "MMM d, yyyy")}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right py-4" onClick={(e) => e.stopPropagation()}>
+                      <TableCell className="text-right py-3" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600">

@@ -27,10 +27,20 @@ import type { Proposal } from "@/lib/types/proposal"
 import { ProposalActivityTimeline } from "@/components/proposal-activity-timeline" // Reusing for CE activity
 import { getProposalActivities } from "@/lib/proposal-activity-service" // Reusing for CE activity
 import type { ProposalActivity } from "@/lib/types/proposal-activity"
+import { Input } from "@/components/ui/input" // Import Input for CC field
+import { Label } from "@/components/ui/label" // Import Label for CC field
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog" // Import Dialog components
 
 // Helper function to generate QR code URL
 const generateQRCodeUrl = (costEstimateId: string) => {
-  const costEstimateViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/public/${costEstimateId}`
+  const costEstimateViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/view/${costEstimateId}`
   return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(costEstimateViewUrl)}`
 }
 
@@ -38,6 +48,7 @@ export default function CostEstimateDetailsPage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
+
   const { toast } = useToast()
 
   const costEstimateId = params.id as string
@@ -48,6 +59,8 @@ export default function CostEstimateDetailsPage() {
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [activities, setActivities] = useState<ProposalActivity[]>([])
   const [timelineOpen, setTimelineOpen] = useState(false)
+  const [isSendEmailDialogOpen, setIsSendEmailDialogOpen] = useState(false) // State for send email dialog
+  const [ccEmail, setCcEmail] = useState("") // State for CC email in dialog (can be multiple, comma-separated)
 
   useEffect(() => {
     const fetchCostEstimateData = async () => {
@@ -87,7 +100,7 @@ export default function CostEstimateDetailsPage() {
     fetchCostEstimateData()
   }, [costEstimateId, router, toast])
 
-  const handleSendEmail = async () => {
+  const handleSendEmailConfirm = async () => {
     if (!costEstimate || !user?.uid) return
 
     // Ensure client email is available before sending
@@ -100,6 +113,23 @@ export default function CostEstimateDetailsPage() {
       return
     }
 
+    // Validate each email in the comma-separated CC list
+    const ccEmailsArray = ccEmail
+      .split(",")
+      .map((email) => email.trim())
+      .filter(Boolean)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    for (const email of ccEmailsArray) {
+      if (!emailRegex.test(email)) {
+        toast({
+          title: "Invalid CC Email",
+          description: `Please enter a valid email address for CC: ${email}`,
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
     setSendingEmail(true)
     try {
       const response = await fetch("/api/cost-estimates/send-email", {
@@ -110,7 +140,9 @@ export default function CostEstimateDetailsPage() {
         body: JSON.stringify({
           costEstimate: costEstimate, // Send the full cost estimate object
           clientEmail: costEstimate.client.email,
-          client: costEstimate.client, // Changed from clientData to client to match API expectation
+          client: costEstimate.client,
+          currentUserEmail: user.email, // Pass current user's email for reply-to
+          ccEmail: ccEmail, // Pass CC email string
         }),
       })
 
@@ -123,10 +155,12 @@ export default function CostEstimateDetailsPage() {
       setCostEstimate((prev) => (prev ? { ...prev, status: "sent" } : null))
       toast({
         title: "Email Sent",
-        description: `Cost estimate sent to ${costEstimate.client.email}.`,
+        description: `Cost estimate sent to ${costEstimate.client.email}${ccEmail ? ` and CC'd to ${ccEmail}` : ""}.`,
       })
       const updatedActivities = await getProposalActivities(costEstimate.id)
       setActivities(updatedActivities)
+      setIsSendEmailDialogOpen(false) // Close dialog on success
+      setCcEmail("") // Clear CC email
     } catch (error) {
       console.error("Error sending email:", error)
       toast({
@@ -311,7 +345,7 @@ export default function CostEstimateDetailsPage() {
 
             {costEstimate.status === "draft" && (
               <Button
-                onClick={handleSendEmail}
+                onClick={() => setIsSendEmailDialogOpen(true)} // Open dialog
                 disabled={sendingEmail}
                 size="sm"
                 className="bg-green-500 hover:bg-green-600"
@@ -630,6 +664,49 @@ export default function CostEstimateDetailsPage() {
           </div>
         </>
       )}
+
+      {/* Send Email Dialog */}
+      <Dialog open={isSendEmailDialogOpen} onOpenChange={setIsSendEmailDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Send Cost Estimate</DialogTitle>
+            <DialogDescription>
+              Confirm client email and add CC if needed before sending the cost estimate.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="client-email">To</Label>
+              <Input id="client-email" value={costEstimate.client?.email || ""} readOnly />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cc-email">CC (Optional, comma-separated)</Label>
+              <Input
+                id="cc-email"
+                type="text" // Changed to text to allow comma-separated values
+                value={ccEmail}
+                onChange={(e) => setCcEmail(e.target.value)}
+                placeholder="carboncopy1@example.com, carboncopy2@example.com"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSendEmailDialogOpen(false)} disabled={sendingEmail}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendEmailConfirm} disabled={sendingEmail}>
+              {sendingEmail ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                "Send Email"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

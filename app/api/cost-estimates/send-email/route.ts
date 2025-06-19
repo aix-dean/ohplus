@@ -5,10 +5,32 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: NextRequest) {
   try {
-    const { costEstimate, clientEmail, client } = await request.json()
+    const { costEstimate, clientEmail, client, currentUserEmail, ccEmail } = await request.json() // Destructure new fields
 
     if (!costEstimate || !clientEmail || !client) {
       return NextResponse.json({ error: "Missing required data" }, { status: 400 })
+    }
+
+    // Validate email format for 'To'
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(clientEmail)) {
+      console.error("Invalid 'To' email format:", clientEmail)
+      return NextResponse.json({ error: "Invalid 'To' email address format" }, { status: 400 })
+    }
+
+    // Process and validate multiple CC emails
+    const ccEmailsArray = ccEmail
+      ? ccEmail
+          .split(",")
+          .map((email: string) => email.trim())
+          .filter(Boolean)
+      : []
+
+    for (const email of ccEmailsArray) {
+      if (!emailRegex.test(email)) {
+        console.error("Invalid 'CC' email format:", email)
+        return NextResponse.json({ error: `Invalid 'CC' email address format: ${email}` }, { status: 400 })
+      }
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
@@ -203,6 +225,8 @@ export async function POST(request: NextRequest) {
       to: [clientEmail],
       subject: `Cost Estimate: ${costEstimate.title || "Custom Cost Estimate"} - OH Plus`,
       html: emailHtml,
+      reply_to: currentUserEmail ? [currentUserEmail] : undefined, // Set reply-to to current user's email
+      cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined, // Add CC if provided
     })
 
     if (error) {

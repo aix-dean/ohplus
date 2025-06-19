@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { X } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -16,25 +16,13 @@ export function OhliverWelcomeNotification({
   onOpenAssistant,
   delay = 1000,
 }: OhliverWelcomeNotificationProps) {
-  const [isVisible, setIsVisible] = useState(false)
+  const [isVisible, setIsVisible] = useState(false) // Set to false by default
   const [isExiting, setIsExiting] = useState(false)
 
-  useEffect(() => {
-    // Show notification after delay
-    const timer = setTimeout(() => {
-      setIsVisible(true)
-    }, delay)
-
-    // Auto-dismiss after 15 seconds
-    const autoDismiss = setTimeout(() => {
-      handleDismiss()
-    }, 15000 + delay)
-
-    return () => {
-      clearTimeout(timer)
-      clearTimeout(autoDismiss)
-    }
-  }, [delay])
+  // The useEffect that controlled visibility and auto-dismissal was removed in the previous turn.
+  // This component will now only be visible if `isVisible` is explicitly set to true elsewhere,
+  // or if it's rendered with a prop that forces visibility.
+  // As `showWelcome` in SalesDashboard is now always false, this component will not render.
 
   const handleDismiss = () => {
     setIsExiting(true)

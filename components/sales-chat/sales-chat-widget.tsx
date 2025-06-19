@@ -19,9 +19,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 interface SalesChatWidgetProps {
   autoOpen?: boolean
   onOpenChange?: (isOpen: boolean) => void
+  hideToggleButton?: boolean // This prop is now effectively unused as the button is removed
 }
 
-export function SalesChatWidget({ autoOpen = false, onOpenChange }: SalesChatWidgetProps = {}) {
+export function SalesChatWidget({
+  autoOpen = false,
+  onOpenChange,
+  hideToggleButton = false, // This prop is now effectively unused as the button is removed
+}: SalesChatWidgetProps = {}) {
   const { user, userData } = useAuth()
   const [isOpen, setIsOpen] = useState(autoOpen)
   const [threads, setThreads] = useState<SalesThread[]>([])
@@ -183,27 +188,7 @@ export function SalesChatWidget({ autoOpen = false, onOpenChange }: SalesChatWid
 
   return (
     <>
-      {/* Floating Button - Always visible */}
-      <div className="fixed bottom-20 right-4 z-40">
-        <Button
-          onClick={handleToggle}
-          size="lg"
-          className={`rounded-full h-14 w-14 shadow-lg p-0 transition-all ${
-            isOpen ? "bg-primary/80 hover:bg-primary/90" : ""
-          }`}
-        >
-          {isOpen ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
-          {getUnreadCount() > 0 && !isOpen && (
-            <Badge
-              variant="destructive"
-              className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0 flex items-center justify-center text-xs"
-            >
-              {getUnreadCount()}
-            </Badge>
-          )}
-        </Button>
-      </div>
-
+      {/* The floating button div has been completely removed from here. */}
       {/* Chat Dialog */}
       {isOpen && (
         <div className="fixed bottom-20 right-20 z-40 w-80 h-[28rem]">
