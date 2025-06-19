@@ -20,13 +20,13 @@ import {
   AlertCircle,
   Search,
   CheckCircle,
+  PlusCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
-// Removed: import { CreateProposalDialog } from "@/components/create-proposal-dialog"
 import {
   getPaginatedUserProducts,
   getUserProductsCount,
@@ -49,12 +49,11 @@ import { SalesChatWidget } from "@/components/sales-chat/sales-chat-widget"
 import { Input } from "@/components/ui/input"
 import { useDebounce } from "@/hooks/use-debounce"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
-import { createProposal } from "@/lib/proposal-service" // Added: Import createProposal
+import { createProposal } from "@/lib/proposal-service"
 import type { ProposalClient } from "@/lib/types/proposal"
-// Add the import for ProposalHistory
 import { ProposalHistory } from "@/components/proposal-history"
-// Import Dialog components
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { ClientDialog } from "@/components/client-dialog" // Using the existing ClientDialog
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -107,11 +106,10 @@ function SalesDashboardContent() {
   const { toast } = useToast()
 
   // Proposal Creation Flow State
-  // Removed: const [createProposalOpen, setCreateProposalOpen] = useState(false)
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([])
-  const [proposalCreationMode, setProposalCreationMode] = useState(false) // True when client & product selection is active
+  const [proposalCreationMode, setProposalCreationMode] = useState(false)
   const [selectedClientForProposal, setSelectedClientForProposal] = useState<ProposalClient | null>(null)
-  const [isCreatingProposal, setIsCreatingProposal] = useState(false) // New loading state for proposal creation
+  const [isCreatingProposal, setIsCreatingProposal] = useState(false)
 
   // Client Search/Selection on Dashboard
   const [dashboardClientSearchTerm, setDashboardClientSearchTerm] = useState("")
@@ -121,6 +119,7 @@ function SalesDashboardContent() {
 
   const clientSearchRef = useRef<HTMLDivElement>(null)
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false)
+  const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false)
 
   // CE/Quote mode
   const [ceQuoteMode, setCeQuoteMode] = useState(false)
@@ -586,8 +585,6 @@ function SalesDashboardContent() {
     }
   }
 
-  // Removed: handleProposalCreated function as it's no longer needed
-
   // Handle CE/Quote mode
   const handleCeQuoteMode = () => {
     setCeQuoteMode(true)
@@ -730,12 +727,11 @@ function SalesDashboardContent() {
                   )}
                   <Button
                     className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
-                    onClick={() => setIsCollabComingSoonOpen(true)} // Added onClick handler
+                    onClick={() => setIsCollabComingSoonOpen(true)}
                   >
                     Collab
-                  </Button>{" "}
-                  {/* This button is now always visible */}
-                  {!proposalCreationMode && ( // Only show this if not in proposal creation mode
+                  </Button>
+                  {!proposalCreationMode && (
                     <Button className="bg-[#ff3333] text-white hover:bg-[#cc2929]">Job Order</Button>
                   )}
                 </div>
@@ -767,8 +763,6 @@ function SalesDashboardContent() {
           {/* Client Selection UI on Dashboard - Visible when proposalCreationMode is active */}
           {proposalCreationMode && (
             <div className="relative w-full max-w-xs" ref={clientSearchRef}>
-              {" "}
-              {/* Added max-w-xs */}
               <div className="relative">
                 <Input
                   placeholder="Search clients..."
@@ -779,57 +773,61 @@ function SalesDashboardContent() {
                   }
                   onChange={(e) => {
                     setDashboardClientSearchTerm(e.target.value)
-                    setSelectedClientForProposal(null) // Clear selected client when typing
+                    setSelectedClientForProposal(null)
                   }}
                   onFocus={() => {
                     setIsClientDropdownOpen(true)
-                    // If a client is selected, clear the search term to allow new search
                     if (selectedClientForProposal) {
                       setDashboardClientSearchTerm("")
                     }
                   }}
-                  className={cn(
-                    "pr-10 h-9 text-sm",
-                    proposalCreationMode && "border-blue-500 ring-2 ring-blue-200", // Added highlight
-                  )}
+                  className={cn("pr-10 h-9 text-sm", proposalCreationMode && "border-blue-500 ring-2 ring-blue-200")}
                 />
                 {isSearchingDashboardClients && (
                   <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
                 )}
               </div>
               {/* Results dropdown */}
-              {isClientDropdownOpen &&
-                (dashboardClientSearchTerm.trim() || dashboardClientSearchResults.length > 0) && (
-                  <Card className="absolute top-full z-50 mt-1 w-full max-h-[200px] overflow-auto shadow-lg">
-                    <div className="p-2">
-                      {dashboardClientSearchResults.length > 0 ? (
-                        dashboardClientSearchResults.map((result) => (
-                          <div
-                            key={result.id}
-                            className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
-                            onClick={() => handleClientSelectOnDashboard(result)}
-                          >
-                            <div>
-                              <p className="font-medium">
-                                {result.name} ({result.company})
-                              </p>
-                              <p className="text-xs text-gray-500">{result.email}</p>
-                            </div>
-                            {selectedClientForProposal?.id === result.id && (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-sm text-gray-500 text-center py-2">
-                          {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
-                            ? "No clients found matching your search."
-                            : "Start typing to search for clients."}
-                        </p>
-                      )}
+              {isClientDropdownOpen && (
+                <Card className="absolute top-full z-50 mt-1 w-full max-h-[200px] overflow-auto shadow-lg">
+                  <div className="p-2">
+                    {/* Always show "Add New Client" option at the top */}
+                    <div
+                      className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
+                      onClick={() => setIsNewClientDialogOpen(true)}
+                    >
+                      <PlusCircle className="h-4 w-4 text-blue-500" />
+                      <span className="font-medium text-blue-700">Add New Client</span>
                     </div>
-                  </Card>
-                )}
+
+                    {dashboardClientSearchResults.length > 0 ? (
+                      dashboardClientSearchResults.map((result) => (
+                        <div
+                          key={result.id}
+                          className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
+                          onClick={() => handleClientSelectOnDashboard(result)}
+                        >
+                          <div>
+                            <p className="font-medium">
+                              {result.name} ({result.company})
+                            </p>
+                            <p className="text-xs text-gray-500">{result.email}</p>
+                          </div>
+                          {selectedClientForProposal?.id === result.id && (
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500 text-center py-2">
+                        {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
+                          ? `No clients found for "${dashboardClientSearchTerm}".`
+                          : "Start typing to search for clients."}
+                      </p>
+                    )}
+                  </div>
+                </Card>
+              )}
             </div>
           )}
 
@@ -1260,6 +1258,21 @@ function SalesDashboardContent() {
           </DialogHeader>
         </DialogContent>
       </Dialog>
+
+      {/* New Client Dialog (now using ClientDialog) */}
+      <ClientDialog
+        open={isNewClientDialogOpen}
+        onOpenChange={setIsNewClientDialogOpen}
+        onSuccess={(newClient) => {
+          setIsNewClientDialogOpen(false)
+          handleClientSelectOnDashboard(newClient)
+          toast({
+            title: "Client Added",
+            description: `${newClient.name} (${newClient.company}) has been added.`,
+            variant: "success",
+          })
+        }}
+      />
     </div>
   )
 }

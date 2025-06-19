@@ -24,13 +24,15 @@ export interface Client {
   email: string
   phone: string
   company: string
+  designation?: string // New field
   address: string
-  city: string
-  state: string
-  zipCode: string
+  city?: string // Make optional as it's not in the new screenshot
+  state?: string // Make optional as it's not in the new screenshot
+  zipCode?: string // Make optional as it's not in the new screenshot
   industry: string
-  notes: string
+  notes?: string // Make optional as it's not in the new screenshot
   status: "active" | "inactive" | "lead"
+  companyLogoUrl?: string // New field
   created: any
   updated: any
 }

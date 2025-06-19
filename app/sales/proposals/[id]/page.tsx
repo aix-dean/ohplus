@@ -1,9 +1,18 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
 import {
   ArrowLeft,
   DownloadIcon,
@@ -17,14 +26,17 @@ import {
   Calculator,
   LayoutGrid,
   Pencil,
+  CalendarIcon,
+  Save,
+  X,
 } from "lucide-react"
-import { getProposalById, updateProposalStatus } from "@/lib/proposal-service" // Removed sendProposalEmail
+import { getProposalById, updateProposalStatus, updateProposal } from "@/lib/proposal-service"
 import { generateProposalPDF } from "@/lib/pdf-service"
-import type { Proposal } from "@/lib/types/proposal"
+import type { Proposal, ProposalClient } from "@/lib/types/proposal"
 import { useToast } from "@/hooks/use-toast"
 import { ProposalActivityTimeline } from "@/components/proposal-activity-timeline"
 import { CostEstimatesList } from "@/components/cost-estimates-list"
-import { SendProposalDialog } from "@/components/send-proposal-dialog" // Import the new dialog
+import { SendProposalDialog } from "@/components/send-proposal-dialog"
 
 // Helper function to generate QR code URL (kept here for consistency with proposal view)
 const generateQRCodeUrl = (proposalId: string) => {
@@ -37,11 +49,14 @@ export default function ProposalDetailsPage() {
   const router = useRouter()
   const { toast } = useToast()
   const [proposal, setProposal] = useState<Proposal | null>(null)
+  const [editableProposal, setEditableProposal] = useState<Proposal | null>(null)
   const [loading, setLoading] = useState(true)
   const [downloadingPDF, setDownloadingPDF] = useState(false)
   const [timelineOpen, setTimelineOpen] = useState(false)
   const [lightboxImage, setLightboxImage] = useState<{ url: string; isVideo: boolean } | null>(null)
-  const [isSendDialogOpen, setIsSendDialogOpen] = useState(false) // New state for send dialog
+  const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     async function fetchProposal() {
@@ -49,6 +64,7 @@ export default function ProposalDetailsPage() {
         try {
           const proposalData = await getProposalById(params.id as string)
           setProposal(proposalData)
+          setEditableProposal(proposalData) // Initialize editable state
         } catch (error) {
           console.error("Error fetching proposal:", error)
           toast({
@@ -71,6 +87,7 @@ export default function ProposalDetailsPage() {
     try {
       await updateProposalStatus(proposal.id, newStatus)
       setProposal({ ...proposal, status: newStatus })
+      setEditableProposal((prev) => (prev ? { ...prev, status: newStatus } : null))
       toast({
         title: "Success",
         description: `Proposal status updated to ${newStatus}`,
@@ -85,9 +102,9 @@ export default function ProposalDetailsPage() {
     }
   }
 
-  // Callback for when the proposal is successfully sent from the dialog
   const handleProposalSent = (proposalId: string, newStatus: Proposal["status"]) => {
     setProposal((prev) => (prev ? { ...prev, status: newStatus } : null))
+    setEditableProposal((prev) => (prev ? { ...prev, status: newStatus } : null))
     // Toast is handled by the dialog itself
   }
 
@@ -119,6 +136,76 @@ export default function ProposalDetailsPage() {
 
   const handleImageClick = (media: { url: string; isVideo: boolean }) => {
     setLightboxImage(media)
+  }
+
+  const handleEditClick = () => {
+    if (proposal) {
+      setEditableProposal({ ...proposal }) // Create a shallow copy for editing
+      setIsEditing(true)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditableProposal(proposal) // Revert to original proposal data
+    setIsEditing(false)
+    toast({
+      title: "Cancelled",
+      description: "Editing cancelled. Changes were not saved.",
+    })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editableProposal || !params.id) return
+
+    setIsSaving(true)
+    try {
+      // Assuming a fixed user ID and name for now, replace with actual user context
+      const currentUserId = "current_user_id"
+      const currentUserName = "Current User"
+
+      await updateProposal(editableProposal.id, editableProposal, currentUserId, currentUserName)
+      setProposal(editableProposal) // Update the main proposal state with saved changes
+      setIsEditing(false)
+      toast({
+        title: "Success",
+        description: "Proposal updated successfully!",
+      })
+    } catch (error) {
+      console.error("Error saving proposal:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save proposal changes.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    if (name.startsWith("client.")) {
+      const clientField = name.split(".")[1] as keyof ProposalClient
+      setEditableProposal((prev) => ({
+        ...prev!,
+        client: {
+          ...prev!.client,
+          [clientField]: value,
+        },
+      }))
+    } else {
+      setEditableProposal((prev) => ({
+        ...prev!,
+        [name]: value,
+      }))
+    }
+  }
+
+  const handleDateChange = (date: Date | undefined) => {
+    setEditableProposal((prev) => ({
+      ...prev!,
+      validUntil: date || new Date(), // Set to current date if undefined
+    }))
   }
 
   const getStatusConfig = (status: string) => {
@@ -202,7 +289,7 @@ export default function ProposalDetailsPage() {
     )
   }
 
-  if (!proposal) {
+  if (!proposal || !editableProposal) {
     return (
       <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6">
@@ -289,6 +376,8 @@ export default function ProposalDetailsPage() {
           </Button>
           <Button
             variant="ghost"
+            onClick={handleEditClick} // Added onClick here
+            disabled={isEditing} // Disable when already editing
             className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
           >
             <Pencil className="h-8 w-8 text-gray-500 mb-1" />
@@ -321,7 +410,14 @@ export default function ProposalDetailsPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">PROPOSAL</h1>
-                <p className="text-sm text-gray-500">{proposal.id}</p>
+                <p className="text-sm text-gray-500 flex items-center gap-2">
+                  {proposal.id}
+                  {isEditing && (
+                    <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                      <Pencil className="h-3 w-3 mr-1" /> Editing
+                    </Badge>
+                  )}
+                </p>
               </div>
               <div className="mt-4 sm:mt-0 flex items-center space-x-4">
                 {/* QR Code */}
@@ -350,16 +446,59 @@ export default function ProposalDetailsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Title</h3>
-                  <p className="text-base font-medium text-gray-900">{proposal.title}</p>
+                  <Label htmlFor="title" className="text-sm font-medium text-gray-500 mb-2">
+                    Title
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="title"
+                      name="title"
+                      value={editableProposal.title}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base font-medium text-gray-900">{proposal.title}</p>
+                  )}
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-2">Created Date</h3>
                   <p className="text-base text-gray-900">{proposal.createdAt.toLocaleDateString()}</p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Valid Until</h3>
-                  <p className="text-base text-gray-900">{proposal.validUntil.toLocaleDateString()}</p>
+                  <Label htmlFor="validUntil" className="text-sm font-medium text-gray-500 mb-2">
+                    Valid Until
+                  </Label>
+                  {isEditing ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal mt-1",
+                            !editableProposal.validUntil && "text-muted-foreground",
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {editableProposal.validUntil ? (
+                            format(editableProposal.validUntil, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={editableProposal.validUntil}
+                          onSelect={handleDateChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    <p className="text-base text-gray-900">{proposal.validUntil.toLocaleDateString()}</p>
+                  )}
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-2">Total Amount</h3>
@@ -376,51 +515,194 @@ export default function ProposalDetailsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Company</h3>
-                  <p className="text-base font-medium text-gray-900">{proposal.client.company}</p>
+                  <Label htmlFor="client.company" className="text-sm font-medium text-gray-500 mb-2">
+                    Company
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="client.company"
+                      name="client.company"
+                      value={editableProposal.client.company}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base font-medium text-gray-900">{proposal.client.company}</p>
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Contact Person</h3>
-                  <p className="text-base text-gray-900">{proposal.client.contactPerson}</p>
+                  <Label htmlFor="client.contactPerson" className="text-sm font-medium text-gray-500 mb-2">
+                    Contact Person
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="client.contactPerson"
+                      name="client.contactPerson"
+                      value={editableProposal.client.contactPerson}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base text-gray-900">{proposal.client.contactPerson}</p>
+                  )}
+                </div>
+                {/* New: Designation Field */}
+                <div>
+                  <Label htmlFor="client.designation" className="text-sm font-medium text-gray-500 mb-2">
+                    Designation
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="client.designation"
+                      name="client.designation"
+                      value={editableProposal.client.designation || ""}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base text-gray-900">{proposal.client.designation || "N/A"}</p>
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Email</h3>
-                  <p className="text-base text-gray-900">{proposal.client.email}</p>
+                  <Label htmlFor="client.email" className="text-sm font-medium text-gray-500 mb-2">
+                    Email
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="client.email"
+                      name="client.email"
+                      type="email"
+                      value={editableProposal.client.email}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base text-gray-900">{proposal.client.email}</p>
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Phone</h3>
-                  <p className="text-base text-gray-900">{proposal.client.phone}</p>
+                  <Label htmlFor="client.phone" className="text-sm font-medium text-gray-500 mb-2">
+                    Phone
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="client.phone"
+                      name="client.phone"
+                      value={editableProposal.client.phone}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base text-gray-900">{proposal.client.phone}</p>
+                  )}
                 </div>
                 {proposal.client.industry && (
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Industry</h3>
-                    <p className="text-base text-gray-900">{proposal.client.industry}</p>
+                    <Label htmlFor="client.industry" className="text-sm font-medium text-gray-500 mb-2">
+                      Industry
+                    </Label>
+                    {isEditing ? (
+                      <Input
+                        id="client.industry"
+                        name="client.industry"
+                        value={editableProposal.client.industry || ""}
+                        onChange={handleChange}
+                        className="mt-1"
+                      />
+                    ) : (
+                      <p className="text-base text-gray-900">{proposal.client.industry}</p>
+                    )}
                   </div>
                 )}
                 {proposal.client.targetAudience && (
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Target Audience</h3>
-                    <p className="text-base text-gray-900">{proposal.client.targetAudience}</p>
+                    <Label htmlFor="client.targetAudience" className="text-sm font-medium text-gray-500 mb-2">
+                      Target Audience
+                    </Label>
+                    {isEditing ? (
+                      <Input
+                        id="client.targetAudience"
+                        name="client.targetAudience"
+                        value={editableProposal.client.targetAudience || ""}
+                        onChange={handleChange}
+                        className="mt-1"
+                      />
+                    ) : (
+                      <p className="text-base text-gray-900">{proposal.client.targetAudience}</p>
+                    )}
                   </div>
                 )}
+                {/* New: Company Logo URL Field */}
+                <div>
+                  <Label htmlFor="client.companyLogoUrl" className="text-sm font-medium text-gray-500 mb-2">
+                    Company Logo URL
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="client.companyLogoUrl"
+                      name="client.companyLogoUrl"
+                      value={editableProposal.client.companyLogoUrl || ""}
+                      onChange={handleChange}
+                      placeholder="Enter logo URL"
+                      className="mt-1"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 mt-1">
+                      {proposal.client.companyLogoUrl ? (
+                        <img
+                          src={proposal.client.companyLogoUrl || "/placeholder.svg"}
+                          alt="Company Logo"
+                          className="h-8 w-auto max-w-[100px] object-contain"
+                        />
+                      ) : (
+                        <span className="text-gray-500">No logo provided</span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {proposal.client.address && (
+              {/* Address and Campaign Objective are always displayed if they exist, and are editable */}
+              {(proposal.client.address || isEditing) && ( // Show if exists or if editing to allow adding
                 <div className="mt-4">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Address</h3>
-                  <p className="text-base text-gray-900">{proposal.client.address}</p>
+                  <Label htmlFor="client.address" className="text-sm font-medium text-gray-500 mb-2">
+                    Address
+                  </Label>
+                  {isEditing ? (
+                    <Textarea
+                      id="client.address"
+                      name="client.address"
+                      value={editableProposal.client.address || ""}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base text-gray-900">{proposal.client.address}</p>
+                  )}
                 </div>
               )}
 
-              {proposal.client.campaignObjective && (
+              {(proposal.client.campaignObjective || isEditing) && ( // Show if exists or if editing to allow adding
                 <div className="mt-4">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Campaign Objective</h3>
-                  <p className="text-base text-gray-900">{proposal.client.campaignObjective}</p>
+                  <Label htmlFor="client.campaignObjective" className="text-sm font-medium text-gray-500 mb-2">
+                    Campaign Objective
+                  </Label>
+                  {isEditing ? (
+                    <Textarea
+                      id="client.campaignObjective"
+                      name="client.campaignObjective"
+                      value={editableProposal.client.campaignObjective || ""}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base text-gray-900">{proposal.client.campaignObjective}</p>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Products & Services */}
+            {/* Products & Services (Not editable in this scope) */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
                 Products & Services
@@ -565,31 +847,55 @@ export default function ProposalDetailsPage() {
             </div>
 
             {/* Additional Information */}
-            {(proposal.notes || proposal.customMessage) && (
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                  Additional Information
-                </h2>
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                Additional Information
+              </h2>
 
-                {proposal.customMessage && (
-                  <div className="mb-4">
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Custom Message</h3>
+              {/* Custom Message */}
+              {(proposal.customMessage || isEditing) && ( // Show if exists or if editing to allow adding
+                <div className="mb-4">
+                  <Label htmlFor="customMessage" className="text-sm font-medium text-gray-500 mb-2">
+                    Custom Message
+                  </Label>
+                  {isEditing ? (
+                    <Textarea
+                      id="customMessage"
+                      name="customMessage"
+                      value={editableProposal.customMessage || ""}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
                     <div className="bg-blue-50 border border-blue-200 rounded-sm p-4">
                       <p className="text-sm text-gray-700 leading-relaxed">{proposal.customMessage}</p>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+              )}
 
-                {proposal.notes && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Internal Notes</h3>
+              {/* Internal Notes */}
+              {(proposal.notes || isEditing) && ( // Show if exists or if editing to allow adding
+                <div>
+                  <Label htmlFor="notes" className="text-sm font-medium text-gray-500 mb-2">
+                    Internal Notes
+                  </Label>
+                  {isEditing ? (
+                    <Textarea
+                      id="notes"
+                      name="notes"
+                      value={editableProposal.notes || ""}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
                     <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
                       <p className="text-sm text-gray-700 leading-relaxed">{proposal.notes}</p>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Cost Estimates */}
             <div className="mb-8">
@@ -605,27 +911,53 @@ export default function ProposalDetailsPage() {
         </div>
       </div>
 
-      {/* Floating Send Button - now opens dialog */}
-      {proposal.status === "draft" && (
+      {/* Floating Action Buttons */}
+      {isEditing ? (
         <div className="fixed bottom-6 right-6 flex space-x-4">
-          {" "}
-          {/* Use a flex container for both buttons */}
           <Button
-            onClick={() => handleStatusUpdate("draft")} // Explicitly save as draft
-            variant="outline" // Use outline variant for a secondary action
+            onClick={handleCancelEdit}
+            variant="outline"
             className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
           >
-            <FileText className="h-5 w-5 mr-2" /> {/* Using FileText as a "draft" icon */}
-            Save as Draft
+            <X className="h-5 w-5 mr-2" />
+            Cancel
           </Button>
           <Button
-            onClick={() => setIsSendDialogOpen(true)}
-            className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+            onClick={handleSaveEdit}
+            disabled={isSaving}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75"
           >
-            <Send className="h-5 w-5 mr-2" />
-            Send
+            {isSaving ? (
+              <>
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" /> Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-5 w-5 mr-2" /> Save Changes
+              </>
+            )}
           </Button>
         </div>
+      ) : (
+        proposal.status === "draft" && (
+          <div className="fixed bottom-6 right-6 flex space-x-4">
+            <Button
+              onClick={() => handleStatusUpdate("draft")} // Explicitly save as draft
+              variant="outline" // Use outline variant for a secondary action
+              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+            >
+              <FileText className="h-5 w-5 mr-2" /> {/* Using FileText as a "draft" icon */}
+              Save as Draft
+            </Button>
+            <Button
+              onClick={() => setIsSendDialogOpen(true)}
+              className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+            >
+              <Send className="h-5 w-5 mr-2" />
+              Send
+            </Button>
+          </div>
+        )
       )}
 
       {/* Send Proposal Dialog */}

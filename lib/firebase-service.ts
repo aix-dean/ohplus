@@ -17,6 +17,10 @@ import {
   getDoc,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage" // Import Firebase Storage functions
+
+// Initialize Firebase Storage
+const storage = getStorage()
 
 // Update the Product interface to include new fields
 export interface Product {
@@ -902,5 +906,24 @@ export async function getQuotationsByRequestId(quotationRequestId: string): Prom
   } catch (error) {
     console.error("Error fetching quotations by request ID:", error)
     return []
+  }
+}
+
+/**
+ * Uploads a file to Firebase Storage.
+ * @param file The file to upload.
+ * @param path The path in Firebase Storage (e.g., "company_logos/").
+ * @returns The download URL of the uploaded file.
+ */
+export async function uploadFileToFirebaseStorage(file: File, path: string): Promise<string> {
+  try {
+    const storageRef = ref(storage, `${path}${file.name}`)
+    const snapshot = await uploadBytes(storageRef, file)
+    const downloadURL = await getDownloadURL(snapshot.ref)
+    console.log("File uploaded successfully:", downloadURL)
+    return downloadURL
+  } catch (error) {
+    console.error("Error uploading file to Firebase Storage:", error)
+    throw error
   }
 }

@@ -377,6 +377,54 @@ export async function updateProposalStatus(
   }
 }
 
+// Implement the updateProposal function
+export async function updateProposal(
+  proposalId: string,
+  data: Partial<Proposal>,
+  userId: string,
+  userName: string,
+): Promise<void> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const proposalRef = doc(db, "proposals", proposalId)
+
+    // Prepare data for Firestore update, handling nested objects
+    const updateData: { [key: string]: any } = {
+      updatedAt: serverTimestamp(),
+    }
+
+    if (data.title !== undefined) updateData.title = data.title
+    if (data.validUntil !== undefined) updateData.validUntil = data.validUntil
+    if (data.notes !== undefined) updateData.notes = data.notes
+    if (data.customMessage !== undefined) updateData.customMessage = data.customMessage
+
+    // Handle client object updates
+    if (data.client) {
+      if (data.client.company !== undefined) updateData["client.company"] = data.client.company
+      if (data.client.contactPerson !== undefined) updateData["client.contactPerson"] = data.client.contactPerson
+      if (data.client.email !== undefined) updateData["client.email"] = data.client.email
+      if (data.client.phone !== undefined) updateData["client.phone"] = data.client.phone
+      if (data.client.address !== undefined) updateData["client.address"] = data.client.address
+      if (data.client.industry !== undefined) updateData["client.industry"] = data.client.industry
+      if (data.client.targetAudience !== undefined) updateData["client.targetAudience"] = data.client.targetAudience
+      if (data.client.campaignObjective !== undefined)
+        updateData["client.campaignObjective"] = data.client.campaignObjective
+    }
+
+    await updateDoc(proposalRef, updateData)
+
+    // Log the activity
+    await logProposalStatusChanged(proposalId, "updated", "updated", userId, userName) // Re-using status change log for general update
+    console.log(`Proposal ${proposalId} updated by ${userName}`)
+  } catch (error) {
+    console.error("Error updating proposal:", error)
+    throw error
+  }
+}
+
 // Generate PDF data for proposal
 export function generateProposalPDFData(proposal: Proposal) {
   return {
@@ -414,11 +462,12 @@ export async function getProposal(id: string) {
   return { id: id, title: "Fake Proposal", description: "This is a fake proposal." }
 }
 
-export async function updateProposal(id: string, data: any, userId: string, userName: string) {
-  // Implementation for updating a proposal
-  console.log("Updating proposal:", id, data, userId, userName)
-  return { id: id, ...data }
-}
+// Removed the old placeholder updateProposal
+// export async function updateProposal(id: string, data: any, userId: string, userName: string) {
+//   // Implementation for updating a proposal
+//   console.log("Updating proposal:", id, data, userId, userName)
+//   return { id: id, ...data }
+// }
 
 export async function deleteProposal(id: string, userId: string, userName: string) {
   // Implementation for deleting a proposal

@@ -1,41 +1,60 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react" // Import useRef
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Plus } from "lucide-react"
 import { createClient, updateClient, type Client } from "@/lib/client-service"
 import { toast } from "sonner"
+import { Plus } from "lucide-react"
+import { uploadFileToFirebaseStorage } from "@/lib/firebase-service" // Import the upload function
 
 interface ClientDialogProps {
   client?: Client
-  onSuccess?: () => void
+  onSuccess?: (client: Client) => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
-export function ClientDialog({ client, onSuccess }: ClientDialogProps) {
-  const [open, setOpen] = useState(false)
+export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDialogProps) {
   const [loading, setLoading] = useState(false)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null) // Ref for hidden file input
+
   const [formData, setFormData] = useState({
-    name: client?.name || "",
-    email: client?.email || "",
-    phone: client?.phone || "",
     company: client?.company || "",
-    address: client?.address || "",
-    city: client?.city || "",
-    state: client?.state || "",
-    zipCode: client?.zipCode || "",
     industry: client?.industry || "",
-    notes: client?.notes || "",
-    status: client?.status || "lead",
+    name: client?.name || "", // Contact Person Name
+    designation: client?.designation || "", // New field
+    phone: client?.phone || "", // Contact Details Phone
+    email: client?.email || "", // Contact Details Email
+    address: client?.address || "", // Company Address
+    companyLogoUrl: client?.companyLogoUrl || "", // Existing logo URL
   })
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  // Reset form data and logo states when dialog opens for a new client or when client prop changes
+  useEffect(() => {
+    if (open) {
+      setFormData({
+        company: client?.company || "",
+        industry: client?.industry || "",
+        name: client?.name || "",
+        designation: client?.designation || "",
+        phone: client?.phone || "",
+        email: client?.email || "",
+        address: client?.address || "",
+        companyLogoUrl: client?.companyLogoUrl || "",
+      })
+      setLogoFile(null) // Clear selected file
+      setLogoPreviewUrl(client?.companyLogoUrl || null) // Set preview to existing logo or null
+    }
+  }, [open, client])
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
@@ -44,23 +63,67 @@ export function ClientDialog({ client, onSuccess }: ClientDialogProps) {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
+  const handleLogoClick = () => {
+    fileInputRef.current?.click() // Trigger hidden file input click
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setLogoFile(file)
+      setLogoPreviewUrl(URL.createObjectURL(file)) // Create a local URL for preview
+    } else {
+      setLogoFile(null)
+      setLogoPreviewUrl(client?.companyLogoUrl || null) // Revert to existing or null
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
 
     try {
-      console.log("Submitting form data:", formData)
+      let finalCompanyLogoUrl = formData.companyLogoUrl
+
+      if (logoFile) {
+        // Only upload if a new file is selected
+        const uploadPath = `company_logos/${client?.id || "new_client"}/` // Use client ID if editing, or 'new_client'
+        finalCompanyLogoUrl = await uploadFileToFirebaseStorage(logoFile, uploadPath)
+      }
+
+      const clientDataToSave = {
+        ...formData,
+        companyLogoUrl: finalCompanyLogoUrl, // Use the uploaded URL or existing one
+        // Ensure required fields are not undefined if they come from optional props
+        name: formData.name || "",
+        email: formData.email || "",
+        phone: formData.phone || "",
+        company: formData.company || "",
+        industry: formData.industry || "",
+        address: formData.address || "",
+        designation: formData.designation || "",
+        // Default status and empty notes/city/state/zipCode if not explicitly handled by new UI
+        status: client?.status || "lead",
+        notes: client?.notes || "",
+        city: client?.city || "",
+        state: client?.state || "",
+        zipCode: client?.zipCode || "",
+      } as Omit<Client, "id" | "created" | "updated"> // Cast to ensure type compatibility
+
+      let savedClient: Client
 
       if (client?.id) {
-        await updateClient(client.id, formData)
+        await updateClient(client.id, clientDataToSave)
+        savedClient = { id: client.id, ...clientDataToSave, created: client.created, updated: new Date() } as Client // Mock updated client
         toast.success("Client updated successfully")
       } else {
-        await createClient(formData)
+        const newClientId = await createClient(clientDataToSave)
+        savedClient = { id: newClientId, ...clientDataToSave, created: new Date(), updated: new Date() } as Client // Mock created client
         toast.success("Client added successfully")
       }
 
-      setOpen(false)
-      if (onSuccess) onSuccess()
+      onOpenChange(false)
+      if (onSuccess) onSuccess(savedClient)
     } catch (error) {
       console.error("Error saving client:", error)
       toast.error("Failed to save client")
@@ -70,104 +133,131 @@ export function ClientDialog({ client, onSuccess }: ClientDialogProps) {
   }
 
   return (
-    <>
-      {!client && (
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Client
-        </Button>
-      )}
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add Client</DialogTitle>
+        </DialogHeader>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{client ? "Edit Client" : "Add New Client"}</DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input id="name" name="name" value={formData.name} onChange={handleChange} required />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" name="email" type="email" value={formData.email} onChange={handleChange} required />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" name="phone" value={formData.phone} onChange={handleChange} required />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="company">Company</Label>
-                <Input id="company" name="company" value={formData.company} onChange={handleChange} required />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Input id="address" name="address" value={formData.address} onChange={handleChange} />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="city">City</Label>
-                <Input id="city" name="city" value={formData.city} onChange={handleChange} />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="state">State</Label>
-                <Input id="state" name="state" value={formData.state} onChange={handleChange} />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="zipCode">Zip Code</Label>
-                <Input id="zipCode" name="zipCode" value={formData.zipCode} onChange={handleChange} />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="industry">Industry</Label>
-                <Input id="industry" name="industry" value={formData.industry} onChange={handleChange} />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select value={formData.status} onValueChange={(value) => handleSelectChange("status", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                    <SelectItem value="lead">Lead</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Company Name */}
             <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                name="notes"
-                value={formData.notes}
+              <Label htmlFor="company">Company Name:</Label>
+              <Input
+                id="company"
+                name="company"
+                value={formData.company}
                 onChange={handleChange}
-                className="min-h-[100px]"
+                placeholder="XYZ Company"
+                required
               />
             </div>
 
-            <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? "Saving..." : client ? "Update Client" : "Add Client"}
-              </Button>
+            {/* Industry */}
+            <div className="space-y-2">
+              <Label htmlFor="industry">Industry:</Label>
+              <Select value={formData.industry} onValueChange={(value) => handleSelectChange("industry", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="-Select-" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="technology">Technology</SelectItem>
+                  <SelectItem value="finance">Finance</SelectItem>
+                  <SelectItem value="healthcare">Healthcare</SelectItem>
+                  <SelectItem value="retail">Retail</SelectItem>
+                  <SelectItem value="manufacturing">Manufacturing</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </>
+
+            {/* Contact Person */}
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="name">Contact Person:</Label>
+              <Input id="name" name="name" value={formData.name} onChange={handleChange} placeholder="Name" required />
+              <Input
+                id="designation"
+                name="designation"
+                value={formData.designation}
+                onChange={handleChange}
+                placeholder="Designation"
+              />
+            </div>
+
+            {/* Contact Details */}
+            <div className="space-y-2 md:col-span-2">
+              <Label>Contact Details:</Label>
+              <Input
+                id="phone"
+                name="phone"
+                value={formData.phone}
+                onChange={handleChange}
+                placeholder="Phone Number"
+                required
+              />
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Email Address"
+                required
+              />
+            </div>
+
+            {/* Address */}
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="address">Address:</Label>
+              <Input
+                id="address"
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                placeholder="Company Address"
+              />
+            </div>
+
+            {/* Company Logo */}
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="companyLogo">
+                Company Logo: <span className="text-green-600">(Optional)</span>
+              </Label>
+              <div
+                className="w-24 h-24 border border-gray-300 rounded-lg flex items-center justify-center cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors overflow-hidden"
+                onClick={handleLogoClick}
+              >
+                {logoPreviewUrl ? (
+                  <img
+                    src={logoPreviewUrl || "/placeholder.svg"}
+                    alt="Company Logo Preview"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <Plus className="h-8 w-8 text-gray-400" />
+                )}
+              </div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="hidden"
+                accept="image/*" // Only accept image files
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Saving..." : "Save Client Information"}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }

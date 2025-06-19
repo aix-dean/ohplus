@@ -13,11 +13,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { CheckCircle, Loader2, XCircle } from "lucide-react"
+import { Loader2, XCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { Proposal } from "@/lib/types/proposal"
 import { updateProposalStatus } from "@/lib/proposal-service"
-import { useRouter } from "next/navigation" // Import useRouter
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
+import { ProposalSentSuccessDialog } from "./proposal-sent-success-dialog"
 
 interface SendProposalDialogProps {
   isOpen: boolean
@@ -28,37 +30,26 @@ interface SendProposalDialogProps {
 
 export function SendProposalDialog({ isOpen, onClose, proposal, onProposalSent }: SendProposalDialogProps) {
   const { toast } = useToast()
-  const router = useRouter() // Initialize useRouter
+  const router = useRouter()
+  const { userData } = useAuth()
   const [isSending, setIsSending] = useState(false)
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
-  const [ccEmail, setCcEmail] = useState("") // New state for CC email
-  const [currentUserEmail, setCurrentUserEmail] = useState("") // New state for current user's email
+  const [ccEmail, setCcEmail] = useState("")
+  const [currentUserEmail, setCurrentUserEmail] = useState("")
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
-      // Set default subject and body when dialog opens
-      setSubject(`Proposal: ${proposal.title || "Custom Advertising Solution"} - OH Plus`)
-      setBody(
-        `
-Dear ${proposal.client?.contactPerson || proposal.client?.company || "Valued Client"},
-
-We are excited to present you with a customized advertising proposal tailored to your specific needs. Our team has carefully crafted this proposal to help you achieve your marketing objectives.
-
-Please find the complete proposal document attached to this email for your convenience, or view it online here: ${process.env.NEXT_PUBLIC_APP_URL}/proposals/view/${proposal.id}
-
-We believe this proposal offers excellent value and aligns perfectly with your advertising goals. Our team is ready to discuss any questions you may have and work with you to bring this campaign to life.
-
-Thank you for considering OH Plus as your advertising partner. We look forward to creating something amazing together!
-
-Best regards,
-The OH Plus Team
-      `.trim(),
-      )
-      // In a real app, you'd fetch the current user's email from an auth context or session
-      setCurrentUserEmail("sales@ohplus.com") // Placeholder
+      setSubject("")
+      setBody("")
+      if (userData?.email) {
+        setCurrentUserEmail(userData.email)
+      } else {
+        setCurrentUserEmail("")
+      }
     }
-  }, [isOpen, proposal])
+  }, [isOpen, proposal, userData])
 
   const handleSendProposal = async () => {
     setIsSending(true)
@@ -74,7 +65,7 @@ The OH Plus Team
           subject,
           body,
           currentUserEmail,
-          ccEmail, // Include CC email
+          ccEmail,
         }),
       })
 
@@ -83,13 +74,9 @@ The OH Plus Team
       if (response.ok && result.success) {
         await updateProposalStatus(proposal.id, "sent")
         onProposalSent(proposal.id, "sent")
-        toast({
-          title: "Proposal Sent!",
-          description: "The proposal has been successfully sent to the client.",
-          icon: <CheckCircle className="h-5 w-5 text-green-500" />,
-        })
-        router.push("/sales/dashboard") // Redirect to dashboard
-        onClose()
+        onClose() // Close the send proposal dialog immediately
+        setShowSuccessDialog(true) // Show the new success dialog
+        // The router.push will now happen after the success dialog dismisses
       } else {
         throw new Error(result.error || "Failed to send email")
       }
@@ -106,86 +93,106 @@ The OH Plus Team
     }
   }
 
+  // Callback function to handle navigation after success dialog dismisses
+  const handleSuccessDialogDismissAndNavigate = () => {
+    setShowSuccessDialog(false) // Hide the success dialog
+    router.push("/sales/dashboard") // Now navigate
+  }
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Send Proposal</DialogTitle>
-          <DialogDescription>
-            Review the email details before sending the proposal to{" "}
-            <span className="font-semibold text-gray-900">{proposal.client.email}</span>.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="to" className="text-right">
-              To
-            </Label>
-            <Input id="to" value={proposal.client.email} readOnly className="col-span-3" />
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Send Proposal</DialogTitle>
+            <DialogDescription>
+              Review the email details before sending the proposal to{" "}
+              <span className="font-semibold text-gray-900">{proposal.client.email}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="to" className="text-right">
+                To
+              </Label>
+              <Input id="to" value={proposal.client.email} readOnly className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="cc" className="text-right">
+                CC
+              </Label>
+              <Input
+                id="cc"
+                value={ccEmail}
+                onChange={(e) => setCcEmail(e.target.value)}
+                placeholder="Optional: comma-separated emails"
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="from" className="text-right">
+                From
+              </Label>
+              <Input id="from" value="OH Plus <noreply@resend.dev>" readOnly className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="replyTo" className="text-right">
+                Reply-To
+              </Label>
+              <Input
+                id="replyTo"
+                value={currentUserEmail}
+                onChange={(e) => setCurrentUserEmail(e.target.value)}
+                placeholder="Your email"
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="subject" className="text-right">
+                Subject
+              </Label>
+              <Input
+                id="subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="col-span-3"
+                placeholder="e.g., Proposal for Your Advertising Campaign"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="body" className="text-right pt-2">
+                Body
+              </Label>
+              <Textarea
+                id="body"
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                className="col-span-3 min-h-[150px]"
+                placeholder="e.g., Dear [Client Name],\n\nPlease find our proposal attached...\n\nBest regards,\nThe OH Plus Team"
+              />
+            </div>
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="cc" className="text-right">
-              CC
-            </Label>
-            <Input
-              id="cc"
-              value={ccEmail}
-              onChange={(e) => setCcEmail(e.target.value)}
-              placeholder="Optional: comma-separated emails"
-              className="col-span-3"
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="from" className="text-right">
-              From
-            </Label>
-            <Input id="from" value="OH Plus <noreply@resend.dev>" readOnly className="col-span-3" />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="replyTo" className="text-right">
-              Reply-To
-            </Label>
-            <Input
-              id="replyTo"
-              value={currentUserEmail}
-              onChange={(e) => setCurrentUserEmail(e.target.value)}
-              placeholder="Your email"
-              className="col-span-3"
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="subject" className="text-right">
-              Subject
-            </Label>
-            <Input id="subject" value={subject} onChange={(e) => setSubject(e.target.value)} className="col-span-3" />
-          </div>
-          <div className="grid grid-cols-4 items-start gap-4">
-            <Label htmlFor="body" className="text-right pt-2">
-              Body
-            </Label>
-            <Textarea
-              id="body"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              className="col-span-3 min-h-[150px]"
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isSending}>
-            Cancel
-          </Button>
-          <Button onClick={handleSendProposal} disabled={isSending}>
-            {isSending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...
-              </>
-            ) : (
-              "Send Proposal"
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose} disabled={isSending}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendProposal} disabled={isSending}>
+              {isSending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...
+                </>
+              ) : (
+                "Send Proposal"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ProposalSentSuccessDialog
+        isOpen={showSuccessDialog}
+        onDismissAndNavigate={handleSuccessDialogDismissAndNavigate}
+      />
+    </>
   )
 }
