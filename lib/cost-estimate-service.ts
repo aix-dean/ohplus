@@ -463,3 +463,38 @@ export async function deleteCostEstimate(id: string): Promise<void> {
     throw new Error("Failed to delete cost estimate.")
   }
 }
+
+// Get cost estimates by createdBy ID
+export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostEstimate[]> {
+  try {
+    const q = query(
+      collection(db, COST_ESTIMATES_COLLECTION),
+      where("createdBy", "==", userId),
+      orderBy("createdAt", "desc"),
+    )
+    const querySnapshot = await getDocs(q)
+    return querySnapshot.docs.map((docSnap) => {
+      const data = docSnap.data()
+      return {
+        id: docSnap.id,
+        proposalId: data.proposalId || null,
+        title: data.title,
+        client: data.client,
+        lineItems: data.lineItems,
+        totalAmount: data.totalAmount,
+        status: data.status,
+        notes: data.notes || "",
+        customMessage: data.customMessage || "",
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate(),
+        createdBy: data.createdBy,
+        startDate: data.startDate?.toDate() || null,
+        endDate: data.endDate?.toDate() || null,
+        validUntil: data.validUntil?.toDate() || null,
+      } as CostEstimate
+    })
+  } catch (error) {
+    console.error("Error fetching cost estimates by createdBy ID:", error)
+    return []
+  }
+}

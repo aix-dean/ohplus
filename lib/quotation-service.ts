@@ -1,4 +1,15 @@
-import { collection, addDoc, serverTimestamp, getDoc, doc, getDocs, query, where, updateDoc } from "firebase/firestore"
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  getDoc,
+  doc,
+  getDocs,
+  query,
+  where,
+  updateDoc,
+  orderBy,
+} from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { addQuotationToCampaign } from "@/lib/campaign-service"
 import { jsPDF } from "jspdf"
@@ -575,6 +586,30 @@ export async function getQuotationsByCampaignId(campaignId: string): Promise<Quo
     return quotations
   } catch (error) {
     console.error("Error fetching quotations by campaign ID:", error)
+    return []
+  }
+}
+
+// Get quotations by created_by ID
+export async function getQuotationsByCreatedBy(userId: string): Promise<Quotation[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const quotationsRef = collection(db, "quotations")
+    const q = query(quotationsRef, where("created_by", "==", userId), orderBy("created", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const quotations: Quotation[] = []
+
+    querySnapshot.forEach((doc) => {
+      quotations.push({ id: doc.id, ...doc.data() } as Quotation)
+    })
+
+    return quotations
+  } catch (error) {
+    console.error("Error fetching quotations by created_by ID:", error)
     return []
   }
 }
