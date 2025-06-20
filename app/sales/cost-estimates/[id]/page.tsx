@@ -44,6 +44,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { generateCostEstimatePDF } from "@/lib/pdf-service" // Import the new PDF generation function
 
 // Helper function to generate QR code URL
 const generateQRCodeUrl = (costEstimateId: string) => {
@@ -74,6 +75,7 @@ export default function CostEstimateDetailsPage() {
   const [emailSubject, setEmailSubject] = useState("")
   const [emailBody, setEmailBody] = useState("")
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [downloadingPDF, setDownloadingPDF] = useState(false) // New state for PDF download
 
   useEffect(() => {
     const fetchCostEstimateData = async () => {
@@ -251,11 +253,25 @@ export default function CostEstimateDetailsPage() {
   }
 
   const handleDownloadPDF = async () => {
-    toast({
-      title: "Download PDF",
-      description: "PDF download functionality for cost estimates is not yet implemented.",
-      variant: "default",
-    })
+    if (!costEstimate) return
+
+    setDownloadingPDF(true)
+    try {
+      await generateCostEstimatePDF(costEstimate)
+      toast({
+        title: "PDF Generated",
+        description: "Cost estimate PDF has been downloaded.",
+      })
+    } catch (error) {
+      console.error("Error downloading PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setDownloadingPDF(false)
+    }
   }
 
   const handleEditClick = () => {
@@ -282,8 +298,8 @@ export default function CostEstimateDetailsPage() {
       await updateCostEstimate(
         editableCostEstimate.id,
         editableCostEstimate,
-        user.uid,
-        user.displayName || "Unknown User",
+        // user.uid, // These arguments are not part of the updateCostEstimate signature
+        // user.displayName || "Unknown User",
       )
       setCostEstimate(editableCostEstimate)
       setIsEditing(false)
@@ -462,20 +478,20 @@ export default function CostEstimateDetailsPage() {
           <Button
             variant="ghost"
             onClick={handleDownloadPDF}
-            // disabled={downloadingPDF} // Re-enable when PDF generation is implemented
+            disabled={downloadingPDF} // Re-enable when PDF generation is implemented
             className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
           >
-            {/* {downloadingPDF ? (
+            {downloadingPDF ? (
               <>
                 <Loader2 className="h-8 w-8 text-gray-500 mb-1 animate-spin" />
                 <span className="text-[10px] text-gray-700">Generating...</span>
               </>
-            ) : ( */}
-            <>
-              <DownloadIcon className="h-8 w-8 text-gray-500 mb-1" />
-              <span className="text-[10px] text-gray-700">Download</span>
-            </>
-            {/* )} */}
+            ) : (
+              <>
+                <DownloadIcon className="h-8 w-8 text-gray-500 mb-1" />
+                <span className="text-[10px] text-gray-700">Download</span>
+              </>
+            )}
           </Button>
         </div>
 
@@ -487,7 +503,7 @@ export default function CostEstimateDetailsPage() {
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">COST ESTIMATE</h1>
                 <p className="text-sm text-gray-500 flex items-center gap-2">
-                  {costEstimate.id}
+                  {costEstimate.costEstimateNumber || costEstimate.id} {/* Display costEstimateNumber */}
                   {isEditing && (
                     <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
                       <Pencil className="h-3 w-3 mr-1" /> Editing

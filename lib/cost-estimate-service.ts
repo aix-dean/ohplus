@@ -114,8 +114,11 @@ export async function createCostEstimateFromProposal(
       notes: "Estimated cost for ongoing maintenance and monitoring.",
     })
 
+    const costEstimateNumber = `CE${Date.now()}` // Generate CE + currentmillis
+
     const newCostEstimateRef = await addDoc(collection(db, COST_ESTIMATES_COLLECTION), {
       proposalId: proposal.id,
+      costEstimateNumber: costEstimateNumber, // Store the new number
       title: `Cost Estimate for ${proposal.title}`,
       client: proposal.client,
       lineItems,
@@ -192,8 +195,11 @@ export async function createDirectCostEstimate(
       notes: "Estimated cost for ongoing maintenance and monitoring.",
     })
 
+    const costEstimateNumber = `CE${Date.now()}` // Generate CE + currentmillis
+
     const newCostEstimateRef = await addDoc(collection(db, COST_ESTIMATES_COLLECTION), {
       proposalId: null, // No associated proposal
+      costEstimateNumber: costEstimateNumber, // Store the new number
       title: `Cost Estimate for ${clientData.company || clientData.name}`,
       client: clientData,
       lineItems,
@@ -278,6 +284,7 @@ export async function getCostEstimatesByProposalId(proposalId: string): Promise<
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
+        costEstimateNumber: data.costEstimateNumber || null, // Retrieve new number
         title: data.title,
         client: data.client,
         lineItems: data.lineItems,
@@ -313,6 +320,7 @@ export async function getCostEstimate(id: string): Promise<CostEstimate | null> 
     return {
       id: docSnap.id,
       proposalId: data.proposalId || null,
+      costEstimateNumber: data.costEstimateNumber || null, // Retrieve new number
       title: data.title,
       client: data.client,
       lineItems: data.lineItems,
@@ -371,6 +379,7 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
+        costEstimateNumber: data.costEstimateNumber || null, // Retrieve new number
         title: data.title,
         client: data.client,
         lineItems: data.lineItems,
@@ -428,6 +437,7 @@ export async function getPaginatedCostEstimates(
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
+        costEstimateNumber: data.costEstimateNumber || null, // Retrieve new number
         title: data.title,
         client: data.client,
         lineItems: data.lineItems,
@@ -478,6 +488,7 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
+        costEstimateNumber: data.costEstimateNumber || null, // Retrieve new number
         title: data.title,
         client: data.client,
         lineItems: data.lineItems,

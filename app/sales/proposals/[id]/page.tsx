@@ -411,7 +411,7 @@ export default function ProposalDetailsPage() {
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">PROPOSAL</h1>
                 <p className="text-sm text-gray-500 flex items-center gap-2">
-                  {proposal.id}
+                  {proposal.proposalNumber}
                   {isEditing && (
                     <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
                       <Pencil className="h-3 w-3 mr-1" /> Editing

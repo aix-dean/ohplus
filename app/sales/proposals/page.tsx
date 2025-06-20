@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import {
   MoreVertical,
   FileText,
@@ -136,14 +137,6 @@ function ProposalsPageContent() {
     console.log("Download PDF for proposal:", proposal.id)
   }
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center py-12">
-        <div className="text-lg text-gray-600">Loading proposals...</div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
@@ -191,7 +184,57 @@ function ProposalsPageContent() {
         </div>
 
         {/* Proposals List */}
-        {filteredProposals.length === 0 ? (
+        {loading ? (
+          <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50 border-b border-gray-200">
+                  <TableHead className="font-semibold text-gray-900">Proposal</TableHead>
+                  <TableHead className="font-semibold text-gray-900">Client</TableHead>
+                  <TableHead className="font-semibold text-gray-900">Status</TableHead>
+                  <TableHead className="font-semibold text-gray-900">Products</TableHead>
+                  <TableHead className="font-semibold text-gray-900">Amount</TableHead>
+                  <TableHead className="font-semibold text-gray-900">Created</TableHead>
+                  <TableHead className="text-right font-semibold text-gray-900">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i} className="border-b border-gray-100">
+                    <TableCell className="py-3">
+                      <Skeleton className="h-5 w-48 mb-1" />
+                      <Skeleton className="h-4 w-32" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-8 w-8 rounded-full" />
+                        <div>
+                          <Skeleton className="h-5 w-28 mb-1" />
+                          <Skeleton className="h-4 w-20" />
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-6 w-20" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-5 w-12 mx-auto" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-5 w-24" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                    <TableCell className="text-right py-3">
+                      <Skeleton className="h-8 w-8 ml-auto" />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        ) : filteredProposals.length === 0 ? (
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="text-center py-12">
               <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -213,93 +256,6 @@ function ProposalsPageContent() {
               )}
             </CardContent>
           </Card>
-        ) : isMobile ? (
-          // Mobile Card View
-          <div className="space-y-4">
-            {filteredProposals.map((proposal) => {
-              const statusConfig = getStatusConfig(proposal.status)
-              const StatusIcon = statusConfig.icon
-
-              return (
-                <Card
-                  key={proposal.id}
-                  className="border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer rounded-xl"
-                >
-                  <CardContent className="p-5" onClick={() => handleViewProposal(proposal.id)}>
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-900 text-base mb-1 line-clamp-1">{proposal.title}</h3>
-                        <div className="flex items-center gap-2 text-xs text-gray-600 mb-2">
-                          <Building2 className="h-4 w-4" />
-                          <span className="truncate">{proposal.client.company}</span>
-                        </div>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem onClick={() => handleViewProposal(proposal.id)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDownloadPDF(proposal)}>
-                            <Download className="mr-2 h-4 w-4" />
-                            Download PDF
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-
-                    <div className="flex items-center justify-between mt-4">
-                      <div className="flex items-center gap-4">
-                        <Badge variant="outline" className={`${statusConfig.color} border font-medium`}>
-                          <StatusIcon className="mr-1 h-3 w-3" />
-                          {statusConfig.label}
-                        </Badge>
-                        <div className="text-xs text-gray-500 flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {format(proposal.createdAt, "MMM d, yyyy")}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            router.push(`/sales/proposals/${proposal.id}/cost-estimates`)
-                          }}
-                          className="text-xs"
-                        >
-                          Cost Estimates
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => handleViewProposal(proposal.id)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDownloadPDF(proposal)}>
-                              <Download className="mr-2 h-4 w-4" />
-                              Download PDF
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
         ) : (
           // Desktop Table View
           <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">

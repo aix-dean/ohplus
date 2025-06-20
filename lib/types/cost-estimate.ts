@@ -15,6 +15,7 @@ export interface CostEstimateLineItem {
 export interface CostEstimate {
   id: string
   proposalId: string | null // Nullable if it's a direct cost estimate
+  costEstimateNumber: string // New field for CE + currentmillis
   title: string
   client: ProposalClient // Reusing ProposalClient type for consistency
   lineItems: CostEstimateLineItem[]

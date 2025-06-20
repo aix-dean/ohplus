@@ -89,10 +89,12 @@ export async function createProposal(
       health_percentage: product.health_percentage || 0,
     }))
 
-    // Removed proposalPassword generation
+    // Generate proposal number
+    const proposalNumber = `PP${Date.now()}`
 
     const proposalData = {
       title: title || "",
+      proposalNumber: proposalNumber, // Add the new proposal number
       client: cleanClient,
       products: cleanProducts,
       totalAmount: totalAmount || 0,
@@ -103,7 +105,6 @@ export async function createProposal(
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       status: "draft" as const, // Always set to draft now
-      // Removed password field
       campaignId: options.campaignId || null, // Store campaign ID if provided
     }
 
@@ -139,8 +140,6 @@ export async function createProposal(
       console.error("Error logging proposal creation:", activityError)
       // Don't throw - proposal was created successfully
     }
-
-    // Removed email sending logic from here
 
     return docRef.id
   } catch (error) {
@@ -400,6 +399,7 @@ export async function updateProposal(
     if (data.validUntil !== undefined) updateData.validUntil = data.validUntil
     if (data.notes !== undefined) updateData.notes = data.notes
     if (data.customMessage !== undefined) updateData.customMessage = data.customMessage
+    if (data.proposalNumber !== undefined) updateData.proposalNumber = data.proposalNumber // Add update for proposalNumber
 
     // Handle client object updates
     if (data.client) {
@@ -429,6 +429,7 @@ export async function updateProposal(
 export function generateProposalPDFData(proposal: Proposal) {
   return {
     title: proposal.title,
+    proposalNumber: proposal.proposalNumber, // Include proposal number in PDF data
     client: proposal.client,
     products: proposal.products.map((product) => ({
       name: product.name,
@@ -526,7 +527,8 @@ export async function getPaginatedProposals(
         (proposal) =>
           (statusFilter === "all" || !statusFilter || proposal.status === statusFilter) &&
           (proposal.title.toLowerCase().includes(lowerCaseSearchTerm) ||
-            proposal.client.company.toLowerCase().includes(lowerCaseSearchTerm)),
+            proposal.client.company.toLowerCase().includes(lowerCaseSearchTerm) ||
+            (proposal.proposalNumber && proposal.proposalNumber.toLowerCase().includes(lowerCaseSearchTerm))), // Include proposalNumber in search
       )
     }
 
@@ -579,7 +581,8 @@ export async function getProposalsCount(searchTerm = "", statusFilter: string | 
         (proposal) =>
           (statusFilter === "all" || !statusFilter || proposal.status === statusFilter) &&
           (proposal.title.toLowerCase().includes(lowerCaseSearchTerm) ||
-            proposal.client.company.toLowerCase().includes(lowerCaseSearchTerm)),
+            proposal.client.company.toLowerCase().includes(lowerCaseSearchTerm) ||
+            (proposal.proposalNumber && proposal.proposalNumber.toLowerCase().includes(lowerCaseSearchTerm))), // Include proposalNumber in count search
       )
       count = filteredProposals.length
     }
