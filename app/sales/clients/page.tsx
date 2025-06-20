@@ -15,9 +15,11 @@ import { formatDistanceToNow } from "date-fns"
 import { Toaster } from "sonner"
 import { toast } from "sonner"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
-// Removed: import { getUsers, type User } from "@/lib/access-management-service"
+import { useAuth } from "@/contexts/auth-context" // Import useAuth
 
 export default function ClientDatabasePage() {
+  const { user } = useAuth() // Get current user from auth context
+
   // State for clients data
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
@@ -29,28 +31,11 @@ export default function ClientDatabasePage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
-  // Removed: const [uploadedByFilter, setUploadedByFilter] = useState<string | null>(null)
-  // Removed: const [users, setUsers] = useState<User[]>([])
-
   const [itemsPerPage] = useState(10)
 
   // State for dialogs
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-
-  // Removed: Load users for the filter dropdown
-  // useEffect(() => {
-  //   const fetchUsers = async () => {
-  //     try {
-  //       const fetchedUsers = await getUsers()
-  //       setUsers(fetchedUsers)
-  //     } catch (error) {
-  //       console.error("Error fetching users for filter:", error)
-  //       toast.error("Failed to load users for filter")
-  //     }
-  //   }
-  //   fetchUsers()
-  // }, [])
 
   // Debounce search term
   useEffect(() => {
@@ -63,26 +48,29 @@ export default function ClientDatabasePage() {
 
   // Load clients on initial render and when filters change
   useEffect(() => {
-    loadClients(true)
+    if (user?.uid) {
+      // Only load clients if user ID is available
+      loadClients(true)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearchTerm, statusFilter]) // Removed uploadedByFilter from dependencies
+  }, [debouncedSearchTerm, statusFilter, user?.uid]) // Add user.uid to dependencies
 
   // Function to load clients
   const loadClients = async (reset = false) => {
     setLoading(true)
     try {
-      console.log("Loading clients with filters:", { debouncedSearchTerm, statusFilter })
+      console.log("Loading clients with filters:", { debouncedSearchTerm, statusFilter, uploadedBy: user?.uid })
 
       // If reset is true, start from the beginning
       const currentLastDoc = reset ? null : lastDoc
 
-      // Get clients
+      // Get clients, passing the current user's UID as the uploadedByFilter
       const result = await getPaginatedClients(
         itemsPerPage,
         currentLastDoc,
         debouncedSearchTerm,
         statusFilter,
-        // Removed: uploadedByFilter,
+        user?.uid, // Pass current user's UID here
       )
       console.log("Loaded clients:", result.items.length)
 
@@ -96,8 +84,8 @@ export default function ClientDatabasePage() {
       setLastDoc(result.lastDoc)
       setHasMore(result.hasMore)
 
-      // Get total count
-      const count = await getClientsCount(debouncedSearchTerm, statusFilter) // Removed uploadedByFilter
+      // Get total count, passing the current user's UID as the uploadedByFilter
+      const count = await getClientsCount(debouncedSearchTerm, statusFilter, user?.uid) // Pass current user's UID here
       setTotalClients(count)
     } catch (error) {
       console.error("Error loading clients:", error)
@@ -200,7 +188,6 @@ export default function ClientDatabasePage() {
               <SelectItem value="lead">Lead</SelectItem>
             </SelectContent>
           </Select>
-          {/* Removed: New Filter: Uploaded By */}
         </div>
 
         {/* Clients Table */}
@@ -219,7 +206,6 @@ export default function ClientDatabasePage() {
                   Phone
                 </TableHead>
                 <TableHead className="py-3 px-4 text-left text-sm font-semibold text-gray-700">Status</TableHead>
-                {/* Removed: TableHead for Uploaded By */}
                 <TableHead className="hidden md:table-cell py-3 px-4 text-left text-sm font-semibold text-gray-700">
                   Last Updated
                 </TableHead>
@@ -246,7 +232,6 @@ export default function ClientDatabasePage() {
                     <TableCell className="py-3 px-4">
                       <Skeleton className="h-5 w-[80px] bg-gray-200" />
                     </TableCell>
-                    {/* Removed: Skeleton for Uploaded By */}
                     <TableCell className="hidden md:table-cell py-3 px-4">
                       <Skeleton className="h-5 w-[100px] bg-gray-200" />
                     </TableCell>
@@ -258,8 +243,6 @@ export default function ClientDatabasePage() {
               ) : clients.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-12 text-gray-500 text-lg">
-                    {" "}
-                    {/* Updated colspan */}
                     No clients found. {debouncedSearchTerm && "Try a different search term or status."}
                   </TableCell>
                 </TableRow>
@@ -274,7 +257,6 @@ export default function ClientDatabasePage() {
                     <TableCell className="hidden lg:table-cell text-gray-600 py-3 px-4">{client.email}</TableCell>
                     <TableCell className="hidden sm:table-cell text-gray-600 py-3 px-4">{client.phone}</TableCell>
                     <TableCell className="py-3 px-4">{getStatusBadge(client.status)}</TableCell>
-                    {/* Removed: TableCell for Uploaded By */}
                     <TableCell className="hidden md:table-cell text-gray-600 text-sm py-3 px-4">
                       {formatTimestamp(client.updated)}
                     </TableCell>

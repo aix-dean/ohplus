@@ -144,10 +144,11 @@ function SalesDashboardContent() {
   // Fetch clients for dashboard client selection (for proposals and CE/Quote)
   useEffect(() => {
     const fetchClients = async () => {
-      if (proposalCreationMode || ceQuoteMode) {
+      if (user?.uid && (proposalCreationMode || ceQuoteMode)) {
+        // Ensure user is logged in
         setIsSearchingDashboardClients(true)
         try {
-          const result = await getPaginatedClients(10, null, debouncedDashboardClientSearchTerm.trim())
+          const result = await getPaginatedClients(10, null, debouncedDashboardClientSearchTerm.trim(), null, user.uid) // Pass user.uid as uploadedByFilter
           setDashboardClientSearchResults(result.items)
         } catch (error) {
           console.error("Error fetching clients for dashboard:", error)
@@ -160,7 +161,7 @@ function SalesDashboardContent() {
       }
     }
     fetchClients()
-  }, [debouncedDashboardClientSearchTerm, proposalCreationMode, ceQuoteMode])
+  }, [debouncedDashboardClientSearchTerm, proposalCreationMode, ceQuoteMode, user?.uid]) // Add user.uid to dependencies
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -833,7 +834,6 @@ function SalesDashboardContent() {
                       onSearchError={handleSearchError}
                       onSearchLoading={handleSearchLoading}
                       onSearchClear={handleSearchClear}
-                      showDropdown={false}
                       userId={user?.uid}
                     />
                   </div>
