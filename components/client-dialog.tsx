@@ -11,6 +11,7 @@ import { createClient, updateClient, type Client } from "@/lib/client-service"
 import { toast } from "sonner"
 import { Plus } from "lucide-react"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service" // Import the upload function
+import { useAuth } from "@/contexts/auth-context" // Import useAuth
 
 interface ClientDialogProps {
   client?: Client
@@ -20,6 +21,7 @@ interface ClientDialogProps {
 }
 
 export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDialogProps) {
+  const { user } = useAuth() // Get current user from auth context
   const [loading, setLoading] = useState(false)
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null)
@@ -108,6 +110,9 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         city: client?.city || "",
         state: client?.state || "",
         zipCode: client?.zipCode || "",
+        // Add uploadedBy and uploadedByName for new clients
+        uploadedBy: client?.uploadedBy || user?.uid || "",
+        uploadedByName: client?.uploadedByName || user?.displayName || user?.email || "",
       } as Omit<Client, "id" | "created" | "updated"> // Cast to ensure type compatibility
 
       let savedClient: Client

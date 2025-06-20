@@ -24,15 +24,17 @@ export interface Client {
   email: string
   phone: string
   company: string
-  designation?: string // New field
+  designation?: string
   address: string
-  city?: string // Make optional as it's not in the new screenshot
-  state?: string // Make optional as it's not in the new screenshot
-  zipCode?: string // Make optional as it's not in the new screenshot
+  city?: string
+  state?: string
+  zipCode?: string
   industry: string
-  notes?: string // Make optional as it's not in the new screenshot
+  notes?: string
   status: "active" | "inactive" | "lead"
-  companyLogoUrl?: string // New field
+  companyLogoUrl?: string
+  uploadedBy?: string // New field: User ID of who uploaded the client
+  uploadedByName?: string // New field: Name of who uploaded the client
   created: any
   updated: any
 }
@@ -116,9 +118,16 @@ export async function getPaginatedClients(
   lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
   searchTerm = "",
   statusFilter: string | null = null,
+  uploadedByFilter: string | null = null, // New filter parameter
 ): Promise<PaginatedResult<Client>> {
   try {
-    console.log("Getting paginated clients:", { itemsPerPage, lastDoc: !!lastDoc, searchTerm, statusFilter })
+    console.log("Getting paginated clients:", {
+      itemsPerPage,
+      lastDoc: !!lastDoc,
+      searchTerm,
+      statusFilter,
+      uploadedByFilter,
+    })
     const clientsRef = collection(db, "client_db")
 
     // Start with base query
@@ -127,6 +136,11 @@ export async function getPaginatedClients(
     // Add status filter if provided
     if (statusFilter) {
       baseQuery = query(baseQuery, where("status", "==", statusFilter))
+    }
+
+    // Add uploadedBy filter if provided
+    if (uploadedByFilter) {
+      baseQuery = query(baseQuery, where("uploadedBy", "==", uploadedByFilter))
     }
 
     // Add pagination
@@ -181,15 +195,26 @@ export async function getPaginatedClients(
 }
 
 // Get the total count of clients
-export async function getClientsCount(searchTerm = "", statusFilter: string | null = null): Promise<number> {
+export async function getClientsCount(
+  searchTerm = "",
+  statusFilter: string | null = null,
+  uploadedByFilter: string | null = null, // New filter parameter
+): Promise<number> {
   try {
-    console.log("Getting clients count:", { searchTerm, statusFilter })
+    console.log("Getting clients count:", { searchTerm, statusFilter, uploadedByFilter })
     const clientsRef = collection(db, "client_db")
 
+    // Start with base query
+    let baseQuery: any = clientsRef
+
     // Add status filter if provided
-    let baseQuery = clientsRef
     if (statusFilter) {
-      baseQuery = query(collection(db, "client_db"), where("status", "==", statusFilter)) as any
+      baseQuery = query(baseQuery, where("status", "==", statusFilter))
+    }
+
+    // Add uploadedBy filter if provided
+    if (uploadedByFilter) {
+      baseQuery = query(baseQuery, where("uploadedBy", "==", uploadedByFilter))
     }
 
     // If there's a search term, we need to fetch all documents and filter client-side
