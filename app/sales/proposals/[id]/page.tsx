@@ -37,6 +37,7 @@ import { useToast } from "@/hooks/use-toast"
 import { ProposalActivityTimeline } from "@/components/proposal-activity-timeline"
 import { CostEstimatesList } from "@/components/cost-estimates-list"
 import { SendProposalDialog } from "@/components/send-proposal-dialog"
+import { SendProposalOptionsDialog } from "@/components/send-proposal-options-dialog" // Import the new options dialog
 
 // Helper function to generate QR code URL (kept here for consistency with proposal view)
 const generateQRCodeUrl = (proposalId: string) => {
@@ -54,7 +55,8 @@ export default function ProposalDetailsPage() {
   const [downloadingPDF, setDownloadingPDF] = useState(false)
   const [timelineOpen, setTimelineOpen] = useState(false)
   const [lightboxImage, setLightboxImage] = useState<{ url: string; isVideo: boolean } | null>(null)
-  const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
+  const [isSendOptionsDialogOpen, setIsSendOptionsDialogOpen] = useState(false) // State for options dialog
+  const [isSendEmailDialogOpen, setIsSendEmailDialogOpen] = useState(false) // State for email dialog
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -206,6 +208,19 @@ export default function ProposalDetailsPage() {
       ...prev!,
       validUntil: date || new Date(), // Set to current date if undefined
     }))
+  }
+
+  const handleSelectSendOption = (option: "email" | "whatsapp" | "viber" | "messenger") => {
+    setIsSendOptionsDialogOpen(false) // Close the options dialog
+    if (option === "email") {
+      setIsSendEmailDialogOpen(true) // Open the email dialog
+    } else {
+      // Handle other options like SMS here if implemented
+      toast({
+        title: "Not Implemented",
+        description: `Sending via ${option.toUpperCase()} is not yet available.`,
+      })
+    }
   }
 
   const getStatusConfig = (status: string) => {
@@ -950,7 +965,7 @@ export default function ProposalDetailsPage() {
               Save as Draft
             </Button>
             <Button
-              onClick={() => setIsSendDialogOpen(true)}
+              onClick={() => setIsSendOptionsDialogOpen(true)} // Open the options dialog first
               className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
             >
               <Send className="h-5 w-5 mr-2" />
@@ -960,11 +975,21 @@ export default function ProposalDetailsPage() {
         )
       )}
 
-      {/* Send Proposal Dialog */}
+      {/* Send Proposal Options Dialog */}
+      {proposal && (
+        <SendProposalOptionsDialog
+          isOpen={isSendOptionsDialogOpen}
+          onClose={() => setIsSendOptionsDialogOpen(false)}
+          proposal={proposal}
+          onSelectOption={handleSelectSendOption}
+        />
+      )}
+
+      {/* Send Proposal Email Dialog */}
       {proposal && (
         <SendProposalDialog
-          isOpen={isSendDialogOpen}
-          onClose={() => setIsSendDialogOpen(false)}
+          isOpen={isSendEmailDialogOpen} // Controlled by new state
+          onClose={() => setIsSendEmailDialogOpen(false)}
           proposal={proposal}
           onProposalSent={handleProposalSent}
         />

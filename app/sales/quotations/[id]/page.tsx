@@ -39,6 +39,7 @@ import { getProductById, type Product } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
 import { SendQuotationDialog } from "@/components/send-quotation-dialog"
 import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-dialog" // Ensure this import is correct
+import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog"
 
 // Helper function to generate QR code URL (kept here for consistency with proposal view)
 const generateQRCodeUrl = (quotationId: string) => {
@@ -64,6 +65,8 @@ export default function QuotationDetailsPage() {
 
   // New state for the success dialog
   const [isQuotationSentSuccessDialogOpen, setIsQuotationSentSuccessDialogOpen] = useState(false)
+
+  const [isSendQuotationOptionsDialogOpen, setIsSendQuotationOptionsDialogOpen] = useState(false)
 
   // Helper function to safely convert any value to string
   const safeString = (value: any): string => {
@@ -225,7 +228,7 @@ export default function QuotationDetailsPage() {
   const handleSendQuotationClick = () => {
     if (quotation) {
       setQuotationToSend(quotation)
-      setIsSendQuotationDialogOpen(true)
+      setIsSendQuotationOptionsDialogOpen(true) // Open the options dialog
     }
   }
 
@@ -363,6 +366,11 @@ export default function QuotationDetailsPage() {
   }
 
   const statusConfig = getStatusConfig(quotation.status || "")
+
+  const handleEmailOptionClick = () => {
+    setIsSendQuotationOptionsDialogOpen(false) // Close the options dialog
+    setIsSendQuotationDialogOpen(true) // Open the SendQuotationDialog
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 relative">
@@ -811,13 +819,23 @@ export default function QuotationDetailsPage() {
         )
       )}
 
-      {/* Shared Send Quotation Dialog */}
+      {/* Shared Send Quotation Options Dialog */}
+      {quotationToSend && (
+        <SendQuotationOptionsDialog
+          isOpen={isSendQuotationOptionsDialogOpen}
+          onClose={() => setIsSendQuotationOptionsDialogOpen(false)}
+          quotation={quotationToSend}
+          onEmailClick={handleEmailOptionClick}
+        />
+      )}
+
+      {/* Existing Send Quotation Dialog */}
       {quotationToSend && (
         <SendQuotationDialog
           isOpen={isSendQuotationDialogOpen}
           onClose={() => setIsSendQuotationDialogOpen(false)}
           quotation={quotationToSend}
-          requestorEmail={quotationToSend.client_email || ""} // Pass client email from the quotation
+          requestorEmail={quotationToSend.client_email || ""}
           onQuotationSent={handleQuotationSentSuccess}
         />
       )}

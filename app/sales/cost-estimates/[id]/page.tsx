@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/dialog"
 import { generateCostEstimatePDF } from "@/lib/pdf-service" // Import the new PDF generation function
 import { CostEstimateSentSuccessDialog } from "@/components/cost-estimate-sent-success-dialog" // Ensure this is imported
+import { SendCostEstimateOptionsDialog } from "@/components/send-cost-estimate-options-dialog" // Import the new options dialog
 
 // Helper function to generate QR code URL
 const generateQRCodeUrl = (costEstimateId: string) => {
@@ -70,6 +71,7 @@ export default function CostEstimateDetailsPage() {
   const [activities, setActivities] = useState<ProposalActivity[]>([])
   const [timelineOpen, setTimelineOpen] = useState(false)
   const [isSendEmailDialogOpen, setIsSendEmailDialogOpen] = useState(false)
+  const [isSendOptionsDialogOpen, setIsSendOptionsDialogOpen] = useState(false) // New state for options dialog
   const [ccEmail, setCcEmail] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -1038,7 +1040,7 @@ export default function CostEstimateDetailsPage() {
               Save as Draft
             </Button>
             <Button
-              onClick={() => setIsSendEmailDialogOpen(true)}
+              onClick={() => setIsSendOptionsDialogOpen(true)} // Open the new options dialog
               className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
             >
               <Send className="h-5 w-5 mr-2" />
@@ -1048,14 +1050,27 @@ export default function CostEstimateDetailsPage() {
         )
       )}
 
-      {/* Send Email Dialog */}
+      {/* Send Cost Estimate Options Dialog */}
+      {costEstimate && (
+        <SendCostEstimateOptionsDialog
+          isOpen={isSendOptionsDialogOpen}
+          onOpenChange={setIsSendOptionsDialogOpen}
+          costEstimate={costEstimate}
+          onEmailClick={() => {
+            setIsSendOptionsDialogOpen(false) // Close options dialog
+            setIsSendEmailDialogOpen(true) // Open email dialog
+          }}
+        />
+      )}
+
+      {/* Send Email Dialog (existing) */}
       <Dialog open={isSendEmailDialogOpen} onOpenChange={setIsSendEmailDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Send Cost Estimate</DialogTitle>
             <DialogDescription>
               Review the email details before sending the cost estimate to{" "}
-              <span className="font-semibold text-gray-900">{costEstimate.client?.email}</span>.
+              <span className="font-semibold text-gray-900">{costEstimate?.client?.email}</span>.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -1063,7 +1078,7 @@ export default function CostEstimateDetailsPage() {
               <Label htmlFor="to" className="text-right">
                 To
               </Label>
-              <Input id="to" value={costEstimate.client?.email || ""} readOnly className="col-span-3" />
+              <Input id="to" value={costEstimate?.client?.email || ""} readOnly className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="cc" className="text-right">
