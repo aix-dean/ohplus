@@ -2,7 +2,7 @@ import jsPDF from "jspdf"
 import type { Proposal } from "@/lib/types/proposal"
 
 // Helper function to load image and convert to base64
-async function loadImageAsBase64(url: string): Promise<string | null> {
+export async function loadImageAsBase64(url: string): Promise<string | null> {
   try {
     const response = await fetch(url)
     const blob = await response.blob()
@@ -20,7 +20,7 @@ async function loadImageAsBase64(url: string): Promise<string | null> {
 }
 
 // Helper function to get image dimensions
-function getImageDimensions(base64: string): Promise<{ width: number; height: number }> {
+export function getImageDimensions(base64: string): Promise<{ width: number; height: number }> {
   return new Promise((resolve) => {
     const img = new Image()
     img.onload = () => {
@@ -34,7 +34,7 @@ function getImageDimensions(base64: string): Promise<{ width: number; height: nu
 }
 
 // Helper function to generate QR code using online service
-async function generateQRCode(text: string): Promise<string> {
+export async function generateQRCode(text: string): Promise<string> {
   try {
     // Using QR Server API for basic QR code generation
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(text)}`

@@ -1,15 +1,22 @@
 "use client"
 
+import type React from "react"
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { getCostEstimate, updateCostEstimateStatus } from "@/lib/cost-estimate-service"
-import type { CostEstimate, CostEstimateStatus } from "@/lib/types/cost-estimate"
+import { getCostEstimate, updateCostEstimateStatus, updateCostEstimate } from "@/lib/cost-estimate-service"
+import type { CostEstimate, CostEstimateClient, CostEstimateStatus } from "@/lib/types/cost-estimate"
 import { format } from "date-fns"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 import {
   ArrowLeft,
   DownloadIcon,
@@ -18,17 +25,17 @@ import {
   XCircle,
   FileText,
   Loader2,
-  History,
   LayoutGrid,
   Pencil,
+  CalendarIcon,
+  Save,
+  X,
 } from "lucide-react"
-import { getProposal } from "@/lib/proposal-service" // To fetch proposal details if linked
+import { getProposal } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
-import { ProposalActivityTimeline } from "@/components/proposal-activity-timeline" // Reusing for CE activity
-import { getProposalActivities } from "@/lib/proposal-activity-service" // Reusing for CE activity
+import { ProposalActivityTimeline } from "@/components/proposal-activity-timeline"
+import { getProposalActivities } from "@/lib/proposal-activity-service"
 import type { ProposalActivity } from "@/lib/types/proposal-activity"
-import { Input } from "@/components/ui/input" // Import Input for CC field
-import { Label } from "@/components/ui/label" // Import Label for CC field
 import {
   Dialog,
   DialogContent,
@@ -36,7 +43,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog" // Import Dialog components
+} from "@/components/ui/dialog"
 
 // Helper function to generate QR code URL
 const generateQRCodeUrl = (costEstimateId: string) => {
@@ -53,14 +60,20 @@ export default function CostEstimateDetailsPage() {
 
   const costEstimateId = params.id as string
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
+  const [editableCostEstimate, setEditableCostEstimate] = useState<CostEstimate | null>(null)
   const [loading, setLoading] = useState(true)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [proposal, setProposal] = useState<Proposal | null>(null)
   const [activities, setActivities] = useState<ProposalActivity[]>([])
   const [timelineOpen, setTimelineOpen] = useState(false)
-  const [isSendEmailDialogOpen, setIsSendEmailDialogOpen] = useState(false) // State for send email dialog
-  const [ccEmail, setCcEmail] = useState("") // State for CC email in dialog (can be multiple, comma-separated)
+  const [isSendEmailDialogOpen, setIsSendEmailDialogOpen] = useState(false)
+  const [ccEmail, setCcEmail] = useState("")
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [emailSubject, setEmailSubject] = useState("")
+  const [emailBody, setEmailBody] = useState("")
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
 
   useEffect(() => {
     const fetchCostEstimateData = async () => {
@@ -71,11 +84,12 @@ export default function CostEstimateDetailsPage() {
         const ce = await getCostEstimate(costEstimateId)
         if (ce) {
           setCostEstimate(ce)
+          setEditableCostEstimate(ce) // Initialize editable state
           if (ce.proposalId) {
             const linkedProposal = await getProposal(ce.proposalId)
             setProposal(linkedProposal)
           }
-          const ceActivities = await getProposalActivities(costEstimateId) // Use CE ID for activities
+          const ceActivities = await getProposalActivities(costEstimateId)
           setActivities(ceActivities)
         } else {
           toast({
@@ -83,7 +97,7 @@ export default function CostEstimateDetailsPage() {
             description: "The cost estimate you're looking for doesn't exist.",
             variant: "destructive",
           })
-          router.push("/sales/cost-estimates") // Redirect to list if not found
+          router.push("/sales/cost-estimates")
         }
       } catch (error) {
         console.error("Error fetching cost estimate:", error)
@@ -100,10 +114,23 @@ export default function CostEstimateDetailsPage() {
     fetchCostEstimateData()
   }, [costEstimateId, router, toast])
 
+  useEffect(() => {
+    if (isSendEmailDialogOpen && costEstimate) {
+      setEmailSubject(`Cost Estimate: ${costEstimate.title || "Custom Cost Estimate"} - OH Plus`)
+      setEmailBody(
+        `Dear ${costEstimate.client?.contactPerson || costEstimate.client?.company || "Valued Client"},\n\nWe are pleased to provide you with a detailed cost estimate for your advertising campaign. Please find the full cost estimate attached and accessible via the link below.\n\nThank you for considering OH Plus for your advertising needs. We look forward to working with you to bring your campaign to life!\n\nBest regards,\nThe OH Plus Team`,
+      )
+      if (user?.email) {
+        setCcEmail(user.email) // Default CC to current user's email
+      } else {
+        setCcEmail("")
+      }
+    }
+  }, [isSendEmailDialogOpen, costEstimate, user])
+
   const handleSendEmailConfirm = async () => {
     if (!costEstimate || !user?.uid) return
 
-    // Ensure client email is available before sending
     if (!costEstimate.client?.email) {
       toast({
         title: "Missing Client Email",
@@ -113,7 +140,6 @@ export default function CostEstimateDetailsPage() {
       return
     }
 
-    // Validate each email in the comma-separated CC list
     const ccEmailsArray = ccEmail
       .split(",")
       .map((email) => email.trim())
@@ -138,11 +164,13 @@ export default function CostEstimateDetailsPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          costEstimate: costEstimate, // Send the full cost estimate object
+          costEstimate: costEstimate,
           clientEmail: costEstimate.client.email,
           client: costEstimate.client,
-          currentUserEmail: user.email, // Pass current user's email for reply-to
-          ccEmail: ccEmail, // Pass CC email string
+          currentUserEmail: user.email, // This is the reply-to
+          ccEmail: ccEmail,
+          subject: emailSubject, // Pass subject
+          body: emailBody, // Pass body
         }),
       })
 
@@ -153,14 +181,13 @@ export default function CostEstimateDetailsPage() {
 
       await updateCostEstimateStatus(costEstimate.id, "sent")
       setCostEstimate((prev) => (prev ? { ...prev, status: "sent" } : null))
-      toast({
-        title: "Email Sent",
-        description: `Cost estimate sent to ${costEstimate.client.email}${ccEmail ? ` and CC'd to ${ccEmail}` : ""}.`,
-      })
+      setEditableCostEstimate((prev) => (prev ? { ...prev, status: "sent" } : null))
+      setIsSendEmailDialogOpen(false) // Close the send dialog
+      setShowSuccessDialog(true) // Show the success dialog
+      setCcEmail("") // Clear CC field
+      // No toast here, success dialog will handle it
       const updatedActivities = await getProposalActivities(costEstimate.id)
       setActivities(updatedActivities)
-      setIsSendEmailDialogOpen(false) // Close dialog on success
-      setCcEmail("") // Clear CC email
     } catch (error) {
       console.error("Error sending email:", error)
       toast({
@@ -171,6 +198,11 @@ export default function CostEstimateDetailsPage() {
     } finally {
       setSendingEmail(false)
     }
+  }
+
+  const handleSuccessDialogDismissAndNavigate = () => {
+    setShowSuccessDialog(false) // Hide the success dialog
+    router.push("/sales/dashboard") // Navigate to dashboard
   }
 
   const handleUpdatePublicStatus = async (status: CostEstimateStatus) => {
@@ -199,6 +231,7 @@ export default function CostEstimateDetailsPage() {
 
       await updateCostEstimateStatus(costEstimate.id, status)
       setCostEstimate((prev) => (prev ? { ...prev, status: status } : null))
+      setEditableCostEstimate((prev) => (prev ? { ...prev, status: status } : null))
       toast({
         title: "Status Updated",
         description: `Cost estimate status changed to ${status}.`,
@@ -218,12 +251,82 @@ export default function CostEstimateDetailsPage() {
   }
 
   const handleDownloadPDF = async () => {
-    // Implement PDF download logic for cost estimates here
     toast({
       title: "Download PDF",
       description: "PDF download functionality for cost estimates is not yet implemented.",
       variant: "default",
     })
+  }
+
+  const handleEditClick = () => {
+    if (costEstimate) {
+      setEditableCostEstimate({ ...costEstimate })
+      setIsEditing(true)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditableCostEstimate(costEstimate)
+    setIsEditing(false)
+    toast({
+      title: "Cancelled",
+      description: "Editing cancelled. Changes were not saved.",
+    })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editableCostEstimate || !params.id || !user?.uid) return
+
+    setIsSaving(true)
+    try {
+      await updateCostEstimate(
+        editableCostEstimate.id,
+        editableCostEstimate,
+        user.uid,
+        user.displayName || "Unknown User",
+      )
+      setCostEstimate(editableCostEstimate)
+      setIsEditing(false)
+      toast({
+        title: "Success",
+        description: "Cost estimate updated successfully!",
+      })
+    } catch (error) {
+      console.error("Error saving cost estimate:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save cost estimate changes.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    if (name.startsWith("client.")) {
+      const clientField = name.split(".")[1] as keyof CostEstimateClient
+      setEditableCostEstimate((prev) => ({
+        ...prev!,
+        client: {
+          ...prev!.client,
+          [clientField]: value,
+        },
+      }))
+    } else {
+      setEditableCostEstimate((prev) => ({
+        ...prev!,
+        [name]: value,
+      }))
+    }
+  }
+
+  const handleDateChange = (date: Date | undefined, field: "startDate" | "endDate" | "validUntil") => {
+    setEditableCostEstimate((prev) => ({
+      ...prev!,
+      [field]: date || new Date(),
+    }))
   }
 
   const getStatusConfig = (status: CostEstimateStatus) => {
@@ -289,7 +392,7 @@ export default function CostEstimateDetailsPage() {
     )
   }
 
-  if (!costEstimate) {
+  if (!costEstimate || !editableCostEstimate) {
     return (
       <div className="min-h-screen bg-gray-50/50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6">
@@ -320,7 +423,7 @@ export default function CostEstimateDetailsPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push("/sales/cost-estimates")}
+              onClick={() => router.back()} // Changed from router.push("/sales/cost-estimates")
               className="text-gray-600 hover:text-gray-900"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -332,39 +435,7 @@ export default function CostEstimateDetailsPage() {
             </Badge>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <Button
-              onClick={() => setTimelineOpen(!timelineOpen)}
-              variant="outline"
-              size="sm"
-              className="border-blue-300 text-blue-700 hover:bg-blue-50"
-            >
-              <History className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Activity</span>
-            </Button>
-
-            {costEstimate.status === "draft" && (
-              <Button
-                onClick={() => setIsSendEmailDialogOpen(true)} // Open dialog
-                disabled={sendingEmail}
-                size="sm"
-                className="bg-green-500 hover:bg-green-600"
-              >
-                {sendingEmail ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Send to Client</span>
-                    <span className="sm:hidden">Send</span>
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
+          <div className="flex items-center space-x-2"></div>
         </div>
       </div>
 
@@ -381,7 +452,8 @@ export default function CostEstimateDetailsPage() {
           </Button>
           <Button
             variant="ghost"
-            onClick={() => router.push(`/sales/cost-estimates/edit/${costEstimate.id}`)}
+            onClick={handleEditClick}
+            disabled={isEditing}
             className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
           >
             <Pencil className="h-8 w-8 text-gray-500 mb-1" />
@@ -414,7 +486,14 @@ export default function CostEstimateDetailsPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">COST ESTIMATE</h1>
-                <p className="text-sm text-gray-500">{costEstimate.id}</p>
+                <p className="text-sm text-gray-500 flex items-center gap-2">
+                  {costEstimate.id}
+                  {isEditing && (
+                    <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                      <Pencil className="h-3 w-3 mr-1" /> Editing
+                    </Badge>
+                  )}
+                </p>
               </div>
               <div className="mt-4 sm:mt-0 flex items-center space-x-4">
                 {/* QR Code */}
@@ -443,25 +522,136 @@ export default function CostEstimateDetailsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Title</h3>
-                  <p className="text-base font-medium text-gray-900">{costEstimate.title}</p>
+                  <Label htmlFor="title" className="text-sm font-medium text-gray-500 mb-2">
+                    Title
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="title"
+                      name="title"
+                      value={editableCostEstimate.title}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base font-medium text-gray-900">{costEstimate.title}</p>
+                  )}
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-2">Created Date</h3>
                   <p className="text-base text-gray-900">{format(costEstimate.createdAt, "PPP")}</p>
                 </div>
-                {costEstimate.startDate && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Start Date</h3>
-                    <p className="text-base text-gray-900">{format(costEstimate.startDate, "PPP")}</p>
-                  </div>
-                )}
-                {costEstimate.endDate && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">End Date</h3>
-                    <p className="text-base text-gray-900">{format(costEstimate.endDate, "PPP")}</p>
-                  </div>
-                )}
+                <div>
+                  <Label htmlFor="startDate" className="text-sm font-medium text-gray-500 mb-2">
+                    Start Date
+                  </Label>
+                  {isEditing ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal mt-1",
+                            !editableCostEstimate.startDate && "text-muted-foreground",
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {editableCostEstimate.startDate ? (
+                            format(editableCostEstimate.startDate, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={editableCostEstimate.startDate}
+                          onSelect={(date) => handleDateChange(date, "startDate")}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    <p className="text-base text-gray-900">
+                      {costEstimate.startDate ? format(costEstimate.startDate, "PPP") : "N/A"}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="endDate" className="text-sm font-medium text-gray-500 mb-2">
+                    End Date
+                  </Label>
+                  {isEditing ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal mt-1",
+                            !editableCostEstimate.endDate && "text-muted-foreground",
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {editableCostEstimate.endDate ? (
+                            format(editableCostEstimate.endDate, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={editableCostEstimate.endDate}
+                          onSelect={(date) => handleDateChange(date, "endDate")}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    <p className="text-base text-gray-900">
+                      {costEstimate.endDate ? format(costEstimate.endDate, "PPP") : "N/A"}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="validUntil" className="text-sm font-medium text-gray-500 mb-2">
+                    Valid Until
+                  </Label>
+                  {isEditing ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal mt-1",
+                            !editableCostEstimate.validUntil && "text-muted-foreground",
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {editableCostEstimate.validUntil ? (
+                            format(editableCostEstimate.validUntil, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={editableCostEstimate.validUntil}
+                          onSelect={(date) => handleDateChange(date, "validUntil")}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    <p className="text-base text-gray-900">
+                      {costEstimate.validUntil ? format(costEstimate.validUntil, "PPP") : "N/A"}
+                    </p>
+                  )}
+                </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-2">Total Amount</h3>
                   <p className="text-base font-semibold text-gray-900">₱{costEstimate.totalAmount.toLocaleString()}</p>
@@ -477,46 +667,182 @@ export default function CostEstimateDetailsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Company</h3>
-                  <p className="text-base font-medium text-gray-900">{costEstimate.client.company}</p>
+                  <Label htmlFor="client.company" className="text-sm font-medium text-gray-500 mb-2">
+                    Company
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="client.company"
+                      name="client.company"
+                      value={editableCostEstimate.client.company}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base font-medium text-gray-900">{costEstimate.client.company}</p>
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Contact Person</h3>
-                  <p className="text-base text-gray-900">{costEstimate.client.contactPerson}</p>
+                  <Label htmlFor="client.contactPerson" className="text-sm font-medium text-gray-500 mb-2">
+                    Contact Person
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="client.contactPerson"
+                      name="client.contactPerson"
+                      value={editableCostEstimate.client.contactPerson}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base text-gray-900">{costEstimate.client.contactPerson}</p>
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Email</h3>
-                  <p className="text-base text-gray-900">{costEstimate.client.email}</p>
+                  <Label htmlFor="client.designation" className="text-sm font-medium text-gray-500 mb-2">
+                    Designation
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="client.designation"
+                      name="client.designation"
+                      value={editableCostEstimate.client.designation || ""}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base text-gray-900">{costEstimate.client.designation || "N/A"}</p>
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Phone</h3>
-                  <p className="text-base text-gray-900">{costEstimate.client.phone}</p>
+                  <Label htmlFor="client.email" className="text-sm font-medium text-gray-500 mb-2">
+                    Email
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="client.email"
+                      name="client.email"
+                      type="email"
+                      value={editableCostEstimate.client.email}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base text-gray-900">{costEstimate.client.email}</p>
+                  )}
                 </div>
-                {costEstimate.client.industry && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Industry</h3>
-                    <p className="text-base text-gray-900">{costEstimate.client.industry}</p>
-                  </div>
-                )}
-                {costEstimate.client.targetAudience && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Target Audience</h3>
-                    <p className="text-base text-gray-900">{costEstimate.client.targetAudience}</p>
-                  </div>
-                )}
+                <div>
+                  <Label htmlFor="client.phone" className="text-sm font-medium text-gray-500 mb-2">
+                    Phone
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="client.phone"
+                      name="client.phone"
+                      value={editableCostEstimate.client.phone}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base text-gray-900">{costEstimate.client.phone}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="client.industry" className="text-sm font-medium text-gray-500 mb-2">
+                    Industry
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="client.industry"
+                      name="client.industry"
+                      value={editableCostEstimate.client.industry || ""}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base text-gray-900">{costEstimate.client.industry || "N/A"}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="client.targetAudience" className="text-sm font-medium text-gray-500 mb-2">
+                    Target Audience
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="client.targetAudience"
+                      name="client.targetAudience"
+                      value={editableCostEstimate.client.targetAudience || ""}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base text-gray-900">{costEstimate.client.targetAudience || "N/A"}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="client.companyLogoUrl" className="text-sm font-medium text-gray-500 mb-2">
+                    Company Logo URL
+                  </Label>
+                  {isEditing ? (
+                    <Input
+                      id="client.companyLogoUrl"
+                      name="client.companyLogoUrl"
+                      value={editableCostEstimate.client.companyLogoUrl || ""}
+                      onChange={handleChange}
+                      placeholder="Enter logo URL"
+                      className="mt-1"
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2 mt-1">
+                      {costEstimate.client.companyLogoUrl ? (
+                        <img
+                          src={costEstimate.client.companyLogoUrl || "/placeholder.svg"}
+                          alt="Company Logo"
+                          className="h-8 w-auto max-w-[100px] object-contain"
+                        />
+                      ) : (
+                        <span className="text-gray-500">No logo provided</span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {costEstimate.client.address && (
+              {(costEstimate.client.address || isEditing) && (
                 <div className="mt-4">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Address</h3>
-                  <p className="text-base text-gray-900">{costEstimate.client.address}</p>
+                  <Label htmlFor="client.address" className="text-sm font-medium text-gray-500 mb-2">
+                    Address
+                  </Label>
+                  {isEditing ? (
+                    <Textarea
+                      id="client.address"
+                      name="client.address"
+                      value={editableCostEstimate.client.address || ""}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base text-gray-900">{costEstimate.client.address}</p>
+                  )}
                 </div>
               )}
 
-              {costEstimate.client.campaignObjective && (
+              {(costEstimate.client.campaignObjective || isEditing) && (
                 <div className="mt-4">
-                  <h3 className="text-sm font-medium text-gray-500 mb-2">Campaign Objective</h3>
-                  <p className="text-base text-gray-900">{costEstimate.client.campaignObjective}</p>
+                  <Label htmlFor="client.campaignObjective" className="text-sm font-medium text-gray-500 mb-2">
+                    Campaign Objective
+                  </Label>
+                  {isEditing ? (
+                    <Textarea
+                      id="client.campaignObjective"
+                      name="client.campaignObjective"
+                      value={editableCostEstimate.client.campaignObjective || ""}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="text-base text-gray-900">{costEstimate.client.campaignObjective}</p>
+                  )}
                 </div>
               )}
             </div>
@@ -573,31 +899,53 @@ export default function CostEstimateDetailsPage() {
             </div>
 
             {/* Additional Information */}
-            {(costEstimate.notes || costEstimate.customMessage) && (
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                  Additional Information
-                </h2>
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                Additional Information
+              </h2>
 
-                {costEstimate.customMessage && (
-                  <div className="mb-4">
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Custom Message</h3>
+              {(costEstimate.customMessage || isEditing) && (
+                <div className="mb-4">
+                  <Label htmlFor="customMessage" className="text-sm font-medium text-gray-500 mb-2">
+                    Custom Message
+                  </Label>
+                  {isEditing ? (
+                    <Textarea
+                      id="customMessage"
+                      name="customMessage"
+                      value={editableCostEstimate.customMessage || ""}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
                     <div className="bg-blue-50 border border-blue-200 rounded-sm p-4">
                       <p className="text-sm text-gray-700 leading-relaxed">{costEstimate.customMessage}</p>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+              )}
 
-                {costEstimate.notes && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500 mb-2">Internal Notes</h3>
+              {(costEstimate.notes || isEditing) && (
+                <div>
+                  <Label htmlFor="notes" className="text-sm font-medium text-gray-500 mb-2">
+                    Internal Notes
+                  </Label>
+                  {isEditing ? (
+                    <Textarea
+                      id="notes"
+                      name="notes"
+                      value={editableCostEstimate.notes || ""}
+                      onChange={handleChange}
+                      className="mt-1"
+                    />
+                  ) : (
                     <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
                       <p className="text-sm text-gray-700 leading-relaxed">{costEstimate.notes}</p>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Linked Proposal (if exists) */}
             {proposal && (
@@ -634,6 +982,148 @@ export default function CostEstimateDetailsPage() {
         </div>
       </div>
 
+      {/* Floating Action Buttons */}
+      {isEditing ? (
+        <div className="fixed bottom-6 right-6 flex space-x-4">
+          <Button
+            onClick={handleCancelEdit}
+            variant="outline"
+            className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+          >
+            <X className="h-5 w-5 mr-2" />
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveEdit}
+            disabled={isSaving}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" /> Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-5 w-5 mr-2" /> Save Changes
+              </>
+            )}
+          </Button>
+        </div>
+      ) : (
+        costEstimate.status === "draft" && (
+          <div className="fixed bottom-6 right-6 flex space-x-4">
+            <Button
+              onClick={() => handleUpdatePublicStatus("draft")} // Explicitly save as draft
+              variant="outline"
+              className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+            >
+              <FileText className="h-5 w-5 mr-2" />
+              Save as Draft
+            </Button>
+            <Button
+              onClick={() => setIsSendEmailDialogOpen(true)}
+              className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
+            >
+              <Send className="h-5 w-5 mr-2" />
+              Send
+            </Button>
+          </div>
+        )
+      )}
+
+      {/* Send Email Dialog */}
+      <Dialog open={isSendEmailDialogOpen} onOpenChange={setIsSendEmailDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Send Cost Estimate</DialogTitle>
+            <DialogDescription>
+              Review the email details before sending the cost estimate to{" "}
+              <span className="font-semibold text-gray-900">{costEstimate.client?.email}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="to" className="text-right">
+                To
+              </Label>
+              <Input id="to" value={costEstimate.client?.email || ""} readOnly className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="cc" className="text-right">
+                CC
+              </Label>
+              <Input
+                id="cc"
+                value={ccEmail}
+                onChange={(e) => setCcEmail(e.target.value)}
+                placeholder="Optional: comma-separated emails"
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="from" className="text-right">
+                From
+              </Label>
+              <Input id="from" value="OH Plus &lt;noreply@resend.dev&gt;" readOnly className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="replyTo" className="text-right">
+                Reply-To
+              </Label>
+              <Input
+                id="replyTo"
+                value={user?.email || ""} // Use current user's email as default reply-to
+                readOnly // Make it read-only as it's derived from user data
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="subject" className="text-right">
+                Subject
+              </Label>
+              <Input
+                id="subject"
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+                className="col-span-3"
+                placeholder="e.g., Cost Estimate for Your Advertising Campaign"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="body" className="text-right pt-2">
+                Body
+              </Label>
+              <Textarea
+                id="body"
+                value={emailBody}
+                onChange={(e) => setEmailBody(e.target.value)}
+                className="col-span-3 min-h-[150px]"
+                placeholder="e.g., Dear [Client Name],\n\nPlease find our cost estimate attached...\n\nBest regards,\nThe OH Plus Team"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSendEmailDialogOpen(false)} disabled={sendingEmail}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendEmailConfirm} disabled={sendingEmail}>
+              {sendingEmail ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                "Send Email"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <CostEstimateSentSuccessDialog
+        isOpen={showSuccessDialog}
+        onDismissAndNavigate={handleSuccessDialogDismissAndNavigate}
+      />
       {/* Timeline Sidebar */}
       {timelineOpen && (
         <>
@@ -656,7 +1146,7 @@ export default function CostEstimateDetailsPage() {
 
             <div className="p-4 overflow-y-auto h-[calc(100%-64px)]">
               <ProposalActivityTimeline
-                proposalId={costEstimate.id} // Pass costEstimate.id as entityId for activities
+                proposalId={costEstimate.id}
                 currentUserId={user?.uid || "unknown_user"}
                 currentUserName={user?.displayName || "Unknown User"}
               />
@@ -664,49 +1154,33 @@ export default function CostEstimateDetailsPage() {
           </div>
         </>
       )}
-
-      {/* Send Email Dialog */}
-      <Dialog open={isSendEmailDialogOpen} onOpenChange={setIsSendEmailDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Send Cost Estimate</DialogTitle>
-            <DialogDescription>
-              Confirm client email and add CC if needed before sending the cost estimate.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="client-email">To</Label>
-              <Input id="client-email" value={costEstimate.client?.email || ""} readOnly />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cc-email">CC (Optional, comma-separated)</Label>
-              <Input
-                id="cc-email"
-                type="text" // Changed to text to allow comma-separated values
-                value={ccEmail}
-                onChange={(e) => setCcEmail(e.target.value)}
-                placeholder="carboncopy1@example.com, carboncopy2@example.com"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsSendEmailDialogOpen(false)} disabled={sendingEmail}>
-              Cancel
-            </Button>
-            <Button onClick={handleSendEmailConfirm} disabled={sendingEmail}>
-              {sendingEmail ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                "Send Email"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
+  )
+}
+
+interface CostEstimateSentSuccessDialogProps {
+  isOpen: boolean
+  onDismissAndNavigate: () => void
+}
+
+const CostEstimateSentSuccessDialog: React.FC<CostEstimateSentSuccessDialogProps> = ({
+  isOpen,
+  onDismissAndNavigate,
+}) => {
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onDismissAndNavigate()}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Cost Estimate Sent Successfully</DialogTitle>
+          <DialogDescription>The cost estimate has been successfully sent to the client.</DialogDescription>
+        </DialogHeader>
+        <div className="flex justify-center items-center p-6">
+          <CheckCircle className="h-10 w-10 text-green-500" />
+        </div>
+        <DialogFooter>
+          <Button onClick={onDismissAndNavigate}>OK</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

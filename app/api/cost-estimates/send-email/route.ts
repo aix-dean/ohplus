@@ -5,9 +5,9 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: NextRequest) {
   try {
-    const { costEstimate, clientEmail, client, currentUserEmail, ccEmail } = await request.json() // Destructure new fields
+    const { costEstimate, clientEmail, client, currentUserEmail, ccEmail, subject, body } = await request.json() // Destructure new fields
 
-    if (!costEstimate || !clientEmail || !client) {
+    if (!costEstimate || !clientEmail || !client || !subject || !body) {
       return NextResponse.json({ error: "Missing required data" }, { status: 400 })
     }
 
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Cost Estimate from OH Plus</title>
+          <title>${subject}</title> {/* Use dynamic subject */}
           <style>
             body {
               font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
                 Dear ${client.contactPerson || client.company || "Valued Client"},
               </div>
 
-              <p>We are pleased to provide you with a detailed cost estimate for your advertising campaign. This estimate has been carefully prepared to meet your specific requirements and budget considerations.</p>
+              <p>${body.replace(/\n/g, "<br>")}</p> {/* Use dynamic body and replace newlines with <br> */}
 
               <div class="cost-estimate-summary">
                 <h3 style="margin-top: 0; color: #1f2937;">Cost Estimate Summary</h3>
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
               </div>
 
               <div class="total-amount">
-                Total Estimated Cost: ${(costEstimate.totalAmount || 0).toLocaleString()}
+                Total Estimated Cost: ₱${(costEstimate.totalAmount || 0).toLocaleString()}
               </div>
 
               <div class="action-button">
@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await resend.emails.send({
       from: "OH Plus <noreply@resend.dev>",
       to: [clientEmail],
-      subject: `Cost Estimate: ${costEstimate.title || "Custom Cost Estimate"} - OH Plus`,
+      subject: subject, // Use dynamic subject
       html: emailHtml,
       reply_to: currentUserEmail ? [currentUserEmail] : undefined, // Set reply-to to current user's email
       cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined, // Add CC if provided

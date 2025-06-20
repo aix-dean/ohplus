@@ -21,6 +21,8 @@ import {
   Search,
   CheckCircle,
   PlusCircle,
+  Calculator,
+  FileText,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -44,7 +46,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useResponsive } from "@/hooks/use-responsive"
 import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
 import { cn } from "@/lib/utils"
-import { CeQuoteActionDialog } from "@/components/ce-quote-action-dialog"
 import { SalesChatWidget } from "@/components/sales-chat/sales-chat-widget"
 import { Input } from "@/components/ui/input"
 import { useDebounce } from "@/hooks/use-debounce"
@@ -53,7 +54,10 @@ import { createProposal } from "@/lib/proposal-service"
 import type { ProposalClient } from "@/lib/types/proposal"
 import { ProposalHistory } from "@/components/proposal-history"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { ClientDialog } from "@/components/client-dialog" // Using the existing ClientDialog
+import { ClientDialog } from "@/components/client-dialog"
+import { DateRangeCalendarDialog } from "@/components/date-range-calendar-dialog"
+import { createDirectCostEstimate } from "@/lib/cost-estimate-service" // Import for CE creation
+import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service" // Imports for Quotation creation
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -111,7 +115,7 @@ function SalesDashboardContent() {
   const [selectedClientForProposal, setSelectedClientForProposal] = useState<ProposalClient | null>(null)
   const [isCreatingProposal, setIsCreatingProposal] = useState(false)
 
-  // Client Search/Selection on Dashboard
+  // Client Search/Selection on Dashboard (now for both proposal and CE/Quote)
   const [dashboardClientSearchTerm, setDashboardClientSearchTerm] = useState("")
   const [dashboardClientSearchResults, setDashboardClientSearchResults] = useState<Client[]>([])
   const [isSearchingDashboardClients, setIsSearchingDashboardClients] = useState(false)
@@ -121,12 +125,12 @@ function SalesDashboardContent() {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false)
   const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false)
 
-  // CE/Quote mode
+  // CE/Quote mode states
   const [ceQuoteMode, setCeQuoteMode] = useState(false)
   const [selectedSites, setSelectedSites] = useState<Product[]>([])
-  const [showActionDialog, setShowActionDialog] = useState(false)
-
-  // State for "Collab Coming Soon" dialog
+  const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false)
+  const [actionAfterDateSelection, setActionAfterDateSelection] = useState<"cost_estimate" | "quotation" | null>(null)
+  const [isCreatingDocument, setIsCreatingDocument] = useState(false) // New loading state for document creation
   const [isCollabComingSoonOpen, setIsCollabComingSoonOpen] = useState(false)
 
   // On mobile, default to grid view
@@ -136,10 +140,10 @@ function SalesDashboardContent() {
     }
   }, [isMobile])
 
-  // Fetch clients for dashboard client selection
+  // Fetch clients for dashboard client selection (for proposals and CE/Quote)
   useEffect(() => {
     const fetchClients = async () => {
-      if (proposalCreationMode) {
+      if (proposalCreationMode || ceQuoteMode) {
         setIsSearchingDashboardClients(true)
         try {
           const result = await getPaginatedClients(10, null, debouncedDashboardClientSearchTerm.trim())
@@ -155,7 +159,7 @@ function SalesDashboardContent() {
       }
     }
     fetchClients()
-  }, [debouncedDashboardClientSearchTerm, proposalCreationMode])
+  }, [debouncedDashboardClientSearchTerm, proposalCreationMode, ceQuoteMode])
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -479,9 +483,11 @@ function SalesDashboardContent() {
   // Handle proposal creation flow
   const handleInitiateProposalFlow = () => {
     setProposalCreationMode(true) // Activate the combined client & product selection mode
+    setCeQuoteMode(false) // Ensure CE/Quote mode is off
     setSelectedClientForProposal(null) // Reset selected client
     setDashboardClientSearchTerm("") // Clear client search term
     setSelectedProducts([]) // Clear any previously selected products
+    setSelectedSites([]) // Clear any previously selected sites
   }
 
   const handleClientSelectOnDashboard = (client: Client) => {
@@ -588,7 +594,11 @@ function SalesDashboardContent() {
   // Handle CE/Quote mode
   const handleCeQuoteMode = () => {
     setCeQuoteMode(true)
+    setProposalCreationMode(false) // Ensure proposal mode is off
     setSelectedSites([])
+    setSelectedClientForProposal(null) // Reset selected client
+    setDashboardClientSearchTerm("") // Clear client search term
+    setSelectedProducts([]) // Clear any previously selected products
   }
 
   const handleSiteSelect = (product: Product) => {
@@ -602,39 +612,152 @@ function SalesDashboardContent() {
     })
   }
 
-  const handleConfirmSiteSelection = () => {
-    if (selectedSites.length > 0) {
-      setShowActionDialog(true)
-    } else {
+  // New functions to open the date range dialog
+  const openCreateCostEstimateDateDialog = () => {
+    if (selectedSites.length === 0) {
       toast({
         title: "No sites selected",
-        description: "Please select at least one site to proceed.",
+        description: "Please select at least one site for the cost estimate.",
         variant: "destructive",
       })
+      return
+    }
+    if (!selectedClientForProposal) {
+      toast({
+        title: "No Client Selected",
+        description: "Please select a client first.",
+        variant: "destructive",
+      })
+      return
+    }
+    setActionAfterDateSelection("cost_estimate")
+    setIsDateRangeDialogOpen(true)
+  }
+
+  const openCreateQuotationDateDialog = () => {
+    if (selectedSites.length === 0) {
+      toast({
+        title: "No sites selected",
+        description: "Please select at least one site for the quotation.",
+        variant: "destructive",
+      })
+      return
+    }
+    if (!selectedClientForProposal) {
+      toast({
+        title: "No Client Selected",
+        description: "Please select a client first.",
+        variant: "destructive",
+      })
+      return
+    }
+    setActionAfterDateSelection("quotation")
+    setIsDateRangeDialogOpen(true)
+  }
+
+  // Callback from DateRangeCalendarDialog - NOW CREATES THE DOCUMENT
+  const handleDatesSelected = async (startDate: Date, endDate: Date) => {
+    if (!user?.uid || !selectedClientForProposal || selectedSites.length === 0) {
+      toast({
+        title: "Missing Information",
+        description: "Client, sites, or user information is missing. Cannot create document.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsCreatingDocument(true)
+    setIsDateRangeDialogOpen(false) // Close dialog immediately
+
+    try {
+      if (actionAfterDateSelection === "cost_estimate") {
+        const clientData = {
+          id: selectedClientForProposal.id,
+          name: selectedClientForProposal.contactPerson,
+          email: selectedClientForProposal.email,
+          company: selectedClientForProposal.company,
+          phone: selectedClientForProposal.phone,
+          address: selectedClientForProposal.address,
+        }
+
+        const sitesData = selectedSites.map((site) => ({
+          id: site.id,
+          name: site.name,
+          location: site.specs_rental?.location || site.light?.location || "N/A",
+          price: site.price || 0,
+          type: site.type || "Unknown",
+        }))
+
+        const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, {
+          startDate,
+          endDate,
+        })
+
+        toast({
+          title: "Cost Estimate Created",
+          description: "Your cost estimate has been created successfully.",
+        })
+        router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
+      } else if (actionAfterDateSelection === "quotation") {
+        // For simplicity, let's assume the quotation is for the first selected site
+        const firstSite = selectedSites[0]
+        if (!firstSite) {
+          throw new Error("No site selected for quotation.")
+        }
+
+        const { durationDays, totalAmount } = calculateQuotationTotal(
+          startDate.toISOString(),
+          endDate.toISOString(),
+          firstSite.price || 0,
+        )
+
+        const quotationData = {
+          quotation_number: generateQuotationNumber(),
+          product_id: firstSite.id,
+          product_name: firstSite.name,
+          product_location: firstSite.specs_rental?.location || firstSite.light?.location || "N/A",
+          site_code: getSiteCode(firstSite) || "N/A",
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+          price: firstSite.price || 0,
+          total_amount: totalAmount,
+          duration_days: durationDays,
+          status: "draft" as const, // Default status
+          created_by: user.uid,
+          client_name: selectedClientForProposal.contactPerson,
+          client_email: selectedClientForProposal.email,
+          // campaignId and proposalId can be added if applicable, but not directly from this flow
+        }
+
+        const newQuotationId = await createQuotation(quotationData)
+
+        toast({
+          title: "Quotation Created",
+          description: "Your quotation has been created successfully.",
+        })
+        router.push(`/sales/quotations/${newQuotationId}`) // Navigate to the new internal quotation view page
+      }
+    } catch (error) {
+      console.error("Error creating document:", error)
+      toast({
+        title: "Error",
+        description: `Failed to create document: ${error.message || "Unknown error"}`,
+        variant: "destructive",
+      })
+    } finally {
+      setIsCreatingDocument(false)
+      setCeQuoteMode(false)
+      setSelectedSites([])
+      setSelectedClientForProposal(null)
+      setActionAfterDateSelection(null)
     }
   }
 
   const handleCancelCeQuote = () => {
     setCeQuoteMode(false)
     setSelectedSites([])
-  }
-
-  const handleCreateCostEstimate = () => {
-    // Navigate to cost estimate creation with selected sites
-    const siteIds = selectedSites.map((site) => site.id).join(",")
-    router.push(`/sales/cost-estimates/create?sites=${siteIds}`)
-    setShowActionDialog(false)
-    setCeQuoteMode(false)
-    setSelectedSites([])
-  }
-
-  const handleCreateQuotation = () => {
-    // Navigate to quotation creation with selected sites
-    const siteIds = selectedSites.map((site) => site.id).join(",")
-    router.push(`/sales/quotations/create?sites=${siteIds}`)
-    setShowActionDialog(false)
-    setCeQuoteMode(false)
-    setSelectedSites([])
+    setSelectedClientForProposal(null)
+    setDashboardClientSearchTerm("")
   }
 
   return (
@@ -642,7 +765,8 @@ function SalesDashboardContent() {
       <div
         className={cn(
           "grid grid-cols-1 gap-6",
-          proposalCreationMode && "lg:grid-cols-[1fr_300px]", // Apply two-column layout only when proposalCreationMode is true
+          // Only apply two-column layout when proposalCreationMode is true
+          proposalCreationMode && "lg:grid-cols-[1fr_300px]",
         )}
       >
         {/* Left Column: Main Dashboard Content */}
@@ -653,8 +777,8 @@ function SalesDashboardContent() {
               <h1 className="text-xl md:text-2xl font-bold">
                 {userData?.first_name ? `${userData.first_name}'s Dashboard` : "Dashboard"}
               </h1>
-              {/* Conditionally hide the SearchBox when in proposalCreationMode */}
-              {!proposalCreationMode && (
+              {/* Conditionally hide the SearchBox when in proposalCreationMode or ceQuoteMode */}
+              {!(proposalCreationMode || ceQuoteMode) && (
                 <div className="w-full sm:w-64 md:w-80">
                   <SearchBox
                     onSearchResults={handleSearchResults}
@@ -696,13 +820,19 @@ function SalesDashboardContent() {
                 </div>
               )}
 
-              {/* CE/Quote Mode Controls */}
+              {/* CE/Quote Mode Controls (on dashboard) */}
               {ceQuoteMode && (
                 <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-                  <span className="text-sm text-blue-700">{selectedSites.length} sites selected</span>
-                  <Button size="sm" onClick={handleConfirmSiteSelection} disabled={selectedSites.length === 0}>
-                    Choose Action
-                  </Button>
+                  <span className="text-sm text-blue-700">
+                    {selectedClientForProposal ? (
+                      <>
+                        Client: <span className="font-semibold">{selectedClientForProposal.company}</span>
+                      </>
+                    ) : (
+                      "Select a client"
+                    )}
+                    {selectedSites.length > 0 && `, ${selectedSites.length} sites selected`}
+                  </span>
                   <Button size="sm" variant="outline" onClick={handleCancelCeQuote}>
                     Cancel
                   </Button>
@@ -710,30 +840,21 @@ function SalesDashboardContent() {
               )}
 
               {/* Action Buttons (only visible when not in any selection mode) */}
-              {!ceQuoteMode && !isSearching && (
+              {!(proposalCreationMode || ceQuoteMode) && !isSearching && (
                 <div className="flex gap-2">
-                  {!proposalCreationMode && ( // Only show these if not in proposal creation mode
-                    <>
-                      <Button
-                        onClick={handleInitiateProposalFlow}
-                        className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
-                      >
-                        Planning & Proposals
-                      </Button>
-                      <Button onClick={handleCeQuoteMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
-                        CE/Quote
-                      </Button>
-                    </>
-                  )}
+                  <Button onClick={handleInitiateProposalFlow} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
+                    Planning & Proposals
+                  </Button>
+                  <Button onClick={handleCeQuoteMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
+                    CE/Quote
+                  </Button>
                   <Button
                     className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
                     onClick={() => setIsCollabComingSoonOpen(true)}
                   >
                     Collab
                   </Button>
-                  {!proposalCreationMode && (
-                    <Button className="bg-[#ff3333] text-white hover:bg-[#cc2929]">Job Order</Button>
-                  )}
+                  <Button className="bg-[#ff3333] text-white hover:bg-[#cc2929]">Job Order</Button>
                 </div>
               )}
 
@@ -760,12 +881,12 @@ function SalesDashboardContent() {
             </div>
           </div>
 
-          {/* Client Selection UI on Dashboard - Visible when proposalCreationMode is active */}
-          {proposalCreationMode && (
+          {/* Client Selection UI on Dashboard - Visible when proposalCreationMode OR ceQuoteMode is active */}
+          {(proposalCreationMode || ceQuoteMode) && (
             <div className="relative w-full max-w-xs" ref={clientSearchRef}>
               <div className="relative">
                 <Input
-                  placeholder="Search clients..."
+                  placeholder="Search or select client..."
                   value={
                     selectedClientForProposal
                       ? selectedClientForProposal.company || selectedClientForProposal.contactPerson
@@ -781,7 +902,10 @@ function SalesDashboardContent() {
                       setDashboardClientSearchTerm("")
                     }
                   }}
-                  className={cn("pr-10 h-9 text-sm", proposalCreationMode && "border-blue-500 ring-2 ring-blue-200")}
+                  className={cn(
+                    "pr-10 h-9 text-sm",
+                    (proposalCreationMode || ceQuoteMode) && "border-blue-500 ring-2 ring-blue-200",
+                  )}
                 />
                 {isSearchingDashboardClients && (
                   <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
@@ -1227,16 +1351,53 @@ function SalesDashboardContent() {
         )}
       </div>
 
-      {/* CE/Quote Action Dialog */}
-      <CeQuoteActionDialog
-        isOpen={showActionDialog}
-        onClose={() => setShowActionDialog(false)}
-        selectedSites={selectedSites}
-        onActionCompleted={() => {
-          setShowActionDialog(false)
-          setCeQuoteMode(false)
-          setSelectedSites([])
-        }}
+      {/* Floating CE/Quote Action Buttons */}
+      {ceQuoteMode && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex gap-4 p-4 bg-white border rounded-lg shadow-lg z-50">
+          <Button
+            onClick={openCreateCostEstimateDateDialog}
+            className="gap-2 bg-gray-200 text-gray-800 hover:bg-gray-300"
+            disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+          >
+            {isCreatingDocument && actionAfterDateSelection === "cost_estimate" ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Calculator className="h-4 w-4" />
+                Create Cost Estimate
+              </>
+            )}
+          </Button>
+          <Button
+            onClick={openCreateQuotationDateDialog}
+            className="gap-2 bg-green-600 text-white hover:bg-green-700"
+            disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+          >
+            {isCreatingDocument && actionAfterDateSelection === "quotation" ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <FileText className="h-4 w-4" />
+                Create Quotation
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* Date Range Selection Dialog */}
+      <DateRangeCalendarDialog
+        isOpen={isDateRangeDialogOpen}
+        onClose={() => setIsDateRangeDialogOpen(false)}
+        onSelectDates={handleDatesSelected}
+        selectedSiteIds={selectedSites.map((s) => s.id)}
+        selectedClientId={selectedClientForProposal?.id}
       />
 
       {/* Delete Confirmation Dialog */}

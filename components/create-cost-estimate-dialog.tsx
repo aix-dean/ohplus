@@ -14,10 +14,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Plus, Trash2, Mail, Loader2, CheckCircle } from "lucide-react"
+import { Plus, Trash2, Mail, Loader2 } from "lucide-react"
 import { createCostEstimateFromProposal } from "@/lib/cost-estimate-service"
 import type { Proposal } from "@/lib/types/proposal"
 import type { CostEstimateLineItem } from "@/lib/types/cost-estimate"
+import { useRouter } from "next/navigation"
+import { CostEstimateSentSuccessDialog } from "./cost-estimate-sent-success-dialog"
 
 interface CreateCostEstimateDialogProps {
   isOpen: boolean
@@ -42,6 +44,7 @@ export function CreateCostEstimateDialog({
 }: CreateCostEstimateDialogProps) {
   const { user } = useAuth()
   const { toast } = useToast()
+  const router = useRouter()
 
   const [lineItems, setLineItems] = useState<CostEstimateLineItem[]>([])
   const [notes, setNotes] = useState("")
@@ -49,6 +52,11 @@ export function CreateCostEstimateDialog({
   const [isCreating, setIsCreating] = useState(false)
   const [creationStep, setCreationStep] = useState("")
   const [step, setStep] = useState<"edit" | "success">("edit")
+  const [subject, setSubject] = useState("") // New
+  const [body, setBody] = useState("") // New
+  const [ccEmail, setCcEmail] = useState("") // New
+  const [currentUserEmail, setCurrentUserEmail] = useState("") // New
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false) // New
 
   // Initialize with default line items based on proposal
   useEffect(() => {
@@ -92,7 +100,19 @@ export function CreateCostEstimateDialog({
 
       setLineItems([...defaultItems, ...additionalItems])
     }
-  }, [proposal])
+    // New: Initialize email fields
+    if (isOpen) {
+      setSubject(`Cost Estimate for ${proposal.title}`)
+      setBody(
+        `Dear ${proposal.client.contactPerson || proposal.client.company},\n\nPlease find the detailed cost estimate for your advertising campaign. You can view it online by clicking the button below.\n\nBest regards,\nThe OH Plus Team`,
+      )
+      if (user?.email) {
+        setCurrentUserEmail(user.email)
+      } else {
+        setCurrentUserEmail("")
+      }
+    }
+  }, [proposal, isOpen, user]) // Add isOpen and user to dependencies
 
   const addLineItem = () => {
     const newItem: CostEstimateLineItem = {
@@ -169,16 +189,43 @@ export function CreateCostEstimateDialog({
         await new Promise((resolve) => setTimeout(resolve, 300))
       }
 
-      await createCostEstimateFromProposal(proposal, user.uid, {
+      // Call the service to create the cost estimate
+      const costEstimateId = await createCostEstimateFromProposal(proposal, user.uid, {
         notes: notes.trim(),
         customLineItems: lineItems,
         sendEmail,
       })
 
+      // If email is to be sent, call the API route
+      if (sendEmail) {
+        const response = await fetch("/api/cost-estimates/send-email", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            costEstimate: { id: costEstimateId, title: subject, lineItems, totalAmount, createdAt: new Date() }, // Pass minimal data needed for email template
+            clientEmail: proposal.client.email,
+            client: proposal.client,
+            subject, // New
+            body, // New
+            currentUserEmail, // New
+            ccEmail, // New
+          }),
+        })
+
+        const result = await response.json()
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || result.details || "Failed to send email")
+        }
+      }
+
       setCreationStep("Finalizing...")
       await new Promise((resolve) => setTimeout(resolve, 300))
 
-      setStep("success")
+      // Instead of setting step to "success" directly, open the new success dialog
+      onClose() // Close the create dialog immediately
+      setShowSuccessDialog(true) // Show the new success dialog
     } catch (error) {
       console.error("Error creating cost estimate:", error)
       toast({
@@ -196,8 +243,12 @@ export function CreateCostEstimateDialog({
     setLineItems([])
     setNotes("")
     setSendEmail(true)
-    setStep("edit")
+    setStep("edit") // Keep this for internal dialog state
     setCreationStep("")
+    setSubject("") // New
+    setBody("") // New
+    setCcEmail("") // New
+    setCurrentUserEmail("") // New
   }
 
   const handleClose = () => {
@@ -205,41 +256,21 @@ export function CreateCostEstimateDialog({
     onClose()
   }
 
-  const handleSuccessDone = () => {
-    onCostEstimateCreated()
-    handleClose()
+  // New: Callback function to handle navigation after success dialog dismisses
+  const handleSuccessDialogDismissAndNavigate = () => {
+    setShowSuccessDialog(false) // Hide the success dialog
+    onCostEstimateCreated() // Trigger parent callback
+    // router.push("/sales/dashboard") // Example navigation, adjust as needed
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className={cn(step === "success" ? "max-w-md" : "max-w-5xl", "max-h-[90vh] overflow-y-auto")}>
-        <DialogHeader>
-          <DialogTitle>
-            {step === "edit" && "Create Cost Estimate"}
-            {step === "success" && "Cost Estimate Created"}
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className={cn("max-w-5xl", "max-h-[90vh] overflow-y-auto")}>
+          <DialogHeader>
+            <DialogTitle>Create Cost Estimate</DialogTitle>
+          </DialogHeader>
 
-        {step === "success" ? (
-          <div className="text-center space-y-4 py-6">
-            <div className="flex justify-center">
-              <CheckCircle className="h-12 w-12 text-green-500" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-lg font-semibold">
-                {sendEmail ? "Cost Estimate Sent Successfully!" : "Cost Estimate Saved as Draft!"}
-              </h3>
-              <p className="text-sm text-gray-600">
-                {sendEmail
-                  ? `The cost estimate has been sent to ${proposal.client.email}. The client will receive an email with the cost breakdown and access code.`
-                  : "The cost estimate has been saved as a draft. You can send it to the client later."}
-              </p>
-            </div>
-            <Button onClick={handleSuccessDone} className="min-w-[100px]">
-              Done
-            </Button>
-          </div>
-        ) : (
           <div className="space-y-6">
             {/* Proposal Information */}
             <Card>
@@ -375,7 +406,78 @@ export function CreateCostEstimateDialog({
               />
             </div>
 
-            {/* Email Option */}
+            {/* Email Fields - New Section */}
+            {sendEmail && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Email Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="to" className="text-right">
+                      To
+                    </Label>
+                    <Input id="to" value={proposal.client.email} readOnly className="col-span-3" />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="cc" className="text-right">
+                      CC
+                    </Label>
+                    <Input
+                      id="cc"
+                      value={ccEmail}
+                      onChange={(e) => setCcEmail(e.target.value)}
+                      placeholder="Optional: comma-separated emails"
+                      className="col-span-3"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="from" className="text-right">
+                      From
+                    </Label>
+                    <Input id="from" value="OH Plus <noreply@resend.dev>" readOnly className="col-span-3" />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="replyTo" className="text-right">
+                      Reply-To
+                    </Label>
+                    <Input
+                      id="replyTo"
+                      value={currentUserEmail}
+                      onChange={(e) => setCurrentUserEmail(e.target.value)}
+                      placeholder="Your email"
+                      className="col-span-3"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="subject" className="text-right">
+                      Subject
+                    </Label>
+                    <Input
+                      id="subject"
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      className="col-span-3"
+                      placeholder="e.g., Cost Estimate for Your Campaign"
+                    />
+                  </div>
+                  <div className="grid grid-cols-4 items-start gap-4">
+                    <Label htmlFor="body" className="text-right pt-2">
+                      Body
+                    </Label>
+                    <Textarea
+                      id="body"
+                      value={body}
+                      onChange={(e) => setBody(e.target.value)}
+                      className="col-span-3 min-h-[150px]"
+                      placeholder="e.g., Dear [Client Name],\n\nPlease find our cost estimate attached...\n\nBest regards,\nThe OH Plus Team"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Email Option (Checkbox) */}
             <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center space-x-2">
@@ -420,8 +522,14 @@ export function CreateCostEstimateDialog({
               </Button>
             </div>
           </div>
-        )}
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cost Estimate Sent Success Dialog */}
+      <CostEstimateSentSuccessDialog
+        isOpen={showSuccessDialog}
+        onDismissAndNavigate={handleSuccessDialogDismissAndNavigate}
+      />
+    </>
   )
 }
