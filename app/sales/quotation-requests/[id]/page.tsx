@@ -18,7 +18,6 @@ import {
   History,
   Eye,
   Mail,
-  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -53,8 +52,8 @@ import {
   calculateQuotationTotal,
   getQuotationById,
   generateQuotationPDF,
-  sendQuotationEmail,
 } from "@/lib/quotation-service"
+import { SendQuotationDialog } from "@/components/send-quotation-dialog" // Import the new dialog
 
 export default function QuotationRequestDetailPage() {
   const params = useParams()
@@ -74,9 +73,8 @@ export default function QuotationRequestDetailPage() {
     clientName: "",
     clientEmail: "",
   })
-  const [sendingEmail, setSendingEmail] = useState(false)
-  const [quotationActionOpen, setQuotationActionOpen] = useState(false)
-  const [generatedQuotation, setGeneratedQuotation] = useState<Quotation | null>(null)
+  const [isSendQuotationDialogOpen, setIsSendQuotationDialogOpen] = useState(false)
+  const [quotationToSend, setQuotationToSend] = useState<Quotation | null>(null)
 
   // Helper function to safely convert any value to string
   const safeString = (value: any): string => {
@@ -326,14 +324,11 @@ export default function QuotationRequestDetailPage() {
       const savedQuotation = await getQuotationById(quotationId)
 
       if (savedQuotation) {
-        // Show action dialog
+        // Close generate dialog and open send dialog
         setGenerateQuotationOpen(false)
-        setQuotationActionOpen(true)
-        setGeneratedQuotation(savedQuotation)
+        setQuotationToSend(savedQuotation) // Set the newly generated quotation
+        setIsSendQuotationDialogOpen(true) // Open the new send dialog
       }
-
-      // Update the quotation request status to "sent"
-      await handleStatusUpdate("sent")
 
       // Refresh quotation history
       const updatedQuotations = await getQuotationsByRequestId(quotationRequest.id)
@@ -353,44 +348,15 @@ export default function QuotationRequestDetailPage() {
     }
   }
 
-  const handleSendEmail = async () => {
-    if (!generatedQuotation || !quotationRequest) return
-
-    setSendingEmail(true)
-    try {
-      console.log("Starting email send process...")
-      await sendQuotationEmail(generatedQuotation, quotationRequest.email_address)
-
-      toast({
-        title: "Email Sent Successfully",
-        description: `Quotation has been sent to ${quotationRequest.email_address}`,
-      })
-
-      setQuotationActionOpen(false)
-    } catch (error) {
-      console.error("Error sending email:", error)
-
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
-
-      toast({
-        title: "Failed to Send Email",
-        description: `Error: ${errorMessage}. Please check your email configuration.`,
-        variant: "destructive",
-      })
-    } finally {
-      setSendingEmail(false)
+  const handleQuotationSentSuccess = async (quotationId: string, newStatus: Quotation["status"]) => {
+    // This callback is triggered when the email is successfully sent from SendQuotationDialog
+    await handleStatusUpdate(newStatus) // Update the quotation request status
+    // Refresh quotation history
+    if (quotationRequest) {
+      const updatedQuotations = await getQuotationsByRequestId(quotationRequest.id)
+      setQuotationHistory(updatedQuotations)
     }
-  }
-
-  const handleDownloadOnly = () => {
-    if (!generatedQuotation) return
-
-    generateQuotationPDF(generatedQuotation)
-    toast({
-      title: "Download Started",
-      description: `Downloading quotation ${generatedQuotation.quotation_number}.`,
-    })
-    setQuotationActionOpen(false)
+    setIsSendQuotationDialogOpen(false) // Close the send dialog
   }
 
   const handleDownloadQuotation = async (quotation: Quotation) => {
@@ -462,6 +428,8 @@ export default function QuotationRequestDetailPage() {
       </div>
     )
   }
+
+  const latestQuotation = quotationHistory.length > 0 ? quotationHistory[0] : null
 
   return (
     <div className="container mx-auto px-6 py-8 max-w-6xl">
@@ -709,7 +677,12 @@ export default function QuotationRequestDetailPage() {
                                     <Eye className="h-4 w-4 mr-2" />
                                     View Details
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setQuotationToSend(quotation) // Set the current quotation to be sent
+                                      setIsSendQuotationDialogOpen(true) // Open the send dialog
+                                    }}
+                                  >
                                     <Mail className="h-4 w-4 mr-2" />
                                     Send to Client
                                   </DropdownMenuItem>
@@ -743,6 +716,20 @@ export default function QuotationRequestDetailPage() {
                 <FileText className="h-4 w-4 mr-2" />
                 Generate Quotation
               </Button>
+
+              {latestQuotation && (
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    setQuotationToSend(latestQuotation)
+                    setIsSendQuotationDialogOpen(true)
+                  }}
+                  disabled={quotationRequest.status?.toLowerCase() === "rejected"}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Latest Quotation
+                </Button>
+              )}
 
               <div className="grid grid-cols-2 gap-2">
                 <Button
@@ -819,12 +806,12 @@ export default function QuotationRequestDetailPage() {
                 </div>
                 <div>
                   <Label className="text-xs font-medium text-gray-500">Latest Quotation</Label>
-                  <p className="text-sm font-medium">{quotationHistory[0]?.quotation_number || "N/A"}</p>
+                  <p className="text-sm font-medium">{latestQuotation?.quotation_number || "N/A"}</p>
                 </div>
                 <div>
                   <Label className="text-xs font-medium text-gray-500">Latest Amount</Label>
                   <p className="text-sm font-medium text-green-600">
-                    ₱{quotationHistory[0]?.total_amount?.toLocaleString() || "0"}
+                    ₱{latestQuotation?.total_amount?.toLocaleString() || "0"}
                   </p>
                 </div>
               </CardContent>
@@ -915,55 +902,16 @@ export default function QuotationRequestDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Quotation Action Dialog */}
-      <Dialog open={quotationActionOpen} onOpenChange={setQuotationActionOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Quotation Generated Successfully</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Quotation {generatedQuotation?.quotation_number} has been created. What would you like to do next?
-            </p>
-
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h4 className="font-semibold text-blue-800 mb-2">Send via Email</h4>
-              <p className="text-sm text-blue-700 mb-3">
-                Send the quotation directly to {quotationRequest?.email_address} with accept/decline options.
-              </p>
-              <Button onClick={handleSendEmail} disabled={sendingEmail} className="w-full">
-                {sendingEmail ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Sending Email...
-                  </>
-                ) : (
-                  <>
-                    <Mail className="h-4 w-4 mr-2" />
-                    Send Email to Client
-                  </>
-                )}
-              </Button>
-            </div>
-
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="font-semibold text-gray-800 mb-2">Download PDF</h4>
-              <p className="text-sm text-gray-600 mb-3">Download the quotation as a PDF file for manual sharing.</p>
-              <Button variant="outline" onClick={handleDownloadOnly} className="w-full">
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF Only
-              </Button>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setQuotationActionOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* New Send Quotation Dialog */}
+      {quotationToSend && quotationRequest && (
+        <SendQuotationDialog
+          isOpen={isSendQuotationDialogOpen}
+          onClose={() => setIsSendQuotationDialogOpen(false)}
+          quotation={quotationToSend}
+          requestorEmail={quotationRequest.email_address}
+          onQuotationSent={handleQuotationSentSuccess}
+        />
+      )}
     </div>
   )
 }

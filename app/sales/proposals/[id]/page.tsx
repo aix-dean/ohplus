@@ -318,7 +318,7 @@ export default function ProposalDetailsPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push("/sales/proposals")}
+              onClick={() => router.back()} // Changed from router.push
               className="text-gray-600 hover:text-gray-900"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />

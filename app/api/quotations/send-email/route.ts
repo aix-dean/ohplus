@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
+import { getQuotationById } from "@/lib/quotation-service" // Import to fetch quotation details
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -20,16 +21,31 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     console.log("Request body received:", {
-      hasQuotation: !!body.quotation,
-      hasRequestorEmail: !!body.requestorEmail,
-      quotationId: body.quotation?.id,
+      quotationId: body.quotationId,
+      toEmail: body.toEmail,
+      subject: body.subject,
+      ccEmail: body.ccEmail,
+      replyToEmail: body.replyToEmail,
+      hasBody: !!body.body,
     })
 
-    const { quotation, requestorEmail } = body
+    const { quotationId, toEmail, subject, body: emailBody, ccEmail, replyToEmail } = body
 
-    if (!quotation || !requestorEmail) {
-      console.error("Missing required fields:", { quotation: !!quotation, requestorEmail: !!requestorEmail })
-      return NextResponse.json({ error: "Missing quotation or email address" }, { status: 400 })
+    if (!quotationId || !toEmail || !subject || !emailBody) {
+      console.error("Missing required fields for email:", {
+        quotationId: !!quotationId,
+        toEmail: !!toEmail,
+        subject: !!subject,
+        emailBody: !!emailBody,
+      })
+      return NextResponse.json({ error: "Missing required email fields" }, { status: 400 })
+    }
+
+    // Fetch the full quotation object using the ID
+    const quotation = await getQuotationById(quotationId)
+    if (!quotation) {
+      console.error("Quotation not found for ID:", quotationId)
+      return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
     }
 
     const acceptUrl = `${process.env.NEXT_PUBLIC_APP_URL}/quotations/${quotation.id}/accept`
@@ -42,7 +58,7 @@ export async function POST(request: NextRequest) {
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Quotation from OOH+ Operator</title>
+        <title>${subject}</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
           .header { background: #2563eb; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
@@ -65,9 +81,7 @@ export async function POST(request: NextRequest) {
         </div>
         
         <div class="content">
-          <p>Dear ${quotation.client_name || "Valued Client"},</p>
-          
-          <p>Thank you for your interest in our advertising solutions. Please find your quotation details below:</p>
+          <p>${emailBody.replace(/\n/g, "<br>")}</p>
           
           <div class="quotation-details">
             <h3>Product Information</h3>
@@ -135,19 +149,23 @@ export async function POST(request: NextRequest) {
       </html>
     `
 
-    console.log("Attempting to send email to:", requestorEmail)
+    console.log("Attempting to send email to:", toEmail)
 
     const emailData = {
       from: "OOH+ Operator <noreply@resend.dev>", // Using Resend's test domain
-      to: [requestorEmail],
-      subject: `Quotation ${quotation.quotation_number} - OOH+ Operator`,
+      to: [toEmail],
+      subject: subject,
       html: emailHtml,
+      ...(ccEmail && { cc: ccEmail.split(",").map((email: string) => email.trim()) }),
+      ...(replyToEmail && { reply_to: replyToEmail }),
     }
 
     console.log("Email data prepared:", {
       from: emailData.from,
       to: emailData.to,
       subject: emailData.subject,
+      cc: emailData.cc,
+      reply_to: emailData["reply_to"],
     })
 
     const { data, error } = await resend.emails.send(emailData)

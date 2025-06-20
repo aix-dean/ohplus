@@ -5,7 +5,6 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Calendar } from "@/components/ui/calendar"
@@ -27,21 +26,19 @@ import {
   CalendarIcon,
   Save,
   X,
-  AlertCircle,
   Clock,
 } from "lucide-react"
 import {
   getQuotationById,
   updateQuotationStatus,
   generateQuotationPDF,
-  sendQuotationEmail,
-  updateQuotation, // Assuming this function exists or will be created
+  updateQuotation,
   type Quotation,
 } from "@/lib/quotation-service"
-import { getProductById, type Product } from "@/lib/firebase-service" // Assuming getProductById is here
+import { getProductById, type Product } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { SendQuotationDialog } from "@/components/send-quotation-dialog"
+import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-dialog" // Ensure this import is correct
 
 // Helper function to generate QR code URL (kept here for consistency with proposal view)
 const generateQRCodeUrl = (quotationId: string) => {
@@ -58,13 +55,15 @@ export default function QuotationDetailsPage() {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [downloadingPDF, setDownloadingPDF] = useState(false)
-  const [isSendEmailDialogOpen, setIsSendEmailDialogOpen] = useState(false)
-  const [emailRecipient, setEmailRecipient] = useState("")
-  const [emailSubject, setEmailSubject] = useState("")
-  const [emailBody, setEmailBody] = useState("")
-  const [sendingEmail, setSendingEmail] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+
+  // State for the shared SendQuotationDialog
+  const [isSendQuotationDialogOpen, setIsSendQuotationDialogOpen] = useState(false)
+  const [quotationToSend, setQuotationToSend] = useState<Quotation | null>(null)
+
+  // New state for the success dialog
+  const [isQuotationSentSuccessDialogOpen, setIsQuotationSentSuccessDialogOpen] = useState(false)
 
   // Helper function to safely convert any value to string
   const safeString = (value: any): string => {
@@ -105,20 +104,6 @@ export default function QuotationDetailsPage() {
             const fetchedProduct = await getProductById(quotationData.product_id)
             setProduct(fetchedProduct)
           }
-
-          // Initialize email fields
-          setEmailRecipient(quotationData.client_email || "")
-          setEmailSubject(`Quotation from OH Plus: ${quotationData.quotation_number}`)
-          setEmailBody(`Dear ${quotationData.client_name || "Client"},
-
-Please find attached your quotation (${quotationData.quotation_number}) for ${quotationData.product_name} for the period from ${formatDate(quotationData.start_date)} to ${formatDate(quotationData.end_date)}.
-
-Total Amount: ₱${quotationData.total_amount?.toLocaleString()}
-
-You can view and accept/decline this quotation online at: ${process.env.NEXT_PUBLIC_APP_URL}/quotations/${quotationId}/accept
-
-Best regards,
-OH Plus Sales Team`)
         } catch (error) {
           console.error("Error fetching quotation:", error)
           toast({
@@ -178,37 +163,6 @@ OH Plus Sales Team`)
     }
   }
 
-  const handleSendEmail = async () => {
-    if (!quotation || !emailRecipient || !emailSubject || !emailBody || !quotation.id) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all email fields.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setSendingEmail(true)
-    try {
-      await sendQuotationEmail(quotation, emailRecipient)
-      await handleStatusUpdate("sent") // Update status to sent after email is sent
-      toast({
-        title: "Email Sent",
-        description: `Quotation ${quotation.quotation_number} sent to ${emailRecipient}.`,
-      })
-      setIsSendEmailDialogOpen(false)
-    } catch (error: any) {
-      console.error("Error sending email:", error)
-      toast({
-        title: "Error",
-        description: `Failed to send email: ${error.message || "Unknown error"}`,
-        variant: "destructive",
-      })
-    } finally {
-      setSendingEmail(false)
-    }
-  }
-
   const handleEditClick = () => {
     if (quotation) {
       setEditableQuotation({ ...quotation }) // Create a shallow copy for editing
@@ -234,8 +188,6 @@ OH Plus Sales Team`)
       const currentUserId = "current_user_id"
       const currentUserName = "Current User"
 
-      // The updateQuotation function needs to be implemented in lib/quotation-service.ts
-      // It should take the quotation ID, the updated quotation object, and user info.
       await updateQuotation(editableQuotation.id, editableQuotation, currentUserId, currentUserName)
       setQuotation(editableQuotation) // Update the main quotation state with saved changes
       setIsEditing(false)
@@ -268,6 +220,27 @@ OH Plus Sales Team`)
       ...prev!,
       valid_until: date || new Date(), // Set to current date if undefined
     }))
+  }
+
+  const handleSendQuotationClick = () => {
+    if (quotation) {
+      setQuotationToSend(quotation)
+      setIsSendQuotationDialogOpen(true)
+    }
+  }
+
+  const handleQuotationSentSuccess = async (quotationId: string, newStatus: Quotation["status"]) => {
+    // Update the status of the current quotation on this page
+    await handleStatusUpdate(newStatus)
+    setIsSendQuotationDialogOpen(false) // Close the send dialog
+
+    // Open the success dialog
+    setIsQuotationSentSuccessDialogOpen(true)
+  }
+
+  const handleDismissQuotationSentSuccess = () => {
+    setIsQuotationSentSuccessDialogOpen(false)
+    router.push("/sales/dashboard") // Changed this line to sales dashboard
   }
 
   const getStatusConfig = (status: string) => {
@@ -828,7 +801,7 @@ OH Plus Sales Team`)
               Save as Draft
             </Button>
             <Button
-              onClick={() => setIsSendEmailDialogOpen(true)}
+              onClick={handleSendQuotationClick} // Use the new handler to open the shared dialog
               className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
             >
               <Send className="h-5 w-5 mr-2" />
@@ -838,70 +811,22 @@ OH Plus Sales Team`)
         )
       )}
 
-      {/* Send Email Dialog */}
-      <Dialog open={isSendEmailDialogOpen} onOpenChange={setIsSendEmailDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Send Quotation via Email</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="emailRecipient">Recipient Email</Label>
-              <Input
-                id="emailRecipient"
-                type="email"
-                value={emailRecipient}
-                onChange={(e) => setEmailRecipient(e.target.value)}
-                placeholder="client@example.com"
-              />
-            </div>
-            <div>
-              <Label htmlFor="emailSubject">Subject</Label>
-              <Input
-                id="emailSubject"
-                value={emailSubject}
-                onChange={(e) => setEmailSubject(e.target.value)}
-                placeholder="Quotation from OH Plus"
-              />
-            </div>
-            <div>
-              <Label htmlFor="emailBody">Message Body</Label>
-              <Textarea
-                id="emailBody"
-                value={emailBody}
-                onChange={(e) => setEmailBody(e.target.value)}
-                rows={8}
-                placeholder="Enter your message here..."
-              />
-            </div>
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                The quotation PDF will be automatically attached.
-                <br />A link to the public acceptance page will be included in the email.
-              </AlertDescription>
-            </Alert>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsSendEmailDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSendEmail} disabled={sendingEmail}>
-              {sendingEmail ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Send Email
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Shared Send Quotation Dialog */}
+      {quotationToSend && (
+        <SendQuotationDialog
+          isOpen={isSendQuotationDialogOpen}
+          onClose={() => setIsSendQuotationDialogOpen(false)}
+          quotation={quotationToSend}
+          requestorEmail={quotationToSend.client_email || ""} // Pass client email from the quotation
+          onQuotationSent={handleQuotationSentSuccess}
+        />
+      )}
+
+      {/* New Quotation Sent Success Dialog */}
+      <QuotationSentSuccessDialog
+        isOpen={isQuotationSentSuccessDialogOpen}
+        onDismissAndNavigate={handleDismissQuotationSentSuccess}
+      />
     </div>
   )
 }

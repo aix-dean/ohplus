@@ -48,9 +48,11 @@ const navigationItems = [
     items: [
       { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
       { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
-      { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
-      { title: "Clients", href: "/sales/clients", icon: Users },
       { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
+      { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
+      { title: "JOs", href: "#", icon: ClipboardList },
+      { title: "Clients", href: "/sales/clients", icon: Users },
+      { title: "Billings", href: "#", icon: FileText }, // Added Billings here
       { title: "Planner", href: "/sales/planner", icon: Calendar },
       { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
     ],
@@ -208,9 +210,11 @@ export function SideNavigation() {
               </div>
               <div className="p-1">
                 {[
-                  { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
-                  { title: "Clients", href: "/sales/clients", icon: Users },
                   { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
+                  { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
+                  { title: "JOs", href: "#", icon: ClipboardList },
+                  { title: "Clients", href: "/sales/clients", icon: Users },
+                  { title: "Billings", href: "#", icon: FileText }, // Added Billings here
                   { title: "Planner", href: "/sales/planner", icon: Calendar },
                   { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
                 ].map((item) => {

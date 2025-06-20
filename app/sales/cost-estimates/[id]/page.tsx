@@ -45,6 +45,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { generateCostEstimatePDF } from "@/lib/pdf-service" // Import the new PDF generation function
+import { CostEstimateSentSuccessDialog } from "@/components/cost-estimate-sent-success-dialog" // Ensure this is imported
 
 // Helper function to generate QR code URL
 const generateQRCodeUrl = (costEstimateId: string) => {
@@ -204,7 +205,7 @@ export default function CostEstimateDetailsPage() {
 
   const handleSuccessDialogDismissAndNavigate = () => {
     setShowSuccessDialog(false) // Hide the success dialog
-    router.push("/sales/dashboard") // Navigate to dashboard
+    router.push("/sales/dashboard") // Navigate to sales dashboard
   }
 
   const handleUpdatePublicStatus = async (status: CostEstimateStatus) => {
@@ -1171,32 +1172,5 @@ export default function CostEstimateDetailsPage() {
         </>
       )}
     </div>
-  )
-}
-
-interface CostEstimateSentSuccessDialogProps {
-  isOpen: boolean
-  onDismissAndNavigate: () => void
-}
-
-const CostEstimateSentSuccessDialog: React.FC<CostEstimateSentSuccessDialogProps> = ({
-  isOpen,
-  onDismissAndNavigate,
-}) => {
-  return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onDismissAndNavigate()}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Cost Estimate Sent Successfully</DialogTitle>
-          <DialogDescription>The cost estimate has been successfully sent to the client.</DialogDescription>
-        </DialogHeader>
-        <div className="flex justify-center items-center p-6">
-          <CheckCircle className="h-10 w-10 text-green-500" />
-        </div>
-        <DialogFooter>
-          <Button onClick={onDismissAndNavigate}>OK</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   )
 }
