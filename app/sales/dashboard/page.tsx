@@ -841,7 +841,24 @@ function SalesDashboardContent() {
               </div>
 
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
-                {/* Proposal Creation Mode Controls (on dashboard) - Removed this inline control */}
+                {/* Proposal Creation Mode Controls (on dashboard) */}
+                {proposalCreationMode && (
+                  <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <span className="text-sm text-blue-700">
+                      {selectedClientForProposal ? (
+                        <>
+                          Client: <span className="font-semibold">{selectedClientForProposal.company}</span>
+                        </>
+                      ) : (
+                        "Select a client"
+                      )}
+                      {selectedProducts.length > 0 && `, ${selectedProducts.length} products selected`}
+                    </span>
+                    <Button size="sm" variant="outline" onClick={handleCancelProposalCreationMode}>
+                      Cancel
+                    </Button>
+                  </div>
+                )}
 
                 {/* CE/Quote Mode Controls (on dashboard) */}
                 {ceQuoteMode && (
