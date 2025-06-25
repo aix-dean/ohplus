@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Upload, Trash2, AlertCircle, ImageIcon, Film, X, Check } from "lucide-react"
+import { ArrowLeft, Upload, Trash2, AlertCircle, ImageIcon, Film, X, Check, Loader2 } from "lucide-react"
 import { createProduct } from "@/lib/firebase-service"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
@@ -18,6 +18,7 @@ import { collection, query, where, getDocs, serverTimestamp } from "firebase/fir
 import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
+import { useSubscriptionGuard } from "@/hooks/use-subscription-guard"
 
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
@@ -42,7 +43,7 @@ interface Category {
 
 export default function AdminProductCreatePage() {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
@@ -81,6 +82,8 @@ export default function AdminProductCreatePage() {
     type: "RENTAL", // Default type
     status: "PENDING", // Default status
   })
+
+  const { canCreateProduct, loading: subscriptionLoading, message: subscriptionMessage } = useSubscriptionGuard()
 
   // Fetch categories on component mount
   useEffect(() => {
@@ -300,8 +303,15 @@ export default function AdminProductCreatePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!user) {
+    if (!user || !userData) {
+      // Ensure userData is available
       setError("You must be logged in to create a product")
+      return
+    }
+
+    // Add subscription guard check here
+    if (!canCreateProduct) {
+      setError(subscriptionMessage || "You cannot create a product due to subscription limits.")
       return
     }
 
@@ -384,7 +394,13 @@ export default function AdminProductCreatePage() {
         },
       }
 
-      const productId = await createProduct(user.uid, user.displayName || "Unknown User", productData)
+      // Pass licenseKey to createProduct
+      const productId = await createProduct(
+        user.uid,
+        user.displayName || "Unknown User",
+        userData.license_key,
+        productData,
+      )
 
       // Show success message
       toast({
@@ -427,6 +443,18 @@ export default function AdminProductCreatePage() {
   // Check if content type is Dynamic
   const isDynamicContent = formData.content_type === "Dynamic(LED)"
 
+  // Add loading state for subscription guard
+  if (subscriptionLoading) {
+    return (
+      <div className="flex-1 p-6">
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold mb-2">Checking Subscription...</h2>
+          <Loader2 className="h-8 w-8 animate-spin text-gray-500 mx-auto mt-4" />
+        </div>
+      </div>
+    )
+  }
+
   if (!user) {
     return (
       <div className="flex-1 p-6">
@@ -456,6 +484,14 @@ export default function AdminProductCreatePage() {
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-6 flex items-start">
                 <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
                 <span>{error}</span>
+              </div>
+            )}
+
+            {/* Display subscription message if not allowed */}
+            {!canCreateProduct && subscriptionMessage && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-md mb-6 flex items-start">
+                <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+                <span>{subscriptionMessage}</span>
               </div>
             )}
 
@@ -905,7 +941,9 @@ export default function AdminProductCreatePage() {
 
               {/* Submit Button */}
               <div className="flex justify-end pt-4">
-                <Button type="submit" disabled={isSubmitting}>
+                <Button type="submit" disabled={isSubmitting || !canCreateProduct}>
+                  {" "}
+                  {/* Disable if not allowed */}
                   {isSubmitting ? "Creating..." : "Create Product"}
                 </Button>
               </div>

@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect, useCallback } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
@@ -18,6 +17,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Info,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -50,24 +50,28 @@ export default function AdminInventoryPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingCount, setLoadingCount] = useState(false)
 
-  const { user } = useAuth()
+  const { user, projectData } = useAuth() // Get projectData from auth context
   const router = useRouter()
   const { toast } = useToast()
 
-  // Fetch total count of products
+  // State for current product count and loading status for subscription check
+  const [currentProductsCount, setCurrentProductsCount] = useState<number | null>(null)
+  const [isLoadingCurrentCount, setIsLoadingCurrentCount] = useState(true)
+
+  // Fetch total count of products (used for pagination display)
   const fetchTotalCount = useCallback(async () => {
     if (!user?.uid) return
 
     setLoadingCount(true)
     try {
-      const count = await getUserProductsCount(user.uid)
+      const count = await getUserProductsCount(user.uid, { deleted: false }) // Ensure count is for active products
       setTotalItems(count)
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
       console.error("Error fetching total count:", error)
       toast({
         title: "Error",
-        description: "Failed to load product count. Please try again.",
+        description: "Failed to load product count for pagination. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -93,8 +97,6 @@ export default function AdminInventoryPage() {
       setLoadingMore(!isFirstPage)
 
       try {
-        // For the first page, start from the beginning
-        // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
         const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc)
@@ -148,6 +150,30 @@ export default function AdminInventoryPage() {
       fetchProducts(currentPage)
     }
   }, [currentPage, fetchProducts, user])
+
+  // Fetch current product count for subscription limit check
+  useEffect(() => {
+    const fetchCurrentProductCount = async () => {
+      if (user?.uid) {
+        setIsLoadingCurrentCount(true)
+        try {
+          const count = await getUserProductsCount(user.uid, { deleted: false })
+          setCurrentProductsCount(count)
+        } catch (error) {
+          console.error("Failed to fetch current product count for subscription check:", error)
+          setCurrentProductsCount(0) // Default to 0 on error
+        } finally {
+          setIsLoadingCurrentCount(false)
+        }
+      }
+    }
+    fetchCurrentProductCount()
+  }, [user?.uid, products]) // Re-fetch when user changes or products list updates (after add/delete)
+
+  // Calculate if the user can add a product based on subscription limit
+  const maxProducts = projectData?.max_products
+  const canAddProduct = maxProducts === null || (currentProductsCount !== null && currentProductsCount < maxProducts)
+  const isLimitReached = currentProductsCount !== null && maxProducts !== null && currentProductsCount >= maxProducts
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -227,7 +253,7 @@ export default function AdminInventoryPage() {
       // Update the UI by removing the deleted product
       setProducts((prevProducts) => prevProducts.filter((p) => p.id !== productToDelete.id))
 
-      // Update total count
+      // Update total count (this will trigger re-fetch of currentProductsCount)
       setTotalItems((prev) => prev - 1)
 
       // Recalculate total pages
@@ -272,29 +298,48 @@ export default function AdminInventoryPage() {
         {/* Header with title and actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h1 className="text-2xl font-bold">Admin Inventory</h1>
-          <div className="flex items-center gap-3">
-            <div className="border rounded-md p-1 flex">
-              <Button
-                variant={viewMode === "grid" ? "default" : "ghost"}
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setViewMode("grid")}
-              >
-                <LayoutGrid size={18} />
-              </Button>
-              <Button
-                variant={viewMode === "list" ? "default" : "ghost"}
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setViewMode("list")}
-              >
-                <List size={18} />
+          <div className="flex flex-col items-end gap-2">
+            {" "}
+            {/* Changed to flex-col for button and message */}
+            <div className="flex items-center gap-3">
+              <div className="border rounded-md p-1 flex">
+                <Button
+                  variant={viewMode === "grid" ? "default" : "ghost"}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setViewMode("grid")}
+                >
+                  <LayoutGrid size={18} />
+                </Button>
+                <Button
+                  variant={viewMode === "list" ? "default" : "ghost"}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setViewMode("list")}
+                >
+                  <List size={18} />
+                </Button>
+              </div>
+              <Button onClick={handleAddProduct} disabled={!canAddProduct || isLoadingCurrentCount}>
+                {isLoadingCurrentCount ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <Plus size={16} />
+                    Add Product
+                  </>
+                )}
               </Button>
             </div>
-            <Button onClick={handleAddProduct} className="flex items-center gap-2">
-              <Plus size={16} />
-              Add Product
-            </Button>
+            {isLimitReached && (
+              <p className="text-sm text-red-500 flex items-center gap-1">
+                <Info className="h-4 w-4" />
+                You have reached your product limit ({maxProducts}). Please upgrade your subscription.
+              </p>
+            )}
           </div>
         </div>
 
@@ -314,10 +359,25 @@ export default function AdminInventoryPage() {
             </div>
             <h3 className="text-lg font-medium mb-2">No products yet</h3>
             <p className="text-gray-500 mb-4">Add your first product to get started</p>
-            <Button onClick={handleAddProduct}>
-              <Plus size={16} className="mr-2" />
-              Add Product
+            <Button onClick={handleAddProduct} disabled={!canAddProduct || isLoadingCurrentCount}>
+              {isLoadingCurrentCount ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                <>
+                  <Plus size={16} className="mr-2" />
+                  Add Product
+                </>
+              )}
             </Button>
+            {isLimitReached && (
+              <p className="text-sm text-red-500 flex items-center justify-center gap-1 mt-4">
+                <Info className="h-4 w-4" />
+                You have reached your product limit ({maxProducts}). Please upgrade your subscription.
+              </p>
+            )}
           </div>
         )}
 

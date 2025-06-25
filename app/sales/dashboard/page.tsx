@@ -53,12 +53,12 @@ import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { createProposal } from "@/lib/proposal-service"
 import type { ProposalClient } from "@/lib/types/proposal"
 import { ProposalHistory } from "@/components/proposal-history"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { ClientDialog } from "@/components/client-dialog"
 import { DateRangeCalendarDialog } from "@/components/date-range-calendar-dialog"
 import { createDirectCostEstimate } from "@/lib/cost-estimate-service" // Import for CE creation
 import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service" // Imports for Quotation creation
 import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
+import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -132,7 +132,7 @@ function SalesDashboardContent() {
   const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false)
   const [actionAfterDateSelection, setActionAfterDateSelection] = useState<"cost_estimate" | "quotation" | null>(null)
   const [isCreatingDocument, setIsCreatingDocument] = useState(false) // New loading state for document creation
-  const [isCollabComingSoonOpen, setIsCollabComingSoonOpen] = useState(false)
+  const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
 
   // On mobile, default to grid view
   useEffect(() => {
@@ -890,7 +890,7 @@ function SalesDashboardContent() {
                     </Button>
                     <Button
                       className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
-                      onClick={() => setIsCollabComingSoonOpen(true)}
+                      onClick={() => setIsCollabPartnerDialogOpen(true)}
                     >
                       Collab
                     </Button>
@@ -1469,15 +1469,8 @@ function SalesDashboardContent() {
         itemName={productToDelete?.name}
       />
 
-      {/* Collab Coming Soon Dialog */}
-      <Dialog open={isCollabComingSoonOpen} onOpenChange={setIsCollabComingSoonOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Collab Feature</DialogTitle>
-            <DialogDescription>This feature is coming soon! Stay tuned for updates.</DialogDescription>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
+      {/* Collab Partner Selection Dialog */}
+      <CollabPartnerDialog isOpen={isCollabPartnerDialogOpen} onClose={() => setIsCollabPartnerDialogOpen(false)} />
 
       {/* New Client Dialog (now using ClientDialog) */}
       <ClientDialog

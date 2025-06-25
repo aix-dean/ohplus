@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useEffect, useRef } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   User,
@@ -14,17 +13,18 @@ import {
   Save,
   Loader2,
   LogOut,
-  Mail,
   Key,
   Award,
   Package,
   Users,
   Star,
   Calendar,
-  MapPinned,
   Facebook,
   Instagram,
   Youtube,
+  CreditCard,
+  Info,
+  Copy,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
@@ -32,22 +32,35 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { storage } from "@/lib/firebase"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { Progress } from "@/components/ui/progress"
+import { getUserProductsCount } from "@/lib/firebase-service"
+import { cn } from "@/lib/utils"
+import { toast } from "@/components/ui/use-toast"
+
+// Helper function to mask the license key
+const maskLicenseKey = (key: string | undefined | null) => {
+  if (!key) return "N/A"
+  if (key.length <= 8) return "*".repeat(key.length) // Mask entirely if too short
+  const firstFour = key.substring(0, 4)
+  const lastFour = key.substring(key.length - 4)
+  const maskedPart = "*".repeat(key.length - 8)
+  return `${firstFour}${maskedPart}${lastFour}`
+}
 
 export default function AccountPage() {
   const { user, userData, projectData, loading, updateUserData, updateProjectData, logout } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [isEditing, setIsEditing] = useState(false)
-  const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
   const [isSaving, setIsSaving] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
 
-  // User form state
+  const [currentProductsCount, setCurrentProductsCount] = useState<number | null>(null)
+  const [isLoadingCurrentCount, setIsLoadingCurrentCount] = useState(true)
+
   const [firstName, setFirstName] = useState("")
   const [middleName, setMiddleName] = useState("")
   const [lastName, setLastName] = useState("")
@@ -56,7 +69,6 @@ export default function AccountPage() {
   const [gender, setGender] = useState("")
   const [photoURL, setPhotoURL] = useState("")
 
-  // Company form state
   const [companyName, setCompanyName] = useState("")
   const [companyLocation, setCompanyLocation] = useState("")
   const [companyWebsite, setCompanyWebsite] = useState("")
@@ -73,7 +85,11 @@ export default function AccountPage() {
       router.push("/login")
     } catch (error: any) {
       console.error("Logout error:", error)
-      setError(error.message || "Failed to log out. Please try again.")
+      toast({
+        title: "Logout Failed",
+        description: error.message || "Failed to log out. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -85,7 +101,6 @@ export default function AccountPage() {
       return
     }
 
-    // Initialize form with user data
     if (userData) {
       setFirstName(userData.first_name || "")
       setMiddleName(userData.middle_name || "")
@@ -96,7 +111,6 @@ export default function AccountPage() {
       setPhotoURL(userData.photo_url || "")
     }
 
-    // Initialize form with project data
     if (projectData) {
       setCompanyName(projectData.company_name || "")
       setCompanyLocation(projectData.company_location || "")
@@ -108,13 +122,33 @@ export default function AccountPage() {
     }
   }, [user, userData, projectData, loading, router])
 
+  useEffect(() => {
+    const fetchProductCount = async () => {
+      if (user && projectData?.license_key) {
+        setIsLoadingCurrentCount(true)
+        try {
+          const count = await getUserProductsCount(user.uid)
+          setCurrentProductsCount(count)
+        } catch (error) {
+          console.error("Failed to fetch product count:", error)
+          setCurrentProductsCount(0)
+          toast({
+            title: "Error",
+            description: "Failed to load product count.",
+            variant: "destructive",
+          })
+        } finally {
+          setIsLoadingCurrentCount(false)
+        }
+      }
+    }
+    fetchProductCount()
+  }, [user, projectData])
+
   const handleSave = async () => {
-    setError("")
-    setSuccess("")
     setIsSaving(true)
 
     try {
-      // Update user data
       await updateUserData({
         first_name: firstName,
         middle_name: middleName,
@@ -125,7 +159,6 @@ export default function AccountPage() {
         photo_url: photoURL,
       })
 
-      // Update project data
       await updateProjectData({
         company_name: companyName,
         company_location: companyLocation,
@@ -138,11 +171,18 @@ export default function AccountPage() {
         },
       })
 
-      setSuccess("Account information updated successfully")
+      toast({
+        title: "Success",
+        description: "Account information updated successfully!",
+      })
       setIsEditing(false)
     } catch (error: any) {
       console.error("Update error:", error)
-      setError(error.message || "Failed to update account information")
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update account information.",
+        variant: "destructive",
+      })
     } finally {
       setIsSaving(false)
     }
@@ -159,31 +199,26 @@ export default function AccountPage() {
     if (!file || !user) return
 
     setIsUploading(true)
-    setError("")
 
     try {
-      // Create a reference to the file in Firebase Storage
       const storageRef = ref(storage, `profile_photos/${user.uid}/${Date.now()}_${file.name}`)
-
-      // Upload the file
       const snapshot = await uploadBytes(storageRef, file)
-
-      // Get the download URL
       const downloadURL = await getDownloadURL(snapshot.ref)
-
-      // Update the photoURL state
       setPhotoURL(downloadURL)
-
-      // Update the user data in Firestore
       await updateUserData({ photo_url: downloadURL })
-
-      setSuccess("Profile photo updated successfully")
+      toast({
+        title: "Success",
+        description: "Profile photo updated successfully!",
+      })
     } catch (error: any) {
       console.error("Photo upload error:", error)
-      setError(error.message || "Failed to upload photo")
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload photo.",
+        variant: "destructive",
+      })
     } finally {
       setIsUploading(false)
-      // Clear the file input
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
       }
@@ -192,84 +227,72 @@ export default function AccountPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     )
   }
 
+  const maxProducts = projectData?.max_products
+  const isLimitReached = maxProducts !== null && currentProductsCount !== null && currentProductsCount >= maxProducts
+
   return (
-    <div className="container max-w-6xl py-8 px-4 sm:px-6">
-      {/* Header with profile overview */}
-      <div className="mb-8">
-        <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
-          <div className="relative group">
-            <div className="w-28 h-28 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 p-1 shadow-lg">
-              <div className="w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
+    <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl">
+        {/* Header Section */}
+        <div className="mb-16 flex flex-col items-center justify-between gap-4 rounded-xl bg-white p-6 shadow-sm md:flex-row md:p-8">
+          <div className="flex flex-col items-center gap-4 md:flex-row">
+            <div className="relative group flex-shrink-0">
+              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-primary/20 p-1 shadow-md">
                 {isUploading ? (
-                  <Loader2 size={40} className="text-primary animate-spin" />
+                  <Loader2 size={36} className="animate-spin text-primary" />
                 ) : photoURL ? (
                   <img
                     src={photoURL || "/placeholder.svg"}
                     alt={userData?.display_name || "Profile"}
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-cover rounded-full"
                   />
                 ) : (
-                  <User size={40} className="text-gray-400" />
+                  <User size={36} className="text-gray-400" />
                 )}
               </div>
+              <button
+                className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary p-1.5 text-white shadow-md transition-colors duration-200 hover:bg-primary/90"
+                onClick={handlePhotoClick}
+                disabled={isUploading}
+                aria-label="Change profile photo"
+              >
+                <Camera size={16} />
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                disabled={isUploading}
+              />
             </div>
-            <button
-              className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full cursor-pointer shadow-md hover:bg-primary/90 transition-colors"
-              onClick={handlePhotoClick}
-              disabled={isUploading}
-              aria-label="Change profile photo"
+            <div className="text-center md:text-left">
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+                Hello, {userData?.display_name || "User"}!
+              </h1>
+              <p className="mt-0.5 text-base text-gray-600">Manage your account and company details.</p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-100"
             >
-              <Camera size={16} />
-            </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept="image/*"
-              onChange={handlePhotoChange}
-              disabled={isUploading}
-            />
-          </div>
-
-          <div className="flex-1 text-center md:text-left">
-            <h1 className="text-2xl md:text-3xl font-bold">{userData?.display_name || "User"}</h1>
-            <div className="flex items-center justify-center md:justify-start gap-2 text-gray-500 mt-1">
-              <Mail className="h-4 w-4" />
-              <span>{userData?.email}</span>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2 justify-center md:justify-start">
-              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                {userData?.type || "User"}
-              </Badge>
-              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                {projectData?.type || "Trial"}
-              </Badge>
-              {userData?.location && (
-                <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-                  <MapPinned className="h-3 w-3 mr-1" />
-                  {typeof userData.location === "object" && userData.location._lat && userData.location._long
-                    ? `${userData.location._lat.toFixed(2)}, ${userData.location._long.toFixed(2)}`
-                    : String(userData.location)}
-                </Badge>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 mt-4 md:mt-0">
-            <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
               <LogOut className="h-4 w-4" />
               Logout
             </Button>
             <Button
               onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
               disabled={isSaving}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90"
             >
               {isEditing ? (
                 <>
@@ -285,419 +308,543 @@ export default function AccountPage() {
             </Button>
           </div>
         </div>
-      </div>
 
-      {error && (
-        <Alert variant="destructive" className="mb-6 animate-in fade-in">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+        {/* Main Content Area with Tabs */}
+        <Tabs defaultValue="personal" className="grid grid-cols-1 gap-x-5 md:grid-cols-[240px_1fr]">
+          {/* Sidebar/Tab Navigation */}
+          <TabsList className="flex flex-col items-start space-y-1 rounded-xl bg-white shadow-sm">
+            <TabsTrigger
+              value="personal"
+              className="w-full justify-start rounded-lg px-5 py-3 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 data-[state=active]:bg-primary data-[state=active]:text-white"
+            >
+              <User className="mr-2 h-4 w-4" /> Personal Information
+            </TabsTrigger>
+            <TabsTrigger
+              value="company"
+              className="w-full justify-start rounded-lg px-5 py-3 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 data-[state=active]:bg-primary data-[state=active]:text-white"
+            >
+              <Building className="mr-2 h-4 w-4" /> Company Information
+            </TabsTrigger>
+            <TabsTrigger
+              value="subscription"
+              className="w-full justify-start rounded-lg px-5 py-3 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 data-[state=active]:bg-primary data-[state=active]:text-white"
+            >
+              <CreditCard className="mr-2 h-4 w-4" /> Subscription Plan
+            </TabsTrigger>
+          </TabsList>
 
-      {success && (
-        <Alert className="mb-6 bg-green-50 text-green-800 border-green-200 animate-in fade-in">
-          <AlertDescription>{success}</AlertDescription>
-        </Alert>
-      )}
+          {/* Tab Contents */}
+          <div className="space-y-6">
+            <TabsContent value="personal" className="mt-0 space-y-6 pt-0">
+              {/* Personal Details Card */}
+              <Card className="rounded-xl shadow-sm">
+                <CardHeader className="border-b px-5 py-3">
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
+                    <User className="h-5 w-5 text-primary" />
+                    Personal Details
+                  </CardTitle>
+                  <CardDescription className="text-xs text-gray-600">
+                    Manage your personal information and preferences.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-5">
+                  <div className="grid grid-cols-1 gap-x-5 gap-y-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="firstName" className="text-xs font-medium text-gray-700">
+                        First Name
+                      </Label>
+                      <Input
+                        id="firstName"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        disabled={!isEditing}
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
 
-      <Tabs defaultValue="personal" className="space-y-8">
-        <TabsList className="grid w-full grid-cols-2 mb-2">
-          <TabsTrigger value="personal" className="text-sm sm:text-base">
-            Personal Information
-          </TabsTrigger>
-          <TabsTrigger value="company" className="text-sm sm:text-base">
-            Company Information
-          </TabsTrigger>
-        </TabsList>
+                    <div className="space-y-1">
+                      <Label htmlFor="lastName" className="text-xs font-medium text-gray-700">
+                        Last Name
+                      </Label>
+                      <Input
+                        id="lastName"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        disabled={!isEditing}
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
 
-        <TabsContent value="personal" className="space-y-6">
-          {/* License Key Card */}
-          <Card className="overflow-hidden border-none shadow-md">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-              <CardTitle className="flex items-center gap-2">
-                <Key className="h-5 w-5 text-primary" />
-                License Key
-              </CardTitle>
-              <CardDescription>Your unique license key connects your account to your projects</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2">
-                <Input value={userData?.license_key || ""} readOnly className="font-mono bg-gray-50" />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(userData?.license_key || "")
-                    setSuccess("License key copied to clipboard")
-                  }}
-                >
-                  Copy
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                    <div className="space-y-1">
+                      <Label htmlFor="middleName" className="text-xs font-medium text-gray-700">
+                        Middle Name
+                      </Label>
+                      <Input
+                        id="middleName"
+                        value={middleName}
+                        onChange={(e) => setMiddleName(e.target.value)}
+                        disabled={!isEditing}
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
 
-          {/* Personal Details Card */}
-          <Card className="overflow-hidden border-none shadow-md">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5 text-primary" />
-                Personal Details
-              </CardTitle>
-              <CardDescription>Manage your personal information and preferences</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-sm font-medium">
-                    First Name
-                  </Label>
-                  <Input
-                    id="firstName"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    disabled={!isEditing}
-                    className={isEditing ? "border-primary/30 focus:border-primary" : ""}
-                  />
-                </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="displayName" className="text-xs font-medium text-gray-700">
+                        Display Name
+                      </Label>
+                      <Input
+                        id="displayName"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        disabled={!isEditing}
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-sm font-medium">
-                    Last Name
-                  </Label>
-                  <Input
-                    id="lastName"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    disabled={!isEditing}
-                    className={isEditing ? "border-primary/30 focus:border-primary" : ""}
-                  />
-                </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="phoneNumber" className="text-xs font-medium text-gray-700">
+                        Phone Number
+                      </Label>
+                      <Input
+                        id="phoneNumber"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        disabled={!isEditing}
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="middleName" className="text-sm font-medium">
-                    Middle Name
-                  </Label>
-                  <Input
-                    id="middleName"
-                    value={middleName}
-                    onChange={(e) => setMiddleName(e.target.value)}
-                    disabled={!isEditing}
-                    className={isEditing ? "border-primary/30 focus:border-primary" : ""}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="displayName" className="text-sm font-medium">
-                    Display Name
-                  </Label>
-                  <Input
-                    id="displayName"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    disabled={!isEditing}
-                    className={isEditing ? "border-primary/30 focus:border-primary" : ""}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phoneNumber" className="text-sm font-medium">
-                    Phone Number
-                  </Label>
-                  <Input
-                    id="phoneNumber"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    disabled={!isEditing}
-                    className={isEditing ? "border-primary/30 focus:border-primary" : ""}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="gender" className="text-sm font-medium">
-                    Gender
-                  </Label>
-                  <select
-                    id="gender"
-                    value={gender}
-                    onChange={(e) => setGender(e.target.value)}
-                    disabled={!isEditing}
-                    className={`flex h-10 w-full rounded-md border bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-                      isEditing ? "border-primary/30 focus:border-primary" : "border-input"
-                    }`}
-                  >
-                    <option value="">Select Gender</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium">
-                    Email
-                  </Label>
-                  <Input id="email" value={userData?.email || ""} disabled className="bg-gray-50" />
-                  <p className="text-xs text-gray-500">Email cannot be changed</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Account Statistics Card */}
-          <Card className="overflow-hidden border-none shadow-md">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-              <CardTitle className="flex items-center gap-2">
-                <Award className="h-5 w-5 text-primary" />
-                Account Statistics
-              </CardTitle>
-              <CardDescription>Overview of your account activity and metrics</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Package className="h-4 w-4 text-blue-500" />
-                    <p className="text-sm text-gray-500">Products</p>
-                  </div>
-                  <p className="text-2xl font-bold">{userData?.products || 0}</p>
-                </div>
-
-                <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Users className="h-4 w-4 text-green-500" />
-                    <p className="text-sm text-gray-500">Followers</p>
-                  </div>
-                  <p className="text-2xl font-bold">{userData?.followers || 0}</p>
-                </div>
-
-                <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Star className="h-4 w-4 text-yellow-500" />
-                    <p className="text-sm text-gray-500">Rating</p>
-                  </div>
-                  <p className="text-2xl font-bold">{userData?.rating || 0}</p>
-                </div>
-
-                <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="h-4 w-4 text-purple-500" />
-                    <p className="text-sm text-gray-500">Member Since</p>
-                  </div>
-                  <p className="text-sm font-semibold">
-                    {userData?.created ? new Date(userData.created).toLocaleDateString() : "N/A"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="company" className="space-y-6">
-          {/* Company Profile Card */}
-          <Card className="overflow-hidden border-none shadow-md">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-              <CardTitle className="flex items-center gap-2">
-                <Building className="h-5 w-5 text-primary" />
-                Company Profile
-              </CardTitle>
-              <CardDescription>Manage your company details and information</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start mb-6">
-                <div className="w-24 h-24 rounded-lg bg-gradient-to-r from-gray-100 to-gray-200 flex items-center justify-center shadow-sm">
-                  <Building size={40} className="text-gray-400" />
-                </div>
-
-                <div className="flex-1 text-center sm:text-left">
-                  <h2 className="text-xl font-semibold">{projectData?.company_name || "Your Company"}</h2>
-                  <p className="text-gray-500">{projectData?.project_name || "Default Project"}</p>
-                  <div className="mt-2 flex flex-wrap gap-4 justify-center sm:justify-start text-sm text-gray-500">
-                    {projectData?.company_location && (
-                      <div className="flex items-center gap-1">
-                        <MapPin size={16} />
-                        <span>{projectData.company_location}</span>
-                      </div>
-                    )}
-                    {projectData?.company_website && (
-                      <div className="flex items-center gap-1">
-                        <Globe size={16} />
-                        <a
-                          href={projectData.company_website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline"
-                        >
-                          Website
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="companyName" className="text-sm font-medium">
-                    Company Name
-                  </Label>
-                  <Input
-                    id="companyName"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    disabled={!isEditing}
-                    className={isEditing ? "border-primary/30 focus:border-primary" : ""}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="companyLocation" className="text-sm font-medium">
-                    Company Address
-                  </Label>
-                  <Input
-                    id="companyLocation"
-                    value={companyLocation}
-                    onChange={(e) => setCompanyLocation(e.target.value)}
-                    disabled={!isEditing}
-                    className={isEditing ? "border-primary/30 focus:border-primary" : ""}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="companyWebsite" className="text-sm font-medium">
-                    Company Website
-                  </Label>
-                  <Input
-                    id="companyWebsite"
-                    value={companyWebsite}
-                    onChange={(e) => setCompanyWebsite(e.target.value)}
-                    disabled={!isEditing}
-                    className={isEditing ? "border-primary/30 focus:border-primary" : ""}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Social Media Card */}
-          <Card className="overflow-hidden border-none shadow-md">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-              <CardTitle className="flex items-center gap-2">
-                <Globe className="h-5 w-5 text-primary" />
-                Social Media
-              </CardTitle>
-              <CardDescription>Connect your company's social media accounts</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                    <Facebook className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <Input
-                    value={facebook}
-                    onChange={(e) => setFacebook(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="Facebook URL"
-                    className={isEditing ? "border-primary/30 focus:border-primary" : ""}
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center flex-shrink-0">
-                    <Instagram className="h-5 w-5 text-pink-600" />
-                  </div>
-                  <Input
-                    value={instagram}
-                    onChange={(e) => setInstagram(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="Instagram URL"
-                    className={isEditing ? "border-primary/30 focus:border-primary" : ""}
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                    <Youtube className="h-5 w-5 text-red-600" />
-                  </div>
-                  <Input
-                    value={youtube}
-                    onChange={(e) => setYoutube(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="YouTube URL"
-                    className={isEditing ? "border-primary/30 focus:border-primary" : ""}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Account Type Card */}
-          <Card className="overflow-hidden border-none shadow-md">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-              <CardTitle className="flex items-center gap-2">
-                <Award className="h-5 w-5 text-primary" />
-                Account Type
-              </CardTitle>
-              <CardDescription>Your current subscription plan and details</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="bg-white p-6 rounded-lg border border-gray-100 shadow-sm">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        variant={projectData?.type === "Trial" ? "outline" : "default"}
-                        className={
-                          projectData?.type === "Trial" ? "bg-yellow-100 text-yellow-800 border-yellow-200" : ""
-                        }
+                    <div className="space-y-1">
+                      <Label htmlFor="gender" className="text-xs font-medium text-gray-700">
+                        Gender
+                      </Label>
+                      <select
+                        id="gender"
+                        value={gender}
+                        onChange={(e) => setGender(e.target.value)}
+                        disabled={!isEditing}
+                        className={cn(
+                          `flex h-9 w-full rounded-md border px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm`,
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
                       >
-                        {projectData?.type || "Trial"}
-                      </Badge>
-                      {projectData?.type !== "Trial" && (
-                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                          Active
-                        </Badge>
+                        <option value="">Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="email" className="text-xs font-medium text-gray-700">
+                        Email
+                      </Label>
+                      <Input
+                        id="email"
+                        value={userData?.email || ""}
+                        disabled
+                        className="rounded-md border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-600 shadow-sm"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Email cannot be changed.</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Account Statistics Card */}
+              <Card className="rounded-xl shadow-sm">
+                <CardHeader className="border-b px-5 py-3">
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
+                    <Award className="h-5 w-5 text-primary" />
+                    Account Statistics
+                  </CardTitle>
+                  <CardDescription className="text-xs text-gray-600">
+                    Overview of your account activity and metrics.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-5">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div className="flex flex-col items-center rounded-md border border-gray-100 bg-white p-3 text-center shadow-sm">
+                      <Package className="mb-1.5 h-5 w-5 text-blue-600" />
+                      <p className="text-xs text-gray-600">Products</p>
+                      <p className="mt-0.5 text-xl font-bold text-gray-900">{userData?.products || 0}</p>
+                    </div>
+
+                    <div className="flex flex-col items-center rounded-md border border-gray-100 bg-white p-3 text-center shadow-sm">
+                      <Users className="mb-1.5 h-5 w-5 text-green-600" />
+                      <p className="text-xs text-gray-600">Followers</p>
+                      <p className="mt-0.5 text-xl font-bold text-gray-900">{userData?.followers || 0}</p>
+                    </div>
+
+                    <div className="flex flex-col items-center rounded-md border border-gray-100 bg-white p-3 text-center shadow-sm">
+                      <Star className="mb-1.5 h-5 w-5 text-yellow-600" />
+                      <p className="text-xs text-gray-600">Rating</p>
+                      <p className="mt-0.5 text-xl font-bold text-gray-900">{userData?.rating || 0}</p>
+                    </div>
+
+                    <div className="flex flex-col items-center rounded-md border border-gray-100 bg-white p-3 text-center shadow-sm">
+                      <Calendar className="mb-1.5 h-5 w-5 text-purple-600" />
+                      <p className="text-xs text-gray-600">Member Since</p>
+                      <p className="mt-0.5 text-sm font-semibold text-gray-900">
+                        {userData?.created ? new Date(userData.created).toLocaleDateString() : "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* License Key Card */}
+              <Card className="rounded-xl shadow-sm">
+                <CardHeader className="border-b px-5 py-3">
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
+                    <Key className="h-5 w-5 text-primary" />
+                    License Key
+                  </CardTitle>
+                  <CardDescription className="text-xs text-gray-600">
+                    Your unique license key connects your account to your projects.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-5">
+                  <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
+                    <Input
+                      value={maskLicenseKey(userData?.license_key)} // Masked value
+                      readOnly
+                      className="flex-1 rounded-md border border-gray-200 bg-gray-100 px-3 py-2 text-sm font-mono text-gray-700 shadow-sm"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(userData?.license_key || "") // Copies full key
+                        toast({
+                          title: "Copied!",
+                          description: "License key copied to clipboard.",
+                        })
+                      }}
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-100"
+                    >
+                      <Copy className="h-4 w-4" />
+                      Copy
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="company" className="mt-0 space-y-6 pt-0">
+              {/* Company Profile Card */}
+              <Card className="rounded-xl shadow-sm">
+                <CardHeader className="border-b px-5 py-3">
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
+                    <Building className="h-5 w-5 text-primary" />
+                    Company Profile
+                  </CardTitle>
+                  <CardDescription className="text-xs text-gray-600">
+                    Manage your company details and information.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-5">
+                  <div className="mb-5 flex flex-col items-center gap-5 sm:flex-row sm:items-start">
+                    <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-100 shadow-sm">
+                      <Building size={40} className="text-gray-400" />
+                    </div>
+
+                    <div className="flex-1 text-center sm:text-left">
+                      <h2 className="text-xl font-bold text-gray-900">{projectData?.company_name || "Your Company"}</h2>
+                      <p className="mt-0.5 text-base text-gray-600">{projectData?.project_name || "Default Project"}</p>
+                      <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-gray-700 sm:justify-start">
+                        {projectData?.company_location && (
+                          <div className="flex items-center gap-1.5">
+                            <MapPin size={14} className="text-gray-500" />
+                            <span>{projectData.company_location}</span>
+                          </div>
+                        )}
+                        {projectData?.company_website && (
+                          <div className="flex items-center gap-1.5">
+                            <Globe size={14} className="text-gray-500" />
+                            <a
+                              href={projectData.company_website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              Website
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="companyName" className="text-xs font-medium text-gray-700">
+                        Company Name
+                      </Label>
+                      <Input
+                        id="companyName"
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        disabled={!isEditing}
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="companyLocation" className="text-xs font-medium text-gray-700">
+                        Company Address
+                      </Label>
+                      <Input
+                        id="companyLocation"
+                        value={companyLocation}
+                        onChange={(e) => setCompanyLocation(e.target.value)}
+                        disabled={!isEditing}
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="companyWebsite" className="text-xs font-medium text-gray-700">
+                        Company Website
+                      </Label>
+                      <Input
+                        id="companyWebsite"
+                        value={companyWebsite}
+                        onChange={(e) => setCompanyWebsite(e.target.value)}
+                        disabled={!isEditing}
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Social Media Card */}
+              <Card className="rounded-xl shadow-sm">
+                <CardHeader className="border-b px-5 py-3">
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
+                    <Globe className="h-5 w-5 text-primary" />
+                    Social Media
+                  </CardTitle>
+                  <CardDescription className="text-xs text-gray-600">
+                    Connect your company's social media accounts.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-5">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100">
+                        <Facebook className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <Input
+                        value={facebook}
+                        onChange={(e) => setFacebook(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="Facebook URL"
+                        className={cn(
+                          "flex-1 rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100">
+                        <Instagram className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <Input
+                        value={instagram}
+                        onChange={(e) => setInstagram(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="Instagram URL"
+                        className={cn(
+                          "flex-1 rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100">
+                        <Youtube className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <Input
+                        value={youtube}
+                        onChange={(e) => setYoutube(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="YouTube URL"
+                        className={cn(
+                          "flex-1 rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="subscription" className="mt-0 space-y-6 pt-0">
+              {/* Subscription Plan Card */}
+              <Card className="rounded-xl shadow-sm">
+                <CardHeader className="border-b px-5 py-3">
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
+                    <CreditCard className="h-5 w-5 text-primary" />
+                    Subscription Plan
+                  </CardTitle>
+                  <CardDescription className="text-xs text-gray-600">
+                    Your current subscription plan and usage details.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-5">
+                  <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
+                    <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={projectData?.type === "Trial" ? "outline" : "default"}
+                            className={cn(
+                              "px-3 py-1 text-xs font-medium",
+                              projectData?.type === "Trial"
+                                ? "border-yellow-200 bg-yellow-100 text-yellow-800"
+                                : "bg-primary text-primary-foreground",
+                            )}
+                          >
+                            {projectData?.type || "Trial"}
+                          </Badge>
+                          {projectData?.type !== "Trial" && (
+                            <Badge
+                              variant="outline"
+                              className="border-green-200 bg-green-100 px-3 py-1 text-xs font-medium text-green-800"
+                            >
+                              Active
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="mt-1 text-sm text-gray-600">
+                          {projectData?.type === "Trial"
+                            ? "Limited features and functionality."
+                            : "Full access to all features."}
+                        </p>
+                      </div>
+                      {projectData?.type === "Trial" && (
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => router.push("/settings/subscription")}
+                          className="px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90"
+                        >
+                          Upgrade Now
+                        </Button>
                       )}
                     </div>
-                    <p className="text-sm text-gray-500 mt-2">
-                      {projectData?.type === "Trial"
-                        ? "Limited features and functionality"
-                        : "Full access to all features"}
-                    </p>
-                  </div>
-                  {projectData?.type === "Trial" && (
-                    <Button variant="default" size="sm" onClick={() => router.push("/settings/subscription")}>
-                      Upgrade Now
-                    </Button>
-                  )}
-                </div>
-              </div>
 
-              <div className="mt-6 grid grid-cols-2 gap-4">
-                <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="h-4 w-4 text-blue-500" />
-                    <p className="text-sm text-gray-500">Created</p>
+                    <div className="mt-5 space-y-3">
+                      <h3 className="flex items-center gap-2 text-base font-bold text-gray-800">
+                        <Package className="h-4 w-4 text-blue-600" />
+                        Product Usage
+                      </h3>
+                      {isLoadingCurrentCount ? (
+                        <div className="flex items-center gap-2 text-gray-500">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span className="text-sm">Loading product count...</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex justify-between text-sm font-medium text-gray-700">
+                            <span>
+                              {currentProductsCount !== null ? currentProductsCount : "N/A"} products uploaded
+                            </span>
+                            <span>{maxProducts === null ? "Unlimited" : `${maxProducts} max`}</span>
+                          </div>
+                          {maxProducts !== null && currentProductsCount !== null && (
+                            <Progress
+                              value={(currentProductsCount / maxProducts) * 100}
+                              className="h-2 rounded-full bg-gray-200 [&>*]:bg-primary"
+                            />
+                          )}
+                          {isLimitReached && (
+                            <p className="mt-2 flex items-center gap-1.5 text-sm text-red-600">
+                              <Info className="h-4 w-4" />
+                              You have reached your product upload limit. Please upgrade your plan.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-sm font-medium">
-                    {projectData?.created ? new Date(projectData.created).toLocaleDateString() : "N/A"}
-                  </p>
-                </div>
 
-                <div className="bg-white p-4 rounded-lg border border-gray-100 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="h-4 w-4 text-green-500" />
-                    <p className="text-sm text-gray-500">Last Updated</p>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="flex flex-col items-center rounded-md border border-gray-100 bg-white p-3 text-center shadow-sm">
+                      <Calendar className="mb-1.5 h-5 w-5 text-blue-600" />
+                      <p className="text-xs text-gray-600">Created</p>
+                      <p className="mt-0.5 text-sm font-semibold text-gray-900">
+                        {projectData?.created ? new Date(projectData.created).toLocaleDateString() : "N/A"}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col items-center rounded-md border border-gray-100 bg-white p-3 text-center shadow-sm">
+                      <Calendar className="mb-1.5 h-5 w-5 text-green-600" />
+                      <p className="text-xs text-gray-600">Last Updated</p>
+                      <p className="mt-0.5 text-sm font-semibold text-gray-900">
+                        {projectData?.updated ? new Date(projectData.updated).toLocaleDateString() : "N/A"}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm font-medium">
-                    {projectData?.updated ? new Date(projectData.updated).toLocaleDateString() : "N/A"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </div>
+        </Tabs>
+      </div>
+    </main>
   )
 }

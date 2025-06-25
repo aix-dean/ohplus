@@ -159,6 +159,31 @@ export interface PaginatedResult<T> {
   hasMore: boolean
 }
 
+// Re-declare ProjectData to include subscription fields, matching AuthContext's ProjectData
+export interface ProjectData {
+  id: string
+  uid: string
+  license_key: string
+  project_name: string
+  company_name: string
+  company_location: string
+  company_website: string
+  type: string // Subscription type: "Basic", "Premium", "Enterprise", "Trial"
+  max_products: number | null // Max products allowed by the plan
+  current_products: number // Current number of products uploaded
+  social_media: {
+    facebook: string
+    instagram: string
+    youtube: string
+  }
+  created: string
+  updated: string
+  deleted: boolean
+  tenant_id?: string
+  subscription_start_date?: Timestamp
+  subscription_end_date?: Timestamp
+}
+
 // Get a single product by ID
 export async function getProductById(productId: string): Promise<Product | null> {
   try {
@@ -285,11 +310,11 @@ export async function getPaginatedUserProducts(
 // Get the total count of products for a user
 export async function getUserProductsCount(
   userId: string,
-  options: { searchTerm?: string; active?: boolean } = {},
+  options: { searchTerm?: string; active?: boolean; deleted?: boolean } = {},
 ): Promise<number> {
   try {
     const productsRef = collection(db, "products")
-    const { searchTerm = "", active } = options
+    const { searchTerm = "", active, deleted } = options
 
     // Start with basic constraints
     const constraints: any[] = [where("seller_id", "==", userId)]
@@ -297,6 +322,10 @@ export async function getUserProductsCount(
     // Add active filter if specified
     if (active !== undefined) {
       constraints.push(where("active", "==", active))
+    }
+    // Add deleted filter if specified
+    if (deleted !== undefined) {
+      constraints.push(where("deleted", "==", deleted))
     }
 
     // Create the query with all constraints
@@ -333,8 +362,33 @@ export async function getUserProductsCount(
 }
 
 // Create a new product
-export async function createProduct(userId: string, userName: string, productData: Partial<Product>): Promise<string> {
+export async function createProduct(
+  userId: string,
+  userName: string,
+  licenseKey: string, // Added licenseKey
+  productData: Partial<Product>,
+): Promise<string> {
   try {
+    // 1. Fetch the project/license data to check limits
+    const projectRef = doc(db, "projects", licenseKey)
+    const projectDoc = await getDoc(projectRef)
+
+    if (!projectDoc.exists()) {
+      throw new Error("Associated project/license not found.")
+    }
+
+    const project = projectDoc.data() as ProjectData
+    const { max_products } = project
+
+    // Get the current count of non-deleted products for the user
+    const currentProductsCount = await getUserProductsCount(userId, { deleted: false })
+
+    if (max_products !== null && currentProductsCount >= max_products) {
+      throw new Error(
+        `You have reached your product upload limit of ${max_products}. Please upgrade your subscription.`,
+      )
+    }
+
     const newProduct = {
       ...productData,
       seller_id: userId,
@@ -342,10 +396,14 @@ export async function createProduct(userId: string, userName: string, productDat
       status: productData.status || "PENDING",
       position: productData.position || 0,
       deleted: productData.deleted !== undefined ? productData.deleted : false, // Ensure deleted field is set
-      // Don't set created/updated here as they're now passed in productData as serverTimestamp()
+      created: serverTimestamp(), // Set created timestamp here
+      updated: serverTimestamp(), // Set updated timestamp here
     }
 
     const docRef = await addDoc(collection(db, "products"), newProduct)
+
+    // No need to increment current_products here, as we rely on count query
+
     return docRef.id
   } catch (error) {
     console.error("Error creating product:", error)
@@ -354,7 +412,7 @@ export async function createProduct(userId: string, userName: string, productDat
 }
 
 // Soft delete a product (mark as deleted)
-export async function softDeleteProduct(productId: string): Promise<void> {
+export async function softDeleteProduct(productId: string, licenseKey: string): Promise<void> {
   try {
     const productRef = doc(db, "products", productId)
     await updateDoc(productRef, {
@@ -362,6 +420,8 @@ export async function softDeleteProduct(productId: string): Promise<void> {
       date_deleted: serverTimestamp(),
       updated: serverTimestamp(),
     })
+
+    // No need to decrement current_products here, as we rely on count query
   } catch (error) {
     console.error("Error soft deleting product:", error)
     throw error

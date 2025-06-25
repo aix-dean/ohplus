@@ -10,9 +10,27 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth"
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore"
+import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from "firebase/firestore" // Import serverTimestamp
 import { auth, db } from "@/lib/firebase"
 import { generateLicenseKey } from "@/lib/utils"
+
+// Helper function to get max products based on plan type
+function getMaxProductsForPlan(type: string): number | null {
+  switch (type.toLowerCase()) {
+    case "basic":
+      return 3
+    case "premium":
+      return 10
+    case "enterprise":
+      return null // Unlimited
+    case "graphic expo event": // Added for the new promo plan
+      return 5
+    case "trial":
+      return 1 // Or any trial limit
+    default:
+      return 1 // Default for unknown types
+  }
+}
 
 interface UserData {
   uid: string
@@ -36,10 +54,11 @@ interface UserData {
   }
   rating: number
   followers: number
-  created: Date
-  created_time: string
-  active_date: string
-  updated: string
+  // Change Date to any for serverTimestamp compatibility
+  created: any
+  created_time: any
+  active_date: any
+  updated: any
   tenant_id?: string
 }
 
@@ -51,16 +70,19 @@ interface ProjectData {
   company_name: string
   company_location: string
   company_website: string
-  type: string
+  type: string // This will be the subscription type: "Basic", "Premium", "Enterprise", "Trial"
+  max_products: number | null // New: Max products allowed by the plan
   social_media: {
     facebook: string
     instagram: string
     youtube: string
   }
-  created: string
-  updated: string
+  created: any // Change to any for serverTimestamp compatibility
+  updated: any // Change to any for serverTimestamp compatibility
   deleted: boolean
   tenant_id?: string
+  subscription_start_date: any // Change to any for serverTimestamp compatibility
+  subscription_end_date: any // Change to any for serverTimestamp compatibility
 }
 
 interface AuthContextType {
@@ -113,6 +135,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (projectDoc.exists()) {
               setProjectData(projectDoc.data() as ProjectData)
+            } else {
+              console.warn("Project document not found for license key:", userData.license_key)
+              setProjectData(null)
             }
 
             // Fetch all projects with the same license key
@@ -131,7 +156,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               console.error("Error fetching projects:", error)
               setAllProjects([])
             }
+          } else {
+            console.warn("User data missing license_key for user:", user.uid)
+            setProjectData(null)
           }
+        } else {
+          console.warn("User document not found for uid:", user.uid)
+          setUserData(null)
+          setProjectData(null)
         }
       } else {
         setUserData(null)
@@ -174,10 +206,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Generate license key
       const licenseKey = generateLicenseKey()
 
-      const now = new Date()
-      const timestamp = now.toISOString()
-      const utcString = now.toUTCString()
-
       // Create user document in Firestore
       const newUserData: UserData = {
         uid: user.uid,
@@ -201,37 +229,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
         rating: 0,
         followers: 0,
-        created: now,
-        created_time: utcString,
-        active_date: utcString,
-        updated: timestamp,
-        tenant_id: "ohplus-07hsi", // Add tenant ID to user data
+        created: serverTimestamp(),
+        created_time: serverTimestamp(),
+        active_date: serverTimestamp(),
+        updated: serverTimestamp(),
+        tenant_id: "ohplus-07hsi",
       }
 
       await setDoc(doc(db, "iboard_users", user.uid), newUserData)
+
+      const now = new Date()
+      let subscriptionEndDate: Date
+
+      // Determine subscription end date based on plan type
+      if (projectData.type?.toLowerCase() === "trial") {
+        subscriptionEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // 30 days for trial
+      } else if (projectData.type?.toLowerCase() === "graphic expo event") {
+        subscriptionEndDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()) // 1 year for promo
+      } else {
+        // For Basic, Premium, Enterprise, assume 1 year for now
+        subscriptionEndDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate())
+      }
 
       // Create project document in Firestore
       const newProjectData: ProjectData = {
         id: crypto.randomUUID(),
         uid: user.uid,
         license_key: licenseKey,
-        project_name: projectData.company_name || "New Project", // Use company name as project name
+        project_name: projectData.company_name || "New Project",
         company_name: projectData.company_name || "",
         company_location: projectData.company_location || "",
         company_website: "",
-        type: projectData.type || "Trial",
+        type: projectData.type || "Trial", // Use the selected type from projectData
+        max_products: getMaxProductsForPlan(projectData.type || "Trial"), // Use selected type to get max products
         social_media: {
           facebook: "",
           instagram: "",
           youtube: "",
         },
-        created: utcString,
-        updated: utcString,
+        created: serverTimestamp(),
+        updated: serverTimestamp(),
         deleted: false,
-        tenant_id: "ohplus-07hsi", // Add tenant ID to project data
+        tenant_id: "ohplus-07hsi",
+        subscription_start_date: serverTimestamp(),
+        subscription_end_date: subscriptionEndDate,
       }
 
       await setDoc(doc(db, "projects", licenseKey), newProjectData)
+
+      // Manually update state after successful registration and data creation
+      setUserData(newUserData)
+      setProjectData(newProjectData)
     } catch (error) {
       console.error("Registration error:", error)
       throw error
@@ -252,7 +300,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const userDocRef = doc(db, "iboard_users", user.uid)
-      await setDoc(userDocRef, { ...data, updated: new Date().toISOString() }, { merge: true })
+      await setDoc(userDocRef, { ...data, updated: serverTimestamp() }, { merge: true }) // Use serverTimestamp
 
       // Update local state
       setUserData((prev) => (prev ? { ...prev, ...data } : null))
@@ -267,7 +315,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const projectDocRef = doc(db, "projects", userData.license_key)
-      await setDoc(projectDocRef, { ...data, updated: new Date() }, { merge: true })
+      await setDoc(projectDocRef, { ...data, updated: serverTimestamp() }, { merge: true }) // Use serverTimestamp
 
       // Update local state
       setProjectData((prev) => (prev ? { ...prev, ...data } : null))
