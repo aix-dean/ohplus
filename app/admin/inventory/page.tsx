@@ -50,7 +50,7 @@ export default function AdminInventoryPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingCount, setLoadingCount] = useState(false)
 
-  const { user, projectData } = useAuth() // Get projectData from auth context
+  const { user, projectData, subscriptionData } = useAuth() // Get projectData from auth context
   const router = useRouter()
   const { toast } = useToast()
 
@@ -171,7 +171,7 @@ export default function AdminInventoryPage() {
   }, [user?.uid, products]) // Re-fetch when user changes or products list updates (after add/delete)
 
   // Calculate if the user can add a product based on subscription limit
-  const maxProducts = projectData?.max_products
+  const maxProducts = subscriptionData?.maxProducts
   const canAddProduct = maxProducts === null || (currentProductsCount !== null && currentProductsCount < maxProducts)
   const isLimitReached = currentProductsCount !== null && maxProducts !== null && currentProductsCount >= maxProducts
 
@@ -516,7 +516,7 @@ export default function AdminInventoryPage() {
                 size="sm"
                 onClick={goToPreviousPage}
                 disabled={currentPage === 1}
-                className="h-8 w-8 p-0"
+                className="h-8 w-8 p-0 bg-transparent"
               >
                 <ChevronLeft size={16} />
               </Button>
@@ -670,7 +670,7 @@ function ProductCard({
             <Button
               variant="outline"
               size="sm"
-              className="h-8"
+              className="h-8 bg-transparent"
               onClick={(e) => {
                 e.stopPropagation()
                 onEdit(e)
@@ -682,7 +682,7 @@ function ProductCard({
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-destructive border-destructive/30 hover:bg-destructive/10"
+              className="h-8 text-destructive border-destructive/30 hover:bg-destructive/10 bg-transparent"
               onClick={(e) => {
                 e.stopPropagation()
                 onDelete(e)

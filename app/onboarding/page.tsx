@@ -40,7 +40,7 @@ function OnboardingFooter({
 }) {
   return (
     <footer className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 p-6 flex items-center justify-between">
-      <Button variant="ghost" onClick={onBack} disabled={currentStep === 0}>
+      <Button variant="ghost" onClick={onBack} disabled={currentStep === 1}>
         <ArrowLeft className="mr-2 h-4 w-4" /> Back
       </Button>
       {isLastStep ? (
@@ -61,15 +61,21 @@ export default function OnboardingPage() {
   const searchParams = useSearchParams()
   const { userData, loading, updateUserData } = useAuth()
 
-  // Step 0 is the overview page, actual steps start from 1
   const totalContentSteps = 3 // Welcome, Upload Product, All Set
-  const currentStep = Number.parseInt(searchParams.get("step") || "0") // Default to 0 for overview
+  const currentStep = Number.parseInt(searchParams.get("step") || "1") // Default to 1 for the first content step
 
   useEffect(() => {
     if (!loading && !userData) {
       router.push("/login") // Redirect to login if not authenticated
     }
   }, [userData, loading, router])
+
+  // Ensure the URL always has a valid step parameter, defaulting to 1
+  useEffect(() => {
+    if (currentStep < 1 || currentStep > totalContentSteps) {
+      router.replace(`/onboarding?step=1`)
+    }
+  }, [currentStep, totalContentSteps, router])
 
   const handleNext = () => {
     if (currentStep < totalContentSteps) {
@@ -78,10 +84,10 @@ export default function OnboardingPage() {
   }
 
   const handleBack = () => {
-    if (currentStep > 0) {
+    if (currentStep > 1) {
       router.push(`/onboarding?step=${currentStep - 1}`)
     } else {
-      // If on overview (step 0) and pressing back, go to subscription selection
+      // If on the first content step (step 1) and pressing back, go to subscription selection
       router.push("/register/select-subscription")
     }
   }
@@ -103,72 +109,12 @@ export default function OnboardingPage() {
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case 0: // Overview Page
-        return (
-          <div className="flex flex-col md:flex-row items-center justify-center min-h-[calc(100vh-160px)] p-8">
-            <div className="md:w-1/2 text-center md:text-left mb-8 md:mb-0">
-              <h1 className="text-5xl font-bold mb-6">It's easy to get started on Your App</h1>
-            </div>
-            <div className="md:w-1/2 space-y-8">
-              <div className="flex items-center space-x-4">
-                <span className="text-3xl font-bold text-primary">1</span>
-                <div>
-                  <h2 className="text-2xl font-semibold">Tell us about your business</h2>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Share some basic info, like your company name and industry.
-                  </p>
-                </div>
-                <Image
-                  src="/placeholder.svg?height=100&width=100"
-                  alt="Business Info"
-                  width={100}
-                  height={100}
-                  className="ml-auto"
-                />
-              </div>
-              <div className="flex items-center space-x-4">
-                <span className="text-3xl font-bold text-primary">2</span>
-                <div>
-                  <h2 className="text-2xl font-semibold">Upload your first product</h2>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Add details and images for your first product or service.
-                  </p>
-                </div>
-                <Image
-                  src="/placeholder.svg?height=100&width=100"
-                  alt="Product Upload"
-                  width={100}
-                  height={100}
-                  className="ml-auto"
-                />
-              </div>
-              <div className="flex items-center space-x-4">
-                <span className="text-3xl font-bold text-primary">3</span>
-                <div>
-                  <h2 className="text-2xl font-semibold">Finish setup and explore</h2>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Complete your profile and start using all features.
-                  </p>
-                </div>
-                <Image
-                  src="/placeholder.svg?height=100&width=100"
-                  alt="Finish Setup"
-                  width={100}
-                  height={100}
-                  className="ml-auto"
-                />
-              </div>
-            </div>
-          </div>
-        )
       case 1: // Welcome/Introduction
         return (
           <div className="flex flex-col md:flex-row items-center justify-center min-h-[calc(100vh-160px)] p-8">
             <div className="md:w-1/2 text-center md:text-left space-y-6">
               <p className="text-xl font-semibold text-gray-600 dark:text-gray-400">Step 1</p>
-              <h1 className="text-5xl font-bold">
-                Welcome, {userData?.first_name || "New User"}! {/* Changed to first_name */}
-              </h1>
+              <h1 className="text-5xl font-bold">Welcome, {userData?.first_name || "New User"}!</h1>
               <p className="text-lg text-gray-600 dark:text-gray-400">
                 Thank you for registering with us. We're excited to have you on board and help you streamline your
                 business operations.

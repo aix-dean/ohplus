@@ -17,7 +17,8 @@ import {
   getDoc,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage" // Import Firebase Storage functions
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { subscriptionService } from "./subscription-service"
 
 // Initialize Firebase Storage
 const storage = getStorage()
@@ -197,9 +198,6 @@ export interface ProjectData {
   company_name: string
   company_location: string
   company_website: string
-  type: string // Subscription type: "Basic", "Premium", "Enterprise", "Trial"
-  max_products: number | null // Max products allowed by the plan
-  current_products: number // Current number of products uploaded
   social_media: {
     facebook: string
     instagram: string
@@ -209,8 +207,6 @@ export interface ProjectData {
   updated: string
   deleted: boolean
   tenant_id?: string
-  subscription_start_date?: Timestamp
-  subscription_end_date?: Timestamp
 }
 
 // Get a single product by ID
@@ -398,24 +394,17 @@ export async function createProduct(
   productData: Partial<Product>,
 ): Promise<string> {
   try {
-    // 1. Fetch the project/license data to check limits
-    const projectRef = doc(db, "projects", licenseKey)
-    const projectDoc = await getDoc(projectRef)
-
-    if (!projectDoc.exists()) {
-      throw new Error("Associated project/license not found.")
+    // Check subscription limits before creating a product
+    const subscription = await subscriptionService.getSubscriptionByLicenseKey(licenseKey)
+    if (!subscription) {
+      throw new Error("No active subscription found for this project.")
     }
-
-    const project = projectDoc.data() as ProjectData
-    const { max_products } = project
 
     // Get the current count of non-deleted products for the user
     const currentProductsCount = await getUserProductsCount(userId, { deleted: false })
 
-    if (max_products !== null && currentProductsCount >= max_products) {
-      throw new Error(
-        `You have reached your product upload limit of ${max_products}. Please upgrade your subscription.`,
-      )
+    if (subscription.maxProducts !== null && currentProductsCount >= subscription.maxProducts) {
+      throw new Error(`Product limit reached. Your current plan allows up to ${subscription.maxProducts} products.`)
     }
 
     const newProduct = {
@@ -430,8 +419,6 @@ export async function createProduct(
     }
 
     const docRef = await addDoc(collection(db, "products"), newProduct)
-
-    // No need to increment current_products here, as we rely on count query
 
     return docRef.id
   } catch (error) {
@@ -449,8 +436,6 @@ export async function softDeleteProduct(productId: string, licenseKey: string): 
       date_deleted: serverTimestamp(),
       updated: serverTimestamp(),
     })
-
-    // No need to decrement current_products here, as we rely on count query
   } catch (error) {
     console.error("Error soft deleting product:", error)
     throw error

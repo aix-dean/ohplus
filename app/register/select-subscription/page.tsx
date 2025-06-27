@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, XCircle } from "lucide-react"
+import { CheckCircle, XCircle, Loader2Icon } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import {
   Dialog,
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { cn } from "@/lib/utils"
+import type { SubscriptionPlanType, BillingCycle } from "@/lib/types/subscription"
 
 interface SubscriptionPlan {
   name: string
@@ -24,7 +25,7 @@ interface SubscriptionPlan {
   description: string
   features: string[]
   maxProducts: number | null // null for unlimited
-  type: string // Corresponds to projectData.type
+  type: SubscriptionPlanType
   isPopular?: boolean
   isPromo?: boolean // Added for special promotions
 }
@@ -37,7 +38,7 @@ const subscriptionPlans: SubscriptionPlan[] = [
     description: "Special offer for Graphic Expo attendees.",
     features: ["Up to 5 sites", "Basic analytics", "Email support", "Exclusive event access"],
     maxProducts: 5,
-    type: "GraphicExpo",
+    type: "Graphic Expo Event",
     isPromo: true, // Highlight this as a promo
   },
   {
@@ -64,7 +65,7 @@ const subscriptionPlans: SubscriptionPlan[] = [
     monthlyPrice: "Contact Us",
     yearlyPrice: "Contact Us",
     description: "Tailored solutions for large enterprises with extensive needs.",
-    features: ["Unlimited sites", "Dedicated account manager", "24/7 phone support"], // 'API access' removed
+    features: ["Unlimited sites", "Dedicated account manager", "24/7 phone support"],
     maxProducts: null, // Unlimited
     type: "Enterprise",
   },
@@ -72,38 +73,50 @@ const subscriptionPlans: SubscriptionPlan[] = [
 
 export default function SelectSubscriptionPage() {
   const router = useRouter()
-  const { user, userData, projectData, loading, updateProjectData } = useAuth()
+  const { user, userData, projectData, subscriptionData, loading, updateSubscriptionData } = useAuth()
   const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly")
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly")
+  const [isUpdating, setIsUpdating] = useState(false)
 
   useEffect(() => {
     if (!loading) {
       if (!user) {
         router.push("/login")
-      } else if (userData && projectData) {
+      } else if (userData && projectData && subscriptionData) {
+        // If user is onboarded, redirect to dashboard
         if (!userData.onboarding) {
           router.push("/sales/dashboard")
-        } else if (projectData.type !== "Trial") {
-          router.push("/onboarding?step=1")
+        } else if (subscriptionData.planType !== "Trial") {
+          // If user has already selected a non-trial plan, redirect to onboarding step 0
+          router.push("/onboarding?step=0")
         }
       }
     }
-  }, [user, userData, projectData, loading, router])
+  }, [user, userData, projectData, subscriptionData, loading, router])
 
-  const handleSelectPlan = async (planType: string) => {
+  const handleSelectPlan = async (planType: SubscriptionPlanType) => {
     setErrorMessage(null)
-    if (!projectData) {
-      setErrorMessage("Project data not loaded. Please try again.")
+    if (!subscriptionData) {
+      setErrorMessage("Subscription data not loaded. Please try again.")
       return
     }
 
+    setIsUpdating(true)
     try {
-      await updateProjectData({ type: planType })
+      // The subscription service will handle maxProducts, status, and endDate calculation
+      // based on the planType and billingCycle provided.
+      await updateSubscriptionData({
+        planType: planType,
+        billingCycle: billingCycle, // This ensures the selected billing cycle is passed
+        startDate: new Date(), // Reset start date on plan selection/upgrade
+      })
       setIsSuccessDialogOpen(true)
     } catch (error: any) {
       console.error("Error updating subscription:", error)
       setErrorMessage("Failed to update subscription. Please try again.")
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -112,7 +125,7 @@ export default function SelectSubscriptionPage() {
     router.push("/onboarding?step=0")
   }
 
-  const isButtonsDisabled = loading || !projectData
+  const isButtonsDisabled = loading || isUpdating || !subscriptionData
 
   return (
     <div className="flex min-h-screen flex-col items-center bg-gray-100 px-4 py-8 dark:bg-gray-950">
@@ -129,7 +142,7 @@ export default function SelectSubscriptionPage() {
           <ToggleGroup
             type="single"
             value={billingCycle}
-            onValueChange={(value: "monthly" | "yearly") => {
+            onValueChange={(value: BillingCycle) => {
               if (value) setBillingCycle(value)
             }}
             className="bg-gray-200 dark:bg-gray-800 rounded-full p-1"
@@ -186,11 +199,11 @@ export default function SelectSubscriptionPage() {
               </CardHeader>
               <CardContent className="flex flex-col items-center p-0">
                 <div className="text-3xl font-extrabold text-gray-900 dark:text-gray-50">
-                  {plan.type === "Enterprise" || plan.type === "GraphicExpo"
+                  {plan.type === "Enterprise" || plan.type === "Graphic Expo Event"
                     ? plan.monthlyPrice
                     : `${billingCycle === "monthly" ? plan.monthlyPrice : plan.yearlyPrice}`}
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    {plan.type === "Enterprise" || plan.type === "GraphicExpo" ? "" : "/ site / month"}
+                    {plan.type === "Enterprise" || plan.type === "Graphic Expo Event" ? "" : "/ site / month"}
                   </span>
                 </div>
                 <ul className="my-6 space-y-3 text-left text-sm text-gray-700 dark:text-gray-300">
@@ -211,9 +224,12 @@ export default function SelectSubscriptionPage() {
                         ? "bg-green-500 hover:bg-green-600 text-white"
                         : "bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-50",
                   )}
-                  disabled={isButtonsDisabled || projectData?.type === plan.type}
+                  disabled={isButtonsDisabled || subscriptionData?.planType === plan.type}
                 >
-                  {projectData?.type === plan.type
+                  {isUpdating && subscriptionData?.planType !== plan.type ? (
+                    <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  {subscriptionData?.planType === plan.type
                     ? "Current Plan"
                     : plan.isPromo
                       ? "Select Promo"

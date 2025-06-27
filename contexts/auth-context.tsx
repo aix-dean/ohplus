@@ -10,27 +10,11 @@ import {
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth"
-import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from "firebase/firestore" // Import serverTimestamp
+import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import { generateLicenseKey } from "@/lib/utils"
-
-// Helper function to get max products based on plan type
-function getMaxProductsForPlan(type: string): number | null {
-  switch (type.toLowerCase()) {
-    case "basic":
-      return 3
-    case "premium":
-      return 10
-    case "enterprise":
-      return null // Unlimited
-    case "graphic expo event": // Added for the new promo plan
-      return 5
-    case "trial":
-      return 1 // Or any trial limit
-    default:
-      return 1 // Default for unknown types
-  }
-}
+import { subscriptionService } from "@/lib/subscription-service"
+import type { Subscription } from "@/lib/types/subscription"
 
 interface UserData {
   uid: string
@@ -54,7 +38,6 @@ interface UserData {
   }
   rating: number
   followers: number
-  // Change Date to any for serverTimestamp compatibility
   created: any
   created_time: any
   active_date: any
@@ -70,25 +53,22 @@ interface ProjectData {
   company_name: string
   company_location: string
   company_website: string
-  type: string // This will be the subscription type: "Basic", "Premium", "Enterprise", "Trial"
-  max_products: number | null // New: Max products allowed by the plan
   social_media: {
     facebook: string
     instagram: string
     youtube: string
   }
-  created: any // Change to any for serverTimestamp compatibility
-  updated: any // Change to any for serverTimestamp compatibility
+  created: any
+  updated: any
   deleted: boolean
   tenant_id?: string
-  subscription_start_date: any // Change to any for serverTimestamp compatibility
-  subscription_end_date: any // Change to any for serverTimestamp compatibility
 }
 
 interface AuthContextType {
   user: User | null
   userData: UserData | null
   projectData: ProjectData | null
+  subscriptionData: Subscription | null
   allProjects: ProjectData[]
   loading: boolean
   login: (email: string, password: string) => Promise<void>
@@ -96,6 +76,7 @@ interface AuthContextType {
   logout: () => Promise<void>
   updateUserData: (data: Partial<UserData>) => Promise<void>
   updateProjectData: (data: Partial<ProjectData>) => Promise<void>
+  updateSubscriptionData: (updates: Partial<Omit<Subscription, "id" | "licenseKey" | "createdAt">>) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -104,6 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
+  const [subscriptionData, setSubscriptionData] = useState<Subscription | null>(null)
   const [allProjects, setAllProjects] = useState<ProjectData[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -128,16 +110,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const userData = userDoc.data() as UserData
           setUserData(userData)
 
-          // Fetch project data using license key
+          // Fetch project data using license key (consistent approach)
           if (userData.license_key) {
-            const projectQuery = doc(db, "projects", userData.license_key)
-            const projectDoc = await getDoc(projectQuery)
+            const projectDocRef = doc(db, "projects", userData.license_key) // Use license_key as doc ID
+            const projectDoc = await getDoc(projectDocRef)
 
             if (projectDoc.exists()) {
               setProjectData(projectDoc.data() as ProjectData)
             } else {
               console.warn("Project document not found for license key:", userData.license_key)
               setProjectData(null)
+            }
+
+            // Fetch subscription data using license key
+            try {
+              const subscription = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
+              setSubscriptionData(subscription)
+            } catch (error) {
+              console.error("Error fetching subscription data:", error)
+              setSubscriptionData(null)
             }
 
             // Fetch all projects with the same license key
@@ -159,15 +150,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } else {
             console.warn("User data missing license_key for user:", user.uid)
             setProjectData(null)
+            setSubscriptionData(null)
           }
         } else {
           console.warn("User document not found for uid:", user.uid)
           setUserData(null)
           setProjectData(null)
+          setSubscriptionData(null)
         }
       } else {
         setUserData(null)
         setProjectData(null)
+        setSubscriptionData(null)
         setAllProjects([])
       }
 
@@ -191,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Reverted register function signature and implementation
   const register = async (userData: Partial<UserData>, projectData: Partial<ProjectData>, password: string) => {
     try {
       // Ensure tenant ID is set before registration
@@ -199,6 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Create user in Firebase Auth
+      // Ensure email and password are strings
       const userCredential = await createUserWithEmailAndPassword(auth, userData.email as string, password)
 
       const user = userCredential.user
@@ -214,7 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         first_name: userData.first_name || "",
         middle_name: userData.middle_name || "",
         last_name: userData.last_name || "",
-        license_key: licenseKey,
+        license_key: licenseKey, // Assign generated license key
         photo_url: userData.photo_url || "",
         phone_number: userData.phone_number || "",
         location: userData.location || "",
@@ -238,30 +234,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       await setDoc(doc(db, "iboard_users", user.uid), newUserData)
 
-      const now = new Date()
-      let subscriptionEndDate: Date
-
-      // Determine subscription end date based on plan type
-      if (projectData.type?.toLowerCase() === "trial") {
-        subscriptionEndDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) // 30 days for trial
-      } else if (projectData.type?.toLowerCase() === "graphic expo event") {
-        subscriptionEndDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()) // 1 year for promo
-      } else {
-        // For Basic, Premium, Enterprise, assume 1 year for now
-        subscriptionEndDate = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate())
-      }
-
-      // Create project document in Firestore
+      // Create project document in Firestore using licenseKey as document ID
       const newProjectData: ProjectData = {
-        id: crypto.randomUUID(),
+        id: crypto.randomUUID(), // This ID is for internal use, Firestore doc ID will be licenseKey
         uid: user.uid,
-        license_key: licenseKey,
+        license_key: licenseKey, // Assign generated license key
         project_name: projectData.company_name || "New Project",
         company_name: projectData.company_name || "",
         company_location: projectData.company_location || "",
         company_website: "",
-        type: projectData.type || "Trial", // Use the selected type from projectData
-        max_products: getMaxProductsForPlan(projectData.type || "Trial"), // Use selected type to get max products
         social_media: {
           facebook: "",
           instagram: "",
@@ -271,15 +252,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updated: serverTimestamp(),
         deleted: false,
         tenant_id: "ohplus-07hsi",
-        subscription_start_date: serverTimestamp(),
-        subscription_end_date: subscriptionEndDate,
       }
 
-      await setDoc(doc(db, "projects", licenseKey), newProjectData)
+      await setDoc(doc(db, "projects", licenseKey), newProjectData) // Store project by licenseKey
+
+      // Create subscription document with Trial plan (60 days)
+      await subscriptionService.createSubscription(licenseKey, "Trial", "monthly", user.uid)
 
       // Manually update state after successful registration and data creation
       setUserData(newUserData)
       setProjectData(newProjectData)
+
+      // Fetch the created subscription to ensure state is up-to-date
+      const subscription = await subscriptionService.getSubscriptionByLicenseKey(licenseKey)
+      setSubscriptionData(subscription)
     } catch (error) {
       console.error("Registration error:", error)
       throw error
@@ -300,7 +286,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const userDocRef = doc(db, "iboard_users", user.uid)
-      await setDoc(userDocRef, { ...data, updated: serverTimestamp() }, { merge: true }) // Use serverTimestamp
+      await setDoc(userDocRef, { ...data, updated: serverTimestamp() }, { merge: true })
 
       // Update local state
       setUserData((prev) => (prev ? { ...prev, ...data } : null))
@@ -310,12 +296,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Reverted updateProjectData to use license_key as doc ID
   const updateProjectData = async (data: Partial<ProjectData>) => {
     if (!userData?.license_key) return
 
     try {
-      const projectDocRef = doc(db, "projects", userData.license_key)
-      await setDoc(projectDocRef, { ...data, updated: serverTimestamp() }, { merge: true }) // Use serverTimestamp
+      const projectDocRef = doc(db, "projects", userData.license_key) // Use license_key as doc ID
+      await setDoc(projectDocRef, { ...data, updated: serverTimestamp() }, { merge: true })
 
       // Update local state
       setProjectData((prev) => (prev ? { ...prev, ...data } : null))
@@ -339,10 +326,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Reverted updateSubscriptionData signature and implementation
+  const updateSubscriptionData = async (updates: Partial<Omit<Subscription, "id" | "licenseKey" | "createdAt">>) => {
+    if (!userData?.license_key) return
+
+    try {
+      await subscriptionService.updateSubscription(userData.license_key, updates)
+
+      // Refresh subscription data to reflect changes
+      const updatedSubscription = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
+      setSubscriptionData(updatedSubscription)
+    } catch (error) {
+      console.error("Update subscription data error:", error)
+      throw error
+    }
+  }
+
   const value = {
     user,
     userData,
     projectData,
+    subscriptionData,
     allProjects,
     loading,
     login,
@@ -350,6 +354,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     updateUserData,
     updateProjectData,
+    updateSubscriptionData,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

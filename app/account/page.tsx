@@ -1,5 +1,7 @@
 "use client"
 
+import { Separator } from "@/components/ui/separator"
+
 import type React from "react"
 import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
@@ -39,6 +41,7 @@ import { Progress } from "@/components/ui/progress"
 import { getUserProductsCount } from "@/lib/firebase-service"
 import { cn } from "@/lib/utils"
 import { toast } from "@/components/ui/use-toast"
+import { subscriptionService } from "@/lib/subscription-service" // Import subscriptionService
 
 // Helper function to mask the license key
 const maskLicenseKey = (key: string | undefined | null) => {
@@ -51,7 +54,8 @@ const maskLicenseKey = (key: string | undefined | null) => {
 }
 
 export default function AccountPage() {
-  const { user, userData, projectData, loading, updateUserData, updateProjectData, logout } = useAuth()
+  const { user, userData, projectData, subscriptionData, loading, updateUserData, updateProjectData, logout } =
+    useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [isEditing, setIsEditing] = useState(false)
@@ -59,7 +63,7 @@ export default function AccountPage() {
   const [isUploading, setIsUploading] = useState(false)
 
   const [currentProductsCount, setCurrentProductsCount] = useState<number | null>(null)
-  const [isLoadingCurrentCount, setIsLoadingCurrentCount] = useState(true)
+  // Removed isLoadingCurrentCount state
 
   const [firstName, setFirstName] = useState("")
   const [middleName, setMiddleName] = useState("")
@@ -122,10 +126,10 @@ export default function AccountPage() {
     }
   }, [user, userData, projectData, loading, router])
 
+  // Removed isLoadingCurrentCount state
   useEffect(() => {
     const fetchProductCount = async () => {
-      if (user && projectData?.license_key) {
-        setIsLoadingCurrentCount(true)
+      if (user && subscriptionData?.licenseKey) {
         try {
           const count = await getUserProductsCount(user.uid)
           setCurrentProductsCount(count)
@@ -137,13 +141,11 @@ export default function AccountPage() {
             description: "Failed to load product count.",
             variant: "destructive",
           })
-        } finally {
-          setIsLoadingCurrentCount(false)
         }
       }
     }
     fetchProductCount()
-  }, [user, projectData])
+  }, [user, subscriptionData])
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -233,8 +235,10 @@ export default function AccountPage() {
     )
   }
 
-  const maxProducts = projectData?.max_products
+  const maxProducts = subscriptionData?.maxProducts
   const isLimitReached = maxProducts !== null && currentProductsCount !== null && currentProductsCount >= maxProducts
+  const isTrial = subscriptionData?.status === "trialing"
+  const daysRemaining = subscriptionData ? subscriptionService.getDaysRemaining(subscriptionData) : 0
 
   return (
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
@@ -275,7 +279,7 @@ export default function AccountPage() {
             </div>
             <div className="text-center md:text-left">
               <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-                Hello, {userData?.display_name || "User"}!
+                Hello, {userData?.first_name || "User"}!
               </h1>
               <p className="mt-0.5 text-base text-gray-600">Manage your account and company details.</p>
             </div>
@@ -284,7 +288,7 @@ export default function AccountPage() {
             <Button
               variant="outline"
               onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-100"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-100 bg-transparent"
             >
               <LogOut className="h-4 w-4" />
               Logout
@@ -613,6 +617,7 @@ export default function AccountPage() {
                         value={companyName}
                         onChange={(e) => setCompanyName(e.target.value)}
                         disabled={!isEditing}
+                        placeholder="Your Company Name"
                         className={cn(
                           "rounded-md border px-3 py-2 text-sm shadow-sm",
                           isEditing
@@ -631,6 +636,7 @@ export default function AccountPage() {
                         value={companyLocation}
                         onChange={(e) => setCompanyLocation(e.target.value)}
                         disabled={!isEditing}
+                        placeholder="123 Main St, City, Country"
                         className={cn(
                           "rounded-md border px-3 py-2 text-sm shadow-sm",
                           isEditing
@@ -649,6 +655,7 @@ export default function AccountPage() {
                         value={companyWebsite}
                         onChange={(e) => setCompanyWebsite(e.target.value)}
                         disabled={!isEditing}
+                        placeholder="https://www.example.com"
                         className={cn(
                           "rounded-md border px-3 py-2 text-sm shadow-sm",
                           isEditing
@@ -745,89 +752,118 @@ export default function AccountPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-5">
-                  <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
-                    <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-                      <div>
-                        <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    {/* Plan Details */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-semibold text-gray-900">{subscriptionData?.planType || "N/A"}</h3>
+                        {subscriptionData?.status && (
                           <Badge
-                            variant={projectData?.type === "Trial" ? "outline" : "default"}
+                            variant="outline"
                             className={cn(
                               "px-3 py-1 text-xs font-medium",
-                              projectData?.type === "Trial"
-                                ? "border-yellow-200 bg-yellow-100 text-yellow-800"
-                                : "bg-primary text-primary-foreground",
+                              subscriptionData.status === "active" && "border-green-200 bg-green-100 text-green-800",
+                              subscriptionData.status === "trialing" && "border-blue-200 bg-blue-100 text-blue-800",
+                              subscriptionData.status === "expired" && "border-red-200 bg-red-100 text-red-800",
+                              subscriptionData.status === "cancelled" && "border-gray-200 bg-gray-100 text-gray-800",
                             )}
                           >
-                            {projectData?.type || "Trial"}
+                            {subscriptionData.status.charAt(0).toUpperCase() + subscriptionData.status.slice(1)}
                           </Badge>
-                          {projectData?.type !== "Trial" && (
-                            <Badge
-                              variant="outline"
-                              className="border-green-200 bg-green-100 px-3 py-1 text-xs font-medium text-green-800"
-                            >
-                              Active
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="mt-1 text-sm text-gray-600">
-                          {projectData?.type === "Trial"
-                            ? "Limited features and functionality."
-                            : "Full access to all features."}
-                        </p>
+                        )}
                       </div>
-                      {projectData?.type === "Trial" && (
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => router.push("/settings/subscription")}
-                          className="px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90"
-                        >
-                          Upgrade Now
-                        </Button>
-                      )}
+
+                      <div className="space-y-1 text-sm text-gray-700">
+                        <p>
+                          <span className="font-medium">Billing Cycle:</span>{" "}
+                          {subscriptionData?.billingCycle
+                            ? subscriptionData.billingCycle.charAt(0).toUpperCase() +
+                              subscriptionData.billingCycle.slice(1)
+                            : "N/A"}
+                        </p>
+                        {subscriptionData?.startDate && (
+                          <p>
+                            <span className="font-medium">Start Date:</span>{" "}
+                            {new Date(subscriptionData.startDate.toDate()).toLocaleDateString()}
+                          </p>
+                        )}
+                        {subscriptionData?.endDate && (
+                          <p>
+                            <span className="font-medium">End Date:</span>{" "}
+                            {new Date(subscriptionData.endDate.toDate()).toLocaleDateString()}
+                          </p>
+                        )}
+                        {subscriptionData?.trialEndDate && isTrial && (
+                          <p>
+                            <span className="font-medium">Trial Ends:</span>{" "}
+                            {new Date(subscriptionData.trialEndDate.toDate()).toLocaleDateString()} ({daysRemaining}{" "}
+                            days remaining)
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
+                        {subscriptionData?.planType === "Trial" && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => router.push("/settings/subscription")}
+                            className="px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90"
+                          >
+                            Upgrade Now
+                          </Button>
+                        )}
+                        {subscriptionData?.planType !== "Trial" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push("/settings/subscription")}
+                            className="px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-100"
+                          >
+                            Manage Subscription
+                          </Button>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="mt-5 space-y-3">
+                    {/* Product Usage */}
+                    <div className="space-y-4">
                       <h3 className="flex items-center gap-2 text-base font-bold text-gray-800">
                         <Package className="h-4 w-4 text-blue-600" />
                         Product Usage
                       </h3>
-                      {isLoadingCurrentCount ? (
-                        <div className="flex items-center gap-2 text-gray-500">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="text-sm">Loading product count...</span>
+                      <>
+                        <div className="flex justify-between text-sm font-medium text-gray-700">
+                          <span>{currentProductsCount !== null ? currentProductsCount : "N/A"} products uploaded</span>
+                          <span>{maxProducts === null ? "Unlimited" : `${maxProducts} max`}</span>
                         </div>
-                      ) : (
-                        <>
-                          <div className="flex justify-between text-sm font-medium text-gray-700">
-                            <span>
-                              {currentProductsCount !== null ? currentProductsCount : "N/A"} products uploaded
-                            </span>
-                            <span>{maxProducts === null ? "Unlimited" : `${maxProducts} max`}</span>
-                          </div>
-                          {maxProducts !== null && currentProductsCount !== null && (
-                            <Progress
-                              value={(currentProductsCount / maxProducts) * 100}
-                              className="h-2 rounded-full bg-gray-200 [&>*]:bg-primary"
-                            />
-                          )}
-                          {isLimitReached && (
-                            <p className="mt-2 flex items-center gap-1.5 text-sm text-red-600">
-                              <Info className="h-4 w-4" />
-                              You have reached your product upload limit. Please upgrade your plan.
-                            </p>
-                          )}
-                        </>
-                      )}
+                        {maxProducts !== null && currentProductsCount !== null && (
+                          <Progress
+                            value={(currentProductsCount / maxProducts) * 100}
+                            className="h-2 rounded-full bg-gray-200 [&>*]:bg-primary"
+                          />
+                        )}
+                        {isLimitReached && (
+                          <p className="mt-2 flex items-center gap-1.5 text-sm text-red-600">
+                            <Info className="h-4 w-4" />
+                            You have reached your product upload limit. Please upgrade your plan.
+                          </p>
+                        )}
+                      </>
                     </div>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-2 gap-3">
+                  <Separator className="my-6" />
+
+                  {/* Subscription Dates */}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="flex flex-col items-center rounded-md border border-gray-100 bg-white p-3 text-center shadow-sm">
                       <Calendar className="mb-1.5 h-5 w-5 text-blue-600" />
-                      <p className="text-xs text-gray-600">Created</p>
+                      <p className="text-xs text-gray-600">Subscription Created</p>
                       <p className="mt-0.5 text-sm font-semibold text-gray-900">
-                        {projectData?.created ? new Date(projectData.created).toLocaleDateString() : "N/A"}
+                        {subscriptionData?.createdAt
+                          ? new Date(subscriptionData.createdAt.toDate()).toLocaleDateString()
+                          : "N/A"}
                       </p>
                     </div>
 
@@ -835,7 +871,9 @@ export default function AccountPage() {
                       <Calendar className="mb-1.5 h-5 w-5 text-green-600" />
                       <p className="text-xs text-gray-600">Last Updated</p>
                       <p className="mt-0.5 text-sm font-semibold text-gray-900">
-                        {projectData?.updated ? new Date(projectData.updated).toLocaleDateString() : "N/A"}
+                        {subscriptionData?.updatedAt
+                          ? new Date(subscriptionData.updatedAt.toDate()).toLocaleDateString()
+                          : "N/A"}
                       </p>
                     </div>
                   </div>

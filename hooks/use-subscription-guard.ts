@@ -1,91 +1,78 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
-import { getUserProductsCount } from "@/lib/firebase-service"
-import { Timestamp } from "firebase/firestore"
+import { subscriptionService } from "@/lib/subscription-service"
 
-/**
- * Custom hook to check if the user can perform actions based on their subscription limits.
- * Currently checks for product creation limits.
- */
-export function useSubscriptionGuard() {
-  const { user, projectData, loading: authLoading, userData } = useAuth()
-  const [canCreateProduct, setCanCreateProduct] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [message, setMessage] = useState<string | null>(null)
+interface SubscriptionGuardResult {
+  isLoading: boolean
+  isSubscriptionActive: boolean
+  isSubscriptionExpired: boolean
+  daysRemaining: number
+  canCreateProducts: boolean
+  currentProductCount: number
+  maxProducts: number | null
+  subscriptionData: any
+}
+
+export function useSubscriptionGuard(): SubscriptionGuardResult {
+  const { userData, subscriptionData, loading: authLoading } = useAuth()
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubscriptionActive, setIsSubscriptionActive] = useState(false)
+  const [isSubscriptionExpired, setIsSubscriptionExpired] = useState(true)
+  const [daysRemaining, setDaysRemaining] = useState(0)
+  const [canCreateProducts, setCanCreateProducts] = useState(false)
+  const [currentProductCount, setCurrentProductCount] = useState(0)
 
   useEffect(() => {
-    async function checkSubscriptionLimits() {
-      if (authLoading) {
-        setLoading(true)
-        return
-      }
-
-      if (!user || !projectData || !userData) {
-        setCanCreateProduct(false)
-        setMessage("Authentication or project data not available.")
-        setLoading(false)
-        return
-      }
-
-      const { max_products, subscription_end_date } = projectData
-
-      // Check time-based validity first
-      let isSubscriptionActive = true
-      let timeBasedMessage: string | null = null
-
-      if (subscription_end_date instanceof Timestamp) {
-        const endDate = subscription_end_date.toDate()
-        const now = new Date()
-        if (now > endDate) {
-          isSubscriptionActive = false
-          timeBasedMessage = "Your subscription has expired. Please renew to continue using all features."
-        }
-      } else if (subscription_end_date === undefined) {
-        // If subscription_end_date is not set, assume it's active for now, but log a warning
-        console.warn("subscription_end_date is undefined for project:", projectData.id)
-      }
-
-      if (!isSubscriptionActive) {
-        setCanCreateProduct(false)
-        setMessage(timeBasedMessage)
-        setLoading(false)
-        return
-      }
-
-      // If subscription is active, then check product limits
-      if (max_products === null) {
-        setCanCreateProduct(true)
-        setMessage(null)
-        setLoading(false)
+    const checkSubscription = async () => {
+      if (authLoading || !userData?.license_key || !subscriptionData) {
+        setIsLoading(false)
         return
       }
 
       try {
-        // Get the current count of non-deleted products for the user
-        const currentProductsCount = await getUserProductsCount(user.uid, { deleted: false })
+        // Check if subscription is active
+        const isActive = await subscriptionService.isSubscriptionActive(userData.license_key)
+        setIsSubscriptionActive(isActive)
 
-        if (currentProductsCount < max_products) {
-          setCanCreateProduct(true)
-          setMessage(null)
-        } else {
-          setCanCreateProduct(false)
-          setMessage(
-            `You have reached your product upload limit of ${max_products} sites. Please upgrade your subscription to add more sites.`,
-          )
-        }
+        // Check if subscription is expired
+        const isExpired = await subscriptionService.isSubscriptionExpired(userData.license_key)
+        setIsSubscriptionExpired(isExpired)
+
+        // Get days remaining
+        const days = await subscriptionService.getDaysRemaining(userData.license_key)
+        setDaysRemaining(days)
+
+        // Check if user can create products (subscription active and within limits)
+        const canCreate = isActive && !isExpired
+        setCanCreateProducts(canCreate)
+
+        // Note: currentProductCount would need to be fetched from firebase-service
+        // For now, we'll use 0 as placeholder
+        setCurrentProductCount(0)
       } catch (error) {
-        console.error("Error checking subscription limits:", error)
-        setCanCreateProduct(false)
-        setMessage("Failed to check subscription limits. Please try again.")
+        console.error("Error checking subscription:", error)
+        setIsSubscriptionActive(false)
+        setIsSubscriptionExpired(true)
+        setDaysRemaining(0)
+        setCanCreateProducts(false)
       } finally {
-        setLoading(false)
+        setIsLoading(false)
       }
     }
 
-    checkSubscriptionLimits()
-  }, [user, projectData, authLoading, userData])
+    checkSubscription()
+  }, [authLoading, userData, subscriptionData])
 
-  return { canCreateProduct, loading, message }
+  return {
+    isLoading,
+    isSubscriptionActive,
+    isSubscriptionExpired,
+    daysRemaining,
+    canCreateProducts,
+    currentProductCount,
+    maxProducts: subscriptionData?.maxProducts || null,
+    subscriptionData,
+  }
 }
