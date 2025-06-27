@@ -250,6 +250,27 @@ export async function getClientsCount(
   }
 }
 
+// Add the following function to the end of the file, before `getAllClients`:
+
+export async function getClientByEmail(email: string): Promise<Client | null> {
+  try {
+    console.log("Getting client by email:", email)
+    const clientsRef = collection(db, "client_db")
+    const q = query(clientsRef, where("email", "==", email), limit(1))
+    const querySnapshot = await getDocs(q)
+
+    if (!querySnapshot.empty) {
+      const doc = querySnapshot.docs[0]
+      return { id: doc.id, ...doc.data() } as Client
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error fetching client by email:", error)
+    return null
+  }
+}
+
 // Get all clients (without pagination)
 export async function getAllClients(): Promise<Client[]> {
   try {

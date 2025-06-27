@@ -54,14 +54,18 @@ import {
   generateQuotationPDF,
 } from "@/lib/quotation-service"
 import { SendQuotationDialog } from "@/components/send-quotation-dialog" // Import the new dialog
+import { useAuth } from "@/contexts/auth-context" // Import useAuth
+import { getClientByEmail } from "@/lib/client-service" // Import getClientByEmail
 
 export default function QuotationRequestDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
+  const { user, userData } = useAuth() // Get current user and userData from AuthContext
 
   const [quotationRequest, setQuotationRequest] = useState<QuotationRequest | null>(null)
   const [product, setProduct] = useState<Product | null>(null)
+  const [clientData, setClientData] = useState<any>(null) // Store client data including ID
   const [quotationHistory, setQuotationHistory] = useState<Quotation[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
@@ -91,7 +95,7 @@ export default function QuotationRequestDetailPage() {
     return String(value)
   }
 
-  // Fetch quotation request and product details
+  // Fetch quotation request, product, and client details
   useEffect(() => {
     const fetchData = async () => {
       if (!params.id) return
@@ -118,13 +122,30 @@ export default function QuotationRequestDetailPage() {
           const productData = await getProductById(request.product_id)
           setProduct(productData)
 
-          // Initialize quotation data
-          setQuotationData({
+          // Initialize quotation data with product price
+          setQuotationData((prev) => ({
+            ...prev,
             price: productData?.price?.toString() || "",
-            notes: "",
+          }))
+        }
+
+        // Fetch client data using email from quotation request
+        if (request.email_address) {
+          const client = await getClientByEmail(request.email_address)
+          setClientData(client)
+          // Initialize quotation data with client name and email
+          setQuotationData((prev) => ({
+            ...prev,
+            clientName: client?.name || request.name || "",
+            clientEmail: client?.email || request.email_address || "",
+          }))
+        } else {
+          // If no email in request, still try to set client name from request
+          setQuotationData((prev) => ({
+            ...prev,
             clientName: request.name || "",
-            clientEmail: request.email_address || "",
-          })
+            clientEmail: "",
+          }))
         }
 
         // Fetch quotation history
@@ -133,7 +154,7 @@ export default function QuotationRequestDetailPage() {
         setQuotationHistory(quotations)
         setLoadingHistory(false)
       } catch (error) {
-        console.error("Error fetching quotation request:", error)
+        console.error("Error fetching quotation request details:", error)
         toast({
           title: "Error",
           description: "Failed to load quotation request details.",
@@ -267,10 +288,19 @@ export default function QuotationRequestDetailPage() {
   }
 
   const handleGenerateQuotation = async () => {
-    if (!quotationRequest || !quotationData.price) {
+    if (!quotationRequest || !quotationData.price || !quotationData.clientName || !quotationData.clientEmail) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields.",
+        description: "Please fill in all required fields (Price, Client Name, Client Email).",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!user || !user.uid) {
+      toast({
+        title: "Authentication Error",
+        description: "User not logged in. Cannot create quotation.",
         variant: "destructive",
       })
       return
@@ -314,23 +344,23 @@ export default function QuotationRequestDetailPage() {
         status: "draft" as const,
         client_name: quotationData.clientName,
         client_email: quotationData.clientEmail,
-        created_by: "current_user",
+        client_id: clientData?.id || undefined, // Pass client ID if available
+        created_by: user.uid,
+        created_by_first_name: userData?.first_name || "",
+        created_by_last_name: userData?.last_name || "",
       }
 
-      // Save to quotations collection
-      const quotationId = await createQuotation(newQuotation)
+      console.log("Final newQuotation object being sent:", newQuotation)
 
-      // Get the saved quotation
+      const quotationId = await createQuotation(newQuotation)
       const savedQuotation = await getQuotationById(quotationId)
 
       if (savedQuotation) {
-        // Close generate dialog and open send dialog
         setGenerateQuotationOpen(false)
-        setQuotationToSend(savedQuotation) // Set the newly generated quotation
-        setIsSendQuotationDialogOpen(true) // Open the new send dialog
+        setQuotationToSend(savedQuotation)
+        setIsSendQuotationDialogOpen(true)
       }
 
-      // Refresh quotation history
       const updatedQuotations = await getQuotationsByRequestId(quotationRequest.id)
       setQuotationHistory(updatedQuotations)
 
@@ -349,14 +379,12 @@ export default function QuotationRequestDetailPage() {
   }
 
   const handleQuotationSentSuccess = async (quotationId: string, newStatus: Quotation["status"]) => {
-    // This callback is triggered when the email is successfully sent from SendQuotationDialog
-    await handleStatusUpdate(newStatus) // Update the quotation request status
-    // Refresh quotation history
+    await handleStatusUpdate(newStatus)
     if (quotationRequest) {
       const updatedQuotations = await getQuotationsByRequestId(quotationRequest.id)
       setQuotationHistory(updatedQuotations)
     }
-    setIsSendQuotationDialogOpen(false) // Close the send dialog
+    setIsSendQuotationDialogOpen(false)
   }
 
   const handleDownloadQuotation = async (quotation: Quotation) => {

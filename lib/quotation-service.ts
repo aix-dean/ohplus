@@ -33,8 +33,11 @@ export interface Quotation {
   created: any
   updated?: any
   created_by?: string
+  created_by_first_name?: string // Added for user's first name
+  created_by_last_name?: string // Added for user's last name
   client_name?: string
   client_email?: string
+  client_id?: string // Added client_id
   campaignId?: string // Add campaign ID field
   proposalId?: string // Add proposal ID field
   valid_until?: any // Added valid_until field
@@ -65,7 +68,7 @@ export async function createQuotation(quotationData: Omit<Quotation, "id">): Pro
     }
 
     return docRef.id
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating quotation:", error)
     throw new Error("Failed to create quotation: " + error.message)
   }

@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton component
 import { QuotationsList } from "@/components/quotations-list"
-import { CostEstimatesList } from "@/components/cost-estimates-list"
+// Removed: import { CostEstimatesList } from "@/components/cost-estimates-list"
 
 export default function BookingsPage() {
   const { user } = useAuth()
@@ -172,10 +172,12 @@ export default function BookingsPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
         <Tabs defaultValue="bookings" onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
+            {" "}
+            {/* Changed from grid-cols-3 to grid-cols-2 */}
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
             <TabsTrigger value="quotations">Quotations</TabsTrigger>
-            <TabsTrigger value="cost-estimates">Cost Estimates</TabsTrigger>
+            {/* Removed: <TabsTrigger value="cost-estimates">Cost Estimates</TabsTrigger> */}
           </TabsList>
 
           <TabsContent value="bookings" className="mt-6">
@@ -309,6 +311,8 @@ export default function BookingsPage() {
             )}
           </TabsContent>
 
+          {/* Removed: Cost Estimates Tab Content */}
+          {/*
           <TabsContent value="cost-estimates" className="mt-6">
             {user?.uid ? (
               <CostEstimatesList userId={user.uid} />
@@ -316,6 +320,7 @@ export default function BookingsPage() {
               <p className="text-center py-10">Please log in to view your cost estimates.</p>
             )}
           </TabsContent>
+          */}
         </Tabs>
       </div>
 

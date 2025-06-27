@@ -50,7 +50,7 @@ const navigationItems = [
       { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
       { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
       { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
-      { title: "JOs", href: "#", icon: ClipboardList },
+      { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
       { title: "Clients", href: "/sales/clients", icon: Users },
       { title: "Billings", href: "#", icon: FileText }, // Added Billings here
       { title: "Planner", href: "/sales/planner", icon: Calendar },
@@ -212,7 +212,7 @@ export function SideNavigation() {
                 {[
                   { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
                   { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
-                  { title: "JOs", href: "#", icon: ClipboardList },
+                  { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
                   { title: "Clients", href: "/sales/clients", icon: Users },
                   { title: "Billings", href: "#", icon: FileText }, // Added Billings here
                   { title: "Planner", href: "/sales/planner", icon: Calendar },

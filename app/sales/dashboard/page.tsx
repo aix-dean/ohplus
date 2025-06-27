@@ -59,6 +59,7 @@ import { createDirectCostEstimate } from "@/lib/cost-estimate-service" // Import
 import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service" // Imports for Quotation creation
 import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
+// Removed: import { SelectQuotationDialog } from "@/components/select-quotation-dialog"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -133,6 +134,8 @@ function SalesDashboardContent() {
   const [actionAfterDateSelection, setActionAfterDateSelection] = useState<"cost_estimate" | "quotation" | null>(null)
   const [isCreatingDocument, setIsCreatingDocument] = useState(false) // New loading state for document creation
   const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
+
+  // Removed: const [isSelectQuotationDialogOpen, setIsSelectQuotationDialogOpen] = useState(false)
 
   // On mobile, default to grid view
   useEffect(() => {
@@ -713,6 +716,11 @@ function SalesDashboardContent() {
           firstSite.price || 0,
         )
 
+        // Log userData to debug
+        console.log("User Data from AuthContext:", userData)
+        console.log("First Name from userData:", userData?.first_name)
+        console.log("Last Name from userData:", userData?.last_name)
+
         const quotationData = {
           quotation_number: generateQuotationNumber(),
           product_id: firstSite.id,
@@ -726,10 +734,16 @@ function SalesDashboardContent() {
           duration_days: durationDays,
           status: "draft" as const, // Default status
           created_by: user.uid,
+          created_by_first_name: userData?.first_name || "", // Add first name
+          created_by_last_name: userData?.last_name || "", // Add last name
           client_name: selectedClientForProposal.contactPerson,
           client_email: selectedClientForProposal.email,
+          client_id: selectedClientForProposal.id, // ADDED THIS LINE
           // campaignId and proposalId can be added if applicable, but not directly from this flow
         }
+
+        // Log the final quotationData object before sending
+        console.log("Final quotationData object being sent:", quotationData)
 
         const newQuotationId = await createQuotation(quotationData)
 
@@ -894,7 +908,12 @@ function SalesDashboardContent() {
                     >
                       Collab
                     </Button>
-                    <Button className="bg-[#ff3333] text-white hover:bg-[#cc2929]">Job Order</Button>
+                    <Button
+                      onClick={() => router.push("/sales/job-orders/select-quotation")} // Changed to navigate to new page
+                      className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
+                    >
+                      Job Order
+                    </Button>
                   </div>
                 )}
 
@@ -1486,6 +1505,12 @@ function SalesDashboardContent() {
           })
         }}
       />
+
+      {/* Removed: Select Quotation Dialog for Job Order */}
+      {/* <SelectQuotationDialog
+        isOpen={isSelectQuotationDialogOpen}
+        onClose={() => setIsSelectQuotationDialogOpen(false)}
+      /> */}
     </div>
   )
 }
