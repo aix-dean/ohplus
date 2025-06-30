@@ -14,7 +14,7 @@ import { doc, getDoc, setDoc, collection, query, where, getDocs, serverTimestamp
 import { auth, db } from "@/lib/firebase"
 import { generateLicenseKey } from "@/lib/utils"
 import { subscriptionService } from "@/lib/subscription-service"
-import type { Subscription } from "@/lib/types/subscription"
+import type { Subscription } from "@/lib/types/subscription" // Import all necessary types
 
 interface UserData {
   uid: string
@@ -76,7 +76,7 @@ interface AuthContextType {
   logout: () => Promise<void>
   updateUserData: (data: Partial<UserData>) => Promise<void>
   updateProjectData: (data: Partial<ProjectData>) => Promise<void>
-  updateSubscriptionData: (updates: Partial<Omit<Subscription, "id" | "licenseKey" | "createdAt">>) => Promise<void>
+  updateSubscriptionData: (updates: Partial<Subscription>) => Promise<void> // Changed to Partial<Subscription>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -185,7 +185,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Reverted register function signature and implementation
   const register = async (userData: Partial<UserData>, projectData: Partial<ProjectData>, password: string) => {
     try {
       // Ensure tenant ID is set before registration
@@ -193,16 +192,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         auth.tenantId = "ohplus-07hsi"
       }
 
-      // Create user in Firebase Auth
-      // Ensure email and password are strings
       const userCredential = await createUserWithEmailAndPassword(auth, userData.email as string, password)
-
       const user = userCredential.user
-
-      // Generate license key
       const licenseKey = generateLicenseKey()
 
-      // Create user document in Firestore
       const newUserData: UserData = {
         uid: user.uid,
         email: userData.email as string,
@@ -210,7 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         first_name: userData.first_name || "",
         middle_name: userData.middle_name || "",
         last_name: userData.last_name || "",
-        license_key: licenseKey, // Assign generated license key
+        license_key: licenseKey,
         photo_url: userData.photo_url || "",
         phone_number: userData.phone_number || "",
         location: userData.location || "",
@@ -234,11 +227,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       await setDoc(doc(db, "iboard_users", user.uid), newUserData)
 
-      // Create project document in Firestore using licenseKey as document ID
       const newProjectData: ProjectData = {
-        id: crypto.randomUUID(), // This ID is for internal use, Firestore doc ID will be licenseKey
+        id: crypto.randomUUID(),
         uid: user.uid,
-        license_key: licenseKey, // Assign generated license key
+        license_key: licenseKey,
         project_name: projectData.company_name || "New Project",
         company_name: projectData.company_name || "",
         company_location: projectData.company_location || "",
@@ -254,16 +246,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         tenant_id: "ohplus-07hsi",
       }
 
-      await setDoc(doc(db, "projects", licenseKey), newProjectData) // Store project by licenseKey
+      await setDoc(doc(db, "projects", licenseKey), newProjectData)
 
       // Create subscription document with Trial plan (60 days)
-      await subscriptionService.createSubscription(licenseKey, "Trial", "monthly", user.uid)
+      // Using the new createSubscription signature
+      await subscriptionService.createSubscription(
+        licenseKey,
+        "Trial",
+        "monthly",
+        user.uid, // uid field
+        new Date(), // startDate
+        null, // endDate (will be calculated by service)
+        "trialing", // status
+        1, // maxProducts (for Trial)
+        null, // maxUsers (not in model, but keeping for consistency if needed elsewhere)
+        [], // features (not in model, but keeping for consistency if needed elsewhere)
+        new Date(new Date().setDate(new Date().getDate() + 60)), // trialEndDate
+      )
 
-      // Manually update state after successful registration and data creation
       setUserData(newUserData)
       setProjectData(newProjectData)
 
-      // Fetch the created subscription to ensure state is up-to-date
       const subscription = await subscriptionService.getSubscriptionByLicenseKey(licenseKey)
       setSubscriptionData(subscription)
     } catch (error) {
@@ -288,7 +291,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userDocRef = doc(db, "iboard_users", user.uid)
       await setDoc(userDocRef, { ...data, updated: serverTimestamp() }, { merge: true })
 
-      // Update local state
       setUserData((prev) => (prev ? { ...prev, ...data } : null))
     } catch (error) {
       console.error("Update user data error:", error)
@@ -296,18 +298,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Reverted updateProjectData to use license_key as doc ID
   const updateProjectData = async (data: Partial<ProjectData>) => {
     if (!userData?.license_key) return
 
     try {
-      const projectDocRef = doc(db, "projects", userData.license_key) // Use license_key as doc ID
+      const projectDocRef = doc(db, "projects", userData.license_key)
       await setDoc(projectDocRef, { ...data, updated: serverTimestamp() }, { merge: true })
 
-      // Update local state
       setProjectData((prev) => (prev ? { ...prev, ...data } : null))
 
-      // Refresh all projects
       if (userData.license_key) {
         const projectsQuery = query(collection(db, "projects"), where("license_key", "==", userData.license_key))
 
@@ -326,18 +325,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Reverted updateSubscriptionData signature and implementation
-  const updateSubscriptionData = async (updates: Partial<Omit<Subscription, "id" | "licenseKey" | "createdAt">>) => {
-    if (!userData?.license_key) return
+  const updateSubscriptionData = async (updates: Partial<Subscription>) => {
+    if (!userData?.license_key) {
+      console.error("updateSubscriptionData: No license key found for user data.")
+      return
+    }
+
+    console.log("updateSubscriptionData: Attempting to update subscription for license key:", userData.license_key)
+    console.log("updateSubscriptionData: Updates:", updates)
 
     try {
       await subscriptionService.updateSubscription(userData.license_key, updates)
 
-      // Refresh subscription data to reflect changes
       const updatedSubscription = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
       setSubscriptionData(updatedSubscription)
+      console.log("updateSubscriptionData: Subscription updated and state refreshed successfully.")
     } catch (error) {
-      console.error("Update subscription data error:", error)
+      console.error("updateSubscriptionData: Error updating subscription data:", error)
       throw error
     }
   }

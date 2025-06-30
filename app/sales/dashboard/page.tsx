@@ -1027,7 +1027,7 @@ function SalesDashboardContent() {
                       Results for "{searchQuery}" ({searchResults.length})
                     </h2>
                   </div>
-                  <Button variant="outline" size="sm" className="gap-1 hidden sm:flex">
+                  <Button variant="outline" size="sm" className="gap-1 hidden sm:flex bg-transparent">
                     <Filter size={14} />
                     <span>Filter</span>
                   </Button>
@@ -1354,7 +1354,7 @@ function SalesDashboardContent() {
                         size="sm"
                         onClick={goToPreviousPage}
                         disabled={currentPage === 1}
-                        className="h-8 w-8 p-0"
+                        className="h-8 w-8 p-0 bg-transparent"
                       >
                         <ChevronLeft size={16} />
                       </Button>
