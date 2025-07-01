@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react"
 
 interface PromoBannerProps {
   promoEndDate: Date
@@ -29,31 +29,30 @@ export function PromoBanner({ promoEndDate }: PromoBannerProps) {
       }
     }
 
-    calculateTimeLeft()
-    timer = setInterval(calculateTimeLeft, 1000)
+    calculateTimeLeft() // Initial calculation
+    timer = setInterval(calculateTimeLeft, 1000) // Update every second
 
-    return () => clearInterval(timer)
+    return () => clearInterval(timer) // Cleanup on unmount
   }, [promoEndDate])
 
   const isPromoActive = timeLeft.days > 0 || timeLeft.hours > 0 || timeLeft.minutes > 0 || timeLeft.seconds > 0
 
   if (!isPromoActive) {
-    return null // Don't render if promo is over
+    return null
   }
 
   return (
     <div className="relative mb-8 flex flex-col items-center">
-      <div className="relative flex items-center justify-center bg-[#28a745] text-white rounded-lg p-4 pr-6 shadow-md overflow-hidden">
-        {/* Red Badge */}
-        <div className="absolute -top-10 -left-10 w-32 h-32 bg-[#dc3545] rounded-full flex items-center justify-center text-center text-xs font-bold uppercase leading-tight shadow-lg transform -rotate-45 origin-bottom-right">
+      <div className="relative flex items-center justify-center bg-green-500 text-white rounded-lg p-4 pr-6 shadow-md overflow-hidden">
+        {/* Red circular badge */}
+        <div className="absolute -top-8 -left-8 w-32 h-32 bg-red-500 rounded-full flex items-center justify-center text-center text-xs font-bold uppercase leading-tight shadow-lg transform -rotate-45 origin-bottom-right">
           <span className="transform rotate-45 text-white text-sm">GRAPHIC EXPO '25 PROMO</span>
         </div>
-
-        <div className="flex items-center gap-4 pl-20">
+        <div className="flex items-center gap-4 pl-16">
           {" "}
-          {/* Added padding-left to account for badge */}
+          {/* Added padding-left to account for the badge */}
           <span className="text-3xl font-bold whitespace-nowrap">90 DAYS FREE TRIAL</span>
-          <Button variant="secondary" size="lg" className="bg-white text-[#28a745] font-bold hover:bg-gray-100">
+          <Button variant="secondary" size="lg" className="bg-white text-green-500 font-bold hover:bg-gray-100">
             GET NOW
           </Button>
         </div>

@@ -4,44 +4,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/contexts/auth-context"
-import { subscriptionService } from "@/lib/subscription-service"
+import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-service"
 import type { BillingCycle, SubscriptionPlanType } from "@/lib/types/subscription"
 import { CheckCircle, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, useCallback } from "react"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast" // Corrected import statement
 import { cn } from "@/lib/utils"
 import { PromoBanner } from "@/components/promo-banner" // Import the new component
-
-const plans = [
-  {
-    id: "basic",
-    name: "Basic",
-    description: "Basic plan description",
-    price: 0,
-    billingCycle: "monthly",
-    features: ["Feature 1", "Feature 2"],
-    buttonText: "Upgrade to Basic",
-  },
-  {
-    id: "premium",
-    name: "Premium",
-    description: "Premium plan description",
-    price: 100,
-    billingCycle: "yearly",
-    features: ["Feature 1", "Feature 2", "Feature 3"],
-    buttonText: "Upgrade to Premium",
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    description: "Enterprise plan description",
-    price: 0,
-    billingCycle: "N/A",
-    features: ["Feature 1", "Feature 2", "Feature 3", "Feature 4"],
-    buttonText: "Contact Us",
-  },
-]
 
 export default function SubscriptionPage() {
   const { user, userData, subscriptionData, loading, refreshSubscriptionData } = useAuth()
@@ -50,9 +20,11 @@ export default function SubscriptionPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
 
+  const plans = getSubscriptionPlans()
+
   // Define a fixed promo end date for the "GRAPHIC EXPO '25 PROMO"
-  // This date is arbitrary for demonstration, adjust as needed.
-  // Example: 2 days, 14 hours, 30 seconds from now (approximate to match screenshot)
+  // This date is set to be 2 days, 14 hours, 30 seconds from the current time
+  // for demonstration purposes, to match the screenshot.
   const promoEndDate = new Date()
   promoEndDate.setDate(promoEndDate.getDate() + 2)
   promoEndDate.setHours(promoEndDate.getHours() + 14)
@@ -150,7 +122,7 @@ export default function SubscriptionPage() {
         setSelectedPlanId(null)
       }
     },
-    [user, userData, subscriptionData, refreshSubscriptionData, toast],
+    [user, userData, subscriptionData, plans, refreshSubscriptionData, toast],
   )
 
   const isCurrentPlan = useCallback(
@@ -174,7 +146,9 @@ export default function SubscriptionPage() {
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
         {/* Render the PromoBanner component */}
-        <PromoBanner promoEndDate={promoEndDate} />
+        {subscriptionData?.planType === "trial" && promoEndDate.getTime() > new Date().getTime() && (
+          <PromoBanner promoEndDate={promoEndDate} />
+        )}
 
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Choose Your Plan</h1>
