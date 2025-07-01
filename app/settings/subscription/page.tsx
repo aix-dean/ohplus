@@ -151,13 +151,17 @@ export default function SubscriptionPage() {
         {/* Moved "Your Current Subscription" section here */}
         <Separator className="my-12" />
 
-        <Card className="mx-auto max-w-lg rounded-xl shadow-sm">
+        <Card className="mx-auto max-w-sm rounded-xl shadow-sm">
+          {" "}
+          {/* Changed max-w-lg to max-w-sm */}
           <CardHeader className="border-b p-4">
             <CardTitle className="text-xl font-bold text-gray-900">Your Current Subscription</CardTitle>
             <CardDescription className="mt-2 text-gray-600">Details of your active plan and usage.</CardDescription>
           </CardHeader>
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4">
+              {" "}
+              {/* Removed sm:grid-cols-2 to force single column */}
               <div className="space-y-1">
                 <p className="text-sm font-medium text-gray-700">Plan Type</p>
                 <p className="text-lg font-semibold capitalize text-gray-900">{subscriptionData?.planType || "N/A"}</p>
