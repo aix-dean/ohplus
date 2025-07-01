@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { FirebaseError } from "firebase/app" // Import FirebaseError type
+import { FirebaseError } from "firebase/app"
 
 export default function RegisterPage() {
   const [activeTab, setActiveTab] = useState("personal")
@@ -19,18 +19,16 @@ export default function RegisterPage() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [middleName, setMiddleName] = useState("")
-  // const [displayName, setDisplayName] = useState("") // Removed display name state
   const [companyName, setCompanyName] = useState("")
   const [companyLocation, setCompanyLocation] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
   const [gender, setGender] = useState("")
   const [loading, setLoading] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null) // State for error message
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const { register } = useAuth()
   const router = useRouter()
 
-  // Helper function to translate Firebase Auth errors
   const getFriendlyErrorMessage = (error: unknown): string => {
     if (error instanceof FirebaseError) {
       switch (error.code) {
@@ -52,7 +50,7 @@ export default function RegisterPage() {
   }
 
   const handleRegister = async () => {
-    setErrorMessage(null) // Clear previous errors
+    setErrorMessage(null)
 
     if (password !== confirmPassword) {
       setErrorMessage("Passwords do not match.")
@@ -67,7 +65,6 @@ export default function RegisterPage() {
           first_name: firstName,
           last_name: lastName,
           middle_name: middleName,
-          // display_name: displayName, // Removed display name from payload
           phone_number: phoneNumber,
           gender: gender,
         },
@@ -77,11 +74,10 @@ export default function RegisterPage() {
         },
         password,
       )
-      // If registration is successful, clear any error message and redirect
       setErrorMessage(null)
-      router.push("/register/select-subscription")
+      router.push("/onboarding?step=1") // Redirect directly to onboarding
     } catch (error: unknown) {
-      setErrorMessage(getFriendlyErrorMessage(error)) // Set the friendly error message
+      setErrorMessage(getFriendlyErrorMessage(error))
     } finally {
       setLoading(false)
     }
@@ -132,17 +128,6 @@ export default function RegisterPage() {
                   onChange={(e) => setMiddleName(e.target.value)}
                 />
               </div>
-              {/* Removed Display Name field */}
-              {/* <div className="space-y-2">
-                <Label htmlFor="displayName">Display Name</Label>
-                <Input
-                  id="displayName"
-                  placeholder="How you'll appear to others"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  required
-                />
-              </div> */}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -226,7 +211,7 @@ export default function RegisterPage() {
                 />
               </div>
               <div className="flex gap-2">
-                <Button className="w-full" variant="outline" onClick={() => setActiveTab("personal")}>
+                <Button className="w-full bg-transparent" variant="outline" onClick={() => setActiveTab("personal")}>
                   Previous
                 </Button>
                 <Button className="w-full" type="submit" onClick={handleRegister} disabled={loading}>

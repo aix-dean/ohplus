@@ -13,8 +13,6 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import { generateLicenseKey } from "@/lib/utils"
-import { subscriptionService } from "@/lib/subscription-service"
-import type { Subscription } from "@/lib/types/subscription" // Import all necessary types
 
 interface UserData {
   uid: string
@@ -68,14 +66,12 @@ interface AuthContextType {
   user: User | null
   userData: UserData | null
   projectData: ProjectData | null
-  subscriptionData: Subscription | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   register: (userData: Partial<UserData>, projectData: Partial<ProjectData>, password: string) => Promise<void>
   logout: () => Promise<void>
   updateUserData: (data: Partial<UserData>) => Promise<void>
   updateProjectData: (data: Partial<ProjectData>) => Promise<void>
-  updateSubscriptionData: (updates: Partial<Subscription>) => Promise<void> // Changed to Partial<Subscription>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -84,7 +80,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
-  const [subscriptionData, setSubscriptionData] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Ensure tenant ID is set
@@ -100,7 +95,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(user)
 
       if (user) {
-        // Fetch user data from Firestore
         const userDocRef = doc(db, "iboard_users", user.uid)
         const userDoc = await getDoc(userDocRef)
 
@@ -108,9 +102,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const userData = userDoc.data() as UserData
           setUserData(userData)
 
-          // Fetch project data using license key (consistent approach)
           if (userData.license_key) {
-            const projectDocRef = doc(db, "projects", userData.license_key) // Use license_key as doc ID
+            const projectDocRef = doc(db, "projects", userData.license_key)
             const projectDoc = await getDoc(projectDocRef)
 
             if (projectDoc.exists()) {
@@ -119,30 +112,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               console.warn("Project document not found for license key:", userData.license_key)
               setProjectData(null)
             }
-
-            // Fetch subscription data using license key
-            try {
-              const subscription = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
-              setSubscriptionData(subscription)
-            } catch (error) {
-              console.error("Error fetching subscription data:", error)
-              setSubscriptionData(null)
-            }
           } else {
             console.warn("User data missing license_key for user:", user.uid)
             setProjectData(null)
-            setSubscriptionData(null)
           }
         } else {
           console.warn("User document not found for uid:", user.uid)
           setUserData(null)
           setProjectData(null)
-          setSubscriptionData(null)
         }
       } else {
         setUserData(null)
         setProjectData(null)
-        setSubscriptionData(null)
       }
 
       setLoading(false)
@@ -153,7 +134,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      // Ensure tenant ID is set before login
       if (auth && !auth.tenantId) {
         auth.tenantId = "ohplus-07hsi"
       }
@@ -167,7 +147,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = async (userData: Partial<UserData>, projectData: Partial<ProjectData>, password: string) => {
     try {
-      // Ensure tenant ID is set before registration
       if (auth && !auth.tenantId) {
         auth.tenantId = "ohplus-07hsi"
       }
@@ -182,8 +161,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         display_name: userData.display_name || "",
         first_name: userData.first_name || "",
         middle_name: userData.middle_name || "",
-        f_name: userData.last_name || "",
-        license_key: null,
+        last_name: userData.last_name || "", // Corrected from f_name
+        license_key: licenseKey, // Assign license key here
         photo_url: userData.photo_url || "",
         phone_number: userData.phone_number || "",
         location: userData.location || "",
@@ -230,7 +209,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUserData(newUserData)
       setProjectData(newProjectData)
-      setSubscriptionData(null)
     } catch (error) {
       console.error("Registration error:", error)
       throw error
@@ -274,39 +252,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const updateSubscriptionData = async (updates: Partial<Subscription>) => {
-    if (!userData?.license_key) {
-      console.error("updateSubscriptionData: No license key found for user data.")
-      return
-    }
-
-    console.log("updateSubscriptionData: Attempting to update subscription for license key:", userData.license_key)
-    console.log("updateSubscriptionData: Updates:", updates)
-
-    try {
-      await subscriptionService.updateSubscription(userData.license_key, updates)
-
-      const updatedSubscription = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
-      setSubscriptionData(updatedSubscription)
-      console.log("updateSubscriptionData: Subscription updated and state refreshed successfully.")
-    } catch (error) {
-      console.error("updateSubscriptionData: Error updating subscription data:", error)
-      throw error
-    }
-  }
-
   const value = {
     user,
     userData,
     projectData,
-    subscriptionData,
     loading,
     login,
     register,
     logout,
     updateUserData,
     updateProjectData,
-    updateSubscriptionData,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
