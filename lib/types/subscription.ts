@@ -1,18 +1,22 @@
-export type SubscriptionPlanType = "Free" | "Basic" | "Pro" | "Enterprise" | "Graphic Expo Event"
-export type BillingCycle = "monthly" | "annually"
+export type SubscriptionPlanType = "Trial" | "Basic" | "Premium" | "Enterprise" | "Graphic Expo Event"
+
+export type BillingCycle = "monthly" | "annually" | "one-time"
+
 export type SubscriptionStatus = "active" | "inactive" | "trialing" | "cancelled" | "expired"
 
 export interface Subscription {
-  id: string // Firestore document ID
-  userId: string // User ID
-  planType: SubscriptionPlanType
-  status: SubscriptionStatus
-  startDate: string // ISO date string
-  endDate: string // ISO date string
-  billingCycle: BillingCycle
+  id: string
   licenseKey: string
-  createdAt: string // ISO date string
-  updatedAt: string // ISO date string
+  planType: SubscriptionPlanType
+  billingCycle: BillingCycle
+  uid: string // User ID
+  startDate: Date // When the subscription started
+  endDate: Date | null // When the subscription ends (null for lifetime or ongoing)
+  status: SubscriptionStatus
+  maxProducts: number // Max number of products allowed for this plan
+  trialEndDate: Date | null // End date of the trial period, if applicable
+  createdAt: Date // Timestamp of creation
+  updatedAt: Date // Timestamp of last update
 }
 
 export interface SubscriptionPlan {
@@ -20,54 +24,47 @@ export interface SubscriptionPlan {
   name: string
   price: number
   features: string[]
-  isCurrent?: boolean // Optional, for client-side display
 }
 
-// Helper function to calculate end date based on plan and billing cycle
 export function calculateSubscriptionEndDate(
   planType: SubscriptionPlanType,
   billingCycle: BillingCycle,
-  startDate: string,
-): { endDate: string; trialEndDate: string | null } {
-  let endDate: string = ""
-  let trialEndDate: string | null = null
+  startDate: Date,
+): { endDate: Date | null; trialEndDate: Date | null } {
+  let endDate: Date | null = null
+  let trialEndDate: Date | null = null
 
   const start = new Date(startDate)
 
-  if (planType === "Free") {
-    endDate = new Date(start).toISOString() // Free plan has no end date
-  } else if (planType === "Trial") {
+  if (planType === "Trial") {
     trialEndDate = new Date(start)
-    trialEndDate.setDate(start.getDate() + 60) // 60 days trial
-    endDate = trialEndDate.toISOString()
-  } else {
-    if (billingCycle === "monthly") {
-      endDate = new Date(start)
-      endDate.setMonth(start.getMonth() + 1)
-    } else if (billingCycle === "annually") {
-      endDate = new Date(start)
-      endDate.setFullYear(start.getFullYear() + 1)
-    }
-    endDate = new Date(endDate).toISOString()
+    trialEndDate.setDate(start.getDate() + 60) // 60-day trial
+    endDate = null // Trial plans don't have a fixed end date beyond the trial
+  } else if (billingCycle === "monthly") {
+    endDate = new Date(start)
+    endDate.setMonth(start.getMonth() + 1)
+  } else if (billingCycle === "annually") {
+    endDate = new Date(start)
+    endDate.setFullYear(start.getFullYear() + 1)
+  } else if (billingCycle === "one-time") {
+    endDate = null // One-time plans might not have an end date, or it's defined differently
   }
-  return { endDate, trialEndDate: trialEndDate ? trialEndDate.toISOString() : null }
+
+  return { endDate, trialEndDate }
 }
 
-// Helper function to get max products for a given plan type
-export function getMaxProductsForPlan(planType: SubscriptionPlanType): number | null {
+export function getMaxProductsForPlan(planType: SubscriptionPlanType): number {
   switch (planType) {
-    case "Free":
-      return 1 // Or whatever free plan limit is
-    case "Basic":
-      return 3
-    case "Pro":
-      return 10
-    case "Enterprise":
-      return null // Unlimited
     case "Trial":
-      return 1 // Or whatever trial limit is
+      return 1 // Example: 1 product for trial
+    case "Basic":
+      return 3 // Example: 3 products for basic
+    case "Premium":
+      return 10 // Example: 10 products for premium
+    case "Enterprise":
+      return -1 // -1 for unlimited
     case "Graphic Expo Event":
-      return 5 // As per your screenshot
+      return 5 // Example: 5 products for event
     default:
       return 0
   }

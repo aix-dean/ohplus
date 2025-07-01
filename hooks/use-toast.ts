@@ -2,12 +2,9 @@
 
 // Inspired by react-hot-toast library
 import * as React from "react"
-import { toast as customToast } from "@/components/ui/use-toast"
-import type { ToastProps } from "@/components/ui/use-toast" // Import the type if needed
+import type { ToastProps } from "@/components/ui/toast" // Import the type if needed
 
-import type {
-  ToastActionElement,
-} from "@/components/ui/toast"
+import type { ToastActionElement } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
@@ -86,9 +83,7 @@ export const reducer = (state: State, action: Action): State => {
     case "UPDATE_TOAST":
       return {
         ...state,
-        toasts: state.toasts.map((t) =>
-          t.id === action.toast.id ? { ...t, ...action.toast } : t
-        ),
+        toasts: state.toasts.map((t) => (t.id === action.toast.id ? { ...t, ...action.toast } : t)),
       }
 
     case "DISMISS_TOAST": {
@@ -112,7 +107,7 @@ export const reducer = (state: State, action: Action): State => {
                 ...t,
                 open: false,
               }
-            : t
+            : t,
         ),
       }
     }
@@ -143,36 +138,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
-function toast({ ...props }: Toast) {
-  const id = genId()
-
-  const update = (props: ToasterToast) =>
-    dispatch({
-      type: "UPDATE_TOAST",
-      toast: { ...props, id },
-    })
-  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
-
-  dispatch({
-    type: "ADD_TOAST",
-    toast: {
-      ...props,
-      id,
-      open: true,
-      onOpenChange: (open) => {
-        if (!open) dismiss()
-      },
-    },
-  })
-
-  return {
-    id: id,
-    dismiss,
-    update,
-  }
-}
-
-function useToast() {
+export function useToast() {
   const [state, setState] = React.useState<State>(memoryState)
 
   React.useEffect(() => {
@@ -185,11 +151,32 @@ function useToast() {
     }
   }, [state])
 
+  const toast = React.useCallback(({ title, description, variant, action }: ToastProps) => {
+    const id = genId()
+    dispatch({
+      type: "ADD_TOAST",
+      toast: {
+        title,
+        description,
+        variant,
+        action,
+        id,
+        open: true,
+        onOpenChange: (open) => {
+          if (!open) dismiss(id)
+        },
+      },
+    })
+    return { id, dismiss: () => dismiss(id) }
+  }, []) // No dependencies, so it's stable
+
+  const dismiss = React.useCallback((toastId?: string) => {
+    dispatch({ type: "DISMISS_TOAST", toastId })
+  }, []) // No dependencies, so it's stable
+
   return {
     ...state,
-    toast: ({ title, description, variant }: ToastProps) => customToast({ title, description, variant }),
-    dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
+    toast,
+    dismiss,
   }
 }
-
-export { useToast }

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckIcon } from 'lucide-react'
+import { CheckIcon } from "lucide-react"
 import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-service"
 import type { Subscription, SubscriptionPlan, SubscriptionPlanType } from "@/lib/types/subscription"
 import { useToast } from "@/hooks/use-toast" // Corrected import path
@@ -44,7 +44,7 @@ export default function SubscriptionSettingsPage() {
     }
 
     fetchSubscriptionData()
-  }, [userData, authLoading, toast])
+  }, [userData, authLoading, toast]) // toast is now a stable reference
 
   const handleSelectPlan = async (plan: SubscriptionPlan) => {
     if (!userData?.license_key || !userData.uid) {
