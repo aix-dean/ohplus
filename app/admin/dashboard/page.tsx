@@ -1,72 +1,72 @@
 "use client"
 
 import { useState } from "react"
-import { Search, X, ChevronDown } from "lucide-react"
+import { Search, X, ChevronDown, Dot } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
-// DepartmentCard component is no longer needed if no cards are rendered,
-// but keeping it here for reference if you decide to add them back later.
-// interface DepartmentCardProps {
-//   title: string
-//   members: string[]
-//   metricLabel?: string
-//   metricValue?: string
-//   badgeCount?: number
-//   headerColor: string
-//   isAddDepartment?: boolean
-// }
+interface DepartmentCardProps {
+  title: string
+  members: string[]
+  metricLabel?: string
+  metricValue?: string
+  badgeCount?: number
+  headerColor: string
+  isAddDepartment?: boolean
+}
 
-// function DepartmentCard({
-//   title,
-//   members,
-//   metricLabel,
-//   metricValue,
-//   badgeCount,
-//   headerColor,
-//   isAddDepartment = false,
-// }: DepartmentCardProps) {
-//   return (
-//     <Card className="w-full">
-//       <CardHeader className={`p-4 rounded-t-lg ${headerColor}`}>
-//         <div className="flex justify-between items-center">
-//           <CardTitle className="text-white text-lg font-semibold">{title}</CardTitle>
-//           {badgeCount !== undefined && badgeCount > 0 && (
-//             <Badge className="bg-white text-gray-800 px-2 py-1 rounded-full text-xs font-bold">{badgeCount}</Badge>
-//           )}
-//         </div>
-//       </CardHeader>
-//       <CardContent className="p-4 space-y-3">
-//         {isAddDepartment ? (
-//           <div className="flex flex-col items-center justify-center h-full min-h-[120px]">
-//             <p className="text-muted-foreground text-sm">Click to add a new department</p>
-//           </div>
-//         ) : (
-//           <>
-//             <div className="space-y-1">
-//               {members.map((member, index) => (
-//                 <div key={index} className="flex items-center text-sm text-gray-700">
-//                   <Dot className="h-4 w-4 text-green-500 mr-1" />
-//                   <span>{member}</span>
-//                 </div>
-//               ))}
-//             </div>
-//             {metricLabel && metricValue && (
-//               <div className="text-sm text-muted-foreground">
-//                 <span>{metricLabel}</span>
-//                 <span className="font-medium text-gray-800 ml-1">{metricValue}</span>
-//               </div>
-//             )}
-//           </>
-//         )}
-//         <Button variant="outline" className="w-full text-gray-600 hover:bg-gray-50 bg-transparent">
-//           + Add Widget
-//         </Button>
-//       </CardContent>
-//     </Card>
-//   )
-// }
+function DepartmentCard({
+  title,
+  members,
+  metricLabel,
+  metricValue,
+  badgeCount,
+  headerColor,
+  isAddDepartment = false,
+}: DepartmentCardProps) {
+  return (
+    <Card className="w-full">
+      <CardHeader className={`p-4 rounded-t-lg ${headerColor}`}>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-white text-lg font-semibold">{title}</CardTitle>
+          {badgeCount !== undefined && badgeCount > 0 && (
+            <Badge className="bg-white text-gray-800 px-2 py-1 rounded-full text-xs font-bold">{badgeCount}</Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="p-4 space-y-3">
+        {isAddDepartment ? (
+          <div className="flex flex-col items-center justify-center h-full min-h-[120px]">
+            <p className="text-muted-foreground text-sm">Click to add a new department</p>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-1">
+              {members.map((member, index) => (
+                <div key={index} className="flex items-center text-sm text-gray-700">
+                  <Dot className="h-4 w-4 text-green-500 mr-1" />
+                  <span>{member}</span>
+                </div>
+              ))}
+            </div>
+            {metricLabel && metricValue && (
+              <div className="text-sm text-muted-foreground">
+                <span>{metricLabel}</span>
+                <span className="font-medium text-gray-800 ml-1">{metricValue}</span>
+              </div>
+            )}
+          </>
+        )}
+        <Button variant="outline" className="w-full text-gray-600 hover:bg-gray-50 bg-transparent">
+          + Add Widget
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function AdminDashboardPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -76,8 +76,98 @@ export default function AdminDashboardPage() {
     setSearchTerm("")
   }
 
-  // departmentData array is removed as cards are no longer rendered.
-  // const departmentData = [ ... ];
+  const departmentData = [
+    {
+      title: "Sales",
+      members: ["Noemi", "Matthew"],
+      metricLabel: "Monthly Revenue",
+      metricValue: "4,000,000",
+      badgeCount: 2,
+      headerColor: "bg-salesHeader",
+    },
+    {
+      title: "Logistics/ Operations",
+      members: ["Chona", "May"],
+      metricLabel: "Total Service Assignments",
+      metricValue: "5",
+      badgeCount: 1,
+      headerColor: "bg-logisticsHeader",
+    },
+    {
+      title: "Accounting",
+      members: ["Chairman"],
+      headerColor: "bg-accountingHeader",
+    },
+    {
+      title: "Treasury",
+      members: ["Juvy"],
+      headerColor: "bg-treasuryHeader",
+    },
+    {
+      title: "I.T.",
+      members: ["Emmerson"],
+      headerColor: "bg-itHeader",
+    },
+    {
+      title: "Fleet",
+      members: ["Jonathan"],
+      headerColor: "bg-fleetHeader",
+    },
+    {
+      title: "Creatives/Contents",
+      members: ["Eda"],
+      headerColor: "bg-creativesHeader",
+    },
+    {
+      title: "Finance",
+      members: ["Juvy"],
+      headerColor: "bg-financeHeader",
+    },
+    {
+      title: "Media/ Procurement",
+      members: ["Zen"],
+      headerColor: "bg-mediaHeader",
+    },
+    {
+      title: "Business Dev.",
+      members: ["Nikki"],
+      headerColor: "bg-businessDevHeader",
+    },
+    {
+      title: "Legal",
+      members: ["Chona"],
+      badgeCount: 2,
+      headerColor: "bg-legalHeader",
+    },
+    {
+      title: "Corporate",
+      members: ["Anthony"],
+      badgeCount: 1,
+      headerColor: "bg-corporateHeader",
+    },
+    {
+      title: "Human Resources",
+      members: ["Vanessa"],
+      badgeCount: 1,
+      headerColor: "bg-hrHeader",
+    },
+    {
+      title: "Special Team",
+      members: ["Mark"],
+      headerColor: "bg-specialTeamHeader",
+    },
+    {
+      title: "Marketing",
+      members: ["John"],
+      headerColor: "bg-marketingHeader",
+    },
+    {
+      title: "+ Add New Department",
+      members: [],
+      headerColor: "bg-addDepartmentHeader",
+      isAddDepartment: true,
+    },
+  ]
 
   return (
     <div className="flex-1 p-6 bg-gray-50">
@@ -128,9 +218,10 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* The grid of department cards has been removed from here */}
-        <div className="flex items-center justify-center h-48 text-muted-foreground">
-          No department cards to display.
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {departmentData.map((data, index) => (
+            <DepartmentCard key={index} {...data} />
+          ))}
         </div>
       </div>
     </div>
