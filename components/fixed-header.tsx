@@ -47,6 +47,8 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
   const isAdmin = useIsAdmin()
   const pathname = usePathname()
 
+  const isAdminPage = pathname.startsWith("/admin")
+
   const getBreadcrumbs = (path: string): BreadcrumbItemData[] => {
     const segments = path.split("/").filter(Boolean)
     const breadcrumbs: BreadcrumbItemData[] = []
@@ -148,7 +150,8 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 bg-deepPurple px-4 sm:static sm:h-auto sm:bg-deepPurple",
+        "sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 px-4 sm:static sm:h-auto",
+        isAdminPage ? "bg-[#5B21B6]" : "bg-rose-600", // Conditional background color
         className,
       )}
       {...props}
@@ -166,8 +169,8 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
       )}
       <Sheet>
         <SheetTrigger asChild>
-          <Button size="icon" variant="outline" className="sm:hidden bg-transparent">
-            <Menu className="h-5 w-5 text-white" />
+          <Button size="icon" variant="outline" className="sm:hidden bg-transparent" onClick={onMenuClick}>
+            <Menu className="h-5 w-5" />
             <span className="sr-only">Toggle Menu</span>
           </Button>
         </SheetTrigger>
@@ -213,12 +216,22 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
         <Input
           type="search"
           placeholder="Search..."
-          className="w-full rounded-lg bg-gray-700 placeholder:text-gray-300 text-white pl-8 md:w-[200px] lg:w-[336px]"
+          className={cn(
+            "w-full rounded-lg placeholder:text-gray-300 text-white pl-8 md:w-[200px] lg:w-[336px]",
+            isAdminPage ? "bg-[#4A1C92]" : "bg-gray-700", // Conditional search input background
+          )}
         />
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="relative rounded-full text-white hover:bg-deepPurple/80">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "relative rounded-full text-white",
+              isAdminPage ? "hover:bg-[#6F29D0]" : "hover:bg-rose-500", // Conditional hover color
+            )}
+          >
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
@@ -239,7 +252,10 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           <Button
             variant="ghost"
             size="icon"
-            className="overflow-hidden rounded-full text-white hover:bg-deepPurple/80"
+            className={cn(
+              "overflow-hidden rounded-full text-white",
+              isAdminPage ? "hover:bg-[#6F29D0]" : "hover:bg-rose-500", // Conditional hover color
+            )}
           >
             <Avatar>
               <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} alt="User Avatar" />

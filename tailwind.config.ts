@@ -69,7 +69,6 @@ module.exports = {
         specialTeamHeader: "#8A2BE2", // Purple
         marketingHeader: "#FF0000", // Red
         addDepartmentHeader: "#333333", // Dark Gray/Black
-        deepPurple: "#673AB7", // Custom deep purple from image
       },
       borderRadius: {
         lg: "var(--radius)",
