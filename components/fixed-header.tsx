@@ -143,11 +143,22 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 bg-rose-600 px-4 sm:static sm:h-auto sm:bg-rose-600",
+        "sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent",
         className,
       )}
       {...props}
     >
+      {/* New: Back button for admin sub-pages */}
+      {pathname.startsWith("/admin/") && pathname !== "/admin/dashboard" && (
+        <Link href="/admin/dashboard" passHref>
+          <Button
+            variant="default"
+            className="bg-black hover:bg-black/90 text-white rounded-full px-4 py-2 flex items-center gap-1"
+          >
+            <ChevronLeft className="h-4 w-4" /> Admin
+          </Button>
+        </Link>
+      )}
       <Sheet>
         <SheetTrigger asChild>
           <Button size="icon" variant="outline" className="sm:hidden bg-transparent" onClick={onMenuClick}>
@@ -161,48 +172,34 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
       </Sheet>
       {/* Replaced h1 with Breadcrumb component */}
       <Breadcrumb>
-        <BreadcrumbList className="text-white">
+        <BreadcrumbList>
           {breadcrumbs.map((item, index) => (
             <React.Fragment key={index}>
               <BreadcrumbItem>
-                {item.label === "Admin - Dashboard" && item.href ? (
-                  <Link href={item.href} passHref>
-                    <Button
-                      variant="default"
-                      className="bg-black hover:bg-black/90 text-white rounded-full px-4 py-2 flex items-center gap-1"
-                      asChild
-                    >
-                      <span>
-                        <ChevronLeft className="h-4 w-4" /> Admin
-                      </span>
-                    </Button>
-                  </Link>
-                ) : item.isPage ? (
-                  <BreadcrumbPage className="font-normal text-white">{item.label}</BreadcrumbPage>
+                {item.isPage ? (
+                  <BreadcrumbPage>{item.label}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
-                    <Link href={item.href || "#"} className="transition-colors hover:text-gray-200 text-white">
-                      {item.label}
-                    </Link>
+                    <Link href={item.href || "#"}>{item.label}</Link>
                   </BreadcrumbLink>
                 )}
               </BreadcrumbItem>
-              {index < breadcrumbs.length - 1 && <BreadcrumbSeparator className="text-white" />}
+              {index < breadcrumbs.length - 1 && <BreadcrumbSeparator />}
             </React.Fragment>
           ))}
         </BreadcrumbList>
       </Breadcrumb>
       <div className="relative ml-auto flex-1 md:grow-0">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white" />
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
           type="search"
           placeholder="Search..."
-          className="w-full rounded-lg bg-gray-700 placeholder:text-gray-300 text-white pl-8 md:w-[200px] lg:w-[336px]"
+          className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
         />
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="relative rounded-full text-white hover:bg-rose-500">
+          <Button variant="ghost" size="icon" className="relative rounded-full">
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
@@ -220,7 +217,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
       </DropdownMenu>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="overflow-hidden rounded-full text-white hover:bg-rose-500">
+          <Button variant="ghost" size="icon" className="overflow-hidden rounded-full">
             <Avatar>
               <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} alt="User Avatar" />
               <AvatarFallback>
