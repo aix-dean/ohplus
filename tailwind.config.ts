@@ -58,6 +58,10 @@ const config = {
           DEFAULT: "#1A2B42", // Dark blue/black from the latest screenshot
           light: "rgba(26, 43, 66, 0.8)", // Slightly lighter for hover
         },
+        adminHeaderPurple: {
+          DEFAULT: "#673AB7", // Purple for buttons from screenshot
+          light: "rgba(103, 58, 183, 0.8)", // Lighter shade for hover
+        },
         salesHeaderRose: {
           DEFAULT: "#e11d48", // Original rose color for sales
           light: "rgba(244, 63, 94, 0.8)", // Lighter shade for hover
