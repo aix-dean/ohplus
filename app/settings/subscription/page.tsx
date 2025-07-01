@@ -5,8 +5,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { CheckIcon } from "lucide-react"
 import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-service"
-import type { Subscription, SubscriptionPlan, SubscriptionPlanType } from "@/lib/types/subscription"
-import { useToast } from "@/hooks/use-toast" // Corrected import path
+import type { Subscription, SubscriptionPlan, SubscriptionPlanType, BillingCycle } from "@/lib/types/subscription"
+import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
 import { Badge } from "@/components/ui/badge"
 
@@ -44,7 +44,7 @@ export default function SubscriptionSettingsPage() {
     }
 
     fetchSubscriptionData()
-  }, [userData, authLoading, toast]) // toast is now a stable reference
+  }, [userData, authLoading, toast])
 
   const handleSelectPlan = async (plan: SubscriptionPlan) => {
     if (!userData?.license_key || !userData.uid) {
@@ -58,12 +58,30 @@ export default function SubscriptionSettingsPage() {
 
     setPageLoading(true)
     try {
-      // Simulate updating the subscription
-      await subscriptionService.updateSubscription(userData.license_key, {
-        planType: plan.name.replace(" Plan", "") as SubscriptionPlanType, // Convert "Basic Plan" to "Basic"
-        status: "active", // Assuming selecting a plan makes it active
-        // You might need to adjust billingCycle, startDate, endDate based on your logic
-      })
+      const planType: SubscriptionPlanType = plan.name.replace(" Plan", "").toLowerCase() as SubscriptionPlanType
+      const defaultBillingCycle: BillingCycle = "monthly" // Default to monthly for new subscriptions
+
+      if (currentSubscription) {
+        // Update existing subscription
+        await subscriptionService.updateSubscription(userData.license_key, {
+          planType: planType,
+          status: "active",
+          // You might need to adjust billingCycle, startDate, endDate based on your logic
+        })
+      } else {
+        // Create new subscription
+        await subscriptionService.createSubscription(
+          userData.license_key,
+          planType,
+          defaultBillingCycle,
+          userData.uid,
+          new Date(), // Start date
+          null, // End date will be calculated by service
+          "active",
+          plan.id === "trial" ? 1 : getMaxProductsForPlan(planType), // Set max products based on plan
+          plan.id === "trial" ? new Date(new Date().setDate(new Date().getDate() + 60)) : null, // Trial end date for trial plan
+        )
+      }
 
       // Re-fetch the updated subscription to reflect changes
       const updatedSub = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
@@ -107,7 +125,7 @@ export default function SubscriptionSettingsPage() {
       </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {availablePlans.map((plan) => {
-          const isCurrent = currentSubscription?.planType === plan.name.replace(" Plan", "")
+          const isCurrent = currentSubscription?.planType === plan.name.replace(" Plan", "").toLowerCase()
           return (
             <Card key={plan.id} className={isCurrent ? "border-primary ring-2 ring-primary" : ""}>
               <CardHeader>
@@ -137,3 +155,6 @@ export default function SubscriptionSettingsPage() {
     </main>
   )
 }
+
+// Re-import getMaxProductsForPlan for use in handleSelectPlan
+import { getMaxProductsForPlan } from "@/lib/types/subscription"

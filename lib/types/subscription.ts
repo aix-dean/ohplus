@@ -1,6 +1,5 @@
-export type SubscriptionPlanType = "Trial" | "Basic" | "Premium" | "Enterprise" | "Graphic Expo Event"
-
-export type BillingCycle = "monthly" | "annually" | "one-time"
+export type SubscriptionPlanType = "basic" | "premium" | "enterprise" | "trial" | "graphic-expo-event"
+export type BillingCycle = "monthly" | "annually"
 
 export type SubscriptionStatus = "active" | "inactive" | "trialing" | "cancelled" | "expired"
 
@@ -9,14 +8,14 @@ export interface Subscription {
   licenseKey: string
   planType: SubscriptionPlanType
   billingCycle: BillingCycle
-  uid: string // User ID
+  uid: string // User ID associated with this subscription
   startDate: Date // When the subscription started
-  endDate: Date | null // When the subscription ends (null for lifetime or ongoing)
+  endDate: Date | null // When the subscription ends (null for lifetime or specific plans)
   status: SubscriptionStatus
   maxProducts: number // Max number of products allowed for this plan
   trialEndDate: Date | null // End date of the trial period, if applicable
-  createdAt: Date // Timestamp of creation
-  updatedAt: Date // Timestamp of last update
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface SubscriptionPlan {
@@ -36,18 +35,22 @@ export function calculateSubscriptionEndDate(
 
   const start = new Date(startDate)
 
-  if (planType === "Trial") {
+  if (planType === "trial") {
     trialEndDate = new Date(start)
     trialEndDate.setDate(start.getDate() + 60) // 60-day trial
-    endDate = null // Trial plans don't have a fixed end date beyond the trial
-  } else if (billingCycle === "monthly") {
+    endDate = trialEndDate // Trial ends, subscription ends
+  } else if (planType === "graphic-expo-event") {
+    // Assuming this is a temporary plan, might have a fixed end date or short duration
     endDate = new Date(start)
-    endDate.setMonth(start.getMonth() + 1)
-  } else if (billingCycle === "annually") {
-    endDate = new Date(start)
-    endDate.setFullYear(start.getFullYear() + 1)
-  } else if (billingCycle === "one-time") {
-    endDate = null // One-time plans might not have an end date, or it's defined differently
+    endDate.setDate(start.getDate() + 30) // Example: 30 days for an event
+  } else {
+    if (billingCycle === "monthly") {
+      endDate = new Date(start)
+      endDate.setMonth(start.getMonth() + 1)
+    } else if (billingCycle === "annually") {
+      endDate = new Date(start)
+      endDate.setFullYear(start.getFullYear() + 1)
+    }
   }
 
   return { endDate, trialEndDate }
@@ -55,15 +58,15 @@ export function calculateSubscriptionEndDate(
 
 export function getMaxProductsForPlan(planType: SubscriptionPlanType): number {
   switch (planType) {
-    case "Trial":
+    case "trial":
       return 1 // Example: 1 product for trial
-    case "Basic":
+    case "basic":
       return 3 // Example: 3 products for basic
-    case "Premium":
+    case "premium":
       return 10 // Example: 10 products for premium
-    case "Enterprise":
-      return -1 // -1 for unlimited
-    case "Graphic Expo Event":
+    case "enterprise":
+      return 999999 // Example: Unlimited for enterprise
+    case "graphic-expo-event":
       return 5 // Example: 5 products for event
     default:
       return 0
