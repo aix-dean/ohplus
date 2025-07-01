@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import Link from "next/link" // Import Link
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -25,7 +26,7 @@ import {
   FileText,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
@@ -60,52 +61,6 @@ import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
 // Removed: import { SelectQuotationDialog } from "@/components/select-quotation-dialog"
 
-// Dummy data for charts
-const salesData = [
-  { name: "Jan", revenue: 4000, proposals: 2400 },
-  { name: "Feb", revenue: 3000, proposals: 1398 },
-  { name: "Mar", revenue: 2000, proposals: 9800 },
-  { name: "Apr", revenue: 2780, proposals: 3908 },
-  { name: "May", revenue: 1890, proposals: 4800 },
-  { name: "Jun", revenue: 2390, proposals: 3800 },
-  { name: "Jul", revenue: 3490, proposals: 4300 },
-]
-
-const proposalStatusData = [
-  { name: "Pending", value: 15 },
-  { name: "Approved", value: 25 },
-  { name: "Rejected", value: 10 },
-  { name: "Draft", value: 5 },
-]
-
-const topProductsData = [
-  { name: "LED Billboard A", sales: 120 },
-  { name: "Static Billboard B", sales: 90 },
-  { name: "Digital Kiosk C", sales: 75 },
-  { name: "Transit Ad D", sales: 60 },
-]
-
-interface MetricCardProps {
-  title: string
-  value: string
-  description: string
-}
-
-function MetricCard({ title, value, description }: MetricCardProps) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Calendar className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground">{description}</p>
-      </CardContent>
-    </Card>
-  )
-}
-
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
 
@@ -116,7 +71,7 @@ const getSiteCode = (product: Product | null) => {
   // Try different possible locations for site_code
   if (product.site_code) return product.site_code
   if (product.specs_rental && "site_code" in product.specs_rental) return product.specs_rental.site_code
-  if (product.light && "site_code" in product) return product.light.siteCode
+  if (product.light && "site_code" in product.light) return product.light.siteCode
 
   // Check for camelCase variant
   if ("siteCode" in product) return (product as any).siteCode
@@ -139,7 +94,6 @@ function SalesDashboardContent() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
-  const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -880,6 +834,16 @@ function SalesDashboardContent() {
         >
           {/* Left Column: Main Dashboard Content */}
           <div className="flex flex-col gap-4 md:gap-6">
+            {/* Back to Admin Dashboard Button */}
+            <div className="flex items-center gap-2">
+              <Link href="/admin/dashboard" passHref>
+                <Button variant="outline" size="sm" className="gap-1 bg-transparent">
+                  <ArrowLeft size={16} />
+                  Back to Admin Dashboard
+                </Button>
+              </Link>
+            </div>
+
             {/* Header with title, actions, and search box */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex flex-col gap-2">
