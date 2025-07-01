@@ -1,6 +1,7 @@
 "use client"
 
-import type * as React from "react"
+import React from "react"
+
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Menu, Bell, Search, Settings, LogOut, User } from "lucide-react"
@@ -21,9 +22,23 @@ import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useIsAdmin } from "@/hooks/use-is-admin"
 import { cn } from "@/lib/utils"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 
 interface FixedHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
   onMenuClick: () => void
+}
+
+interface BreadcrumbItemData {
+  label: string
+  href?: string
+  isPage?: boolean
 }
 
 export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderProps) {
@@ -32,40 +47,48 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
   const isAdmin = useIsAdmin()
   const pathname = usePathname()
 
-  const getPageTitle = (path: string) => {
+  const getBreadcrumbs = (path: string): BreadcrumbItemData[] => {
     const segments = path.split("/").filter(Boolean)
-    if (segments.length === 0) return "Dashboard" // Default for root
+    const breadcrumbs: BreadcrumbItemData[] = []
 
-    // Handle specific known paths
-    if (path === "/sales/dashboard") return "Sales - Dashboard"
-    if (path === "/logistics/dashboard") return "Logistics - Dashboard"
-    if (path === "/cms/dashboard") return "CMS - Dashboard"
-    if (path === "/admin/dashboard") return "Admin - Dashboard"
-    if (path === "/ai-assistant") return "AI Assistant"
-    if (path === "/account") return "Account Settings"
-    if (path === "/settings") return "Settings"
-    if (path === "/settings/subscription") return "Settings - Subscription"
-    if (path === "/help") return "Help & Support"
-    if (path === "/features") return "Features"
-
-    // Handle dynamic paths and general structure
-    if (segments[0]) {
+    if (path === "/admin/dashboard") {
+      breadcrumbs.push({ label: "Admin - Dashboard", isPage: true })
+    } else if (path.startsWith("/admin/")) {
+      breadcrumbs.push({ label: "Admin - Dashboard", href: "/admin/dashboard" })
+      const adminSubPath = segments[1]
+      if (adminSubPath) {
+        const pageLabel = adminSubPath
+          .replace(/-/g, " ")
+          .split(" ")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ")
+        breadcrumbs.push({ label: pageLabel, isPage: true })
+      }
+    } else if (path.startsWith("/sales/dashboard")) {
+      breadcrumbs.push({ label: "Admin - Dashboard", href: "/admin/dashboard" })
+      breadcrumbs.push({ label: "Sales - Dashboard", isPage: true })
+    } else if (path.startsWith("/logistics/dashboard")) {
+      breadcrumbs.push({ label: "Admin - Dashboard", href: "/admin/dashboard" })
+      breadcrumbs.push({ label: "Logistics - Dashboard", isPage: true })
+    } else if (segments.length === 0) {
+      breadcrumbs.push({ label: "Dashboard", isPage: true })
+    } else {
+      // General handling for other paths
       const section = segments[0].charAt(0).toUpperCase() + segments[0].slice(1)
       let page = ""
 
       if (segments.length > 1) {
         page = segments[1].charAt(0).toUpperCase() + segments[1].slice(1)
-        // Special handling for common patterns like [id] or edit/[id]
         if (segments.length > 2 && segments[2].match(/\[.*\]/)) {
-          page = segments[1].charAt(0).toUpperCase() + segments[1].slice(1) // Keep parent name
+          page = segments[1].charAt(0).toUpperCase() + segments[1].slice(1)
         } else if (segments.length > 2 && segments[1] === "edit" && segments[2].match(/\[.*\]/)) {
-          page = `Edit ${segments[0].slice(0, -1)}` // e.g., Sales - Edit Product
+          page = `Edit ${segments[0].slice(0, -1)}`
         } else if (segments.length > 2 && segments[1] === "create") {
-          page = `Create ${segments[0].slice(0, -1)}` // e.g., Admin - Create Product
+          page = `Create ${segments[0].slice(0, -1)}`
         } else if (segments.length > 2 && segments[1] === "new") {
-          page = `New ${segments[0].slice(0, -1)}` // e.g., Sales - New Product
+          page = `New ${segments[0].slice(0, -1)}`
         } else if (segments.length > 2 && segments[1] === "view") {
-          page = `View ${segments[0].slice(0, -1)}` // e.g., Proposals - View Proposal
+          page = `View ${segments[0].slice(0, -1)}`
         } else if (segments.length > 2 && segments[1] === "cost-estimates") {
           page = `Cost Estimates`
         } else if (segments.length > 2 && segments[1] === "generate-quotation") {
@@ -98,7 +121,6 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           page = `Chat Analytics`
         }
 
-        // Capitalize and replace hyphens for readability
         page = page
           .replace(/-/g, " ")
           .split(" ")
@@ -107,14 +129,16 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
       }
 
       if (page) {
-        return `${section} - ${page}`
+        breadcrumbs.push({ label: section, href: `/${segments[0]}` })
+        breadcrumbs.push({ label: page, isPage: true })
+      } else {
+        breadcrumbs.push({ label: section, isPage: true })
       }
-      return section
     }
-    return "Dashboard"
+    return breadcrumbs
   }
 
-  const pageTitle = getPageTitle(pathname)
+  const breadcrumbs = getBreadcrumbs(pathname)
 
   return (
     <header
@@ -126,7 +150,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
     >
       <Sheet>
         <SheetTrigger asChild>
-          <Button size="icon" variant="outline" className="sm:hidden" onClick={onMenuClick}>
+          <Button size="icon" variant="outline" className="sm:hidden bg-transparent" onClick={onMenuClick}>
             <Menu className="h-5 w-5" />
             <span className="sr-only">Toggle Menu</span>
           </Button>
@@ -135,7 +159,25 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           {/* Mobile navigation content would go here, if needed */}
         </SheetContent>
       </Sheet>
-      <h1 className="text-lg font-semibold md:text-xl">{pageTitle}</h1>
+      {/* Replaced h1 with Breadcrumb component */}
+      <Breadcrumb>
+        <BreadcrumbList>
+          {breadcrumbs.map((item, index) => (
+            <React.Fragment key={index}>
+              <BreadcrumbItem>
+                {item.isPage ? (
+                  <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                ) : (
+                  <BreadcrumbLink asChild>
+                    <Link href={item.href || "#"}>{item.label}</Link>
+                  </BreadcrumbLink>
+                )}
+              </BreadcrumbItem>
+              {index < breadcrumbs.length - 1 && <BreadcrumbSeparator />}
+            </React.Fragment>
+          ))}
+        </BreadcrumbList>
+      </Breadcrumb>
       <div className="relative ml-auto flex-1 md:grow-0">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
@@ -189,7 +231,9 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           </DropdownMenuItem>
           {isAdmin && (
             <DropdownMenuItem asChild>
-              <Link href="/admin">
+              <Link href="/admin/dashboard">
+                {" "}
+                {/* Updated link to admin dashboard */}
                 <Settings className="mr-2 h-4 w-4" />
                 Admin
               </Link>

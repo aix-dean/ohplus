@@ -52,22 +52,22 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Custom colors for admin dashboard cards
-        salesHeader: "#FF5757", // Red
-        logisticsHeader: "#4A90E2", // Blue
-        accountingHeader: "#C70039", // Pink/Magenta
-        treasuryHeader: "#287D3C", // Dark Green
-        itHeader: "#00A896", // Teal
-        fleetHeader: "#8D8D8D", // Gray
-        creativesHeader: "#E87B00", // Orange
-        financeHeader: "#6BBF59", // Lime Green
-        mediaHeader: "#00C1D4", // Light Blue/Cyan
-        businessDevHeader: "#5C4B8B", // Darker Blue/Purple
-        legalHeader: "#A00000", // Dark Red
-        corporateHeader: "#007BFF", // Bright Blue
-        humanResourcesHeader: "#FF69B4", // Bright Pink
+        // Custom colors for department cards
+        salesHeader: "#FF6B6B", // Red
+        logisticsHeader: "#5DADE2", // Blue
+        accountingHeader: "#C34A8D", // Pink/Magenta
+        treasuryHeader: "#347C4B", // Dark Green
+        itHeader: "#00B8A9", // Teal
+        fleetHeader: "#808080", // Gray
+        creativesHeader: "#E67E22", // Orange
+        financeHeader: "#8BC34A", // Lime Green
+        mediaHeader: "#4ECDC4", // Light Blue/Cyan
+        businessDevHeader: "#6A5ACD", // Darker Blue/Purple
+        legalHeader: "#B22222", // Dark Red
+        corporateHeader: "#00BFFF", // Bright Blue
+        hrHeader: "#FF69B4", // Bright Pink
         specialTeamHeader: "#8A2BE2", // Purple
-        marketingHeader: "#E00000", // Red
+        marketingHeader: "#FF0000", // Red
         addDepartmentHeader: "#333333", // Dark Gray/Black
       },
       borderRadius: {
