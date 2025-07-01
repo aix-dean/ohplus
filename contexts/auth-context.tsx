@@ -13,6 +13,8 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import { generateLicenseKey } from "@/lib/utils"
+import { subscriptionService } from "@/lib/subscription-service"
+import { type Subscription } from "@/lib/types/subscription"
 
 interface UserData {
   uid: string
@@ -66,12 +68,14 @@ interface AuthContextType {
   user: User | null
   userData: UserData | null
   projectData: ProjectData | null
+  subscriptionData: Subscription | null // Added subscriptionData
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   register: (userData: Partial<UserData>, projectData: Partial<ProjectData>, password: string) => Promise<void>
   logout: () => Promise<void>
   updateUserData: (data: Partial<UserData>) => Promise<void>
   updateProjectData: (data: Partial<ProjectData>) => Promise<void>
+  refreshSubscriptionData: () => Promise<void> // Added refresh function
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -80,6 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
+  const [subscriptionData, setSubscriptionData] = useState<Subscription | null>(null) // New state for subscription
   const [loading, setLoading] = useState(true)
 
   // Ensure tenant ID is set
@@ -90,47 +95,72 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  const fetchUserDataAndSubscription = async (currentUser: User) => {
+    const userDocRef = doc(db, "iboard_users", currentUser.uid)
+    const userDoc = await getDoc(userDocRef)
+
+    if (userDoc.exists()) {
+      const fetchedUserData = userDoc.data() as UserData
+      setUserData(fetchedUserData)
+
+      if (fetchedUserData.license_key) {
+        const projectDocRef = doc(db, "projects", fetchedUserData.license_key)
+        const projectDoc = await getDoc(projectDocRef)
+
+        if (projectDoc.exists()) {
+          setProjectData(projectDoc.data() as ProjectData)
+        } else {
+          console.warn("Project document not found for license key:", fetchedUserData.license_key)
+          setProjectData(null)
+        }
+
+        // Fetch subscription data
+        try {
+          const fetchedSubscription = await subscriptionService.getSubscriptionByLicenseKey(fetchedUserData.license_key)
+          setSubscriptionData(fetchedSubscription)
+        } catch (subError) {
+          console.error("Error fetching subscription data:", subError)
+          setSubscriptionData(null)
+        }
+      } else {
+        console.warn("User data missing license_key for user:", currentUser.uid)
+        setProjectData(null)
+        setSubscriptionData(null)
+      }
+    } else {
+      console.warn("User document not found for uid:", currentUser.uid)
+      setUserData(null)
+      setProjectData(null)
+      setSubscriptionData(null)
+    }
+  }
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user)
-
       if (user) {
-        const userDocRef = doc(db, "iboard_users", user.uid)
-        const userDoc = await getDoc(userDocRef)
-
-        if (userDoc.exists()) {
-          const userData = userDoc.data() as UserData
-          setUserData(userData)
-
-          if (userData.license_key) {
-            const projectDocRef = doc(db, "projects", userData.license_key)
-            const projectDoc = await getDoc(projectDocRef)
-
-            if (projectDoc.exists()) {
-              setProjectData(projectDoc.data() as ProjectData)
-            } else {
-              console.warn("Project document not found for license key:", userData.license_key)
-              setProjectData(null)
-            }
-          } else {
-            console.warn("User data missing license_key for user:", user.uid)
-            setProjectData(null)
-          }
-        } else {
-          console.warn("User document not found for uid:", user.uid)
-          setUserData(null)
-          setProjectData(null)
-        }
+        await fetchUserDataAndSubscription(user)
       } else {
         setUserData(null)
         setProjectData(null)
+        setSubscriptionData(null)
       }
-
       setLoading(false)
     })
 
     return () => unsubscribe()
   }, [])
+
+  const refreshSubscriptionData = async () => {
+    if (user && userData?.license_key) {
+      try {
+        const fetchedSubscription = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
+        setSubscriptionData(fetchedSubscription)
+      } catch (error) {
+        console.error("Error refreshing subscription data:", error)
+      }
+    }
+  }
 
   const login = async (email: string, password: string) => {
     try {
@@ -209,6 +239,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUserData(newUserData)
       setProjectData(newProjectData)
+
+      // Create initial subscription for the new user
+      await subscriptionService.createSubscription(
+        licenseKey,
+        "trial", // Default to trial plan on registration
+        "monthly", // Default billing cycle
+        user.uid,
+      )
+      await refreshSubscriptionData() // Refresh subscription data after creation
     } catch (error) {
       console.error("Registration error:", error)
       throw error
@@ -256,12 +295,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     userData,
     projectData,
+    subscriptionData, // Provided subscriptionData
     loading,
     login,
     register,
     logout,
     updateUserData,
     updateProjectData,
+    refreshSubscriptionData, // Provided refresh function
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

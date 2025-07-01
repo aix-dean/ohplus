@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronDown, Upload, Trash2, ImageIcon, Film, X, Check, Loader2, Info } from "lucide-react"
+import { ChevronDown, Upload, Trash2, ImageIcon, Film, X, Check, Loader2, Info } from 'lucide-react'
 import { createProduct } from "@/lib/firebase-service"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
@@ -306,7 +306,8 @@ export default function AdminProductCreatePage() {
       return
     }
 
-    if (!subscriptionData?.licenseKey) {
+    // Check if subscriptionData exists and is active
+    if (!subscriptionData || subscriptionData.status !== "active") {
       toast({
         title: "Subscription Required",
         description: "You need an active subscription to create products. Please subscribe.",
@@ -399,7 +400,7 @@ export default function AdminProductCreatePage() {
       const productId = await createProduct(
         user.uid,
         user.displayName || "Unknown User",
-        subscriptionData?.licenseKey,
+        userData.license_key, // Use userData.license_key here
         productData,
       )
 
@@ -454,7 +455,7 @@ export default function AdminProductCreatePage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
-          {!subscriptionData?.licenseKey && (
+          {(!subscriptionData || subscriptionData.status !== "active") && (
             <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 flex items-center gap-3 border border-red-200">
               <Info className="h-5 w-5 text-red-500" />
               <span>You need an active subscription to create products. Please subscribe to unlock this feature.</span>
@@ -477,7 +478,7 @@ export default function AdminProductCreatePage() {
                     onChange={handleInputChange}
                     placeholder="Enter product name"
                     required
-                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                   />
                 </div>
 
@@ -492,7 +493,7 @@ export default function AdminProductCreatePage() {
                     placeholder="Enter price per month"
                     min="0"
                     step="0.01"
-                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                   />
                 </div>
               </div>
@@ -509,7 +510,7 @@ export default function AdminProductCreatePage() {
                   placeholder="Enter product description"
                   rows={4}
                   required
-                  disabled={isSubmitting || !subscriptionData?.licenseKey}
+                  disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                 />
               </div>
 
@@ -517,7 +518,7 @@ export default function AdminProductCreatePage() {
                 <div className="space-y-2">
                   <Label htmlFor="type">Product Type</Label>
                   <Select
-                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                     onValueChange={handleTypeChange}
                     defaultValue={formData.type}
                   >
@@ -534,7 +535,7 @@ export default function AdminProductCreatePage() {
                 <div className="space-y-2">
                   <Label htmlFor="content_type">Content Type</Label>
                   <Select
-                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                     onValueChange={(value) =>
                       setFormData((prev) => ({
                         ...prev,
@@ -573,7 +574,7 @@ export default function AdminProductCreatePage() {
                         placeholder="Enter number of spots per loop"
                         min="1"
                         required={isDynamicContent}
-                        disabled={isSubmitting || !subscriptionData?.licenseKey}
+                        disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                       />
                     </div>
 
@@ -590,7 +591,7 @@ export default function AdminProductCreatePage() {
                         placeholder="Enter number of loops per day"
                         min="1"
                         required={isDynamicContent}
-                        disabled={isSubmitting || !subscriptionData?.licenseKey}
+                        disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                       />
                     </div>
                   </div>
@@ -608,7 +609,11 @@ export default function AdminProductCreatePage() {
                     className={`w-full justify-between ${selectedCategories.length === 0 ? "border-red-300" : ""}`}
                     onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
                     disabled={
-                      isLoadingCategories || categories.length === 0 || isSubmitting || !subscriptionData?.licenseKey
+                      isLoadingCategories ||
+                      categories.length === 0 ||
+                      isSubmitting ||
+                      !subscriptionData ||
+                      subscriptionData.status !== "active"
                     }
                   >
                     <span>
@@ -683,7 +688,7 @@ export default function AdminProductCreatePage() {
                   onChange={handleLocationChange}
                   placeholder="Enter site location"
                   required
-                  disabled={isSubmitting || !subscriptionData?.licenseKey}
+                  disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                 />
               </div>
 
@@ -695,7 +700,7 @@ export default function AdminProductCreatePage() {
                     variant="outline"
                     className="w-full justify-between bg-transparent"
                     onClick={() => setShowAudienceDropdown(!showAudienceDropdown)}
-                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                   >
                     <span>
                       {selectedAudienceTypes.length > 0
@@ -755,7 +760,7 @@ export default function AdminProductCreatePage() {
                     onChange={handleInputChange}
                     placeholder="Enter average daily traffic count"
                     min="0"
-                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                   />
                 </div>
 
@@ -770,7 +775,7 @@ export default function AdminProductCreatePage() {
                     placeholder="Enter elevation from ground level in feet"
                     min="0"
                     step="0.01"
-                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                   />
                 </div>
               </div>
@@ -787,7 +792,7 @@ export default function AdminProductCreatePage() {
                     placeholder="Enter height in feet"
                     min="0"
                     step="0.01"
-                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                   />
                 </div>
 
@@ -802,7 +807,7 @@ export default function AdminProductCreatePage() {
                     placeholder="Enter width in feet"
                     min="0"
                     step="0.01"
-                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                   />
                 </div>
               </div>
@@ -817,7 +822,7 @@ export default function AdminProductCreatePage() {
                     onChange={(e) => handleGeopointChange(e, 0)}
                     placeholder="Enter latitude"
                     step="0.000001"
-                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                   />
                 </div>
 
@@ -830,7 +835,7 @@ export default function AdminProductCreatePage() {
                     onChange={(e) => handleGeopointChange(e, 1)}
                     placeholder="Enter longitude"
                     step="0.000001"
-                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                   />
                 </div>
               </div>
@@ -855,7 +860,7 @@ export default function AdminProductCreatePage() {
                   className="hidden"
                   onChange={handleFileChange}
                   required={mediaFiles.length === 0}
-                  disabled={isSubmitting || !subscriptionData?.licenseKey}
+                  disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                 />
                 <label htmlFor="media-upload" className="flex flex-col items-center justify-center cursor-pointer">
                   <Upload className={`h-12 w-12 ${mediaFiles.length === 0 ? "text-red-500" : "text-gray-500"} mb-3`} />
@@ -910,7 +915,7 @@ export default function AdminProductCreatePage() {
                                   onChange={(e) => handleMediaDistanceChange(index, e.target.value)}
                                   placeholder="e.g., 100m"
                                   className="h-9 text-sm"
-                                  disabled={isSubmitting || !subscriptionData?.licenseKey}
+                                  disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
                                 />
                               </div>
                             </div>
@@ -935,7 +940,7 @@ export default function AdminProductCreatePage() {
 
             {/* Submit Button */}
             <div className="flex justify-end pt-4">
-              <Button type="submit" disabled={isSubmitting || !subscriptionData?.licenseKey}>
+              <Button type="submit" disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}>
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...
