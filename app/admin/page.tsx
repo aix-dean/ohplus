@@ -49,15 +49,15 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground">Manage your system and monitor performance</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="h-8 gap-1">
+          <Button variant="outline" size="sm" className="h-8 gap-1 bg-transparent">
             <RefreshCcw size={14} />
             <span>Refresh</span>
           </Button>
-          <Button variant="outline" size="sm" className="h-8 gap-1">
+          <Button variant="outline" size="sm" className="h-8 gap-1 bg-transparent">
             <Download size={14} />
             <span>Export</span>
           </Button>
-          <Button variant="outline" size="sm" className="h-8 w-8 p-0">
+          <Button variant="outline" size="sm" className="h-8 w-8 p-0 bg-transparent">
             <Settings size={14} />
             <span className="sr-only">Settings</span>
           </Button>
@@ -219,28 +219,28 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-2">
-              <Button variant="outline" className="justify-between">
+              <Button variant="outline" className="justify-between bg-transparent">
                 <span className="flex items-center gap-2">
                   <User size={16} />
                   <span>Manage Users</span>
                 </span>
                 <ArrowUpRight size={14} />
               </Button>
-              <Button variant="outline" className="justify-between">
+              <Button variant="outline" className="justify-between bg-transparent">
                 <span className="flex items-center gap-2">
                   <Package size={16} />
                   <span>Manage Products</span>
                 </span>
                 <ArrowUpRight size={14} />
               </Button>
-              <Button variant="outline" className="justify-between">
+              <Button variant="outline" className="justify-between bg-transparent">
                 <span className="flex items-center gap-2">
                   <FileText size={16} />
                   <span>View Reports</span>
                 </span>
                 <ArrowUpRight size={14} />
               </Button>
-              <Button variant="outline" className="justify-between">
+              <Button variant="outline" className="justify-between bg-transparent">
                 <span className="flex items-center gap-2">
                   <Settings size={16} />
                   <span>System Settings</span>

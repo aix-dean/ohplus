@@ -54,9 +54,9 @@ import type { ProposalClient } from "@/lib/types/proposal"
 import { ProposalHistory } from "@/components/proposal-history"
 import { ClientDialog } from "@/components/client-dialog"
 import { DateRangeCalendarDialog } from "@/components/date-range-calendar-dialog"
-import { createDirectCostEstimate } from "@/lib/cost-estimate-service" // Import for CE creation
-import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service" // Imports for Quotation creation
-import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
+import { createDirectCostEstimate } from "@/lib/cost-estimate-service"
+import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service"
+import { Skeleton } from "@/components/ui/skeleton"
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
 // Removed: import { SelectQuotationDialog } from "@/components/select-quotation-dialog"
 
@@ -752,7 +752,7 @@ function SalesDashboardContent() {
         })
         router.push(`/sales/quotations/${newQuotationId}`) // Navigate to the new internal quotation view page
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating document:", error)
       toast({
         title: "Error",

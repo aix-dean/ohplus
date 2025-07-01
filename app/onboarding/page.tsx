@@ -1,165 +1,242 @@
 "use client"
 
-import { useRouter, useSearchParams } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ArrowRight, Upload, LayoutGrid } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Progress } from "@/components/ui/progress"
+import { Loader2, ArrowLeft, ArrowRight, CheckCircle } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { useEffect } from "react"
+import { toast } from "@/components/ui/use-toast"
 import Image from "next/image"
-
-// Onboarding Header Component
-function OnboardingHeader() {
-  const router = useRouter()
-  return (
-    <header className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
-      <div className="flex items-center">
-        <Image src="/oh-plus-logo.png" alt="OHPlus Logo" width={100} height={30} />
-      </div>
-      <Button variant="outline" onClick={() => router.push("/login")}>
-        Exit
-      </Button>
-    </header>
-  )
-}
-
-// Onboarding Footer Component
-function OnboardingFooter({
-  currentStep,
-  totalSteps,
-  onBack,
-  onNext,
-  onFinish,
-  isLastStep,
-}: {
-  currentStep: number
-  totalSteps: number
-  onBack: () => void
-  onNext: () => void
-  onFinish: () => void
-  isLastStep: boolean
-}) {
-  return (
-    <footer className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 p-6 flex items-center justify-between">
-      <Button variant="ghost" onClick={onBack} disabled={currentStep === 1}>
-        <ArrowLeft className="mr-2 h-4 w-4" /> Back
-      </Button>
-      {isLastStep ? (
-        <Button onClick={onFinish}>
-          Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
-      ) : (
-        <Button onClick={onNext}>
-          Next <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
-      )}
-    </footer>
-  )
-}
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const { userData, loading, updateUserData } = useAuth()
+  const { user, userData, updateUserData, updateProjectData } = useAuth()
 
-  const totalContentSteps = 3
-  const currentStep = Number.parseInt(searchParams.get("step") || "1")
+  const [currentStep, setCurrentStep] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [progress, setProgress] = useState(0)
+
+  // Step 1: Personal Info
+  const [firstName, setFirstName] = useState(userData?.first_name || "")
+  const [lastName, setLastName] = useState(userData?.last_name || "")
+  const [phoneNumber, setPhoneNumber] = useState(userData?.phone_number || "")
+  const [gender, setGender] = useState(userData?.gender || "")
+
+  // Step 2: Company Info
+  const [companyName, setCompanyName] = useState(userData?.company_name || "")
+  const [companyLocation, setCompanyLocation] = useState("")
+  const [companyWebsite, setCompanyWebsite] = useState("")
+
+  // Step 3: Preferences
+  const [industry, setIndustry] = useState("")
+  const [goals, setGoals] = useState<string[]>([])
 
   useEffect(() => {
-    if (!loading && !userData) {
+    if (!user) {
       router.push("/login")
+    } else if (userData) {
+      // Pre-fill if data exists
+      setFirstName(userData.first_name || "")
+      setLastName(userData.last_name || "")
+      setPhoneNumber(userData.phone_number || "")
+      setGender(userData.gender || "")
+      setCompanyName(userData.company_name || "") // Assuming company_name is part of userData
+      // For companyLocation, companyWebsite, industry, goals, they might not be in initial userData
+      // and would be collected during onboarding.
     }
-  }, [userData, loading, router])
+  }, [user, userData, router])
 
-  useEffect(() => {
-    if (currentStep < 1 || currentStep > totalContentSteps) {
-      router.replace(`/onboarding?step=1`)
-    }
-  }, [currentStep, totalContentSteps, router])
+  const totalSteps = 3
 
-  const handleNext = () => {
-    if (currentStep < totalContentSteps) {
-      router.push(`/onboarding?step=${currentStep + 1}`)
+  const handleNext = async () => {
+    setLoading(true)
+    try {
+      if (currentStep === 1) {
+        await updateUserData({
+          first_name: firstName,
+          last_name: lastName,
+          phone_number: phoneNumber,
+          gender,
+        })
+        toast({ title: "Personal info saved!" })
+      } else if (currentStep === 2) {
+        await updateProjectData({
+          company_name: companyName,
+          company_location: companyLocation,
+          company_website: companyWebsite,
+        })
+        toast({ title: "Company info saved!" })
+      }
+      setCurrentStep((prev) => prev + 1)
+      setProgress(((currentStep + 1) / totalSteps) * 100)
+    } catch (error: any) {
+      console.error("Onboarding save error:", error)
+      toast({
+        title: "Error saving data",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
   const handleBack = () => {
-    if (currentStep > 1) {
-      router.push(`/onboarding?step=${currentStep - 1}`)
-    } else {
-      router.push("/login") // Go to login if on the first step and pressing back
+    setCurrentStep((prev) => prev - 1)
+    setProgress(((currentStep - 1) / totalSteps) * 100)
+  }
+
+  const handleFinish = async () => {
+    setLoading(true)
+    try {
+      await updateUserData({
+        industry,
+        goals,
+        onboarding_complete: true, // Mark onboarding as complete
+      })
+      toast({ title: "Onboarding complete!", description: "Redirecting to dashboard..." })
+      router.push("/sales/dashboard") // Redirect to dashboard after onboarding
+    } catch (error: any) {
+      console.error("Onboarding finish error:", error)
+      toast({
+        title: "Error saving preferences",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
   }
 
-  const handleFinishOnboarding = async (redirectPath: string) => {
-    if (userData) {
-      await updateUserData({ onboarding: false })
-    }
-    router.push(redirectPath)
-  }
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 dark:bg-gray-950">
-        <p>Loading...</p>
-      </div>
-    )
-  }
-
-  const renderStepContent = () => {
+  const renderStep = () => {
     switch (currentStep) {
       case 1:
         return (
-          <div className="flex flex-col md:flex-row items-center justify-center min-h-[calc(100vh-160px)] p-8">
-            <div className="md:w-1/2 text-center md:text-left space-y-6">
-              <p className="text-xl font-semibold text-gray-600 dark:text-gray-400">Step 1</p>
-              <h1 className="text-5xl font-bold">Welcome, {userData?.first_name || "New User"}!</h1>
-              <p className="text-lg text-gray-600 dark:text-gray-400">
-                Thank you for registering with us. We're excited to have you on board and help you streamline your
-                business operations.
-              </p>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  id="firstName"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="John"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Doe"
+                  required
+                />
+              </div>
             </div>
-            <div className="md:w-1/2 flex justify-center md:justify-end mt-8 md:mt-0">
-              <Image src="/placeholder.svg?height=300&width=400" alt="Welcome" width={400} height={300} />
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber">Phone Number</Label>
+              <Input
+                id="phoneNumber"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="+1234567890"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="gender">Gender</Label>
+              <RadioGroup value={gender} onValueChange={setGender} className="flex space-x-4">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="Male" id="male" />
+                  <Label htmlFor="male">Male</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="Female" id="female" />
+                  <Label htmlFor="female">Female</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="Other" id="other" />
+                  <Label htmlFor="other">Other</Label>
+                </div>
+              </RadioGroup>
             </div>
           </div>
         )
       case 2:
         return (
-          <div className="flex flex-col md:flex-row items-center justify-center min-h-[calc(100vh-160px)] p-8">
-            <div className="md:w-1/2 text-center md:text-left space-y-6">
-              <p className="text-xl font-semibold text-gray-600 dark:text-gray-400">Step 2</p>
-              <h1 className="text-5xl font-bold">Upload Your First Product</h1>
-              <p className="text-lg text-gray-600 dark:text-gray-400">
-                Let's get you started by adding your first product or service. This will be the foundation for your
-                proposals and cost estimates.
-              </p>
-              <Button onClick={() => handleFinishOnboarding("/admin/inventory")} className="w-full md:w-auto">
-                <Upload className="mr-2 h-5 w-5" />
-                Upload Product Now
-              </Button>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="companyName">Company Name</Label>
+              <Input
+                id="companyName"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Acme Corp"
+                required
+              />
             </div>
-            <div className="md:w-1/2 flex justify-center md:justify-end mt-8 md:mt-0">
-              <Image src="/placeholder.svg?height=300&width=400" alt="Upload Product" width={400} height={300} />
+            <div className="space-y-2">
+              <Label htmlFor="companyLocation">Company Location</Label>
+              <Input
+                id="companyLocation"
+                value={companyLocation}
+                onChange={(e) => setCompanyLocation(e.target.value)}
+                placeholder="New York, NY"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="companyWebsite">Company Website</Label>
+              <Input
+                id="companyWebsite"
+                value={companyWebsite}
+                onChange={(e) => setCompanyWebsite(e.target.value)}
+                placeholder="https://www.acmecorp.com"
+              />
             </div>
           </div>
         )
       case 3:
         return (
-          <div className="flex flex-col md:flex-row items-center justify-center min-h-[calc(100vh-160px)] p-8">
-            <div className="md:w-1/2 text-center md:text-left space-y-6">
-              <p className="text-xl font-semibold text-gray-600 dark:text-gray-400">Step 3</p>
-              <h1 className="text-5xl font-bold">You're All Set!</h1>
-              <p className="text-lg text-gray-600 dark:text-gray-400">
-                Congratulations! You've completed the initial setup. You're now ready to explore your dashboard and
-                start managing your business efficiently.
-              </p>
-              <Button onClick={() => handleFinishOnboarding("/sales/dashboard")} className="w-full md:w-auto">
-                <LayoutGrid className="mr-2 h-5 w-5" />
-                Go to Dashboard
-              </Button>
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="industry">Your Industry</Label>
+              <Input
+                id="industry"
+                value={industry}
+                onChange={(e) => setIndustry(e.target.value)}
+                placeholder="e.g., Advertising, Retail, Tech"
+              />
             </div>
-            <div className="md:w-1/2 flex justify-center md:justify-end mt-8 md:mt-0">
-              <Image src="/placeholder.svg?height=300&width=400" alt="All Set" width={400} height={300} />
+            <div className="space-y-2">
+              <Label>What are your primary goals with OH Plus?</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  "Manage sales pipeline",
+                  "Track logistics & operations",
+                  "Streamline content publishing",
+                  "Improve team collaboration",
+                  "Monitor site performance",
+                  "Generate reports & analytics",
+                ].map((goal) => (
+                  <div key={goal} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={goal}
+                      checked={goals.includes(goal)}
+                      onCheckedChange={(checked) => {
+                        setGoals((prev) => (checked ? [...prev, goal] : prev.filter((item) => item !== goal)))
+                      }}
+                    />
+                    <Label htmlFor={goal}>{goal}</Label>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )
@@ -169,17 +246,61 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-white dark:bg-gray-950">
-      <OnboardingHeader />
-      <main className="flex-grow">{renderStepContent()}</main>
-      <OnboardingFooter
-        currentStep={currentStep}
-        totalSteps={totalContentSteps}
-        onBack={handleBack}
-        onNext={handleNext}
-        onFinish={() => handleFinishOnboarding("/sales/dashboard")}
-        isLastStep={currentStep === totalContentSteps}
-      />
+    <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-12">
+      <Card className="w-full max-w-2xl">
+        <CardHeader className="text-center">
+          <div className="flex justify-center mb-4">
+            <Image src="/ohplus-new-logo.png" alt="OH Plus Logo" width={100} height={100} />
+          </div>
+          <CardTitle className="text-3xl font-bold">Welcome to OH Plus!</CardTitle>
+          <CardDescription>
+            Let's set up your account. Step {currentStep} of {totalSteps}
+          </CardDescription>
+          <Progress value={progress} className="w-full mt-4 h-2" />
+        </CardHeader>
+        <CardContent>
+          {renderStep()}
+          <div className="mt-6 flex justify-between">
+            {currentStep > 1 && (
+              <Button variant="outline" onClick={handleBack} disabled={loading}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back
+              </Button>
+            )}
+            {currentStep < totalSteps ? (
+              <Button
+                onClick={handleNext}
+                disabled={
+                  loading || (currentStep === 1 && (!firstName || !lastName)) || (currentStep === 2 && !companyName)
+                }
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    Next <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button onClick={handleFinish} disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Finishing...
+                  </>
+                ) : (
+                  <>
+                    Finish <CheckCircle className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
