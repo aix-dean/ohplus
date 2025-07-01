@@ -14,8 +14,28 @@ interface DepartmentCardProps {
   metricLabel?: string
   metricValue?: string
   badgeCount?: number
-  headerColor: string
+  headerColorClass: string // Changed prop name to avoid confusion with actual color value
   isAddDepartment?: boolean
+}
+
+// Map Tailwind class names to their actual hex color values for inline styling
+const headerColorMap: { [key: string]: string } = {
+  "bg-salesHeader": "#FF6B6B",
+  "bg-logisticsHeader": "#4D8AF0",
+  "bg-accountingHeader": "#E06BFF",
+  "bg-treasuryHeader": "#22C55E",
+  "bg-itHeader": "#00D9BF",
+  "bg-fleetHeader": "#A0A0A0",
+  "bg-creativesHeader": "#FFB86B",
+  "bg-financeHeader": "#84CC16",
+  "bg-mediaHeader": "#22D3EE",
+  "bg-businessDevHeader": "#6B8EFF",
+  "bg-legalHeader": "#DC2626",
+  "bg-corporateHeader": "#0EA5E9",
+  "bg-hrHeader": "#FF6BEB",
+  "bg-specialTeamHeader": "#B86BFF",
+  "bg-marketingHeader": "#EF4444",
+  "bg-addDepartmentHeader": "#333333",
 }
 
 function DepartmentCard({
@@ -24,12 +44,14 @@ function DepartmentCard({
   metricLabel,
   metricValue,
   badgeCount,
-  headerColor,
+  headerColorClass, // Using the new prop name
   isAddDepartment = false,
 }: DepartmentCardProps) {
+  const actualHeaderColor = headerColorMap[headerColorClass] || "#FFFFFF" // Fallback to white if color not found
+
   return (
     <Card className="w-full">
-      <CardHeader className={`p-4 rounded-t-lg ${headerColor}`}>
+      <CardHeader className="p-4 rounded-t-lg" style={{ backgroundColor: actualHeaderColor }}>
         <div className="flex justify-between items-center">
           <CardTitle className="text-white text-lg font-semibold">{title}</CardTitle>
           {badgeCount !== undefined && badgeCount > 0 && (
@@ -83,7 +105,7 @@ export default function AdminDashboardPage() {
       metricLabel: "Monthly Revenue",
       metricValue: "4,000,000",
       badgeCount: 2,
-      headerColor: "bg-salesHeader",
+      headerColorClass: "bg-salesHeader", // Using the new prop name
     },
     {
       title: "Logistics/ Operations",
@@ -91,80 +113,80 @@ export default function AdminDashboardPage() {
       metricLabel: "Total Service Assignments",
       metricValue: "5",
       badgeCount: 1,
-      headerColor: "bg-logisticsHeader",
+      headerColorClass: "bg-logisticsHeader",
     },
     {
       title: "Accounting",
       members: ["Chairman"],
-      headerColor: "bg-accountingHeader",
+      headerColorClass: "bg-accountingHeader",
     },
     {
       title: "Treasury",
       members: ["Juvy"],
-      headerColor: "bg-treasuryHeader",
+      headerColorClass: "bg-treasuryHeader",
     },
     {
       title: "I.T.",
       members: ["Emmerson"],
-      headerColor: "bg-itHeader",
+      headerColorClass: "bg-itHeader",
     },
     {
       title: "Fleet",
       members: ["Jonathan"],
-      headerColor: "bg-fleetHeader",
+      headerColorClass: "bg-fleetHeader",
     },
     {
       title: "Creatives/Contents",
       members: ["Eda"],
-      headerColor: "bg-creativesHeader",
+      headerColorClass: "bg-creativesHeader",
     },
     {
       title: "Finance",
       members: ["Juvy"],
-      headerColor: "bg-financeHeader",
+      headerColorClass: "bg-financeHeader",
     },
     {
       title: "Media/ Procurement",
       members: ["Zen"],
-      headerColor: "bg-mediaHeader",
+      headerColorClass: "bg-mediaHeader",
     },
     {
       title: "Business Dev.",
       members: ["Nikki"],
-      headerColor: "bg-businessDevHeader",
+      headerColorClass: "bg-businessDevHeader",
     },
     {
       title: "Legal",
       members: ["Chona"],
       badgeCount: 2,
-      headerColor: "bg-legalHeader",
+      headerColorClass: "bg-legalHeader",
     },
     {
       title: "Corporate",
       members: ["Anthony"],
       badgeCount: 1,
-      headerColor: "bg-corporateHeader",
+      headerColorClass: "bg-corporateHeader",
     },
     {
       title: "Human Resources",
       members: ["Vanessa"],
       badgeCount: 1,
-      headerColor: "bg-hrHeader",
+      headerColorClass: "bg-hrHeader",
     },
     {
       title: "Special Team",
       members: ["Mark"],
-      headerColor: "bg-specialTeamHeader",
+      headerColorClass: "bg-specialTeamHeader",
     },
     {
       title: "Marketing",
       members: ["John"],
-      headerColor: "bg-marketingHeader",
+      headerColorClass: "bg-marketingHeader",
     },
     {
       title: "+ Add New Department",
       members: [],
-      headerColor: "bg-addDepartmentHeader",
+      headerColorClass: "bg-addDepartmentHeader",
       isAddDepartment: true,
     },
   ]
