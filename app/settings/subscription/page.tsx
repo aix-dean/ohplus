@@ -148,6 +148,48 @@ export default function SubscriptionPage() {
         {/* Render the PromoBanner component */}
         <PromoBanner promoEndDate={promoEndDate} />
 
+        {/* Moved "Your Current Subscription" section here */}
+        <Separator className="my-12" />
+
+        <Card className="mx-auto max-w-2xl rounded-xl shadow-sm">
+          <CardHeader className="border-b p-6">
+            <CardTitle className="text-xl font-bold text-gray-900">Your Current Subscription</CardTitle>
+            <CardDescription className="mt-2 text-gray-600">Details of your active plan and usage.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-700">Plan Type</p>
+                <p className="text-lg font-semibold capitalize text-gray-900">{subscriptionData?.planType || "N/A"}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-700">Status</p>
+                <p className="text-lg font-semibold capitalize text-gray-900">{subscriptionData?.status || "N/A"}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-700">Max Products</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {subscriptionData?.maxProducts === 99999 ? "Unlimited" : subscriptionData?.maxProducts || "N/A"}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-700">Trial End Date</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {subscriptionData?.trialEndDate
+                    ? new Date(subscriptionData.trialEndDate).toLocaleDateString()
+                    : "N/A"}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-700">Days Remaining (Trial)</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {subscriptionData ? subscriptionService.getDaysRemaining(subscriptionData) : "N/A"}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Choose Your Plan</h1>
           <p className="mt-3 text-lg text-gray-600">Select the perfect plan that fits your business needs.</p>
@@ -214,47 +256,6 @@ export default function SubscriptionPage() {
               </Card>
             ))}
         </div>
-
-        <Separator className="my-12" />
-
-        <Card className="mx-auto max-w-2xl rounded-xl shadow-sm">
-          <CardHeader className="border-b p-6">
-            <CardTitle className="text-xl font-bold text-gray-900">Your Current Subscription</CardTitle>
-            <CardDescription className="mt-2 text-gray-600">Details of your active plan and usage.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-700">Plan Type</p>
-                <p className="text-lg font-semibold capitalize text-gray-900">{subscriptionData?.planType || "N/A"}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-700">Status</p>
-                <p className="text-lg font-semibold capitalize text-gray-900">{subscriptionData?.status || "N/A"}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-700">Max Products</p>
-                <p className="text-lg font-semibold text-gray-900">
-                  {subscriptionData?.maxProducts === 99999 ? "Unlimited" : subscriptionData?.maxProducts || "N/A"}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-700">Trial End Date</p>
-                <p className="text-lg font-semibold text-gray-900">
-                  {subscriptionData?.trialEndDate
-                    ? new Date(subscriptionData.trialEndDate).toLocaleDateString()
-                    : "N/A"}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-700">Days Remaining (Trial)</p>
-                <p className="text-lg font-semibold text-gray-900">
-                  {subscriptionData ? subscriptionService.getDaysRemaining(subscriptionData) : "N/A"}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </main>
   )
