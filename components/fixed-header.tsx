@@ -152,7 +152,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
     <header
       className={cn(
         "sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 px-4 sm:static sm:h-auto",
-        isAdminPage ? "bg-purple-600" : "bg-rose-600",
+        isAdminPage ? "bg-adminHeaderPurple" : "bg-salesHeaderRose", // Use custom colors
         className,
       )}
       {...props}
@@ -222,7 +222,14 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="relative rounded-full text-white hover:bg-white/20">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "relative rounded-full text-white",
+              isAdminPage ? "hover:bg-adminHeaderPurpleLight" : "hover:bg-salesHeaderRoseLight", // Use custom hover colors
+            )}
+          >
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
@@ -240,7 +247,14 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
       </DropdownMenu>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="overflow-hidden rounded-full text-white hover:bg-white/20">
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "overflow-hidden rounded-full text-white",
+              isAdminPage ? "hover:bg-adminHeaderPurpleLight" : "hover:bg-salesHeaderRoseLight", // Use custom hover colors
+            )}
+          >
             <Avatar>
               <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} alt="User Avatar" />
               <AvatarFallback>
