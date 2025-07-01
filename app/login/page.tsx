@@ -28,7 +28,7 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      router.push("/sales/dashboard")
+      router.push("/admin/dashboard") // Changed redirect to /admin/dashboard
     }
   }, [user, router])
 
@@ -39,7 +39,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password)
-      router.push("/sales/dashboard")
+      router.push("/admin/dashboard") // Changed redirect to /admin/dashboard
     } catch (error: any) {
       console.error("Login error:", error)
 
@@ -78,14 +78,14 @@ export default function LoginPage() {
               <div className="flex gap-4 mb-6">
                 <Button
                   variant="outline"
-                  className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
                 >
                   <Image src="/placeholder.svg?height=20&width=20" alt="Google" width={20} height={20} />
                   Google
                 </Button>
                 <Button
                   variant="outline"
-                  className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                  className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
                 >
                   <Image src="/placeholder.svg?height=20&width=20" alt="Facebook" width={20} height={20} />
                   Facebook

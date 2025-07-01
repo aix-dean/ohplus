@@ -3,12 +3,12 @@ import type { Config } from "tailwindcss"
 const config: Config = {
   darkMode: ["class"],
   content: [
-    "./pages/**/*.{ts,tsx}",
-    "./components/**/*.{ts,tsx}",
-    "./app/**/*.{ts,tsx}",
-    "./src/**/*.{ts,tsx}",
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "*.{js,ts,jsx,tsx,mdx}",
   ],
+  prefix: "",
   theme: {
     container: {
       center: true,
@@ -18,10 +18,6 @@ const config: Config = {
       },
     },
     extend: {
-      fontFamily: {
-        inter: ["var(--font-inter)", "Inter", "sans-serif"],
-        sans: ["var(--font-inter)", "Inter", "sans-serif"],
-      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -56,17 +52,11 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        sidebar: {
-          DEFAULT: "#1D2327",
-          hover: "#2271b1",
-          active: "#2271b1",
-        },
-        brand: {
-          purple: "#b66dff",
-          blue: "#4d8af0",
-          teal: "#00d9bf",
-          coral: "#ff7f50",
-        },
+        // Custom colors for headers - NOW CORRECTLY DEFINED AT TOP LEVEL
+        adminHeaderPurple: "#0000FF", // Bright Blue for Admin pages
+        adminHeaderPurpleLight: "#3333FF", // Lighter Blue for hover
+        salesHeaderRose: "#FF0000", // Bright Red for Sales pages
+        salesHeaderRoseLight: "#FF3333", // Lighter Red for hover
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -87,13 +77,9 @@ const config: Config = {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
-      boxShadow: {
-        card: "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
-        "card-hover": "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
-      },
     },
   },
   plugins: [require("tailwindcss-animate")],
-}
+} satisfies Config
 
 export default config
