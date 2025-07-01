@@ -155,8 +155,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
   // This variable is used to conditionally apply the header color
   // and hover effects for dropdowns.
   // It correctly checks if the path starts with "/admin".
-  // The issue is likely with Tailwind not recognizing the custom colors.
-  // The `tailwind.config.ts` update should fix this.
+  // The `tailwind.config.ts` update should now correctly map the colors.
 
   return (
     <header

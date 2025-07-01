@@ -61,11 +61,11 @@ const config: Config = {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-        // Custom colors for headers - Using distinct colors for testing
-        adminHeaderPurple: "#00FF00", // Bright Green for Admin pages
-        adminHeaderPurpleLight: "#33FF33", // Lighter Green for hover
-        salesHeaderRose: "#FF0000", // Bright Red for Sales pages
-        salesHeaderRoseLight: "#FF3333", // Lighter Red for hover
+        // Custom colors for headers - NOW DIRECTLY UNDER extend.colors
+        adminHeaderPurple: "#6B46C1", // A deep purple for admin header
+        adminHeaderPurpleLight: "#805AD5", // A lighter purple for hover states
+        salesHeaderRose: "#E53E3E", // A strong rose/red for sales header
+        salesHeaderRoseLight: "#F56565", // A lighter rose/red for hover states
       },
       borderRadius: {
         lg: "var(--radius)",
