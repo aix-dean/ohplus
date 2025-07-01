@@ -17,7 +17,7 @@ import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplet
 import { collection, query, where, getDocs, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
-import { toast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast" // Corrected import path for useToast
 
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
@@ -43,6 +43,7 @@ interface Category {
 export default function AdminProductCreatePage() {
   const router = useRouter()
   const { user, userData, subscriptionData, loading } = useAuth()
+  const { toast } = useToast() // Destructure toast from useToast hook
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
@@ -127,7 +128,7 @@ export default function AdminProductCreatePage() {
     if (user) {
       fetchCategories()
     }
-  }, [user])
+  }, [user, toast])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target

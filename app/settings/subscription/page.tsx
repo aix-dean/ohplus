@@ -8,12 +8,13 @@ import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-se
 import type { SubscriptionPlanType } from "@/lib/types/subscription"
 import { CheckCircle, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState, useCallback } from "react" // Added useCallback
-import { toast } from "@/components/ui/use-toast"
+import { useEffect, useState, useCallback } from "react"
+import { useToast } from "@/hooks/use-toast" // Corrected import path for useToast
 import { cn } from "@/lib/utils"
 
 export default function SubscriptionPage() {
   const { user, userData, subscriptionData, loading, refreshSubscriptionData } = useAuth()
+  const { toast } = useToast() // Destructure toast from useToast hook
   const router = useRouter()
   const [isUpdating, setIsUpdating] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlanType | null>(null)
@@ -105,7 +106,7 @@ export default function SubscriptionPage() {
         setSelectedPlan(null)
       }
     },
-    [user, userData, subscriptionData, plans, refreshSubscriptionData, toast], // Changed availablePlans to plans
+    [user, userData, subscriptionData, plans, refreshSubscriptionData, toast],
   )
 
   const isCurrentPlan = useCallback(
