@@ -22,14 +22,6 @@ import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useIsAdmin } from "@/hooks/use-is-admin"
 import { cn } from "@/lib/utils"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
 
 interface FixedHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
   onMenuClick: () => void
@@ -150,13 +142,14 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
 
   return (
     <header
-      className={cn("sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 px-4 sm:static sm:h-auto", className)}
-      style={{
-        backgroundColor: isAdminPage ? "#673AB7" : "#e11d48", // Using inline style to ensure it takes precedence
-      }}
+      className={cn(
+        "sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 px-4 sm:static sm:h-auto",
+        isAdminPage ? "bg-adminHeaderPurple" : "bg-salesHeaderRose", // Use custom colors
+        className,
+      )}
       {...props}
     >
-      {/* Back button for admin sub-pages, sales dashboard, and logistics dashboard */}
+      {/* New: Back button for admin sub-pages, sales dashboard, and logistics dashboard */}
       {showAdminBackButton && (
         <Link href="/admin/dashboard" passHref>
           <Button
@@ -178,39 +171,21 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           {/* Mobile navigation content would go here, if needed */}
         </SheetContent>
       </Sheet>
-      {/* Breadcrumb component */}
-      <Breadcrumb>
-        <BreadcrumbList className="text-white">
-          {breadcrumbs.map((item, index) => (
-            <React.Fragment key={index}>
-              <BreadcrumbItem>
-                {item.label === "Admin - Dashboard" && item.href && !showAdminBackButton ? (
-                  <Link href={item.href} passHref>
-                    <Button
-                      variant="default"
-                      className="bg-black hover:bg-black/90 text-white rounded-full px-4 py-2 flex items-center gap-1"
-                      asChild
-                    >
-                      <span>
-                        <ChevronLeft className="h-4 w-4" /> Admin
-                      </span>
-                    </Button>
-                  </Link>
-                ) : item.isPage ? (
-                  <BreadcrumbPage className="font-normal text-white">{item.label}</BreadcrumbPage>
-                ) : (
-                  <BreadcrumbLink asChild>
-                    <Link href={item.href || "#"} className="transition-colors hover:text-gray-200 text-white">
-                      {item.label}
-                    </Link>
-                  </BreadcrumbLink>
-                )}
-              </BreadcrumbItem>
-              {index < breadcrumbs.length - 1 && <BreadcrumbSeparator className="text-white" />}
-            </React.Fragment>
-          ))}
-        </BreadcrumbList>
-      </Breadcrumb>
+      {/* Replaced h1 with Breadcrumb component */}
+      <div className="flex-1 text-lg font-semibold text-white md:text-2xl">
+        {breadcrumbs.map((item, index) => (
+          <React.Fragment key={index}>
+            {item.isPage ? (
+              <span className="font-normal">{item.label}</span>
+            ) : (
+              <Link href={item.href || "#"} className="transition-colors hover:text-gray-200">
+                {item.label}
+              </Link>
+            )}
+            {index < breadcrumbs.length - 1 && <span className="mx-1">/</span>}
+          </React.Fragment>
+        ))}
+      </div>
       <div className="relative ml-auto flex-1 md:grow-0">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white" />
         <Input
@@ -224,16 +199,10 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           <Button
             variant="ghost"
             size="icon"
-            className="relative rounded-full text-white"
-            style={{
-              backgroundColor: "transparent",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = isAdminPage ? "rgba(103, 58, 183, 0.8)" : "rgba(244, 63, 94, 0.8)"
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent"
-            }}
+            className={cn(
+              "relative rounded-full text-white",
+              isAdminPage ? "hover:bg-adminHeaderPurple-light" : "hover:bg-salesHeaderRose-light",
+            )}
           >
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
@@ -255,16 +224,10 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           <Button
             variant="ghost"
             size="icon"
-            className="overflow-hidden rounded-full text-white"
-            style={{
-              backgroundColor: "transparent",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = isAdminPage ? "rgba(103, 58, 183, 0.8)" : "rgba(244, 63, 94, 0.8)"
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent"
-            }}
+            className={cn(
+              "overflow-hidden rounded-full text-white",
+              isAdminPage ? "hover:bg-adminHeaderPurple-light" : "hover:bg-salesHeaderRose-light",
+            )}
           >
             <Avatar>
               <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} alt="User Avatar" />

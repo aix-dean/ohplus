@@ -1,5 +1,6 @@
-/** @type {import('tailwindcss').Config} */
-module.exports = {
+import type { Config } from "tailwindcss"
+
+const config = {
   darkMode: ["class"],
   content: [
     "./pages/**/*.{ts,tsx}",
@@ -52,23 +53,16 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Custom colors for department cards
-        salesHeader: "#FF6B6B", // Red
-        logisticsHeader: "#5DADE2", // Blue
-        accountingHeader: "#C34A8D", // Pink/Magenta
-        treasuryHeader: "#347C4B", // Dark Green
-        itHeader: "#00B8A9", // Teal
-        fleetHeader: "#808080", // Gray
-        creativesHeader: "#E67E22", // Orange
-        financeHeader: "#8BC34A", // Lime Green
-        mediaHeader: "#4ECDC4", // Light Blue/Cyan
-        businessDevHeader: "#6A5ACD", // Darker Blue/Purple
-        legalHeader: "#B22222", // Dark Red
-        corporateHeader: "#00BFFF", // Bright Blue
-        hrHeader: "#FF69B4", // Bright Pink
-        specialTeamHeader: "#8A2BE2", // Purple
-        marketingHeader: "#FF0000", // Red
-        addDepartmentHeader: "#333333", // Dark Gray/Black
+        // Custom color for admin header
+        adminHeaderPurple: {
+          DEFAULT: "#673AB7", // The main purple from the screenshot
+          light: "#9575CD", // A lighter shade for potential hover/active states
+        },
+        // Custom color for sales header (assuming rose-600 is #E11D48)
+        salesHeaderRose: {
+          DEFAULT: "#E11D48",
+          light: "#F43F5E",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -92,4 +86,6 @@ module.exports = {
     },
   },
   plugins: [require("tailwindcss-animate")],
-}
+} satisfies Config
+
+export default config
