@@ -1,63 +1,62 @@
-import type { Timestamp } from "firebase/firestore"
-
 export type SubscriptionPlanType = "Trial" | "Basic" | "Premium" | "Enterprise" | "Graphic Expo Event"
-export type BillingCycle = "monthly" | "yearly"
+export type BillingCycle = "monthly" | "annually"
+export type SubscriptionStatus = "active" | "inactive" | "trialing" | "cancelled" | "expired"
 
 export interface Subscription {
-  id: string // Firestore generated ID
+  id: string // Firestore document ID
   licenseKey: string
-  uid: string // User ID
   planType: SubscriptionPlanType
   billingCycle: BillingCycle
-  status: "active" | "inactive" | "trialing" | "cancelled" | "expired"
-  maxProducts: number | null // null for unlimited
-  startDate: Timestamp // When the current subscription period started
-  endDate: Timestamp // When the current subscription period ends
-  trialEndDate: Timestamp | null // For trial plans, when the trial ends
-  createdAt: Timestamp
-  updatedAt: Timestamp
+  uid: string // User ID
+  startDate: Date
+  endDate: Date | null
+  status: SubscriptionStatus
+  maxProducts: number | null
+  trialEndDate: Date | null
+  createdAt: Date
+  updatedAt: Date
 }
 
-// Helper function to get max products based on plan type
-export function getMaxProductsForPlan(type: SubscriptionPlanType): number | null {
-  switch (type) {
+// Helper function to calculate end date based on plan and billing cycle
+export function calculateSubscriptionEndDate(
+  planType: SubscriptionPlanType,
+  billingCycle: BillingCycle,
+  startDate: Date,
+): { endDate: Date | null; trialEndDate: Date | null } {
+  let endDate: Date | null = null
+  let trialEndDate: Date | null = null
+
+  const start = new Date(startDate)
+
+  if (planType === "Trial") {
+    trialEndDate = new Date(start)
+    trialEndDate.setDate(start.getDate() + 60) // 60 days trial
+  } else {
+    if (billingCycle === "monthly") {
+      endDate = new Date(start)
+      endDate.setMonth(start.getMonth() + 1)
+    } else if (billingCycle === "annually") {
+      endDate = new Date(start)
+      endDate.setFullYear(start.getFullYear() + 1)
+    }
+  }
+  return { endDate, trialEndDate }
+}
+
+// Helper function to get max products for a given plan type
+export function getMaxProductsForPlan(planType: SubscriptionPlanType): number | null {
+  switch (planType) {
     case "Basic":
       return 3
     case "Premium":
       return 10
     case "Enterprise":
       return null // Unlimited
-    case "Graphic Expo Event":
-      return 5
     case "Trial":
-      return 1 // Or any trial limit
+      return 1 // Or whatever trial limit is
+    case "Graphic Expo Event":
+      return 5 // As per your screenshot
     default:
-      return 1 // Default for unknown types
+      return 0
   }
-}
-
-// Helper function to calculate subscription end date
-export function calculateSubscriptionEndDate(
-  planType: SubscriptionPlanType,
-  billingCycle: BillingCycle,
-  startDate: Date,
-): { endDate: Date; trialEndDate: Date | null } {
-  const start = new Date(startDate)
-  const endDate = new Date(start)
-  let trialEndDate: Date | null = null
-
-  if (planType === "Trial" || planType === "Graphic Expo Event") {
-    // Trial and Graphic Expo Event plans are 60 days
-    endDate.setDate(start.getDate() + 60)
-    trialEndDate = new Date(endDate) // Trial ends when the 60-day period ends
-  } else {
-    // For paid plans, calculate based on billing cycle
-    if (billingCycle === "monthly") {
-      endDate.setMonth(start.getMonth() + 1)
-    } else if (billingCycle === "yearly") {
-      endDate.setFullYear(start.getFullYear() + 1)
-    }
-  }
-
-  return { endDate, trialEndDate }
 }

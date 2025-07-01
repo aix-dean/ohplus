@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { subscriptionService } from "@/lib/subscription-service"
+import type { Subscription } from "@/lib/types/subscription" // Import Subscription type
 
 interface SubscriptionGuardResult {
   isLoading: boolean
@@ -12,7 +13,7 @@ interface SubscriptionGuardResult {
   canCreateProducts: boolean
   currentProductCount: number
   maxProducts: number | null
-  subscriptionData: any
+  subscriptionData: Subscription | null // Use the imported type
 }
 
 export function useSubscriptionGuard(): SubscriptionGuardResult {
@@ -26,25 +27,33 @@ export function useSubscriptionGuard(): SubscriptionGuardResult {
 
   useEffect(() => {
     const checkSubscription = async () => {
+      // If still loading auth data, or if user data/license key/subscription data is not yet available,
+      // set loading to false and return, assuming no active subscription for now.
       if (authLoading || !userData?.license_key || !subscriptionData) {
         setIsLoading(false)
+        setIsSubscriptionActive(false)
+        setIsSubscriptionExpired(true)
+        setDaysRemaining(0)
+        setCanCreateProducts(false)
         return
       }
 
       try {
         // Check if subscription is active
-        const isActive = await subscriptionService.isSubscriptionActive(userData.license_key)
+        const isActive = await subscriptionService.isSubscriptionActive(subscriptionData) // Pass the subscription object directly
         setIsSubscriptionActive(isActive)
 
         // Check if subscription is expired
-        const isExpired = await subscriptionService.isSubscriptionExpired(userData.license_key)
+        const isExpired = await subscriptionService.isSubscriptionExpired(subscriptionData) // Pass the subscription object directly
         setIsSubscriptionExpired(isExpired)
 
         // Get days remaining
-        const days = await subscriptionService.getDaysRemaining(userData.license_key)
+        const days = await subscriptionService.getDaysRemaining(subscriptionData) // Pass the subscription object directly
         setDaysRemaining(days)
 
         // Check if user can create products (subscription active and within limits)
+        // For now, `canCreateProducts` is simply `isActive && !isExpired`.
+        // Product count logic would need to be integrated here if actual limits are to be enforced.
         const canCreate = isActive && !isExpired
         setCanCreateProducts(canCreate)
 
@@ -63,7 +72,7 @@ export function useSubscriptionGuard(): SubscriptionGuardResult {
     }
 
     checkSubscription()
-  }, [authLoading, userData, subscriptionData])
+  }, [authLoading, userData, subscriptionData]) // Depend on subscriptionData to re-run when it changes
 
   return {
     isLoading,

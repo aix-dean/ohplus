@@ -1,16 +1,16 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Upload, Trash2, AlertCircle, ImageIcon, Film, X, Check, Loader2 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ArrowLeft, Upload, Trash2, ImageIcon, Film, X, Check, Loader2 } from "lucide-react"
 import { createProduct } from "@/lib/firebase-service"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
@@ -18,7 +18,7 @@ import { collection, query, where, getDocs, serverTimestamp } from "firebase/fir
 import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
-import { useSubscriptionGuard } from "@/hooks/use-subscription-guard"
+import Info from "@/components/info-icon" // Import the Info component
 
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
@@ -43,7 +43,7 @@ interface Category {
 
 export default function AdminProductCreatePage() {
   const router = useRouter()
-  const { user, userData } = useAuth()
+  const { user, userData, subscriptionData } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
@@ -82,8 +82,6 @@ export default function AdminProductCreatePage() {
     type: "RENTAL", // Default type
     status: "PENDING", // Default status
   })
-
-  const { canCreateProduct, loading: subscriptionLoading, message: subscriptionMessage } = useSubscriptionGuard()
 
   // Fetch categories on component mount
   useEffect(() => {
@@ -309,9 +307,13 @@ export default function AdminProductCreatePage() {
       return
     }
 
-    // Add subscription guard check here
-    if (!canCreateProduct) {
-      setError(subscriptionMessage || "You cannot create a product due to subscription limits.")
+    if (!subscriptionData?.licenseKey) {
+      toast({
+        title: "Subscription Required",
+        description: "You need an active subscription to create products. Please subscribe.",
+        variant: "destructive",
+      })
+      router.push("/settings/subscription")
       return
     }
 
@@ -398,7 +400,7 @@ export default function AdminProductCreatePage() {
       const productId = await createProduct(
         user.uid,
         user.displayName || "Unknown User",
-        userData.license_key,
+        subscriptionData?.licenseKey,
         productData,
       )
 
@@ -443,243 +445,220 @@ export default function AdminProductCreatePage() {
   // Check if content type is Dynamic
   const isDynamicContent = formData.content_type === "Dynamic(LED)"
 
-  // Add loading state for subscription guard
-  if (subscriptionLoading) {
-    return (
-      <div className="flex-1 p-6">
-        <div className="text-center py-12">
-          <h2 className="text-2xl font-bold mb-2">Checking Subscription...</h2>
-          <Loader2 className="h-8 w-8 animate-spin text-gray-500 mx-auto mt-4" />
-        </div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return (
-      <div className="flex-1 p-6">
-        <div className="text-center py-12">
-          <h2 className="text-2xl font-bold mb-2">Authentication Required</h2>
-          <p className="text-gray-500 mb-6">Please log in to add a new product.</p>
-          <Button onClick={() => router.push("/login")}>Log In</Button>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="flex-1 p-6">
-      <div className="max-w-3xl mx-auto">
-        <Button variant="ghost" onClick={handleBack} className="mb-6">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Inventory
-        </Button>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4">
+      <Card className="w-full max-w-md shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold">Create New Product</CardTitle>
+          <CardDescription>Fill in the details to add a new product to your inventory.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!subscriptionData?.licenseKey && (
+            <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700 flex items-center gap-2">
+              <Info className="h-5 w-5" />
+              <span>You need an active subscription to create products.</span>
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Basic Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Basic Information</h3>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Add New Product</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-6 flex items-start">
-                <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">
+                    Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder="Enter product name"
+                    required
+                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                  />
+                </div>
 
-            {/* Display subscription message if not allowed */}
-            {!canCreateProduct && subscriptionMessage && (
-              <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-md mb-6 flex items-start">
-                <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                <span>{subscriptionMessage}</span>
-              </div>
-            )}
+                <div className="space-y-2">
+                  <Label htmlFor="description">
+                    Description <span className="text-red-500">*</span>
+                  </Label>
+                  <Textarea
+                    id="description"
+                    name="description"
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    placeholder="Enter product description"
+                    rows={4}
+                    required
+                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                  />
+                </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Basic Information */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium">Basic Information</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price per Month (₱)</Label>
+                  <Input
+                    id="price"
+                    name="price"
+                    type="number"
+                    value={formData.price}
+                    onChange={handleInputChange}
+                    placeholder="Enter price per month"
+                    min="0"
+                    step="0.01"
+                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                  />
+                </div>
 
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">
-                      Name <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      placeholder="Enter product name"
-                      required
-                    />
+                <div className="space-y-2">
+                  <Label htmlFor="type">Product Type</Label>
+                  <Select
+                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                    onValueChange={handleTypeChange}
+                    defaultValue={formData.type}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="RENTAL">Rental</SelectItem>
+                      <SelectItem value="MERCHANDISE">Merchandise</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="content_type">Content Type</Label>
+                  <Select
+                    disabled={isSubmitting || !subscriptionData?.licenseKey}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        content_type: value,
+                      }))
+                    }
+                    defaultValue={formData.content_type}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select content type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Static">Static</SelectItem>
+                      <SelectItem value="Dynamic(LED)">Dynamic(LED)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Dynamic content specific fields */}
+                {isDynamicContent && (
+                  <div className="space-y-4 p-4 bg-gray-50 rounded-md border border-gray-200">
+                    <h4 className="text-sm font-medium">Dynamic Content Settings</h4>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="cms.spots_per_loop">
+                        Spots per Loop <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="cms.spots_per_loop"
+                        name="cms.spots_per_loop"
+                        type="number"
+                        value={formData.cms.spots_per_loop}
+                        onChange={handleInputChange}
+                        placeholder="Enter number of spots per loop"
+                        min="1"
+                        required={isDynamicContent}
+                        disabled={isSubmitting || !subscriptionData?.licenseKey}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="cms.loops_per_day">
+                        Loops per Day <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="cms.loops_per_day"
+                        name="cms.loops_per_day"
+                        type="number"
+                        value={formData.cms.loops_per_day}
+                        onChange={handleInputChange}
+                        placeholder="Enter number of loops per day"
+                        min="1"
+                        required={isDynamicContent}
+                        disabled={isSubmitting || !subscriptionData?.licenseKey}
+                      />
+                    </div>
                   </div>
+                )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="description">
-                      Description <span className="text-red-500">*</span>
-                    </Label>
-                    <Textarea
-                      id="description"
-                      name="description"
-                      value={formData.description}
-                      onChange={handleInputChange}
-                      placeholder="Enter product description"
-                      rows={4}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Price per Month (₱)</Label>
-                    <Input
-                      id="price"
-                      name="price"
-                      type="number"
-                      value={formData.price}
-                      onChange={handleInputChange}
-                      placeholder="Enter price per month"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="type">Product Type</Label>
-                    <select
-                      id="type"
-                      name="type"
-                      value={formData.type}
-                      onChange={handleTypeChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                <div className="space-y-2">
+                  <Label htmlFor="categories">
+                    Categories <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={`w-full justify-between ${selectedCategories.length === 0 ? "border-red-300" : ""}`}
+                      onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                      disabled={isLoadingCategories || categories.length === 0 || isSubmitting || !subscriptionData?.licenseKey}
                     >
-                      <option value="RENTAL">Rental</option>
-                      <option value="MERCHANDISE">Merchandise</option>
-                    </select>
+                      <span>
+                        {isLoadingCategories
+                          ? "Loading categories..."
+                          : selectedCategories.length > 0
+                            ? `${selectedCategories.length} categories selected`
+                            : "Select categories"}
+                      </span>
+                      <ArrowLeft
+                        className={`h-4 w-4 transition-transform ${showCategoryDropdown ? "rotate-90" : "-rotate-90"}`}
+                      />
+                    </Button>
+
+                    {showCategoryDropdown && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                        {categories.map((category) => (
+                          <div
+                            key={category.id}
+                            className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                            onClick={() => toggleCategory(category.id)}
+                          >
+                            <div className="flex-1">{category.name}</div>
+                            {selectedCategories.includes(category.id) ? (
+                              <Check className="h-4 w-4 text-green-500" />
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="content_type">Content Type</Label>
-                    <select
-                      id="content_type"
-                      name="content_type"
-                      value={formData.content_type}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="Static">Static</option>
-                      <option value="Dynamic(LED)">Dynamic(LED)</option>
-                    </select>
-                  </div>
-
-                  {/* Dynamic content specific fields */}
-                  {isDynamicContent && (
-                    <div className="space-y-4 p-4 bg-gray-50 rounded-md border border-gray-200">
-                      <h4 className="text-sm font-medium">Dynamic Content Settings</h4>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="cms.spots_per_loop">
-                          Spots per Loop <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          id="cms.spots_per_loop"
-                          name="cms.spots_per_loop"
-                          type="number"
-                          value={formData.cms.spots_per_loop}
-                          onChange={handleInputChange}
-                          placeholder="Enter number of spots per loop"
-                          min="1"
-                          required={isDynamicContent}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="cms.loops_per_day">
-                          Loops per Day <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          id="cms.loops_per_day"
-                          name="cms.loops_per_day"
-                          type="number"
-                          value={formData.cms.loops_per_day}
-                          onChange={handleInputChange}
-                          placeholder="Enter number of loops per day"
-                          min="1"
-                          required={isDynamicContent}
-                        />
-                      </div>
+                  {/* Selected categories */}
+                  {selectedCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {selectedCategories.map((categoryId) => {
+                        const category = categories.find((c) => c.id === categoryId)
+                        return category ? (
+                          <Badge key={categoryId} variant="secondary" className="flex items-center gap-1">
+                            {category.name}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-4 w-4 p-0 hover:bg-transparent"
+                              onClick={() => removeCategory(categoryId)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </Badge>
+                        ) : null
+                      })}
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="categories">
-                      Categories <span className="text-red-500">*</span>
-                    </Label>
-                    <div className="relative">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className={`w-full justify-between ${selectedCategories.length === 0 ? "border-red-300" : ""}`}
-                        onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                        disabled={isLoadingCategories || categories.length === 0}
-                      >
-                        <span>
-                          {isLoadingCategories
-                            ? "Loading categories..."
-                            : selectedCategories.length > 0
-                              ? `${selectedCategories.length} categories selected`
-                              : "Select categories"}
-                        </span>
-                        <ArrowLeft
-                          className={`h-4 w-4 transition-transform ${showCategoryDropdown ? "rotate-90" : "-rotate-90"}`}
-                        />
-                      </Button>
-
-                      {showCategoryDropdown && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
-                          {categories.map((category) => (
-                            <div
-                              key={category.id}
-                              className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                              onClick={() => toggleCategory(category.id)}
-                            >
-                              <div className="flex-1">{category.name}</div>
-                              {selectedCategories.includes(category.id) ? (
-                                <Check className="h-4 w-4 text-green-500" />
-                              ) : null}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Selected categories */}
-                    {selectedCategories.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {selectedCategories.map((categoryId) => {
-                          const category = categories.find((c) => c.id === categoryId)
-                          return category ? (
-                            <Badge key={categoryId} variant="secondary" className="flex items-center gap-1">
-                              {category.name}
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-4 w-4 p-0 hover:bg-transparent"
-                                onClick={() => removeCategory(categoryId)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </Badge>
-                          ) : null
-                        })}
-                      </div>
-                    )}
-
-                    {categories.length === 0 && !isLoadingCategories && (
-                      <p className="text-xs text-amber-600 mt-1">No active categories found</p>
-                    )}
-                  </div>
+                  {categories.length === 0 && !isLoadingCategories && (
+                    <p className="text-xs text-amber-600 mt-1">No active categories found</p>
+                  )}
                 </div>
               </div>
 
@@ -697,6 +676,7 @@ export default function AdminProductCreatePage() {
                       onChange={handleLocationChange}
                       placeholder="Enter site location"
                       required
+                      disabled={isSubmitting || !subscriptionData?.licenseKey}
                     />
                   </div>
 
@@ -706,8 +686,9 @@ export default function AdminProductCreatePage() {
                       <Button
                         type="button"
                         variant="outline"
-                        className="w-full justify-between"
+                        className="w-full justify-between bg-transparent"
                         onClick={() => setShowAudienceDropdown(!showAudienceDropdown)}
+                        disabled={isSubmitting || !subscriptionData?.licenseKey}
                       >
                         <span>
                           {selectedAudienceTypes.length > 0
@@ -768,6 +749,7 @@ export default function AdminProductCreatePage() {
                       onChange={handleInputChange}
                       placeholder="Enter average daily traffic count"
                       min="0"
+                      disabled={isSubmitting || !subscriptionData?.licenseKey}
                     />
                   </div>
 
@@ -782,6 +764,7 @@ export default function AdminProductCreatePage() {
                       placeholder="Enter elevation from ground level in feet"
                       min="0"
                       step="0.01"
+                      disabled={isSubmitting || !subscriptionData?.licenseKey}
                     />
                   </div>
 
@@ -797,6 +780,7 @@ export default function AdminProductCreatePage() {
                         placeholder="Enter height in feet"
                         min="0"
                         step="0.01"
+                        disabled={isSubmitting || !subscriptionData?.licenseKey}
                       />
                     </div>
 
@@ -811,6 +795,7 @@ export default function AdminProductCreatePage() {
                         placeholder="Enter width in feet"
                         min="0"
                         step="0.01"
+                        disabled={isSubmitting || !subscriptionData?.licenseKey}
                       />
                     </div>
                   </div>
@@ -825,6 +810,7 @@ export default function AdminProductCreatePage() {
                         onChange={(e) => handleGeopointChange(e, 0)}
                         placeholder="Enter latitude"
                         step="0.000001"
+                        disabled={isSubmitting || !subscriptionData?.licenseKey}
                       />
                     </div>
 
@@ -837,6 +823,7 @@ export default function AdminProductCreatePage() {
                         onChange={(e) => handleGeopointChange(e, 1)}
                         placeholder="Enter longitude"
                         step="0.000001"
+                        disabled={isSubmitting || !subscriptionData?.licenseKey}
                       />
                     </div>
                   </div>
@@ -862,6 +849,7 @@ export default function AdminProductCreatePage() {
                     className="hidden"
                     onChange={handleFileChange}
                     required={mediaFiles.length === 0}
+                    disabled={isSubmitting || !subscriptionData?.licenseKey}
                   />
                   <label htmlFor="media-upload" className="flex flex-col items-center justify-center cursor-pointer">
                     <Upload
@@ -929,6 +917,7 @@ export default function AdminProductCreatePage() {
                                 onChange={(e) => handleMediaDistanceChange(index, e.target.value)}
                                 placeholder="e.g., 100m"
                                 className="h-8 text-xs"
+                                disabled={isSubmitting || !subscriptionData?.licenseKey}
                               />
                             </div>
                           </div>
@@ -941,16 +930,19 @@ export default function AdminProductCreatePage() {
 
               {/* Submit Button */}
               <div className="flex justify-end pt-4">
-                <Button type="submit" disabled={isSubmitting || !canCreateProduct}>
-                  {" "}
-                  {/* Disable if not allowed */}
-                  {isSubmitting ? "Creating..." : "Create Product"}
+                <Button type="submit" disabled={isSubmitting || !subscriptionData?.licenseKey}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...
+                    </>
+                  ) : (
+                    "Create Product"
+                  )}
                 </Button>
               </div>
             </form>
           </CardContent>
         </Card>
-      </div>
-    </div>
-  )
+      </main>
+  )\
 }

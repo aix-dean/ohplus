@@ -37,7 +37,6 @@ import {
   type Booking,
 } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
-import ProtectedRoute from "@/components/protected-route"
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { SearchBox } from "@/components/search-box"
@@ -71,7 +70,7 @@ const getSiteCode = (product: Product | null) => {
   // Try different possible locations for site_code
   if (product.site_code) return product.site_code
   if (product.specs_rental && "site_code" in product.specs_rental) return product.specs_rental.site_code
-  if (product.light && "site_code" in product.light) return product.light.site_code
+  if (product.light && "site_code" in product.light) return product.light.siteCode
 
   // Check for camelCase variant
   if ("siteCode" in product) return (product as any).siteCode
@@ -1027,7 +1026,7 @@ function SalesDashboardContent() {
                       Results for "{searchQuery}" ({searchResults.length})
                     </h2>
                   </div>
-                  <Button variant="outline" size="sm" className="gap-1 hidden sm:flex">
+                  <Button variant="outline" size="sm" className="gap-1 hidden sm:flex bg-transparent">
                     <Filter size={14} />
                     <span>Filter</span>
                   </Button>
@@ -1354,7 +1353,7 @@ function SalesDashboardContent() {
                         size="sm"
                         onClick={goToPreviousPage}
                         disabled={currentPage === 1}
-                        className="h-8 w-8 p-0"
+                        className="h-8 w-8 p-0 bg-transparent"
                       >
                         <ChevronLeft size={16} />
                       </Button>
@@ -1520,9 +1519,7 @@ export default function SalesDashboard() {
 
   return (
     <div>
-      <ProtectedRoute module="sales" action="view">
-        <SalesDashboardContent />
-      </ProtectedRoute>
+      <SalesDashboardContent />
 
       {/* Render SalesChatWidget without the floating button */}
       <SalesChatWidget />
@@ -1606,8 +1603,6 @@ function ProductCard({
             </div>
           </div>
         )}
-
-        {/* Removed the DropdownMenu for actions */}
       </div>
 
       <CardContent className="p-4">

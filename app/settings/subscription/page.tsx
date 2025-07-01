@@ -1,20 +1,24 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation" // Import useRouter
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckCircle } from "lucide-react"
+import { CheckCircle, Loader2 } from "lucide-react" // Import Loader2 for spinner
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { getUserProductsCount } from "@/lib/firebase-service" // Import the service to get product count
+import { getUserProductsCount } from "@/lib/firebase-service"
+import { subscriptionService } from "@/lib/subscription-service"
+import type { SubscriptionPlanType, BillingCycle } from "@/lib/types/subscription"
 
 interface SubscriptionPlan {
   name: string
   price: string
   description: string
   features: string[]
-  maxProducts: number | null // null for unlimited
-  type: string // Corresponds to projectData.type
+  maxProducts: number | null
+  type: SubscriptionPlanType
+  billingCycle: BillingCycle
 }
 
 const subscriptionPlans: SubscriptionPlan[] = [
@@ -25,6 +29,7 @@ const subscriptionPlans: SubscriptionPlan[] = [
     features: ["Up to 3 product uploads", "Basic analytics", "Email support"],
     maxProducts: 3,
     type: "Basic",
+    billingCycle: "monthly",
   },
   {
     name: "Premium",
@@ -33,22 +38,26 @@ const subscriptionPlans: SubscriptionPlan[] = [
     features: ["Up to 10 product uploads", "Advanced analytics", "Priority email support", "Custom branding"],
     maxProducts: 10,
     type: "Premium",
+    billingCycle: "monthly",
   },
   {
     name: "Enterprise",
     price: "Contact Us",
     description: "Tailored solutions for large enterprises with extensive needs.",
     features: ["Unlimited product uploads", "Dedicated account manager", "API access", "24/7 phone support"],
-    maxProducts: null, // Unlimited
+    maxProducts: null,
     type: "Enterprise",
+    billingCycle: "monthly",
   },
 ]
 
 export default function SubscriptionPage() {
-  const { projectData, updateProjectData, user } = useAuth()
+  const router = useRouter() // Initialize useRouter
+  const { user, userData, subscriptionData, loading: authLoading, updateSubscriptionData } = useAuth()
   const { toast } = useToast()
   const [currentProductsCount, setCurrentProductsCount] = useState<number | null>(null)
   const [loadingCount, setLoadingCount] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false) // New state for button loading
 
   useEffect(() => {
     const fetchProductCount = async () => {
@@ -64,7 +73,7 @@ export default function SubscriptionPage() {
             description: "Failed to load current product count.",
             variant: "destructive",
           })
-          setCurrentProductsCount(0) // Default to 0 on error
+          setCurrentProductsCount(0)
         } finally {
           setLoadingCount(false)
         }
@@ -73,36 +82,69 @@ export default function SubscriptionPage() {
     fetchProductCount()
   }, [user?.uid, toast])
 
-  const handleUpgradeSubscription = async (planType: string, maxProducts: number | null) => {
-    if (!projectData) {
-      toast({
-        title: "Error",
-        description: "Project data not available. Please try again.",
-        variant: "destructive",
-      })
-      return
-    }
+  const handleUpgradeSubscription = async (plan: SubscriptionPlan) => {
+    console.log("Attempting to change subscription to:", plan.name)
+    console.log("Current subscriptionData:", subscriptionData)
+    setIsSubmitting(true) // Start loading
 
     try {
-      await updateProjectData({
-        type: planType,
-        max_products: maxProducts,
-      })
+      if (!user?.uid || !userData?.license_key) {
+        toast({
+          title: "Error",
+          description: "User or license key not available to manage subscription.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      if (!subscriptionData) {
+        // No existing subscription, create a new one
+        console.log("Creating new subscription...")
+        await subscriptionService.createSubscription(
+          userData.license_key,
+          plan.type,
+          plan.billingCycle,
+          user.uid,
+          new Date(), // startDate
+          null, // endDate (will be calculated by service)
+          "active", // status
+          plan.maxProducts, // maxProducts
+          null, // maxUsers (not in model, but keeping for consistency if needed elsewhere)
+          plan.features, // features (not in model, but keeping for consistency if needed elsewhere)
+          null, // trialEndDate (will be calculated by service)
+        )
+      } else {
+        // Existing subscription, update it
+        console.log("Updating existing subscription...")
+        await updateSubscriptionData({
+          planType: plan.type,
+          billingCycle: plan.billingCycle,
+          startDate: new Date(), // Update start date on plan change
+          status: "active", // Assume changing plan makes it active
+          maxProducts: plan.maxProducts, // Pass maxProducts from the selected plan
+          // maxUsers and features are not directly updated here as they are derived from planType in service
+        })
+      }
+
       toast({
         title: "Subscription Updated",
-        description: `Your subscription has been updated to ${planType}.`,
+        description: `Your subscription has been updated to ${plan.name}.`,
       })
+      console.log("Subscription change successful for plan:", plan.name)
+      router.push("/sales/dashboard") // Navigate to sales/dashboard
     } catch (error) {
-      console.error("Error updating subscription:", error)
+      console.error("Error changing subscription:", error)
       toast({
         title: "Error",
         description: "Failed to update subscription. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setIsSubmitting(false) // End loading
     }
   }
 
-  const currentPlan = subscriptionPlans.find((plan) => plan.type === projectData?.type)
+  const currentPlan = subscriptionPlans.find((plan) => plan.type === subscriptionData?.planType)
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -111,9 +153,11 @@ export default function SubscriptionPage() {
       <div className="mb-8">
         <Card className="p-6 text-center">
           <CardTitle className="text-2xl font-semibold mb-2">Your Current Plan</CardTitle>
-          {projectData ? (
+          {authLoading || !subscriptionData ? (
+            <p className="text-gray-500 dark:text-gray-400">Loading your plan details...</p>
+          ) : (
             <>
-              <p className="text-lg font-medium text-primary">{currentPlan?.name || projectData.type}</p>
+              <p className="text-lg font-medium text-primary">{currentPlan?.name || subscriptionData.planType}</p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                 {loadingCount
                   ? "Loading product count..."
@@ -122,8 +166,6 @@ export default function SubscriptionPage() {
                     : `Currently using ${currentProductsCount} of ${currentPlan?.maxProducts} products`}
               </p>
             </>
-          ) : (
-            <p className="text-gray-500 dark:text-gray-400">Loading your plan details...</p>
           )}
         </Card>
       </div>
@@ -152,24 +194,35 @@ export default function SubscriptionPage() {
               </ul>
             </CardContent>
             <div className="mt-6">
-              {currentPlan?.type === plan.type ? (
+              {subscriptionData?.planType === plan.type ? (
                 <Button disabled className="w-full">
                   Current Plan
                 </Button>
               ) : (
                 <Button
                   className="w-full"
-                  onClick={() => handleUpgradeSubscription(plan.type, plan.maxProducts)}
+                  onClick={() => handleUpgradeSubscription(plan)}
                   disabled={
+                    isSubmitting || // Disable if any button is submitting
+                    authLoading ||
                     loadingCount ||
                     (plan.maxProducts !== null &&
                       currentProductsCount !== null &&
                       currentProductsCount > plan.maxProducts)
                   }
                 >
-                  {plan.maxProducts !== null && currentProductsCount !== null && currentProductsCount > plan.maxProducts
-                    ? `Cannot Downgrade (Too many products)`
-                    : `Choose ${plan.name}`}
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : plan.maxProducts !== null &&
+                    currentProductsCount !== null &&
+                    currentProductsCount > plan.maxProducts ? (
+                    `Cannot Downgrade (Too many products)`
+                  ) : (
+                    `Choose ${plan.name}`
+                  )}
                 </Button>
               )}
             </div>
