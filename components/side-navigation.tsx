@@ -105,7 +105,7 @@ export function SideNavigation() {
   if (pathname?.startsWith("/sales/project-campaigns")) {
     currentSection = "sales"
   }
-  // Explicitly set currentSection to "admin" if path starts with /admin
+  // Explicitly set currentSection to "admin" if path starts with /admin or /admin/dashboard
   if (pathname?.startsWith("/admin")) {
     currentSection = "admin"
   }
@@ -150,7 +150,7 @@ export function SideNavigation() {
               </div>
               <div className="p-1">
                 {[
-                  { title: "Dashboard", href: "/admin", icon: LayoutDashboard },
+                  { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard }, // Updated href
                   { title: "Bulletin Board", href: "/admin/bulletin-board", icon: ClipboardList },
                 ].map((item) => {
                   const Icon = item.icon
