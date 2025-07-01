@@ -1,63 +1,101 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useState } from "react"
+import { ArrowLeft, Search, X, Plus } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Search, X } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function AdminDocumentsPage() {
-  const router = useRouter()
+  const [searchValue, setSearchValue] = useState("")
+
+  const clearSearch = () => {
+    setSearchValue("")
+  }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center p-4 border-b bg-white">
-        <Button variant="ghost" size="icon" onClick={() => router.back()} aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h1 className="text-xl font-semibold ml-2">Documents</h1>
-      </div>
+    <div className="flex-1 p-4 md:p-6">
+      <div className="flex flex-col gap-6">
+        {/* Header with back button */}
+        <div className="flex items-center gap-4">
+          <Link href="/admin/dashboard">
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <h1 className="text-xl md:text-2xl font-bold">Documents</h1>
+        </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 p-4 overflow-auto">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4">
-          {/* Tabs and Search */}
-          <div className="flex flex-col md:flex-row md:items-center gap-4 w-full md:w-auto">
-            <Tabs defaultValue="contracts" className="w-full md:w-auto">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="contracts">Contracts</TabsTrigger>
-                <TabsTrigger value="invoices">Invoices</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <div className="relative flex items-center w-full md:max-w-xs">
-              <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
-              <Input type="search" placeholder="Search..." className="pl-9 pr-8 w-full" aria-label="Search documents" />
-              <Button variant="ghost" size="icon" className="absolute right-1 h-7 w-7" aria-label="Clear search">
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+        {/* Tabs and Action Buttons */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <Tabs defaultValue="contracts" className="w-full sm:w-auto">
+            <TabsList className="grid w-full grid-cols-2 sm:w-auto">
+              <TabsTrigger
+                value="contracts"
+                className="data-[state=active]:border-b-2 data-[state=active]:border-purple-600"
+              >
+                Contracts
+              </TabsTrigger>
+              <TabsTrigger value="invoices">Invoices</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap gap-2 justify-end">
-            <Button className="bg-[#673AB7] hover:bg-[#5e33a6] text-white">+Create Contract</Button>
-            <Button variant="outline" className="bg-[#673AB7] hover:bg-[#5e33a6] text-white border-transparent">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+              <Plus className="mr-2 h-4 w-4" />
+              Create Contract
+            </Button>
+            <Button variant="outline" className="border-purple-600 text-purple-600 hover:bg-purple-50 bg-transparent">
               Templates
             </Button>
-            <Button variant="outline" className="bg-[#673AB7] hover:bg-[#5e33a6] text-white border-transparent">
+            <Button variant="outline" className="border-purple-600 text-purple-600 hover:bg-purple-50 bg-transparent">
               Drafts
             </Button>
           </div>
         </div>
 
-        {/* No Contracts Yet Message */}
-        <div className="flex flex-col items-center justify-center h-[calc(100vh-250px)] text-center text-muted-foreground">
-          <p className="text-lg">No contracts yet.</p>
-          <a href="#" className="text-blue-600 hover:underline mt-2">
-            Add Template?
-          </a>
+        {/* Search Bar */}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="search"
+            placeholder="Search documents..."
+            className="pl-10 pr-10"
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+          />
+          {searchValue && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6"
+              onClick={clearSearch}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
         </div>
+
+        {/* Content Area */}
+        <Tabs defaultValue="contracts" className="flex-1">
+          <TabsContent value="contracts" className="mt-6">
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <p className="text-gray-600 mb-2">No contracts yet.</p>
+              <Link href="#" className="text-blue-600 hover:text-blue-800 underline">
+                Add Template?
+              </Link>
+            </div>
+          </TabsContent>
+          <TabsContent value="invoices" className="mt-6">
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <p className="text-gray-600 mb-2">No invoices yet.</p>
+              <Link href="#" className="text-blue-600 hover:text-blue-800 underline">
+                Add Template?
+              </Link>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )
