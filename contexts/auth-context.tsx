@@ -14,7 +14,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import { generateLicenseKey } from "@/lib/utils"
 import { subscriptionService } from "@/lib/subscription-service"
-import { type Subscription } from "@/lib/types/subscription"
+import type { Subscription } from "@/lib/types/subscription"
 
 interface UserData {
   uid: string

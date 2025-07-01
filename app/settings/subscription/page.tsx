@@ -5,10 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/contexts/auth-context"
 import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-service"
-import { type SubscriptionPlanType } from "@/lib/types/subscription"
-import { CheckCircle, Loader2, XCircle } from 'lucide-react'
+import type { SubscriptionPlanType } from "@/lib/types/subscription"
+import { CheckCircle, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { toast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
 
@@ -26,44 +26,76 @@ export default function SubscriptionPage() {
     }
   }, [loading, user, router])
 
-  const handleUpgrade = async (planType: SubscriptionPlanType) => {
-    if (!user || !userData?.license_key) {
-      toast({
-        title: "Error",
-        description: "User not authenticated or license key missing.",
-        variant: "destructive",
-      })
-      return
-    }
+  const handleUpgrade = useCallback(
+    async (planType: SubscriptionPlanType) => {
+      if (!user || !userData?.license_key) {
+        toast({
+          title: "Error",
+          description: "User not authenticated or license key missing.",
+          variant: "destructive",
+        })
+        return
+      }
 
-    setIsUpdating(true)
-    setSelectedPlan(planType)
+      setIsUpdating(true)
+      setSelectedPlan(planType)
 
-    try {
-      await subscriptionService.updateSubscription(userData.license_key, {
-        planType: planType,
-        status: "active", // Assuming upgrade makes it active
-        billingCycle: "monthly", // Default to monthly for upgrades, can be made dynamic
-        startDate: new Date(), // Reset start date on upgrade
-        trialEndDate: null, // Clear trial end date if upgrading from trial
-      })
-      await refreshSubscriptionData() // Refresh the context data
-      toast({
-        title: "Success",
-        description: `Successfully upgraded to ${planType} plan!`,
-      })
-    } catch (error: any) {
-      console.error("Failed to upgrade subscription:", error)
-      toast({
-        title: "Upgrade Failed",
-        description: error.message || "Failed to upgrade subscription. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsUpdating(false)
-      setSelectedPlan(null)
-    }
-  }
+      try {
+        const selectedPlanData = plans.find((plan) => plan.id === planType)
+        if (!selectedPlanData) {
+          toast({
+            title: "Error",
+            description: "Selected plan not found.",
+            variant: "destructive",
+          })
+          return
+        }
+
+        // Always try to get the latest subscription from the database before deciding
+        const existingSubscription = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
+
+        if (existingSubscription) {
+          // Update existing subscription
+          await subscriptionService.updateSubscription(userData.license_key, {
+            planType: planType,
+            status: "active",
+            billingCycle: "monthly", // Default to monthly for upgrades, can be made dynamic
+            startDate: new Date(), // Reset start date on upgrade
+            trialEndDate: null, // Clear trial end date if upgrading from trial
+          })
+          toast({
+            title: "Success",
+            description: `Successfully upgraded to ${planType} plan!`,
+          })
+        } else {
+          // Create new subscription if none exists
+          await subscriptionService.createSubscription(
+            userData.license_key,
+            planType,
+            "monthly", // Default billing cycle
+            user.uid,
+          )
+          toast({
+            title: "Success",
+            description: `Successfully subscribed to ${planType} plan!`,
+          })
+        }
+
+        await refreshSubscriptionData() // Refresh the context data
+      } catch (error: any) {
+        console.error("Failed to upgrade/subscribe:", error)
+        toast({
+          title: "Action Failed",
+          description: error.message || "Failed to update/create subscription. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsUpdating(false)
+        setSelectedPlan(null)
+      }
+    },
+    [user, userData, plans, refreshSubscriptionData, toast],
+  )
 
   if (loading) {
     return (
@@ -80,9 +112,7 @@ export default function SubscriptionPage() {
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Choose Your Plan</h1>
-          <p className="mt-3 text-lg text-gray-600">
-            Select the perfect plan that fits your business needs.
-          </p>
+          <p className="mt-3 text-lg text-gray-600">Select the perfect plan that fits your business needs.</p>
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -145,9 +175,7 @@ export default function SubscriptionPage() {
         <Card className="mx-auto max-w-2xl rounded-xl shadow-sm">
           <CardHeader className="border-b p-6">
             <CardTitle className="text-xl font-bold text-gray-900">Your Current Subscription</CardTitle>
-            <CardDescription className="mt-2 text-gray-600">
-              Details of your active plan and usage.
-            </CardDescription>
+            <CardDescription className="mt-2 text-gray-600">Details of your active plan and usage.</CardDescription>
           </CardHeader>
           <CardContent className="p-6">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
