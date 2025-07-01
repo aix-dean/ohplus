@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronDown, Upload, Trash2, ImageIcon, Film, X, Check, Loader2, Info } from 'lucide-react'
+import { ChevronDown, Upload, Trash2, ImageIcon, Film, X, Check, Loader2, Info, Package } from 'lucide-react'
 import { createProduct } from "@/lib/firebase-service"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
@@ -18,6 +18,7 @@ import { collection, query, where, getDocs, serverTimestamp } from "firebase/fir
 import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
+import Link from "next/link"
 
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
@@ -42,7 +43,7 @@ interface Category {
 
 export default function AdminProductCreatePage() {
   const router = useRouter()
-  const { user, userData, subscriptionData } = useAuth()
+  const { user, userData, subscriptionData, loading } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
@@ -82,7 +83,12 @@ export default function AdminProductCreatePage() {
     status: "PENDING", // Default status
   })
 
-  // Fetch categories on component mount
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login")
+    }
+  }, [loading, user, router])
+
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -119,10 +125,11 @@ export default function AdminProductCreatePage() {
       }
     }
 
-    fetchCategories()
-  }, [])
+    if (user) {
+      fetchCategories()
+    }
+  }, [user])
 
-  // Handle form input changes
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
 
@@ -143,7 +150,6 @@ export default function AdminProductCreatePage() {
     }
   }
 
-  // Handle location change from GooglePlacesAutocomplete
   const handleLocationChange = (value: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -154,7 +160,6 @@ export default function AdminProductCreatePage() {
     }))
   }
 
-  // Handle category selection
   const toggleCategory = (categoryId: string) => {
     setSelectedCategories((prev) => {
       if (prev.includes(categoryId)) {
@@ -165,7 +170,6 @@ export default function AdminProductCreatePage() {
     })
   }
 
-  // Handle audience type selection
   const toggleAudienceType = (audienceType: string) => {
     setSelectedAudienceTypes((prev) => {
       if (prev.includes(audienceType)) {
@@ -186,7 +190,6 @@ export default function AdminProductCreatePage() {
     }))
   }
 
-  // Handle geopoint changes
   const handleGeopointChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const value = Number.parseFloat(e.target.value) || 0
     const newGeopoint = [...formData.specs_rental.geopoint]
@@ -201,7 +204,6 @@ export default function AdminProductCreatePage() {
     }))
   }
 
-  // Handle product type change
   const handleTypeChange = (value: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -209,7 +211,6 @@ export default function AdminProductCreatePage() {
     }))
   }
 
-  // Handle media file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files)
@@ -230,14 +231,12 @@ export default function AdminProductCreatePage() {
     }
   }
 
-  // Handle media distance change
   const handleMediaDistanceChange = (index: number, value: string) => {
     const newDistances = [...mediaDistances]
     newDistances[index] = value
     setMediaDistances(newDistances)
   }
 
-  // Remove a media file
   const handleRemoveMedia = (index: number) => {
     // Release the object URL to avoid memory leaks
     URL.revokeObjectURL(mediaPreviewUrls[index])
@@ -249,7 +248,6 @@ export default function AdminProductCreatePage() {
     setMediaTypes((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // Upload media files to Firebase Storage
   const uploadMediaFiles = async () => {
     if (!user) return []
 
@@ -286,7 +284,6 @@ export default function AdminProductCreatePage() {
     return mediaData
   }
 
-  // Get category names from selected IDs
   const getCategoryNames = () => {
     return selectedCategories
       .map((id) => {
@@ -296,7 +293,6 @@ export default function AdminProductCreatePage() {
       .filter(Boolean)
   }
 
-  // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -306,8 +302,7 @@ export default function AdminProductCreatePage() {
       return
     }
 
-    // Check if subscriptionData exists and is active
-    if (!subscriptionData || subscriptionData.status !== "active") {
+    if (!subscriptionData || (subscriptionData.status !== "active" && subscriptionData.status !== "trialing")) {
       toast({
         title: "Subscription Required",
         description: "You need an active subscription to create products. Please subscribe.",
@@ -317,7 +312,6 @@ export default function AdminProductCreatePage() {
       return
     }
 
-    // Validate required fields
     if (!formData.name) {
       setError("Name is required")
       return
@@ -343,7 +337,6 @@ export default function AdminProductCreatePage() {
       return
     }
 
-    // Validate Dynamic content type specific fields
     if (formData.content_type === "Dynamic(LED)") {
       if (!formData.cms.spots_per_loop) {
         setError("Spots per loop is required for Dynamic content")
@@ -359,24 +352,21 @@ export default function AdminProductCreatePage() {
       setIsSubmitting(true)
       setError(null)
 
-      // Upload media files and get their data
       const mediaData = await uploadMediaFiles()
 
-      // Strip "(LED)" from content_type if present
       const contentType = formData.content_type === "Dynamic(LED)" ? "Dynamic" : formData.content_type
 
-      // Create the product
       const productData = {
         ...formData,
-        content_type: contentType, // Use the cleaned content type
+        content_type: contentType,
         price: formData.price ? Number.parseFloat(formData.price) : null,
         media: mediaData,
         categories: selectedCategories,
         category_names: getCategoryNames(),
-        active: true, // Add default active state
-        deleted: false, // Add default deleted state
-        created: serverTimestamp(), // Use Firebase server timestamp
-        updated: serverTimestamp(), // Use Firebase server timestamp for updated field too
+        active: true,
+        deleted: false,
+        created: serverTimestamp(),
+        updated: serverTimestamp(),
         cms:
           contentType === "Dynamic"
             ? {
@@ -396,21 +386,18 @@ export default function AdminProductCreatePage() {
         },
       }
 
-      // Pass licenseKey to createProduct
       const productId = await createProduct(
         user.uid,
         user.displayName || "Unknown User",
-        userData.license_key, // Use userData.license_key here
+        userData.license_key,
         productData,
       )
 
-      // Show success message
       toast({
         title: "Product created",
         description: "Your product has been created successfully.",
       })
 
-      // Navigate back to the admin inventory page
       router.push("/admin/inventory")
     } catch (error) {
       console.error("Error creating product:", error)
@@ -424,12 +411,10 @@ export default function AdminProductCreatePage() {
     router.push("/admin/inventory")
   }
 
-  // Remove a selected category
   const removeCategory = (categoryId: string) => {
     setSelectedCategories((prev) => prev.filter((id) => id !== categoryId))
   }
 
-  // Remove a selected audience type
   const removeAudienceType = (audienceType: string) => {
     setSelectedAudienceTypes((prev) => prev.filter((type) => type !== audienceType))
 
@@ -442,8 +427,18 @@ export default function AdminProductCreatePage() {
     }))
   }
 
-  // Check if content type is Dynamic
   const isDynamicContent = formData.content_type === "Dynamic(LED)"
+
+  const hasActiveSubscription = subscriptionData?.status === "active" || subscriptionData?.status === "trialing"
+  const isTrial = subscriptionData?.status === "trialing"
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    )
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-start bg-gray-50 p-4 sm:p-6 lg:p-8 pt-8">
@@ -455,502 +450,503 @@ export default function AdminProductCreatePage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
-          {(!subscriptionData || subscriptionData.status !== "active") && (
+          {!hasActiveSubscription ? (
             <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 flex items-center gap-3 border border-red-200">
               <Info className="h-5 w-5 text-red-500" />
               <span>You need an active subscription to create products. Please subscribe to unlock this feature.</span>
             </div>
-          )}
-          <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Basic Information */}
-            <section className="space-y-6 p-6 border border-gray-200 rounded-lg bg-white">
-              <h3 className="text-xl font-semibold text-gray-800 border-b pb-3 mb-3">Basic Information</h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="name">
-                    Name <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="Enter product name"
-                    required
-                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
-                  />
+          ) : (
+            <div className="space-y-4">
+              {isTrial && (
+                <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-700">
+                  You are currently on a trial plan. You can create up to {subscriptionData?.maxProducts} product.
+                  Upgrade to unlock more features.
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="price">Price per Month (₱)</Label>
-                  <Input
-                    id="price"
-                    name="price"
-                    type="number"
-                    value={formData.price}
-                    onChange={handleInputChange}
-                    placeholder="Enter price per month"
-                    min="0"
-                    step="0.01"
-                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">
-                  Description <span className="text-red-500">*</span>
-                </Label>
-                <Textarea
-                  id="description"
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  placeholder="Enter product description"
-                  rows={4}
-                  required
-                  disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="type">Product Type</Label>
-                  <Select
-                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
-                    onValueChange={handleTypeChange}
-                    defaultValue={formData.type}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="RENTAL">Rental</SelectItem>
-                      <SelectItem value="MERCHANDISE">Merchandise</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="content_type">Content Type</Label>
-                  <Select
-                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
-                    onValueChange={(value) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        content_type: value,
-                      }))
-                    }
-                    defaultValue={formData.content_type}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select content type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Static">Static</SelectItem>
-                      <SelectItem value="Dynamic(LED)">Dynamic(LED)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* Dynamic content specific fields */}
-              {isDynamicContent && (
-                <div className="space-y-4 p-4 bg-gray-50 rounded-md border border-gray-200">
-                  <h4 className="text-base font-medium text-gray-700">Dynamic Content Settings</h4>
+              )}
+              <form onSubmit={handleSubmit} className="space-y-8">
+                <section className="space-y-6 p-6 border border-gray-200 rounded-lg bg-white">
+                  <h3 className="text-xl font-semibold text-gray-800 border-b pb-3 mb-3">Basic Information</h3>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label htmlFor="cms.spots_per_loop">
-                        Spots per Loop <span className="text-red-500">*</span>
+                      <Label htmlFor="name">
+                        Name <span className="text-red-500">*</span>
                       </Label>
                       <Input
-                        id="cms.spots_per_loop"
-                        name="cms.spots_per_loop"
-                        type="number"
-                        value={formData.cms.spots_per_loop}
+                        id="name"
+                        name="name"
+                        value={formData.name}
                         onChange={handleInputChange}
-                        placeholder="Enter number of spots per loop"
-                        min="1"
-                        required={isDynamicContent}
-                        disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
+                        placeholder="Enter product name"
+                        required
+                        disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="cms.loops_per_day">
-                        Loops per Day <span className="text-red-500">*</span>
-                      </Label>
+                      <Label htmlFor="price">Price per Month (₱)</Label>
                       <Input
-                        id="cms.loops_per_day"
-                        name="cms.loops_per_day"
+                        id="price"
+                        name="price"
                         type="number"
-                        value={formData.cms.loops_per_day}
+                        value={formData.price}
                         onChange={handleInputChange}
-                        placeholder="Enter number of loops per day"
-                        min="1"
-                        required={isDynamicContent}
-                        disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
+                        placeholder="Enter price per month"
+                        min="0"
+                        step="0.01"
+                        disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                       />
                     </div>
                   </div>
-                </div>
-              )}
 
-              <div className="space-y-2">
-                <Label htmlFor="categories">
-                  Categories <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={`w-full justify-between ${selectedCategories.length === 0 ? "border-red-300" : ""}`}
-                    onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                    disabled={
-                      isLoadingCategories ||
-                      categories.length === 0 ||
-                      isSubmitting ||
-                      !subscriptionData ||
-                      subscriptionData.status !== "active"
-                    }
-                  >
-                    <span>
-                      {isLoadingCategories
-                        ? "Loading categories..."
-                        : selectedCategories.length > 0
-                          ? `${selectedCategories.length} categories selected`
-                          : "Select categories"}
-                    </span>
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform ${showCategoryDropdown ? "rotate-180" : "rotate-0"}`}
+                  <div className="space-y-2">
+                    <Label htmlFor="description">
+                      Description <span className="text-red-500">*</span>
+                    </Label>
+                    <Textarea
+                      id="description"
+                      name="description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      placeholder="Enter product description"
+                      rows={4}
+                      required
+                      disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                     />
-                  </Button>
+                  </div>
 
-                  {showCategoryDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {categories.map((category) => (
-                        <div
-                          key={category.id}
-                          className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                          onClick={() => toggleCategory(category.id)}
-                        >
-                          <div className="flex-1">{category.name}</div>
-                          {selectedCategories.includes(category.id) ? (
-                            <Check className="h-4 w-4 text-green-500" />
-                          ) : null}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="type">Product Type</Label>
+                      <Select
+                        disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
+                        onValueChange={handleTypeChange}
+                        defaultValue={formData.type}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="RENTAL">Rental</SelectItem>
+                          <SelectItem value="MERCHANDISE">Merchandise</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="content_type">Content Type</Label>
+                      <Select
+                        disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
+                        onValueChange={(value) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            content_type: value,
+                          }))
+                        }
+                        defaultValue={formData.content_type}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select content type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Static">Static</SelectItem>
+                          <SelectItem value="Dynamic(LED)">Dynamic(LED)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {isDynamicContent && (
+                    <div className="space-y-4 p-4 bg-gray-50 rounded-md border border-gray-200">
+                      <h4 className="text-base font-medium text-gray-700">Dynamic Content Settings</h4>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="cms.spots_per_loop">
+                            Spots per Loop <span className="text-red-500">*</span>
+                          </Label>
+                          <Input
+                            id="cms.spots_per_loop"
+                            name="cms.spots_per_loop"
+                            type="number"
+                            value={formData.cms.spots_per_loop}
+                            onChange={handleInputChange}
+                            placeholder="Enter number of spots per loop"
+                            min="1"
+                            required={isDynamicContent}
+                            disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
+                          />
                         </div>
-                      ))}
+
+                        <div className="space-y-2">
+                          <Label htmlFor="cms.loops_per_day">
+                            Loops per Day <span className="text-red-500">*</span>
+                          </Label>
+                          <Input
+                            id="cms.loops_per_day"
+                            name="cms.loops_per_day"
+                            type="number"
+                            value={formData.cms.loops_per_day}
+                            onChange={handleInputChange}
+                            placeholder="Enter number of loops per day"
+                            min="1"
+                            required={isDynamicContent}
+                            disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
-                </div>
 
-                {/* Selected categories */}
-                {selectedCategories.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {selectedCategories.map((categoryId) => {
-                      const category = categories.find((c) => c.id === categoryId)
-                      return category ? (
-                        <Badge key={categoryId} variant="secondary" className="flex items-center gap-1 pr-1">
-                          {category.name}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-4 w-4 p-0 hover:bg-transparent"
-                            onClick={() => removeCategory(categoryId)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </Badge>
-                      ) : null
-                    })}
-                  </div>
-                )}
+                  <div className="space-y-2">
+                    <Label htmlFor="categories">
+                      Categories <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={`w-full justify-between ${selectedCategories.length === 0 ? "border-red-300" : ""}`}
+                        onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                        disabled={
+                          isLoadingCategories ||
+                          categories.length === 0 ||
+                          isSubmitting ||
+                          !subscriptionData ||
+                          !hasActiveSubscription
+                        }
+                      >
+                        <span>
+                          {isLoadingCategories
+                            ? "Loading categories..."
+                            : selectedCategories.length > 0
+                              ? `${selectedCategories.length} categories selected`
+                              : "Select categories"}
+                        </span>
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform ${showCategoryDropdown ? "rotate-180" : "rotate-0"}`}
+                        />
+                      </Button>
 
-                {categories.length === 0 && !isLoadingCategories && (
-                  <p className="text-xs text-amber-600 mt-1">No active categories found</p>
-                )}
-              </div>
-            </section>
-
-            {/* Location Information */}
-            <section className="space-y-6 p-6 border border-gray-200 rounded-lg bg-white">
-              <h3 className="text-xl font-semibold text-gray-800 border-b pb-3 mb-3">Location Information</h3>
-
-              <div className="space-y-2">
-                <Label htmlFor="specs_rental.location">
-                  Location <span className="text-red-500">*</span>
-                </Label>
-                <GooglePlacesAutocomplete
-                  value={formData.specs_rental.location}
-                  onChange={handleLocationChange}
-                  placeholder="Enter site location"
-                  required
-                  disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="audience_types">Audience Types (Multiple)</Label>
-                <div className="relative">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-between bg-transparent"
-                    onClick={() => setShowAudienceDropdown(!showAudienceDropdown)}
-                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
-                  >
-                    <span>
-                      {selectedAudienceTypes.length > 0
-                        ? `${selectedAudienceTypes.length} audience types selected`
-                        : "Select audience types"}
-                    </span>
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform ${showAudienceDropdown ? "rotate-180" : "rotate-0"}`}
-                    />
-                  </Button>
-
-                  {showAudienceDropdown && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {AUDIENCE_TYPES.map((type) => (
-                        <div
-                          key={type}
-                          className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                          onClick={() => toggleAudienceType(type)}
-                        >
-                          <div className="flex-1">{type}</div>
-                          {selectedAudienceTypes.includes(type) ? <Check className="h-4 w-4 text-green-500" /> : null}
+                      {showCategoryDropdown && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                          {categories.map((category) => (
+                            <div
+                              key={category.id}
+                              className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                              onClick={() => toggleCategory(category.id)}
+                            >
+                              <div className="flex-1">{category.name}</div>
+                              {selectedCategories.includes(category.id) ? (
+                                <Check className="h-4 w-4 text-green-500" />
+                              ) : null}
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
+                    </div>
+
+                    {selectedCategories.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {selectedCategories.map((categoryId) => {
+                          const category = categories.find((c) => c.id === categoryId)
+                          return category ? (
+                            <Badge key={categoryId} variant="secondary" className="flex items-center gap-1 pr-1">
+                              {category.name}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-4 w-4 p-0 hover:bg-transparent"
+                                onClick={() => removeCategory(categoryId)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </Badge>
+                          ) : null
+                        })}
+                      </div>
+                    )}
+
+                    {categories.length === 0 && !isLoadingCategories && (
+                      <p className="text-xs text-amber-600 mt-1">No active categories found</p>
+                    )}
+                  </div>
+                </section>
+
+                <section className="space-y-6 p-6 border border-gray-200 rounded-lg bg-white">
+                  <h3 className="text-xl font-semibold text-gray-800 border-b pb-3 mb-3">Location Information</h3>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="specs_rental.location">
+                      Location <span className="text-red-500">*</span>
+                    </Label>
+                    <GooglePlacesAutocomplete
+                      value={formData.specs_rental.location}
+                      onChange={handleLocationChange}
+                      placeholder="Enter site location"
+                      required
+                      disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="audience_types">Audience Types (Multiple)</Label>
+                    <div className="relative">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-between bg-transparent"
+                        onClick={() => setShowAudienceDropdown(!showAudienceDropdown)}
+                        disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
+                      >
+                        <span>
+                          {selectedAudienceTypes.length > 0
+                            ? `${selectedAudienceTypes.length} audience types selected`
+                            : "Select audience types"}
+                        </span>
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform ${showAudienceDropdown ? "rotate-180" : "rotate-0"}`}
+                        />
+                      </Button>
+
+                      {showAudienceDropdown && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                          {AUDIENCE_TYPES.map((type) => (
+                            <div
+                              key={type}
+                              className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                              onClick={() => toggleAudienceType(type)}
+                            >
+                              <div className="flex-1">{type}</div>
+                              {selectedAudienceTypes.includes(type) ? <Check className="h-4 w-4 text-green-500" /> : null}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {selectedAudienceTypes.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {selectedAudienceTypes.map((type) => (
+                          <Badge key={type} variant="secondary" className="flex items-center gap-1 pr-1">
+                            {type}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-4 w-4 p-0 hover:bg-transparent"
+                              onClick={() => removeAudienceType(type)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="specs_rental.traffic_count">Traffic Count (Daily)</Label>
+                      <Input
+                        id="specs_rental.traffic_count"
+                        name="specs_rental.traffic_count"
+                        type="number"
+                        value={formData.specs_rental.traffic_count}
+                        onChange={handleInputChange}
+                        placeholder="Enter average daily traffic count"
+                        min="0"
+                        disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="specs_rental.elevation">Elevation (ft)</Label>
+                      <Input
+                        id="specs_rental.elevation"
+                        name="specs_rental.elevation"
+                        type="number"
+                        value={formData.specs_rental.elevation}
+                        onChange={handleInputChange}
+                        placeholder="Enter elevation from ground level in feet"
+                        min="0"
+                        step="0.01"
+                        disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="specs_rental.height">Height (ft)</Label>
+                      <Input
+                        id="specs_rental.height"
+                        name="specs_rental.height"
+                        type="number"
+                        value={formData.specs_rental.height}
+                        onChange={handleInputChange}
+                        placeholder="Enter height in feet"
+                        min="0"
+                        step="0.01"
+                        disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="specs_rental.width">Width (ft)</Label>
+                      <Input
+                        id="specs_rental.width"
+                        name="specs_rental.width"
+                        type="number"
+                        value={formData.specs_rental.width}
+                        onChange={handleInputChange}
+                        placeholder="Enter width in feet"
+                        min="0"
+                        step="0.01"
+                        disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="latitude">Latitude</Label>
+                      <Input
+                        id="latitude"
+                        type="number"
+                        value={formData.specs_rental.geopoint[0]}
+                        onChange={(e) => handleGeopointChange(e, 0)}
+                        placeholder="Enter latitude"
+                        step="0.000001"
+                        disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="longitude">Longitude</Label>
+                      <Input
+                        id="longitude"
+                        type="number"
+                        value={formData.specs_rental.geopoint[1]}
+                        onChange={(e) => handleGeopointChange(e, 1)}
+                        placeholder="Enter longitude"
+                        step="0.000001"
+                        disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <section className="space-y-6 p-6 border border-gray-200 rounded-lg bg-white">
+                  <h3 className="text-xl font-semibold text-gray-800 border-b pb-3 mb-3">
+                    Media <span className="text-red-500">*</span>
+                  </h3>
+
+                  <div
+                    className={`border-2 border-dashed ${
+                      mediaFiles.length === 0 ? "border-red-400 bg-red-50" : "border-gray-300 bg-gray-50"
+                    } rounded-lg p-8 text-center transition-colors duration-200`}
+                  >
+                    <input
+                      type="file"
+                      id="media-upload"
+                      multiple
+                      accept="image/*,video/*"
+                      className="hidden"
+                      onChange={handleFileChange}
+                      required={mediaFiles.length === 0}
+                      disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
+                    />
+                    <label htmlFor="media-upload" className="flex flex-col items-center justify-center cursor-pointer">
+                      <Upload className={`h-12 w-12 ${mediaFiles.length === 0 ? "text-red-500" : "text-gray-500"} mb-3`} />
+                      <p className="text-base font-medium text-gray-700 mb-1">Click to upload or drag and drop</p>
+                      <p className="text-sm text-gray-500">Images or videos (max 10MB each)</p>
+                      {mediaFiles.length === 0 && (
+                        <p className="text-sm text-red-600 mt-3 font-medium">At least one media file is required</p>
+                      )}
+                    </label>
+                  </div>
+
+                  {mediaPreviewUrls.length > 0 && (
+                    <div className="space-y-4">
+                      <h4 className="text-base font-medium text-gray-700">Uploaded Media</h4>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {mediaPreviewUrls.map((url, index) => {
+                          const isVideo = mediaTypes[index] === "Video"
+                          return (
+                            <Card key={index} className="relative group overflow-hidden">
+                              <CardContent className="p-0">
+                                <div className="aspect-video bg-gray-100 flex items-center justify-center overflow-hidden">
+                                  {isVideo ? (
+                                    <video src={url} controls className="w-full h-full object-contain" />
+                                  ) : (
+                                    <img
+                                      src={url || "/placeholder.svg"}
+                                      alt={`Preview ${index + 1}`}
+                                      className="w-full h-full object-contain"
+                                    />
+                                  )}
+                                </div>
+                                <div className="p-3 space-y-2">
+                                  <div className="flex items-center text-sm font-medium text-gray-700">
+                                    {isVideo ? (
+                                      <Film className="h-4 w-4 mr-2 text-blue-500" />
+                                    ) : (
+                                      <ImageIcon className="h-4 w-4 mr-2 text-green-500" />
+                                    )}
+                                    <span>
+                                      {isVideo ? "Video" : "Image"} {index + 1}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label htmlFor={`media-distance-${index}`} className="text-xs text-gray-600">
+                                      Viewing Distance
+                                    </Label>
+                                    <Input
+                                      id={`media-distance-${index}`}
+                                      value={mediaDistances[index]}
+                                      onChange={(e) => handleMediaDistanceChange(index, e.target.value)}
+                                      placeholder="e.g., 100m"
+                                      className="h-9 text-sm"
+                                      disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
+                                    />
+                                  </div>
+                                </div>
+                              </CardContent>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveMedia(index)}
+                                className="absolute top-2 right-2 h-8 w-8 rounded-full bg-white/80 text-red-500 hover:bg-white hover:text-red-600 transition-all opacity-0 group-hover:opacity-100"
+                                aria-label="Remove media"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </Card>
+                          )
+                        })}
+                      </div>
                     </div>
                   )}
+                </section>
+
+                <div className="flex justify-end pt-4">
+                  <Button type="submit" disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}>
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...
+                      </>
+                    ) : (
+                      "Create Product"
+                    )}
+                  </Button>
                 </div>
-
-                {/* Selected audience types */}
-                {selectedAudienceTypes.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {selectedAudienceTypes.map((type) => (
-                      <Badge key={type} variant="secondary" className="flex items-center gap-1 pr-1">
-                        {type}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-4 w-4 p-0 hover:bg-transparent"
-                          onClick={() => removeAudienceType(type)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="specs_rental.traffic_count">Traffic Count (Daily)</Label>
-                  <Input
-                    id="specs_rental.traffic_count"
-                    name="specs_rental.traffic_count"
-                    type="number"
-                    value={formData.specs_rental.traffic_count}
-                    onChange={handleInputChange}
-                    placeholder="Enter average daily traffic count"
-                    min="0"
-                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="specs_rental.elevation">Elevation (ft)</Label>
-                  <Input
-                    id="specs_rental.elevation"
-                    name="specs_rental.elevation"
-                    type="number"
-                    value={formData.specs_rental.elevation}
-                    onChange={handleInputChange}
-                    placeholder="Enter elevation from ground level in feet"
-                    min="0"
-                    step="0.01"
-                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="specs_rental.height">Height (ft)</Label>
-                  <Input
-                    id="specs_rental.height"
-                    name="specs_rental.height"
-                    type="number"
-                    value={formData.specs_rental.height}
-                    onChange={handleInputChange}
-                    placeholder="Enter height in feet"
-                    min="0"
-                    step="0.01"
-                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="specs_rental.width">Width (ft)</Label>
-                  <Input
-                    id="specs_rental.width"
-                    name="specs_rental.width"
-                    type="number"
-                    value={formData.specs_rental.width}
-                    onChange={handleInputChange}
-                    placeholder="Enter width in feet"
-                    min="0"
-                    step="0.01"
-                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="latitude">Latitude</Label>
-                  <Input
-                    id="latitude"
-                    type="number"
-                    value={formData.specs_rental.geopoint[0]}
-                    onChange={(e) => handleGeopointChange(e, 0)}
-                    placeholder="Enter latitude"
-                    step="0.000001"
-                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="longitude">Longitude</Label>
-                  <Input
-                    id="longitude"
-                    type="number"
-                    value={formData.specs_rental.geopoint[1]}
-                    onChange={(e) => handleGeopointChange(e, 1)}
-                    placeholder="Enter longitude"
-                    step="0.000001"
-                    disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
-                  />
-                </div>
-              </div>
-            </section>
-
-            {/* Media Upload */}
-            <section className="space-y-6 p-6 border border-gray-200 rounded-lg bg-white">
-              <h3 className="text-xl font-semibold text-gray-800 border-b pb-3 mb-3">
-                Media <span className="text-red-500">*</span>
-              </h3>
-
-              <div
-                className={`border-2 border-dashed ${
-                  mediaFiles.length === 0 ? "border-red-400 bg-red-50" : "border-gray-300 bg-gray-50"
-                } rounded-lg p-8 text-center transition-colors duration-200`}
-              >
-                <input
-                  type="file"
-                  id="media-upload"
-                  multiple
-                  accept="image/*,video/*"
-                  className="hidden"
-                  onChange={handleFileChange}
-                  required={mediaFiles.length === 0}
-                  disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
-                />
-                <label htmlFor="media-upload" className="flex flex-col items-center justify-center cursor-pointer">
-                  <Upload className={`h-12 w-12 ${mediaFiles.length === 0 ? "text-red-500" : "text-gray-500"} mb-3`} />
-                  <p className="text-base font-medium text-gray-700 mb-1">Click to upload or drag and drop</p>
-                  <p className="text-sm text-gray-500">Images or videos (max 10MB each)</p>
-                  {mediaFiles.length === 0 && (
-                    <p className="text-sm text-red-600 mt-3 font-medium">At least one media file is required</p>
-                  )}
-                </label>
-              </div>
-
-              {/* Media Preview - Grid Layout */}
-              {mediaPreviewUrls.length > 0 && (
-                <div className="space-y-4">
-                  <h4 className="text-base font-medium text-gray-700">Uploaded Media</h4>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {mediaPreviewUrls.map((url, index) => {
-                      const isVideo = mediaTypes[index] === "Video"
-                      return (
-                        <Card key={index} className="relative group overflow-hidden">
-                          <CardContent className="p-0">
-                            <div className="aspect-video bg-gray-100 flex items-center justify-center overflow-hidden">
-                              {isVideo ? (
-                                <video src={url} controls className="w-full h-full object-contain" />
-                              ) : (
-                                <img
-                                  src={url || "/placeholder.svg"}
-                                  alt={`Preview ${index + 1}`}
-                                  className="w-full h-full object-contain"
-                                />
-                              )}
-                            </div>
-                            <div className="p-3 space-y-2">
-                              <div className="flex items-center text-sm font-medium text-gray-700">
-                                {isVideo ? (
-                                  <Film className="h-4 w-4 mr-2 text-blue-500" />
-                                ) : (
-                                  <ImageIcon className="h-4 w-4 mr-2 text-green-500" />
-                                )}
-                                <span>
-                                  {isVideo ? "Video" : "Image"} {index + 1}
-                                </span>
-                              </div>
-                              <div className="space-y-1">
-                                <Label htmlFor={`media-distance-${index}`} className="text-xs text-gray-600">
-                                  Viewing Distance
-                                </Label>
-                                <Input
-                                  id={`media-distance-${index}`}
-                                  value={mediaDistances[index]}
-                                  onChange={(e) => handleMediaDistanceChange(index, e.target.value)}
-                                  placeholder="e.g., 100m"
-                                  className="h-9 text-sm"
-                                  disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}
-                                />
-                              </div>
-                            </div>
-                          </CardContent>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveMedia(index)}
-                            className="absolute top-2 right-2 h-8 w-8 rounded-full bg-white/80 text-red-500 hover:bg-white hover:text-red-600 transition-all opacity-0 group-hover:opacity-100"
-                            aria-label="Remove media"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </Card>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </section>
-
-            {/* Submit Button */}
-            <div className="flex justify-end pt-4">
-              <Button type="submit" disabled={isSubmitting || !subscriptionData || subscriptionData.status !== "active"}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...
-                  </>
-                ) : (
-                  "Create Product"
-                )}
-              </Button>
+              </form>
             </div>
-          </form>
+          )}
         </CardContent>
       </Card>
     </main>

@@ -159,6 +159,17 @@ export const subscriptionService = {
     await updateDoc(docRef, updateData)
     console.log("subscriptionService: Subscription updated successfully for ID:", docRef.id)
   },
+
+  getDaysRemaining(subscription: Subscription): number {
+    if (!subscription.trialEndDate) {
+      return 0
+    }
+    const today = new Date()
+    const trialEnd = new Date(subscription.trialEndDate)
+    const diffTime = trialEnd.getTime() - today.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return Math.max(0, diffDays) // Ensure it doesn't return negative days
+  },
 }
 
 // This function provides the list of available plans.
