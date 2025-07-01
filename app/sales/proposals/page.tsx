@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import {
   MoreVertical,
   FileText,
@@ -31,8 +31,8 @@ import { format } from "date-fns"
 import { getProposalsByUserId } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
 import { useResponsive } from "@/hooks/use-responsive"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { CostEstimatesList } from "@/components/cost-estimates-list"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Import Tabs components
+import { CostEstimatesList } from "@/components/cost-estimates-list" // Import CostEstimatesList
 
 function ProposalsPageContent() {
   const [proposals, setProposals] = useState<Proposal[]>([])
@@ -43,7 +43,7 @@ function ProposalsPageContent() {
   const { user } = useAuth()
   const router = useRouter()
   const { isMobile } = useResponsive()
-  const [activeTab, setActiveTab] = useState("proposals")
+  const [activeTab, setActiveTab] = useState("proposals") // State to manage active tab
 
   useEffect(() => {
     if (user?.uid) {

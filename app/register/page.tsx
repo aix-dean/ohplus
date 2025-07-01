@@ -1,156 +1,230 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useAuth } from "@/contexts/auth-context"
-import { Loader2 } from "lucide-react"
-import { toast } from "@/components/ui/use-toast"
-import Image from "next/image"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { FirebaseError } from "firebase/app"
 
 export default function RegisterPage() {
+  const [activeTab, setActiveTab] = useState("personal")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
+  const [middleName, setMiddleName] = useState("")
   const [companyName, setCompanyName] = useState("")
+  const [companyLocation, setCompanyLocation] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("")
+  const [gender, setGender] = useState("")
   const [loading, setLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
   const { register } = useAuth()
   const router = useRouter()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const getFriendlyErrorMessage = (error: unknown): string => {
+    if (error instanceof FirebaseError) {
+      switch (error.code) {
+        case "auth/email-already-in-use":
+          return "This email address is already in use. Please use a different email or log in."
+        case "auth/invalid-email":
+          return "The email address is not valid. Please check the format."
+        case "auth/weak-password":
+          return "The password is too weak. Please choose a stronger password (at least 6 characters)."
+        case "auth/operation-not-allowed":
+          return "Email/password accounts are not enabled. Please contact support."
+        case "auth/network-request-failed":
+          return "Network error. Please check your internet connection and try again."
+        default:
+          return "An unexpected error occurred during registration. Please try again."
+      }
+    }
+    return "An unknown error occurred. Please try again."
+  }
+
+  const handleRegister = async () => {
+    setErrorMessage(null)
+
     if (password !== confirmPassword) {
-      toast({
-        title: "Registration Failed",
-        description: "Passwords do not match.",
-        variant: "destructive",
-      })
+      setErrorMessage("Passwords do not match.")
       return
     }
 
     setLoading(true)
     try {
-      await register(email, password, firstName, lastName, companyName)
-      toast({
-        title: "Registration Successful",
-        description: "Your account has been created. Welcome to OH Plus!",
-      })
-      router.push("/onboarding") // Redirect directly to onboarding
-    } catch (error: any) {
-      console.error("Registration error:", error)
-      toast({
-        title: "Registration Failed",
-        description: error.message || "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      })
+      await register(
+        {
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          middle_name: middleName,
+          phone_number: phoneNumber,
+          gender: gender,
+        },
+        {
+          company_name: companyName,
+          company_location: companyLocation,
+        },
+        password,
+      )
+      setErrorMessage(null)
+      router.push("/onboarding?step=1") // Redirect directly to onboarding
+    } catch (error: unknown) {
+      setErrorMessage(getFriendlyErrorMessage(error))
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 dark:bg-gray-950">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <Image src="/ohplus-new-logo.png" alt="OH Plus Logo" width={120} height={120} />
-          </div>
-          <CardTitle className="text-3xl font-bold">Register</CardTitle>
-          <CardDescription>Create your account to get started with OH Plus.</CardDescription>
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-2xl font-bold">Register</CardTitle>
+          <CardDescription>Create your account to get started</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="personal">Personal Info</TabsTrigger>
+              <TabsTrigger value="company">Company Info</TabsTrigger>
+            </TabsList>
+            <TabsContent value="personal" className="mt-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    placeholder="John"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    placeholder="Doe"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
               <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="middleName">Middle Name (Optional)</Label>
                 <Input
-                  id="firstName"
-                  type="text"
-                  placeholder="John"
-                  required
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
+                  id="middleName"
+                  placeholder=""
+                  value={middleName}
+                  onChange={(e) => setMiddleName(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="email">Email</Label>
                 <Input
-                  id="lastName"
-                  type="text"
-                  placeholder="Doe"
+                  id="email"
+                  type="email"
+                  placeholder="m@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="companyName">Company Name</Label>
-              <Input
-                id="companyName"
-                type="text"
-                placeholder="Acme Corp"
-                required
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="m@example.com"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Registering...
-                </>
-              ) : (
-                "Register"
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phoneNumber">Phone Number</Label>
+                  <Input
+                    id="phoneNumber"
+                    placeholder=""
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="gender">Gender</Label>
+                  <Select value={gender} onValueChange={setGender}>
+                    <SelectTrigger id="gender">
+                      <SelectValue placeholder="Select Gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Male">Male</SelectItem>
+                      <SelectItem value="Female">Female</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <Button className="w-full" onClick={() => setActiveTab("company")}>
+                Next
+              </Button>
+            </TabsContent>
+            <TabsContent value="company" className="mt-4 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="companyName">Company Name</Label>
+                <Input
+                  id="companyName"
+                  placeholder="Acme Corp"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="companyLocation">Company Location</Label>
+                <Input
+                  id="companyLocation"
+                  placeholder="New York, NY"
+                  value={companyLocation}
+                  onChange={(e) => setCompanyLocation(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button className="w-full bg-transparent" variant="outline" onClick={() => setActiveTab("personal")}>
+                  Previous
+                </Button>
+                <Button className="w-full" type="submit" onClick={handleRegister} disabled={loading}>
+                  {loading ? "Registering..." : "Register"}
+                </Button>
+              </div>
+              {errorMessage && (
+                <div className="text-red-500 text-sm mt-4 text-center" role="alert">
+                  {errorMessage}
+                </div>
               )}
-            </Button>
-          </form>
-          <div className="mt-4 text-center text-sm">
-            Already have an account?{" "}
-            <Link href="/login" className="underline">
-              Login
-            </Link>
-          </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>
