@@ -1,42 +1,31 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useState, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
-import { useToast } from "@/hooks/use-toast"
-import {
-  Plus,
-  MoreVertical,
-  MapPin,
-  LayoutGrid,
-  List,
-  Edit,
-  Trash2,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  Info,
-} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { Loader2, Plus, MapPin, ChevronLeft, ChevronRight } from "lucide-react"
 import { getPaginatedUserProducts, getUserProductsCount, softDeleteProduct, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
+import { toast } from "@/components/ui/use-toast"
+import { useResponsive } from "@/hooks/use-responsive"
+import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import Image from "next/image"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
 
 export default function AdminInventoryPage() {
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const router = useRouter()
+  const { user, userData } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
+  const { isMobile, isTablet } = useResponsive()
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -50,28 +39,20 @@ export default function AdminInventoryPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingCount, setLoadingCount] = useState(false)
 
-  const { user, projectData, subscriptionData } = useAuth() // Get projectData from auth context
-  const router = useRouter()
-  const { toast } = useToast()
-
-  // State for current product count and loading status for subscription check
-  const [currentProductsCount, setCurrentProductsCount] = useState<number | null>(null)
-  const [isLoadingCurrentCount, setIsLoadingCurrentCount] = useState(true)
-
-  // Fetch total count of products (used for pagination display)
+  // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
     if (!user?.uid) return
 
     setLoadingCount(true)
     try {
-      const count = await getUserProductsCount(user.uid, { deleted: false }) // Ensure count is for active products
+      const count = await getUserProductsCount(user.uid, { active: true })
       setTotalItems(count)
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
       console.error("Error fetching total count:", error)
       toast({
         title: "Error",
-        description: "Failed to load product count for pagination. Please try again.",
+        description: "Failed to load product count. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -97,9 +78,11 @@ export default function AdminInventoryPage() {
       setLoadingMore(!isFirstPage)
 
       try {
+        // For the first page, start from the beginning
+        // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
-        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc)
+        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, { active: true })
 
         setProducts(result.items)
         setLastDoc(result.lastDoc)
@@ -114,18 +97,11 @@ export default function AdminInventoryPage() {
           })
           return newCache
         })
-
-        // Store product names in localStorage for breadcrumb navigation
-        const simplifiedProducts = result.items.map((product) => ({
-          id: product.id,
-          name: product.name,
-        }))
-        localStorage.setItem("adminProducts", JSON.stringify(simplifiedProducts))
       } catch (error) {
         console.error("Error fetching products:", error)
         toast({
           title: "Error",
-          description: "Failed to load products. Please try again.",
+          description: "Failed to load product count. Please try again.",
           variant: "destructive",
         })
       } finally {
@@ -150,30 +126,6 @@ export default function AdminInventoryPage() {
       fetchProducts(currentPage)
     }
   }, [currentPage, fetchProducts, user])
-
-  // Fetch current product count for subscription limit check
-  useEffect(() => {
-    const fetchCurrentProductCount = async () => {
-      if (user?.uid) {
-        setIsLoadingCurrentCount(true)
-        try {
-          const count = await getUserProductsCount(user.uid, { deleted: false })
-          setCurrentProductsCount(count)
-        } catch (error) {
-          console.error("Failed to fetch current product count for subscription check:", error)
-          setCurrentProductsCount(0) // Default to 0 on error
-        } finally {
-          setIsLoadingCurrentCount(false)
-        }
-      }
-    }
-    fetchCurrentProductCount()
-  }, [user?.uid, products]) // Re-fetch when user changes or products list updates (after add/delete)
-
-  // Calculate if the user can add a product based on subscription limit
-  const maxProducts = subscriptionData?.maxProducts
-  const canAddProduct = maxProducts === null || (currentProductsCount !== null && currentProductsCount < maxProducts)
-  const isLimitReached = currentProductsCount !== null && maxProducts !== null && currentProductsCount >= maxProducts
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -253,7 +205,7 @@ export default function AdminInventoryPage() {
       // Update the UI by removing the deleted product
       setProducts((prevProducts) => prevProducts.filter((p) => p.id !== productToDelete.id))
 
-      // Update total count (this will trigger re-fetch of currentProductsCount)
+      // Update total count
       setTotalItems((prev) => prev - 1)
 
       // Recalculate total pages
@@ -276,226 +228,75 @@ export default function AdminInventoryPage() {
     }
   }
 
-  // Handle edit click
   const handleEditClick = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation()
-    router.push(`/admin/inventory/edit/${product.id}`)
+    router.push(`/admin/products/edit/${product.id}`)
   }
 
-  // Handle view details click
   const handleViewDetails = (productId: string) => {
-    router.push(`/admin/inventory/${productId}`)
-  }
-
-  // Handle add new product
-  const handleAddProduct = () => {
-    router.push("/admin/products/create")
+    router.push(`/admin/products/${productId}`)
   }
 
   return (
-    <div className="flex-1 p-6">
-      <div className="flex flex-col gap-6">
-        {/* Header with title and actions */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-2xl font-bold">Admin Inventory</h1>
-          <div className="flex flex-col items-end gap-2">
-            {" "}
-            {/* Changed to flex-col for button and message */}
-            <div className="flex items-center gap-3">
-              <div className="border rounded-md p-1 flex">
-                <Button
-                  variant={viewMode === "grid" ? "default" : "ghost"}
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setViewMode("grid")}
-                >
-                  <LayoutGrid size={18} />
-                </Button>
-                <Button
-                  variant={viewMode === "list" ? "default" : "ghost"}
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setViewMode("list")}
-                >
-                  <List size={18} />
-                </Button>
-              </div>
-              <Button onClick={handleAddProduct} disabled={!canAddProduct || isLoadingCurrentCount}>
-                {isLoadingCurrentCount ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    <Plus size={16} />
-                    Add Product
-                  </>
-                )}
-              </Button>
-            </div>
-            {isLimitReached && (
-              <p className="text-sm text-red-500 flex items-center gap-1">
-                <Info className="h-4 w-4" />
-                You have reached your product limit ({maxProducts}). Please upgrade your subscription.
-              </p>
-            )}
-          </div>
+    <div className="flex-1 p-4 md:p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
+        <Button
+          onClick={() => router.push("/admin/products/create")}
+          className="bg-primary text-white hover:bg-primary/90"
+        >
+          <Plus className="mr-2 h-5 w-5" /> New Product
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
         </div>
-
-        {/* Loading state */}
-        {loading && (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-2 text-lg">Loading products...</span>
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!loading && products.length === 0 && (
-          <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed">
-            <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <MapPin size={24} className="text-gray-400" />
-            </div>
-            <h3 className="text-lg font-medium mb-2">No products yet</h3>
-            <p className="text-gray-500 mb-4">Add your first product to get started</p>
-            <Button onClick={handleAddProduct} disabled={!canAddProduct || isLoadingCurrentCount}>
-              {isLoadingCurrentCount ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                <>
-                  <Plus size={16} className="mr-2" />
-                  Add Product
-                </>
-              )}
-            </Button>
-            {isLimitReached && (
-              <p className="text-sm text-red-500 flex items-center justify-center gap-1 mt-4">
-                <Info className="h-4 w-4" />
-                You have reached your product limit ({maxProducts}). Please upgrade your subscription.
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Grid View */}
-        {!loading && products.length > 0 && viewMode === "grid" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      ) : (
+        <div className="grid gap-6">
+          {/* Product List */}
+          <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
             {products.map((product) => (
-              <ProductCard
+              <Card
                 key={product.id}
-                product={product}
-                onView={() => handleViewDetails(product.id)}
-                onEdit={(e) => handleEditClick(product, e)}
-                onDelete={(e) => handleDeleteClick(product, e)}
-              />
+                className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
+              >
+                <div className="h-48 bg-gray-200 relative">
+                  <Image
+                    src={
+                      product.media && product.media.length > 0
+                        ? product.media[0].url
+                        : "/abstract-geometric-sculpture.png"
+                    }
+                    alt={product.name || "Product image"}
+                    fill
+                    className="object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.src = "/abstract-geometric-sculpture.png"
+                      target.className = "opacity-50"
+                    }}
+                  />
+                </div>
+
+                <CardContent className="p-4">
+                  <div className="flex flex-col">
+                    <h3 className="font-semibold line-clamp-1">{product.name}</h3>
+                    <div className="mt-2 text-sm font-medium text-green-700">
+                      ₱{Number(product.price).toLocaleString()}
+                    </div>
+                    <div className="mt-1 text-xs text-gray-500 flex items-center">
+                      <MapPin size={12} className="mr-1 flex-shrink-0" />
+                      <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             ))}
-          </div>
-        )}
+          </ResponsiveCardGrid>
 
-        {/* List View */}
-        {!loading && products.length > 0 && viewMode === "list" && (
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[80px]">Image</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {products.map((product) => (
-                  <TableRow
-                    key={product.id}
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleViewDetails(product.id)}
-                  >
-                    <TableCell>
-                      <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
-                        {product.media && product.media.length > 0 ? (
-                          <>
-                            <Image
-                              src={product.media[0].url || "/placeholder.svg"}
-                              alt={product.name || "Product image"}
-                              width={48}
-                              height={48}
-                              className="h-full w-full object-cover"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement
-                                target.src = "/abstract-geometric-sculpture.png"
-                                target.className = "opacity-50"
-                              }}
-                            />
-                            <Badge
-                              variant="outline"
-                              className={`absolute bottom-0 left-0 z-10 text-[8px] px-1 py-0 ${
-                                product.status === "PENDING"
-                                  ? "bg-blue-50 text-blue-700 border-blue-200"
-                                  : product.status === "ACTIVE"
-                                    ? "bg-green-50 text-green-700 border-green-200"
-                                    : "bg-gray-50 text-gray-700 border-gray-200"
-                              }`}
-                            >
-                              {product.status}
-                            </Badge>
-                          </>
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center bg-gray-100">
-                            <MapPin size={16} className="text-gray-400" />
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>
-                      {product.specs_rental?.location || product.light?.location || "Unknown location"}
-                    </TableCell>
-                    <TableCell>{product.price ? `₱${Number(product.price).toLocaleString()}` : "Not set"}</TableCell>
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => handleEditClick(product, e)}
-                        >
-                          <Edit size={16} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive"
-                          onClick={(e) => handleDeleteClick(product, e)}
-                        >
-                          <Trash2 size={16} />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-
-        {/* Loading More Indicator */}
-        {loadingMore && (
-          <div className="flex justify-center my-4">
-            <div className="flex items-center gap-2">
-              <Loader2 size={18} className="animate-spin" />
-              <span>Loading more...</span>
-            </div>
-          </div>
-        )}
-
-        {/* Pagination Controls */}
-        {!loading && products.length > 0 && (
+          {/* Pagination Controls */}
           <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
             <div className="text-sm text-gray-500 flex items-center">
               {loadingCount ? (
@@ -505,7 +306,7 @@ export default function AdminInventoryPage() {
                 </div>
               ) : (
                 <span>
-                  Page {currentPage} of {totalPages} ({totalItems} items)
+                  Page {currentPage} of {totalPages} ({products.length} items)
                 </span>
               )}
             </div>
@@ -521,8 +322,8 @@ export default function AdminInventoryPage() {
                 <ChevronLeft size={16} />
               </Button>
 
-              {/* Page numbers */}
-              <div className="flex items-center gap-1">
+              {/* Page numbers - Hide on mobile */}
+              <div className="hidden sm:flex items-center gap-1">
                 {getPageNumbers().map((page, index) =>
                   page === "..." ? (
                     <span key={`ellipsis-${index}`} className="px-2">
@@ -553,8 +354,8 @@ export default function AdminInventoryPage() {
               </Button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog
@@ -566,134 +367,5 @@ export default function AdminInventoryPage() {
         itemName={productToDelete?.name}
       />
     </div>
-  )
-}
-
-// Product Card Component for Grid View
-function ProductCard({
-  product,
-  onView,
-  onEdit,
-  onDelete,
-}: {
-  product: Product
-  onView: () => void
-  onEdit: (e: React.MouseEvent) => void
-  onDelete: (e: React.MouseEvent) => void
-}) {
-  // Get the first media item for the thumbnail
-  const thumbnailUrl =
-    product.media && product.media.length > 0 ? product.media[0].url : "/abstract-geometric-sculpture.png"
-
-  // Determine location based on product type
-  const location = product.specs_rental?.location || product.light?.location || "Unknown location"
-
-  // Format price if available
-  const formattedPrice = product.price ? `₱${Number(product.price).toLocaleString()}` : "Price not set"
-
-  return (
-    <Card
-      className="overflow-hidden cursor-pointer border border-gray-200 shadow-sm transition-all hover:shadow-md"
-      onClick={onView}
-    >
-      <div className="h-48 bg-gray-200 relative">
-        <Image
-          src={thumbnailUrl || "/placeholder.svg"}
-          alt={product.name || "Product image"}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/abstract-geometric-sculpture.png"
-            target.className = "opacity-50 object-contain"
-          }}
-        />
-
-        {/* Status Badge positioned at the bottom left of the image */}
-        <Badge
-          variant="outline"
-          className={`absolute bottom-2 left-2 z-10 ${
-            product.status === "PENDING"
-              ? "bg-blue-50 text-blue-700 border-blue-200"
-              : product.status === "ACTIVE"
-                ? "bg-green-50 text-green-700 border-green-200"
-                : "bg-gray-50 text-gray-700 border-gray-200"
-          }`}
-        >
-          {product.status}
-        </Badge>
-
-        {/* Type Badge positioned at the bottom right of the image */}
-        {product.type && (
-          <Badge variant="outline" className="absolute bottom-2 right-12 z-10 bg-blue-50 text-blue-700 border-blue-200">
-            {product.type}
-          </Badge>
-        )}
-
-        <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="icon" className="h-8 w-8 bg-white/80 backdrop-blur-sm">
-                <MoreVertical size={16} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onView}>View Details</DropdownMenuItem>
-              <DropdownMenuItem onClick={onEdit}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Product
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onDelete} className="text-destructive">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Product
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      <CardContent className="p-4">
-        <div className="flex justify-between items-start">
-          <div>
-            <h3 className="font-semibold line-clamp-1">{product.name}</h3>
-            <div className="mt-1 text-sm text-gray-600 flex items-center gap-1">
-              <MapPin size={14} />
-              <span className="truncate max-w-[200px]">{location}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-2 text-sm font-medium text-green-700">{formattedPrice}</div>
-
-        <div className="mt-4 flex justify-between">
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 bg-transparent"
-              onClick={(e) => {
-                e.stopPropagation()
-                onEdit(e)
-              }}
-            >
-              <Edit size={14} className="mr-1" />
-              Edit
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 text-destructive border-destructive/30 hover:bg-destructive/10 bg-transparent"
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete(e)
-              }}
-            >
-              <Trash2 size={14} className="mr-1" />
-              Delete
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   )
 }
