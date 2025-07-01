@@ -54,17 +54,13 @@ const config = {
           foreground: "hsl(var(--card-foreground))",
         },
         // Custom colors for headers
-        adminHeaderDark: {
-          DEFAULT: "#1A2B42", // Dark blue/black from screenshot
-          light: "#2A3C54", // A slightly lighter shade for hover/active states
-        },
         adminHeaderPurple: {
-          DEFAULT: "#673AB7", // Purple from screenshot
-          light: "#7B1FA2", // A slightly lighter shade for hover/active states
+          DEFAULT: "#673AB7", // Main purple from screenshot
+          light: "rgba(103, 58, 183, 0.8)", // Lighter shade for hover
         },
         salesHeaderRose: {
-          DEFAULT: "#e11d48", // Existing rose color
-          light: "#f43f5e", // A slightly lighter shade for hover/active states
+          DEFAULT: "#e11d48", // Original rose color
+          light: "rgba(244, 63, 94, 0.8)", // Lighter shade for hover
         },
       },
       borderRadius: {

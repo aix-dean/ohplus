@@ -1,15 +1,14 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 
-import { useState } from "react"
-import { usePathname, useRouter } from "next/navigation"
-import { ArrowLeft, Bell, Menu, Search } from "lucide-react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { Menu, Bell, Search, Settings, LogOut, User, ChevronLeft } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { SideNavigation } from "./side-navigation"
-import { cn } from "@/lib/utils"
+import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,131 +19,279 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/contexts/auth-context"
+import { useUnreadMessages } from "@/hooks/use-unread-messages"
+import { useIsAdmin } from "@/hooks/use-is-admin"
+import { cn } from "@/lib/utils"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 
-export function FixedHeader() {
+interface FixedHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
+  onMenuClick: () => void
+}
+
+interface BreadcrumbItemData {
+  label: string
+  href?: string
+  isPage?: boolean
+}
+
+export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderProps) {
+  const { user, userData, signOut } = useAuth()
+  const { unreadCount } = useUnreadMessages()
+  const isAdmin = useIsAdmin()
   const pathname = usePathname()
-  const router = useRouter()
-  const { user, logout } = useAuth()
-  const [searchQuery, setSearchQuery] = useState("")
 
+  const getBreadcrumbs = (path: string): BreadcrumbItemData[] => {
+    const segments = path.split("/").filter(Boolean)
+    const breadcrumbs: BreadcrumbItemData[] = []
+
+    if (path === "/admin/dashboard") {
+      breadcrumbs.push({ label: "Admin - Dashboard", isPage: true })
+    } else if (path.startsWith("/admin/")) {
+      breadcrumbs.push({ label: "Admin - Dashboard", href: "/admin/dashboard" })
+      const adminSubPath = segments[1]
+      if (adminSubPath) {
+        const pageLabel = adminSubPath
+          .replace(/-/g, " ")
+          .split(" ")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ")
+        breadcrumbs.push({ label: pageLabel, isPage: true })
+      }
+    } else if (path.startsWith("/sales/dashboard")) {
+      breadcrumbs.push({ label: "Admin - Dashboard", href: "/admin/dashboard" })
+      breadcrumbs.push({ label: "Sales - Dashboard", isPage: true })
+    } else if (path.startsWith("/logistics/dashboard")) {
+      breadcrumbs.push({ label: "Admin - Dashboard", href: "/admin/dashboard" })
+      breadcrumbs.push({ label: "Logistics - Dashboard", isPage: true })
+    } else if (segments.length === 0) {
+      breadcrumbs.push({ label: "Dashboard", isPage: true })
+    } else {
+      // General handling for other paths
+      const section = segments[0].charAt(0).toUpperCase() + segments[0].slice(1)
+      let page = ""
+
+      if (segments.length > 1) {
+        page = segments[1].charAt(0).toUpperCase() + segments[1].slice(1)
+        if (segments.length > 2 && segments[2].match(/\[.*\]/)) {
+          page = segments[1].charAt(0).toUpperCase() + segments[1].slice(1)
+        } else if (segments.length > 2 && segments[1] === "edit" && segments[2].match(/\[.*\]/)) {
+          page = `Edit ${segments[0].slice(0, -1)}`
+        } else if (segments.length > 2 && segments[1] === "create") {
+          page = `Create ${segments[0].slice(0, -1)}`
+        } else if (segments.length > 2 && segments[1] === "new") {
+          page = `New ${segments[0].slice(0, -1)}`
+        } else if (segments.length > 2 && segments[1] === "view") {
+          page = `View ${segments[0].slice(0, -1)}`
+        } else if (segments.length > 2 && segments[1] === "cost-estimates") {
+          page = `Cost Estimates`
+        } else if (segments.length > 2 && segments[1] === "generate-quotation") {
+          page = `Generate Quotation`
+        } else if (segments.length > 2 && segments[1] === "create-cost-estimate") {
+          page = `Create Cost Estimate`
+        } else if (segments.length > 2 && segments[1] === "accept") {
+          page = `Accept Quotation`
+        } else if (segments.length > 2 && segments[1] === "decline") {
+          page = `Decline Quotation`
+        } else if (segments.length > 2 && segments[1] === "chat") {
+          page = `Chat`
+        } else if (segments.length > 2 && segments[1] === "bulletin-board") {
+          page = `Bulletin Board`
+        } else if (segments.length > 2 && segments[1] === "project-campaigns") {
+          page = `Project Campaigns`
+        } else if (segments.length > 2 && segments[1] === "quotation-requests") {
+          page = `Quotation Requests`
+        } else if (segments.length > 2 && segments[1] === "bookings") {
+          page = `Bookings`
+        } else if (segments.length > 2 && segments[1] === "alerts") {
+          page = `Alerts`
+        } else if (segments.length > 2 && segments[1] === "assignments") {
+          page = `Assignments`
+        } else if (segments.length > 2 && segments[1] === "planner") {
+          page = `Planner`
+        } else if (segments.length > 2 && segments[1] === "access-management") {
+          page = `Access Management`
+        } else if (segments.length > 2 && segments[1] === "chat-analytics") {
+          page = `Chat Analytics`
+        }
+
+        page = page
+          .replace(/-/g, " ")
+          .split(" ")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ")
+      }
+
+      if (page) {
+        breadcrumbs.push({ label: section, href: `/${segments[0]}` })
+        breadcrumbs.push({ label: page, isPage: true })
+      } else {
+        breadcrumbs.push({ label: section, isPage: true })
+      }
+    }
+    return breadcrumbs
+  }
+
+  const breadcrumbs = getBreadcrumbs(pathname)
+
+  const showAdminBackButton =
+    (pathname.startsWith("/admin/") && pathname !== "/admin/dashboard") ||
+    pathname.startsWith("/sales/dashboard") ||
+    pathname.startsWith("/logistics/dashboard")
+
+  // Determine if the current path is an admin page
   const isAdminPage = pathname.startsWith("/admin")
-  const isSalesPage = pathname.startsWith("/sales")
-  const isLogisticsPage = pathname.startsWith("/logistics")
-
-  const getHeaderTitle = () => {
-    if (pathname.startsWith("/admin/dashboard")) return "Admin - Dashboard"
-    if (pathname.startsWith("/admin/products/create")) return "Admin - Create Product"
-    if (pathname.startsWith("/admin/inventory/edit")) return "Admin - Edit Inventory"
-    if (pathname.startsWith("/admin/inventory")) return "Admin - Inventory"
-    if (pathname.startsWith("/admin/access-management")) return "Admin - Access Management"
-    if (pathname.startsWith("/admin/chat-analytics")) return "Admin - Chat Analytics"
-    if (pathname.startsWith("/admin/subscriptions")) return "Admin - Subscriptions"
-    if (pathname.startsWith("/admin/documents")) return "Admin - Documents" // New admin documents page
-    if (pathname.startsWith("/sales/dashboard")) return "Sales - Dashboard"
-    if (pathname.startsWith("/sales/bookings")) return "Sales - Bookings"
-    if (pathname.startsWith("/sales/clients")) return "Sales - Clients"
-    if (pathname.startsWith("/sales/products")) return "Sales - Products"
-    if (pathname.startsWith("/sales/proposals")) return "Sales - Proposals"
-    if (pathname.startsWith("/sales/quotation-requests")) return "Sales - Quotation Requests"
-    if (pathname.startsWith("/sales/job-orders")) return "Sales - Job Orders"
-    if (pathname.startsWith("/sales/project-campaigns")) return "Sales - Project Campaigns"
-    if (pathname.startsWith("/sales/chat")) return "Sales - Chat"
-    if (pathname.startsWith("/sales/planner")) return "Sales - Planner"
-    if (pathname.startsWith("/sales/bulletin-board")) return "Sales - Bulletin Board"
-    if (pathname.startsWith("/logistics/dashboard")) return "Logistics - Dashboard"
-    if (pathname.startsWith("/logistics/alerts")) return "Logistics - Alerts"
-    if (pathname.startsWith("/logistics/assignments")) return "Logistics - Assignments"
-    if (pathname.startsWith("/logistics/planner")) return "Logistics - Planner"
-    if (pathname.startsWith("/logistics/sites")) return "Logistics - Sites"
-    return "Dashboard"
-  }
-
-  const showBackButton =
-    (pathname.startsWith("/admin/") && !pathname.startsWith("/admin/dashboard")) ||
-    (pathname.startsWith("/sales/") && !pathname.startsWith("/sales/dashboard")) ||
-    (pathname.startsWith("/logistics/") && !pathname.startsWith("/logistics/dashboard"))
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    console.log("Searching for:", searchQuery)
-    // Implement actual search logic here
-  }
-
-  const headerBgClass = isAdminPage ? "bg-adminHeaderDark" : "bg-salesHeaderRose"
-  const buttonHoverClass = isAdminPage ? "hover:bg-adminHeaderDark-light" : "hover:bg-salesHeaderRose-light"
 
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 flex h-16 items-center justify-between px-4 shadow-sm transition-colors duration-300",
-        headerBgClass,
+        "sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 px-4 sm:static sm:h-auto",
+        isAdminPage ? "bg-adminHeaderPurple" : "bg-salesHeaderRose", // Conditional background first
+        className, // External classes last
       )}
+      {...props}
     >
-      <div className="flex items-center gap-4">
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="lg:hidden text-white">
-              <Menu className="h-6 w-6" />
-              <span className="sr-only">Toggle navigation menu</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-64 p-0">
-            <SideNavigation />
-          </SheetContent>
-        </Sheet>
-        {showBackButton && (
+      {/* New: Back button for admin sub-pages, sales dashboard, and logistics dashboard */}
+      {showAdminBackButton && (
+        <Link href="/admin/dashboard" passHref>
+          <Button
+            variant="default"
+            className="bg-black hover:bg-black/90 text-white rounded-full px-4 py-2 flex items-center gap-1"
+          >
+            <ChevronLeft className="h-4 w-4" /> Admin
+          </Button>
+        </Link>
+      )}
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button size="icon" variant="outline" className="sm:hidden bg-transparent" onClick={onMenuClick}>
+            <Menu className="h-5 w-5" />
+            <span className="sr-only">Toggle Menu</span>
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="sm:max-w-xs">
+          {/* Mobile navigation content would go here, if needed */}
+        </SheetContent>
+      </Sheet>
+      {/* Replaced h1 with Breadcrumb component */}
+      <Breadcrumb>
+        <BreadcrumbList className="text-white">
+          {breadcrumbs.map((item, index) => (
+            <React.Fragment key={index}>
+              <BreadcrumbItem>
+                {item.label === "Admin - Dashboard" && item.href && !showAdminBackButton ? (
+                  <Link href={item.href} passHref>
+                    <Button
+                      variant="default"
+                      className="bg-black hover:bg-black/90 text-white rounded-full px-4 py-2 flex items-center gap-1"
+                      asChild
+                    >
+                      <span>
+                        <ChevronLeft className="h-4 w-4" /> Admin
+                      </span>
+                    </Button>
+                  </Link>
+                ) : item.isPage ? (
+                  <BreadcrumbPage className="font-normal text-white">{item.label}</BreadcrumbPage>
+                ) : (
+                  <BreadcrumbLink asChild>
+                    <Link href={item.href || "#"} className="transition-colors hover:text-gray-200 text-white">
+                      {item.label}
+                    </Link>
+                  </BreadcrumbLink>
+                )}
+              </BreadcrumbItem>
+              {index < breadcrumbs.length - 1 && <BreadcrumbSeparator className="text-white" />}
+            </React.Fragment>
+          ))}
+        </BreadcrumbList>
+      </Breadcrumb>
+      <div className="relative ml-auto flex-1 md:grow-0">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white" />
+        <Input
+          type="search"
+          placeholder="Search..."
+          className="w-full rounded-lg bg-gray-700 placeholder:text-gray-300 text-white pl-8 md:w-[200px] lg:w-[336px]"
+        />
+      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => router.back()}
-            className={cn("text-white", buttonHoverClass)}
-            aria-label="Go back"
+            className={cn(
+              "relative rounded-full text-white",
+              isAdminPage ? "hover:bg-adminHeaderPurple-light" : "hover:bg-salesHeaderRose-light",
+            )}
           >
-            <ArrowLeft className="h-5 w-5" />
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                {unreadCount}
+              </span>
+            )}
+            <span className="sr-only">Notifications</span>
           </Button>
-        )}
-        <h1 className="text-xl font-semibold text-white">{getHeaderTitle()}</h1>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <form onSubmit={handleSearch} className="relative hidden md:block">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300" />
-          <Input
-            type="search"
-            placeholder="Search..."
-            className="pl-8 pr-2 py-1 rounded-md bg-white/20 text-white placeholder:text-gray-300 focus:outline-none focus:ring-1 focus:ring-white border-none"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </form>
-
-        <Button variant="ghost" size="icon" className={cn("text-white", buttonHoverClass)} aria-label="Notifications">
-          <Bell className="h-5 w-5" />
-        </Button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className={cn("relative h-8 w-8 rounded-full text-white", buttonHoverClass)}>
-              <Avatar className="h-8 w-8">
-                <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} alt="User Avatar" />
-                <AvatarFallback>{user?.email ? user.email[0].toUpperCase() : "U"}</AvatarFallback>
-              </Avatar>
-              <span className="sr-only">User menu</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="end" forceMount>
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">{user?.displayName || "User"}</p>
-                <p className="text-xs leading-none text-muted-foreground">{user?.email || "user@example.com"}</p>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push("/account")}>Account Settings</DropdownMenuItem>
-            <DropdownMenuItem onClick={logout}>Log out</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>No new notifications</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "overflow-hidden rounded-full text-white",
+              isAdminPage ? "hover:bg-adminHeaderPurple-light" : "hover:bg-salesHeaderRose-light",
+            )}
+          >
+            <Avatar>
+              <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} alt="User Avatar" />
+              <AvatarFallback>
+                {userData?.first_name ? userData.first_name.charAt(0) : user?.email?.charAt(0) || "U"}
+              </AvatarFallback>
+            </Avatar>
+            <span className="sr-only">User Menu</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>
+            {userData?.first_name && userData?.last_name
+              ? `${userData.first_name} ${userData.last_name}`
+              : user?.email || "My Account"}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/account">
+              <User className="mr-2 h-4 w-4" />
+              Account
+            </Link>
+          </DropdownMenuItem>
+          {isAdmin && (
+            <DropdownMenuItem asChild>
+              <Link href="/admin/dashboard">
+                <Settings className="mr-2 h-4 w-4" />
+                Admin
+              </Link>
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={signOut}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </header>
   )
 }
