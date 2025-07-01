@@ -152,32 +152,24 @@ export default function SubscriptionPage() {
         <Separator className="my-12" />
 
         <Card className="mx-auto max-w-4xl rounded-xl shadow-sm">
-          {" "}
-          {/* Changed max-w-sm to max-w-4xl for wider layout */}
           <CardHeader className="border-b p-6">
-            {" "}
-            {/* Adjusted padding */}
             <CardTitle className="text-xl font-bold text-gray-900">Your Current Subscription</CardTitle>
             <CardDescription className="mt-2 text-gray-600">Details of your active plan and usage.</CardDescription>
           </CardHeader>
           <CardContent className="p-6">
-            {" "}
-            {/* Adjusted padding */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-              {" "}
-              {/* Adjusted grid columns for horizontal spread */}
               <div className="space-y-1">
                 <p className="text-sm font-medium text-gray-700">Plan Type</p>
-                <p className="text-lg font-semibold capitalize text-gray-900">{subscriptionData?.planType || "N/A"}</p>
+                <p className="text-lg font-semibold capitalize text-gray-900">{subscriptionData?.planType || "None"}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-gray-700">Status</p>
-                <p className="text-lg font-semibold capitalize text-gray-900">{subscriptionData?.status || "N/A"}</p>
+                <p className="text-lg font-semibold capitalize text-gray-900">{subscriptionData?.status || "None"}</p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-gray-700">Max Products</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {subscriptionData?.maxProducts === 99999 ? "Unlimited" : subscriptionData?.maxProducts || "N/A"}
+                  {subscriptionData?.maxProducts === 99999 ? "Unlimited" : subscriptionData?.maxProducts || "None"}
                 </p>
               </div>
               <div className="space-y-1">
@@ -185,13 +177,13 @@ export default function SubscriptionPage() {
                 <p className="text-lg font-semibold text-gray-900">
                   {subscriptionData?.trialEndDate
                     ? new Date(subscriptionData.trialEndDate).toLocaleDateString()
-                    : "N/A"}
+                    : "None"}
                 </p>
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-gray-700">Days Remaining (Trial)</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {subscriptionData ? subscriptionService.getDaysRemaining(subscriptionData) : "N/A"}
+                  {subscriptionData ? subscriptionService.getDaysRemaining(subscriptionData) : "None"}
                 </p>
               </div>
             </div>
