@@ -18,7 +18,6 @@ import { collection, query, where, getDocs, serverTimestamp } from "firebase/fir
 import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
-import Info from "@/components/info-icon" // Import the Info component
 
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
@@ -454,9 +453,8 @@ export default function AdminProductCreatePage() {
         </CardHeader>
         <CardContent>
           {!subscriptionData?.licenseKey && (
-            <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700 flex items-center gap-2">
-              <Info className="h-5 w-5" />
-              <span>You need an active subscription to create products.</span>
+            <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">
+              You need an active subscription to create products.
             </div>
           )}
           <form onSubmit={handleSubmit} className="space-y-6">
