@@ -160,14 +160,13 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
     >
       {/* New: Back button for admin sub-pages, sales dashboard, and logistics dashboard */}
       {showAdminBackButton && (
-        <Link href="/admin/dashboard" passHref>
-          <Button
-            variant="default"
-            className="flex items-center gap-1 rounded-full bg-black px-4 py-2 text-white hover:bg-black/90"
-          >
-            <ChevronLeft className="h-4 w-4" /> Admin
-          </Button>
-        </Link>
+        <Button
+          variant="default"
+          className="flex items-center gap-1 rounded-full bg-black px-4 py-2 text-white hover:bg-black/90"
+          onClick={() => router.push("/admin/dashboard")} // Use router.push for navigation
+        >
+          <ChevronLeft className="h-4 w-4" /> Admin
+        </Button>
       )}
       <Sheet>
         <SheetTrigger asChild>
