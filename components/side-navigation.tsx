@@ -105,6 +105,10 @@ export function SideNavigation() {
   if (pathname?.startsWith("/sales/project-campaigns")) {
     currentSection = "sales"
   }
+  // Explicitly set currentSection to "admin" if path starts with /admin
+  if (pathname?.startsWith("/admin")) {
+    currentSection = "admin"
+  }
 
   // Find the navigation item for the current section
   const currentNavItem = navigationItems.find((item) => item.section === currentSection)
@@ -114,17 +118,18 @@ export function SideNavigation() {
     return pathname === path || pathname?.startsWith(path + "/")
   }
 
-  // If there's no current section or it has no sub-items, don't render the side nav
-  if (!currentNavItem || currentNavItem.items.length === 0) {
+  // IMPORTANT: Modified condition.
+  // Only return null if there's no currentNavItem AND it's not one of the custom sections ("admin", "sales")
+  if (!currentNavItem && currentSection !== "admin" && currentSection !== "sales") {
     return null
   }
 
-  const SectionIcon = currentNavItem.icon
+  const SectionIcon = currentNavItem?.icon // Use optional chaining as currentNavItem might be undefined for custom sections
 
   return (
     <div className="w-64 h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 overflow-y-auto shadow-sm">
       <nav className="p-3 space-y-4">
-        {currentNavItem.section === "admin" ? (
+        {currentSection === "admin" ? (
           <>
             {/* Notification Section */}
             <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg p-3 text-white">
@@ -226,7 +231,7 @@ export function SideNavigation() {
               </div>
             </div>
           </>
-        ) : currentNavItem.section === "sales" ? (
+        ) : currentSection === "sales" ? (
           // Special grouped layout for sales
           <>
             {/* Notification Section */}
@@ -244,7 +249,7 @@ export function SideNavigation() {
                     <div className="h-2 bg-white/30 rounded-full mb-1"></div>
                     <div className="h-2 bg-white/20 rounded-full w-3/4"></div>
                   </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                  <button className="w-2 h-2 bg-white rounded-full"></button>
                 </div>
                 <div className="flex items-center space-x-3">
                   <Avatar className="h-8 w-8">
@@ -255,7 +260,7 @@ export function SideNavigation() {
                     <div className="h-2 bg-white/30 rounded-full mb-1"></div>
                     <div className="h-2 bg-white/20 rounded-full w-2/3"></div>
                   </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                  <button className="w-2 h-2 bg-white rounded-full"></button>
                 </div>
               </div>
               <div className="flex justify-end mt-3">
@@ -372,7 +377,8 @@ export function SideNavigation() {
           </>
         ) : (
           // Default layout for other sections
-          currentNavItem.items.map((item) => {
+          currentNavItem?.items.map((item) => {
+            // Use optional chaining here
             const Icon = item.icon
             const active = isActive(item.href)
 

@@ -1,26 +1,30 @@
 import type { Config } from "tailwindcss"
 
-const config: Config = {
+const config = {
   darkMode: ["class"],
   content: [
-    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./pages/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+    "./app/**/*.{ts,tsx}",
+    "./src/**/*.{ts,tsx}",
     "*.{js,ts,jsx,tsx,mdx}",
   ],
+  prefix: "",
   theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
     extend: {
       colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
-        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -28,6 +32,10 @@ const config: Config = {
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
@@ -37,47 +45,31 @@ const config: Config = {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
         },
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        chart: {
-          "1": "hsl(var(--chart-1))",
-          "2": "hsl(var(--chart-2))",
-          "3": "hsl(var(--chart-3))",
-          "4": "hsl(var(--chart-4))",
-          "5": "hsl(var(--chart-5))",
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
         },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
-        },
-        // Custom colors for dashboard cards
-        salesHeader: "#FF6B6B", // Red
-        logisticsHeader: "#6B8EFF", // Blue
-        accountingHeader: "#E06BFF", // Pink/Purple
-        treasuryHeader: "#6BFF8E", // Green
-        itHeader: "#6BE0FF", // Teal
-        fleetHeader: "#A0A0A0", // Gray
-        creativesHeader: "#FFB86B", // Orange
-        financeHeader: "#8EFF6B", // Light Green
-        mediaHeader: "#6BFFB8", // Mint Green
-        businessDevHeader: "#FF6BE0", // Bright Pink
-        legalHeader: "#FF8E6B", // Salmon
-        corporateHeader: "#6BFFD9", // Light Blue
-        hrHeader: "#FF6BEB", // Magenta
-        specialTeamHeader: "#B86BFF", // Purple
-        marketingHeader: "#FF6B6B", // Red (same as sales for consistency if needed, or adjust)
-        addDepartmentHeader: "#333333", // Dark Gray/Black
+        // Custom colors for department cards
+        salesHeader: "#EF4444", // Red
+        logisticsHeader: "#3B82F6", // Blue
+        accountingHeader: "#EC4899", // Pink
+        treasuryHeader: "#22C55E", // Green
+        itHeader: "#14B8A6", // Teal
+        fleetHeader: "#6B7280", // Gray
+        creativesHeader: "#F97316", // Orange
+        financeHeader: "#84CC16", // Lime Green
+        mediaHeader: "#2DD4BF", // Cyan
+        businessDevHeader: "#FACC15", // Yellow
+        legalHeader: "#EF4444", // Red (duplicate from sales, based on screenshot)
+        corporateHeader: "#3B82F6", // Blue (duplicate from logistics, based on screenshot)
+        hrHeader: "#EC4899", // Pink (duplicate from accounting, based on screenshot)
+        specialTeamHeader: "#6B7280", // Gray (duplicate from fleet, based on screenshot)
+        marketingHeader: "#EF4444", // Red (duplicate from sales, based on screenshot)
+        addDepartmentHeader: "#374151", // Dark Gray/Black
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -86,20 +78,12 @@ const config: Config = {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
       },
       animation: {
@@ -109,5 +93,6 @@ const config: Config = {
     },
   },
   plugins: [require("tailwindcss-animate")],
-}
+} satisfies Config
+
 export default config
