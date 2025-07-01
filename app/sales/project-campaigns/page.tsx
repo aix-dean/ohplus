@@ -27,7 +27,6 @@ import {
 import { format } from "date-fns"
 import { getCampaignsByUserId } from "@/lib/campaign-service"
 import type { Campaign } from "@/lib/types/campaign"
-import ProtectedRoute from "@/components/protected-route"
 import { useResponsive } from "@/hooks/use-responsive"
 
 function CampaignsPageContent() {
@@ -462,9 +461,5 @@ function CampaignsPageContent() {
 }
 
 export default function CampaignsPage() {
-  return (
-    <ProtectedRoute module="sales" action="view">
-      <CampaignsPageContent />
-    </ProtectedRoute>
-  )
+  return <CampaignsPageContent />
 }
