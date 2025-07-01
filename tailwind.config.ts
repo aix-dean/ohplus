@@ -53,22 +53,22 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Custom colors for department cards based on the new screenshot
+        // Custom colors for department cards based on the screenshot
         salesHeader: "#FF6B6B", // Red
         logisticsHeader: "#4D8AF0", // Blue
         accountingHeader: "#E06BFF", // Pink/Purple
         treasuryHeader: "#22C55E", // Green
         itHeader: "#00D9BF", // Teal
-        fleetHeader: "#6B7280", // Gray
+        fleetHeader: "#A0A0A0", // Gray
         creativesHeader: "#FFB86B", // Orange
         financeHeader: "#84CC16", // Lime Green
-        mediaHeader: "#00D9BF", // Mint Green (same as IT, based on screenshot)
-        businessDevHeader: "#6B8EFF", // Darker Blue/Purple
-        legalHeader: "#FF6B6B", // Red (same as sales, based on screenshot)
-        corporateHeader: "#4D8AF0", // Blue (same as logistics, based on screenshot)
+        mediaHeader: "#00D9BF", // Mint Green (matches IT)
+        businessDevHeader: "#6B8EFF", // Distinct Blue-Purple
+        legalHeader: "#FF6B6B", // Red (matches Sales)
+        corporateHeader: "#4D8AF0", // Blue (matches Logistics)
         hrHeader: "#FF6BEB", // Magenta
         specialTeamHeader: "#B86BFF", // Purple
-        marketingHeader: "#FF6B6B", // Red (same as sales, based on screenshot)
+        marketingHeader: "#FF6B6B", // Red (matches Sales)
         addDepartmentHeader: "#333333", // Dark Gray/Black
       },
       borderRadius: {
