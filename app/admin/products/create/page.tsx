@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChevronDown, Upload, Trash2, ImageIcon, Film, X, Check, Loader2, Lock } from "lucide-react"
-import { addProduct } from "@/lib/firebase-service"
+import { createProduct } from "@/lib/firebase-service" // Corrected import from addProduct to createProduct
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
 import { collection, query, where, getDocs, serverTimestamp } from "firebase/firestore"
@@ -388,7 +388,8 @@ export default function AdminProductCreatePage() {
         },
       }
 
-      const productId = await addProduct(
+      const productId = await createProduct(
+        // Corrected usage from addProduct to createProduct
         user.uid,
         user.displayName || "Unknown User",
         userData.license_key,
