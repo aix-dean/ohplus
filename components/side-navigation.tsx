@@ -95,6 +95,10 @@ const navigationItems = [
   },
 ]
 
+function isActive(pathname: string, href: string) {
+  return pathname === href
+}
+
 export function SideNavigation() {
   const pathname = usePathname()
   const { user } = useAuth()
@@ -112,11 +116,6 @@ export function SideNavigation() {
 
   // Find the navigation item for the current section
   const currentNavItem = navigationItems.find((item) => item.section === currentSection)
-
-  // Check if a path is active
-  const isActive = (path: string) => {
-    return pathname === path || pathname?.startsWith(path + "/")
-  }
 
   // IMPORTANT: Modified condition.
   // Only return null if there's no currentNavItem AND it's not one of the custom sections ("admin", "sales")
@@ -154,7 +153,7 @@ export function SideNavigation() {
                   { title: "Bulletin Board", href: "/admin/bulletin-board", icon: ClipboardList },
                 ].map((item) => {
                   const Icon = item.icon
-                  const active = isActive(item.href)
+                  const active = isActive(pathname, item.href)
                   return (
                     <Link
                       key={item.href}
@@ -186,7 +185,7 @@ export function SideNavigation() {
                   { title: "Subscription", href: "/admin/subscriptions", icon: FileText }, // Updated href
                 ].map((item) => {
                   const Icon = item.icon
-                  const active = isActive(item.href)
+                  const active = isActive(pathname, item.href)
                   return (
                     <Link
                       key={item.href}
@@ -279,7 +278,7 @@ export function SideNavigation() {
                   { title: "Bulletin Board", href: "/sales/bulletin-board", icon: ClipboardList }, // New item
                 ].map((item) => {
                   const Icon = item.icon
-                  const active = isActive(item.href)
+                  const active = isActive(pathname, item.href)
                   return (
                     <Link
                       key={item.href}
@@ -322,7 +321,7 @@ export function SideNavigation() {
                   { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
                 ].map((item) => {
                   const Icon = item.icon
-                  const active = isActive(item.href)
+                  const active = isActive(pathname, item.href)
                   return (
                     <Link
                       key={item.href}
@@ -380,7 +379,7 @@ export function SideNavigation() {
           currentNavItem?.items.map((item) => {
             // Use optional chaining here
             const Icon = item.icon
-            const active = isActive(item.href)
+            const active = isActive(pathname, item.href)
 
             return (
               <Link
