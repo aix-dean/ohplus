@@ -90,7 +90,7 @@ const navigationItems = [
     icon: Settings,
     items: [
       { title: "General", href: "/settings", icon: Settings },
-      { title: "Subscription", href: "/settings/subscription", icon: FileText },
+      { title: "Subscription", href: "/admin/subscriptions", icon: FileText }, // Updated href
     ],
   },
 ]
@@ -183,7 +183,7 @@ export function SideNavigation() {
                   { title: "Documents", href: "/admin/documents", icon: FileText },
                   { title: "Inventory", href: "/admin/inventory", icon: Package },
                   { title: "User Management", href: "/admin/access-management", icon: Users },
-                  { title: "Subscription", href: "/settings/subscription", icon: FileText },
+                  { title: "Subscription", href: "/admin/subscriptions", icon: FileText }, // Updated href
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(item.href)
