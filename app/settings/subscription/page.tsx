@@ -4,13 +4,44 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/contexts/auth-context"
-import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-service"
+import { subscriptionService } from "@/lib/subscription-service"
 import type { BillingCycle, SubscriptionPlanType } from "@/lib/types/subscription"
 import { CheckCircle, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, useCallback } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { PromoBanner } from "@/components/promo-banner" // Import the new component
+
+const plans = [
+  {
+    id: "basic",
+    name: "Basic",
+    description: "Basic plan description",
+    price: 0,
+    billingCycle: "monthly",
+    features: ["Feature 1", "Feature 2"],
+    buttonText: "Upgrade to Basic",
+  },
+  {
+    id: "premium",
+    name: "Premium",
+    description: "Premium plan description",
+    price: 100,
+    billingCycle: "yearly",
+    features: ["Feature 1", "Feature 2", "Feature 3"],
+    buttonText: "Upgrade to Premium",
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    description: "Enterprise plan description",
+    price: 0,
+    billingCycle: "N/A",
+    features: ["Feature 1", "Feature 2", "Feature 3", "Feature 4"],
+    buttonText: "Contact Us",
+  },
+]
 
 export default function SubscriptionPage() {
   const { user, userData, subscriptionData, loading, refreshSubscriptionData } = useAuth()
@@ -18,50 +49,21 @@ export default function SubscriptionPage() {
   const router = useRouter()
   const [isUpdating, setIsUpdating] = useState(false)
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
-  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
-  const [trialDaysRemaining, setTrialDaysRemaining] = useState(0)
 
-  const plans = getSubscriptionPlans()
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout
-
-    const calculateTimeLeft = () => {
-      if (subscriptionData?.trialEndDate) {
-        const trialEndDate = new Date(subscriptionData.trialEndDate).getTime()
-        const now = new Date().getTime()
-        const difference = trialEndDate - now
-
-        if (difference > 0) {
-          const days = Math.floor(difference / (1000 * 60 * 60 * 24))
-          const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-          const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60))
-          const seconds = Math.floor((difference % (1000 * 60)) / 1000)
-          setTimeLeft({ days, hours, minutes, seconds })
-        } else {
-          setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
-          clearInterval(timer) // Stop the timer if trial ended
-        }
-      }
-    }
-
-    calculateTimeLeft() // Initial calculation
-    timer = setInterval(calculateTimeLeft, 1000) // Update every second
-
-    return () => clearInterval(timer) // Cleanup on unmount
-  }, [subscriptionData]) // Recalculate if subscriptionData changes
+  // Define a fixed promo end date for the "GRAPHIC EXPO '25 PROMO"
+  // This date is arbitrary for demonstration, adjust as needed.
+  // Example: 2 days, 14 hours, 30 seconds from now (approximate to match screenshot)
+  const promoEndDate = new Date()
+  promoEndDate.setDate(promoEndDate.getDate() + 2)
+  promoEndDate.setHours(promoEndDate.getHours() + 14)
+  promoEndDate.setMinutes(promoEndDate.getMinutes() + 30)
+  promoEndDate.setSeconds(promoEndDate.getSeconds() + 0)
 
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login")
     }
   }, [loading, user, router])
-
-  useEffect(() => {
-    if (subscriptionData) {
-      setTrialDaysRemaining(subscriptionService.getDaysRemaining(subscriptionData))
-    }
-  }, [subscriptionData])
 
   const handleUpgrade = useCallback(
     async (planId: string) => {
@@ -148,7 +150,7 @@ export default function SubscriptionPage() {
         setSelectedPlanId(null)
       }
     },
-    [user, userData, subscriptionData, plans, refreshSubscriptionData, toast],
+    [user, userData, subscriptionData, refreshSubscriptionData, toast],
   )
 
   const isCurrentPlan = useCallback(
@@ -171,26 +173,8 @@ export default function SubscriptionPage() {
   return (
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        {/* Promo Banner */}
-        {subscriptionData?.planType === "trial" && timeLeft.days > 0 && (
-          <div className="relative mb-8 flex flex-col items-center">
-            <div className="relative flex items-center justify-center bg-green-500 text-white rounded-lg p-4 pr-6 shadow-md">
-              <div className="absolute -top-4 -left-4 w-24 h-24 bg-red-500 rounded-full flex items-center justify-center text-center text-xs font-bold uppercase leading-tight shadow-lg">
-                GRAPHIC EXPO '25 PROMO
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-3xl font-bold whitespace-nowrap">90 DAYS FREE TRIAL</span>
-                <Button variant="secondary" size="lg" className="bg-white text-green-500 font-bold hover:bg-gray-100">
-                  GET NOW
-                </Button>
-              </div>
-            </div>
-            <p className="mt-2 text-lg font-medium text-gray-700">
-              {timeLeft.days} days : {timeLeft.hours.toString().padStart(2, "0")} hours :{" "}
-              {timeLeft.seconds.toString().padStart(2, "0")} seconds left
-            </p>
-          </div>
-        )}
+        {/* Render the PromoBanner component */}
+        <PromoBanner promoEndDate={promoEndDate} />
 
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Choose Your Plan</h1>
