@@ -1,5 +1,7 @@
 "use client"
 
+import { Badge } from "@/components/ui/badge"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
@@ -18,6 +20,7 @@ export default function SubscriptionPage() {
   const router = useRouter()
   const [isUpdating, setIsUpdating] = useState(false)
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
+  const [trialDaysRemaining, setTrialDaysRemaining] = useState(0)
 
   const plans = getSubscriptionPlans()
 
@@ -26,6 +29,12 @@ export default function SubscriptionPage() {
       router.push("/login")
     }
   }, [loading, user, router])
+
+  useEffect(() => {
+    if (subscriptionData) {
+      setTrialDaysRemaining(subscriptionService.getDaysRemaining(subscriptionData))
+    }
+  }, [subscriptionData])
 
   const handleUpgrade = useCallback(
     async (planId: string) => {
@@ -135,6 +144,22 @@ export default function SubscriptionPage() {
   return (
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
+        {/* Promo Banner */}
+        {subscriptionData?.planType === "trial" && trialDaysRemaining > 0 && (
+          <div className="relative rounded-xl bg-green-500 text-white p-4 mb-8 flex items-center justify-between">
+            <div className="absolute top-2 left-2">
+              <Badge variant="destructive">GRAPHIC EXPO '25 PROMO</Badge>
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold">{trialDaysRemaining} Days Free Trial</h2>
+              <p>{Math.floor(trialDaysRemaining * 24)} hours left</p>
+            </div>
+            <Button variant="secondary" size="sm">
+              GET NOW
+            </Button>
+          </div>
+        )}
+
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Choose Your Plan</h1>
           <p className="mt-3 text-lg text-gray-600">Select the perfect plan that fits your business needs.</p>
