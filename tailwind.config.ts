@@ -53,23 +53,23 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Custom colors for admin dashboard cards
-        "sales-red": "#FF6B6B",
-        "logistics-blue": "#6B8EFF",
-        "accounting-purple": "#B16BFF",
-        "treasury-green": "#6BFF8C",
-        "it-teal": "#6BFFD9",
-        "fleet-gray": "#A0A0A0",
-        "creatives-orange": "#FFB16B",
-        "finance-dark-green": "#3CB371",
-        "media-cyan": "#6BEBFF",
-        "business-dev-indigo": "#6B6BFF",
-        "legal-light-red": "#FF9999",
-        "corporate-light-blue": "#99CCFF",
-        "hr-pink": "#FF6BB1",
-        "special-team-lavender": "#B199FF",
-        "marketing-bright-red": "#FF3333",
-        "add-new-gray": "#CCCCCC",
+        // Custom colors for department cards based on the new screenshot
+        salesHeader: "#FF6B6B", // Red
+        logisticsHeader: "#4D8AF0", // Blue
+        accountingHeader: "#E06BFF", // Pink/Purple
+        treasuryHeader: "#22C55E", // Green
+        itHeader: "#00D9BF", // Teal
+        fleetHeader: "#6B7280", // Gray
+        creativesHeader: "#FFB86B", // Orange
+        financeHeader: "#84CC16", // Lime Green
+        mediaHeader: "#00D9BF", // Mint Green (same as IT, based on screenshot)
+        businessDevHeader: "#6B8EFF", // Darker Blue/Purple
+        legalHeader: "#FF6B6B", // Red (same as sales, based on screenshot)
+        corporateHeader: "#4D8AF0", // Blue (same as logistics, based on screenshot)
+        hrHeader: "#FF6BEB", // Magenta
+        specialTeamHeader: "#B86BFF", // Purple
+        marketingHeader: "#FF6B6B", // Red (same as sales, based on screenshot)
+        addDepartmentHeader: "#333333", // Dark Gray/Black
       },
       borderRadius: {
         lg: "var(--radius)",
