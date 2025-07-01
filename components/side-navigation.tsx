@@ -83,7 +83,7 @@ const navigationItems = [
     title: "Admin",
     icon: ShieldCheck,
     items: [
-      { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard }, // Updated href
+      { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
       { title: "Inventory", href: "/admin/inventory", icon: FileText },
       { title: "Access Management", href: "/admin/access-management", icon: ShieldCheck },
     ],
@@ -109,7 +109,6 @@ export function SideNavigation() {
   if (pathname?.startsWith("/sales/project-campaigns")) {
     currentSection = "sales"
   } else if (pathname?.startsWith("/admin")) {
-    // This will catch /admin and /admin/dashboard
     currentSection = "admin"
   }
 
@@ -165,7 +164,7 @@ export function SideNavigation() {
               </div>
               <div className="p-1">
                 {[
-                  { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard }, // Updated href
+                  { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
                   { title: "Bulletin Board", href: "/admin/bulletin-board", icon: ClipboardList },
                 ].map((item) => {
                   const Icon = item.icon
