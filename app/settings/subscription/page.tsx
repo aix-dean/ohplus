@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/contexts/auth-context"
 import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-service"
 import type { BillingCycle, SubscriptionPlanType } from "@/lib/types/subscription"
@@ -145,10 +144,7 @@ export default function SubscriptionPage() {
   return (
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        {/* Removed PromoBanner from here */}
-
-        {/* Moved "Your Current Subscription" section here */}
-        <Separator className="my-12" />
+        {/* Removed the Separator component */}
 
         <Card className="mx-auto max-w-4xl rounded-xl shadow-sm">
           <CardHeader className="border-b p-6">
