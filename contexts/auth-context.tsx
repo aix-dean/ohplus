@@ -1,16 +1,17 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
+  signOut, // Added signOut import
   type User as FirebaseUser,
 } from "firebase/auth"
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore"
-import { firebaseAuth, db } from "@/lib/firebase"
+import { auth, db } from "@/lib/firebase" // Corrected import from firebaseAuth to auth
 import { subscriptionService } from "@/lib/subscription-service"
 import type { Subscription } from "@/lib/types/subscription"
 import { generateLicenseKey } from "@/lib/utils" // Assuming this utility exists
@@ -60,7 +61,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
@@ -173,7 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     setLoading(true)
     try {
-      const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password)
+      const userCredential = await signInWithEmailAndPassword(auth, email, password) // Corrected auth
       setUser(userCredential.user)
       await fetchUserData(userCredential.user)
     } catch (error) {
@@ -185,7 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (email: string, password: string) => {
     setLoading(true)
     try {
-      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password)
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password) // Corrected auth
       const firebaseUser = userCredential.user
       setUser(firebaseUser)
 
@@ -224,7 +225,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      await firebaseAuth.signOut()
+      await signOut(auth) // Corrected auth
       setUser(null)
       setUserData(null)
       setProjectData(null)
@@ -237,7 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = async (email: string) => {
     try {
-      await sendPasswordResetEmail(firebaseAuth, email)
+      await sendPasswordResetEmail(auth, email) // Corrected auth
     } catch (error) {
       throw error
     }
@@ -262,7 +263,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(firebaseAuth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      // Corrected auth
       setUser(currentUser)
       setLoading(false)
       if (currentUser) {

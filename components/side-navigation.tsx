@@ -1,9 +1,10 @@
 "use client"
-import Link from "next/link"
-import type React from "react"
 
+import { Badge } from "@/components/ui/badge"
+
+import * as React from "react"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
   ClipboardList,
@@ -11,314 +12,298 @@ import {
   Package,
   Users,
   Settings,
-  MessageSquare,
-  Calendar,
-  DollarSign,
-  Briefcase,
   Bell,
   ChevronRight,
   ChevronLeft,
   Sparkles,
-  BookOpen,
-  MapPin,
-  ShoppingBag,
-  Megaphone,
-  ScrollText,
-  FileStack,
-  FileCheck,
-  UserCog,
-  CreditCard,
+  DollarSign,
 } from "lucide-react"
+
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { useMobile } from "@/hooks/use-mobile"
-import { useAuth } from "@/contexts/auth-context"
-import { useUnreadMessages } from "@/hooks/use-unread-messages"
-import { Badge } from "@/components/ui/badge"
-import { CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+  SidebarTrigger,
+} from "@/components/ui/sidebar"
 
 interface NavigationItem {
-  name: string
+  title: string
   href: string
   icon: React.ElementType
   badge?: number
-  subItems?: NavigationItem[]
 }
 
-export default function SideNavigation() {
+interface NavigationGroup {
+  label: string
+  items: NavigationItem[]
+}
+
+const navigationItems: Record<string, NavigationGroup[]> = {
+  sales: [
+    {
+      label: "Overview",
+      items: [
+        { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
+        { title: "Bookings", href: "/sales/bookings", icon: ClipboardList },
+        { title: "Proposals", href: "/sales/proposals", icon: FileText },
+        { title: "Products", href: "/sales/products", icon: Package },
+      ],
+    },
+    {
+      label: "Management",
+      items: [
+        { title: "Clients", href: "/sales/clients", icon: Users },
+        { title: "Job Orders", href: "/sales/job-orders", icon: ClipboardList },
+        { title: "Project Campaigns", href: "/sales/project-campaigns", icon: LayoutDashboard },
+        { title: "Planner", href: "/sales/planner", icon: CalendarIcon },
+      ],
+    },
+    {
+      label: "Communication",
+      items: [
+        { title: "Chat", href: "/sales/chat", icon: MessageSquare },
+        { title: "Bulletin Board", href: "/sales/bulletin-board", icon: Megaphone },
+      ],
+    },
+  ],
+  logistics: [
+    {
+      label: "Overview",
+      items: [
+        { title: "Dashboard", href: "/logistics/dashboard", icon: LayoutDashboard },
+        { title: "Sites", href: "/logistics/sites", icon: MapPin },
+        { title: "Products", href: "/logistics/products", icon: Package },
+      ],
+    },
+    {
+      label: "Operations",
+      items: [
+        { title: "Assignments", href: "/logistics/assignments", icon: ClipboardList },
+        { title: "Alerts", href: "/logistics/alerts", icon: Bell },
+        { title: "Planner", href: "/logistics/planner", icon: CalendarIcon },
+      ],
+    },
+  ],
+  cms: [
+    {
+      label: "Content Management",
+      items: [
+        { title: "Dashboard", href: "/cms/dashboard", icon: LayoutDashboard },
+        { title: "Orders", href: "/cms/orders", icon: ClipboardList },
+        { title: "Planner", href: "/cms/planner", icon: CalendarIcon },
+      ],
+    },
+  ],
+  admin: [
+    // This section will be custom rendered below
+    {
+      label: "Admin",
+      items: [
+        { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+        { title: "Access Management", href: "/admin/access-management", icon: Users },
+        { title: "Chat Analytics", href: "/admin/chat-analytics", icon: BarChart },
+        { title: "Inventory", href: "/admin/inventory", icon: Package },
+        { title: "Subscriptions", href: "/admin/subscriptions", icon: DollarSign }, // Updated path
+      ],
+    },
+  ],
+  settings: [
+    {
+      label: "Settings",
+      items: [
+        { title: "Account", href: "/account", icon: Settings },
+        // Subscription moved to admin
+      ],
+    },
+  ],
+}
+
+export function SideNavigation() {
   const pathname = usePathname()
-  const { isMobile } = useMobile()
-  const { user } = useAuth()
-  const { unreadCount } = useUnreadMessages()
+  const currentSection = pathname.split("/")[1] || "sales" // Default to 'sales' if no section
 
-  const currentSection = pathname.split("/")[1] // e.g., "sales", "logistics", "admin"
-
-  const navigationItems: { [key: string]: NavigationItem[] } = {
-    sales: [
-      { name: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
-      { name: "Bulletin Board", href: "/sales/bulletin-board", icon: ClipboardList },
-      {
-        name: "Chat",
-        href: "/sales/chat",
-        icon: MessageSquare,
-        badge: unreadCount,
-      },
-      { name: "Planner", href: "/sales/planner", icon: Calendar },
-      { name: "Clients", href: "/sales/clients", icon: Users },
-      {
-        name: "Products",
-        href: "/sales/products",
-        icon: ShoppingBag,
-        subItems: [
-          { name: "All Products", href: "/sales/products", icon: Package },
-          { name: "New Product", href: "/sales/products/new", icon: Package },
-        ],
-      },
-      {
-        name: "Proposals",
-        href: "/sales/proposals",
-        icon: FileText,
-        subItems: [
-          { name: "All Proposals", href: "/sales/proposals", icon: FileStack },
-          { name: "Create Proposal", href: "/sales/proposals/create", icon: FileText },
-        ],
-      },
-      {
-        name: "Cost Estimates",
-        href: "/sales/cost-estimates",
-        icon: DollarSign,
-        subItems: [
-          { name: "All Estimates", href: "/sales/cost-estimates", icon: FileStack },
-          { name: "Create Estimate", href: "/sales/cost-estimates/create", icon: DollarSign },
-        ],
-      },
-      {
-        name: "Quotations",
-        href: "/sales/quotation-requests",
-        icon: Briefcase,
-        subItems: [
-          { name: "All Quotations", href: "/sales/quotation-requests", icon: FileCheck },
-          { name: "Create Quotation", href: "/sales/quotation-requests/create", icon: Briefcase },
-        ],
-      },
-      {
-        name: "Job Orders",
-        href: "/sales/job-orders",
-        icon: ScrollText,
-        subItems: [
-          { name: "All Job Orders", href: "/sales/job-orders", icon: FileStack },
-          { name: "Create Job Order", href: "/sales/job-orders/create", icon: ScrollText },
-        ],
-      },
-      { name: "Bookings", href: "/sales/bookings", icon: Calendar },
-      { name: "Project Campaigns", href: "/sales/project-campaigns", icon: Megaphone },
-    ],
-    logistics: [
-      { name: "Dashboard", href: "/logistics/dashboard", icon: LayoutDashboard },
-      { name: "Planner", href: "/logistics/planner", icon: Calendar },
-      { name: "Sites", href: "/logistics/sites", icon: MapPin },
-      { name: "Products", href: "/logistics/products", icon: Package },
-      { name: "Assignments", href: "/logistics/assignments", icon: Briefcase },
-      { name: "Alerts", href: "/logistics/alerts", icon: Bell },
-    ],
-    cms: [
-      { name: "Dashboard", href: "/cms/dashboard", icon: LayoutDashboard },
-      { name: "Planner", href: "/cms/planner", icon: Calendar },
-      { name: "Orders", href: "/cms/orders", icon: ShoppingBag },
-      { name: "Details", href: "/cms/details", icon: FileText },
-    ],
-    admin: [
-      // No direct items here, handled by custom rendering below
-    ],
-    account: [
-      { name: "Account Settings", href: "/account", icon: UserCog },
-      { name: "Subscription", href: "/admin/subscriptions", icon: CreditCard },
-    ],
-    // Add other sections as needed
-  }
-
-  const commonItems = [
-    { name: "Help", href: "/help", icon: BookOpen },
-    { name: "Settings", href: "/settings", icon: Settings },
-  ]
-
-  const renderNavItems = (items: NavigationItem[]) => (
-    <nav className="grid items-start gap-2">
-      {items.map((item, index) => (
-        <div key={index}>
-          <Link
-            href={item.href}
-            className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-300 transition-all hover:text-white hover:bg-sidebar-hover",
-              pathname === item.href && "bg-sidebar-active text-white",
-            )}
-          >
-            <item.icon className="h-4 w-4" />
-            {item.name}
-            {item.badge !== undefined && item.badge > 0 && (
-              <Badge className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white text-xs">
-                {item.badge}
-              </Badge>
-            )}
-          </Link>
-          {item.subItems && (
-            <div className="ml-6 mt-1 space-y-1">
-              {item.subItems.map((subItem, subIndex) => (
-                <Link
-                  key={subIndex}
-                  href={subItem.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-400 transition-all hover:text-white hover:bg-sidebar-hover",
-                    pathname === subItem.href && "bg-sidebar-active text-white",
-                  )}
-                >
-                  <subItem.icon className="h-4 w-4" />
-                  {subItem.name}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-    </nav>
-  )
+  const getIsActive = (href: string) => pathname === href
 
   return (
-    <div
-      className={cn(
-        "hidden border-r bg-sidebar-DEFAULT lg:block",
-        isMobile ? "fixed inset-y-0 left-0 z-50 w-64" : "h-screen w-64",
-      )}
-    >
-      <div className="flex h-full max-h-screen flex-col gap-2">
-        <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-          <Link href="/" className="flex items-center gap-2 font-semibold text-white">
-            <img src="/ohplus-new-logo.png" alt="OH Plus Logo" className="h-6 w-auto" />
-            <span className="sr-only">OH Plus</span>
-          </Link>
-        </div>
-        <div className="flex-1 overflow-auto py-2">
+    <Sidebar>
+      <SidebarHeader>
+        <Link href="/" className="flex items-center gap-2">
+          <img src="/ohplus-new-logo.png" alt="OH Plus Logo" className="h-8 w-auto" />
+        </Link>
+      </SidebarHeader>
+      <SidebarContent>
+        <ScrollArea className="h-full">
           {currentSection === "admin" ? (
-            <div className="px-4 lg:px-6 space-y-6">
-              {/* Notification Card */}
-              <Card className="bg-blue-500 text-white border-none shadow-none">
-                <CardHeader className="p-4 pb-2">
-                  <CardTitle className="text-lg font-semibold">Notification</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-0 text-sm">
-                  <p className="mb-2">No notification for now.</p>
-                  <Button variant="link" className="text-white p-0 h-auto text-sm">
-                    See All
+            // Custom layout for Admin Dashboard
+            <div className="p-4 space-y-6">
+              <div className="bg-blue-500 text-white p-4 rounded-lg shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-lg">Notification</h3>
+                  <Bell className="h-5 w-5" />
+                </div>
+                <p className="text-sm text-blue-100">No notification for now.</p>
+                <Button variant="link" className="text-blue-100 p-0 h-auto mt-2">
+                  See All
+                </Button>
+              </div>
+
+              <div className="bg-white p-4 rounded-lg shadow-sm">
+                <h3 className="font-semibold text-gray-800 mb-3">To Go</h3>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={getIsActive("/admin/dashboard")}>
+                      <Link href="/admin/dashboard">
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        Dashboard
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={getIsActive("/admin/bulletin-board")}>
+                      <Link href="/admin/bulletin-board">
+                        <ClipboardList className="mr-2 h-4 w-4" />
+                        Bulletin Board
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </div>
+
+              <div className="bg-white p-4 rounded-lg shadow-sm">
+                <h3 className="font-semibold text-gray-800 mb-3">To Do</h3>
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={getIsActive("/admin/documents")}>
+                      <Link href="/admin/documents">
+                        <FileText className="mr-2 h-4 w-4" />
+                        Documents
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={getIsActive("/admin/inventory")}>
+                      <Link href="/admin/inventory">
+                        <Package className="mr-2 h-4 w-4" />
+                        Inventory
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={getIsActive("/admin/user-management")}>
+                      <Link href="/admin/user-management">
+                        <Users className="mr-2 h-4 w-4" />
+                        User Management
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild isActive={getIsActive("/admin/subscriptions")}>
+                      <Link href="/admin/subscriptions">
+                        <DollarSign className="mr-2 h-4 w-4" />
+                        Subscription
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </div>
+
+              <div className="bg-purple-600 text-white p-4 rounded-lg shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold text-lg">Intelligence</h3>
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <Button variant="ghost" size="icon" className="text-white hover:bg-purple-700">
+                    <ChevronLeft className="h-5 w-5" />
                   </Button>
-                </CardContent>
-              </Card>
-
-              {/* To Go Section */}
-              <div className="space-y-2">
-                <h3 className="text-gray-400 text-sm font-medium uppercase tracking-wider">To Go</h3>
-                <nav className="grid items-start gap-2">
-                  <Link
-                    href="/admin/dashboard"
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-300 transition-all hover:text-white hover:bg-sidebar-hover",
-                      pathname === "/admin/dashboard" && "bg-sidebar-active text-white",
-                    )}
-                  >
-                    <LayoutDashboard className="h-4 w-4" />
-                    Dashboard
-                  </Link>
-                  <Link
-                    href="/admin/bulletin-board" // Assuming this route exists or will be created
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-300 transition-all hover:text-white hover:bg-sidebar-hover",
-                      pathname === "/admin/bulletin-board" && "bg-sidebar-active text-white",
-                    )}
-                  >
-                    <ClipboardList className="h-4 w-4" />
-                    Bulletin Board
-                  </Link>
-                </nav>
-              </div>
-
-              {/* To Do Section */}
-              <div className="space-y-2">
-                <h3 className="text-gray-400 text-sm font-medium uppercase tracking-wider">To Do</h3>
-                <nav className="grid items-start gap-2">
-                  <Link
-                    href="/admin/documents" // Assuming this route exists or will be created
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-300 transition-all hover:text-white hover:bg-sidebar-hover",
-                      pathname === "/admin/documents" && "bg-sidebar-active text-white",
-                    )}
-                  >
-                    <FileText className="h-4 w-4" />
-                    Documents
-                  </Link>
-                  <Link
-                    href="/admin/inventory" // Assuming this route exists or will be created
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-300 transition-all hover:text-white hover:bg-sidebar-hover",
-                      pathname === "/admin/inventory" && "bg-sidebar-active text-white",
-                    )}
-                  >
-                    <Package className="h-4 w-4" />
-                    Inventory
-                  </Link>
-                  <Link
-                    href="/admin/user-management" // Assuming this route exists or will be created
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-300 transition-all hover:text-white hover:bg-sidebar-hover",
-                      pathname === "/admin/user-management" && "bg-sidebar-active text-white",
-                    )}
-                  >
-                    <Users className="h-4 w-4" />
-                    User Management
-                  </Link>
-                  <Link
-                    href="/admin/subscriptions"
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-300 transition-all hover:text-white hover:bg-sidebar-hover",
-                      pathname === "/admin/subscriptions" && "bg-sidebar-active text-white",
-                    )}
-                  >
-                    <CreditCard className="h-4 w-4" />
-                    Subscription
-                  </Link>
-                </nav>
-              </div>
-
-              {/* Intelligence Card */}
-              <Card className="bg-purple-600 text-white border-none shadow-none">
-                <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
-                  <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                    Intelligence <Sparkles className="h-4 w-4" />
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-0">
-                  <div className="flex items-center justify-between mb-2">
-                    <Button variant="ghost" size="icon" className="text-white hover:bg-purple-700">
-                      <ChevronLeft className="h-5 w-5" />
-                    </Button>
-                    <div className="flex gap-2">
-                      <div className="h-10 w-16 bg-purple-700 rounded-md" />
-                      <div className="h-10 w-16 bg-purple-700 rounded-md" />
-                    </div>
-                    <Button variant="ghost" size="icon" className="text-white hover:bg-purple-700">
-                      <ChevronRight className="h-5 w-5" />
-                    </Button>
+                  <div className="flex gap-2">
+                    <div className="h-12 w-20 bg-purple-700 rounded-md" />
+                    <div className="h-12 w-20 bg-purple-700 rounded-md" />
                   </div>
-                  <Button variant="link" className="text-white p-0 h-auto text-sm">
-                    See All
+                  <Button variant="ghost" size="icon" className="text-white hover:bg-purple-700">
+                    <ChevronRight className="h-5 w-5" />
                   </Button>
-                </CardContent>
-              </Card>
+                </div>
+                <Button variant="link" className="text-purple-100 p-0 h-auto mt-2">
+                  See All
+                </Button>
+              </div>
             </div>
           ) : (
-            renderNavItems(navigationItems[currentSection] || [])
+            // Existing navigation for other sections
+            Object.entries(navigationItems).map(([section, groups]) => (
+              <React.Fragment key={section}>
+                {section === currentSection && (
+                  <>
+                    {groups.map((group, groupIndex) => (
+                      <SidebarGroup key={groupIndex}>
+                        <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                        <SidebarGroupContent>
+                          <SidebarMenu>
+                            {group.items.map((item, itemIndex) => (
+                              <SidebarMenuItem key={itemIndex}>
+                                <SidebarMenuButton asChild isActive={getIsActive(item.href)}>
+                                  <Link href={item.href}>
+                                    <item.icon className="mr-2 h-4 w-4" />
+                                    {item.title}
+                                    {item.badge !== undefined && (
+                                      <Badge className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full">
+                                        {item.badge}
+                                      </Badge>
+                                    )}
+                                  </Link>
+                                </SidebarMenuButton>
+                              </SidebarMenuItem>
+                            ))}
+                          </SidebarMenu>
+                        </SidebarGroupContent>
+                      </SidebarGroup>
+                    ))}
+                  </>
+                )}
+              </React.Fragment>
+            ))
           )}
-        </div>
-        <div className="mt-auto p-4 border-t border-gray-700">{renderNavItems(commonItems)}</div>
-      </div>
-    </div>
+        </ScrollArea>
+      </SidebarContent>
+      <SidebarRail>
+        <TooltipProvider>
+          {Object.entries(navigationItems).map(([section, groups]) => (
+            <React.Fragment key={section}>
+              {groups.map((group, groupIndex) => (
+                <React.Fragment key={groupIndex}>
+                  {group.items.map((item, itemIndex) => (
+                    <Tooltip key={itemIndex}>
+                      <TooltipTrigger asChild>
+                        <SidebarTrigger asChild>
+                          <Link href={item.href} className={cn(getIsActive(item.href) && "bg-muted")}>
+                            <item.icon className="h-5 w-5" />
+                            <span className="sr-only">{item.title}</span>
+                          </Link>
+                        </SidebarTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">{item.title}</TooltipContent>
+                    </Tooltip>
+                  ))}
+                </React.Fragment>
+              ))}
+            </React.Fragment>
+          ))}
+        </TooltipProvider>
+      </SidebarRail>
+    </Sidebar>
   )
 }
+
+import { CalendarIcon, MessageSquare, Megaphone, MapPin, BarChart } from "lucide-react"
