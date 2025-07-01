@@ -195,11 +195,9 @@ export default function SubscriptionPage() {
               <>
                 {plan.id === "solo" && ( // Conditionally render PromoBanner before "solo" plan
                   <div className="col-span-full flex justify-center">
-                    {" "}
-                    {/* Added flex justify-center */}
-                    <div className="max-w-xs w-full">
+                    <div className="w-[280px]">
                       {" "}
-                      {/* Added max-w-xs and w-full */}
+                      {/* Changed from max-w-xs to a fixed width */}
                       <PromoBanner promoEndDate={promoEndDate} />
                     </div>
                   </div>
