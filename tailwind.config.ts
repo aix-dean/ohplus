@@ -53,15 +53,14 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Custom color for admin header
+        // Custom colors for headers
         adminHeaderPurple: {
-          DEFAULT: "#673AB7", // The main purple from the screenshot
-          light: "#9575CD", // A lighter shade for potential hover/active states
+          DEFAULT: "#673AB7", // Main purple from screenshot
+          light: "rgba(103, 58, 183, 0.8)", // Lighter shade for hover
         },
-        // Custom color for sales header (assuming rose-600 is #E11D48)
         salesHeaderRose: {
-          DEFAULT: "#E11D48",
-          light: "#F43F5E",
+          DEFAULT: "#e11d48", // Original rose color
+          light: "rgba(244, 63, 94, 0.8)", // Lighter shade for hover
         },
       },
       borderRadius: {

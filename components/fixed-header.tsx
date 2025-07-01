@@ -22,6 +22,14 @@ import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useIsAdmin } from "@/hooks/use-is-admin"
 import { cn } from "@/lib/utils"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
 
 interface FixedHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
   onMenuClick: () => void
@@ -172,20 +180,38 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
         </SheetContent>
       </Sheet>
       {/* Replaced h1 with Breadcrumb component */}
-      <div className="flex-1 text-lg font-semibold text-white md:text-2xl">
-        {breadcrumbs.map((item, index) => (
-          <React.Fragment key={index}>
-            {item.isPage ? (
-              <span className="font-normal">{item.label}</span>
-            ) : (
-              <Link href={item.href || "#"} className="transition-colors hover:text-gray-200">
-                {item.label}
-              </Link>
-            )}
-            {index < breadcrumbs.length - 1 && <span className="mx-1">/</span>}
-          </React.Fragment>
-        ))}
-      </div>
+      <Breadcrumb>
+        <BreadcrumbList className="text-white">
+          {breadcrumbs.map((item, index) => (
+            <React.Fragment key={index}>
+              <BreadcrumbItem>
+                {item.label === "Admin - Dashboard" && item.href && !showAdminBackButton ? (
+                  <Link href={item.href} passHref>
+                    <Button
+                      variant="default"
+                      className="bg-black hover:bg-black/90 text-white rounded-full px-4 py-2 flex items-center gap-1"
+                      asChild
+                    >
+                      <span>
+                        <ChevronLeft className="h-4 w-4" /> Admin
+                      </span>
+                    </Button>
+                  </Link>
+                ) : item.isPage ? (
+                  <BreadcrumbPage className="font-normal text-white">{item.label}</BreadcrumbPage>
+                ) : (
+                  <BreadcrumbLink asChild>
+                    <Link href={item.href || "#"} className="transition-colors hover:text-gray-200 text-white">
+                      {item.label}
+                    </Link>
+                  </BreadcrumbLink>
+                )}
+              </BreadcrumbItem>
+              {index < breadcrumbs.length - 1 && <BreadcrumbSeparator className="text-white" />}
+            </React.Fragment>
+          ))}
+        </BreadcrumbList>
+      </Breadcrumb>
       <div className="relative ml-auto flex-1 md:grow-0">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white" />
         <Input

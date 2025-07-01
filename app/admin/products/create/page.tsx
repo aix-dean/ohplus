@@ -15,7 +15,7 @@ import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplet
 import { collection, query, where, getDocs, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "@/components/ui/use-toast"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
@@ -42,12 +42,11 @@ interface Category {
 
 export default function AdminProductCreatePage() {
   const router = useRouter()
-  const [name, setName] = useState("")
+  const [productName, setProductName] = useState("")
   const [description, setDescription] = useState("")
   const [price, setPrice] = useState("")
   const [imageUrl, setImageUrl] = useState("")
   const [loading, setLoading] = useState(false)
-  const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
@@ -297,8 +296,10 @@ export default function AdminProductCreatePage() {
 
       const productData = {
         ...formData,
+        name: productName,
+        description,
+        price: Number.parseFloat(price),
         content_type: contentType,
-        price: formData.price ? Number.parseFloat(formData.price) : null,
         media: mediaData,
         categories: selectedCategories,
         category_names: getCategoryNames(),
@@ -380,14 +381,14 @@ export default function AdminProductCreatePage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="name">
+                    <Label htmlFor="productName">
                       Name <span className="text-red-500">*</span>
                     </Label>
                     <Input
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
+                      id="productName"
+                      name="productName"
+                      value={productName}
+                      onChange={(e) => setProductName(e.target.value)}
                       placeholder="Enter product name"
                       required
                       disabled={loading}
@@ -400,8 +401,8 @@ export default function AdminProductCreatePage() {
                       id="price"
                       name="price"
                       type="number"
-                      value={formData.price}
-                      onChange={handleInputChange}
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
                       placeholder="Enter price per month"
                       min="0"
                       step="0.01"
@@ -417,8 +418,8 @@ export default function AdminProductCreatePage() {
                   <Textarea
                     id="description"
                     name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
                     placeholder="Enter product description"
                     rows={4}
                     required
