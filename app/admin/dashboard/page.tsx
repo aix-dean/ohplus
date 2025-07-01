@@ -1,15 +1,35 @@
 "use client"
-
 import { useState } from "react"
 import Link from "next/link"
-import { Search, X, Calendar, ChevronDown, Dot, Plus } from "lucide-react"
+import { Calendar, Search, Dot, X, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import type { Product } from "@/lib/firebase-service"
+import { Input } from "@/components/ui/input"
+import { useDebounce } from "@/hooks/use-debounce"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { useAuth } from "@/hooks/use-auth" // Import useAuth hook
 
-// Map header color names to their hex values for inline styling
+// Number of items to display per page
+const ITEMS_PER_PAGE = 12
+
+// Function to get site code from product
+const getSiteCode = (product: Product | null) => {
+  if (!product) return null
+
+  // Try different possible locations for site_code
+  if (product.site_code) return product.site_code
+  if (product.specs_rental && "site_code" in product.specs_rental) return product.specs_rental.site_code
+  if (product.light && "site_code" in product) return product.light.siteCode
+
+  // Check for camelCase variant
+  if ("siteCode" in product) return (product as any).siteCode
+
+  return null
+}
+
+// Map for inline header colors
 const headerColorMap: Record<string, string> = {
   salesHeader: "#FF5757",
   logisticsHeader: "#4A90E2",
@@ -18,15 +38,15 @@ const headerColorMap: Record<string, string> = {
   itHeader: "#00A896",
   fleetHeader: "#8D8D8D",
   creativesHeader: "#E87B00",
-  financeHeader: "#6BBF59",
-  mediaHeader: "#00C1D4",
-  businessDevHeader: "#5C4B8B",
-  legalHeader: "#A00000",
-  corporateHeader: "#007BFF",
+  financeHeader: "#7CB342",
+  mediaHeader: "#00BCD4",
+  businessDevHeader: "#5C6BC0",
+  legalHeader: "#B71C1C",
+  corporateHeader: "#2196F3",
   humanResourcesHeader: "#FF69B4",
-  specialTeamHeader: "#8A2BE2",
-  marketingHeader: "#E00000",
-  addDepartmentHeader: "#333333",
+  specialTeamHeader: "#673AB7",
+  marketingHeader: "#D32F2F",
+  addDepartmentHeader: "#424242",
 }
 
 interface DepartmentCardProps {
@@ -36,7 +56,7 @@ interface DepartmentCardProps {
   metricLabel?: string
   metricValue?: string
   badgeCount?: number
-  href?: string // Added href prop for navigation
+  href?: string // Optional href for navigation
 }
 
 function DepartmentCard({
@@ -49,48 +69,54 @@ function DepartmentCard({
   href,
 }: DepartmentCardProps) {
   const cardContent = (
-    <Card className="w-full max-w-xs overflow-hidden rounded-xl shadow-md">
-      <CardHeader className="relative p-4 text-white" style={{ backgroundColor: headerColorMap[headerColor] }}>
-        <CardTitle className="text-lg font-semibold">{title}</CardTitle>
-        {badgeCount !== undefined && (
-          <Badge className="absolute right-3 top-3 rounded-full bg-white text-gray-800 px-2 py-1 text-xs font-bold">
-            {badgeCount}
-          </Badge>
-        )}
+    <>
+      <CardHeader className="relative p-4 rounded-t-lg" style={{ backgroundColor: headerColorMap[headerColor] }}>
+        <CardTitle className="text-white text-lg font-semibold flex justify-between items-center">
+          {title}
+          {badgeCount !== undefined && (
+            <Badge className="bg-white text-gray-800 rounded-full px-2 py-0.5 text-xs font-bold">{badgeCount}</Badge>
+          )}
+        </CardTitle>
       </CardHeader>
-      <CardContent className="p-4">
-        <div className="mb-4">
+      <CardContent className="p-4 flex flex-col justify-between flex-grow">
+        <div className="space-y-1 mb-4">
           {members.map((member, index) => (
-            <div key={index} className="flex items-center text-sm text-gray-700">
-              <Dot className="h-4 w-4 text-green-500" />
-              {member}
-            </div>
+            <p key={index} className="text-sm text-gray-700 flex items-center">
+              <Dot className="h-4 w-4 text-green-500 mr-1" /> {member}
+            </p>
           ))}
         </div>
         {metricLabel && metricValue && (
-          <div className="mb-4">
-            <p className="text-sm text-gray-500">{metricLabel}</p>
-            <p className="text-lg font-bold text-gray-800">{metricValue}</p>
+          <div className="mt-auto pt-2 border-t border-gray-200">
+            <p className="text-xs text-gray-500">{metricLabel}</p>
+            <p className="text-base font-bold text-gray-800">{metricValue}</p>
           </div>
         )}
-        <Button variant="outline" className="w-full bg-transparent">
-          <Plus className="mr-2 h-4 w-4" /> Add Widget
+        <Button variant="outline" className="mt-4 w-full bg-transparent">
+          + Add Widget
         </Button>
       </CardContent>
-    </Card>
+    </>
   )
 
-  if (href) {
-    return <Link href={href}>{cardContent}</Link>
-  }
-  return cardContent
+  return href ? (
+    <Link href={href} passHref>
+      <Card className="overflow-hidden shadow-md rounded-xl flex flex-col h-full cursor-pointer hover:shadow-lg transition-shadow">
+        {cardContent}
+      </Card>
+    </Link>
+  ) : (
+    <Card className="overflow-hidden shadow-md rounded-xl flex flex-col h-full">{cardContent}</Card>
+  )
 }
 
-export default function AdminDashboardPage() {
+function AdminDashboardContent() {
+  const { userData } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedDate, setSelectedDate] = useState("Jun 2025")
+  const debouncedSearchQuery = useDebounce(searchQuery, 300)
 
-  const departmentData = [
+  // Dummy data for department cards
+  const departmentData: DepartmentCardProps[] = [
     {
       title: "Sales",
       headerColor: "salesHeader",
@@ -98,7 +124,7 @@ export default function AdminDashboardPage() {
       metricLabel: "Monthly Revenue",
       metricValue: "4,000,000",
       badgeCount: 2,
-      href: "/sales/dashboard", // Added navigation path
+      href: "/sales/dashboard", // Link for Sales
     },
     {
       title: "Logistics/ Operations",
@@ -107,7 +133,7 @@ export default function AdminDashboardPage() {
       metricLabel: "Total Service Assignments",
       metricValue: "5",
       badgeCount: 1,
-      href: "/logistics/dashboard", // Added navigation path
+      href: "/logistics/dashboard", // Link for Logistics
     },
     {
       title: "Accounting",
@@ -184,28 +210,38 @@ export default function AdminDashboardPage() {
     },
   ]
 
+  // Filter departments based on search query
+  const filteredDepartments = departmentData.filter(
+    (department) =>
+      department.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      department.members.some((member) => member.toLowerCase().includes(debouncedSearchQuery.toLowerCase())),
+  )
+
   return (
     <div className="flex-1 p-4 md:p-6">
-      <div className="flex flex-col gap-6">
-        {/* Header Section */}
+      <div className="flex flex-col gap-4 md:gap-6">
+        {/* Header with title, search box, and date filter */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex flex-col gap-2">
-            <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
+            <h1 className="text-xl md:text-2xl font-bold">
+              {userData?.first_name ? `${userData.first_name}'s Dashboard` : "Ohliver's Dashboard"}
+            </h1>
           </div>
+
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+            <div className="relative w-full sm:w-64 md:w-80">
               <Input
                 placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-8"
+                className="pl-8 pr-8"
               />
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
               {searchQuery && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-gray-500 hover:bg-transparent"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 text-gray-500 hover:bg-transparent"
                   onClick={() => setSearchQuery("")}
                 >
                   <X className="h-4 w-4" />
@@ -214,31 +250,35 @@ export default function AdminDashboardPage() {
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                <Button variant="outline" className="gap-2 bg-transparent">
                   <Calendar className="h-4 w-4" />
-                  {selectedDate}
-                  <ChevronDown className="h-4 w-4" />
+                  Jun 2025
+                  <ChevronDown className="h-4 w-4 opacity-50" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setSelectedDate("Jan 2025")}>Jan 2025</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDate("Feb 2025")}>Feb 2025</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDate("Mar 2025")}>Mar 2025</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDate("Apr 2025")}>Apr 2025</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDate("May 2025")}>May 2025</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDate("Jun 2025")}>Jun 2025</DropdownMenuItem>
+                <DropdownMenuItem>January 2025</DropdownMenuItem>
+                <DropdownMenuItem>February 2025</DropdownMenuItem>
+                <DropdownMenuItem>March 2025</DropdownMenuItem>
+                <DropdownMenuItem>April 2025</DropdownMenuItem>
+                <DropdownMenuItem>May 2025</DropdownMenuItem>
+                <DropdownMenuItem>June 2025</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
 
         {/* Department Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {departmentData.map((department, index) => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredDepartments.map((department, index) => (
             <DepartmentCard key={index} {...department} />
           ))}
         </div>
       </div>
     </div>
   )
+}
+
+export default function AdminDashboard() {
+  return <AdminDashboardContent />
 }

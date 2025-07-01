@@ -4,7 +4,6 @@ import type React from "react"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
-import Link from "next/link" // Import Link
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import {
@@ -71,7 +70,7 @@ const getSiteCode = (product: Product | null) => {
   // Try different possible locations for site_code
   if (product.site_code) return product.site_code
   if (product.specs_rental && "site_code" in product.specs_rental) return product.specs_rental.site_code
-  if (product.light && "site_code" in product.light) return product.light.siteCode
+  if (product.light && "site_code" in product) return product.light.siteCode
 
   // Check for camelCase variant
   if ("siteCode" in product) return (product as any).siteCode
@@ -834,16 +833,6 @@ function SalesDashboardContent() {
         >
           {/* Left Column: Main Dashboard Content */}
           <div className="flex flex-col gap-4 md:gap-6">
-            {/* Back to Admin Dashboard Button */}
-            <div className="flex items-center gap-2">
-              <Link href="/admin/dashboard" passHref>
-                <Button variant="outline" size="sm" className="gap-1 bg-transparent">
-                  <ArrowLeft size={16} />
-                  Back to Admin Dashboard
-                </Button>
-              </Link>
-            </div>
-
             {/* Header with title, actions, and search box */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex flex-col gap-2">
