@@ -52,7 +52,7 @@ const navigationItems = [
       { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
       { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
       { title: "Clients", href: "/sales/clients", icon: Users },
-      { title: "Billings", href: "#", icon: FileText }, // Added Billings here
+      { title: "Billings", href: "#", icon: FileText },
       { title: "Planner", href: "/sales/planner", icon: Calendar },
       { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
     ],
@@ -112,21 +112,17 @@ export function SideNavigation() {
     currentSection = "admin" // Explicitly set admin section
   }
 
-  // Find the navigation item for the current section
-  const currentNavItem = navigationItems.find((item) => item.section === currentSection)
-
   // Check if a path is active
   const isActive = (path: string) => {
     return pathname === path || pathname?.startsWith(path + "/")
   }
 
-  // If there's no current section or it has no sub-items, don't render the side nav
-  if (!currentNavItem || currentNavItem.items.length === 0) {
-    // Render specific admin sidebar if currentSection is 'admin'
-    if (currentSection === "admin") {
-      return (
-        <div className="w-64 h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 overflow-y-auto shadow-sm">
-          <nav className="p-3 space-y-4">
+  return (
+    <div className="w-64 h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 overflow-y-auto shadow-sm">
+      <nav className="p-3 space-y-4">
+        {currentSection === "admin" ? (
+          // Admin specific sidebar layout
+          <>
             {/* Notification Section */}
             <div className="bg-[#3399FF] rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
@@ -249,22 +245,11 @@ export function SideNavigation() {
                 <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
               </div>
             </div>
-          </nav>
-        </div>
-      )
-    }
-    return null
-  }
-
-  const SectionIcon = currentNavItem.icon
-
-  return (
-    <div className="w-64 h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 overflow-y-auto shadow-sm">
-      <nav className="p-3 space-y-4">
-        {currentNavItem.section === "sales" ? (
-          // Special grouped layout for sales
+          </>
+        ) : currentSection === "sales" ? (
+          // Sales specific sidebar layout
           <>
-            {/* Notification Section */}
+            {/* Notification Section (Sales specific) */}
             <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium">Notification</h3>
@@ -306,7 +291,7 @@ export function SideNavigation() {
                 {[
                   { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
                   { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
-                  { title: "Bulletin Board", href: "/sales/bulletin-board", icon: ClipboardList }, // New item
+                  { title: "Bulletin Board", href: "/sales/bulletin-board", icon: ClipboardList },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(item.href)
@@ -347,7 +332,7 @@ export function SideNavigation() {
                   { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
                   { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
                   { title: "Clients", href: "/sales/clients", icon: Users },
-                  { title: "Billings", href: "#", icon: FileText }, // Added Billings here
+                  { title: "Billings", href: "#", icon: FileText },
                   { title: "Planner", href: "/sales/planner", icon: Calendar },
                   { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
                 ].map((item) => {
@@ -380,7 +365,7 @@ export function SideNavigation() {
               </div>
             </div>
 
-            {/* Intelligence Section */}
+            {/* Intelligence Section (Sales specific) */}
             <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
               <div className="flex items-center space-x-2 mb-3">
                 <h3 className="text-sm font-medium">Intelligence</h3>
@@ -407,32 +392,34 @@ export function SideNavigation() {
           </>
         ) : (
           // Default layout for other sections
-          currentNavItem.items.map((item) => {
-            const Icon = item.icon
-            const active = isActive(item.href)
+          navigationItems
+            .find((item) => item.section === currentSection)
+            ?.items.map((item) => {
+              const Icon = item.icon
+              const active = isActive(item.href)
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center py-2.5 px-3 text-sm rounded-md mx-2 my-1 transition-all duration-200",
-                  active
-                    ? "bg-gray-200 text-gray-900 font-medium shadow-sm"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
-                )}
-              >
-                <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                <span className="flex-1">{item.title}</span>
-                {item.href === "/sales/chat" && unreadCount > 0 && (
-                  <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </Badge>
-                )}
-                {active && <div className="ml-auto w-1 h-5 bg-gray-700 rounded-full"></div>}
-              </Link>
-            )
-          })
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center py-2.5 px-3 text-sm rounded-md mx-2 my-1 transition-all duration-200",
+                    active
+                      ? "bg-gray-200 text-gray-900 font-medium shadow-sm"
+                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
+                  )}
+                >
+                  <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                  <span className="flex-1">{item.title}</span>
+                  {item.href === "/sales/chat" && unreadCount > 0 && (
+                    <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </Badge>
+                  )}
+                  {active && <div className="ml-auto w-1 h-5 bg-gray-700 rounded-full"></div>}
+                </Link>
+              )
+            })
         )}
       </nav>
     </div>
