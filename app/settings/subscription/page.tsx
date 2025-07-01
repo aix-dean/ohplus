@@ -1,7 +1,5 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
-
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
@@ -20,9 +18,38 @@ export default function SubscriptionPage() {
   const router = useRouter()
   const [isUpdating, setIsUpdating] = useState(false)
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
   const [trialDaysRemaining, setTrialDaysRemaining] = useState(0)
 
   const plans = getSubscriptionPlans()
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout
+
+    const calculateTimeLeft = () => {
+      if (subscriptionData?.trialEndDate) {
+        const trialEndDate = new Date(subscriptionData.trialEndDate).getTime()
+        const now = new Date().getTime()
+        const difference = trialEndDate - now
+
+        if (difference > 0) {
+          const days = Math.floor(difference / (1000 * 60 * 60 * 24))
+          const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+          const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60))
+          const seconds = Math.floor((difference % (1000 * 60)) / 1000)
+          setTimeLeft({ days, hours, minutes, seconds })
+        } else {
+          setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+          clearInterval(timer) // Stop the timer if trial ended
+        }
+      }
+    }
+
+    calculateTimeLeft() // Initial calculation
+    timer = setInterval(calculateTimeLeft, 1000) // Update every second
+
+    return () => clearInterval(timer) // Cleanup on unmount
+  }, [subscriptionData]) // Recalculate if subscriptionData changes
 
   useEffect(() => {
     if (!loading && !user) {
@@ -145,18 +172,23 @@ export default function SubscriptionPage() {
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
         {/* Promo Banner */}
-        {subscriptionData?.planType === "trial" && trialDaysRemaining > 0 && (
-          <div className="relative rounded-xl bg-green-500 text-white p-4 mb-8 flex items-center justify-between">
-            <div className="absolute top-2 left-2">
-              <Badge variant="destructive">GRAPHIC EXPO '25 PROMO</Badge>
+        {subscriptionData?.planType === "trial" && timeLeft.days > 0 && (
+          <div className="relative mb-8 flex flex-col items-center">
+            <div className="relative flex items-center justify-center bg-green-500 text-white rounded-lg p-4 pr-6 shadow-md">
+              <div className="absolute -top-4 -left-4 w-24 h-24 bg-red-500 rounded-full flex items-center justify-center text-center text-xs font-bold uppercase leading-tight shadow-lg">
+                GRAPHIC EXPO '25 PROMO
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="text-3xl font-bold whitespace-nowrap">90 DAYS FREE TRIAL</span>
+                <Button variant="secondary" size="lg" className="bg-white text-green-500 font-bold hover:bg-gray-100">
+                  GET NOW
+                </Button>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-semibold">{trialDaysRemaining} Days Free Trial</h2>
-              <p>{Math.floor(trialDaysRemaining * 24)} hours left</p>
-            </div>
-            <Button variant="secondary" size="sm">
-              GET NOW
-            </Button>
+            <p className="mt-2 text-lg font-medium text-gray-700">
+              {timeLeft.days} days : {timeLeft.hours.toString().padStart(2, "0")} hours :{" "}
+              {timeLeft.seconds.toString().padStart(2, "0")} seconds left
+            </p>
           </div>
         )}
 
