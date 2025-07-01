@@ -40,7 +40,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
     if (path === "/sales/dashboard") return "Sales - Dashboard"
     if (path === "/logistics/dashboard") return "Logistics - Dashboard"
     if (path === "/cms/dashboard") return "CMS - Dashboard"
-    if (path === "/admin/dashboard") return "Admin - Dashboard"
+    if (path === "/admin") return "Admin - Dashboard" // Corrected for /admin
     if (path === "/ai-assistant") return "AI Assistant"
     if (path === "/account") return "Account Settings"
     if (path === "/settings") return "Settings"
@@ -126,7 +126,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
     >
       <Sheet>
         <SheetTrigger asChild>
-          <Button size="icon" variant="outline" className="sm:hidden" onClick={onMenuClick}>
+          <Button size="icon" variant="outline" className="sm:hidden bg-transparent" onClick={onMenuClick}>
             <Menu className="h-5 w-5" />
             <span className="sr-only">Toggle Menu</span>
           </Button>
