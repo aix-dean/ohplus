@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link" // Import Link for navigation
 import { Search, X, ChevronDown, Dot } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -14,8 +15,9 @@ interface DepartmentCardProps {
   metricLabel?: string
   metricValue?: string
   badgeCount?: number
-  headerColorClass: string // Changed prop name to avoid confusion with actual color value
+  headerColorClass: string
   isAddDepartment?: boolean
+  href?: string // Added href prop for navigation
 }
 
 // Map Tailwind class names to their actual hex color values for inline styling
@@ -44,13 +46,14 @@ function DepartmentCard({
   metricLabel,
   metricValue,
   badgeCount,
-  headerColorClass, // Using the new prop name
+  headerColorClass,
   isAddDepartment = false,
+  href, // Destructure href
 }: DepartmentCardProps) {
   const actualHeaderColor = headerColorMap[headerColorClass] || "#FFFFFF" // Fallback to white if color not found
 
-  return (
-    <Card className="w-full">
+  const cardContent = (
+    <>
       <CardHeader className="p-4 rounded-t-lg" style={{ backgroundColor: actualHeaderColor }}>
         <div className="flex justify-between items-center">
           <CardTitle className="text-white text-lg font-semibold">{title}</CardTitle>
@@ -86,7 +89,15 @@ function DepartmentCard({
           + Add Widget
         </Button>
       </CardContent>
-    </Card>
+    </>
+  )
+
+  return href ? (
+    <Link href={href} className="block">
+      <Card className="w-full hover:shadow-lg transition-shadow duration-200 cursor-pointer">{cardContent}</Card>
+    </Link>
+  ) : (
+    <Card className="w-full">{cardContent}</Card>
   )
 }
 
@@ -105,7 +116,8 @@ export default function AdminDashboardPage() {
       metricLabel: "Monthly Revenue",
       metricValue: "4,000,000",
       badgeCount: 2,
-      headerColorClass: "bg-salesHeader", // Using the new prop name
+      headerColorClass: "bg-salesHeader",
+      href: "/sales/dashboard", // Added navigation link
     },
     {
       title: "Logistics/ Operations",
@@ -114,6 +126,7 @@ export default function AdminDashboardPage() {
       metricValue: "5",
       badgeCount: 1,
       headerColorClass: "bg-logisticsHeader",
+      href: "/logistics/dashboard", // Added navigation link
     },
     {
       title: "Accounting",
