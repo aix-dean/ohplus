@@ -1,24 +1,21 @@
 "use client"
 
 import { useState } from "react"
-import { Search, X, CalendarDays } from "lucide-react"
+import { Search, X, ChevronDown, Dot } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
-import { format } from "date-fns"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
-// Reusable Department Card Component
 interface DepartmentCardProps {
   title: string
-  members?: { name: string; avatar?: string }[]
+  members: string[]
   metricLabel?: string
   metricValue?: string
   badgeCount?: number
-  color: string // Tailwind color class or hex code
-  className?: string
+  headerColor: string
+  isAddDepartment?: boolean
 }
 
 function DepartmentCard({
@@ -27,41 +24,43 @@ function DepartmentCard({
   metricLabel,
   metricValue,
   badgeCount,
-  color,
-  className,
+  headerColor,
+  isAddDepartment = false,
 }: DepartmentCardProps) {
   return (
-    <Card className={`relative overflow-hidden ${className}`}>
-      <CardHeader className={`pb-2 pt-4 px-4 rounded-t-lg text-white`} style={{ backgroundColor: color }}>
+    <Card className="w-full">
+      <CardHeader className={`p-4 rounded-t-lg ${headerColor}`}>
         <div className="flex justify-between items-center">
-          <CardTitle className="text-lg font-semibold">{title}</CardTitle>
+          <CardTitle className="text-white text-lg font-semibold">{title}</CardTitle>
           {badgeCount !== undefined && badgeCount > 0 && (
-            <Badge className="bg-white text-black rounded-full px-2 py-0.5 text-xs font-bold">{badgeCount}</Badge>
+            <Badge className="bg-white text-gray-800 px-2 py-1 rounded-full text-xs font-bold">{badgeCount}</Badge>
           )}
         </div>
       </CardHeader>
-      <CardContent className="p-4 bg-white rounded-b-lg">
-        <div className="space-y-2">
-          {members && members.length > 0 && (
-            <div className="flex flex-col space-y-1">
+      <CardContent className="p-4 space-y-3">
+        {isAddDepartment ? (
+          <div className="flex flex-col items-center justify-center h-full min-h-[120px]">
+            <p className="text-muted-foreground text-sm">Click to add a new department</p>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-1">
               {members.map((member, index) => (
                 <div key={index} className="flex items-center text-sm text-gray-700">
-                  <span className="h-2 w-2 rounded-full bg-green-500 mr-2" />
-                  {member.name}
+                  <Dot className="h-4 w-4 text-green-500 mr-1" />
+                  <span>{member}</span>
                 </div>
               ))}
             </div>
-          )}
-          {metricLabel && metricValue && (
-            <div className="text-sm text-gray-600">
-              {metricLabel}: <span className="font-medium text-gray-800">{metricValue}</span>
-            </div>
-          )}
-        </div>
-        <Button
-          variant="outline"
-          className="mt-4 w-full text-sm text-gray-700 border-gray-300 hover:bg-gray-50 bg-transparent"
-        >
+            {metricLabel && metricValue && (
+              <div className="text-sm text-muted-foreground">
+                <span>{metricLabel}</span>
+                <span className="font-medium text-gray-800 ml-1">{metricValue}</span>
+              </div>
+            )}
+          </>
+        )}
+        <Button variant="outline" className="w-full text-gray-600 hover:bg-gray-50 bg-transparent">
           + Add Widget
         </Button>
       </CardContent>
@@ -70,155 +69,160 @@ function DepartmentCard({
 }
 
 export default function AdminDashboardPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [date, setDate] = useState<Date | undefined>(new Date())
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
-  const departments = [
+  const handleClearSearch = () => {
+    setSearchTerm("")
+  }
+
+  const departmentData = [
     {
       title: "Sales",
-      members: [{ name: "Noemi" }, { name: "Matthew" }],
+      members: ["Noemi", "Matthew"],
       metricLabel: "Monthly Revenue",
-      metricValue: "4,000,000",
+      metricValue: "₱4,000,000",
       badgeCount: 2,
-      color: "#FF3366",
+      headerColor: "bg-salesHeader",
     },
     {
       title: "Logistics/ Operations",
-      members: [{ name: "Chona" }, { name: "May" }],
+      members: ["Chona", "May"],
       metricLabel: "Total Service Assignments",
       metricValue: "5",
       badgeCount: 1,
-      color: "#6699FF",
+      headerColor: "bg-logisticsHeader",
     },
     {
       title: "Accounting",
-      members: [{ name: "Chairman" }],
-      color: "#CC3399",
+      members: ["Chairman"],
+      headerColor: "bg-accountingHeader",
     },
     {
       title: "Treasury",
-      members: [{ name: "Juvy" }],
-      color: "#339966",
+      members: ["Juvy"],
+      headerColor: "bg-treasuryHeader",
     },
     {
       title: "I.T.",
-      members: [{ name: "Emmerson" }],
-      color: "#33CC99",
+      members: ["Emmerson"],
+      headerColor: "bg-itHeader",
     },
     {
       title: "Fleet",
-      members: [{ name: "Jonathan" }],
-      color: "#999999",
+      members: ["Jonathan"],
+      headerColor: "bg-fleetHeader",
     },
     {
       title: "Creatives/Contents",
-      members: [{ name: "Eda" }],
-      color: "#FF9933",
+      members: ["Eda"],
+      headerColor: "bg-creativesHeader",
     },
     {
       title: "Finance",
-      members: [{ name: "Juvy" }],
-      color: "#66CC33",
+      members: ["Juvy"],
+      headerColor: "bg-financeHeader",
     },
     {
       title: "Media/ Procurement",
-      members: [{ name: "Zen" }],
-      color: "#66CCFF",
+      members: ["Zen"],
+      headerColor: "bg-mediaHeader",
     },
     {
       title: "Business Dev.",
-      members: [{ name: "Nikki" }],
-      color: "#9966FF",
+      members: ["Nikki"],
+      headerColor: "bg-businessDevHeader",
     },
     {
       title: "Legal",
-      members: [{ name: "Chona" }],
+      members: ["Chona"],
       badgeCount: 2,
-      color: "#FFCC99",
+      headerColor: "bg-legalHeader",
     },
     {
       title: "Corporate",
-      members: [{ name: "Anthony" }],
+      members: ["Anthony"],
       badgeCount: 1,
-      color: "#3366FF",
+      headerColor: "bg-corporateHeader",
     },
     {
       title: "Human Resources",
-      members: [{ name: "Vanessa" }],
+      members: ["Vanessa"],
       badgeCount: 1,
-      color: "#FF66CC",
+      headerColor: "bg-hrHeader",
     },
     {
       title: "Special Team",
-      members: [{ name: "Mark" }],
-      color: "#9999CC",
+      members: ["Mark"],
+      headerColor: "bg-specialTeamHeader",
     },
     {
       title: "Marketing",
-      members: [{ name: "John" }],
-      color: "#CC3333",
+      members: ["John"],
+      headerColor: "bg-marketingHeader",
     },
     {
       title: "+ Add New Department",
-      color: "#333333",
-      className: "flex flex-col justify-center items-center text-center", // Center content for this card
+      members: [],
+      headerColor: "bg-addDepartmentHeader",
+      isAddDepartment: true,
     },
   ]
 
   return (
-    <div className="flex-1 space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Ohliver's Dashboard</h2>
-        <div className="flex items-center space-x-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search..."
-              className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            {searchQuery && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground"
-                onClick={() => setSearchQuery("")}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant={"outline"}
-                className={`w-[180px] justify-between text-left font-normal ${!date && "text-muted-foreground"}`}
-              >
-                <CalendarDays className="mr-2 h-4 w-4" />
-                {date ? format(date, "MMM yyyy") : <span>Pick a date</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={setDate}
-                initialFocus
-                captionLayout="dropdown-buttons"
-                fromYear={2000}
-                toYear={2030}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
+    <div className="flex-1 p-6 bg-gray-50">
+      {/* Admin Dashboard Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">Admin- Dashboard</h1>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-        {departments.map((dept, index) => (
-          <DepartmentCard key={index} {...dept} />
-        ))}
+      {/* Ohliver's Dashboard Section */}
+      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-semibold text-gray-800">Ohliver's Dashboard</h2>
+          <div className="flex items-center space-x-3">
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search..."
+                className="pl-9 pr-8 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              {searchTerm && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 text-gray-500 hover:bg-gray-100"
+                  onClick={handleClearSearch}
+                >
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Clear search</span>
+                </Button>
+              )}
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                  {selectedDate}
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setSelectedDate("Jun 2025")}>Jun 2025</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedDate("May 2025")}>May 2025</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedDate("Apr 2025")}>Apr 2025</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {departmentData.map((data, index) => (
+            <DepartmentCard key={index} {...data} />
+          ))}
+        </div>
       </div>
     </div>
   )

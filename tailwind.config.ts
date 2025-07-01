@@ -3,31 +3,24 @@ import type { Config } from "tailwindcss"
 const config: Config = {
   darkMode: ["class"],
   content: [
-    "./pages/**/*.{ts,tsx}",
-    "./components/**/*.{ts,tsx}",
-    "./app/**/*.{ts,tsx}",
-    "./src/**/*.{ts,tsx}",
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    container: {
-      center: true,
-      padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
-    },
     extend: {
-      fontFamily: {
-        inter: ["var(--font-inter)", "Inter", "sans-serif"],
-        sans: ["var(--font-inter)", "Inter", "sans-serif"],
-      },
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -35,10 +28,6 @@ const config: Config = {
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
@@ -48,25 +37,47 @@ const config: Config = {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
         },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        chart: {
+          "1": "hsl(var(--chart-1))",
+          "2": "hsl(var(--chart-2))",
+          "3": "hsl(var(--chart-3))",
+          "4": "hsl(var(--chart-4))",
+          "5": "hsl(var(--chart-5))",
         },
         sidebar: {
-          DEFAULT: "#1D2327",
-          hover: "#2271b1",
-          active: "#2271b1",
+          DEFAULT: "hsl(var(--sidebar-background))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          primary: "hsl(var(--sidebar-primary))",
+          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
+          accent: "hsl(var(--sidebar-accent))",
+          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
+          border: "hsl(var(--sidebar-border))",
+          ring: "hsl(var(--sidebar-ring))",
         },
-        brand: {
-          purple: "#b66dff",
-          blue: "#4d8af0",
-          teal: "#00d9bf",
-          coral: "#ff7f50",
-        },
+        // Custom colors for dashboard cards
+        salesHeader: "#FF6B6B", // Red
+        logisticsHeader: "#6B8EFF", // Blue
+        accountingHeader: "#E06BFF", // Pink/Purple
+        treasuryHeader: "#6BFF8E", // Green
+        itHeader: "#6BE0FF", // Teal
+        fleetHeader: "#A0A0A0", // Gray
+        creativesHeader: "#FFB86B", // Orange
+        financeHeader: "#8EFF6B", // Light Green
+        mediaHeader: "#6BFFB8", // Mint Green
+        businessDevHeader: "#FF6BE0", // Bright Pink
+        legalHeader: "#FF8E6B", // Salmon
+        corporateHeader: "#6BFFD9", // Light Blue
+        hrHeader: "#FF6BEB", // Magenta
+        specialTeamHeader: "#B86BFF", // Purple
+        marketingHeader: "#FF6B6B", // Red (same as sales for consistency if needed, or adjust)
+        addDepartmentHeader: "#333333", // Dark Gray/Black
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -75,25 +86,28 @@ const config: Config = {
       },
       keyframes: {
         "accordion-down": {
-          from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
+          from: {
+            height: "0",
+          },
+          to: {
+            height: "var(--radix-accordion-content-height)",
+          },
         },
         "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
+          from: {
+            height: "var(--radix-accordion-content-height)",
+          },
+          to: {
+            height: "0",
+          },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
-      boxShadow: {
-        card: "0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)",
-        "card-hover": "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
-      },
     },
   },
   plugins: [require("tailwindcss-animate")],
 }
-
 export default config
