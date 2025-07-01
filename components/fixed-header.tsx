@@ -42,10 +42,10 @@ interface BreadcrumbItemData {
 }
 
 export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderProps) {
+  const pathname = usePathname()
   const { user, userData, signOut } = useAuth()
   const { unreadCount } = useUnreadMessages()
   const isAdmin = useIsAdmin()
-  const pathname = usePathname()
 
   // --- Debugging Logs ---
   console.log("Current Pathname:", pathname)
@@ -151,18 +151,12 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
     pathname.startsWith("/sales/dashboard") ||
     pathname.startsWith("/logistics/dashboard")
 
-  // Determine if the current path is an admin page
-  // This variable is used to conditionally apply the header color
-  // and hover effects for dropdowns.
-  // It correctly checks if the path starts with "/admin".
-  // The `tailwind.config.ts` update should now correctly map the colors.
-
   return (
     <header
       className={cn(
         "sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 px-4 sm:static sm:h-auto",
-        isAdminPage ? "bg-adminHeaderPurple" : "bg-salesHeaderRose", // Conditional background first
-        className, // External classes last
+        isAdminPage ? "bg-adminHeaderPurple" : "bg-salesHeaderRose", // Conditional background
+        className,
       )}
       {...props}
     >
