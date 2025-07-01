@@ -62,9 +62,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-white p-4">
       <div className="flex w-full max-w-4xl bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Left Section: Logo and Company Name */}
-        <div className="hidden md:flex flex-col items-center justify-center p-8 bg-gray-50 w-1/2">
+        <div className="hidden md:flex flex-col items-center justify-center p-8 bg-deepPurple w-1/2">
           <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={200} height={200} priority />
-          <span className="mt-4 text-2xl font-bold text-gray-800">OH Plus</span>
+          <span className="mt-4 text-2xl font-bold text-white">OH Plus</span>
         </div>
 
         {/* Right Section: Login Form */}
