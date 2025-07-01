@@ -10,14 +10,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronDown, Upload, Trash2, ImageIcon, Film, X, Check, Loader2, Lock } from "lucide-react"
+import { ChevronDown, Upload, Trash2, ImageIcon, Film, X, Check, Loader2, Lock } from 'lucide-react'
 import { createProduct } from "@/lib/firebase-service"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
 import { collection, query, where, getDocs, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/hooks/use-toast" // Corrected import path for useToast
+import { useToast } from "@/hooks/use-toast"
 
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
@@ -43,7 +43,7 @@ interface Category {
 export default function AdminProductCreatePage() {
   const router = useRouter()
   const { user, userData, subscriptionData, loading } = useAuth()
-  const { toast } = useToast() // Destructure toast from useToast hook
+  const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mediaFiles, setMediaFiles] = useState<File[]>([])

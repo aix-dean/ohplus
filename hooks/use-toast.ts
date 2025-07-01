@@ -1,17 +1,33 @@
-"use client"
-
 import * as React from "react"
-import { toast as showToast } from "@/components/ui/use-toast"
+
+import { ToastAction } from "@/components/ui/toast"
+import { toast as showToast } from "@/components/ui/use-toast" // Renamed to avoid conflict
 
 export function useToast() {
-  const toast = React.useCallback(({ title, description, action, ...props }: Parameters<typeof showToast>[0]) => {
-    showToast({
+  const toast = React.useCallback(
+    ({
       title,
       description,
       action,
-      ...props,
-    })
-  }, [])
+      variant,
+      duration = 5000,
+    }: {
+      title: string
+      description?: string
+      action?: React.ReactElement<typeof ToastAction>
+      variant?: "default" | "destructive"
+      duration?: number
+    }) => {
+      showToast({
+        title,
+        description,
+        action,
+        variant,
+        duration,
+      })
+    },
+    [],
+  )
 
   return { toast }
 }

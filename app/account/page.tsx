@@ -5,29 +5,7 @@ import { Separator } from "@/components/ui/separator"
 import type React from "react"
 import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
-import {
-  User,
-  Camera,
-  Building,
-  MapPin,
-  Globe,
-  Edit2,
-  Save,
-  Loader2,
-  LogOut,
-  Key,
-  Award,
-  Package,
-  Users,
-  Star,
-  Calendar,
-  Facebook,
-  Instagram,
-  Youtube,
-  CreditCard,
-  Info,
-  Copy,
-} from "lucide-react"
+import { User, Camera, Building, MapPin, Globe, Edit2, Save, Loader2, LogOut, Key, Award, Package, Users, Star, Calendar, Facebook, Instagram, Youtube, CreditCard, Info, Copy } from 'lucide-react'
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -40,8 +18,8 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { Progress } from "@/components/ui/progress"
 import { getUserProductsCount } from "@/lib/firebase-service" // Corrected import path
 import { cn } from "@/lib/utils"
-import { useToast } from "@/hooks/use-toast" // Corrected import path for useToast
-import { subscriptionService } from "@/lib/subscription-service" // Import subscriptionService
+import { useToast } from "@/hooks/use-toast"
+import { subscriptionService } from "@/lib/subscription-service"
 
 // Helper function to mask the license key
 const maskLicenseKey = (key: string | undefined | null) => {
@@ -57,7 +35,7 @@ export default function AccountPage() {
   const { user, userData, projectData, subscriptionData, loading, updateUserData, updateProjectData, logout } =
     useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { toast } = useToast() // Destructure toast from useToast hook
+  const { toast } = useToast()
 
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)

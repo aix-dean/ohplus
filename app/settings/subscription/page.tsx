@@ -5,19 +5,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/contexts/auth-context"
 import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-service"
-import type { SubscriptionPlanType } from "@/lib/types/subscription"
-import { CheckCircle, Loader2 } from "lucide-react"
+import type { BillingCycle, SubscriptionPlanType } from "@/lib/types/subscription"
+import { CheckCircle, Loader2 } from 'lucide-react'
 import { useRouter } from "next/navigation"
 import { useEffect, useState, useCallback } from "react"
-import { useToast } from "@/hooks/use-toast" // Corrected import path for useToast
+import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 
 export default function SubscriptionPage() {
   const { user, userData, subscriptionData, loading, refreshSubscriptionData } = useAuth()
-  const { toast } = useToast() // Destructure toast from useToast hook
+  const { toast } = useToast()
   const router = useRouter()
   const [isUpdating, setIsUpdating] = useState(false)
-  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlanType | null>(null)
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
 
   const plans = getSubscriptionPlans()
 
@@ -39,7 +39,7 @@ export default function SubscriptionPage() {
       }
 
       setIsUpdating(true)
-      setSelectedPlan(planId as SubscriptionPlanType)
+      setSelectedPlanId(planId)
 
       try {
         const selectedPlan = plans.find((plan) => plan.id === planId)
@@ -52,12 +52,20 @@ export default function SubscriptionPage() {
           return
         }
 
+        if (selectedPlan.id === "enterprise") {
+          toast({
+            title: "Enterprise Plan",
+            description: "Please contact us directly for Enterprise plan inquiries.",
+            variant: "default",
+          })
+          return // Do not proceed with Firebase update for Enterprise
+        }
+
         const newPlanType: SubscriptionPlanType = selectedPlan.id as SubscriptionPlanType
-        const billingCycle = "monthly" // Assuming monthly for simplicity, can be made dynamic
+        const billingCycle: BillingCycle = selectedPlan.billingCycle === "N/A" ? "monthly" : selectedPlan.billingCycle // Default to monthly if N/A
 
         let success = false
         if (subscriptionData) {
-          // Attempt to update existing subscription
           try {
             await subscriptionService.updateSubscription(userData.license_key, {
               planType: newPlanType,
@@ -73,7 +81,6 @@ export default function SubscriptionPage() {
             })
           } catch (updateError: any) {
             console.warn("Failed to update subscription, attempting to create instead:", updateError)
-            // Fallback: if update fails (e.g., document not found), try creating
             await subscriptionService.createSubscription(userData.license_key, newPlanType, billingCycle, user.uid)
             success = true
             toast({
@@ -82,7 +89,6 @@ export default function SubscriptionPage() {
             })
           }
         } else {
-          // No existing subscription found in context, create a new one
           await subscriptionService.createSubscription(userData.license_key, newPlanType, billingCycle, user.uid)
           success = true
           toast({
@@ -92,7 +98,7 @@ export default function SubscriptionPage() {
         }
 
         if (success) {
-          await refreshSubscriptionData() // Refresh the context after update/creation
+          await refreshSubscriptionData()
         }
       } catch (error: any) {
         console.error("Failed to select plan:", error)
@@ -103,7 +109,7 @@ export default function SubscriptionPage() {
         })
       } finally {
         setIsUpdating(false)
-        setSelectedPlan(null)
+        setSelectedPlanId(null)
       }
     },
     [user, userData, subscriptionData, plans, refreshSubscriptionData, toast],
@@ -134,8 +140,8 @@ export default function SubscriptionPage() {
           <p className="mt-3 text-lg text-gray-600">Select the perfect plan that fits your business needs.</p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {plans.map((plan) => (
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {plans.filter(plan => plan.id !== "trial" && plan.id !== "graphic-expo-event").map((plan) => (
             <Card
               key={plan.id}
               className={cn(
@@ -147,16 +153,21 @@ export default function SubscriptionPage() {
             >
               <CardHeader className="border-b p-6">
                 <CardTitle className="text-2xl font-bold capitalize text-gray-900">{plan.name}</CardTitle>
-                <CardDescription className="mt-2 text-gray-600">
-                  {plan.price === 0 ? (
-                    <span className="text-3xl font-bold text-gray-900">Free</span>
-                  ) : (
-                    <span className="text-3xl font-bold text-gray-900">${plan.price}</span>
-                  )}
-                  {plan.id !== "trial" && plan.id !== "graphic-expo-event" && (
-                    <span className="text-base font-medium text-gray-500">/month</span>
-                  )}
+                <CardDescription className="mt-2 text-gray-600 min-h-[40px]">
+                  {plan.description}
                 </CardDescription>
+                <div className="mt-4">
+                  {plan.price === 0 && plan.id === "enterprise" ? (
+                    <span className="text-3xl font-bold text-gray-900">Contact Us</span>
+                  ) : (
+                    <span className="text-3xl font-bold text-gray-900">
+                      Php {plan.price.toLocaleString()}
+                      {plan.billingCycle !== "N/A" && (
+                        <span className="text-base font-medium text-gray-500">/{plan.billingCycle === "monthly" ? "month" : "year"}</span>
+                      )}
+                    </span>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="flex flex-1 flex-col justify-between p-6">
                 <ul className="mb-6 space-y-3 text-sm text-gray-700">
@@ -173,14 +184,14 @@ export default function SubscriptionPage() {
                   </Button>
                 ) : (
                   <Button
-                    onClick={() => handleUpgrade(plan.id as SubscriptionPlanType)}
-                    disabled={isUpdating && selectedPlan === plan.id}
+                    onClick={() => handleUpgrade(plan.id)}
+                    disabled={isUpdating && selectedPlanId === plan.id}
                     className="w-full bg-primary text-white hover:bg-primary/90"
                   >
-                    {isUpdating && selectedPlan === plan.id ? (
+                    {isUpdating && selectedPlanId === plan.id ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                      "Upgrade Now"
+                      plan.buttonText
                     )}
                   </Button>
                 )}

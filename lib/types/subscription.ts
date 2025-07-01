@@ -1,4 +1,4 @@
-export type SubscriptionPlanType = "trial" | "basic" | "premium" | "enterprise" | "graphic-expo-event"
+export type SubscriptionPlanType = "solo" | "family" | "membership" | "enterprise" | "trial" | "graphic-expo-event"
 export type BillingCycle = "monthly" | "annually"
 export type SubscriptionStatus = "active" | "inactive" | "trialing" | "cancelled" | "expired"
 
@@ -20,8 +20,11 @@ export interface Subscription {
 export interface SubscriptionPlan {
   id: string
   name: string
+  description: string // Added description for plans
   price: number // Price per month/year depending on context, or 0 for free/trial
+  billingCycle: BillingCycle | "N/A" // Added billing cycle to plan definition
   features: string[]
+  buttonText: string // Added button text for plans
 }
 
 // Helper function to calculate subscription end date
@@ -40,9 +43,10 @@ export function calculateSubscriptionEndDate(
     trialEndDate.setDate(start.getDate() + 60) // 60-day trial
     endDate = trialEndDate // Trial ends, subscription ends
   } else if (planType === "graphic-expo-event") {
-    // Assuming this is a temporary plan, set a fixed end date or short duration
     endDate = new Date(start)
     endDate.setDate(start.getDate() + 30) // Example: 30 days for event plan
+  } else if (planType === "enterprise") {
+    endDate = null // Enterprise has no fixed end date, or handled separately
   } else {
     if (billingCycle === "monthly") {
       endDate = new Date(start)
@@ -59,14 +63,16 @@ export function calculateSubscriptionEndDate(
 // Helper function to get max products for a given plan type
 export function getMaxProductsForPlan(planType: SubscriptionPlanType): number {
   switch (planType) {
+    case "solo":
+      return 3 // Manage up to 3 sites
+    case "family":
+      return 5 // Manage up to 5 sites
+    case "membership":
+      return 8 // Manage up to 8 sites
+    case "enterprise":
+      return 99999 // Unlimited for enterprise
     case "trial":
       return 1 // Example: 1 product for trial
-    case "basic":
-      return 3 // Example: 3 products for basic
-    case "premium":
-      return 10 // Example: 10 products for premium
-    case "enterprise":
-      return 99999 // Example: unlimited for enterprise
     case "graphic-expo-event":
       return 5 // Example: 5 products for event plan
     default:
