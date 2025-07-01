@@ -2,10 +2,11 @@
 
 // Inspired by react-hot-toast library
 import * as React from "react"
+import { toast as customToast } from "@/components/ui/use-toast"
+import type { ToastProps } from "@/components/ui/use-toast" // Import the type if needed
 
 import type {
   ToastActionElement,
-  ToastProps,
 } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
@@ -186,9 +187,9 @@ function useToast() {
 
   return {
     ...state,
-    toast,
+    toast: ({ title, description, variant }: ToastProps) => customToast({ title, description, variant }),
     dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
   }
 }
 
-export { useToast, toast }
+export { useToast }

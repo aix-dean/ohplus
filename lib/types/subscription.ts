@@ -1,20 +1,18 @@
-export type SubscriptionPlanType = "Trial" | "Basic" | "Premium" | "Enterprise" | "Graphic Expo Event"
+export type SubscriptionPlanType = "Free" | "Basic" | "Pro" | "Enterprise" | "Graphic Expo Event"
 export type BillingCycle = "monthly" | "annually"
 export type SubscriptionStatus = "active" | "inactive" | "trialing" | "cancelled" | "expired"
 
 export interface Subscription {
   id: string // Firestore document ID
-  licenseKey: string
+  userId: string // User ID
   planType: SubscriptionPlanType
-  billingCycle: BillingCycle
-  uid: string // User ID
-  startDate: Date
-  endDate: Date | null
   status: SubscriptionStatus
-  maxProducts: number | null
-  trialEndDate: Date | null
-  createdAt: Date
-  updatedAt: Date
+  startDate: string // ISO date string
+  endDate: string // ISO date string
+  billingCycle: BillingCycle
+  licenseKey: string
+  createdAt: string // ISO date string
+  updatedAt: string // ISO date string
 }
 
 export interface SubscriptionPlan {
@@ -22,23 +20,26 @@ export interface SubscriptionPlan {
   name: string
   price: number
   features: string[]
-  // isCurrent will be determined dynamically on the page
+  isCurrent?: boolean // Optional, for client-side display
 }
 
 // Helper function to calculate end date based on plan and billing cycle
 export function calculateSubscriptionEndDate(
   planType: SubscriptionPlanType,
   billingCycle: BillingCycle,
-  startDate: Date,
-): { endDate: Date | null; trialEndDate: Date | null } {
-  let endDate: Date | null = null
-  let trialEndDate: Date | null = null
+  startDate: string,
+): { endDate: string; trialEndDate: string | null } {
+  let endDate: string = ""
+  let trialEndDate: string | null = null
 
   const start = new Date(startDate)
 
-  if (planType === "Trial") {
+  if (planType === "Free") {
+    endDate = new Date(start).toISOString() // Free plan has no end date
+  } else if (planType === "Trial") {
     trialEndDate = new Date(start)
     trialEndDate.setDate(start.getDate() + 60) // 60 days trial
+    endDate = trialEndDate.toISOString()
   } else {
     if (billingCycle === "monthly") {
       endDate = new Date(start)
@@ -47,16 +48,19 @@ export function calculateSubscriptionEndDate(
       endDate = new Date(start)
       endDate.setFullYear(start.getFullYear() + 1)
     }
+    endDate = new Date(endDate).toISOString()
   }
-  return { endDate, trialEndDate }
+  return { endDate, trialEndDate: trialEndDate ? trialEndDate.toISOString() : null }
 }
 
 // Helper function to get max products for a given plan type
 export function getMaxProductsForPlan(planType: SubscriptionPlanType): number | null {
   switch (planType) {
+    case "Free":
+      return 1 // Or whatever free plan limit is
     case "Basic":
       return 3
-    case "Premium":
+    case "Pro":
       return 10
     case "Enterprise":
       return null // Unlimited

@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckIcon } from "lucide-react"
+import { CheckIcon } from 'lucide-react'
 import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-service"
 import type { Subscription, SubscriptionPlan, SubscriptionPlanType } from "@/lib/types/subscription"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast" // Corrected import path
 import { useAuth } from "@/contexts/auth-context"
-import { Badge } from "@/components/ui/badge" // Ensure Badge is imported from shadcn/ui
+import { Badge } from "@/components/ui/badge"
 
 export default function SubscriptionSettingsPage() {
   const { userData, loading: authLoading } = useAuth()
