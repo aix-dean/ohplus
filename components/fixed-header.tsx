@@ -3,7 +3,7 @@
 import React from "react"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { Menu, Bell, Search, Settings, LogOut, User, ChevronLeft } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -30,10 +30,9 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { SideNavigation } from "./side-navigation" // Assuming this exists for mobile sheet
 
 interface FixedHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
-  onMenuClick?: () => void // Made optional as it's not always passed
+  onMenuClick: () => void
 }
 
 interface BreadcrumbItemData {
@@ -47,7 +46,6 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
   const { unreadCount } = useUnreadMessages()
   const isAdmin = useIsAdmin()
   const pathname = usePathname()
-  const router = useRouter()
 
   const getBreadcrumbs = (path: string): BreadcrumbItemData[] => {
     const segments = path.split("/").filter(Boolean)
@@ -147,37 +145,38 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
     pathname.startsWith("/sales/dashboard") ||
     pathname.startsWith("/logistics/dashboard")
 
-  const isAdminPage = pathname.startsWith("/admin/")
+  // New: Determine if the current path is an admin page
+  const isAdminPage = pathname.startsWith("/admin")
 
   return (
     <header
       className={cn(
         "sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 px-4 sm:static sm:h-auto",
-        isAdminPage ? "bg-[#5B3B9B]" : "bg-rose-600", // Conditional background color
+        isAdminPage ? "bg-[#673AB7]" : "bg-rose-600", // Conditional background color
         className,
       )}
       {...props}
     >
       {/* New: Back button for admin sub-pages, sales dashboard, and logistics dashboard */}
       {showAdminBackButton && (
-        <Button
-          variant="default"
-          className="flex items-center gap-1 rounded-full bg-black px-4 py-2 text-white hover:bg-black/90"
-          onClick={() => router.push("/admin/dashboard")} // Use router.push for navigation
-        >
-          <ChevronLeft className="h-4 w-4" /> Admin
-        </Button>
+        <Link href="/admin/dashboard" passHref>
+          <Button
+            variant="default"
+            className="bg-black hover:bg-black/90 text-white rounded-full px-4 py-2 flex items-center gap-1"
+          >
+            <ChevronLeft className="h-4 w-4" /> Admin
+          </Button>
+        </Link>
       )}
       <Sheet>
         <SheetTrigger asChild>
-          <Button size="icon" variant="outline" className="bg-transparent sm:hidden" onClick={onMenuClick}>
+          <Button size="icon" variant="outline" className="sm:hidden bg-transparent" onClick={onMenuClick}>
             <Menu className="h-5 w-5" />
             <span className="sr-only">Toggle Menu</span>
           </Button>
         </SheetTrigger>
         <SheetContent side="left" className="sm:max-w-xs">
           {/* Mobile navigation content would go here, if needed */}
-          <SideNavigation /> {/* Assuming SideNavigation is for mobile */}
         </SheetContent>
       </Sheet>
       {/* Replaced h1 with Breadcrumb component */}
@@ -190,7 +189,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
                   <Link href={item.href} passHref>
                     <Button
                       variant="default"
-                      className="flex items-center gap-1 rounded-full bg-black px-4 py-2 text-white hover:bg-black/90"
+                      className="bg-black hover:bg-black/90 text-white rounded-full px-4 py-2 flex items-center gap-1"
                       asChild
                     >
                       <span>
@@ -202,7 +201,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
                   <BreadcrumbPage className="font-normal text-white">{item.label}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
-                    <Link href={item.href || "#"} className="text-white transition-colors hover:text-gray-200">
+                    <Link href={item.href || "#"} className="transition-colors hover:text-gray-200 text-white">
                       {item.label}
                     </Link>
                   </BreadcrumbLink>
@@ -218,12 +217,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
         <Input
           type="search"
           placeholder="Search..."
-          className={cn(
-            "w-full rounded-lg pl-8 md:w-[200px] lg:w-[336px]",
-            isAdminPage
-              ? "bg-[#7A5BBF] placeholder:text-gray-200 text-white" // Adjusted for purple header
-              : "bg-gray-700 placeholder:text-gray-300 text-white", // Original for rose header
-          )}
+          className="w-full rounded-lg bg-gray-700 placeholder:text-gray-300 text-white pl-8 md:w-[200px] lg:w-[336px]"
         />
       </div>
       <DropdownMenu>
@@ -231,7 +225,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           <Button variant="ghost" size="icon" className="relative rounded-full text-white hover:bg-rose-500">
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
                 {unreadCount}
               </span>
             )}
