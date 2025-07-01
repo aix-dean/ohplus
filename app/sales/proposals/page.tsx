@@ -30,7 +30,6 @@ import {
 import { format } from "date-fns"
 import { getProposalsByUserId } from "@/lib/proposal-service"
 import type { Proposal } from "@/lib/types/proposal"
-import ProtectedRoute from "@/components/protected-route"
 import { useResponsive } from "@/hooks/use-responsive"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Import Tabs components
 import { CostEstimatesList } from "@/components/cost-estimates-list" // Import CostEstimatesList
@@ -384,9 +383,5 @@ function ProposalsPageContent() {
 }
 
 export default function ProposalsPage() {
-  return (
-    <ProtectedRoute module="sales" action="view">
-      <ProposalsPageContent />
-    </ProtectedRoute>
-  )
+  return <ProposalsPageContent />
 }
