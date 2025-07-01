@@ -29,30 +29,27 @@ export function PromoBanner({ promoEndDate }: PromoBannerProps) {
       }
     }
 
-    calculateTimeLeft() // Initial calculation
-    timer = setInterval(calculateTimeLeft, 1000) // Update every second
+    calculateTimeLeft()
+    timer = setInterval(calculateTimeLeft, 1000)
 
-    return () => clearInterval(timer) // Cleanup on unmount
+    return () => clearInterval(timer)
   }, [promoEndDate])
 
-  const isPromoActive = timeLeft.days > 0 || timeLeft.hours > 0 || timeLeft.minutes > 0 || timeLeft.seconds > 0
-
-  if (!isPromoActive) {
-    return null
+  if (promoEndDate.getTime() <= new Date().getTime()) {
+    return null // Don't render if the promo has ended
   }
 
   return (
     <div className="relative mb-8 flex flex-col items-center">
-      <div className="relative flex items-center justify-center bg-green-500 text-white rounded-lg p-4 pr-6 shadow-md overflow-hidden">
-        {/* Red circular badge */}
-        <div className="absolute -top-8 -left-8 w-32 h-32 bg-red-500 rounded-full flex items-center justify-center text-center text-xs font-bold uppercase leading-tight shadow-lg transform -rotate-45 origin-bottom-right">
-          <span className="transform rotate-45 text-white text-sm">GRAPHIC EXPO '25 PROMO</span>
+      <div className="relative flex items-center justify-center bg-[#22C55E] text-white rounded-lg p-4 pr-6 shadow-md overflow-hidden">
+        <div className="absolute -top-4 -left-4 w-24 h-24 bg-[#EF4444] rounded-full flex items-center justify-center text-center text-xs font-bold uppercase leading-tight shadow-lg transform -rotate-12">
+          GRAPHIC EXPO '25 PROMO
         </div>
         <div className="flex items-center gap-4 pl-16">
           {" "}
           {/* Added padding-left to account for the badge */}
           <span className="text-3xl font-bold whitespace-nowrap">90 DAYS FREE TRIAL</span>
-          <Button variant="secondary" size="lg" className="bg-white text-green-500 font-bold hover:bg-gray-100">
+          <Button variant="secondary" size="lg" className="bg-white text-[#22C55E] font-bold hover:bg-gray-100">
             GET NOW
           </Button>
         </div>

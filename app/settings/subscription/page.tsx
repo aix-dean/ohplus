@@ -9,7 +9,7 @@ import type { BillingCycle, SubscriptionPlanType } from "@/lib/types/subscriptio
 import { CheckCircle, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, useCallback } from "react"
-import { useToast } from "@/hooks/use-toast" // Corrected import statement
+import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { PromoBanner } from "@/components/promo-banner" // Import the new component
 
@@ -146,9 +146,7 @@ export default function SubscriptionPage() {
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
         {/* Render the PromoBanner component */}
-        {subscriptionData?.planType === "trial" && promoEndDate.getTime() > new Date().getTime() && (
-          <PromoBanner promoEndDate={promoEndDate} />
-        )}
+        <PromoBanner promoEndDate={promoEndDate} />
 
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Choose Your Plan</h1>
