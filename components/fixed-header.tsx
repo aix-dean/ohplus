@@ -47,6 +47,12 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
   const isAdmin = useIsAdmin()
   const pathname = usePathname()
 
+  // --- Debugging Logs ---
+  console.log("Current Pathname:", pathname)
+  const isAdminPage = pathname.startsWith("/admin")
+  console.log("Is Admin Page:", isAdminPage)
+  // --- End Debugging Logs ---
+
   const getBreadcrumbs = (path: string): BreadcrumbItemData[] => {
     const segments = path.split("/").filter(Boolean)
     const breadcrumbs: BreadcrumbItemData[] = []
@@ -146,7 +152,11 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
     pathname.startsWith("/logistics/dashboard")
 
   // Determine if the current path is an admin page
-  const isAdminPage = pathname.startsWith("/admin")
+  // This variable is used to conditionally apply the header color
+  // and hover effects for dropdowns.
+  // It correctly checks if the path starts with "/admin".
+  // The issue is likely with Tailwind not recognizing the custom colors.
+  // The `tailwind.config.ts` update should fix this.
 
   return (
     <header
