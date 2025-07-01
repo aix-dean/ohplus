@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation"
 import { useEffect, useState, useCallback } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import { PromoBanner } from "@/components/promo-banner" // Import the new component
+import { PromoBanner } from "@/components/promo-banner"
 
 export default function SubscriptionPage() {
   const { user, userData, subscriptionData, loading, refreshSubscriptionData } = useAuth()
@@ -21,9 +21,6 @@ export default function SubscriptionPage() {
 
   const plans = getSubscriptionPlans()
 
-  // Define a fixed promo end date for the "GRAPHIC EXPO '25 PROMO"
-  // This date is set to be 2 days, 14 hours, 30 seconds from the current time
-  // for demonstration purposes, to match the screenshot.
   const promoEndDate = new Date()
   promoEndDate.setDate(promoEndDate.getDate() + 2)
   promoEndDate.setHours(promoEndDate.getHours() + 14)
@@ -67,11 +64,11 @@ export default function SubscriptionPage() {
             description: "Please contact us directly for Enterprise plan inquiries.",
             variant: "default",
           })
-          return // Do not proceed with Firebase update for Enterprise
+          return
         }
 
         const newPlanType: SubscriptionPlanType = selectedPlan.id as SubscriptionPlanType
-        const billingCycle: BillingCycle = selectedPlan.billingCycle === "N/A" ? "monthly" : selectedPlan.billingCycle // Default to monthly if N/A
+        const billingCycle: BillingCycle = selectedPlan.billingCycle === "N/A" ? "monthly" : selectedPlan.billingCycle
 
         let success = false
         if (subscriptionData) {
@@ -144,44 +141,8 @@ export default function SubscriptionPage() {
   return (
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        <Card className="mx-auto max-w-4xl rounded-xl shadow-sm">
-          <CardHeader className="border-b p-6">
-            <CardTitle className="text-xl font-bold text-gray-900">Your Current Subscription</CardTitle>
-            <CardDescription className="mt-2 text-gray-600">Details of your active plan and usage.</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-700">Plan Type</p>
-                <p className="text-lg font-semibold capitalize text-gray-900">{subscriptionData?.planType || "None"}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-700">Status</p>
-                <p className="text-lg font-semibold capitalize text-gray-900">{subscriptionData?.status || "None"}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-700">Max Products</p>
-                <p className="text-lg font-semibold text-gray-900">
-                  {subscriptionData?.maxProducts === 99999 ? "Unlimited" : subscriptionData?.maxProducts || "None"}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-700">Trial End Date</p>
-                <p className="text-lg font-semibold text-gray-900">
-                  {subscriptionData?.trialEndDate
-                    ? new Date(subscriptionData.trialEndDate).toLocaleDateString()
-                    : "None"}
-                </p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-gray-700">Days Remaining (Trial)</p>
-                <p className="text-lg font-semibold text-gray-900">
-                  {subscriptionData ? subscriptionService.getDaysRemaining(subscriptionData) : "None"}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Removed "Your Current Subscription" section */}
+        {/* Removed Separator component */}
 
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Choose Your Plan</h1>
@@ -193,11 +154,9 @@ export default function SubscriptionPage() {
             .filter((plan) => plan.id !== "trial" && plan.id !== "graphic-expo-event")
             .map((plan) => (
               <>
-                {plan.id === "solo" && ( // Conditionally render PromoBanner before "solo" plan
+                {plan.id === "solo" && (
                   <div className="col-span-full flex justify-center">
                     <div className="w-[280px]">
-                      {" "}
-                      {/* Changed from max-w-xs to a fixed width */}
                       <PromoBanner promoEndDate={promoEndDate} />
                     </div>
                   </div>
