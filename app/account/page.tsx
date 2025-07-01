@@ -5,7 +5,29 @@ import { Separator } from "@/components/ui/separator"
 import type React from "react"
 import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { User, Camera, Building, MapPin, Globe, Edit2, Save, Loader2, LogOut, Key, Award, Package, Users, Star, Calendar, Facebook, Instagram, Youtube, CreditCard, Info, Copy } from 'lucide-react'
+import {
+  User,
+  Camera,
+  Building,
+  MapPin,
+  Globe,
+  Edit2,
+  Save,
+  Loader2,
+  LogOut,
+  Key,
+  Award,
+  Package,
+  Users,
+  Star,
+  Calendar,
+  Facebook,
+  Instagram,
+  Youtube,
+  CreditCard,
+  Info,
+  Copy,
+} from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -42,6 +64,8 @@ export default function AccountPage() {
   const [isUploading, setIsUploading] = useState(false)
 
   const [currentProductsCount, setCurrentProductsCount] = useState<number | null>(null)
+  const [productsCount, setProductsCount] = useState<number | null>(null)
+  const [productsLoading, setProductsLoading] = useState(true)
 
   const [firstName, setFirstName] = useState("")
   const [middleName, setMiddleName] = useState("")
@@ -123,6 +147,27 @@ export default function AccountPage() {
     }
     fetchProductCount()
   }, [user, subscriptionData, toast])
+
+  useEffect(() => {
+    const fetchProductsCount = async () => {
+      if (user?.uid) {
+        setProductsLoading(true)
+        try {
+          const count = await getUserProductsCount(user.uid)
+          setProductsCount(count)
+        } catch (error) {
+          console.error("Error fetching user products count:", error)
+          setProductsCount(0) // Default to 0 on error
+        } finally {
+          setProductsLoading(false)
+        }
+      }
+    }
+
+    if (user) {
+      fetchProductsCount()
+    }
+  }, [user])
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -869,6 +914,58 @@ export default function AccountPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Overview Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>User Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p>
+                      <strong>Email:</strong> {userData?.email || "N/A"}
+                    </p>
+                    <p>
+                      <strong>Display Name:</strong> {userData?.displayName || "N/A"}
+                    </p>
+                    <p>
+                      <strong>User ID:</strong> {userData?.uid || "N/A"}
+                    </p>
+                    <p>
+                      <strong>Role:</strong> {userData?.role || "N/A"}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Subscription Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <p>
+                      <strong>Plan Type:</strong>{" "}
+                      <span className="capitalize">{subscriptionData?.planType || "N/A"}</span>
+                    </p>
+                    <p>
+                      <strong>Status:</strong> <span className="capitalize">{subscriptionData?.status || "N/A"}</span>
+                    </p>
+                    <p>
+                      <strong>License Key:</strong> {userData?.license_key || "N/A"}
+                    </p>
+                    <p>
+                      <strong>Max Products:</strong>{" "}
+                      {subscriptionData?.maxProducts === 99999 ? "Unlimited" : subscriptionData?.maxProducts || "N/A"}
+                    </p>
+                    <p>
+                      <strong>Your Products:</strong>{" "}
+                      {productsLoading ? <Loader2 className="h-4 w-4 animate-spin inline-block" /> : productsCount}
+                    </p>
+                    <Button onClick={() => router.push("/settings/subscription")} className="mt-4">
+                      Manage Subscription
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
           </div>
         </Tabs>

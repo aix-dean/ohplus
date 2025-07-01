@@ -1,13 +1,6 @@
 "use client"
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  type ReactNode,
-} from "react"
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -24,21 +17,31 @@ import { generateLicenseKey } from "@/lib/utils" // Assuming this utility exists
 
 interface UserData {
   uid: string
-  email: string
-  first_name?: string
-  middle_name?: string
-  last_name?: string
-  display_name?: string
-  phone_number?: string
-  gender?: string
-  photo_url?: string
-  license_key: string
-  products?: number
-  followers?: number
-  rating?: number
-  created?: Date
-  updated?: Date
+  email: string | null
+  displayName: string | null
+  license_key: string | null
+  role: string | null
+  permissions: string[]
+  // Add other user-specific data here
 }
+
+interface AuthContextType {
+  user: FirebaseUser | null
+  userData: UserData | null
+  subscriptionData: Subscription | null
+  loading: boolean
+  login: (email: string, password: string) => Promise<void>
+  register: (email: string, password: string) => Promise<void>
+  logout: () => Promise<void>
+  resetPassword: (email: string) => Promise<void>
+  updateUserData: (updates: Partial<UserData>) => Promise<void>
+  updateProjectData: (updates: Partial<ProjectData>) => Promise<void>
+  refreshUserData: () => Promise<void>
+  refreshSubscriptionData: () => Promise<void>
+  assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 interface ProjectData {
   project_id: string
@@ -55,23 +58,6 @@ interface ProjectData {
   updated?: Date
 }
 
-interface AuthContextType {
-  user: FirebaseUser | null
-  userData: UserData | null
-  projectData: ProjectData | null
-  subscriptionData: Subscription | null
-  loading: boolean
-  login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string) => Promise<void>
-  logout: () => Promise<void>
-  resetPassword: (email: string) => Promise<void>
-  updateUserData: (updates: Partial<UserData>) => Promise<void>
-  updateProjectData: (updates: Partial<ProjectData>) => Promise<void>
-  refreshSubscriptionData: () => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
@@ -84,94 +70,102 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userDocRef = doc(db, "users", firebaseUser.uid)
       const userDocSnap = await getDoc(userDocRef)
 
+      let fetchedUserData: UserData
+
       if (userDocSnap.exists()) {
         const data = userDocSnap.data()
-        const fetchedUserData: UserData = {
+        fetchedUserData = {
           uid: firebaseUser.uid,
-          email: firebaseUser.email || "",
-          first_name: data.first_name,
-          middle_name: data.middle_name,
-          last_name: data.last_name,
-          display_name: data.display_name,
-          phone_number: data.phone_number,
-          gender: data.gender,
-          photo_url: data.photo_url,
-          license_key: data.license_key,
-          products: data.products || 0,
-          followers: data.followers || 0,
-          rating: data.rating || 0,
-          created: data.created?.toDate(),
-          updated: data.updated?.toDate(),
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          license_key: data.license_key || null,
+          role: data.role || "user", // Default role
+          permissions: data.permissions || [], // Default empty permissions
+          ...data, // Spread any other fields
         }
-        setUserData(fetchedUserData)
+      } else {
+        // If user document doesn't exist, create a basic one
+        fetchedUserData = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          license_key: null, // Will be assigned during registration/onboarding
+          role: "user",
+          permissions: [],
+        }
+        await setDoc(userDocRef, fetchedUserData, { merge: true })
+      }
+      setUserData(fetchedUserData)
 
-        // Fetch project data if project_id exists in user data
-        if (data.project_id) {
-          const projectDocRef = doc(db, "projects", data.project_id)
-          const projectDocSnap = await getDoc(projectDocRef)
-          if (projectDocSnap.exists()) {
-            const projectData = projectDocSnap.data()
-            setProjectData({
-              project_id: projectDocSnap.id,
-              company_name: projectData.company_name,
-              company_location: projectData.company_location,
-              company_website: projectData.company_website,
-              project_name: projectData.project_name,
-              social_media: projectData.social_media,
-              created: projectData.created?.toDate(),
-              updated: projectData.updated?.toDate(),
-            })
-          } else {
-            setProjectData(null)
-          }
+      // Fetch project data if project_id exists in user data
+      if (fetchedUserData.project_id) {
+        const projectDocRef = doc(db, "projects", fetchedUserData.project_id)
+        const projectDocSnap = await getDoc(projectDocRef)
+        if (projectDocSnap.exists()) {
+          const projectData = projectDocSnap.data()
+          setProjectData({
+            project_id: projectDocSnap.id,
+            company_name: projectData.company_name,
+            company_location: projectData.company_location,
+            company_website: projectData.company_website,
+            project_name: projectData.project_name,
+            social_media: projectData.social_media,
+            created: projectData.created?.toDate(),
+            updated: projectData.updated?.toDate(),
+          })
         } else {
           setProjectData(null)
         }
-
-        // Fetch subscription data using license_key
-        if (fetchedUserData.license_key) {
-          const subscription = await subscriptionService.getSubscriptionByLicenseKey(fetchedUserData.license_key)
-          setSubscriptionData(subscription)
-        } else {
-          setSubscriptionData(null)
-        }
       } else {
-        setUserData(null)
         setProjectData(null)
+      }
+
+      // Fetch subscription data if license_key exists
+      if (fetchedUserData.license_key) {
+        const subscription = await subscriptionService.getSubscriptionByLicenseKey(fetchedUserData.license_key)
+        setSubscriptionData(subscription)
+      } else {
         setSubscriptionData(null)
       }
     } catch (error) {
-      console.error("Error fetching user data:", error)
+      console.error("Error fetching user data or subscription:", error)
       setUserData(null)
       setProjectData(null)
       setSubscriptionData(null)
-    } finally {
-      setLoading(false)
     }
   }, [])
 
-  const refreshSubscriptionData = useCallback(async () => {
-    if (user && userData?.license_key) {
-      const subscription = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
-      setSubscriptionData(subscription)
+  const refreshUserData = useCallback(async () => {
+    if (user) {
+      await fetchUserData(user)
     }
-  }, [user, userData])
+  }, [user, fetchUserData])
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser)
-        await fetchUserData(firebaseUser)
-      } else {
-        setUser(null)
-        setUserData(null)
-        setProjectData(null)
-        setSubscriptionData(null)
-        setLoading(false)
+  const refreshSubscriptionData = useCallback(async () => {
+    if (userData?.license_key) {
+      const subData = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
+      setSubscriptionData(subData)
+    } else {
+      setSubscriptionData(null)
+    }
+  }, [userData])
+
+  const assignLicenseKey = useCallback(
+    async (uid: string, licenseKey: string) => {
+      try {
+        const userDocRef = doc(db, "users", uid)
+        await setDoc(userDocRef, { license_key: licenseKey }, { merge: true })
+        // Update local state immediately
+        setUserData((prev) => (prev ? { ...prev, license_key: licenseKey } : null))
+        // Refresh subscription data after assigning license key
+        await refreshSubscriptionData()
+      } catch (error) {
+        console.error("Error assigning license key:", error)
+        throw error
       }
-    })
-    return () => unsubscribe()
-  }, [fetchUserData])
+    },
+    [refreshSubscriptionData],
+  )
 
   const login = async (email: string, password: string) => {
     setLoading(true)
@@ -200,6 +194,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: firebaseUser.email,
         uid: firebaseUser.uid,
         license_key: licenseKey, // Assign the generated license key
+        role: "user", // Default role
+        permissions: [], // Default empty permissions
         created: serverTimestamp(),
         updated: serverTimestamp(),
       })
@@ -263,6 +259,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProjectData((prev) => (prev ? { ...prev, ...updates } : null))
   }
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        setUser(firebaseUser)
+        await fetchUserData(firebaseUser)
+      } else {
+        setUser(null)
+        setUserData(null)
+        setProjectData(null)
+        setSubscriptionData(null)
+      }
+      setLoading(false)
+    })
+    return () => unsubscribe()
+  }, [fetchUserData])
+
   const value = {
     user,
     userData,
@@ -275,7 +287,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resetPassword,
     updateUserData,
     updateProjectData,
+    refreshUserData,
     refreshSubscriptionData,
+    assignLicenseKey,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

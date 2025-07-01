@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/contexts/auth-context"
 import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-service"
 import type { BillingCycle, SubscriptionPlanType } from "@/lib/types/subscription"
-import { CheckCircle, Loader2 } from 'lucide-react'
+import { CheckCircle, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState, useCallback } from "react"
 import { useToast } from "@/hooks/use-toast"
@@ -141,63 +141,65 @@ export default function SubscriptionPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {plans.filter(plan => plan.id !== "trial" && plan.id !== "graphic-expo-event").map((plan) => (
-            <Card
-              key={plan.id}
-              className={cn(
-                "flex flex-col rounded-xl border-2 shadow-sm transition-all duration-200",
-                currentPlan === plan.id
-                  ? "border-primary ring-2 ring-primary/50"
-                  : "border-gray-200 hover:border-primary/50",
-              )}
-            >
-              <CardHeader className="border-b p-6">
-                <CardTitle className="text-2xl font-bold capitalize text-gray-900">{plan.name}</CardTitle>
-                <CardDescription className="mt-2 text-gray-600 min-h-[40px]">
-                  {plan.description}
-                </CardDescription>
-                <div className="mt-4">
-                  {plan.price === 0 && plan.id === "enterprise" ? (
-                    <span className="text-3xl font-bold text-gray-900">Contact Us</span>
-                  ) : (
-                    <span className="text-3xl font-bold text-gray-900">
-                      Php {plan.price.toLocaleString()}
-                      {plan.billingCycle !== "N/A" && (
-                        <span className="text-base font-medium text-gray-500">/{plan.billingCycle === "monthly" ? "month" : "year"}</span>
-                      )}
-                    </span>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col justify-between p-6">
-                <ul className="mb-6 space-y-3 text-sm text-gray-700">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-center">
-                      <CheckCircle className="mr-2 h-4 w-4 flex-shrink-0 text-green-500" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-                {currentPlan === plan.id ? (
-                  <Button disabled className="w-full bg-gray-200 text-gray-700 cursor-not-allowed">
-                    Current Plan
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => handleUpgrade(plan.id)}
-                    disabled={isUpdating && selectedPlanId === plan.id}
-                    className="w-full bg-primary text-white hover:bg-primary/90"
-                  >
-                    {isUpdating && selectedPlanId === plan.id ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      plan.buttonText
-                    )}
-                  </Button>
+          {plans
+            .filter((plan) => plan.id !== "trial" && plan.id !== "graphic-expo-event")
+            .map((plan) => (
+              <Card
+                key={plan.id}
+                className={cn(
+                  "flex flex-col rounded-xl border-2 shadow-sm transition-all duration-200",
+                  currentPlan === plan.id
+                    ? "border-primary ring-2 ring-primary/50"
+                    : "border-gray-200 hover:border-primary/50",
                 )}
-              </CardContent>
-            </Card>
-          ))}
+              >
+                <CardHeader className="border-b p-6">
+                  <CardTitle className="text-2xl font-bold capitalize text-gray-900">{plan.name}</CardTitle>
+                  <CardDescription className="mt-2 text-gray-600 min-h-[40px]">{plan.description}</CardDescription>
+                  <div className="mt-4">
+                    {plan.price === 0 && plan.id === "enterprise" ? (
+                      <span className="text-3xl font-bold text-gray-900">Contact Us</span>
+                    ) : (
+                      <span className="text-3xl font-bold text-gray-900">
+                        Php {plan.price.toLocaleString()}
+                        {plan.billingCycle !== "N/A" && (
+                          <span className="text-base font-medium text-gray-500">
+                            /{plan.billingCycle === "monthly" ? "month" : "year"}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col justify-between p-6">
+                  <ul className="mb-6 space-y-3 text-sm text-gray-700">
+                    {plan.features.map((feature, index) => (
+                      <li key={index} className="flex items-center">
+                        <CheckCircle className="mr-2 h-4 w-4 flex-shrink-0 text-green-500" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  {currentPlan === plan.id ? (
+                    <Button disabled className="w-full bg-gray-200 text-gray-700 cursor-not-allowed">
+                      Current Plan
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => handleUpgrade(plan.id)}
+                      disabled={isUpdating && selectedPlanId === plan.id}
+                      className="w-full bg-primary text-white hover:bg-primary/90"
+                    >
+                      {isUpdating && selectedPlanId === plan.id ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        plan.buttonText
+                      )}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
         </div>
 
         <Separator className="my-12" />

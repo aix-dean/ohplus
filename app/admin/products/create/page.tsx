@@ -1,17 +1,19 @@
 "use client"
 
+import { CardDescription } from "@/components/ui/card"
+
 import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronDown, Upload, Trash2, ImageIcon, Film, X, Check, Loader2, Lock } from 'lucide-react'
-import { createProduct } from "@/lib/firebase-service"
+import { ChevronDown, Upload, Trash2, ImageIcon, Film, X, Check, Loader2, Lock } from "lucide-react"
+import { addProduct } from "@/lib/firebase-service"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
 import { collection, query, where, getDocs, serverTimestamp } from "firebase/firestore"
@@ -42,7 +44,7 @@ interface Category {
 
 export default function AdminProductCreatePage() {
   const router = useRouter()
-  const { user, userData, subscriptionData, loading } = useAuth()
+  const { user, userData, subscriptionData, loading: authLoading } = useAuth()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -84,10 +86,10 @@ export default function AdminProductCreatePage() {
   })
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!authLoading && !user) {
       router.push("/login")
     }
-  }, [loading, user, router])
+  }, [authLoading, user, router])
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -386,7 +388,7 @@ export default function AdminProductCreatePage() {
         },
       }
 
-      const productId = await createProduct(
+      const productId = await addProduct(
         user.uid,
         user.displayName || "Unknown User",
         userData.license_key,
@@ -433,7 +435,7 @@ export default function AdminProductCreatePage() {
   const isTrial = subscriptionData?.status === "trialing"
   const canCreateMoreProducts = (subscriptionData?.maxProducts || 0) > (userData?.products || 0)
 
-  if (loading) {
+  if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
