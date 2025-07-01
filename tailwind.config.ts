@@ -1,4 +1,4 @@
-import type { Config } from "tailwindcss"
+import type { Config from "tailwindcss"
 
 const config = {
   darkMode: ["class"],
@@ -62,13 +62,13 @@ const config = {
         fleetHeader: "#A0A0A0", // Gray
         creativesHeader: "#FFB86B", // Orange
         financeHeader: "#84CC16", // Lime Green
-        mediaHeader: "#00D9BF", // Mint Green (matches IT)
+        mediaHeader: "#22D3EE", // Adjusted: Lighter Cyan/Teal
         businessDevHeader: "#6B8EFF", // Distinct Blue-Purple
-        legalHeader: "#FF6B6B", // Red (matches Sales)
-        corporateHeader: "#4D8AF0", // Blue (matches Logistics)
+        legalHeader: "#DC2626", // Adjusted: Darker Red
+        corporateHeader: "#0EA5E9", // Adjusted: Brighter Blue
         hrHeader: "#FF6BEB", // Magenta
         specialTeamHeader: "#B86BFF", // Purple
-        marketingHeader: "#FF6B6B", // Red (matches Sales)
+        marketingHeader: "#EF4444", // Adjusted: Red
         addDepartmentHeader: "#333333", // Dark Gray/Black
       },
       borderRadius: {
