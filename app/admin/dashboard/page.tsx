@@ -1,261 +1,241 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link" // Import Link for navigation
-import { Search, X, ChevronDown, Dot } from "lucide-react"
+import Link from "next/link"
+import { Search, X, Calendar, ChevronDown, Dot, Plus } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
+// Map header color names to their hex values for inline styling
+const headerColorMap: Record<string, string> = {
+  salesHeader: "#FF5757",
+  logisticsHeader: "#4A90E2",
+  accountingHeader: "#C70039",
+  treasuryHeader: "#287D3C",
+  itHeader: "#00A896",
+  fleetHeader: "#8D8D8D",
+  creativesHeader: "#E87B00",
+  financeHeader: "#6BBF59",
+  mediaHeader: "#00C1D4",
+  businessDevHeader: "#5C4B8B",
+  legalHeader: "#A00000",
+  corporateHeader: "#007BFF",
+  humanResourcesHeader: "#FF69B4",
+  specialTeamHeader: "#8A2BE2",
+  marketingHeader: "#E00000",
+  addDepartmentHeader: "#333333",
+}
+
 interface DepartmentCardProps {
   title: string
+  headerColor: keyof typeof headerColorMap
   members: string[]
   metricLabel?: string
   metricValue?: string
   badgeCount?: number
-  headerColorClass: string
-  isAddDepartment?: boolean
   href?: string // Added href prop for navigation
-}
-
-// Map Tailwind class names to their actual hex color values for inline styling
-const headerColorMap: { [key: string]: string } = {
-  "bg-salesHeader": "#FF6B6B",
-  "bg-logisticsHeader": "#4D8AF0",
-  "bg-accountingHeader": "#E06BFF",
-  "bg-treasuryHeader": "#22C55E",
-  "bg-itHeader": "#00D9BF",
-  "bg-fleetHeader": "#A0A0A0",
-  "bg-creativesHeader": "#FFB86B",
-  "bg-financeHeader": "#84CC16",
-  "bg-mediaHeader": "#22D3EE",
-  "bg-businessDevHeader": "#6B8EFF",
-  "bg-legalHeader": "#DC2626",
-  "bg-corporateHeader": "#0EA5E9",
-  "bg-hrHeader": "#FF6BEB",
-  "bg-specialTeamHeader": "#B86BFF",
-  "bg-marketingHeader": "#EF4444",
-  "bg-addDepartmentHeader": "#333333",
 }
 
 function DepartmentCard({
   title,
+  headerColor,
   members,
   metricLabel,
   metricValue,
   badgeCount,
-  headerColorClass,
-  isAddDepartment = false,
-  href, // Destructure href
+  href,
 }: DepartmentCardProps) {
-  const actualHeaderColor = headerColorMap[headerColorClass] || "#FFFFFF" // Fallback to white if color not found
-
   const cardContent = (
-    <>
-      <CardHeader className="p-4 rounded-t-lg" style={{ backgroundColor: actualHeaderColor }}>
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-white text-lg font-semibold">{title}</CardTitle>
-          {badgeCount !== undefined && badgeCount > 0 && (
-            <Badge className="bg-white text-gray-800 px-2 py-1 rounded-full text-xs font-bold">{badgeCount}</Badge>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="p-4 space-y-3">
-        {isAddDepartment ? (
-          <div className="flex flex-col items-center justify-center h-full min-h-[120px]">
-            <p className="text-muted-foreground text-sm">Click to add a new department</p>
-          </div>
-        ) : (
-          <>
-            <div className="space-y-1">
-              {members.map((member, index) => (
-                <div key={index} className="flex items-center text-sm text-gray-700">
-                  <Dot className="h-4 w-4 text-green-500 mr-1" />
-                  <span>{member}</span>
-                </div>
-              ))}
-            </div>
-            {metricLabel && metricValue && (
-              <div className="text-sm text-muted-foreground">
-                <span>{metricLabel}</span>
-                <span className="font-medium text-gray-800 ml-1">{metricValue}</span>
-              </div>
-            )}
-          </>
+    <Card className="w-full max-w-xs overflow-hidden rounded-xl shadow-md">
+      <CardHeader className="relative p-4 text-white" style={{ backgroundColor: headerColorMap[headerColor] }}>
+        <CardTitle className="text-lg font-semibold">{title}</CardTitle>
+        {badgeCount !== undefined && (
+          <Badge className="absolute right-3 top-3 rounded-full bg-white text-gray-800 px-2 py-1 text-xs font-bold">
+            {badgeCount}
+          </Badge>
         )}
-        <Button variant="outline" className="w-full text-gray-600 hover:bg-gray-50 bg-transparent">
-          + Add Widget
+      </CardHeader>
+      <CardContent className="p-4">
+        <div className="mb-4">
+          {members.map((member, index) => (
+            <div key={index} className="flex items-center text-sm text-gray-700">
+              <Dot className="h-4 w-4 text-green-500" />
+              {member}
+            </div>
+          ))}
+        </div>
+        {metricLabel && metricValue && (
+          <div className="mb-4">
+            <p className="text-sm text-gray-500">{metricLabel}</p>
+            <p className="text-lg font-bold text-gray-800">{metricValue}</p>
+          </div>
+        )}
+        <Button variant="outline" className="w-full bg-transparent">
+          <Plus className="mr-2 h-4 w-4" /> Add Widget
         </Button>
       </CardContent>
-    </>
+    </Card>
   )
 
-  return href ? (
-    <Link href={href} className="block">
-      <Card className="w-full hover:shadow-lg transition-shadow duration-200 cursor-pointer">{cardContent}</Card>
-    </Link>
-  ) : (
-    <Card className="w-full">{cardContent}</Card>
-  )
+  if (href) {
+    return <Link href={href}>{cardContent}</Link>
+  }
+  return cardContent
 }
 
 export default function AdminDashboardPage() {
-  const [searchTerm, setSearchTerm] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
   const [selectedDate, setSelectedDate] = useState("Jun 2025")
-
-  const handleClearSearch = () => {
-    setSearchTerm("")
-  }
 
   const departmentData = [
     {
       title: "Sales",
+      headerColor: "salesHeader",
       members: ["Noemi", "Matthew"],
       metricLabel: "Monthly Revenue",
       metricValue: "4,000,000",
       badgeCount: 2,
-      headerColorClass: "bg-salesHeader",
-      href: "/sales/dashboard", // Added navigation link
+      href: "/sales/dashboard", // Added navigation path
     },
     {
       title: "Logistics/ Operations",
+      headerColor: "logisticsHeader",
       members: ["Chona", "May"],
       metricLabel: "Total Service Assignments",
       metricValue: "5",
       badgeCount: 1,
-      headerColorClass: "bg-logisticsHeader",
-      href: "/logistics/dashboard", // Added navigation link
+      href: "/logistics/dashboard", // Added navigation path
     },
     {
       title: "Accounting",
+      headerColor: "accountingHeader",
       members: ["Chairman"],
-      headerColorClass: "bg-accountingHeader",
     },
     {
       title: "Treasury",
+      headerColor: "treasuryHeader",
       members: ["Juvy"],
-      headerColorClass: "bg-treasuryHeader",
     },
     {
       title: "I.T.",
+      headerColor: "itHeader",
       members: ["Emmerson"],
-      headerColorClass: "bg-itHeader",
     },
     {
       title: "Fleet",
+      headerColor: "fleetHeader",
       members: ["Jonathan"],
-      headerColorClass: "bg-fleetHeader",
     },
     {
       title: "Creatives/Contents",
+      headerColor: "creativesHeader",
       members: ["Eda"],
-      headerColorClass: "bg-creativesHeader",
     },
     {
       title: "Finance",
+      headerColor: "financeHeader",
       members: ["Juvy"],
-      headerColorClass: "bg-financeHeader",
     },
     {
       title: "Media/ Procurement",
+      headerColor: "mediaHeader",
       members: ["Zen"],
-      headerColorClass: "bg-mediaHeader",
     },
     {
       title: "Business Dev.",
+      headerColor: "businessDevHeader",
       members: ["Nikki"],
-      headerColorClass: "bg-businessDevHeader",
     },
     {
       title: "Legal",
+      headerColor: "legalHeader",
       members: ["Chona"],
       badgeCount: 2,
-      headerColorClass: "bg-legalHeader",
     },
     {
       title: "Corporate",
+      headerColor: "corporateHeader",
       members: ["Anthony"],
       badgeCount: 1,
-      headerColorClass: "bg-corporateHeader",
     },
     {
       title: "Human Resources",
+      headerColor: "humanResourcesHeader",
       members: ["Vanessa"],
       badgeCount: 1,
-      headerColorClass: "bg-hrHeader",
     },
     {
       title: "Special Team",
+      headerColor: "specialTeamHeader",
       members: ["Mark"],
-      headerColorClass: "bg-specialTeamHeader",
     },
     {
       title: "Marketing",
+      headerColor: "marketingHeader",
       members: ["John"],
-      headerColorClass: "bg-marketingHeader",
     },
     {
-      title: "+ Add New Department",
+      title: "Add New Department",
+      headerColor: "addDepartmentHeader",
       members: [],
-      headerColorClass: "bg-addDepartmentHeader",
-      isAddDepartment: true,
     },
   ]
 
   return (
-    <div className="flex-1 p-6 bg-gray-50">
-      {/* Admin Dashboard Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Admin- Dashboard</h1>
-      </div>
-
-      {/* Ohliver's Dashboard Section */}
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-gray-800">Ohliver's Dashboard</h2>
-          <div className="flex items-center space-x-3">
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+    <div className="flex-1 p-4 md:p-6">
+      <div className="flex flex-col gap-6">
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex flex-col gap-2">
+            <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
               <Input
-                type="text"
                 placeholder="Search..."
-                className="pl-9 pr-8 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 pr-8"
               />
-              {searchTerm && (
+              {searchQuery && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 text-gray-500 hover:bg-gray-100"
-                  onClick={handleClearSearch}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-gray-500 hover:bg-transparent"
+                  onClick={() => setSearchQuery("")}
                 >
                   <X className="h-4 w-4" />
-                  <span className="sr-only">Clear search</span>
                 </Button>
               )}
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                  <Calendar className="h-4 w-4" />
                   {selectedDate}
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => setSelectedDate("Jun 2025")}>Jun 2025</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setSelectedDate("May 2025")}>May 2025</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setSelectedDate("Apr 2025")}>Apr 2025</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSelectedDate("Jan 2025")}>Jan 2025</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSelectedDate("Feb 2025")}>Feb 2025</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSelectedDate("Mar 2025")}>Mar 2025</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSelectedDate("Apr 2025")}>Apr 2025</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSelectedDate("May 2025")}>May 2025</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSelectedDate("Jun 2025")}>Jun 2025</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
 
+        {/* Department Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {departmentData.map((data, index) => (
-            <DepartmentCard key={index} {...data} />
+          {departmentData.map((department, index) => (
+            <DepartmentCard key={index} {...department} />
           ))}
         </div>
       </div>

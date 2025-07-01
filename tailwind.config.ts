@@ -1,6 +1,5 @@
-import type { Config } from "tailwindcss"
-
-const config = {
+/** @type {import('tailwindcss').Config} */
+module.exports = {
   darkMode: ["class"],
   content: [
     "./pages/**/*.{ts,tsx}",
@@ -53,22 +52,22 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Custom colors for department cards based on the screenshot
-        salesHeader: "#FF6B6B", // Red
-        logisticsHeader: "#4D8AF0", // Blue
-        accountingHeader: "#E06BFF", // Pink/Purple
-        treasuryHeader: "#22C55E", // Green
-        itHeader: "#00D9BF", // Teal
-        fleetHeader: "#A0A0A0", // Gray
-        creativesHeader: "#FFB86B", // Orange
-        financeHeader: "#84CC16", // Lime Green
-        mediaHeader: "#22D3EE", // Adjusted: Lighter Cyan/Teal
-        businessDevHeader: "#6B8EFF", // Distinct Blue-Purple
-        legalHeader: "#DC2626", // Adjusted: Darker Red
-        corporateHeader: "#0EA5E9", // Adjusted: Brighter Blue
-        hrHeader: "#FF6BEB", // Magenta
-        specialTeamHeader: "#B86BFF", // Purple
-        marketingHeader: "#EF4444", // Adjusted: Red
+        // Custom colors for admin dashboard cards
+        salesHeader: "#FF5757", // Red
+        logisticsHeader: "#4A90E2", // Blue
+        accountingHeader: "#C70039", // Pink/Magenta
+        treasuryHeader: "#287D3C", // Dark Green
+        itHeader: "#00A896", // Teal
+        fleetHeader: "#8D8D8D", // Gray
+        creativesHeader: "#E87B00", // Orange
+        financeHeader: "#6BBF59", // Lime Green
+        mediaHeader: "#00C1D4", // Light Blue/Cyan
+        businessDevHeader: "#5C4B8B", // Darker Blue/Purple
+        legalHeader: "#A00000", // Dark Red
+        corporateHeader: "#007BFF", // Bright Blue
+        humanResourcesHeader: "#FF69B4", // Bright Pink
+        specialTeamHeader: "#8A2BE2", // Purple
+        marketingHeader: "#E00000", // Red
         addDepartmentHeader: "#333333", // Dark Gray/Black
       },
       borderRadius: {
@@ -93,6 +92,4 @@ const config = {
     },
   },
   plugins: [require("tailwindcss-animate")],
-} satisfies Config
-
-export default config
+}
