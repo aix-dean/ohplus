@@ -151,8 +151,8 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
   return (
     <header
       className={cn(
-        isAdminPage ? "bg-adminHeaderPurple" : "bg-salesHeaderRose", // Conditional background first
         "sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 px-4 sm:static sm:h-auto",
+        isAdminPage ? "bg-adminHeaderPurple" : "bg-salesHeaderRose", // Conditional background first
         className, // External classes last
       )}
       {...props}

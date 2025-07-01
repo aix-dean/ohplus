@@ -1,9 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-
 import { useState } from "react"
-
 import type React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -12,14 +10,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { ChevronDown, Upload, Trash2, ImageIcon, Film, X, Check, Loader2 } from "lucide-react"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
 import { collection, query, where, getDocs, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "@/components/ui/use-toast"
 
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
@@ -44,7 +42,7 @@ interface Category {
 
 export default function AdminProductCreatePage() {
   const router = useRouter()
-  const [name, setName] = useState("")
+  const [productName, setProductName] = useState("")
   const [description, setDescription] = useState("")
   const [price, setPrice] = useState("")
   const [imageUrl, setImageUrl] = useState("")
@@ -57,7 +55,6 @@ export default function AdminProductCreatePage() {
   const [mediaTypes, setMediaTypes] = useState<string[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoadingCategories, setIsLoadingCategories] = useState(false)
-  const { toast } = useToast()
 
   // Selected categories and audience types
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
@@ -299,7 +296,7 @@ export default function AdminProductCreatePage() {
 
       const productData = {
         ...formData,
-        name,
+        name: productName,
         description,
         price: Number.parseFloat(price),
         content_type: contentType,
@@ -389,13 +386,13 @@ export default function AdminProductCreatePage() {
             <CardContent>
               <form onSubmit={handleSubmit} className="grid gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="name">Product Name</Label>
+                  <Label htmlFor="productName">Product Name</Label>
                   <Input
-                    id="name"
+                    id="productName"
                     type="text"
                     placeholder="e.g., LED Billboard 10x20"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
                     required
                   />
                 </div>
@@ -684,7 +681,7 @@ export default function AdminProductCreatePage() {
                   )}
                 </section>
 
-                <div className="flex justify-end pt-4">
+                <CardFooter className="flex justify-end p-0 pt-4">
                   <Button type="submit" disabled={loading}>
                     {loading ? (
                       <>
@@ -694,7 +691,7 @@ export default function AdminProductCreatePage() {
                       "Create Product"
                     )}
                   </Button>
-                </div>
+                </CardFooter>
               </form>
             </CardContent>
           </Card>
