@@ -163,40 +163,39 @@ export const subscriptionService = {
   },
 }
 
+// This function provides the list of available plans.
+// In a real-world scenario, these might come from a database or a payment provider.
 export const getSubscriptionPlans = (): SubscriptionPlan[] => {
   return [
     {
-      id: "free",
-      name: "Free Plan",
+      id: "trial",
+      name: "Trial Plan",
       price: 0,
-      features: ["Basic analytics", "Limited site management", "Community support"],
-      isCurrent: true, // Simulate this as the current plan for demonstration
+      features: ["60-day free trial", "Limited features", "Basic support"],
     },
     {
-      id: "pro",
-      name: "Pro Plan",
+      id: "basic",
+      name: "Basic Plan",
+      price: 9.99,
+      features: ["All Trial features", "3 Products", "Standard support", "Monthly billing"],
+    },
+    {
+      id: "premium",
+      name: "Premium Plan",
       price: 29.99,
-      features: [
-        "All Free Plan features",
-        "Advanced analytics",
-        "Unlimited site management",
-        "Priority support",
-        "Custom reports",
-      ],
-      isCurrent: false,
+      features: ["All Basic features", "10 Products", "Priority support", "Monthly or Annual billing"],
     },
     {
       id: "enterprise",
       name: "Enterprise Plan",
       price: 99.99,
-      features: [
-        "All Pro Plan features",
-        "Dedicated account manager",
-        "SLA-backed support",
-        "On-premise deployment options",
-        "Custom integrations",
-      ],
-      isCurrent: false,
+      features: ["All Premium features", "Unlimited Products", "Dedicated support", "Custom integrations"],
+    },
+    {
+      id: "graphic-expo-event",
+      name: "Graphic Expo Event",
+      price: 0, // Assuming this is a special free event plan
+      features: ["5 Products", "Event-specific features", "Limited duration"],
     },
   ]
 }

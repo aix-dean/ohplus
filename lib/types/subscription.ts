@@ -22,7 +22,7 @@ export interface SubscriptionPlan {
   name: string
   price: number
   features: string[]
-  isCurrent: boolean
+  // isCurrent will be determined dynamically on the page
 }
 
 // Helper function to calculate end date based on plan and billing cycle
