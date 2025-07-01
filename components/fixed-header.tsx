@@ -152,8 +152,8 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
     <header
       className={cn(
         "sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 px-4 sm:static sm:h-auto",
-        isAdminPage ? "bg-adminHeaderPurple" : "bg-salesHeaderRose", // Conditional background
-        className,
+        isAdminPage ? "bg-adminHeaderPurple" : "bg-salesHeaderRose", // Conditional background first
+        className, // External classes last
       )}
       {...props}
     >
@@ -227,7 +227,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
             size="icon"
             className={cn(
               "relative rounded-full text-white",
-              isAdminPage ? "hover:bg-adminHeaderPurple/light" : "hover:bg-salesHeaderRose/light", // Use custom hover colors
+              isAdminPage ? "hover:bg-adminHeaderPurpleLight" : "hover:bg-salesHeaderRoseLight",
             )}
           >
             <Bell className="h-5 w-5" />
@@ -252,7 +252,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
             size="icon"
             className={cn(
               "overflow-hidden rounded-full text-white",
-              isAdminPage ? "hover:bg-adminHeaderPurple/light" : "hover:bg-salesHeaderRose/light", // Use custom hover colors
+              isAdminPage ? "hover:bg-adminHeaderPurpleLight" : "hover:bg-salesHeaderRoseLight",
             )}
           >
             <Avatar>
