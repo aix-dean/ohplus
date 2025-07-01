@@ -4,7 +4,7 @@ import React from "react"
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, Bell, Search, Settings, LogOut, User } from "lucide-react"
+import { Menu, Bell, Search, Settings, LogOut, User, ChevronLeft } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -143,7 +143,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent",
+        "sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 bg-rose-600 px-4 sm:static sm:h-auto sm:bg-rose-600",
         className,
       )}
       {...props}
@@ -161,34 +161,48 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
       </Sheet>
       {/* Replaced h1 with Breadcrumb component */}
       <Breadcrumb>
-        <BreadcrumbList>
+        <BreadcrumbList className="text-white">
           {breadcrumbs.map((item, index) => (
             <React.Fragment key={index}>
               <BreadcrumbItem>
-                {item.isPage ? (
-                  <BreadcrumbPage>{item.label}</BreadcrumbPage>
+                {item.label === "Admin - Dashboard" && item.href ? (
+                  <Link href={item.href} passHref>
+                    <Button
+                      variant="default"
+                      className="bg-black hover:bg-black/90 text-white rounded-full px-4 py-2 flex items-center gap-1"
+                      asChild
+                    >
+                      <span>
+                        <ChevronLeft className="h-4 w-4" /> Admin
+                      </span>
+                    </Button>
+                  </Link>
+                ) : item.isPage ? (
+                  <BreadcrumbPage className="font-normal text-white">{item.label}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
-                    <Link href={item.href || "#"}>{item.label}</Link>
+                    <Link href={item.href || "#"} className="transition-colors hover:text-gray-200 text-white">
+                      {item.label}
+                    </Link>
                   </BreadcrumbLink>
                 )}
               </BreadcrumbItem>
-              {index < breadcrumbs.length - 1 && <BreadcrumbSeparator />}
+              {index < breadcrumbs.length - 1 && <BreadcrumbSeparator className="text-white" />}
             </React.Fragment>
           ))}
         </BreadcrumbList>
       </Breadcrumb>
       <div className="relative ml-auto flex-1 md:grow-0">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white" />
         <Input
           type="search"
           placeholder="Search..."
-          className="w-full rounded-lg bg-background pl-8 md:w-[200px] lg:w-[336px]"
+          className="w-full rounded-lg bg-gray-700 placeholder:text-gray-300 text-white pl-8 md:w-[200px] lg:w-[336px]"
         />
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="relative rounded-full">
+          <Button variant="ghost" size="icon" className="relative rounded-full text-white hover:bg-rose-500">
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
@@ -206,7 +220,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
       </DropdownMenu>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="overflow-hidden rounded-full">
+          <Button variant="ghost" size="icon" className="overflow-hidden rounded-full text-white hover:bg-rose-500">
             <Avatar>
               <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} alt="User Avatar" />
               <AvatarFallback>
