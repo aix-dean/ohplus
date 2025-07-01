@@ -18,6 +18,7 @@ import {
   calculateSubscriptionEndDate,
   getMaxProductsForPlan,
 } from "@/lib/types/subscription"
+import type { SubscriptionPlan } from "./types/subscription"
 
 export const subscriptionService = {
   async createSubscription(
@@ -160,4 +161,42 @@ export const subscriptionService = {
     await updateDoc(docRef, updateData)
     console.log("subscriptionService: Subscription updated successfully for ID:", docRef.id)
   },
+}
+
+export const getSubscriptionPlans = (): SubscriptionPlan[] => {
+  return [
+    {
+      id: "free",
+      name: "Free Plan",
+      price: 0,
+      features: ["Basic analytics", "Limited site management", "Community support"],
+      isCurrent: true, // Simulate this as the current plan for demonstration
+    },
+    {
+      id: "pro",
+      name: "Pro Plan",
+      price: 29.99,
+      features: [
+        "All Free Plan features",
+        "Advanced analytics",
+        "Unlimited site management",
+        "Priority support",
+        "Custom reports",
+      ],
+      isCurrent: false,
+    },
+    {
+      id: "enterprise",
+      name: "Enterprise Plan",
+      price: 99.99,
+      features: [
+        "All Pro Plan features",
+        "Dedicated account manager",
+        "SLA-backed support",
+        "On-premise deployment options",
+        "Custom integrations",
+      ],
+      isCurrent: false,
+    },
+  ]
 }

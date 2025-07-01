@@ -17,6 +17,14 @@ export interface Subscription {
   updatedAt: Date
 }
 
+export interface SubscriptionPlan {
+  id: string
+  name: string
+  price: number
+  features: string[]
+  isCurrent: boolean
+}
+
 // Helper function to calculate end date based on plan and billing cycle
 export function calculateSubscriptionEndDate(
   planType: SubscriptionPlanType,
