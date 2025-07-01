@@ -8,7 +8,7 @@ import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-se
 import type { SubscriptionPlanType } from "@/lib/types/subscription"
 import { CheckCircle, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback } from "react" // Added useCallback
 import { toast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
 
@@ -27,22 +27,22 @@ export default function SubscriptionPage() {
   }, [loading, user, router])
 
   const handleUpgrade = useCallback(
-    async (planType: SubscriptionPlanType) => {
+    async (planId: string) => {
       if (!user || !userData?.license_key) {
         toast({
-          title: "Error",
-          description: "User not authenticated or license key missing.",
+          title: "Authentication Required",
+          description: "Please log in to manage your subscription.",
           variant: "destructive",
         })
         return
       }
 
       setIsUpdating(true)
-      setSelectedPlan(planType)
+      setSelectedPlan(planId as SubscriptionPlanType)
 
       try {
-        const selectedPlanData = plans.find((plan) => plan.id === planType)
-        if (!selectedPlanData) {
+        const selectedPlan = plans.find((plan) => plan.id === planId)
+        if (!selectedPlan) {
           toast({
             title: "Error",
             description: "Selected plan not found.",
@@ -51,42 +51,53 @@ export default function SubscriptionPage() {
           return
         }
 
-        // Always try to get the latest subscription from the database before deciding
-        const existingSubscription = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
+        const newPlanType: SubscriptionPlanType = selectedPlan.id as SubscriptionPlanType
+        const billingCycle = "monthly" // Assuming monthly for simplicity, can be made dynamic
 
-        if (existingSubscription) {
-          // Update existing subscription
-          await subscriptionService.updateSubscription(userData.license_key, {
-            planType: planType,
-            status: "active",
-            billingCycle: "monthly", // Default to monthly for upgrades, can be made dynamic
-            startDate: new Date(), // Reset start date on upgrade
-            trialEndDate: null, // Clear trial end date if upgrading from trial
-          })
-          toast({
-            title: "Success",
-            description: `Successfully upgraded to ${planType} plan!`,
-          })
+        let success = false
+        if (subscriptionData) {
+          // Attempt to update existing subscription
+          try {
+            await subscriptionService.updateSubscription(userData.license_key, {
+              planType: newPlanType,
+              billingCycle: billingCycle,
+              status: "active",
+              startDate: new Date(),
+              trialEndDate: null,
+            })
+            success = true
+            toast({
+              title: "Subscription Updated",
+              description: `Your plan has been updated to ${selectedPlan.name}.`,
+            })
+          } catch (updateError: any) {
+            console.warn("Failed to update subscription, attempting to create instead:", updateError)
+            // Fallback: if update fails (e.g., document not found), try creating
+            await subscriptionService.createSubscription(userData.license_key, newPlanType, billingCycle, user.uid)
+            success = true
+            toast({
+              title: "Subscription Activated",
+              description: `Welcome to the ${selectedPlan.name}! (New subscription created)`,
+            })
+          }
         } else {
-          // Create new subscription if none exists
-          await subscriptionService.createSubscription(
-            userData.license_key,
-            planType,
-            "monthly", // Default billing cycle
-            user.uid,
-          )
+          // No existing subscription found in context, create a new one
+          await subscriptionService.createSubscription(userData.license_key, newPlanType, billingCycle, user.uid)
+          success = true
           toast({
-            title: "Success",
-            description: `Successfully subscribed to ${planType} plan!`,
+            title: "Subscription Activated",
+            description: `Welcome to the ${selectedPlan.name}!`,
           })
         }
 
-        await refreshSubscriptionData() // Refresh the context data
+        if (success) {
+          await refreshSubscriptionData() // Refresh the context after update/creation
+        }
       } catch (error: any) {
-        console.error("Failed to upgrade/subscribe:", error)
+        console.error("Failed to select plan:", error)
         toast({
-          title: "Action Failed",
-          description: error.message || "Failed to update/create subscription. Please try again.",
+          title: "Error",
+          description: `Failed to update subscription: ${error instanceof Error ? error.message : String(error)}`,
           variant: "destructive",
         })
       } finally {
@@ -94,7 +105,14 @@ export default function SubscriptionPage() {
         setSelectedPlan(null)
       }
     },
-    [user, userData, plans, refreshSubscriptionData, toast],
+    [user, userData, subscriptionData, plans, refreshSubscriptionData, toast], // Changed availablePlans to plans
+  )
+
+  const isCurrentPlan = useCallback(
+    (planId: string) => {
+      return subscriptionData?.planType === planId
+    },
+    [subscriptionData],
   )
 
   if (loading) {

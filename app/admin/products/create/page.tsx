@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronDown, Upload, Trash2, ImageIcon, Film, X, Check, Loader2, PlusCircle } from "lucide-react"
+import { ChevronDown, Upload, Trash2, ImageIcon, Film, X, Check, Loader2, Lock } from "lucide-react"
 import { createProduct } from "@/lib/firebase-service"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
@@ -18,7 +18,6 @@ import { collection, query, where, getDocs, serverTimestamp } from "firebase/fir
 import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
-import { getMaxProductsForPlan } from "@/lib/types/subscription"
 
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
@@ -43,7 +42,7 @@ interface Category {
 
 export default function AdminProductCreatePage() {
   const router = useRouter()
-  const { user, userData, subscriptionData, loading: authLoading } = useAuth()
+  const { user, userData, subscriptionData, loading } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mediaFiles, setMediaFiles] = useState<File[]>([])
@@ -52,13 +51,6 @@ export default function AdminProductCreatePage() {
   const [mediaTypes, setMediaTypes] = useState<string[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoadingCategories, setIsLoadingCategories] = useState(false)
-  const [productName, setProductName] = useState("")
-  const [productDescription, setProductDescription] = useState("")
-  const [productType, setProductType] = useState("RENTAL")
-  const [price, setPrice] = useState("")
-  const [canCreateProduct, setCanCreateProduct] = useState(false)
-  const [maxProductsAllowed, setMaxProductsAllowed] = useState(0)
-  const [currentProductsCount, setCurrentProductsCount] = useState(0)
 
   // Selected categories and audience types
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
@@ -91,65 +83,51 @@ export default function AdminProductCreatePage() {
   })
 
   useEffect(() => {
-    if (!authLoading) {
-      if (!user) {
-        router.push("/login")
-        return
-      }
-
-      if (subscriptionData) {
-        const maxAllowed = getMaxProductsForPlan(subscriptionData.planType)
-        setMaxProductsAllowed(maxAllowed)
-        setCurrentProductsCount(userData?.products_count?.rental || 0) // Assuming rental for simplicity
-        setCanCreateProduct(maxAllowed === 99999 || (userData?.products_count?.rental || 0) < maxAllowed)
-      } else {
-        setCanCreateProduct(false)
-        setMaxProductsAllowed(0)
-        setCurrentProductsCount(0)
-      }
+    if (!loading && !user) {
+      router.push("/login")
     }
-  }, [authLoading, user, userData, subscriptionData, router])
+  }, [loading, user, router])
 
   useEffect(() => {
-    if (!authLoading && user) {
-      const fetchCategories = async () => {
-        try {
-          setIsLoadingCategories(true)
-          const categoriesRef = collection(db, "categories")
-          const q = query(categoriesRef, where("active", "==", true), where("deleted", "==", false))
+    const fetchCategories = async () => {
+      try {
+        setIsLoadingCategories(true)
+        const categoriesRef = collection(db, "categories")
+        const q = query(categoriesRef, where("active", "==", true), where("deleted", "==", false))
 
-          const querySnapshot = await getDocs(q)
-          const categoriesData: Category[] = []
+        const querySnapshot = await getDocs(q)
+        const categoriesData: Category[] = []
 
-          querySnapshot.forEach((doc) => {
-            const data = doc.data()
-            categoriesData.push({
-              id: doc.id,
-              name: data.name,
-              type: data.type,
-              position: data.position || 0,
-              photo_url: data.photo_url,
-            })
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          categoriesData.push({
+            id: doc.id,
+            name: data.name,
+            type: data.type,
+            position: data.position || 0,
+            photo_url: data.photo_url,
           })
+        })
 
-          // Sort categories by position
-          categoriesData.sort((a, b) => a.position - b.position)
-          setCategories(categoriesData)
-        } catch (error) {
-          console.error("Error fetching categories:", error)
-          toast({
-            title: "Error",
-            description: "Failed to load categories. Please try again.",
-            variant: "destructive",
-          })
-        } finally {
-          setIsLoadingCategories(false)
-        }
+        // Sort categories by position
+        categoriesData.sort((a, b) => a.position - b.position)
+        setCategories(categoriesData)
+      } catch (error) {
+        console.error("Error fetching categories:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load categories. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoadingCategories(false)
       }
+    }
 
+    if (user) {
       fetchCategories()
     }
-  }, [authLoading, user])
+  }, [user])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -323,12 +301,13 @@ export default function AdminProductCreatePage() {
       return
     }
 
-    if (!canCreateProduct) {
+    if (!subscriptionData || (subscriptionData.status !== "active" && subscriptionData.status !== "trialing")) {
       toast({
         title: "Subscription Required",
-        description: "You have reached your product limit or do not have an active subscription.",
+        description: "You need an active subscription to create products. Please subscribe.",
         variant: "destructive",
       })
+      router.push("/settings/subscription")
       return
     }
 
@@ -449,7 +428,11 @@ export default function AdminProductCreatePage() {
 
   const isDynamicContent = formData.content_type === "Dynamic(LED)"
 
-  if (authLoading) {
+  const hasActiveSubscription = subscriptionData?.status === "active" || subscriptionData?.status === "trialing"
+  const isTrial = subscriptionData?.status === "trialing"
+  const canCreateMoreProducts = (subscriptionData?.maxProducts || 0) > (userData?.products || 0)
+
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -457,26 +440,19 @@ export default function AdminProductCreatePage() {
     )
   }
 
-  if (!canCreateProduct) {
+  if (!hasActiveSubscription || !canCreateMoreProducts) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center p-4 md:p-6">
         <Card className="w-full max-w-md text-center">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold">Subscription Required</CardTitle>
-            <CardDescription>
+            <Lock className="mx-auto h-12 w-12 text-gray-400" />
+            <CardTitle className="mt-4 text-2xl font-bold">Subscription Required</CardTitle>
+            <CardDescription className="mt-2 text-gray-600">
               You need an active subscription to create products. Please subscribe to unlock this feature.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Your current plan:{" "}
-              <span className="font-semibold capitalize">{subscriptionData?.planType || "None"}</span>
-            </p>
-            <p className="text-sm text-gray-600">
-              Products created: {currentProductsCount} /{" "}
-              {maxProductsAllowed === 99999 ? "Unlimited" : maxProductsAllowed}
-            </p>
-            <Button onClick={() => router.push("/settings/subscription")}>Manage Subscription</Button>
+          <CardContent>
+            <Button onClick={() => router.push("/settings/subscription")}>Go to Subscription Settings</Button>
           </CardContent>
         </Card>
       </main>
@@ -494,6 +470,12 @@ export default function AdminProductCreatePage() {
         </CardHeader>
         <CardContent className="pt-4">
           <div className="space-y-4">
+            {isTrial && (
+              <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-700">
+                You are currently on a trial plan. You can create up to {subscriptionData?.maxProducts} product. Upgrade
+                to unlock more features.
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-8">
               <section className="space-y-6 p-6 border border-gray-200 rounded-lg bg-white">
                 <h3 className="text-xl font-semibold text-gray-800 border-b pb-3 mb-3">Basic Information</h3>
@@ -510,7 +492,7 @@ export default function AdminProductCreatePage() {
                       onChange={handleInputChange}
                       placeholder="Enter product name"
                       required
-                      disabled={isSubmitting || !canCreateProduct}
+                      disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                     />
                   </div>
 
@@ -525,7 +507,7 @@ export default function AdminProductCreatePage() {
                       placeholder="Enter price per month"
                       min="0"
                       step="0.01"
-                      disabled={isSubmitting || !canCreateProduct}
+                      disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                     />
                   </div>
                 </div>
@@ -542,7 +524,7 @@ export default function AdminProductCreatePage() {
                     placeholder="Enter product description"
                     rows={4}
                     required
-                    disabled={isSubmitting || !canCreateProduct}
+                    disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                   />
                 </div>
 
@@ -550,7 +532,7 @@ export default function AdminProductCreatePage() {
                   <div className="space-y-2">
                     <Label htmlFor="type">Product Type</Label>
                     <Select
-                      disabled={isSubmitting || !canCreateProduct}
+                      disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                       onValueChange={handleTypeChange}
                       defaultValue={formData.type}
                     >
@@ -567,7 +549,7 @@ export default function AdminProductCreatePage() {
                   <div className="space-y-2">
                     <Label htmlFor="content_type">Content Type</Label>
                     <Select
-                      disabled={isSubmitting || !canCreateProduct}
+                      disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                       onValueChange={(value) =>
                         setFormData((prev) => ({
                           ...prev,
@@ -605,7 +587,7 @@ export default function AdminProductCreatePage() {
                           placeholder="Enter number of spots per loop"
                           min="1"
                           required={isDynamicContent}
-                          disabled={isSubmitting || !canCreateProduct}
+                          disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                         />
                       </div>
 
@@ -622,7 +604,7 @@ export default function AdminProductCreatePage() {
                           placeholder="Enter number of loops per day"
                           min="1"
                           required={isDynamicContent}
-                          disabled={isSubmitting || !canCreateProduct}
+                          disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                         />
                       </div>
                     </div>
@@ -639,7 +621,13 @@ export default function AdminProductCreatePage() {
                       variant="outline"
                       className={`w-full justify-between ${selectedCategories.length === 0 ? "border-red-300" : ""}`}
                       onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                      disabled={isLoadingCategories || categories.length === 0 || isSubmitting || !canCreateProduct}
+                      disabled={
+                        isLoadingCategories ||
+                        categories.length === 0 ||
+                        isSubmitting ||
+                        !subscriptionData ||
+                        !hasActiveSubscription
+                      }
                     >
                       <span>
                         {isLoadingCategories
@@ -711,7 +699,7 @@ export default function AdminProductCreatePage() {
                     onChange={handleLocationChange}
                     placeholder="Enter site location"
                     required
-                    disabled={isSubmitting || !canCreateProduct}
+                    disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                   />
                 </div>
 
@@ -723,7 +711,7 @@ export default function AdminProductCreatePage() {
                       variant="outline"
                       className="w-full justify-between bg-transparent"
                       onClick={() => setShowAudienceDropdown(!showAudienceDropdown)}
-                      disabled={isSubmitting || !canCreateProduct}
+                      disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                     >
                       <span>
                         {selectedAudienceTypes.length > 0
@@ -782,7 +770,7 @@ export default function AdminProductCreatePage() {
                       onChange={handleInputChange}
                       placeholder="Enter average daily traffic count"
                       min="0"
-                      disabled={isSubmitting || !canCreateProduct}
+                      disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                     />
                   </div>
 
@@ -797,7 +785,7 @@ export default function AdminProductCreatePage() {
                       placeholder="Enter elevation from ground level in feet"
                       min="0"
                       step="0.01"
-                      disabled={isSubmitting || !canCreateProduct}
+                      disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                     />
                   </div>
                 </div>
@@ -814,7 +802,7 @@ export default function AdminProductCreatePage() {
                       placeholder="Enter height in feet"
                       min="0"
                       step="0.01"
-                      disabled={isSubmitting || !canCreateProduct}
+                      disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                     />
                   </div>
 
@@ -829,7 +817,7 @@ export default function AdminProductCreatePage() {
                       placeholder="Enter width in feet"
                       min="0"
                       step="0.01"
-                      disabled={isSubmitting || !canCreateProduct}
+                      disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                     />
                   </div>
                 </div>
@@ -844,7 +832,7 @@ export default function AdminProductCreatePage() {
                       onChange={(e) => handleGeopointChange(e, 0)}
                       placeholder="Enter latitude"
                       step="0.000001"
-                      disabled={isSubmitting || !canCreateProduct}
+                      disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                     />
                   </div>
 
@@ -857,7 +845,7 @@ export default function AdminProductCreatePage() {
                       onChange={(e) => handleGeopointChange(e, 1)}
                       placeholder="Enter longitude"
                       step="0.000001"
-                      disabled={isSubmitting || !canCreateProduct}
+                      disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                     />
                   </div>
                 </div>
@@ -881,7 +869,7 @@ export default function AdminProductCreatePage() {
                     className="hidden"
                     onChange={handleFileChange}
                     required={mediaFiles.length === 0}
-                    disabled={isSubmitting || !canCreateProduct}
+                    disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                   />
                   <label htmlFor="media-upload" className="flex flex-col items-center justify-center cursor-pointer">
                     <Upload
@@ -937,7 +925,7 @@ export default function AdminProductCreatePage() {
                                     onChange={(e) => handleMediaDistanceChange(index, e.target.value)}
                                     placeholder="e.g., 100m"
                                     className="h-9 text-sm"
-                                    disabled={isSubmitting || !canCreateProduct}
+                                    disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}
                                   />
                                 </div>
                               </div>
@@ -961,15 +949,13 @@ export default function AdminProductCreatePage() {
               </section>
 
               <div className="flex justify-end pt-4">
-                <Button type="submit" disabled={isSubmitting || !canCreateProduct}>
+                <Button type="submit" disabled={isSubmitting || !subscriptionData || !hasActiveSubscription}>
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...
                     </>
                   ) : (
-                    <>
-                      <PlusCircle className="mr-2 h-4 w-4" /> Create Product
-                    </>
+                    "Create Product"
                   )}
                 </Button>
               </div>

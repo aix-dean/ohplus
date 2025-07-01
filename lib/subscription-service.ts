@@ -117,7 +117,8 @@ export const subscriptionService = {
 
     if (querySnapshot.empty) {
       console.error("subscriptionService: No subscription found to update for licenseKey:", licenseKey)
-      throw new Error("Subscription not found for update.")
+      // Throw an error that can be caught by the caller to handle creation fallback
+      throw new Error("Subscription document not found for update.")
     }
 
     const docRef = doc(db, "subscriptions", querySnapshot.docs[0].id)

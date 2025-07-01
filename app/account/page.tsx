@@ -1,24 +1,184 @@
 "use client"
 
-import { useAuth } from "@/contexts/auth-context"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-import { Loader2, Mail, Phone, MapPin, CalendarDays, User, Star, Users, Package } from "lucide-react"
-import { useRouter } from "next/navigation"
+import type React from "react"
+
 import { useEffect } from "react"
-import { subscriptionService } from "@/lib/subscription-service" // Import subscriptionService
+
+import { useRouter } from "next/navigation"
+
+import { useState } from "react"
+
+import { Separator } from "@/components/ui/separator"
+import { useAuth } from "@/contexts/auth-context"
+import { subscriptionService } from "@/lib/subscription-service"
+import { Loader2 } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { getUserProductsCount } from "@/lib/user-products-service" // Import the getUserProductsCount function
 
 export default function AccountPage() {
-  const { user, userData, projectData, subscriptionData, loading } = useAuth()
+  const { user, userData, projectData, subscriptionData, loading, updateUserData, updateProjectData, logout } =
+    useAuth()
+
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+
+  const [currentProductsCount, setCurrentProductsCount] = useState<number | null>(null)
+
+  const [firstName, setFirstName] = useState("")
+  const [middleName, setMiddleName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [displayName, setDisplayName] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("")
+  const [gender, setGender] = useState("")
+  const [photoURL, setPhotoURL] = useState("")
+
+  const [companyName, setCompanyName] = useState("")
+  const [companyLocation, setCompanyLocation] = useState("")
+  const [companyWebsite, setCompanyWebsite] = useState("")
+  const [projectName, setProjectName] = useState("")
+  const [facebook, setFacebook] = useState("")
+  const [instagram, setInstagram] = useState("")
+  const [youtube, setYoutube] = useState("")
+
   const router = useRouter()
 
-  useEffect(() => {
-    if (!loading && !user) {
+  const handleLogout = async () => {
+    try {
+      await logout()
       router.push("/login")
+    } catch (error: any) {
+      console.error("Logout error:", error)
+      // toast({
+      //   title: "Logout Failed",
+      //   description: error.message || "Failed to log out. Please try again.",
+      //   variant: "destructive",
+      // })
     }
-  }, [loading, user, router])
+  }
+
+  useEffect(() => {
+    if (loading) return
+
+    if (!user) {
+      router.push("/login")
+      return
+    }
+
+    if (userData) {
+      setFirstName(userData.first_name || "")
+      setMiddleName(userData.middle_name || "")
+      setLastName(userData.last_name || "")
+      setDisplayName(userData.display_name || "")
+      setPhoneNumber(userData.phone_number || "")
+      setGender(userData.gender || "")
+      setPhotoURL(userData.photo_url || "")
+    }
+
+    if (projectData) {
+      setCompanyName(projectData.company_name || "")
+      setCompanyLocation(projectData.company_location || "")
+      setCompanyWebsite(projectData.company_website || "")
+      setProjectName(projectData.project_name || "")
+      setFacebook(projectData.social_media?.facebook || "")
+      setInstagram(projectData.social_media?.instagram || "")
+      setYoutube(projectData.social_media?.youtube || "")
+    }
+  }, [user, userData, projectData, loading, router])
+
+  useEffect(() => {
+    const fetchProductCount = async () => {
+      if (user && subscriptionData?.licenseKey) {
+        try {
+          const count = await getUserProductsCount(user.uid)
+          setCurrentProductsCount(count)
+        } catch (error) {
+          console.error("Failed to fetch product count:", error)
+          setCurrentProductsCount(0)
+          // toast({
+          //   title: "Error",
+          //   description: "Failed to load product count.",
+          //   variant: "destructive",
+          // })
+        }
+      }
+    }
+    fetchProductCount()
+  }, [user, subscriptionData])
+
+  const handleSave = async () => {
+    setIsSaving(true)
+
+    try {
+      await updateUserData({
+        first_name: firstName,
+        middle_name: middleName,
+        last_name: lastName,
+        display_name: displayName,
+        phone_number: phoneNumber,
+        gender,
+        photo_url: photoURL,
+      })
+
+      await updateProjectData({
+        company_name: companyName,
+        company_location: companyLocation,
+        company_website: companyWebsite,
+        project_name: projectName,
+        social_media: {
+          facebook,
+          instagram,
+          youtube,
+        },
+      })
+
+      // toast({
+      //   title: "Success",
+      //   description: "Account information updated successfully!",
+      // })
+      setIsEditing(false)
+    } catch (error: any) {
+      console.error("Update error:", error)
+      // toast({
+      //   title: "Update Failed",
+      //   description: error.message || "Failed to update account information.",
+      //   variant: "destructive",
+      // })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handlePhotoClick = () => {
+    // fileInputRef.current?.click()
+  }
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // const file = e.target.files?.[0]
+    // if (!file || !user) return
+    // setIsUploading(true)
+    // try {
+    //   const storageRef = ref(storage, `profile_photos/${user.uid}/${Date.now()}_${file.name}`)
+    //   const snapshot = await uploadBytes(storageRef, file)
+    //   const downloadURL = await getDownloadURL(snapshot.ref)
+    //   setPhotoURL(downloadURL)
+    //   await updateUserData({ photo_url: downloadURL })
+    //   toast({
+    //     title: "Success",
+    //     description: "Profile photo updated successfully!",
+    //   })
+    // } catch (error: any) {
+    //   console.error("Photo upload error:", error)
+    //   toast({
+    //     title: "Upload Failed",
+    //     description: error.message || "Failed to upload photo.",
+    //     variant: "destructive",
+    //   })
+    // } finally {
+    //   setIsUploading(false)
+    //   fileInputRef.current?.value = ""
+    // }
+  }
 
   if (loading) {
     return (
@@ -28,189 +188,177 @@ export default function AccountPage() {
     )
   }
 
-  if (!user || !userData) {
+  if (!userData) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <p className="text-gray-600">User data not available. Please log in.</p>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Account Not Found</CardTitle>
+            <CardDescription>Please log in to view your account details.</CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     )
   }
 
-  const daysRemaining =
-    subscriptionData && subscriptionData.trialEndDate ? subscriptionService.getDaysRemaining(subscriptionData) : 0
+  const daysRemaining = subscriptionData ? subscriptionService.getDaysRemaining(subscriptionData) : 0
 
   return (
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-4xl">
-        <Card className="shadow-lg">
-          <CardHeader className="flex flex-col items-center border-b p-6 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex flex-col items-center sm:flex-row">
-              <Avatar className="h-24 w-24 border-4 border-white shadow-md">
-                <AvatarImage src={userData.photo_url || "/placeholder-user.jpg"} alt="User Avatar" />
-                <AvatarFallback>{userData.display_name ? userData.display_name.charAt(0) : "U"}</AvatarFallback>
-              </Avatar>
-              <div className="mt-4 text-center sm:ml-6 sm:mt-0 sm:text-left">
-                <CardTitle className="text-3xl font-bold text-gray-900">
-                  {userData.display_name || `${userData.first_name} ${userData.last_name}`}
-                </CardTitle>
-                <CardDescription className="text-lg text-gray-600">
-                  {userData.type === "admin" ? "Administrator" : "User"}
-                </CardDescription>
-                <p className="mt-1 text-sm text-gray-500">License Key: {userData.license_key || "N/A"}</p>
+      <div className="mx-auto max-w-6xl">
+        {/* Header Section */}
+        <div className="mb-16 flex flex-col items-center justify-between gap-4 rounded-xl bg-white p-6 shadow-sm md:flex-row md:p-8">
+          <div className="flex flex-col items-center gap-4 md:flex-row">
+            <div className="relative group flex-shrink-0">
+              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-primary/20 p-1 shadow-md">
+                {/* {isUploading ? (
+                  <Loader2 size={36} className="animate-spin text-primary" />
+                ) : photoURL ? (
+                  <img
+                    src={photoURL || "/placeholder.svg"}
+                    alt={userData?.display_name || "Profile"}
+                    className="h-full w-full object-cover rounded-full"
+                  />
+                ) : (
+                  <User size={36} className="text-gray-400" />
+                )} */}
               </div>
+              {/* <button
+                className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary p-1.5 text-white shadow-md transition-colors duration-200 hover:bg-primary/90"
+                onClick={handlePhotoClick}
+                disabled={isUploading}
+                aria-label="Change profile photo"
+              >
+                <Camera size={16} />
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                disabled={isUploading}
+              /> */}
             </div>
-            <div className="mt-6 sm:mt-0">
-              <Button variant="outline" onClick={() => router.push("/settings")}>
-                Edit Profile
-              </Button>
+            <div className="text-center md:text-left">
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+                Hello, {userData?.first_name || "User"}!
+              </h1>
+              <p className="mt-0.5 text-base text-gray-600">Manage your account and company details.</p>
             </div>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-100 bg-transparent"
+              onClick={handleLogout}
+            >
+              {/* <LogOut className="h-4 w-4" /> */}
+              Logout
+            </button>
+            <button
+              onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90"
+            >
+              {isEditing ? (
+                <>
+                  {/* <Save className="h-4 w-4" /> */}
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </>
+              ) : (
+                <>
+                  {/* <Edit2 className="h-4 w-4" /> */}
+                  Edit Profile
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Main Content Area with Tabs */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Personal Information</CardTitle>
+              <CardDescription>Manage your personal details.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Name</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {userData.first_name} {userData.last_name}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">Email</p>
+                <p className="text-lg font-semibold text-gray-900">{userData.email}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">Phone Number</p>
+                <p className="text-lg font-semibold text-gray-900">{userData.phone_number || "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">Location</p>
+                <p className="text-lg font-semibold text-gray-900">{userData.location || "N/A"}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Company Information</CardTitle>
+              <CardDescription>Details about your registered company.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Company Name</p>
+                <p className="text-lg font-semibold text-gray-900">{projectData?.company_name || "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">Company Location</p>
+                <p className="text-lg font-semibold text-gray-900">{projectData?.company_location || "N/A"}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-700">License Key</p>
+                <p className="text-lg font-semibold text-gray-900">{userData.license_key || "N/A"}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Separator className="my-8" />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Subscription Details</CardTitle>
+            <CardDescription>Your current plan and its status.</CardDescription>
           </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
-              <div>
-                <h2 className="mb-4 text-xl font-semibold text-gray-800">Contact Information</h2>
-                <div className="space-y-3 text-gray-700">
-                  <p className="flex items-center">
-                    <Mail className="mr-2 h-5 w-5 text-gray-500" /> {userData.email}
-                  </p>
-                  <p className="flex items-center">
-                    <Phone className="mr-2 h-5 w-5 text-gray-500" /> {userData.phone_number || "N/A"}
-                  </p>
-                  <p className="flex items-center">
-                    <MapPin className="mr-2 h-5 w-5 text-gray-500" /> {userData.location || "N/A"}
-                  </p>
-                </div>
-              </div>
-              <div>
-                <h2 className="mb-4 text-xl font-semibold text-gray-800">Account Details</h2>
-                <div className="space-y-3 text-gray-700">
-                  <p className="flex items-center">
-                    <User className="mr-2 h-5 w-5 text-gray-500" /> Gender: {userData.gender || "N/A"}
-                  </p>
-                  <p className="flex items-center">
-                    <CalendarDays className="mr-2 h-5 w-5 text-gray-500" /> Joined:{" "}
-                    {userData.created?.toDate().toLocaleDateString() || "N/A"}
-                  </p>
-                  <p className="flex items-center">
-                    <Star className="mr-2 h-5 w-5 text-gray-500" /> Rating: {userData.rating || 0}
-                  </p>
-                  <p className="flex items-center">
-                    <Users className="mr-2 h-5 w-5 text-gray-500" /> Followers: {userData.followers || 0}
-                  </p>
-                  <p className="flex items-center">
-                    <Package className="mr-2 h-5 w-5 text-gray-500" /> Products: {userData.products || 0}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <Separator className="my-8" />
-
+          <CardContent className="space-y-4">
             <div>
-              <h2 className="mb-4 text-xl font-semibold text-gray-800">Project Information</h2>
-              {projectData ? (
-                <div className="space-y-3 text-gray-700">
-                  <p>
-                    <span className="font-medium">Project Name:</span> {projectData.project_name}
-                  </p>
-                  <p>
-                    <span className="font-medium">Company Name:</span> {projectData.company_name || "N/A"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Company Location:</span> {projectData.company_location || "N/A"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Company Website:</span>{" "}
-                    {projectData.company_website ? (
-                      <a
-                        href={projectData.company_website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                        {projectData.company_website}
-                      </a>
-                    ) : (
-                      "N/A"
-                    )}
-                  </p>
-                  <p>
-                    <span className="font-medium">Social Media:</span>
-                    {projectData.social_media && (
-                      <span className="ml-2">
-                        {projectData.social_media.facebook && (
-                          <a
-                            href={projectData.social_media.facebook}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline mr-2"
-                          >
-                            Facebook
-                          </a>
-                        )}
-                        {projectData.social_media.instagram && (
-                          <a
-                            href={projectData.social_media.instagram}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline mr-2"
-                          >
-                            Instagram
-                          </a>
-                        )}
-                        {projectData.social_media.youtube && (
-                          <a
-                            href={projectData.social_media.youtube}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline"
-                          >
-                            YouTube
-                          </a>
-                        )}
-                        {!projectData.social_media.facebook &&
-                          !projectData.social_media.instagram &&
-                          !projectData.social_media.youtube &&
-                          "N/A"}
-                      </span>
-                    )}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-gray-600">No project information available.</p>
-              )}
+              <p className="text-sm font-medium text-gray-700">Plan Type</p>
+              <p className="text-lg font-semibold capitalize text-gray-900">{subscriptionData?.planType || "N/A"}</p>
             </div>
-
-            <Separator className="my-8" />
-
             <div>
-              <h2 className="mb-4 text-xl font-semibold text-gray-800">Subscription Status</h2>
-              {subscriptionData ? (
-                <div className="space-y-3 text-gray-700">
-                  <p>
-                    <span className="font-medium">Plan:</span> {subscriptionData.planType.toUpperCase()}
-                  </p>
-                  <p>
-                    <span className="font-medium">Status:</span> {subscriptionData.status.toUpperCase()}
-                  </p>
-                  {subscriptionData.trialEndDate && (
-                    <p>
-                      <span className="font-medium">Trial Ends:</span>{" "}
-                      {new Date(subscriptionData.trialEndDate).toLocaleDateString()} ({daysRemaining} days remaining)
-                    </p>
-                  )}
-                  <Button onClick={() => router.push("/settings/subscription")} className="mt-4">
-                    Manage Subscription
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-3 text-gray-700">
-                  <p>No active subscription found.</p>
-                  <Button onClick={() => router.push("/settings/subscription")} className="mt-4">
-                    Choose a Plan
-                  </Button>
-                </div>
-              )}
+              <p className="text-sm font-medium text-gray-700">Status</p>
+              <p className="text-lg font-semibold capitalize text-gray-900">{subscriptionData?.status || "N/A"}</p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-700">Max Products</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {subscriptionData?.maxProducts === 99999 ? "Unlimited" : subscriptionData?.maxProducts || "N/A"}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-700">Trial End Date</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {subscriptionData?.trialEndDate ? new Date(subscriptionData.trialEndDate).toLocaleDateString() : "N/A"}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-700">Days Remaining (Trial)</p>
+              <p className="text-lg font-semibold text-gray-900">
+                {daysRemaining > 0 ? `${daysRemaining} days` : "N/A"}
+              </p>
             </div>
           </CardContent>
         </Card>
