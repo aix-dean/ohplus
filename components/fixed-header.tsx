@@ -1,122 +1,149 @@
 "use client"
 
-import { usePathname } from "next/navigation"
+import type React from "react"
+
+import { useState } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import { ArrowLeft, Bell, Menu, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { SideNavigation } from "./side-navigation"
+import { cn } from "@/lib/utils"
 import {
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { BellIcon, SearchIcon, UserIcon, ArrowLeftIcon, XIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useAuth } from "@/contexts/auth-context"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
 
-interface FixedHeaderProps {
-  title?: string
-  showBackButton?: boolean
-}
-
-export function FixedHeader({ title, showBackButton = false }: FixedHeaderProps) {
+export function FixedHeader() {
   const pathname = usePathname()
-  const { user, signOut } = useAuth()
   const router = useRouter()
+  const { user, logout } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
 
   const isAdminPage = pathname.startsWith("/admin")
   const isSalesPage = pathname.startsWith("/sales")
   const isLogisticsPage = pathname.startsWith("/logistics")
 
-  let headerBgClass = "bg-salesHeaderRose" // Default for sales and other pages
-  let buttonHoverClass = "hover:bg-salesHeaderRose/80"
-
-  if (isAdminPage) {
-    headerBgClass = "bg-adminHeaderDark"
-    buttonHoverClass = "hover:bg-adminHeaderDark/80"
-  } else if (isLogisticsPage) {
-    headerBgClass = "bg-logisticsHeader" // Assuming logisticsHeader is defined in tailwind.config.ts
-    buttonHoverClass = "hover:bg-logisticsHeader/80"
+  const getHeaderTitle = () => {
+    if (pathname.startsWith("/admin/dashboard")) return "Admin - Dashboard"
+    if (pathname.startsWith("/admin/products/create")) return "Admin - Create Product"
+    if (pathname.startsWith("/admin/inventory/edit")) return "Admin - Edit Inventory"
+    if (pathname.startsWith("/admin/inventory")) return "Admin - Inventory"
+    if (pathname.startsWith("/admin/access-management")) return "Admin - Access Management"
+    if (pathname.startsWith("/admin/chat-analytics")) return "Admin - Chat Analytics"
+    if (pathname.startsWith("/admin/subscriptions")) return "Admin - Subscriptions"
+    if (pathname.startsWith("/admin/documents")) return "Admin - Documents" // New admin documents page
+    if (pathname.startsWith("/sales/dashboard")) return "Sales - Dashboard"
+    if (pathname.startsWith("/sales/bookings")) return "Sales - Bookings"
+    if (pathname.startsWith("/sales/clients")) return "Sales - Clients"
+    if (pathname.startsWith("/sales/products")) return "Sales - Products"
+    if (pathname.startsWith("/sales/proposals")) return "Sales - Proposals"
+    if (pathname.startsWith("/sales/quotation-requests")) return "Sales - Quotation Requests"
+    if (pathname.startsWith("/sales/job-orders")) return "Sales - Job Orders"
+    if (pathname.startsWith("/sales/project-campaigns")) return "Sales - Project Campaigns"
+    if (pathname.startsWith("/sales/chat")) return "Sales - Chat"
+    if (pathname.startsWith("/sales/planner")) return "Sales - Planner"
+    if (pathname.startsWith("/sales/bulletin-board")) return "Sales - Bulletin Board"
+    if (pathname.startsWith("/logistics/dashboard")) return "Logistics - Dashboard"
+    if (pathname.startsWith("/logistics/alerts")) return "Logistics - Alerts"
+    if (pathname.startsWith("/logistics/assignments")) return "Logistics - Assignments"
+    if (pathname.startsWith("/logistics/planner")) return "Logistics - Planner"
+    if (pathname.startsWith("/logistics/sites")) return "Logistics - Sites"
+    return "Dashboard"
   }
 
-  const handleSearch = () => {
-    if (searchQuery.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
-    }
+  const showBackButton =
+    (pathname.startsWith("/admin/") && !pathname.startsWith("/admin/dashboard")) ||
+    (pathname.startsWith("/sales/") && !pathname.startsWith("/sales/dashboard")) ||
+    (pathname.startsWith("/logistics/") && !pathname.startsWith("/logistics/dashboard"))
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    console.log("Searching for:", searchQuery)
+    // Implement actual search logic here
   }
 
-  const handleClearSearch = () => {
-    setSearchQuery("")
-  }
+  const headerBgClass = isAdminPage ? "bg-adminHeaderDark" : "bg-salesHeaderRose"
+  const buttonHoverClass = isAdminPage ? "hover:bg-adminHeaderDark-light" : "hover:bg-salesHeaderRose-light"
 
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 flex h-16 items-center justify-between px-4 shadow-md transition-colors duration-300",
+        "sticky top-0 z-40 flex h-16 items-center justify-between px-4 shadow-sm transition-colors duration-300",
         headerBgClass,
       )}
     >
       <div className="flex items-center gap-4">
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="lg:hidden text-white">
+              <Menu className="h-6 w-6" />
+              <span className="sr-only">Toggle navigation menu</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-64 p-0">
+            <SideNavigation />
+          </SheetContent>
+        </Sheet>
         {showBackButton && (
-          <Button variant="ghost" size="icon" onClick={() => router.back()} className="text-white">
-            <ArrowLeftIcon className="h-6 w-6" />
-            <span className="sr-only">Back</span>
-          </Button>
-        )}
-        <h1 className="text-xl font-semibold text-white">{title || "Dashboard"}</h1>
-      </div>
-      <div className="relative flex-1 max-w-md mx-4">
-        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-300" />
-        <Input
-          type="search"
-          placeholder="Search..."
-          className="w-full rounded-md border border-gray-300 bg-white py-2 pl-10 pr-8 text-sm focus:border-blue-500 focus:ring-blue-500"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              handleSearch()
-            }
-          }}
-        />
-        {searchQuery && (
           <Button
             variant="ghost"
             size="icon"
-            onClick={handleClearSearch}
-            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-gray-500 hover:bg-gray-200"
+            onClick={() => router.back()}
+            className={cn("text-white", buttonHoverClass)}
+            aria-label="Go back"
           >
-            <XIcon className="h-4 w-4" />
-            <span className="sr-only">Clear search</span>
+            <ArrowLeft className="h-5 w-5" />
           </Button>
         )}
+        <h1 className="text-xl font-semibold text-white">{getHeaderTitle()}</h1>
       </div>
+
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className={cn("text-white", buttonHoverClass)}>
-          <BellIcon className="h-6 w-6" />
-          <span className="sr-only">Notifications</span>
+        <form onSubmit={handleSearch} className="relative hidden md:block">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300" />
+          <Input
+            type="search"
+            placeholder="Search..."
+            className="pl-8 pr-2 py-1 rounded-md bg-white/20 text-white placeholder:text-gray-300 focus:outline-none focus:ring-1 focus:ring-white border-none"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </form>
+
+        <Button variant="ghost" size="icon" className={cn("text-white", buttonHoverClass)} aria-label="Notifications">
+          <Bell className="h-5 w-5" />
         </Button>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className={cn("text-white", buttonHoverClass)}>
-              <UserIcon className="h-6 w-6" />
+            <Button variant="ghost" className={cn("relative h-8 w-8 rounded-full text-white", buttonHoverClass)}>
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} alt="User Avatar" />
+                <AvatarFallback>{user?.email ? user.email[0].toUpperCase() : "U"}</AvatarFallback>
+              </Avatar>
               <span className="sr-only">User menu</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
+          <DropdownMenuContent className="w-56" align="end" forceMount>
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none">{user?.displayName || "User"}</p>
+                <p className="text-xs leading-none text-muted-foreground">{user?.email || "user@example.com"}</p>
+              </div>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={signOut}>Logout</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push("/account")}>Account Settings</DropdownMenuItem>
+            <DropdownMenuItem onClick={logout}>Log out</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <span className="text-white text-sm hidden md:block">
-          {new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })},{" "}
-          {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-        </span>
       </div>
     </header>
   )

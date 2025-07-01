@@ -55,34 +55,17 @@ const config = {
         },
         // Custom colors for headers
         adminHeaderDark: {
-          DEFAULT: "#1A2B42", // Dark blue/black from the latest screenshot
-          light: "rgba(26, 43, 66, 0.8)", // Slightly lighter for hover
+          DEFAULT: "#1A2B42", // Dark blue/black from screenshot
+          light: "#2A3C54", // A slightly lighter shade for hover/active states
         },
         adminHeaderPurple: {
-          DEFAULT: "#673AB7", // Purple for buttons from screenshot
-          light: "rgba(103, 58, 183, 0.8)", // Lighter shade for hover
+          DEFAULT: "#673AB7", // Purple from screenshot
+          light: "#7B1FA2", // A slightly lighter shade for hover/active states
         },
         salesHeaderRose: {
-          DEFAULT: "#e11d48", // Original rose color for sales
-          light: "rgba(244, 63, 94, 0.8)", // Lighter shade for hover
+          DEFAULT: "#e11d48", // Existing rose color
+          light: "#f43f5e", // A slightly lighter shade for hover/active states
         },
-        // Custom colors for department cards (from previous context)
-        salesHeader: "#FF6B6B", // Red
-        logisticsHeader: "#5DADE2", // Blue
-        accountingHeader: "#C34A8D", // Pink/Magenta
-        treasuryHeader: "#347C4B", // Dark Green
-        itHeader: "#00B8A9", // Teal
-        fleetHeader: "#808080", // Gray
-        creativesHeader: "#E67E22", // Orange
-        financeHeader: "#8BC34A", // Lime Green
-        mediaHeader: "#4ECDC4", // Light Blue/Cyan
-        businessDevHeader: "#6A5ACD", // Darker Blue/Purple
-        legalHeader: "#B22222", // Dark Red
-        corporateHeader: "#00BFFF", // Bright Blue
-        hrHeader: "#FF69B4", // Bright Pink
-        specialTeamHeader: "#8A2BE2", // Purple
-        marketingHeader: "#FF0000", // Red
-        addDepartmentHeader: "#333333", // Dark Gray/Black
       },
       borderRadius: {
         lg: "var(--radius)",

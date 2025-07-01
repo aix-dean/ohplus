@@ -16,7 +16,7 @@ import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplet
 import { collection, query, where, getDocs, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "@/components/ui/use-toast"
 import { FixedHeader } from "@/components/fixed-header"
 
 // Audience types for the dropdown
@@ -56,7 +56,6 @@ export default function AdminProductCreatePage() {
   const [mediaTypes, setMediaTypes] = useState<string[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [isLoadingCategories, setIsLoadingCategories] = useState(false)
-  const { toast } = useToast()
 
   // Selected categories and audience types
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
@@ -686,7 +685,7 @@ export default function AdminProductCreatePage() {
               </section>
 
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => router.back()} disabled={loading}>
+                <Button variant="outline" onClick={handleBack} disabled={loading}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={loading}>
