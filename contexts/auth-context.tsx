@@ -1,16 +1,16 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
+import { useRouter } from "next/navigation"
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signOut,
   sendPasswordResetEmail,
   type User as FirebaseUser,
 } from "firebase/auth"
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore"
-import { auth, db } from "@/lib/firebase"
+import { firebaseAuth, db } from "@/lib/firebase"
 import { subscriptionService } from "@/lib/subscription-service"
 import type { Subscription } from "@/lib/types/subscription"
 import { generateLicenseKey } from "@/lib/utils" // Assuming this utility exists
@@ -24,24 +24,6 @@ interface UserData {
   permissions: string[]
   // Add other user-specific data here
 }
-
-interface AuthContextType {
-  user: FirebaseUser | null
-  userData: UserData | null
-  subscriptionData: Subscription | null
-  loading: boolean
-  login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string) => Promise<void>
-  logout: () => Promise<void>
-  resetPassword: (email: string) => Promise<void>
-  updateUserData: (updates: Partial<UserData>) => Promise<void>
-  updateProjectData: (updates: Partial<ProjectData>) => Promise<void>
-  refreshUserData: () => Promise<void>
-  refreshSubscriptionData: () => Promise<void>
-  assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 interface ProjectData {
   project_id: string
@@ -58,12 +40,33 @@ interface ProjectData {
   updated?: Date
 }
 
+interface AuthContextType {
+  user: FirebaseUser | null
+  userData: UserData | null
+  projectData: ProjectData | null
+  subscriptionData: Subscription | null
+  loading: boolean
+  isAuthenticated: boolean
+  login: (email: string, password: string) => Promise<void>
+  register: (email: string, password: string) => Promise<void>
+  logout: () => Promise<void>
+  resetPassword: (email: string) => Promise<void>
+  updateUserData: (updates: Partial<UserData>) => Promise<void>
+  updateProjectData: (updates: Partial<ProjectData>) => Promise<void>
+  refreshUserData: () => Promise<void>
+  refreshSubscriptionData: () => Promise<void>
+  assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
   const [subscriptionData, setSubscriptionData] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
   const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
     try {
@@ -170,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     setLoading(true)
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password)
       setUser(userCredential.user)
       await fetchUserData(userCredential.user)
     } catch (error) {
@@ -182,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (email: string, password: string) => {
     setLoading(true)
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password)
       const firebaseUser = userCredential.user
       setUser(firebaseUser)
 
@@ -219,23 +222,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const logout = async () => {
-    setLoading(true)
+  const logout = useCallback(async () => {
     try {
-      await signOut(auth)
+      await firebaseAuth.signOut()
       setUser(null)
       setUserData(null)
       setProjectData(null)
       setSubscriptionData(null)
+      router.push("/login")
     } catch (error) {
-      setLoading(false)
-      throw error
+      console.error("Error logging out:", error)
     }
-  }
+  }, [router])
 
   const resetPassword = async (email: string) => {
     try {
-      await sendPasswordResetEmail(auth, email)
+      await sendPasswordResetEmail(firebaseAuth, email)
     } catch (error) {
       throw error
     }
@@ -260,20 +262,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser)
-        await fetchUserData(firebaseUser)
-      } else {
-        setUser(null)
-        setUserData(null)
-        setProjectData(null)
-        setSubscriptionData(null)
-      }
+    const unsubscribe = onAuthStateChanged(firebaseAuth, (currentUser) => {
+      setUser(currentUser)
       setLoading(false)
+      if (currentUser) {
+        // Redirect to admin dashboard after login
+        router.push("/admin/dashboard")
+      } else {
+        // Redirect to login if not authenticated and not on a public route
+        if (
+          !["/login", "/register", "/forgot-password"].includes(window.location.pathname) &&
+          !window.location.pathname.startsWith("/quotations/") &&
+          !window.location.pathname.startsWith("/proposals/view/") &&
+          !window.location.pathname.startsWith("/cost-estimates/view/")
+        ) {
+          router.push("/login")
+        }
+      }
     })
     return () => unsubscribe()
-  }, [fetchUserData])
+  }, [router])
 
   const value = {
     user,
@@ -281,6 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     projectData,
     subscriptionData,
     loading,
+    isAuthenticated: !!user,
     login,
     register,
     logout,

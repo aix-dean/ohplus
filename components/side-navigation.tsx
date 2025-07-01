@@ -1,410 +1,324 @@
 "use client"
 import Link from "next/link"
+import type React from "react"
+
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
-  Users,
-  Calendar,
-  BarChart3,
-  Truck,
-  AlertTriangle,
-  FileText,
-  Settings,
-  ShieldCheck,
-  BookOpen,
-  Package,
-  MessageCircle,
-  FileCheck,
-  Sparkles,
-  ChevronLeft,
-  ChevronRight,
-  TrendingUp,
   ClipboardList,
+  FileText,
+  Package,
+  Users,
+  Settings,
+  MessageSquare,
+  Calendar,
+  DollarSign,
+  Briefcase,
+  Bell,
+  ChevronRight,
+  ChevronLeft,
+  Sparkles,
+  BookOpen,
+  MapPin,
+  ShoppingBag,
+  Megaphone,
+  ScrollText,
+  FileStack,
+  FileCheck,
+  UserCog,
+  CreditCard,
 } from "lucide-react"
-import { useUnreadMessages } from "@/hooks/use-unread-messages"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { useMobile } from "@/hooks/use-mobile"
 import { useAuth } from "@/contexts/auth-context"
+import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 
-// Navigation data structure with icons
-const navigationItems = [
-  {
-    section: "dashboard",
-    title: "Dashboard",
-    icon: LayoutDashboard,
-    items: [],
-  },
-  {
-    section: "features",
-    title: "Features",
-    icon: Package,
-    items: [{ title: "Overview", href: "/features", icon: LayoutDashboard }],
-  },
-  {
-    section: "sales",
-    title: "Sales",
-    icon: BarChart3,
-    items: [
-      { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
-      { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
-      { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
-      { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
-      { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
-      { title: "Clients", href: "/sales/clients", icon: Users },
-      { title: "Billings", href: "#", icon: FileText }, // Added Billings here
-      { title: "Planner", href: "/sales/planner", icon: Calendar },
-      { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
-    ],
-  },
-  {
-    section: "logistics",
-    title: "Logistics",
-    icon: Truck,
-    items: [
-      { title: "Dashboard", href: "/logistics/dashboard", icon: LayoutDashboard },
-      { title: "Service Assignments", href: "/logistics/assignments", icon: FileText },
-      { title: "Planner", href: "/logistics/planner", icon: Calendar },
-      { title: "Alerts", href: "/logistics/alerts", icon: AlertTriangle },
-    ],
-  },
-  {
-    section: "cms",
-    title: "CMS",
-    icon: FileText,
-    items: [
-      { title: "Dashboard", href: "/cms/dashboard", icon: LayoutDashboard },
-      { title: "Planner", href: "/cms/planner", icon: Calendar },
-      { title: "Orders", href: "/cms/orders", icon: FileText },
-    ],
-  },
-  {
-    section: "admin",
-    title: "Admin",
-    icon: ShieldCheck,
-    items: [], // Custom content will be rendered below
-  },
-  {
-    section: "settings",
-    title: "Settings",
-    icon: Settings,
-    items: [
-      { title: "General", href: "/settings", icon: Settings },
-      { title: "Subscription", href: "/admin/subscriptions", icon: FileText }, // Updated href
-    ],
-  },
-]
-
-function isActive(pathname: string, href: string) {
-  return pathname === href
+interface NavigationItem {
+  name: string
+  href: string
+  icon: React.ElementType
+  badge?: number
+  subItems?: NavigationItem[]
 }
 
-export function SideNavigation() {
+export default function SideNavigation() {
   const pathname = usePathname()
+  const { isMobile } = useMobile()
   const { user } = useAuth()
   const { unreadCount } = useUnreadMessages()
 
-  // Determine the current section from the pathname
-  let currentSection = pathname?.split("/")[1] || "dashboard"
-  if (pathname?.startsWith("/sales/project-campaigns")) {
-    currentSection = "sales"
-  }
-  // Explicitly set currentSection to "admin" if path starts with /admin or /admin/dashboard
-  if (pathname?.startsWith("/admin")) {
-    currentSection = "admin"
+  const currentSection = pathname.split("/")[1] // e.g., "sales", "logistics", "admin"
+
+  const navigationItems: { [key: string]: NavigationItem[] } = {
+    sales: [
+      { name: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
+      { name: "Bulletin Board", href: "/sales/bulletin-board", icon: ClipboardList },
+      {
+        name: "Chat",
+        href: "/sales/chat",
+        icon: MessageSquare,
+        badge: unreadCount,
+      },
+      { name: "Planner", href: "/sales/planner", icon: Calendar },
+      { name: "Clients", href: "/sales/clients", icon: Users },
+      {
+        name: "Products",
+        href: "/sales/products",
+        icon: ShoppingBag,
+        subItems: [
+          { name: "All Products", href: "/sales/products", icon: Package },
+          { name: "New Product", href: "/sales/products/new", icon: Package },
+        ],
+      },
+      {
+        name: "Proposals",
+        href: "/sales/proposals",
+        icon: FileText,
+        subItems: [
+          { name: "All Proposals", href: "/sales/proposals", icon: FileStack },
+          { name: "Create Proposal", href: "/sales/proposals/create", icon: FileText },
+        ],
+      },
+      {
+        name: "Cost Estimates",
+        href: "/sales/cost-estimates",
+        icon: DollarSign,
+        subItems: [
+          { name: "All Estimates", href: "/sales/cost-estimates", icon: FileStack },
+          { name: "Create Estimate", href: "/sales/cost-estimates/create", icon: DollarSign },
+        ],
+      },
+      {
+        name: "Quotations",
+        href: "/sales/quotation-requests",
+        icon: Briefcase,
+        subItems: [
+          { name: "All Quotations", href: "/sales/quotation-requests", icon: FileCheck },
+          { name: "Create Quotation", href: "/sales/quotation-requests/create", icon: Briefcase },
+        ],
+      },
+      {
+        name: "Job Orders",
+        href: "/sales/job-orders",
+        icon: ScrollText,
+        subItems: [
+          { name: "All Job Orders", href: "/sales/job-orders", icon: FileStack },
+          { name: "Create Job Order", href: "/sales/job-orders/create", icon: ScrollText },
+        ],
+      },
+      { name: "Bookings", href: "/sales/bookings", icon: Calendar },
+      { name: "Project Campaigns", href: "/sales/project-campaigns", icon: Megaphone },
+    ],
+    logistics: [
+      { name: "Dashboard", href: "/logistics/dashboard", icon: LayoutDashboard },
+      { name: "Planner", href: "/logistics/planner", icon: Calendar },
+      { name: "Sites", href: "/logistics/sites", icon: MapPin },
+      { name: "Products", href: "/logistics/products", icon: Package },
+      { name: "Assignments", href: "/logistics/assignments", icon: Briefcase },
+      { name: "Alerts", href: "/logistics/alerts", icon: Bell },
+    ],
+    cms: [
+      { name: "Dashboard", href: "/cms/dashboard", icon: LayoutDashboard },
+      { name: "Planner", href: "/cms/planner", icon: Calendar },
+      { name: "Orders", href: "/cms/orders", icon: ShoppingBag },
+      { name: "Details", href: "/cms/details", icon: FileText },
+    ],
+    admin: [
+      // No direct items here, handled by custom rendering below
+    ],
+    account: [
+      { name: "Account Settings", href: "/account", icon: UserCog },
+      { name: "Subscription", href: "/admin/subscriptions", icon: CreditCard },
+    ],
+    // Add other sections as needed
   }
 
-  // Find the navigation item for the current section
-  const currentNavItem = navigationItems.find((item) => item.section === currentSection)
+  const commonItems = [
+    { name: "Help", href: "/help", icon: BookOpen },
+    { name: "Settings", href: "/settings", icon: Settings },
+  ]
 
-  // IMPORTANT: Modified condition.
-  // Only return null if there's no currentNavItem AND it's not one of the custom sections ("admin", "sales")
-  if (!currentNavItem && currentSection !== "admin" && currentSection !== "sales") {
-    return null
-  }
-
-  const SectionIcon = currentNavItem?.icon // Use optional chaining as currentNavItem might be undefined for custom sections
+  const renderNavItems = (items: NavigationItem[]) => (
+    <nav className="grid items-start gap-2">
+      {items.map((item, index) => (
+        <div key={index}>
+          <Link
+            href={item.href}
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-300 transition-all hover:text-white hover:bg-sidebar-hover",
+              pathname === item.href && "bg-sidebar-active text-white",
+            )}
+          >
+            <item.icon className="h-4 w-4" />
+            {item.name}
+            {item.badge !== undefined && item.badge > 0 && (
+              <Badge className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white text-xs">
+                {item.badge}
+              </Badge>
+            )}
+          </Link>
+          {item.subItems && (
+            <div className="ml-6 mt-1 space-y-1">
+              {item.subItems.map((subItem, subIndex) => (
+                <Link
+                  key={subIndex}
+                  href={subItem.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-400 transition-all hover:text-white hover:bg-sidebar-hover",
+                    pathname === subItem.href && "bg-sidebar-active text-white",
+                  )}
+                >
+                  <subItem.icon className="h-4 w-4" />
+                  {subItem.name}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </nav>
+  )
 
   return (
-    <div className="w-64 h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 overflow-y-auto shadow-sm">
-      <nav className="p-3 space-y-4">
-        {currentSection === "admin" ? (
-          <>
-            {/* Notification Section */}
-            <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg p-3 text-white">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
-              </div>
+    <div
+      className={cn(
+        "hidden border-r bg-sidebar-DEFAULT lg:block",
+        isMobile ? "fixed inset-y-0 left-0 z-50 w-64" : "h-screen w-64",
+      )}
+    >
+      <div className="flex h-full max-h-screen flex-col gap-2">
+        <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
+          <Link href="/" className="flex items-center gap-2 font-semibold text-white">
+            <img src="/ohplus-new-logo.png" alt="OH Plus Logo" className="h-6 w-auto" />
+            <span className="sr-only">OH Plus</span>
+          </Link>
+        </div>
+        <div className="flex-1 overflow-auto py-2">
+          {currentSection === "admin" ? (
+            <div className="px-4 lg:px-6 space-y-6">
+              {/* Notification Card */}
+              <Card className="bg-blue-500 text-white border-none shadow-none">
+                <CardHeader className="p-4 pb-2">
+                  <CardTitle className="text-lg font-semibold">Notification</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0 text-sm">
+                  <p className="mb-2">No notification for now.</p>
+                  <Button variant="link" className="text-white p-0 h-auto text-sm">
+                    See All
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* To Go Section */}
               <div className="space-y-2">
-                <p className="text-xs text-white/90">No notification for now.</p>
+                <h3 className="text-gray-400 text-sm font-medium uppercase tracking-wider">To Go</h3>
+                <nav className="grid items-start gap-2">
+                  <Link
+                    href="/admin/dashboard"
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-300 transition-all hover:text-white hover:bg-sidebar-hover",
+                      pathname === "/admin/dashboard" && "bg-sidebar-active text-white",
+                    )}
+                  >
+                    <LayoutDashboard className="h-4 w-4" />
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/admin/bulletin-board" // Assuming this route exists or will be created
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-300 transition-all hover:text-white hover:bg-sidebar-hover",
+                      pathname === "/admin/bulletin-board" && "bg-sidebar-active text-white",
+                    )}
+                  >
+                    <ClipboardList className="h-4 w-4" />
+                    Bulletin Board
+                  </Link>
+                </nav>
               </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
-              </div>
-            </div>
 
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-              <div className="px-3 py-2 border-b border-gray-100">
-                <h3 className="text-sm font-medium text-gray-700">To Go</h3>
-              </div>
-              <div className="p-1">
-                {[
-                  { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard }, // Updated href
-                  { title: "Bulletin Board", href: "/admin/bulletin-board", icon: ClipboardList },
-                ].map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(pathname, item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
-                        active
-                          ? "bg-gray-100 text-gray-900 font-medium"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                      )}
-                    >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                      <span className="flex-1">{item.title}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-              <div className="px-3 py-2 border-b border-gray-100">
-                <h3 className="text-sm font-medium text-gray-700">To Do</h3>
-              </div>
-              <div className="p-1">
-                {[
-                  { title: "Documents", href: "/admin/documents", icon: FileText },
-                  { title: "Inventory", href: "/admin/inventory", icon: Package },
-                  { title: "User Management", href: "/admin/access-management", icon: Users },
-                  { title: "Subscription", href: "/admin/subscriptions", icon: FileText }, // Updated href
-                ].map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(pathname, item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
-                        active
-                          ? "bg-gray-100 text-gray-900 font-medium"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                      )}
-                    >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                      <span className="flex-1">{item.title}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Intelligence Section */}
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
-              <div className="flex items-center space-x-2 mb-3">
-                <h3 className="text-sm font-medium">Intelligence</h3>
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <div className="relative">
-                <div className="flex items-center space-x-2">
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <div className="flex-1 grid grid-cols-2 gap-2">
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                  </div>
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
-              </div>
-            </div>
-          </>
-        ) : currentSection === "sales" ? (
-          // Special grouped layout for sales
-          <>
-            {/* Notification Section */}
-            <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg p-3 text-white">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
-              </div>
+              {/* To Do Section */}
               <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                    <AvatarFallback className="bg-white/20 text-white text-xs">JD</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/30 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/20 rounded-full w-3/4"></div>
+                <h3 className="text-gray-400 text-sm font-medium uppercase tracking-wider">To Do</h3>
+                <nav className="grid items-start gap-2">
+                  <Link
+                    href="/admin/documents" // Assuming this route exists or will be created
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-300 transition-all hover:text-white hover:bg-sidebar-hover",
+                      pathname === "/admin/documents" && "bg-sidebar-active text-white",
+                    )}
+                  >
+                    <FileText className="h-4 w-4" />
+                    Documents
+                  </Link>
+                  <Link
+                    href="/admin/inventory" // Assuming this route exists or will be created
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-300 transition-all hover:text-white hover:bg-sidebar-hover",
+                      pathname === "/admin/inventory" && "bg-sidebar-active text-white",
+                    )}
+                  >
+                    <Package className="h-4 w-4" />
+                    Inventory
+                  </Link>
+                  <Link
+                    href="/admin/user-management" // Assuming this route exists or will be created
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-300 transition-all hover:text-white hover:bg-sidebar-hover",
+                      pathname === "/admin/user-management" && "bg-sidebar-active text-white",
+                    )}
+                  >
+                    <Users className="h-4 w-4" />
+                    User Management
+                  </Link>
+                  <Link
+                    href="/admin/subscriptions"
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-300 transition-all hover:text-white hover:bg-sidebar-hover",
+                      pathname === "/admin/subscriptions" && "bg-sidebar-active text-white",
+                    )}
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    Subscription
+                  </Link>
+                </nav>
+              </div>
+
+              {/* Intelligence Card */}
+              <Card className="bg-purple-600 text-white border-none shadow-none">
+                <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
+                  <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                    Intelligence <Sparkles className="h-4 w-4" />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  <div className="flex items-center justify-between mb-2">
+                    <Button variant="ghost" size="icon" className="text-white hover:bg-purple-700">
+                      <ChevronLeft className="h-5 w-5" />
+                    </Button>
+                    <div className="flex gap-2">
+                      <div className="h-10 w-16 bg-purple-700 rounded-md" />
+                      <div className="h-10 w-16 bg-purple-700 rounded-md" />
+                    </div>
+                    <Button variant="ghost" size="icon" className="text-white hover:bg-purple-700">
+                      <ChevronRight className="h-5 w-5" />
+                    </Button>
                   </div>
-                  <button className="w-2 h-2 bg-white rounded-full"></button>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                    <AvatarFallback className="bg-white/20 text-white text-xs">SM</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/30 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/20 rounded-full w-2/3"></div>
-                  </div>
-                  <button className="w-2 h-2 bg-white rounded-full"></button>
-                </div>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
-              </div>
+                  <Button variant="link" className="text-white p-0 h-auto text-sm">
+                    See All
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-              <div className="px-3 py-2 border-b border-gray-100">
-                <h3 className="text-sm font-medium text-gray-700">To Do</h3>
-              </div>
-              <div className="p-1">
-                {[
-                  { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
-                  { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
-                  { title: "Bulletin Board", href: "/sales/bulletin-board", icon: ClipboardList }, // New item
-                ].map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(pathname, item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
-                        active
-                          ? "bg-gray-100 text-gray-900 font-medium"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                      )}
-                    >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                      <span className="flex-1">{item.title}</span>
-                      {item.href === "/sales/chat" && unreadCount > 0 && (
-                        <Badge
-                          variant="destructive"
-                          className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
-                        >
-                          {unreadCount > 99 ? "99+" : unreadCount}
-                        </Badge>
-                      )}
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-              <div className="px-3 py-2 border-b border-gray-100">
-                <h3 className="text-sm font-medium text-gray-700">To Go</h3>
-              </div>
-              <div className="p-1">
-                {[
-                  { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
-                  { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
-                  { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
-                  { title: "Clients", href: "/sales/clients", icon: Users },
-                  { title: "Billings", href: "#", icon: FileText }, // Added Billings here
-                  { title: "Planner", href: "/sales/planner", icon: Calendar },
-                  { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
-                ].map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(pathname, item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
-                        active
-                          ? "bg-gray-100 text-gray-900 font-medium"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                      )}
-                    >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                      <span className="flex-1">{item.title}</span>
-                      {item.href === "/sales/chat" && unreadCount > 0 && (
-                        <Badge
-                          variant="destructive"
-                          className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
-                        >
-                          {unreadCount > 99 ? "99+" : unreadCount}
-                        </Badge>
-                      )}
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Intelligence Section */}
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
-              <div className="flex items-center space-x-2 mb-3">
-                <h3 className="text-sm font-medium">Intelligence</h3>
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <div className="relative">
-                <div className="flex items-center space-x-2">
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <div className="flex-1 grid grid-cols-2 gap-2">
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                  </div>
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
-              </div>
-            </div>
-          </>
-        ) : (
-          // Default layout for other sections
-          currentNavItem?.items.map((item) => {
-            // Use optional chaining here
-            const Icon = item.icon
-            const active = isActive(pathname, item.href)
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center py-2.5 px-3 text-sm rounded-md mx-2 my-1 transition-all duration-200",
-                  active
-                    ? "bg-gray-200 text-gray-900 font-medium shadow-sm"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
-                )}
-              >
-                <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                <span className="flex-1">{item.title}</span>
-                {item.href === "/sales/chat" && unreadCount > 0 && (
-                  <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </Badge>
-                )}
-                {active && <div className="ml-auto w-1 h-5 bg-gray-700 rounded-full"></div>}
-              </Link>
-            )
-          })
-        )}
-      </nav>
+          ) : (
+            renderNavItems(navigationItems[currentSection] || [])
+          )}
+        </div>
+        <div className="mt-auto p-4 border-t border-gray-700">{renderNavItems(commonItems)}</div>
+      </div>
     </div>
   )
 }

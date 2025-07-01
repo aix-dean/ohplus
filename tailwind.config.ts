@@ -53,23 +53,23 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Custom colors for department cards
-        salesHeader: "#EF4444", // Red
-        logisticsHeader: "#3B82F6", // Blue
-        accountingHeader: "#EC4899", // Pink
-        treasuryHeader: "#22C55E", // Green
-        itHeader: "#14B8A6", // Teal
-        fleetHeader: "#6B7280", // Gray
-        creativesHeader: "#F97316", // Orange
-        financeHeader: "#84CC16", // Lime Green
-        mediaHeader: "#2DD4BF", // Cyan
-        businessDevHeader: "#FACC15", // Yellow
-        legalHeader: "#EF4444", // Red (duplicate from sales, based on screenshot)
-        corporateHeader: "#3B82F6", // Blue (duplicate from logistics, based on screenshot)
-        hrHeader: "#EC4899", // Pink (duplicate from accounting, based on screenshot)
-        specialTeamHeader: "#6B7280", // Gray (duplicate from fleet, based on screenshot)
-        marketingHeader: "#EF4444", // Red (duplicate from sales, based on screenshot)
-        addDepartmentHeader: "#374151", // Dark Gray/Black
+        // Custom colors for department cards - refined to match screenshot
+        salesHeader: "#F87171", // Red
+        logisticsHeader: "#60A5FA", // Blue
+        accountingHeader: "#E879F9", // Pink/Purple
+        treasuryHeader: "#34D399", // Green
+        itHeader: "#2DD4BF", // Teal
+        fleetHeader: "#9CA3AF", // Gray
+        creativesHeader: "#FB923C", // Orange
+        financeHeader: "#A3E635", // Light Green
+        mediaHeader: "#22D3EE", // Cyan
+        businessDevHeader: "#8B5CF6", // Darker Purple/Blue
+        legalHeader: "#F87171", // Red (same as sales)
+        corporateHeader: "#3B82F6", // Blue (similar to logistics)
+        hrHeader: "#F472B6", // Bright Pink
+        specialTeamHeader: "#A78BFA", // Medium Purple
+        marketingHeader: "#EF4444", // Red (slightly darker red)
+        addDepartmentHeader: "#4B5563", // Dark Gray/Black
       },
       borderRadius: {
         lg: "var(--radius)",
