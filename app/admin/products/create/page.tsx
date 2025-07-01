@@ -445,7 +445,7 @@ export default function AdminProductCreatePage() {
   const isDynamicContent = formData.content_type === "Dynamic(LED)"
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4 sm:p-6 lg:p-8">
+    <main className="flex min-h-screen flex-col items-center justify-start bg-gray-50 p-4 sm:p-6 lg:p-8 pt-8">
       <Card className="w-full max-w-2xl shadow-lg">
         <CardHeader className="pb-4">
           <CardTitle className="text-3xl font-extrabold text-gray-900">Create New Product</CardTitle>
