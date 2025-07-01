@@ -1,9 +1,8 @@
 "use client"
 
-import React from "react"
-
+import React, { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Menu, Bell, Search, Settings, LogOut, User, ChevronLeft } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -30,9 +29,11 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { useResponsive } from "@/hooks/use-responsive"
+import { SideNavigation } from "./side-navigation" // Assuming this component exists for mobile sheet
 
 interface FixedHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
-  onMenuClick: () => void
+  // onMenuClick: () => void // This prop is no longer needed as SheetTrigger handles it
 }
 
 interface BreadcrumbItemData {
@@ -41,13 +42,18 @@ interface BreadcrumbItemData {
   isPage?: boolean
 }
 
-export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderProps) {
+export function FixedHeader({ className, ...props }: FixedHeaderProps) {
   const { user, userData, signOut } = useAuth()
   const { unreadCount } = useUnreadMessages()
   const isAdmin = useIsAdmin()
   const pathname = usePathname()
+  const router = useRouter()
+  const { isMobile } = useResponsive()
+  const [isSalesOrLogisticsDashboard, setIsSalesOrLogisticsDashboard] = useState(false)
 
-  const isAdminPage = pathname.startsWith("/admin")
+  useEffect(() => {
+    setIsSalesOrLogisticsDashboard(pathname === "/sales/dashboard" || pathname === "/logistics/dashboard")
+  }, [pathname])
 
   const getBreadcrumbs = (path: string): BreadcrumbItemData[] => {
     const segments = path.split("/").filter(Boolean)
@@ -143,43 +149,45 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
   const breadcrumbs = getBreadcrumbs(pathname)
 
   const showAdminBackButton =
-    (pathname.startsWith("/admin/") && pathname !== "/admin/dashboard") ||
-    pathname.startsWith("/sales/dashboard") ||
-    pathname.startsWith("/logistics/dashboard")
+    (pathname.startsWith("/admin/") && pathname !== "/admin/dashboard") || isSalesOrLogisticsDashboard
+
+  const isAdminPage = pathname.startsWith("/admin/")
 
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 px-4 sm:static sm:h-auto",
-        isAdminPage ? "bg-[#5B21B6]" : "bg-rose-600", // Conditional background color
+        "sticky top-0 z-30 flex h-16 items-center gap-4 border-b px-4 shrink-0 md:px-6",
+        isAdminPage ? "bg-[#5B21B6]" : "bg-rose-600", // Dynamic background color
         className,
       )}
       {...props}
     >
-      {/* New: Back button for admin sub-pages, sales dashboard, and logistics dashboard */}
-      {showAdminBackButton && (
-        <Link href="/admin/dashboard" passHref>
-          <Button
-            variant="default"
-            className="bg-black hover:bg-black/90 text-white rounded-full px-4 py-2 flex items-center gap-1"
-          >
-            <ChevronLeft className="h-4 w-4" /> Admin
-          </Button>
-        </Link>
+      {isMobile && (
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="shrink-0 text-white md:hidden">
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Toggle navigation menu</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="flex flex-col">
+            {/* Assuming SideNavigation is available and correctly imported */}
+            <SideNavigation />
+          </SheetContent>
+        </Sheet>
       )}
-      <Sheet>
-        <SheetTrigger asChild>
-          <Button size="icon" variant="outline" className="sm:hidden bg-transparent" onClick={onMenuClick}>
-            <Menu className="h-5 w-5" />
-            <span className="sr-only">Toggle Menu</span>
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="sm:max-w-xs">
-          {/* Mobile navigation content would go here, if needed */}
-        </SheetContent>
-      </Sheet>
-      {/* Replaced h1 with Breadcrumb component */}
-      <Breadcrumb>
+
+      {showAdminBackButton && (
+        <Button
+          variant="default"
+          className="flex items-center gap-1 rounded-full bg-black text-white hover:bg-black/90"
+          onClick={() => router.push("/admin/dashboard")}
+        >
+          <ChevronLeft className="h-4 w-4" /> Admin
+        </Button>
+      )}
+
+      <Breadcrumb className="hidden md:flex">
         <BreadcrumbList className="text-white">
           {breadcrumbs.map((item, index) => (
             <React.Fragment key={index}>
@@ -211,6 +219,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           ))}
         </BreadcrumbList>
       </Breadcrumb>
+
       <div className="relative ml-auto flex-1 md:grow-0">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white" />
         <Input
@@ -218,20 +227,13 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           placeholder="Search..."
           className={cn(
             "w-full rounded-lg placeholder:text-gray-300 text-white pl-8 md:w-[200px] lg:w-[336px]",
-            isAdminPage ? "bg-[#4A1C92]" : "bg-gray-700", // Conditional search input background
+            isAdminPage ? "bg-[#6D28D9]" : "bg-rose-700", // Dynamic search input background
           )}
         />
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "relative rounded-full text-white",
-              isAdminPage ? "hover:bg-[#6F29D0]" : "hover:bg-rose-500", // Conditional hover color
-            )}
-          >
+          <Button variant="ghost" size="icon" className="relative rounded-full text-white hover:bg-opacity-80">
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
@@ -249,14 +251,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
       </DropdownMenu>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "overflow-hidden rounded-full text-white",
-              isAdminPage ? "hover:bg-[#6F29D0]" : "hover:bg-rose-500", // Conditional hover color
-            )}
-          >
+          <Button variant="ghost" size="icon" className="overflow-hidden rounded-full text-white hover:bg-opacity-80">
             <Avatar>
               <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} alt="User Avatar" />
               <AvatarFallback>
@@ -282,8 +277,6 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           {isAdmin && (
             <DropdownMenuItem asChild>
               <Link href="/admin/dashboard">
-                {" "}
-                {/* Updated link to admin dashboard */}
                 <Settings className="mr-2 h-4 w-4" />
                 Admin
               </Link>
