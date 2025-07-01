@@ -144,8 +144,6 @@ export default function SubscriptionPage() {
   return (
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        {/* Removed the Separator component */}
-
         <Card className="mx-auto max-w-4xl rounded-xl shadow-sm">
           <CardHeader className="border-b p-6">
             <CardTitle className="text-xl font-bold text-gray-900">Your Current Subscription</CardTitle>
@@ -196,8 +194,14 @@ export default function SubscriptionPage() {
             .map((plan) => (
               <>
                 {plan.id === "solo" && ( // Conditionally render PromoBanner before "solo" plan
-                  <div className="col-span-full">
-                    <PromoBanner promoEndDate={promoEndDate} />
+                  <div className="col-span-full flex justify-center">
+                    {" "}
+                    {/* Added flex justify-center */}
+                    <div className="max-w-xs w-full">
+                      {" "}
+                      {/* Added max-w-xs and w-full */}
+                      <PromoBanner promoEndDate={promoEndDate} />
+                    </div>
                   </div>
                 )}
                 <Card
