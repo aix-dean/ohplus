@@ -145,19 +145,18 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
     pathname.startsWith("/sales/dashboard") ||
     pathname.startsWith("/logistics/dashboard")
 
-  // New: Determine if the current path is an admin page
+  // Determine if the current path is an admin page
   const isAdminPage = pathname.startsWith("/admin")
 
   return (
     <header
-      className={cn(
-        "sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 px-4 sm:static sm:h-auto",
-        isAdminPage ? "bg-[#673AB7]" : "bg-rose-600", // Conditional background color
-        className,
-      )}
+      className={cn("sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 px-4 sm:static sm:h-auto", className)}
+      style={{
+        backgroundColor: isAdminPage ? "#673AB7" : "#e11d48", // Using inline style to ensure it takes precedence
+      }}
       {...props}
     >
-      {/* New: Back button for admin sub-pages, sales dashboard, and logistics dashboard */}
+      {/* Back button for admin sub-pages, sales dashboard, and logistics dashboard */}
       {showAdminBackButton && (
         <Link href="/admin/dashboard" passHref>
           <Button
@@ -179,7 +178,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           {/* Mobile navigation content would go here, if needed */}
         </SheetContent>
       </Sheet>
-      {/* Replaced h1 with Breadcrumb component */}
+      {/* Breadcrumb component */}
       <Breadcrumb>
         <BreadcrumbList className="text-white">
           {breadcrumbs.map((item, index) => (
@@ -222,7 +221,20 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
       </div>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="relative rounded-full text-white hover:bg-rose-500">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative rounded-full text-white"
+            style={{
+              backgroundColor: "transparent",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = isAdminPage ? "rgba(103, 58, 183, 0.8)" : "rgba(244, 63, 94, 0.8)"
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent"
+            }}
+          >
             <Bell className="h-5 w-5" />
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
@@ -240,7 +252,20 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
       </DropdownMenu>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="overflow-hidden rounded-full text-white hover:bg-rose-500">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="overflow-hidden rounded-full text-white"
+            style={{
+              backgroundColor: "transparent",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = isAdminPage ? "rgba(103, 58, 183, 0.8)" : "rgba(244, 63, 94, 0.8)"
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent"
+            }}
+          >
             <Avatar>
               <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} alt="User Avatar" />
               <AvatarFallback>
@@ -266,8 +291,6 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           {isAdmin && (
             <DropdownMenuItem asChild>
               <Link href="/admin/dashboard">
-                {" "}
-                {/* Updated link to admin dashboard */}
                 <Settings className="mr-2 h-4 w-4" />
                 Admin
               </Link>
