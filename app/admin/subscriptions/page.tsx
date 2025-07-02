@@ -58,8 +58,7 @@ export default function SubscriptionPage() {
     const timer = setInterval(calculateTimeLeft, 1000)
 
     return () => clearInterval(timer)
-  }, []) // Removed promoEndDate from dependency array as it's now a stable outside reference
-  // The effect only needs to run once on mount and clean up on unmount.
+  }, [])
 
   const handleUpgrade = useCallback(
     async (planId: string) => {
@@ -98,47 +97,30 @@ export default function SubscriptionPage() {
         const newPlanType: SubscriptionPlanType = selectedPlan.id as SubscriptionPlanType
         const billingCycle: BillingCycle = selectedPlan.billingCycle === "N/A" ? "monthly" : selectedPlan.billingCycle
 
-        let success = false
-        if (subscriptionData) {
-          try {
-            await subscriptionService.updateSubscription(userData.license_key, {
-              planType: newPlanType,
-              billingCycle: billingCycle,
-              status: "active",
-              startDate: new Date(),
-              trialEndDate: null,
-            })
-            success = true
-            toast({
-              title: "Subscription Updated",
-              description: `Your plan has been updated to ${selectedPlan.name}.`,
-            })
-          } catch (updateError: any) {
-            console.warn("Failed to update subscription, attempting to create instead:", updateError)
-            await subscriptionService.createSubscription(userData.license_key, newPlanType, billingCycle, user.uid)
-            success = true
-            toast({
-              title: "Subscription Activated",
-              description: `Welcome to the ${selectedPlan.name}! (New subscription created)`,
-            })
-          }
-        } else {
-          await subscriptionService.createSubscription(userData.license_key, newPlanType, billingCycle, user.uid)
-          success = true
-          toast({
-            title: "Subscription Activated",
-            description: `Welcome to the ${selectedPlan.name}!`,
-          })
-        }
+        // Always create a new subscription document
+        await subscriptionService.createSubscription(
+          userData.license_key,
+          newPlanType,
+          billingCycle,
+          user.uid,
+          new Date(), // Start date is now
+          null, // Let the service calculate end date
+          "active", // New subscription is active
+          null, // Let the service calculate max products
+          null, // No trial for new paid plans
+        )
 
-        if (success) {
-          await refreshSubscriptionData()
-        }
+        toast({
+          title: "Subscription Activated",
+          description: `Welcome to the ${selectedPlan.name}! Your new subscription has been created.`,
+        })
+
+        await refreshSubscriptionData()
       } catch (error: any) {
         console.error("Failed to select plan:", error)
         toast({
           title: "Error",
-          description: `Failed to update subscription: ${error instanceof Error ? error.message : String(error)}`,
+          description: `Failed to activate subscription: ${error instanceof Error ? error.message : String(error)}`,
           variant: "destructive",
         })
       } finally {
@@ -146,7 +128,7 @@ export default function SubscriptionPage() {
         setSelectedPlanId(null)
       }
     },
-    [user, userData, subscriptionData, plans, refreshSubscriptionData, toast],
+    [user, userData, plans, refreshSubscriptionData, toast],
   )
 
   const isCurrentPlan = useCallback(
