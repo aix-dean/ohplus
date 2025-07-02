@@ -164,7 +164,7 @@ export default function SubscriptionPage() {
         {/* Current Plan Details Section */}
         {subscriptionData && (
           <div className="mb-12">
-            <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl mb-6">
+            <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl mb-6">
               Current Plan:{" "}
               <span
                 className={cn(
@@ -184,7 +184,7 @@ export default function SubscriptionPage() {
               {/* Plan Card */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
-                  <CardTitle className="text-xl font-bold">Plan</CardTitle>
+                  <CardTitle className="text-lg font-bold">Plan</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
@@ -214,7 +214,7 @@ export default function SubscriptionPage() {
               {/* Cycle Card */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
-                  <CardTitle className="text-xl font-bold">Cycle</CardTitle>
+                  <CardTitle className="text-lg font-bold">Cycle</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
@@ -232,7 +232,7 @@ export default function SubscriptionPage() {
               {/* Users Card (Placeholder Data) */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
-                  <CardTitle className="text-xl font-bold">Users</CardTitle>
+                  <CardTitle className="text-lg font-bold">Users</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
@@ -248,7 +248,7 @@ export default function SubscriptionPage() {
               {/* Inventory Card (Placeholder Data) */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
-                  <CardTitle className="text-xl font-bold">Inventory</CardTitle>
+                  <CardTitle className="text-lg font-bold">Inventory</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
