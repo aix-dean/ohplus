@@ -11,14 +11,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FirebaseError } from "firebase/app"
 import { Separator } from "@/components/ui/separator"
 import { ChromeIcon, FacebookIcon } from "lucide-react" // Using Lucide React for icons
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function RegisterPage() {
-  const [step, setStep] = useState(1) // 1 for personal info, 2 for password
-  const [userName, setUserName] = useState("") // Combines first and last name for UI
+  const [step, setStep] = useState(1) // 1 for personal info, 2 for password and company info
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [middleName, setMiddleName] = useState("")
+  const [companyName, setCompanyName] = useState("")
+  const [companyLocation, setCompanyLocation] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
+  const [gender, setGender] = useState("")
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -48,8 +54,8 @@ export default function RegisterPage() {
 
   const handleNext = () => {
     setErrorMessage(null)
-    if (!userName || !phoneNumber || !email) {
-      setErrorMessage("Please fill in all required fields.")
+    if (!firstName || !lastName || !email || !phoneNumber || !gender) {
+      setErrorMessage("Please fill in all required personal information fields.")
       return
     }
     setStep(2)
@@ -63,23 +69,25 @@ export default function RegisterPage() {
       return
     }
 
+    if (!companyName || !companyLocation) {
+      setErrorMessage("Please fill in all required company information fields.")
+      return
+    }
+
     setLoading(true)
     try {
-      // For "User Name", we'll use it as first_name and leave last_name empty
-      // middle_name, gender, company_name, company_location are not in the new UI,
-      // so we pass empty strings to maintain the register function signature.
       await register(
         {
           email,
-          first_name: userName, // Using userName for first_name
-          last_name: "", // Not collected in new UI
-          middle_name: "", // Not collected in new UI
+          first_name: firstName,
+          last_name: lastName,
+          middle_name: middleName,
           phone_number: phoneNumber,
-          gender: "", // Not collected in new UI
+          gender: gender,
         },
         {
-          company_name: "", // Not collected in new UI
-          company_location: "", // Not collected in new UI
+          company_name: companyName,
+          company_location: companyLocation,
         },
         password,
       )
@@ -125,14 +133,35 @@ export default function RegisterPage() {
           <CardContent>
             {step === 1 && (
               <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      placeholder="John"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      placeholder="Doe"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
                 <div className="space-y-2">
-                  <Label htmlFor="userName">User Name</Label>
+                  <Label htmlFor="middleName">Middle Name (Optional)</Label>
                   <Input
-                    id="userName"
-                    placeholder="John Doe"
-                    value={userName}
-                    onChange={(e) => setUserName(e.target.value)}
-                    required
+                    id="middleName"
+                    placeholder=""
+                    value={middleName}
+                    onChange={(e) => setMiddleName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
@@ -155,6 +184,19 @@ export default function RegisterPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="gender">Gender</Label>
+                  <Select value={gender} onValueChange={setGender} required>
+                    <SelectTrigger id="gender">
+                      <SelectValue placeholder="Select Gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Male">Male</SelectItem>
+                      <SelectItem value="Female">Female</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Separator className="my-6" />
                 <div className="relative flex justify-center text-xs uppercase">
@@ -197,6 +239,26 @@ export default function RegisterPage() {
 
             {step === 2 && (
               <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="companyName">Company Name</Label>
+                  <Input
+                    id="companyName"
+                    placeholder="Acme Corp"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="companyLocation">Company Location</Label>
+                  <Input
+                    id="companyLocation"
+                    placeholder="New York, NY"
+                    value={companyLocation}
+                    onChange={(e) => setCompanyLocation(e.target.value)}
+                    required
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
                   <Input
