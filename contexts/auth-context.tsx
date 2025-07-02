@@ -67,7 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
     try {
-      const userDocRef = doc(db, "users", firebaseUser.uid)
+      // Corrected collection name to "iboard_users"
+      const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
       const userDocSnap = await getDoc(userDocRef)
 
       let fetchedUserData: UserData
@@ -84,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ...data, // Spread any other fields
         }
       } else {
-        // If user document doesn't exist, create a basic one
+        // If user document doesn't exist, create a basic one in "iboard_users"
         fetchedUserData = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -153,7 +154,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const assignLicenseKey = useCallback(
     async (uid: string, licenseKey: string) => {
       try {
-        const userDocRef = doc(db, "users", uid)
+        // Corrected collection name to "iboard_users"
+        const userDocRef = doc(db, "iboard_users", uid)
         await setDoc(userDocRef, { license_key: licenseKey }, { merge: true })
         // Update local state immediately
         setUserData((prev) => (prev ? { ...prev, license_key: licenseKey } : null))
@@ -188,8 +190,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const licenseKey = generateLicenseKey() // Generate a new license key
 
-      // Create user document
-      const userDocRef = doc(db, "users", firebaseUser.uid)
+      // Create user document in "iboard_users"
+      const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
       await setDoc(userDocRef, {
         email: firebaseUser.email,
         uid: firebaseUser.uid,
@@ -243,7 +245,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateUserData = async (updates: Partial<UserData>) => {
     if (!user) throw new Error("User not authenticated.")
-    const userDocRef = doc(db, "users", user.uid)
+    // Corrected collection name to "iboard_users"
+    const userDocRef = doc(db, "iboard_users", user.uid)
     const updatedFields = { ...updates, updated: serverTimestamp() }
     await updateDoc(userDocRef, updatedFields)
     // Optimistically update state
