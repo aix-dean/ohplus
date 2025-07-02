@@ -1,5 +1,3 @@
-"use client"
-
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
@@ -11,28 +9,19 @@ interface PromoBannerProps {
 
 export function PromoBanner({ className }: PromoBannerProps) {
   return (
-    <Card
-      className={cn(
-        "relative flex items-center justify-between p-4 rounded-xl shadow-lg overflow-hidden",
-        "bg-gradient-to-r from-green-500 to-green-600 text-white",
-        className,
-      )}
-    >
-      {/* Badge */}
-      <div className="absolute -left-8 -top-8 h-24 w-24 bg-red-500 rounded-full flex items-center justify-center transform -rotate-45">
-        <div className="text-center text-white font-bold text-xs transform rotate-45">
-          GRAPHIC EXPO
-          <br />
-          '25 PROMO
+    <Card className={cn("rounded-xl border-2 shadow-sm", className)}>
+      <CardContent className="flex items-center justify-between p-4">
+        <div className="relative flex items-center justify-center h-16 w-16 rounded-full bg-red-500 text-white text-center font-bold text-xs uppercase mr-4 flex-shrink-0">
+          <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">GRAPHIC EXPO '25 PROMO</span>
         </div>
-      </div>
-
-      <CardContent className="flex flex-1 items-center justify-center p-0 pl-16">
-        <div className="text-3xl font-extrabold tracking-tight">90 DAYS FREE TRIAL</div>
+        <div className="flex-grow text-center">
+          <h2 className="text-3xl font-extrabold">90 DAYS FREE TRIAL</h2>
+          <p className="text-sm mt-1">Limited time offer for new sign-ups!</p>
+        </div>
+        <Button variant="secondary" className="ml-4 flex-shrink-0">
+          GET NOW <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
       </CardContent>
-      <Button variant="secondary" className="bg-white text-green-600 hover:bg-gray-100">
-        GET NOW <ArrowRight className="ml-2 h-4 w-4" />
-      </Button>
     </Card>
   )
 }

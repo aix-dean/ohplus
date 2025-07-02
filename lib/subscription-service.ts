@@ -1,77 +1,234 @@
-import { db } from "./firebase"
+import { db } from "@/lib/firebase"
 import {
   collection,
-  addDoc,
   query,
   where,
   getDocs,
-  updateDoc,
   doc,
+  addDoc,
   serverTimestamp,
-  orderBy,
-  limit,
+  Timestamp,
+  updateDoc,
+  orderBy, // Import orderBy
+  limit, // Import limit
 } from "firebase/firestore"
-import type { Subscription, SubscriptionPlan, BillingCycle, SubscriptionPlanType } from "./types/subscription"
+import {
+  type Subscription,
+  type SubscriptionPlanType,
+  type BillingCycle,
+  type SubscriptionStatus,
+  calculateSubscriptionEndDate,
+  getMaxProductsForPlan,
+} from "@/lib/types/subscription"
+import type { SubscriptionPlan } from "./types/subscription"
 
+export const subscriptionService = {
+  async createSubscription(
+    licenseKey: string,
+    planType: SubscriptionPlanType,
+    billingCycle: BillingCycle,
+    uid: string,
+    startDate: Date = new Date(),
+    endDate: Date | null = null,
+    status: SubscriptionStatus = "active",
+    maxProducts: number | null = null,
+    trialEndDate: Date | null = null,
+  ): Promise<Subscription> {
+    console.log("subscriptionService: Creating subscription for licenseKey:", licenseKey)
+
+    const { endDate: calculatedEndDate, trialEndDate: calculatedTrialEndDate } = calculateSubscriptionEndDate(
+      planType,
+      billingCycle,
+      startDate,
+    )
+
+    const subscriptionData = {
+      licenseKey,
+      planType,
+      billingCycle,
+      uid,
+      startDate: startDate, // Store as Date object, Firestore will convert to Timestamp
+      endDate: endDate || calculatedEndDate, // Use provided or calculated
+      status,
+      maxProducts: maxProducts || getMaxProductsForPlan(planType),
+      trialEndDate: trialEndDate || calculatedTrialEndDate, // Use provided or calculated
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }
+
+    // Use addDoc to let Firestore generate the document ID
+    const docRef = await addDoc(collection(db, "subscriptions"), subscriptionData)
+    console.log("subscriptionService: Subscription created with ID:", docRef.id)
+
+    // Return the created subscription with the Firestore ID and converted dates
+    const newSubscription: Subscription = {
+      id: docRef.id,
+      licenseKey,
+      planType,
+      billingCycle,
+      uid,
+      startDate: startDate,
+      endDate: endDate || calculatedEndDate,
+      status,
+      maxProducts: maxProducts || getMaxProductsForPlan(planType),
+      trialEndDate: trialEndDate || calculatedTrialEndDate,
+      createdAt: new Date(), // Approximate, will be updated on next fetch
+      updatedAt: new Date(), // Approximate, will be updated on next fetch
+    }
+    return newSubscription
+  },
+
+  async getSubscriptionByLicenseKey(licenseKey: string): Promise<Subscription | null> {
+    console.log("subscriptionService: Fetching subscription for licenseKey:", licenseKey)
+    const subscriptionsRef = collection(db, "subscriptions")
+    // Query for the license key, order by createdAt descending, and limit to 1 to get the latest
+    const q = query(subscriptionsRef, where("licenseKey", "==", licenseKey), orderBy("createdAt", "desc"), limit(1))
+    const querySnapshot = await getDocs(q)
+
+    if (querySnapshot.empty) {
+      console.log("subscriptionService: No subscription found for licenseKey:", licenseKey)
+      return null
+    }
+
+    const docSnap = querySnapshot.docs[0]
+    const data = docSnap.data()
+
+    // Convert Firestore Timestamps to JavaScript Date objects
+    const subscription: Subscription = {
+      id: docSnap.id,
+      licenseKey: data.licenseKey,
+      planType: data.planType,
+      billingCycle: data.billingCycle,
+      uid: data.uid,
+      startDate: data.startDate instanceof Timestamp ? data.startDate.toDate() : data.startDate,
+      endDate: data.endDate instanceof Timestamp ? data.endDate.toDate() : data.endDate,
+      status: data.status,
+      maxProducts: data.maxProducts,
+      trialEndDate: data.trialEndDate instanceof Timestamp ? data.trialEndDate.toDate() : data.trialEndDate,
+      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : data.createdAt,
+      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : data.updatedAt,
+    }
+    console.log("subscriptionService: Found subscription:", subscription)
+    return subscription
+  },
+
+  async updateSubscription(licenseKey: string, updates: Partial<Subscription>): Promise<void> {
+    console.log("subscriptionService: Updating subscription for licenseKey:", licenseKey, "with updates:", updates)
+    const subscriptionsRef = collection(db, "subscriptions")
+    const q = query(subscriptionsRef, where("licenseKey", "==", licenseKey))
+    const querySnapshot = await getDocs(q)
+
+    if (querySnapshot.empty) {
+      console.error("subscriptionService: No subscription found to update for licenseKey:", licenseKey)
+      // Throw an error that can be caught by the caller to handle creation fallback
+      throw new Error("Subscription document not found for update.")
+    }
+
+    const docRef = doc(db, "subscriptions", querySnapshot.docs[0].id)
+
+    // Prepare updates, converting Date objects to serverTimestamp if present
+    const updateData: { [key: string]: any } = { ...updates }
+    if (updateData.startDate instanceof Date) {
+      updateData.startDate = updateData.startDate
+    }
+    if (updateData.endDate instanceof Date) {
+      updateData.endDate = updateData.endDate
+    } else if (updateData.endDate === null) {
+      updateData.endDate = null
+    }
+    if (updateData.trialEndDate instanceof Date) {
+      updateData.trialEndDate = updateData.trialEndDate
+    } else if (updateData.trialEndDate === null) {
+      updateData.trialEndDate = null
+    }
+    updateData.updatedAt = serverTimestamp()
+
+    // Recalculate endDate and trialEndDate if planType or billingCycle changes
+    if (updates.planType || updates.billingCycle || updates.startDate) {
+      const currentSubscription = querySnapshot.docs[0].data() as Subscription
+      const newPlanType = updates.planType || currentSubscription.planType
+      const newBillingCycle = updates.billingCycle || currentSubscription.billingCycle
+      const newStartDate = updates.startDate || currentSubscription.startDate
+
+      const { endDate: recalculatedEndDate, trialEndDate: recalculatedTrialEndDate } = calculateSubscriptionEndDate(
+        newPlanType,
+        newBillingCycle,
+        newStartDate instanceof Timestamp ? newStartDate.toDate() : newStartDate,
+      )
+      updateData.endDate = recalculatedEndDate
+      updateData.trialEndDate = recalculatedTrialEndDate
+      updateData.maxProducts = getMaxProductsForPlan(newPlanType)
+    }
+
+    await updateDoc(docRef, updateData)
+    console.log("subscriptionService: Subscription updated successfully for ID:", docRef.id)
+  },
+
+  getDaysRemaining(subscription: Subscription): number {
+    if (!subscription.trialEndDate) {
+      return 0
+    }
+    const today = new Date()
+    const trialEnd = new Date(subscription.trialEndDate)
+    const diffTime = trialEnd.getTime() - today.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return Math.max(0, diffDays) // Ensure it doesn't return negative days
+  },
+}
+
+// This function provides the list of available plans.
+// In a real-world scenario, these might come from a database or a payment provider.
 export const getSubscriptionPlans = (): SubscriptionPlan[] => {
   return [
     {
-      id: "trial",
-      name: "Free Trial",
-      price: 0,
-      billingCycle: "N/A",
-      description: "Explore basic features for a limited time.",
-      features: ["Access to basic features", "Limited OOH sites", "Community support"],
-      buttonText: "Start Free Trial",
-    },
-    {
       id: "solo",
       name: "Solo Plan",
+      description: "Ideal for first time users and media owners with 1-3 OOH sites.",
       price: 1500,
       billingCycle: "monthly",
-      description: "Ideal for first time users and media owners with 1-3 OOH sites.",
       features: [
         "Manage up to 3 sites",
         "FREE Listing to OOH Marketplaces",
         "FREE 1-Day onboarding training",
         "ERP + Programmatic CMS",
       ],
-      buttonText: "Upgrade to Solo",
+      buttonText: "Select Solo Plan",
     },
     {
       id: "family",
       name: "Family Plan",
+      description: "Ideal for media owners with around 5 OOH sites.",
       price: 2100,
       billingCycle: "monthly",
-      description: "Ideal for media owners with around 5 OOH sites.",
       features: [
         "Manage up to 5 sites",
         "FREE Listing to OOH Marketplaces",
         "FREE 1-Day onboarding training",
         "ERP + Programmatic CMS",
       ],
-      buttonText: "Upgrade to Family",
+      buttonText: "Select Family Plan",
     },
     {
       id: "membership",
       name: "Membership",
-      price: 30000,
-      billingCycle: "yearly",
       description: "Access exclusive perks and features from OH!Plus.",
+      price: 30000,
+      billingCycle: "annually",
       features: [
         "Manage up to 8 sites",
         "FREE Listing to OOH Marketplaces",
         "FREE 1-Day onboarding training",
-        "ERP + Programmatic CMS",
+        "ERP + Programmatic CMS + Planning",
+        "OH!Plus Lite for 3 sites",
       ],
-      buttonText: "Upgrade to Membership",
+      buttonText: "Be an OH!Plus member",
     },
     {
       id: "enterprise",
       name: "Enterprise",
-      price: 0, // Contact us for pricing
-      billingCycle: "N/A",
       description: "Tailored for large companies with extensive needs.",
+      price: 0, // Indicates "Contact Us"
+      billingCycle: "N/A",
       features: [
         "Flexible Pricing",
         "Flexible Payment Terms",
@@ -79,70 +236,26 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
         "Priority Assistance",
         "Full- Access",
       ],
-      buttonText: "Contact Us",
+      buttonText: "Let's Talk",
+    },
+    // Retaining existing plans for compatibility if needed, though they might be removed later
+    {
+      id: "trial",
+      name: "Trial Plan",
+      description: "Try out our platform for a limited time.",
+      price: 0,
+      billingCycle: "N/A",
+      features: ["60-day free trial", "Limited features", "Basic support"],
+      buttonText: "Start Free Trial",
     },
     {
       id: "graphic-expo-event",
       name: "Graphic Expo Event",
+      description: "Special plan for Graphic Expo attendees.",
       price: 0,
       billingCycle: "N/A",
-      description: "Special 90-day free trial for Graphic Expo attendees.",
-      features: ["90-day free trial", "Access to all features", "Priority support"],
-      buttonText: "Activate Trial",
+      features: ["5 Products", "Event-specific features", "Limited duration"],
+      buttonText: "Activate Event Plan",
     },
   ]
 }
-
-class SubscriptionService {
-  private subscriptionsCollection = collection(db, "subscriptions")
-
-  async createSubscription(
-    licenseKey: string,
-    planType: SubscriptionPlanType,
-    billingCycle: BillingCycle,
-    userId: string,
-    startDate: Date,
-    endDate: Date | null,
-    status: "active" | "inactive" | "trialing" | "expired" | "cancelled",
-    maxProducts: number | null,
-    trialEndDate: Date | null,
-  ): Promise<Subscription> {
-    const newSubscription: Omit<Subscription, "id"> = {
-      license_key: licenseKey,
-      planType,
-      billingCycle,
-      userId,
-      startDate,
-      endDate,
-      status,
-      maxProducts,
-      trialEndDate,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    }
-    const docRef = await addDoc(this.subscriptionsCollection, newSubscription)
-    return { id: docRef.id, ...(newSubscription as Omit<Subscription, "id">) }
-  }
-
-  async getSubscriptionByLicenseKey(licenseKey: string): Promise<Subscription | null> {
-    const q = query(
-      this.subscriptionsCollection,
-      where("license_key", "==", licenseKey),
-      orderBy("createdAt", "desc"), // Order by creation date descending
-      limit(1), // Get only the latest one
-    )
-    const querySnapshot = await getDocs(q)
-    if (!querySnapshot.empty) {
-      const doc = querySnapshot.docs[0]
-      return { id: doc.id, ...doc.data() } as Subscription
-    }
-    return null
-  }
-
-  async updateSubscription(id: string, updates: Partial<Omit<Subscription, "id">>): Promise<void> {
-    const subscriptionRef = doc(this.subscriptionsCollection, id)
-    await updateDoc(subscriptionRef, { ...updates, updatedAt: serverTimestamp() })
-  }
-}
-
-export const subscriptionService = new SubscriptionService()
