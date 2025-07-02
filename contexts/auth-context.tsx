@@ -54,7 +54,7 @@ interface ProjectData {
     instagram?: string
     youtube?: string
   }
-  license_key?: string | null // Added license_key to ProjectData interface
+  license_key?: string | null
   created?: Date
   updated?: Date
 }
@@ -235,8 +235,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         updated: serverTimestamp(),
       })
 
-      // Create a default trial subscription for the user
-      await subscriptionService.createSubscription(licenseKey, "trial", "monthly", firebaseUser.uid)
+      // Removed: Create a default trial subscription for the user
+      // await subscriptionService.createSubscription(licenseKey, "trial", "monthly", firebaseUser.uid)
 
       await fetchUserData(firebaseUser)
     } catch (error) {
