@@ -61,9 +61,8 @@ export function PromoBanner({ promoEndDate }: PromoBannerProps) {
           </div>
         </div>
         <div className="flex flex-col items-center gap-2">
-          <p className="text-lg font-semibold text-center">
-            {timeLeft.days} days : {timeLeft.hours} hours : {timeLeft.minutes} minutes :<br />
-            {timeLeft.seconds} seconds left
+          <p className="text-lg font-semibold whitespace-nowrap">
+            {timeLeft.days} days : {timeLeft.hours} hours : {timeLeft.minutes} minutes : {timeLeft.seconds} seconds left
           </p>
           <Button variant="secondary" className="bg-white text-green-600 hover:bg-gray-100">
             GET NOW <ArrowRight className="ml-2 h-4 w-4" />
