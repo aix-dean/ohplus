@@ -14,13 +14,22 @@ import { useResponsive } from "@/hooks/use-responsive"
 import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import Image from "next/image"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
 
 export default function AdminInventoryPage() {
   const router = useRouter()
-  const { user, userData } = useAuth()
+  const { user, userData, subscriptionData } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -38,6 +47,10 @@ export default function AdminInventoryPage() {
   >(new Map())
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingCount, setLoadingCount] = useState(false)
+
+  // Subscription limit dialog state
+  const [showSubscriptionLimitDialog, setShowSubscriptionLimitDialog] = useState(false)
+  const [subscriptionLimitMessage, setSubscriptionLimitMessage] = useState("")
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
@@ -237,6 +250,32 @@ export default function AdminInventoryPage() {
     router.push(`/admin/products/${productId}`)
   }
 
+  const handleAddSiteClick = () => {
+    if (!userData?.license_key) {
+      setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
+      setShowSubscriptionLimitDialog(true)
+      return
+    }
+
+    if (!subscriptionData || subscriptionData.status !== "active") {
+      setSubscriptionLimitMessage(
+        "Your current subscription is not active. Please activate or upgrade your plan to add more sites.",
+      )
+      setShowSubscriptionLimitDialog(true)
+      return
+    }
+
+    if (totalItems >= subscriptionData.maxProducts) {
+      setSubscriptionLimitMessage(
+        `You have reached the maximum number of sites allowed by your current plan (${subscriptionData.maxProducts}). Please upgrade your subscription to add more sites.`,
+      )
+      setShowSubscriptionLimitDialog(true)
+      return
+    }
+
+    router.push("/admin/products/create")
+  }
+
   return (
     <div className="flex-1 p-4 md:p-6">
       <div className="mb-6 flex items-center justify-between">
@@ -255,7 +294,7 @@ export default function AdminInventoryPage() {
             {/* The "+ Add Site" card is now the first item in the grid */}
             <Card
               className="w-full min-h-[284px] flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
-              onClick={() => router.push("/admin/products/create")}
+              onClick={handleAddSiteClick}
             >
               <Plus className="h-8 w-8 mb-2" />
               <span className="text-lg font-semibold">+ Add Site</span>
@@ -370,6 +409,22 @@ export default function AdminInventoryPage() {
         description="This product will be removed from your inventory. This action cannot be undone."
         itemName={productToDelete?.name}
       />
+
+      {/* Subscription Limit Dialog */}
+      <Dialog open={showSubscriptionLimitDialog} onOpenChange={setShowSubscriptionLimitDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Subscription Required</DialogTitle>
+            <DialogDescription>{subscriptionLimitMessage}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => router.push("/admin/subscriptions/choose-plan")}>Choose Plan</Button>
+            <DialogClose asChild>
+              <Button variant="outline">Close</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

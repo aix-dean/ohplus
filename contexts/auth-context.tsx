@@ -235,9 +235,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         updated: serverTimestamp(),
       })
 
-      // Removed: Create a default trial subscription for the user
-      // await subscriptionService.createSubscription(licenseKey, "trial", "monthly", firebaseUser.uid)
-
       await fetchUserData(firebaseUser)
     } catch (error) {
       console.error("Error in AuthContext register:", error) // Added logging
