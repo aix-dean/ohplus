@@ -3,7 +3,6 @@
 import { useEffect } from "react"
 import { useState } from "react"
 import type React from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createProduct } from "@/lib/firebase-service"
 import { Button } from "@/components/ui/button"
@@ -371,12 +370,7 @@ export default function AdminProductCreatePage() {
         <p className="text-muted-foreground">Fill in the details to add a new product to your inventory.</p>
       </div>
       <div className="mx-auto grid w-full max-w-6xl items-start gap-6 md:grid-cols-[180px_1fr] lg:grid-cols-[250px_1fr]">
-        <nav className="grid gap-4 text-sm text-muted-foreground">
-          <Link href="/admin/inventory" className="font-semibold text-primary">
-            Product List
-          </Link>
-          <Link href="/admin/products/create">Create New Product</Link>
-        </nav>
+        <nav className="grid gap-4 text-sm text-muted-foreground"></nav>
         <div className="grid gap-6">
           <Card>
             <CardHeader>
