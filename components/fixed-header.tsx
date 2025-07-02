@@ -248,6 +248,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           <DropdownMenuItem>No new notifications</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      {/* Directly link the profile icon to the account page */}
       <Link href="/account" passHref>
         <Button
           variant="ghost"
