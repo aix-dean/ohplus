@@ -30,6 +30,7 @@ export default function RegisterPage() {
   const router = useRouter()
 
   const getFriendlyErrorMessage = (error: unknown): string => {
+    console.error("Raw error during registration:", error) // Added logging
     if (error instanceof FirebaseError) {
       switch (error.code) {
         case "auth/email-already-in-use":

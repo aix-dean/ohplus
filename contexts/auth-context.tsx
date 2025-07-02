@@ -181,10 +181,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const register = async (email: string, password: string) => {
+  const register = async (
+    personalInfo: {
+      email: string
+      first_name: string
+      last_name: string
+      middle_name: string
+      phone_number: string
+      gender: string
+    },
+    companyInfo: {
+      company_name: string
+      company_location: string
+    },
+    password: string,
+  ) => {
     setLoading(true)
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const userCredential = await createUserWithEmailAndPassword(auth, personalInfo.email, password)
       const firebaseUser = userCredential.user
       setUser(firebaseUser)
 
@@ -200,12 +214,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         permissions: [], // Default empty permissions
         created: serverTimestamp(),
         updated: serverTimestamp(),
+        first_name: personalInfo.first_name,
+        last_name: personalInfo.last_name,
+        middle_name: personalInfo.middle_name,
+        phone_number: personalInfo.phone_number,
+        gender: personalInfo.gender,
+        project_id: firebaseUser.uid, // Assign project_id here
       })
 
       // Create a default project for the user
       const projectDocRef = doc(db, "projects", firebaseUser.uid) // Using UID as project ID for simplicity
       await setDoc(projectDocRef, {
-        company_name: "My Company",
+        company_name: companyInfo.company_name,
+        company_location: companyInfo.company_location,
         project_name: "My First Project",
         created: serverTimestamp(),
         updated: serverTimestamp(),
@@ -216,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await fetchUserData(firebaseUser)
     } catch (error) {
+      console.error("Error in AuthContext register:", error) // Added logging
       setLoading(false)
       throw error
     }
