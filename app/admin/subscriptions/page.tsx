@@ -11,6 +11,7 @@ import { useEffect, useState, useCallback } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { PromoBanner } from "@/components/promo-banner"
+import { Separator } from "@/components/ui/separator" // Re-import Separator
 
 export default function SubscriptionPage() {
   const { user, userData, subscriptionData, loading, refreshSubscriptionData } = useAuth()
@@ -134,12 +135,108 @@ export default function SubscriptionPage() {
   }
 
   const currentPlan = subscriptionData?.planType || "None"
+  const currentSubscriptionPlanDetails = plans.find((p) => p.id === subscriptionData?.planType)
 
   return (
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        {/* Removed "Your Current Subscription" section */}
-        {/* Removed Separator component */}
+        {subscriptionData && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl mb-6">
+              Current Plan:{" "}
+              <span
+                className={cn("font-bold", subscriptionData.status === "trialing" ? "text-green-600" : "text-primary")}
+              >
+                {currentSubscriptionPlanDetails?.name || subscriptionData.planType}
+                {subscriptionData.status === "trialing" && " Trial Plan"}
+              </span>
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Plan Card */}
+              <Card className="flex flex-col rounded-xl border-2 shadow-sm">
+                <CardHeader className="bg-[#6B46C1] text-white p-4 rounded-t-xl">
+                  <CardTitle className="text-xl font-bold">Plan</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col justify-between p-6">
+                  <div>
+                    <h3 className="text-lg font-semibold capitalize">
+                      {currentSubscriptionPlanDetails?.name || subscriptionData.planType}
+                    </h3>
+                    {currentSubscriptionPlanDetails?.price !== 0 && (
+                      <p className="text-gray-700">
+                        Php {currentSubscriptionPlanDetails?.price.toLocaleString()}
+                        {currentSubscriptionPlanDetails?.billingCycle !== "N/A" && (
+                          <span className="text-sm font-medium text-gray-500">
+                            /{currentSubscriptionPlanDetails?.billingCycle === "monthly" ? "month" : "year"}
+                          </span>
+                        )}
+                      </p>
+                    )}
+                    <ul className="mt-4 space-y-2 text-sm text-gray-700">
+                      {(currentSubscriptionPlanDetails?.features || []).map((feature, index) => (
+                        <li key={index} className="flex items-center">
+                          <CheckCircle className="mr-2 h-4 w-4 flex-shrink-0 text-green-500" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Cycle Card */}
+              <Card className="flex flex-col rounded-xl border-2 shadow-sm">
+                <CardHeader className="bg-[#6B46C1] text-white p-4 rounded-t-xl">
+                  <CardTitle className="text-xl font-bold">Cycle</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col justify-between p-6">
+                  <div>
+                    <p className="text-gray-700">
+                      <span className="font-bold">Start:</span>{" "}
+                      {subscriptionData.startDate
+                        ? subscriptionData.startDate.toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : "N/A"}
+                    </p>
+                    <p className="text-gray-700">
+                      <span className="font-bold">End:</span>{" "}
+                      {subscriptionData.endDate
+                        ? subscriptionData.endDate.toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : "N/A"}
+                    </p>
+                  </div>
+                  <Button variant="outline" className="mt-4 self-end bg-transparent">
+                    Extend
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Users Card */}
+              <Card className="flex flex-col rounded-xl border-2 shadow-sm">
+                <CardHeader className="bg-[#6B46C1] text-white p-4 rounded-t-xl">
+                  <CardTitle className="text-xl font-bold">Users</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col justify-between p-6">
+                  <div>
+                    <p className="text-lg font-bold text-gray-900">23 users</p> {/* Hardcoded as per screenshot */}
+                    <p className="text-sm text-gray-600">(Max of {subscriptionData.maxProducts} users)</p>
+                  </div>
+                  <Button variant="outline" className="mt-4 self-end bg-transparent">
+                    Expand
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+        <Separator className="my-8" />
 
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Choose Your Plan</h1>
