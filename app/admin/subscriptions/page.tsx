@@ -164,11 +164,11 @@ export default function SubscriptionPage() {
         {/* Current Plan Details Section */}
         {subscriptionData && (
           <div className="mb-12">
-            <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl mb-6">
+            <h2 className="text-lg font-bold tracking-tight text-gray-900 sm:text-xl mb-6">
               Current Plan:{" "}
               <span
                 className={cn(
-                  "font-extrabold",
+                  "font-extrabold text-xl sm:text-2xl", // Adjusted font size for plan name
                   subscriptionData.status === "active" && "text-green-600",
                   subscriptionData.status === "trialing" && "text-blue-600",
                   (subscriptionData.status === "inactive" ||
@@ -184,25 +184,32 @@ export default function SubscriptionPage() {
               {/* Plan Card */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
-                  <CardTitle className="text-lg font-bold">Plan</CardTitle>
+                  <CardTitle className="text-base font-bold">Plan</CardTitle> {/* Adjusted font size */}
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
-                    <h3 className="text-lg font-semibold capitalize text-gray-900">
+                    <h3 className="text-base font-semibold capitalize text-gray-900">
                       {currentPlanDetails?.name || "N/A"}
-                    </h3>
+                    </h3>{" "}
+                    {/* Adjusted font size */}
                     {currentPlanDetails?.price !== 0 && currentPlanDetails?.billingCycle !== "N/A" && (
-                      <p className="text-base text-gray-700 mt-1">
+                      <p className="text-sm text-gray-700 mt-1">
+                        {" "}
+                        {/* Adjusted font size */}
                         Php {currentPlanDetails?.price.toLocaleString()}{" "}
-                        <span className="text-sm font-medium text-gray-500">
-                          /{currentPlanDetails?.billingCycle === "monthly" ? "month" : "year"}
+                        <span className="text-xs font-medium text-gray-500">
+                          {" "}
+                          {/* Adjusted font size */}/{currentPlanDetails?.billingCycle === "monthly" ? "month" : "year"}
                         </span>
                       </p>
                     )}
-                    <ul className="mt-4 space-y-2 text-sm text-gray-700">
+                    <ul className="mt-4 space-y-2 text-xs text-gray-700">
+                      {" "}
+                      {/* Adjusted font size */}
                       {currentPlanDetails?.features.map((feature, index) => (
                         <li key={index} className="flex items-center">
-                          <CheckCircle className="mr-2 h-4 w-4 flex-shrink-0 text-green-500" />
+                          <CheckCircle className="mr-2 h-3 w-3 flex-shrink-0 text-green-500" />{" "}
+                          {/* Adjusted icon size */}
                           {feature}
                         </li>
                       ))}
@@ -214,16 +221,24 @@ export default function SubscriptionPage() {
               {/* Cycle Card */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
-                  <CardTitle className="text-lg font-bold">Cycle</CardTitle>
+                  <CardTitle className="text-base font-bold">Cycle</CardTitle> {/* Adjusted font size */}
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
                     <p className="text-base font-semibold text-gray-900">
+                      {" "}
+                      {/* Adjusted font size */}
                       Start: {formatDate(subscriptionData.startDate)}
                     </p>
-                    <p className="text-base font-semibold text-gray-900">End: {formatDate(subscriptionData.endDate)}</p>
+                    <p className="text-base font-semibold text-gray-900">
+                      {" "}
+                      {/* Adjusted font size */}
+                      End: {formatDate(subscriptionData.endDate)}
+                    </p>
                   </div>
-                  <Button variant="outline" className="mt-4 w-full bg-transparent">
+                  <Button variant="outline" className="mt-4 w-full bg-transparent text-sm">
+                    {" "}
+                    {/* Adjusted font size */}
                     Extend
                   </Button>
                 </CardContent>
@@ -232,14 +247,16 @@ export default function SubscriptionPage() {
               {/* Users Card (Placeholder Data) */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
-                  <CardTitle className="text-lg font-bold">Users</CardTitle>
+                  <CardTitle className="text-base font-bold">Users</CardTitle> {/* Adjusted font size */}
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
-                    <p className="text-base font-semibold text-gray-900">23 users</p>
-                    <p className="text-sm text-gray-600">(Max of 30 users)</p>
+                    <p className="text-base font-semibold text-gray-900">23 users</p> {/* Adjusted font size */}
+                    <p className="text-xs text-gray-600">(Max of 30 users)</p> {/* Adjusted font size */}
                   </div>
-                  <Button variant="outline" className="mt-4 w-full bg-transparent">
+                  <Button variant="outline" className="mt-4 w-full bg-transparent text-sm">
+                    {" "}
+                    {/* Adjusted font size */}
                     Expand
                   </Button>
                 </CardContent>
@@ -248,16 +265,19 @@ export default function SubscriptionPage() {
               {/* Inventory Card (Placeholder Data) */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
-                  <CardTitle className="text-lg font-bold">Inventory</CardTitle>
+                  <CardTitle className="text-base font-bold">Inventory</CardTitle> {/* Adjusted font size */}
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
-                    <p className="text-base font-semibold text-gray-900">100 static sites</p>
-                    <p className="text-base font-semibold text-gray-900">15 dynamic sites</p>
-                    <p className="text-base font-semibold text-gray-900">3 developments</p>
-                    <p className="text-sm text-gray-600">(Max of {subscriptionData.maxProducts} sites)</p>
+                    <p className="text-base font-semibold text-gray-900">100 static sites</p> {/* Adjusted font size */}
+                    <p className="text-base font-semibold text-gray-900">15 dynamic sites</p> {/* Adjusted font size */}
+                    <p className="text-base font-semibold text-gray-900">3 developments</p> {/* Adjusted font size */}
+                    <p className="text-xs text-gray-600">(Max of {subscriptionData.maxProducts} sites)</p>{" "}
+                    {/* Adjusted font size */}
                   </div>
-                  <Button variant="outline" className="mt-4 w-full bg-transparent">
+                  <Button variant="outline" className="mt-4 w-full bg-transparent text-sm">
+                    {" "}
+                    {/* Adjusted font size */}
                     Expand
                   </Button>
                 </CardContent>
