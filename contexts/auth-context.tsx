@@ -54,6 +54,7 @@ interface ProjectData {
     instagram?: string
     youtube?: string
   }
+  license_key?: string | null // Added license_key to ProjectData interface
   created?: Date
   updated?: Date
 }
@@ -111,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             company_website: projectData.company_website,
             project_name: projectData.project_name,
             social_media: projectData.social_media,
+            license_key: projectData.license_key, // Fetch license_key for project data
             created: projectData.created?.toDate(),
             updated: projectData.updated?.toDate(),
           })
@@ -228,6 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         company_name: companyInfo.company_name,
         company_location: companyInfo.company_location,
         project_name: "My First Project",
+        license_key: licenseKey, // Now also saving license_key to the project document
         created: serverTimestamp(),
         updated: serverTimestamp(),
       })
