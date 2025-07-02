@@ -2,40 +2,27 @@ import { db } from "./firebase"
 import {
   collection,
   addDoc,
-  getDocs,
   query,
   where,
-  doc,
+  getDocs,
   updateDoc,
+  doc,
+  serverTimestamp,
   orderBy,
   limit,
-  serverTimestamp,
 } from "firebase/firestore"
-import type { SubscriptionPlan, SubscriptionPlanType, BillingCycle, Subscription } from "./types/subscription"
+import type { Subscription, SubscriptionPlan, BillingCycle, SubscriptionPlanType } from "./types/subscription"
 
 export const getSubscriptionPlans = (): SubscriptionPlan[] => {
   return [
     {
       id: "trial",
-      name: "Trial",
+      name: "Free Trial",
       price: 0,
       billingCycle: "N/A",
-      description: "Experience the basic features for a limited time.",
-      features: ["Limited features", "7-day trial period"],
+      description: "Explore basic features for a limited time.",
+      features: ["Access to basic features", "Limited OOH sites", "Community support"],
       buttonText: "Start Free Trial",
-      maxProducts: 1,
-      maxUsers: 1,
-    },
-    {
-      id: "graphic-expo-event",
-      name: "Graphic Expo Event",
-      price: 0,
-      billingCycle: "N/A",
-      description: "Exclusive 90-day free trial for Graphic Expo attendees.",
-      features: ["All Solo Plan features", "90-day free trial"],
-      buttonText: "Get Now",
-      maxProducts: 3,
-      maxUsers: 1,
     },
     {
       id: "solo",
@@ -50,8 +37,6 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
         "ERP + Programmatic CMS",
       ],
       buttonText: "Upgrade to Solo",
-      maxProducts: 3,
-      maxUsers: 1,
     },
     {
       id: "family",
@@ -66,8 +51,6 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
         "ERP + Programmatic CMS",
       ],
       buttonText: "Upgrade to Family",
-      maxProducts: 5,
-      maxUsers: 5,
     },
     {
       id: "membership",
@@ -80,12 +63,8 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
         "FREE Listing to OOH Marketplaces",
         "FREE 1-Day onboarding training",
         "ERP + Programmatic CMS",
-        "Priority Assistance",
-        "Flexible Payment Terms",
       ],
       buttonText: "Upgrade to Membership",
-      maxProducts: 8,
-      maxUsers: 10,
     },
     {
       id: "enterprise",
@@ -101,13 +80,22 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
         "Full- Access",
       ],
       buttonText: "Contact Us",
-      maxProducts: 9999, // Effectively unlimited
-      maxUsers: 9999, // Effectively unlimited
+    },
+    {
+      id: "graphic-expo-event",
+      name: "Graphic Expo Event",
+      price: 0,
+      billingCycle: "N/A",
+      description: "Special 90-day free trial for Graphic Expo attendees.",
+      features: ["90-day free trial", "Access to all features", "Priority support"],
+      buttonText: "Activate Trial",
     },
   ]
 }
 
-export const subscriptionService = {
+class SubscriptionService {
+  private subscriptionsCollection = collection(db, "subscriptions")
+
   async createSubscription(
     licenseKey: string,
     planType: SubscriptionPlanType,
@@ -118,62 +106,43 @@ export const subscriptionService = {
     status: "active" | "inactive" | "trialing" | "expired" | "cancelled",
     maxProducts: number | null,
     trialEndDate: Date | null,
-  ): Promise<void> {
-    const plans = getSubscriptionPlans()
-    const selectedPlan = plans.find((p) => p.id === planType)
-
-    if (!selectedPlan) {
-      throw new Error("Invalid plan type")
-    }
-
+  ): Promise<Subscription> {
     const newSubscription: Omit<Subscription, "id"> = {
       license_key: licenseKey,
-      planType: planType,
-      billingCycle: billingCycle,
-      startDate: startDate,
-      endDate: endDate || new Date(startDate.getFullYear() + 1, startDate.getMonth(), startDate.getDate()), // Default to 1 year if not provided
-      status: status,
-      maxProducts: maxProducts || selectedPlan.maxProducts,
-      maxUsers: selectedPlan.maxUsers,
-      trialEndDate: trialEndDate,
-      userId: userId,
+      planType,
+      billingCycle,
+      userId,
+      startDate,
+      endDate,
+      status,
+      maxProducts,
+      trialEndDate,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }
-
-    await addDoc(collection(db, "subscriptions"), newSubscription)
-  },
+    const docRef = await addDoc(this.subscriptionsCollection, newSubscription)
+    return { id: docRef.id, ...(newSubscription as Omit<Subscription, "id">) }
+  }
 
   async getSubscriptionByLicenseKey(licenseKey: string): Promise<Subscription | null> {
     const q = query(
-      collection(db, "subscriptions"),
+      this.subscriptionsCollection,
       where("license_key", "==", licenseKey),
       orderBy("createdAt", "desc"), // Order by creation date descending
       limit(1), // Get only the latest one
     )
     const querySnapshot = await getDocs(q)
-
-    if (querySnapshot.empty) {
-      return null
+    if (!querySnapshot.empty) {
+      const doc = querySnapshot.docs[0]
+      return { id: doc.id, ...doc.data() } as Subscription
     }
+    return null
+  }
 
-    const docData = querySnapshot.docs[0].data() as Omit<Subscription, "id">
-    return {
-      id: querySnapshot.docs[0].id,
-      ...docData,
-      startDate: docData.startDate ? new Date(docData.startDate.seconds * 1000) : null,
-      endDate: docData.endDate ? new Date(docData.endDate.seconds * 1000) : null,
-      trialEndDate: docData.trialEndDate ? new Date(docData.trialEndDate.seconds * 1000) : null,
-      createdAt: docData.createdAt ? new Date(docData.createdAt.seconds * 1000) : null,
-      updatedAt: docData.updatedAt ? new Date(docData.updatedAt.seconds * 1000) : null,
-    } as Subscription
-  },
-
-  async updateSubscription(id: string, data: Partial<Omit<Subscription, "id">>): Promise<void> {
-    const subscriptionRef = doc(db, "subscriptions", id)
-    await updateDoc(subscriptionRef, {
-      ...data,
-      updatedAt: serverTimestamp(),
-    })
-  },
+  async updateSubscription(id: string, updates: Partial<Omit<Subscription, "id">>): Promise<void> {
+    const subscriptionRef = doc(this.subscriptionsCollection, id)
+    await updateDoc(subscriptionRef, { ...updates, updatedAt: serverTimestamp() })
+  }
 }
+
+export const subscriptionService = new SubscriptionService()

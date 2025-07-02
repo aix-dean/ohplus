@@ -1,4 +1,7 @@
-import { Card } from "@/components/ui/card"
+"use client"
+
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -15,21 +18,21 @@ export function PromoBanner({ className }: PromoBannerProps) {
         className,
       )}
     >
-      <div className="absolute -left-4 -top-4 h-20 w-20 rounded-full bg-red-500 flex items-center justify-center text-center text-xs font-bold transform rotate-[-25deg] shadow-md">
-        <span className="transform rotate-[25deg] text-white">
+      {/* Badge */}
+      <div className="absolute -left-8 -top-8 h-24 w-24 bg-red-500 rounded-full flex items-center justify-center transform -rotate-45">
+        <div className="text-center text-white font-bold text-xs transform rotate-45">
           GRAPHIC EXPO
           <br />
           '25 PROMO
-        </span>
+        </div>
       </div>
-      <div className="flex-1 text-center ml-16">
-        <h2 className="text-3xl font-extrabold">90 DAYS FREE TRIAL</h2>
-      </div>
-      <div className="flex items-center">
-        <a href="#" className="flex items-center text-white font-semibold hover:underline">
-          GET NOW <ArrowRight className="ml-2 h-5 w-5" />
-        </a>
-      </div>
+
+      <CardContent className="flex flex-1 items-center justify-center p-0 pl-16">
+        <div className="text-3xl font-extrabold tracking-tight">90 DAYS FREE TRIAL</div>
+      </CardContent>
+      <Button variant="secondary" className="bg-white text-green-600 hover:bg-gray-100">
+        GET NOW <ArrowRight className="ml-2 h-4 w-4" />
+      </Button>
     </Card>
   )
 }
