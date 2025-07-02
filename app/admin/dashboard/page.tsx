@@ -208,6 +208,15 @@ export default function AdminDashboardPage() {
     },
   ]
 
+  // Filter departments based on search term
+  const filteredDepartments = departmentData.filter((department) => {
+    const lowerCaseSearchTerm = searchTerm.toLowerCase()
+    return (
+      department.name.toLowerCase().includes(lowerCaseSearchTerm) ||
+      department.members.some((member) => member.toLowerCase().includes(lowerCaseSearchTerm))
+    )
+  })
+
   return (
     <div className="flex-1 p-4 md:p-6">
       <div className="flex flex-col gap-6">
@@ -245,7 +254,7 @@ export default function AdminDashboardPage() {
 
         {/* Department Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {departmentData.map((department) => (
+          {filteredDepartments.map((department) => (
             <DepartmentCard key={department.id} department={department} />
           ))}
         </div>
