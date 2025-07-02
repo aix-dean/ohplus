@@ -4,7 +4,7 @@ import React from "react"
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, Bell, Search, ChevronLeft } from "lucide-react"
+import { Menu, Bell, Search, ChevronLeft } from "lucide-react" // Removed LogOut, User, Settings as they are no longer needed for the profile dropdown
 
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -43,7 +43,7 @@ interface BreadcrumbItemData {
 
 export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderProps) {
   const pathname = usePathname()
-  const { user, userData, signOut } = useAuth()
+  const { user, userData } = useAuth() // Removed signOut as it's no longer in this component's direct interaction
   const { unreadCount } = useUnreadMessages()
   const isAdmin = useIsAdmin()
 
@@ -248,7 +248,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           <DropdownMenuItem>No new notifications</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      {/* START: Modified profile icon behavior */}
+      {/* Directly link the profile icon to the /account page */}
       <Link href="/account" passHref>
         <Button
           variant="ghost"
@@ -267,7 +267,6 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           </Avatar>
         </Button>
       </Link>
-      {/* END: Modified profile icon behavior */}
     </header>
   )
 }
