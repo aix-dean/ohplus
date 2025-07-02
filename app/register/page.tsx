@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FirebaseError } from "firebase/app"
-import { Separator } from "@/components/ui/separator"
-import { ChromeIcon, FacebookIcon } from "lucide-react" // Using Lucide React for icons
+// Removed Separator import as it's no longer needed
+// import { Separator } from "@/components/ui/separator"
+// Removed ChromeIcon and FacebookIcon imports
+// import { ChromeIcon, FacebookIcon } from 'lucide-react'
 // Removed Select import as Gender field is removed
 // import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -188,25 +190,7 @@ export default function RegisterPage() {
                     required
                   />
                 </div>
-                {/* Removed Gender Select */}
-                <Separator className="my-6" />
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-muted-foreground dark:bg-gray-950">or</span>
-                </div>
-                <Button
-                  variant="outline"
-                  className="w-full bg-transparent"
-                  onClick={() => alert("Google Sign-up not implemented")}
-                >
-                  <ChromeIcon className="mr-2 h-4 w-4" /> Sign up with Google
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full bg-transparent"
-                  onClick={() => alert("Facebook Sign-up not implemented")}
-                >
-                  <FacebookIcon className="mr-2 h-4 w-4" /> Sign up with Facebook
-                </Button>
+                {/* Removed Separator and social login buttons */}
                 <p className="text-center text-xs text-gray-500 dark:text-gray-400">
                   By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
                   <a href="#" className="text-blue-600 hover:underline">
