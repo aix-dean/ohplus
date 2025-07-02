@@ -14,7 +14,8 @@ import { cn } from "@/lib/utils"
 interface Department {
   id: string
   name: string
-  headerColor: string // This will now be a Tailwind class name, e.g., "bg-department-sales-red"
+  headerColor: string // Tailwind class name for header background
+  contentBgColor: string // New: Tailwind class name for content background
   members: string[]
   metricLabel?: string
   metricValue?: string
@@ -40,7 +41,9 @@ function DepartmentCard({
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-4 bg-card-content-background rounded-b-lg flex flex-col justify-between flex-grow">
+      <CardContent
+        className={cn("p-4 rounded-b-lg flex flex-col justify-between flex-grow", department.contentBgColor)}
+      >
         <div>
           {department.members.map((member, index) => (
             <p key={index} className="text-sm text-gray-700 flex items-center gap-1">
@@ -84,6 +87,7 @@ export default function AdminDashboardPage() {
       id: "sales",
       name: "Sales",
       headerColor: "bg-department-sales-red",
+      contentBgColor: "bg-card-content-sales",
       members: ["Noemi", "Matthew"],
       metricLabel: "Monthly Revenue",
       metricValue: "4,000,000",
@@ -94,6 +98,7 @@ export default function AdminDashboardPage() {
       id: "logistics",
       name: "Logistics/ Operations",
       headerColor: "bg-department-logistics-blue",
+      contentBgColor: "bg-card-content-logistics",
       members: ["Chona", "May"],
       metricLabel: "Total Service Assignments",
       metricValue: "5",
@@ -104,54 +109,63 @@ export default function AdminDashboardPage() {
       id: "accounting",
       name: "Accounting",
       headerColor: "bg-department-accounting-purple",
+      contentBgColor: "bg-card-content-accounting",
       members: ["Chairman"],
     },
     {
       id: "treasury",
       name: "Treasury",
       headerColor: "bg-department-treasury-green",
+      contentBgColor: "bg-card-content-treasury",
       members: ["Juvy"],
     },
     {
       id: "it",
       name: "I.T.",
       headerColor: "bg-department-it-teal",
+      contentBgColor: "bg-card-content-it",
       members: ["Emmerson"],
     },
     {
       id: "fleet",
       name: "Fleet",
       headerColor: "bg-department-fleet-gray",
+      contentBgColor: "bg-card-content-fleet",
       members: ["Jonathan"],
     },
     {
       id: "creatives",
       name: "Creatives/Contents",
       headerColor: "bg-department-creatives-orange",
+      contentBgColor: "bg-card-content-creatives",
       members: ["Eda"],
     },
     {
       id: "finance",
       name: "Finance",
       headerColor: "bg-department-finance-green",
+      contentBgColor: "bg-card-content-finance",
       members: ["Juvy"],
     },
     {
       id: "media",
       name: "Media/ Procurement",
       headerColor: "bg-department-media-lightblue",
+      contentBgColor: "bg-card-content-media",
       members: ["Zen"],
     },
     {
       id: "businessDev",
       name: "Business Dev.",
       headerColor: "bg-department-businessdev-darkpurple",
+      contentBgColor: "bg-card-content-businessdev",
       members: ["Nikki"],
     },
     {
       id: "legal",
       name: "Legal",
       headerColor: "bg-department-legal-darkred",
+      contentBgColor: "bg-card-content-legal",
       members: ["Chona"],
       badgeCount: 2,
     },
@@ -159,6 +173,7 @@ export default function AdminDashboardPage() {
       id: "corporate",
       name: "Corporate",
       headerColor: "bg-department-corporate-lightblue",
+      contentBgColor: "bg-card-content-corporate",
       members: ["Anthony"],
       badgeCount: 1,
     },
@@ -166,6 +181,7 @@ export default function AdminDashboardPage() {
       id: "hr",
       name: "Human Resources",
       headerColor: "bg-department-hr-pink",
+      contentBgColor: "bg-card-content-hr",
       members: ["Vanessa"],
       badgeCount: 1,
     },
@@ -173,18 +189,21 @@ export default function AdminDashboardPage() {
       id: "specialTeam",
       name: "Special Team",
       headerColor: "bg-department-specialteam-lightpurple",
+      contentBgColor: "bg-card-content-specialteam",
       members: ["Mark"],
     },
     {
       id: "marketing",
       name: "Marketing",
       headerColor: "bg-department-marketing-red",
+      contentBgColor: "bg-card-content-marketing",
       members: ["John"],
     },
     {
       id: "addDepartment",
       name: "+ Add New Department",
       headerColor: "bg-department-add-darkgray",
+      contentBgColor: "bg-card-content-add",
       members: [], // No members for this card
     },
   ]

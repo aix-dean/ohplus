@@ -69,8 +69,23 @@ const config: Config = {
         "department-specialteam-lightpurple": "#AF7AC5",
         "department-marketing-red": "#E74C3C", // Same as sales
         "department-add-darkgray": "#2C3E50",
-        // Updated custom color for card content background to blue
-        "card-content-background": "#E0F2F7", // A light blue shade
+        // New custom colors for card content backgrounds based on the image
+        "card-content-sales": "#FCE4EC", // Light pink
+        "card-content-logistics": "#E3F2FD", // Light blue
+        "card-content-accounting": "#EDE7F6", // Light lavender
+        "card-content-treasury": "#E8F5E9", // Light green
+        "card-content-it": "#E0F2F1", // Light teal
+        "card-content-fleet": "#F5F5F5", // Light gray
+        "card-content-creatives": "#FFF3E0", // Light orange
+        "card-content-finance": "#E8F5E9", // Light green (similar to treasury)
+        "card-content-media": "#E0F7FA", // Light cyan/aqua
+        "card-content-businessdev": "#F3E5F5", // Light blue/purple
+        "card-content-legal": "#FFEBEE", // Light red/pink
+        "card-content-corporate": "#E3F2FD", // Light blue (same as logistics)
+        "card-content-hr": "#FCE4EC", // Light pink (similar to sales)
+        "card-content-specialteam": "#EDE7F6", // Light purple (similar to accounting)
+        "card-content-marketing": "#FFEBEE", // Light red/pink (similar to legal)
+        "card-content-add": "#EEEEEE", // Light gray
       },
       borderRadius: {
         lg: "var(--radius)",
