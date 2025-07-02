@@ -8,9 +8,10 @@ import { cn } from "@/lib/utils"
 interface PromoBannerProps {
   className?: string
   onClick?: () => void // Add onClick prop
+  disabled?: boolean // Add disabled prop
 }
 
-export function PromoBanner({ className, onClick }: PromoBannerProps) {
+export function PromoBanner({ className, onClick, disabled }: PromoBannerProps) {
   return (
     <Card className={cn("rounded-xl border-2 shadow-sm", className)}>
       <CardContent className="flex items-center justify-between p-4">
@@ -21,9 +22,9 @@ export function PromoBanner({ className, onClick }: PromoBannerProps) {
           <h2 className="text-3xl font-extrabold">90 DAYS FREE TRIAL</h2>
           <p className="text-sm mt-1">Limited time offer for new sign-ups!</p>
         </div>
-        <Button variant="secondary" className="ml-4 flex-shrink-0" onClick={onClick}>
+        <Button variant="secondary" className="ml-4 flex-shrink-0" onClick={onClick} disabled={disabled}>
           {" "}
-          {/* Pass onClick to Button */}
+          {/* Pass onClick and disabled to Button */}
           GET NOW <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </CardContent>

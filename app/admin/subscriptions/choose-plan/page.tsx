@@ -137,6 +137,7 @@ export default function ChoosePlanPage() {
   }, [handleUpgrade])
 
   const currentPlan = subscriptionData?.planType || "None"
+  const isGraphicExpoActive = currentPlan === "graphic-expo-event"
 
   return (
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
@@ -151,7 +152,8 @@ export default function ChoosePlanPage() {
           <div className="mb-8 flex flex-col items-center">
             <PromoBanner
               className="w-full max-w-2xl bg-gradient-to-r from-green-500 to-green-600 text-white"
-              onClick={handlePromoBannerClick} // Pass the handler here
+              onClick={handlePromoBannerClick}
+              disabled={isGraphicExpoActive} // Disable if already on graphic-expo-event plan
             />
             <p className="mt-4 text-lg font-semibold text-gray-700 whitespace-nowrap">
               {timeLeft.days} days : {timeLeft.hours.toString().padStart(2, "0")} hours :{" "}
