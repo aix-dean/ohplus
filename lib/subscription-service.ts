@@ -9,6 +9,8 @@ import {
   serverTimestamp,
   Timestamp,
   updateDoc,
+  orderBy, // Import orderBy
+  limit, // Import limit
 } from "firebase/firestore"
 import {
   type Subscription,
@@ -79,7 +81,8 @@ export const subscriptionService = {
   async getSubscriptionByLicenseKey(licenseKey: string): Promise<Subscription | null> {
     console.log("subscriptionService: Fetching subscription for licenseKey:", licenseKey)
     const subscriptionsRef = collection(db, "subscriptions")
-    const q = query(subscriptionsRef, where("licenseKey", "==", licenseKey))
+    // Query for the license key, order by createdAt descending, and limit to 1 to get the latest
+    const q = query(subscriptionsRef, where("licenseKey", "==", licenseKey), orderBy("createdAt", "desc"), limit(1))
     const querySnapshot = await getDocs(q)
 
     if (querySnapshot.empty) {
