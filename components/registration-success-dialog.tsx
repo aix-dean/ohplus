@@ -3,7 +3,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+// Removed useRouter as redirection is handled by parent component
 
 interface RegistrationSuccessDialogProps {
   isOpen: boolean
@@ -12,11 +12,9 @@ interface RegistrationSuccessDialogProps {
 }
 
 export function RegistrationSuccessDialog({ isOpen, firstName, onClose }: RegistrationSuccessDialogProps) {
-  const router = useRouter()
-
+  // handleStart now just closes the dialog, as redirection happens before this dialog is shown
   const handleStart = () => {
-    onClose() // Close the dialog
-    router.push("/admin/dashboard") // Redirect to dashboard
+    onClose()
   }
 
   return (
@@ -27,7 +25,7 @@ export function RegistrationSuccessDialog({ isOpen, firstName, onClose }: Regist
         </DialogHeader>
         <div className="flex flex-col items-center justify-center space-y-4">
           <Image
-            src="/placeholder.svg?height=150&width=150"
+            src="/celebration.png" // Updated image source
             alt="Celebration"
             width={150}
             height={150}
