@@ -13,8 +13,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
-  DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -248,7 +248,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           <DropdownMenuItem>No new notifications</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      {/* Directly link the profile icon to the account page */}
+      {/* START: Modified profile icon behavior */}
       <Link href="/account" passHref>
         <Button
           variant="ghost"
@@ -257,6 +257,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
             "overflow-hidden rounded-full text-white",
             isAdminPage ? "hover:bg-adminHeaderPurpleLight" : "hover:bg-salesHeaderRoseLight",
           )}
+          asChild
         >
           <Avatar>
             <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} alt="User Avatar" />
@@ -264,9 +265,9 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
               {userData?.first_name ? userData.first_name.charAt(0) : user?.email?.charAt(0) || "U"}
             </AvatarFallback>
           </Avatar>
-          <span className="sr-only">Account</span>
         </Button>
       </Link>
+      {/* END: Modified profile icon behavior */}
     </header>
   )
 }
