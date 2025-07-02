@@ -75,7 +75,7 @@ export default function RegisterPage() {
         password,
       )
       setErrorMessage(null)
-      router.push("/onboarding?step=1") // Redirect directly to onboarding
+      router.push("/admin/dashboard") // Changed redirect path
     } catch (error: unknown) {
       setErrorMessage(getFriendlyErrorMessage(error))
     } finally {
