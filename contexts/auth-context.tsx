@@ -19,7 +19,7 @@ interface UserData {
   uid: string
   email: string | null
   displayName: string | null
-  license_key: string | null // This will now map to iboard_users_license_key
+  license_key: string | null
   role: string | null
   permissions: string[]
   // Add other user-specific data here
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
-          license_key: data.iboard_users_license_key || null, // Changed to iboard_users_license_key
+          license_key: (data.license_key as string | null) || null, // Explicitly cast to string | null
           role: data.role || "user", // Default role
           permissions: data.permissions || [], // Default empty permissions
           ...data, // Spread any other fields
@@ -154,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (uid: string, licenseKey: string) => {
       try {
         const userDocRef = doc(db, "users", uid)
-        await setDoc(userDocRef, { iboard_users_license_key: licenseKey }, { merge: true }) // Changed to iboard_users_license_key
+        await setDoc(userDocRef, { license_key: licenseKey }, { merge: true })
         // Update local state immediately
         setUserData((prev) => (prev ? { ...prev, license_key: licenseKey } : null))
         // Refresh subscription data after assigning license key
@@ -193,7 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await setDoc(userDocRef, {
         email: firebaseUser.email,
         uid: firebaseUser.uid,
-        iboard_users_license_key: licenseKey, // Changed to iboard_users_license_key
+        license_key: licenseKey, // Assign the generated license key
         role: "user", // Default role
         permissions: [], // Default empty permissions
         created: serverTimestamp(),
@@ -244,12 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUserData = async (updates: Partial<UserData>) => {
     if (!user) throw new Error("User not authenticated.")
     const userDocRef = doc(db, "users", user.uid)
-    // Map license_key from UserData to iboard_users_license_key for storage
-    const updatedFields: Record<string, any> = { ...updates, updated: serverTimestamp() }
-    if (updates.license_key !== undefined) {
-      updatedFields.iboard_users_license_key = updates.license_key
-      delete updatedFields.license_key // Remove the original key if it exists
-    }
+    const updatedFields = { ...updates, updated: serverTimestamp() }
     await updateDoc(userDocRef, updatedFields)
     // Optimistically update state
     setUserData((prev) => (prev ? { ...prev, ...updates } : null))
