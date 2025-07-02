@@ -1,3 +1,5 @@
+"use client"
+
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
@@ -9,17 +11,25 @@ interface PromoBannerProps {
 
 export function PromoBanner({ className }: PromoBannerProps) {
   return (
-    <Card className={cn("rounded-xl border-2 shadow-sm", className)}>
-      <CardContent className="flex items-center justify-between p-4">
-        <div className="relative flex items-center justify-center h-16 w-16 rounded-full bg-red-500 text-white text-center font-bold text-xs uppercase mr-4 flex-shrink-0">
-          <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">GRAPHIC EXPO '25 PROMO</span>
+    <Card className={cn("relative overflow-hidden rounded-xl shadow-lg", className)}>
+      <CardContent className="flex items-center justify-between p-4 sm:p-6">
+        {/* Graphic Expo Badge */}
+        <div className="absolute -left-4 -top-4 h-20 w-20 rounded-full bg-red-500 flex items-center justify-center transform rotate-[-25deg] shadow-md">
+          <div className="text-white text-xs font-bold text-center leading-tight transform rotate-[25deg]">
+            GRAPHIC EXPO
+            <br />
+            '25 PROMO
+          </div>
         </div>
-        <div className="flex-grow text-center">
-          <h2 className="text-3xl font-extrabold">90 DAYS FREE TRIAL</h2>
-          <p className="text-sm mt-1">Limited time offer for new sign-ups!</p>
+
+        {/* Main Text */}
+        <div className="flex-1 text-center ml-16 sm:ml-20">
+          <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">90 DAYS FREE TRIAL</h2>
         </div>
-        <Button variant="secondary" className="ml-4 flex-shrink-0">
-          GET NOW <ArrowRight className="ml-2 h-4 w-4" />
+
+        {/* Get Now Button */}
+        <Button className="bg-white text-green-600 hover:bg-gray-100 px-6 py-3 rounded-full shadow-md flex items-center gap-2">
+          GET NOW <ArrowRight className="h-5 w-5" />
         </Button>
       </CardContent>
     </Card>

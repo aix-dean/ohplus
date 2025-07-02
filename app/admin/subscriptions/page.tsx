@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/contexts/auth-context"
 import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-service"
 import type { BillingCycle, SubscriptionPlanType } from "@/lib/types/subscription"
-import { CheckCircle, Loader2 } from "lucide-react" // Added ArrowRight
+import { CheckCircle, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -188,13 +188,13 @@ export default function SubscriptionPage() {
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
-                    <h3 className="text-xl font-semibold capitalize text-gray-900">
+                    <h3 className="text-lg font-semibold capitalize text-gray-900">
                       {currentPlanDetails?.name || "N/A"}
                     </h3>
                     {currentPlanDetails?.price !== 0 && currentPlanDetails?.billingCycle !== "N/A" && (
-                      <p className="text-lg text-gray-700 mt-1">
+                      <p className="text-base text-gray-700 mt-1">
                         Php {currentPlanDetails?.price.toLocaleString()}{" "}
-                        <span className="text-base font-medium text-gray-500">
+                        <span className="text-sm font-medium text-gray-500">
                           /{currentPlanDetails?.billingCycle === "monthly" ? "month" : "year"}
                         </span>
                       </p>
@@ -218,10 +218,10 @@ export default function SubscriptionPage() {
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
-                    <p className="text-lg font-semibold text-gray-900">
+                    <p className="text-base font-semibold text-gray-900">
                       Start: {formatDate(subscriptionData.startDate)}
                     </p>
-                    <p className="text-lg font-semibold text-gray-900">End: {formatDate(subscriptionData.endDate)}</p>
+                    <p className="text-base font-semibold text-gray-900">End: {formatDate(subscriptionData.endDate)}</p>
                   </div>
                   <Button variant="outline" className="mt-4 w-full bg-transparent">
                     Extend
@@ -236,7 +236,7 @@ export default function SubscriptionPage() {
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
-                    <p className="text-lg font-semibold text-gray-900">23 users</p>
+                    <p className="text-base font-semibold text-gray-900">23 users</p>
                     <p className="text-sm text-gray-600">(Max of 30 users)</p>
                   </div>
                   <Button variant="outline" className="mt-4 w-full bg-transparent">
@@ -252,9 +252,9 @@ export default function SubscriptionPage() {
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
-                    <p className="text-lg font-semibold text-gray-900">100 static sites</p>
-                    <p className="text-lg font-semibold text-gray-900">15 dynamic sites</p>
-                    <p className="text-lg font-semibold text-gray-900">3 developments</p>
+                    <p className="text-base font-semibold text-gray-900">100 static sites</p>
+                    <p className="text-base font-semibold text-gray-900">15 dynamic sites</p>
+                    <p className="text-base font-semibold text-gray-900">3 developments</p>
                     <p className="text-sm text-gray-600">(Max of {subscriptionData.maxProducts} sites)</p>
                   </div>
                   <Button variant="outline" className="mt-4 w-full bg-transparent">
