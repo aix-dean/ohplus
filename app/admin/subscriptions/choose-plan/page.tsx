@@ -107,7 +107,7 @@ export default function ChoosePlanPage() {
           null, // Let the service calculate end date
           "active", // New subscription is active
           null, // Let the service calculate max products
-          null, // No trial for new paid plans
+          selectedPlan.id === "graphic-expo-event" ? promoEndDate : null, // Set trialEndDate for graphic-expo-event
         )
 
         toast({
@@ -132,6 +132,10 @@ export default function ChoosePlanPage() {
     [user, userData, plans, refreshSubscriptionData, toast, router],
   )
 
+  const handlePromoBannerClick = useCallback(() => {
+    handleUpgrade("graphic-expo-event")
+  }, [handleUpgrade])
+
   const currentPlan = subscriptionData?.planType || "None"
 
   return (
@@ -145,7 +149,10 @@ export default function ChoosePlanPage() {
         {/* Promo Banner */}
         {timeLeft && (timeLeft.days > 0 || timeLeft.hours > 0 || timeLeft.minutes > 0 || timeLeft.seconds > 0) && (
           <div className="mb-8 flex flex-col items-center">
-            <PromoBanner className="w-full max-w-2xl bg-gradient-to-r from-green-500 to-green-600 text-white" />
+            <PromoBanner
+              className="w-full max-w-2xl bg-gradient-to-r from-green-500 to-green-600 text-white"
+              onClick={handlePromoBannerClick} // Pass the handler here
+            />
             <p className="mt-4 text-lg font-semibold text-gray-700 whitespace-nowrap">
               {timeLeft.days} days : {timeLeft.hours.toString().padStart(2, "0")} hours :{" "}
               {timeLeft.minutes.toString().padStart(2, "0")} minutes : {timeLeft.seconds.toString().padStart(2, "0")}{" "}

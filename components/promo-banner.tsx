@@ -1,3 +1,5 @@
+"use client"
+
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
@@ -5,9 +7,10 @@ import { cn } from "@/lib/utils"
 
 interface PromoBannerProps {
   className?: string
+  onClick?: () => void // Add onClick prop
 }
 
-export function PromoBanner({ className }: PromoBannerProps) {
+export function PromoBanner({ className, onClick }: PromoBannerProps) {
   return (
     <Card className={cn("rounded-xl border-2 shadow-sm", className)}>
       <CardContent className="flex items-center justify-between p-4">
@@ -18,7 +21,9 @@ export function PromoBanner({ className }: PromoBannerProps) {
           <h2 className="text-3xl font-extrabold">90 DAYS FREE TRIAL</h2>
           <p className="text-sm mt-1">Limited time offer for new sign-ups!</p>
         </div>
-        <Button variant="secondary" className="ml-4 flex-shrink-0">
+        <Button variant="secondary" className="ml-4 flex-shrink-0" onClick={onClick}>
+          {" "}
+          {/* Pass onClick to Button */}
           GET NOW <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </CardContent>
