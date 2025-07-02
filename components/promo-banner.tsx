@@ -54,7 +54,7 @@ export function PromoBanner({ promoEndDate }: PromoBannerProps) {
           </Button>
         </div>
       </div>
-      <p className="mt-2 text-lg font-medium text-gray-700">
+      <p className="mt-2 text-lg font-medium text-gray-700 whitespace-nowrap">
         {timeLeft.days} days : {timeLeft.hours.toString().padStart(2, "0")} hours :{" "}
         {timeLeft.minutes.toString().padStart(2, "0")} minutes : {timeLeft.seconds.toString().padStart(2, "0")} seconds
         left
