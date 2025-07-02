@@ -369,9 +369,8 @@ export default function AdminProductCreatePage() {
         <h1 className="text-3xl font-semibold">Create New Product</h1>
         <p className="text-muted-foreground">Fill in the details to add a new product to your inventory.</p>
       </div>
-      <div className="mx-auto grid w-full max-w-6xl items-start gap-6 md:grid-cols-[180px_1fr] lg:grid-cols-[250px_1fr]">
-        <nav className="grid gap-4 text-sm text-muted-foreground"></nav>
-        <div className="grid gap-6">
+      <div className="mx-auto w-full max-w-6xl flex justify-center">
+        <div className="grid gap-6 w-full max-w-2xl">
           <Card>
             <CardHeader>
               <CardTitle>Product Details</CardTitle>
