@@ -1,5 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { simpleSearch } from "@/lib/local-search-service"
+import { NextResponse } from "next/server"
 
 // Simple in-memory database for search
 const items = [
@@ -33,24 +32,6 @@ const items = [
   { objectID: "7", name: "City Advertisers", type: "client", location: "789 Urban Blvd" },
   { objectID: "8", name: "Regional Promotions", type: "client", location: "321 District Rd" },
 ]
-
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const query = searchParams.get("query")
-  const type = searchParams.get("type") as "products" | "clients" | "proposals" | "all" | null
-
-  if (!query) {
-    return NextResponse.json({ error: "Query parameter is required" }, { status: 400 })
-  }
-
-  try {
-    const results = simpleSearch(query, type)
-    return NextResponse.json(results)
-  } catch (error) {
-    console.error("Error performing simple search:", error)
-    return NextResponse.json({ error: "Failed to perform simple search" }, { status: 500 })
-  }
-}
 
 export async function POST(request: Request) {
   try {

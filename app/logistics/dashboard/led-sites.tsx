@@ -14,36 +14,9 @@ import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/auth-context"
 import { Search, ChevronLeft, ChevronRight } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
-
-const ledSitesData = [
-  { month: "Jan", active: 100, maintenance: 5, inactive: 2 },
-  { month: "Feb", active: 102, maintenance: 4, inactive: 1 },
-  { month: "Mar", active: 105, maintenance: 3, inactive: 0 },
-  { month: "Apr", active: 103, maintenance: 6, inactive: 2 },
-  { month: "May", active: 108, maintenance: 2, inactive: 1 },
-  { month: "Jun", active: 110, maintenance: 1, inactive: 0 },
-]
-
-const chartConfig = {
-  active: {
-    label: "Active",
-    color: "hsl(var(--chart-1))",
-  },
-  maintenance: {
-    label: "Under Maintenance",
-    color: "hsl(var(--chart-2))",
-  },
-  inactive: {
-    label: "Inactive",
-    color: "hsl(var(--chart-3))",
-  },
-}
 
 export default function LEDSitesTab() {
   const [contentTab, setContentTab] = useState<"content" | "display-health" | "structure" | "compliance">("content")
@@ -263,9 +236,6 @@ export default function LEDSitesTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* LED Sites Overview */}
-      <LEDSitesOverview />
-
       {/* Content Type Tabs */}
       <Tabs defaultValue="content" className="w-full" onValueChange={(value) => setContentTab(value as any)}>
         <TabsList className="grid w-full max-w-[450px] grid-cols-2 md:grid-cols-4">
@@ -378,7 +348,7 @@ export default function LEDSitesTab() {
                     size="sm"
                     onClick={goToPreviousPage}
                     disabled={currentPage === 1}
-                    className="h-8 w-8 p-0 bg-transparent"
+                    className="h-8 w-8 p-0"
                   >
                     <ChevronLeft size={16} />
                   </Button>
@@ -420,34 +390,5 @@ export default function LEDSitesTab() {
         )}
       </Tabs>
     </div>
-  )
-}
-
-export function LEDSitesOverview() {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xl font-bold">LED Sites Overview</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
-          <LineChart data={ledSitesData}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
-            <YAxis tickLine={false} tickMargin={10} axisLine={false} />
-            <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-            <Line type="monotone" dataKey="active" stroke="var(--color-active)" strokeWidth={2} dot={{ r: 4 }} />
-            <Line
-              type="monotone"
-              dataKey="maintenance"
-              stroke="var(--color-maintenance)"
-              strokeWidth={2}
-              dot={{ r: 4 }}
-            />
-            <Line type="monotone" dataKey="inactive" stroke="var(--color-inactive)" strokeWidth={2} dot={{ r: 4 }} />
-          </LineChart>
-        </ChartContainer>
-      </CardContent>
-    </Card>
   )
 }

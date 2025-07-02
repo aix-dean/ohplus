@@ -1,23 +1,22 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { updateCostEstimateStatus } from "@/lib/cost-estimate-service"
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const { id, status } = await req.json()
+    const { costEstimateId, status, userId, rejectionReason } = await request.json()
 
-    if (!id || !status) {
-      return NextResponse.json({ message: "Missing required fields: id and status" }, { status: 400 })
+    if (!costEstimateId || !status) {
+      return NextResponse.json({ error: "Cost estimate ID and status are required" }, { status: 400 })
     }
 
-    const updatedCostEstimate = await updateCostEstimateStatus(id, status)
+    await updateCostEstimateStatus(costEstimateId, status, userId, rejectionReason)
 
-    if (!updatedCostEstimate) {
-      return NextResponse.json({ message: "Cost estimate not found or status not updated" }, { status: 404 })
-    }
-
-    return NextResponse.json(updatedCostEstimate)
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error updating cost estimate status:", error)
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 },
+    )
   }
 }

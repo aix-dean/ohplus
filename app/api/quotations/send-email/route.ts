@@ -3,7 +3,6 @@ import { Resend } from "resend"
 import { getQuotationById } from "@/lib/quotation-service" // Import to fetch quotation details
 
 const resend = new Resend(process.env.RESEND_API_KEY)
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,6 +14,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email service not configured" }, { status: 500 })
     }
 
+    if (!process.env.NEXT_PUBLIC_APP_URL) {
+      console.error("NEXT_PUBLIC_APP_URL not found in environment variables")
+      return NextResponse.json({ error: "App URL not configured" }, { status: 500 })
+    }
+
     const body = await request.json()
     console.log("Request body received:", {
       quotationId: body.quotationId,
@@ -22,19 +26,17 @@ export async function POST(request: NextRequest) {
       subject: body.subject,
       ccEmail: body.ccEmail,
       replyToEmail: body.replyToEmail,
-      clientName: body.clientName,
-      totalAmount: body.totalAmount,
+      hasBody: !!body.body,
     })
 
-    const { quotationId, toEmail: to, subject, body: emailBody, ccEmail, replyToEmail, clientName, totalAmount } = body
+    const { quotationId, toEmail, subject, body: emailBody, ccEmail, replyToEmail } = body
 
-    if (!quotationId || !to || !subject || !clientName || !totalAmount) {
+    if (!quotationId || !toEmail || !subject || !emailBody) {
       console.error("Missing required fields for email:", {
         quotationId: !!quotationId,
-        to: !!to,
+        toEmail: !!toEmail,
         subject: !!subject,
-        clientName: !!clientName,
-        totalAmount: !!totalAmount,
+        emailBody: !!emailBody,
       })
       return NextResponse.json({ error: "Missing required email fields" }, { status: 400 })
     }
@@ -46,8 +48,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Quotation not found" }, { status: 404 })
     }
 
-    const acceptUrl = `${APP_URL}/quotations/${quotation.id}/accept`
-    const declineUrl = `${APP_URL}/quotations/${quotation.id}/decline`
+    const acceptUrl = `${process.env.NEXT_PUBLIC_APP_URL}/quotations/${quotation.id}/accept`
+    const declineUrl = `${process.env.NEXT_PUBLIC_APP_URL}/quotations/${quotation.id}/decline`
 
     console.log("Generated URLs:", { acceptUrl, declineUrl })
 
@@ -147,11 +149,11 @@ export async function POST(request: NextRequest) {
       </html>
     `
 
-    console.log("Attempting to send email to:", to)
+    console.log("Attempting to send email to:", toEmail)
 
     const emailData = {
-      from: "Jiven <onboarding@resend.dev>",
-      to: [to],
+      from: "OOH+ Operator <noreply@resend.dev>", // Using Resend's test domain
+      to: [toEmail],
       subject: subject,
       html: emailHtml,
       ...(ccEmail && { cc: ccEmail.split(",").map((email: string) => email.trim()) }),

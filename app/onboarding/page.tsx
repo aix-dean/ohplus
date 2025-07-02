@@ -1,218 +1,185 @@
 "use client"
 
-import type React from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { ArrowLeft, ArrowRight, Upload, LayoutGrid } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
+import { useEffect } from "react"
+import Image from "next/image"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { useToast } from "@/hooks/use-toast"
+// Onboarding Header Component
+function OnboardingHeader() {
+  const router = useRouter()
+  return (
+    <header className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+      <div className="flex items-center">
+        <Image src="/oh-plus-logo.png" alt="OHPlus Logo" width={100} height={30} />
+      </div>
+      <Button variant="outline" onClick={() => router.push("/login")}>
+        Exit
+      </Button>
+    </header>
+  )
+}
+
+// Onboarding Footer Component
+function OnboardingFooter({
+  currentStep,
+  totalSteps,
+  onBack,
+  onNext,
+  onFinish,
+  isLastStep,
+}: {
+  currentStep: number
+  totalSteps: number
+  onBack: () => void
+  onNext: () => void
+  onFinish: () => void
+  isLastStep: boolean
+}) {
+  return (
+    <footer className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-950 border-t border-gray-200 dark:border-gray-800 p-6 flex items-center justify-between">
+      <Button variant="ghost" onClick={onBack} disabled={currentStep === 1}>
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back
+      </Button>
+      {isLastStep ? (
+        <Button onClick={onFinish}>
+          Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      ) : (
+        <Button onClick={onNext}>
+          Next <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      )}
+    </footer>
+  )
+}
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const { toast } = useToast()
-  const [step, setStep] = useState(1)
-  const totalSteps = 4 // Total number of onboarding steps
+  const searchParams = useSearchParams()
+  const { userData, loading, updateUserData } = useAuth()
 
-  const [companyInfo, setCompanyInfo] = useState({
-    companyName: "",
-    industry: "",
-    companySize: "",
-    website: "",
-  })
+  const totalContentSteps = 3
+  const currentStep = Number.parseInt(searchParams.get("step") || "1")
 
-  const [contactInfo, setContactInfo] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    role: "",
-  })
+  useEffect(() => {
+    if (!loading && !userData) {
+      router.push("/login")
+    }
+  }, [userData, loading, router])
 
-  const [preferences, setPreferences] = useState({
-    modules: {
-      sales: false,
-      logistics: false,
-      cms: false,
-      admin: false,
-      aiAssistant: false,
-    },
-    notificationPreferences: {
-      email: true,
-      sms: false,
-      push: true,
-    },
-  })
+  useEffect(() => {
+    if (currentStep < 1 || currentStep > totalContentSteps) {
+      router.replace(`/onboarding?step=1`)
+    }
+  }, [currentStep, totalContentSteps, router])
 
-  const [goals, setGoals] = useState("")
-
-  const handleCompanyInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value } = e.target
-    setCompanyInfo((prev) => ({ ...prev, [id]: value }))
-  }
-
-  const handleContactInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value } = e.target
-    setContactInfo((prev) => ({ ...prev, [id]: value }))
-  }
-
-  const handleSelectChange = (value: string, id: string, section: "company" | "contact") => {
-    if (section === "company") {
-      setCompanyInfo((prev) => ({ ...prev, [id]: value }))
-    } else if (section === "contact") {
-      setContactInfo((prev) => ({ ...prev, [id]: value }))
+  const handleNext = () => {
+    if (currentStep < totalContentSteps) {
+      router.push(`/onboarding?step=${currentStep + 1}`)
     }
   }
 
-  const handleModuleChange = (moduleName: string, checked: boolean) => {
-    setPreferences((prev) => ({
-      ...prev,
-      modules: {
-        ...prev.modules,
-        [moduleName]: checked,
-      },
-    }))
-  }
-
-  const handleNotificationChange = (prefName: string, checked: boolean) => {
-    setPreferences((prev) => ({
-      ...prev,
-      notificationPreferences: {
-        ...prev.notificationPreferences,
-        [prefName]: checked,
-      },
-    }))
-  }
-
-  const handleGoalsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setGoals(e.target.value)
-  }
-
-  const nextStep = () => {
-    // Basic validation before moving to the next step
-    if (step === 1 && (!companyInfo.companyName || !companyInfo.industry)) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required company information.",
-        variant: "destructive",
-      })
-      return
+  const handleBack = () => {
+    if (currentStep > 1) {
+      router.push(`/onboarding?step=${currentStep - 1}`)
+    } else {
+      router.push("/login") // Go to login if on the first step and pressing back
     }
-    if (step === 2 && (!contactInfo.fullName || !contactInfo.email || !contactInfo.role)) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required contact information.",
-        variant: "destructive",
-      })
-      return
+  }
+
+  const handleFinishOnboarding = async (redirectPath: string) => {
+    if (userData) {
+      await updateUserData({ onboarding: false })
     }
-    setStep((prev) => Math.min(prev + 1, totalSteps))
+    router.push(redirectPath)
   }
 
-  const prevStep = () => {
-    setStep((prev) => Math.max(prev - 1, 1))
-  }
-
-  const handleSubmit = () => {
-    // In a real application, send all collected data to your backend
-    console.log("Onboarding complete!", { companyInfo, contactInfo, preferences, goals })
-    toast({
-      title: "Onboarding Complete!",
-      description: "Welcome to Jiven! Your setup is complete.",
-    })
-    router.push("/dashboard") // Redirect to dashboard after onboarding
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 dark:bg-gray-950">
+        <p>Loading...</p>
+      </div>
+    )
   }
 
   const renderStepContent = () => {
-    switch (step) {
+    switch (currentStep) {
       case 1:
         return (
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="companyName">Company Name</Label>
-              <Input id="companyName" value={companyInfo.companyName} onChange={handleCompanyInfoChange} required />
+          <div className="flex flex-col md:flex-row items-center justify-center min-h-[calc(100vh-160px)] p-8">
+            <div className="md:w-1/2 text-center md:text-left space-y-6">
+              <p className="text-xl font-semibold text-gray-600 dark:text-gray-400">Step 1</p>
+              <h1 className="text-5xl font-bold">Welcome, {userData?.first_name || "New User"}!</h1>
+              <p className="text-lg text-gray-600 dark:text-gray-400">
+                Thank you for registering with us. We're excited to have you on board and help you streamline your
+                business operations.
+              </p>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="industry">Industry</Label>
-              <Select value={companyInfo.industry} onValueChange={(value) => handleSelectChange(value, "industry", "company")}>
-                <SelectTrigger id="industry">
-                  <SelectValue placeholder="Select industry" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="OOH Advertising">OOH Advertising</SelectItem>
-                  <SelectItem value="Digital Marketing">Digital Marketing</SelectItem>
-                  <SelectItem value="Media Agency">Media Agency</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="companySize">Company Size</Label>
-              <Select value={companyInfo.companySize} onValueChange={(value) => handleSelectChange(value, "companySize", "company")}>
-                <SelectTrigger id="companySize">
-                  <SelectValue placeholder="Select size" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1-10">1-10 employees</SelectItem>
-                  <SelectItem value="11-50">11-50 employees</SelectItem>
-                  <SelectItem value="51-200">51-200 employees</SelectItem>
-                  <SelectItem value="201-500">201-500 employees</SelectItem>
-                  <SelectItem value="500+">500+ employees</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="website">Website (Optional)</Label>
-              <Input id="website" value={companyInfo.website} onChange={handleCompanyInfoChange} />
+            <div className="md:w-1/2 flex justify-center md:justify-end mt-8 md:mt-0">
+              <Image src="/placeholder.svg?height=300&width=400" alt="Welcome" width={400} height={300} />
             </div>
           </div>
         )
       case 2:
         return (
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="fullName">Your Full Name</Label>
-              <Input id="fullName" value={contactInfo.fullName} onChange={handleContactInfoChange} required />
+          <div className="flex flex-col md:flex-row items-center justify-center min-h-[calc(100vh-160px)] p-8">
+            <div className="md:w-1/2 text-center md:text-left space-y-6">
+              <p className="text-xl font-semibold text-gray-600 dark:text-gray-400">Step 2</p>
+              <h1 className="text-5xl font-bold">Upload Your First Product</h1>
+              <p className="text-lg text-gray-600 dark:text-gray-400">
+                Let's get you started by adding your first product or service. This will be the foundation for your
+                proposals and cost estimates.
+              </p>
+              <Button onClick={() => handleFinishOnboarding("/admin/inventory")} className="w-full md:w-auto">
+                <Upload className="mr-2 h-5 w-5" />
+                Upload Product Now
+              </Button>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="email">Work Email</Label>
-              <Input id="email" type="email" value={contactInfo.email} onChange={handleContactInfoChange} required />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="phone">Phone Number (Optional)</Label>
-              <Input id="phone" value={contactInfo.phone} onChange={handleContactInfoChange} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="role">Your Role</Label>
-              <Select value={contactInfo.role} onValueChange={(value) => handleSelectChange(value, "role", "contact")}>
-                <SelectTrigger id="role">
-                  <SelectValue placeholder="Select your role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Owner">Owner</SelectItem>
-                  <SelectItem value="Manager">Manager</SelectItem>
-                  <SelectItem value="Sales">Sales</SelectItem>
-                  <SelectItem value="Operations">Operations</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="md:w-1/2 flex justify-center md:justify-end mt-8 md:mt-0">
+              <Image src="/placeholder.svg?height=300&width=400" alt="Upload Product" width={400} height={300} />
             </div>
           </div>
         )
       case 3:
         return (
-          <div className="grid gap-6">
-            <div className="grid gap-2">
-              <h3 className="text-lg font-semibold">Select Modules</h3>
-              <p className="text-muted-foreground text-sm">Choose the Jiven modules relevant to your business needs.</p>
-              <div className="grid gap-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="sales" checked={preferences.modules.sales} onCheckedChange={(checked) => handleModuleChange("sales", !!checked)} />
-                  <label htmlFor="sales" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    Sales & CRM
-                  </label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="logistics" checked={preferences.modules.logistics} onCheckedChange={(checked) => handleModuleChange("logistics", !!checked)} />
-                  <label htmlFor="logistics" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer\
+          <div className="flex flex-col md:flex-row items-center justify-center min-h-[calc(100vh-160px)] p-8">
+            <div className="md:w-1/2 text-center md:text-left space-y-6">
+              <p className="text-xl font-semibold text-gray-600 dark:text-gray-400">Step 3</p>
+              <h1 className="text-5xl font-bold">You're All Set!</h1>
+              <p className="text-lg text-gray-600 dark:text-gray-400">
+                Congratulations! You've completed the initial setup. You're now ready to explore your dashboard and
+                start managing your business efficiently.
+              </p>
+              <Button onClick={() => handleFinishOnboarding("/sales/dashboard")} className="w-full md:w-auto">
+                <LayoutGrid className="mr-2 h-5 w-5" />
+                Go to Dashboard
+              </Button>
+            </div>
+            <div className="md:w-1/2 flex justify-center md:justify-end mt-8 md:mt-0">
+              <Image src="/placeholder.svg?height=300&width=400" alt="All Set" width={400} height={300} />
+            </div>
+          </div>
+        )
+      default:
+        return null
+    }
+  }
+
+  return (
+    <div className="flex flex-col min-h-screen bg-white dark:bg-gray-950">
+      <OnboardingHeader />
+      <main className="flex-grow">{renderStepContent()}</main>
+      <OnboardingFooter
+        currentStep={currentStep}
+        totalSteps={totalContentSteps}
+        onBack={handleBack}
+        onNext={handleNext}
+        onFinish={() => handleFinishOnboarding("/sales/dashboard")}
+        isLastStep={currentStep === totalContentSteps}
+      />
+    </div>
+  )
+}

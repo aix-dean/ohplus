@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { AuthProvider } from "@/contexts/auth-context"
+
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import ClientLayout from "./clientLayout"
@@ -24,7 +24,7 @@ const publicRoutes = [
   "/onboarding", // New public route for the multi-step onboarding
 ]
 
-const AuthLayout = ({ children }: AuthLayoutProps) => {
+export default function AuthLayout({ children }: AuthLayoutProps) {
   const { user, userData, loading } = useAuth() // Get userData here
   const pathname = usePathname()
 
@@ -68,12 +68,4 @@ const AuthLayout = ({ children }: AuthLayoutProps) => {
 
   // If all checks pass (user is logged in, onboarding complete or on an allowed onboarding page), render ClientLayout
   return <ClientLayout>{children}</ClientLayout>
-}
-
-export default function AuthLayoutWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <AuthProvider>
-      <AuthLayout>{children}</AuthLayout>
-    </AuthProvider>
-  )
 }

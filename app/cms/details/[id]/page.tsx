@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
@@ -244,56 +243,7 @@ const formatDate = (timestamp: any) => {
   }
 }
 
-interface ContentItem {
-  id: string
-  title: string
-  type: string
-  status: string
-  client: string
-  campaign: string
-  dueDate: string
-  publishDate: string
-  budget: number
-  description: string
-  imageUrl: string
-  tags: string[]
-  revisions: { date: string; description: string; author: string }[]
-  performanceMetrics: { label: string; value: string }[]
-}
-
-const mockContentItem: ContentItem = {
-  id: "CON001",
-  title: "New Product Showcase Video Ad",
-  type: "Video Ad",
-  status: "In Review",
-  client: "Acme Corp",
-  campaign: "Summer Sale 2024",
-  dueDate: "2024-07-15",
-  publishDate: "2024-07-20",
-  budget: 5000,
-  imageUrl: "/placeholder.svg?height=400&width=600",
-  description:
-    "A 30-second video advertisement showcasing the new line of summer products. Focus on vibrant colors and energetic music. Target audience: young adults.",
-  tags: ["video", "product", "summer", "ad"],
-  revisions: [
-    { date: "2024-07-01", description: "Initial draft submitted", author: "Eda" },
-    { date: "2024-07-03", description: "Client feedback incorporated (color palette adjustment)", author: "Eda" },
-    { date: "2024-07-05", description: "Voiceover updated", author: "Eda" },
-  ],
-  performanceMetrics: [
-    { label: "Views", value: "1,200" },
-    { label: "Engagement Rate", value: "8.5%" },
-    { label: "Click-Through Rate", value: "2.1%" },
-    { label: "Conversion Rate", value: "0.5%" },
-  ],
-}
-
-export default function CMSDetailsPage() {
-  const params = useParams()
-  const { id } = params
-  const { toast } = useToast()
-  const [contentItem, setContentItem] = useState<ContentItem | null>(null)
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+export default function ProductDetailsPage({ params }: { params: { id: string } }) {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -311,16 +261,7 @@ export default function CMSDetailsPage() {
 
   const router = useRouter()
   const { user } = useAuth()
-
-  useEffect(() => {
-    // In a real application, you would fetch data based on `id`
-    // For now, we use mock data
-    if (id === "CON001") {
-      setContentItem(mockContentItem)
-    } else {
-      setContentItem(null) // Or handle not found
-    }
-  }, [id])
+  const { toast } = useToast()
 
   // Update the useEffect to handle the tab change if "details" is selected
   useEffect(() => {
@@ -1133,12 +1074,6 @@ export default function CMSDetailsPage() {
     )
   }
 
-  const revisionsColumns = [
-    { header: "Date", accessorKey: "date" },
-    { header: "Description", accessorKey: "description" },
-    { header: "Author", accessorKey: "author" },
-  ]
-
   // Loading state
   if (loading) {
     return (
@@ -1166,25 +1101,13 @@ export default function CMSDetailsPage() {
     )
   }
 
-  if (!contentItem) {
-    return (
-      <div className="flex-1 p-4 md:p-6 flex items-center justify-center">
-        <p>Loading content item or item not found...</p>
-      </div>
-    )
-  }
-
   // Remove the timestamp section from here
   return (
     <div className="flex-1 p-3 sm:p-6">
       <div className="flex flex-col gap-4 sm:gap-6">
         {/* Header with back button and actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full">
-          <Button
-            variant="outline"
-            onClick={handleBack}
-            className="flex items-center gap-2 w-full sm:w-auto bg-transparent"
-          >
+          <Button variant="outline" onClick={handleBack} className="flex items-center gap-2 w-full sm:w-auto">
             <ArrowLeft size={16} />
             Back to Dashboard
           </Button>
@@ -1499,7 +1422,7 @@ export default function CMSDetailsPage() {
 
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                              <Button variant="outline" className="flex items-center gap-2">
                                 <Filter size={16} />
                                 <span className="hidden sm:inline">Filter</span>
                               </Button>
@@ -1870,7 +1793,7 @@ export default function CMSDetailsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
+                        className="flex items-center justify-center gap-2 h-12"
                         onClick={handlePowerToggle}
                         disabled={isPerformingAction}
                       >
@@ -1880,7 +1803,7 @@ export default function CMSDetailsPage() {
 
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
+                        className="flex items-center justify-center gap-2 h-12"
                         onClick={handleReboot}
                         disabled={isPerformingAction}
                       >
@@ -1896,7 +1819,7 @@ export default function CMSDetailsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
+                        className="flex items-center justify-center gap-2 h-12"
                         onClick={handlePlayPause}
                         disabled={isPerformingAction}
                       >
@@ -1906,7 +1829,7 @@ export default function CMSDetailsPage() {
 
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
+                        className="flex items-center justify-center gap-2 h-12"
                         onClick={handleVideoSourceSwitch}
                         disabled={isPerformingAction}
                       >
@@ -1922,7 +1845,7 @@ export default function CMSDetailsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
+                        className="flex items-center justify-center gap-2 h-12"
                         onClick={handleTimeSync}
                         disabled={isPerformingAction}
                       >
@@ -1932,7 +1855,7 @@ export default function CMSDetailsPage() {
 
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
+                        className="flex items-center justify-center gap-2 h-12"
                         onClick={handleScreenRefresh}
                         disabled={isPerformingAction}
                       >
@@ -1948,7 +1871,7 @@ export default function CMSDetailsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
+                        className="flex items-center justify-center gap-2 h-12"
                         onClick={handleScreenshot}
                         disabled={isPerformingAction}
                       >
@@ -1958,7 +1881,7 @@ export default function CMSDetailsPage() {
 
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
+                        className="flex items-center justify-center gap-2 h-12"
                         onClick={handleRefresh}
                         disabled={isPerformingAction}
                       >
@@ -2019,6 +1942,7 @@ export default function CMSDetailsPage() {
         </Tabs>
       </div>
 
+      {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog
         isOpen={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}

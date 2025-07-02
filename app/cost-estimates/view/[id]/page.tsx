@@ -1,229 +1,522 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
-import { format } from "date-fns"
+import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import { ResponsiveTable } from "@/components/responsive-table"
 import { Badge } from "@/components/ui/badge"
+import { CheckCircle, XCircle, Calculator, Loader2, Download, ArrowLeft, Share2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import type { CostEstimate } from "@/lib/types/cost-estimate"
 
-interface CostEstimateItem {
-  id: string
-  description: string
-  quantity: number
-  unitPrice: number
-  total: number
+const categoryLabels = {
+  media_cost: "Media Cost",
+  production_cost: "Production Cost",
+  installation_cost: "Installation Cost",
+  maintenance_cost: "Maintenance Cost",
+  other: "Other",
 }
 
-interface CostEstimate {
-  id: string
-  clientName: string
-  clientEmail: string
-  projectName: string
-  status: "Pending" | "Approved" | "Rejected"
-  dateCreated: string
-  validUntil: string
-  items: CostEstimateItem[]
-  subtotal: number
-  taxRate: number
-  taxAmount: number
-  totalAmount: number
-  notes?: string
-}
-
-const mockCostEstimate: CostEstimate = {
-  id: "CE001",
-  clientName: "Acme Corp",
-  clientEmail: "client@acmecorp.com",
-  projectName: "Q3 Marketing Campaign",
-  status: "Pending",
-  dateCreated: "2024-07-01T10:00:00Z",
-  validUntil: "2024-07-31T23:59:59Z",
-  items: [
-    { id: "1", description: "LED Billboard Ad Slot (1 month)", quantity: 1, unitPrice: 50000, total: 50000 },
-    { id: "2", description: "Digital Kiosk Ad (2 weeks)", quantity: 2, unitPrice: 10000, total: 20000 },
-    { id: "3", description: "Creative Design Services", quantity: 1, unitPrice: 7500, total: 7500 },
-    { id: "4", description: "Installation & Maintenance Fee", quantity: 1, unitPrice: 2500, total: 2500 },
-  ],
-  subtotal: 80000,
-  taxRate: 0.12,
-  taxAmount: 9600,
-  totalAmount: 89600,
-  notes: "This estimate is valid for 30 days. Prices are subject to change based on final requirements.",
+// Generate QR code URL for cost estimate
+function generateQRCodeUrl(costEstimateId: string): string {
+  const url = `https://ohplus.aix.ph/cost-estimates/view/${costEstimateId}`
+  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}`
 }
 
 export default function PublicCostEstimateViewPage() {
   const params = useParams()
-  const { id } = params
+  const router = useRouter()
   const { toast } = useToast()
   const [costEstimate, setCostEstimate] = useState<CostEstimate | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [submittingResponse, setSubmittingResponse] = useState(false)
+  const [showQRModal, setShowQRModal] = useState(false)
 
   useEffect(() => {
-    // In a real application, you would fetch data based on `id`
-    // For now, we use mock data
-    if (id === "CE001") {
-      setCostEstimate(mockCostEstimate)
-    } else {
-      setCostEstimate(null) // Or handle not found
-    }
-  }, [id])
+    async function fetchCostEstimate() {
+      if (params.id) {
+        try {
+          const response = await fetch(`/api/cost-estimates/public/${params.id}`)
 
-  const handleAccept = async () => {
-    if (!costEstimate) return
+          if (response.ok) {
+            const data = await response.json()
+            setCostEstimate({
+              ...data,
+              createdAt: new Date(data.createdAt),
+              updatedAt: new Date(data.updatedAt),
+              approvedAt: data.approvedAt ? new Date(data.approvedAt) : undefined,
+              rejectedAt: data.rejectedAt ? new Date(data.rejectedAt) : undefined,
+              validUntil: data.validUntil ? new Date(data.validUntil) : null, // Ensure validUntil is a Date or null
+            })
+
+            // Update status to viewed if it was in sent status
+            if (data.status === "sent") {
+              updateViewedStatus(data.id)
+            }
+          } else {
+            toast({
+              title: "Error",
+              description: "Cost estimate not found or not available",
+              variant: "destructive",
+            })
+          }
+        } catch (error) {
+          console.error("Error fetching cost estimate:", error)
+          toast({
+            title: "Error",
+            description: "Failed to load cost estimate",
+            variant: "destructive",
+          })
+        } finally {
+          setLoading(false)
+        }
+      }
+    }
+
+    fetchCostEstimate()
+  }, [params.id, toast])
+
+  const updateViewedStatus = async (costEstimateId: string) => {
     try {
-      // Simulate API call to update status
-      const response = await fetch("/api/cost-estimates/update-status", {
+      await fetch(`/api/cost-estimates/update-status`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: costEstimate.id, status: "Approved" }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          costEstimateId,
+          status: "viewed",
+          userId: "public_viewer",
+        }),
       })
+    } catch (error) {
+      console.error("Error updating viewed status:", error)
+    }
+  }
+
+  const handleApprove = async () => {
+    if (!costEstimate) return
+
+    setSubmittingResponse(true)
+    try {
+      const response = await fetch(`/api/cost-estimates/update-status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          costEstimateId: costEstimate.id,
+          status: "approved",
+          userId: "public_viewer",
+        }),
+      })
+
       if (response.ok) {
-        setCostEstimate((prev) => (prev ? { ...prev, status: "Approved" } : null))
+        setCostEstimate({ ...costEstimate, status: "approved", approvedAt: new Date() })
         toast({
-          title: "Cost Estimate Accepted!",
-          description: "Thank you for accepting the cost estimate. We will be in touch shortly.",
+          title: "Cost estimate approved!",
+          description: "Thank you for your approval. We will proceed with the next steps.",
         })
       } else {
-        throw new Error("Failed to update status")
+        throw new Error("Failed to approve cost estimate")
       }
     } catch (error) {
-      console.error("Error accepting cost estimate:", error)
+      console.error("Error approving cost estimate:", error)
       toast({
         title: "Error",
-        description: "There was an error accepting the cost estimate. Please try again.",
+        description: "Failed to approve cost estimate. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setSubmittingResponse(false)
     }
   }
 
   const handleReject = async () => {
     if (!costEstimate) return
+
+    setSubmittingResponse(true)
     try {
-      // Simulate API call to update status
-      const response = await fetch("/api/cost-estimates/update-status", {
+      const response = await fetch(`/api/cost-estimates/update-status`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: costEstimate.id, status: "Rejected" }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          costEstimateId: costEstimate.id,
+          status: "rejected",
+          userId: "public_viewer",
+          rejectionReason: "Rejected by client",
+        }),
       })
+
       if (response.ok) {
-        setCostEstimate((prev) => (prev ? { ...prev, status: "Rejected" } : null))
+        setCostEstimate({ ...costEstimate, status: "rejected", rejectedAt: new Date() })
         toast({
-          title: "Cost Estimate Rejected",
-          description: "You have rejected the cost estimate. Please contact us if you have any questions.",
-          variant: "destructive",
+          title: "Cost estimate rejected",
+          description: "Your feedback has been recorded. We will contact you to discuss alternatives.",
         })
       } else {
-        throw new Error("Failed to update status")
+        throw new Error("Failed to reject cost estimate")
       }
     } catch (error) {
       console.error("Error rejecting cost estimate:", error)
       toast({
         title: "Error",
-        description: "There was an error rejecting the cost estimate. Please try again.",
+        description: "Failed to reject cost estimate. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setSubmittingResponse(false)
     }
   }
 
-  if (!costEstimate) {
+  const handleDownloadPDF = async () => {
+    if (!costEstimate) return
+
+    // This is a placeholder - in a real implementation, you would generate and download the PDF
+    toast({
+      title: "Download started",
+      description: "Your cost estimate PDF is being prepared for download.",
+    })
+
+    // Simulate PDF download delay
+    setTimeout(() => {
+      toast({
+        title: "Download complete",
+        description: "Cost estimate PDF has been downloaded.",
+      })
+    }, 2000)
+  }
+
+  const copyLinkToClipboard = () => {
+    if (!costEstimate) return
+
+    const url = `https://ohplus.aix.ph/cost-estimates/view/${costEstimate.id}`
+    navigator.clipboard.writeText(url)
+
+    toast({
+      title: "Link copied",
+      description: "Cost estimate link copied to clipboard",
+    })
+  }
+
+  if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-100 dark:bg-gray-950 p-4">
-        <Card className="w-full max-w-2xl">
-          <CardHeader>
-            <CardTitle>Cost Estimate Not Found</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>The cost estimate you are looking for does not exist or has been removed.</p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-gray-600">Loading cost estimate...</p>
+        </div>
       </div>
     )
   }
 
-  const itemColumns = [
-    { header: "Description", accessorKey: "description" },
-    { header: "Quantity", accessorKey: "quantity" },
-    { header: "Unit Price", accessorKey: "unitPrice", cell: (info: any) => `$${info.getValue().toFixed(2)}` },
-    { header: "Total", accessorKey: "total", cell: (info: any) => `$${info.getValue().toFixed(2)}` },
-  ]
+  if (!costEstimate) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+            <Calculator className="h-8 w-8 text-gray-400" />
+          </div>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-2">Cost Estimate Not Found</h1>
+          <p className="text-gray-600">The cost estimate you're looking for doesn't exist or may have been removed.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 dark:bg-gray-950 p-4">
-      <Card className="w-full max-w-4xl shadow-lg">
-        <CardHeader className="pb-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle className="text-2xl font-bold">Cost Estimate</CardTitle>
-              <p className="text-sm text-muted-foreground">For Project: {costEstimate.projectName}</p>
-            </div>
+    <>
+      {/* Fixed header */}
+      <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-sm border-b border-gray-200 shadow-sm">
+        <div className="max-w-[850px] mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Button variant="ghost" size="sm" className="text-gray-600" onClick={() => router.back()}>
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Button>
             <Badge
-              variant={
-                costEstimate.status === "Approved"
-                  ? "default"
-                  : costEstimate.status === "Pending"
-                    ? "secondary"
-                    : "destructive"
-              }
+              className={`${
+                costEstimate.status === "approved"
+                  ? "bg-green-100 text-green-800 border-green-200"
+                  : costEstimate.status === "rejected"
+                    ? "bg-red-100 text-red-800 border-red-200"
+                    : "bg-blue-100 text-blue-800 border-blue-200"
+              } border font-medium px-3 py-1`}
             >
-              {costEstimate.status}
+              {costEstimate.status === "approved" && <CheckCircle className="h-3.5 w-3.5 mr-1" />}
+              {costEstimate.status === "rejected" && <XCircle className="h-3.5 w-3.5 mr-1" />}
+              <span className="capitalize">{costEstimate.status}</span>
             </Badge>
           </div>
-          <div className="text-sm text-muted-foreground mt-2">
-            <p>
-              Client: {costEstimate.clientName} ({costEstimate.clientEmail})
-            </p>
-            <p>Date: {format(new Date(costEstimate.dateCreated), "PPP")}</p>
-            <p>Valid Until: {format(new Date(costEstimate.validUntil), "PPP")}</p>
+          <div className="flex items-center space-x-2">
+            <Button variant="outline" size="sm" className="text-gray-600" onClick={() => setShowQRModal(true)}>
+              <Share2 className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Share</span>
+            </Button>
+            <Button variant="outline" size="sm" className="text-gray-600" onClick={handleDownloadPDF}>
+              <Download className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Download</span>
+            </Button>
           </div>
-        </CardHeader>
-        <CardContent className="grid gap-6">
-          <Separator />
-          <div>
-            <h3 className="text-lg font-semibold mb-2">Items</h3>
-            <ResponsiveTable data={costEstimate.items} columns={itemColumns} />
+        </div>
+      </div>
+
+      {/* Document Container */}
+      <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 pt-16">
+        <div className="max-w-[850px] mx-auto bg-white shadow-md rounded-sm overflow-hidden">
+          {/* Document Header */}
+          <div className="border-b-2 border-orange-600 p-6 sm:p-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">COST ESTIMATE</h1>
+                <p className="text-sm text-gray-500">{costEstimate.id}</p>
+              </div>
+              <div className="mt-4 sm:mt-0 flex items-center space-x-4">
+                <div className="text-center">
+                  <img
+                    src={generateQRCodeUrl(costEstimate.id) || "/placeholder.svg"}
+                    alt="QR Code"
+                    className="w-16 h-16 border border-gray-300 bg-white p-1 rounded"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Scan to view online</p>
+                </div>
+                <img src="/oh-plus-logo.png" alt="Company Logo" className="h-8 sm:h-10" />
+              </div>
+            </div>
           </div>
-          <div className="grid gap-2 text-right">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Subtotal:</span>
-              <span className="font-medium">${costEstimate.subtotal.toFixed(2)}</span>
+
+          {/* Document Content */}
+          <div className="p-6 sm:p-8">
+            {/* Cost Estimate Information */}
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                Cost Estimate Details
+              </h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Title</h3>
+                  <p className="text-base font-medium text-gray-900">{costEstimate.title}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Created Date</h3>
+                  <p className="text-base text-gray-900">{costEstimate.createdAt.toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Valid Until</h3>
+                  <p className="text-base text-gray-900">
+                    {costEstimate.validUntil ? costEstimate.validUntil.toLocaleDateString() : "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Status</h3>
+                  <Badge
+                    className={`${
+                      costEstimate.status === "approved"
+                        ? "bg-green-100 text-green-800 border-green-200"
+                        : costEstimate.status === "rejected"
+                          ? "bg-red-100 text-red-800 border-red-200"
+                          : "bg-blue-100 text-blue-800 border-blue-200"
+                    } border font-medium px-3 py-1`}
+                  >
+                    {costEstimate.status === "approved" && <CheckCircle className="h-3.5 w-3.5 mr-1" />}
+                    {costEstimate.status === "rejected" && <XCircle className="h-3.5 w-3.5 mr-1" />}
+                    <span className="capitalize">{costEstimate.status}</span>
+                  </Badge>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Total Amount</h3>
+                  <p className="text-base font-semibold text-gray-900">{costEstimate.totalAmount.toLocaleString()}</p>
+                </div>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tax ({costEstimate.taxRate * 100}%):</span>
-              <span className="font-medium">${costEstimate.taxAmount.toFixed(2)}</span>
+
+            {/* Cost Breakdown */}
+            <div className="mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                Cost Breakdown
+              </h2>
+
+              <div className="border border-gray-300 rounded-sm overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                        Description
+                      </th>
+                      <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                        Category
+                      </th>
+                      <th className="py-2 px-4 text-center font-medium text-gray-700 border-b border-gray-300">Qty</th>
+                      <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
+                        Unit Price
+                      </th>
+                      <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {costEstimate.lineItems.map((item, index) => (
+                      <tr key={item.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                        <td className="py-3 px-4 border-b border-gray-200">
+                          <div className="font-medium text-gray-900">{item.description}</div>
+                        </td>
+                        <td className="py-3 px-4 border-b border-gray-200">
+                          <span className="inline-block px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded">
+                            {categoryLabels[item.category]}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center border-b border-gray-200">{item.quantity}</td>
+                        <td className="py-3 px-4 text-right border-b border-gray-200">
+                          {item.unitPrice.toLocaleString()}
+                        </td>
+                        <td className="py-3 px-4 text-right border-b border-gray-200">
+                          <div className="font-medium text-gray-900">{item.totalPrice.toLocaleString()}</div>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="bg-gray-50">
+                      <td colSpan={4} className="py-3 px-4 text-right font-medium">
+                        Subtotal:
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium">{costEstimate.subtotal.toLocaleString()}</td>
+                    </tr>
+                    <tr className="bg-gray-50">
+                      <td colSpan={4} className="py-3 px-4 text-right font-medium">
+                        VAT ({(costEstimate.taxRate * 100).toFixed(0)}%):
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium">{costEstimate.taxAmount.toLocaleString()}</td>
+                    </tr>
+                    <tr className="bg-orange-50">
+                      <td colSpan={4} className="py-3 px-4 text-right font-bold">
+                        Total Amount:
+                      </td>
+                      <td className="py-3 px-4 text-right font-bold text-orange-600">
+                        {costEstimate.totalAmount.toLocaleString()}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <Separator />
-            <div className="flex justify-between text-lg font-bold">
-              <span>Total Amount:</span>
-              <span>${costEstimate.totalAmount.toFixed(2)}</span>
-            </div>
-          </div>
-          {costEstimate.notes && (
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Notes</h3>
-              <p className="text-muted-foreground text-sm">{costEstimate.notes}</p>
-            </div>
-          )}
-          <div className="flex justify-end gap-2 mt-4">
-            {costEstimate.status === "Pending" && (
-              <>
-                <Button variant="destructive" onClick={handleReject}>
-                  Reject
-                </Button>
-                <Button onClick={handleAccept}>Accept</Button>
-              </>
+
+            {/* Notes */}
+            {costEstimate.notes && (
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                  Notes
+                </h2>
+                <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
+                  <p className="text-sm text-gray-700 leading-relaxed">{costEstimate.notes}</p>
+                </div>
+              </div>
             )}
-            {costEstimate.status === "Approved" && (
-              <p className="text-green-600 font-semibold">This cost estimate has been accepted.</p>
-            )}
-            {costEstimate.status === "Rejected" && (
-              <p className="text-red-600 font-semibold">This cost estimate has been rejected.</p>
-            )}
+
+            {/* Action Buttons */}
+            {costEstimate.status === "sent" || costEstimate.status === "viewed" ? (
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                  Your Response
+                </h2>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <p className="text-gray-700 mb-4">
+                    Please review the cost estimate above and let us know if you approve or need any modifications.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <Button
+                      onClick={handleApprove}
+                      disabled={submittingResponse}
+                      className="bg-green-600 hover:bg-green-700 flex-1"
+                    >
+                      {submittingResponse ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Approve Cost Estimate
+                    </Button>
+                    <Button
+                      onClick={handleReject}
+                      disabled={submittingResponse}
+                      variant="outline"
+                      className="border-red-300 text-red-700 hover:bg-red-50 flex-1"
+                    >
+                      {submittingResponse ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Request Changes
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : costEstimate.status === "approved" ? (
+              <div className="mb-8">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+                  <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-green-900 mb-2">Cost Estimate Approved</h3>
+                  <p className="text-green-700">
+                    Thank you for approving this cost estimate. We will proceed with the next steps and contact you
+                    soon.
+                  </p>
+                  <p className="text-green-700 text-sm mt-2">
+                    Approved on: {costEstimate.approvedAt?.toLocaleDateString()} at{" "}
+                    {costEstimate.approvedAt?.toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+            ) : costEstimate.status === "rejected" ? (
+              <div className="mb-8">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                  <XCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-red-900 mb-2">Changes Requested</h3>
+                  <p className="text-red-700">
+                    We have received your feedback. Our team will review your requirements and contact you with a
+                    revised estimate.
+                  </p>
+                  <p className="text-red-700 text-sm mt-2">
+                    Rejected on: {costEstimate.rejectedAt?.toLocaleDateString()} at{" "}
+                    {costEstimate.rejectedAt?.toLocaleTimeString()}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Document Footer */}
+            <div className="mt-12 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
+              <p>This cost estimate is subject to final approval and may be revised based on project requirements.</p>
+              <p className="mt-1">© {new Date().getFullYear()} OH+ Outdoor Advertising. All rights reserved.</p>
+            </div>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      </div>
+
+      {/* QR Code Modal */}
+      {showQRModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
+            <h3 className="text-lg font-semibold mb-4">Share Cost Estimate</h3>
+            <div className="flex flex-col items-center mb-4">
+              <img
+                src={generateQRCodeUrl(costEstimate.id) || "/placeholder.svg"}
+                alt="QR Code"
+                className="w-48 h-48 border border-gray-300 p-2 mb-2"
+              />
+              <p className="text-sm text-gray-600">Scan to view this cost estimate</p>
+            </div>
+            <div className="flex flex-col space-y-3">
+              <Button onClick={copyLinkToClipboard} className="w-full">
+                <Share2 className="h-4 w-4 mr-2" />
+                Copy Link
+              </Button>
+              <Button variant="outline" onClick={() => setShowQRModal(false)} className="w-full">
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

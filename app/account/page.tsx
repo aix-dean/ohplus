@@ -1,24 +1,9 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
-
 import { Separator } from "@/components/ui/separator"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { storage } from "@/lib/firebase"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { Progress } from "@/components/ui/progress"
-import { getUserProductsCount } from "@/lib/firebase-service" // Corrected import path
-import { cn } from "@/lib/utils"
-import { useToast } from "@/hooks/use-toast"
-import { subscriptionService } from "@/lib/subscription-service"
-import { useEffect, useRef } from "react"
+
+import type React from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   User,
@@ -44,6 +29,19 @@ import {
   Copy,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import { storage } from "@/lib/firebase"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { Progress } from "@/components/ui/progress"
+import { getUserProductsCount } from "@/lib/firebase-service" // Corrected import path
+import { cn } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
+import { subscriptionService } from "@/lib/subscription-service"
 
 // Helper function to mask the license key
 const maskLicenseKey = (key: string | undefined | null) => {
@@ -85,16 +83,6 @@ export default function AccountPage() {
   const [instagram, setInstagram] = useState("")
   const [youtube, setYoutube] = useState("")
 
-  const [formData, setFormData] = useState({
-    name: "John Doe",
-    email: "john.doe@example.com",
-    phone: "123-456-7890",
-    address: "123 Main St, Anytown, USA",
-    company: "Acme Corp",
-    role: "Admin",
-    bio: "Experienced professional with a passion for innovation.",
-  })
-
   const router = useRouter()
 
   const handleLogout = async () => {
@@ -109,31 +97,6 @@ export default function AccountPage() {
         variant: "destructive",
       })
     }
-  }
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value } = e.target
-    setFormData((prevData) => ({
-      ...prevData,
-      [id]: value,
-    }))
-  }
-
-  const handleSelectChange = (value: string, id: string) => {
-    setFormData((prevData) => ({
-      ...prevData,
-      [id]: value,
-    }))
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    // Here you would typically send the formData to your backend
-    console.log("Form submitted:", formData)
-    toast({
-      title: "Account Updated",
-      description: "Your account information has been successfully updated.",
-    })
   }
 
   useEffect(() => {
@@ -742,7 +705,7 @@ export default function AccountPage() {
 
               {/* Social Media Card */}
               <Card className="rounded-xl shadow-sm">
-                <CardHeader>
+                <CardHeader className="border-b px-5 py-3">
                   <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
                     <Globe className="h-5 w-5 text-primary" />
                     Social Media
@@ -751,7 +714,7 @@ export default function AccountPage() {
                     Connect your company's social media accounts.
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-5">
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100">

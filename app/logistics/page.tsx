@@ -1,11 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Package2 } from "lucide-react"
 import Link from "next/link"
-import { redirect } from "next/navigation"
 
+// Update the page title
 export default function LogisticsPage() {
-  redirect("/logistics/dashboard")
-
   return (
     <div className="container mx-auto py-10">
       <h1 className="text-3xl font-bold mb-6">Logistics Dashboard</h1>

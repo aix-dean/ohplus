@@ -5,31 +5,9 @@ import { LayoutGrid, List, Plus } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Line, LineChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import type { Product } from "@/lib/firebase-service"
-
-const displayHealthData = [
-  { month: "Jan", uptime: 99.5, brightness: 80 },
-  { month: "Feb", uptime: 99.2, brightness: 78 },
-  { month: "Mar", uptime: 99.8, brightness: 82 },
-  { month: "Apr", uptime: 99.6, brightness: 81 },
-  { month: "May", uptime: 99.9, brightness: 85 },
-  { month: "Jun", uptime: 99.7, brightness: 83 },
-]
-
-const chartConfig = {
-  uptime: {
-    label: "Uptime (%)",
-    color: "hsl(var(--chart-1))",
-  },
-  brightness: {
-    label: "Brightness (nits)",
-    color: "hsl(var(--chart-2))",
-  },
-}
 
 export default function LEDSitesDisplayHealthTab({ products = [] }: { products?: Product[] }) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -108,11 +86,6 @@ export default function LEDSitesDisplayHealthTab({ products = [] }: { products?:
             <LEDHealthCard key={product.id} product={product} />
           </Link>
         ))}
-      </div>
-
-      {/* Display Health Chart */}
-      <div className="mt-4">
-        <LEDSitesDisplayHealth />
       </div>
 
       {/* Create Service Assignment Button */}
@@ -217,43 +190,6 @@ function LEDHealthCard({ product }: { product: Product }) {
             />
           </div>
         </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-export function LEDSitesDisplayHealth() {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xl font-bold">LED Sites Display Health</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
-          <LineChart data={displayHealthData}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
-            <YAxis yAxisId="left" tickLine={false} tickMargin={10} axisLine={false} />
-            <YAxis yAxisId="right" orientation="right" tickLine={false} tickMargin={10} axisLine={false} />
-            <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-            <Line
-              yAxisId="left"
-              type="monotone"
-              dataKey="uptime"
-              stroke="var(--color-uptime)"
-              strokeWidth={2}
-              dot={{ r: 4 }}
-            />
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="brightness"
-              stroke="var(--color-brightness)"
-              strokeWidth={2}
-              dot={{ r: 4 }}
-            />
-          </LineChart>
-        </ChartContainer>
       </CardContent>
     </Card>
   )

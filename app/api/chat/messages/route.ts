@@ -1,31 +1,40 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { getMessagesByConversationId, addMessageToConversation } from "@/lib/chat-database-service"
+import { chatDB } from "@/lib/chat-database-service"
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const conversationId = searchParams.get("conversationId")
-
-  if (!conversationId) {
-    return NextResponse.json({ error: "Conversation ID is required" }, { status: 400 })
-  }
-
+export async function GET(request: NextRequest) {
   try {
-    const messages = await getMessagesByConversationId(conversationId)
-    return NextResponse.json(messages)
+    const { searchParams } = new URL(request.url)
+    const conversationId = searchParams.get("conversationId")
+    const limit = Number.parseInt(searchParams.get("limit") || "50")
+
+    if (!conversationId) {
+      return NextResponse.json({ error: "Conversation ID is required" }, { status: 400 })
+    }
+
+    const messages = await chatDB.getMessages(conversationId, limit)
+    return NextResponse.json({ messages })
   } catch (error) {
     console.error("Error fetching messages:", error)
     return NextResponse.json({ error: "Failed to fetch messages" }, { status: 500 })
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const { conversationId, sender, content } = await req.json()
-    if (!conversationId || !sender || !content) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    const { conversationId, role, content, currentPage, responseTime } = await request.json()
+
+    if (!conversationId || !role || !content) {
+      return NextResponse.json(
+        {
+          error: "Conversation ID, role, and content are required",
+        },
+        { status: 400 },
+      )
     }
-    const newMessage = await addMessageToConversation(conversationId, sender, content)
-    return NextResponse.json(newMessage, { status: 201 })
+
+    const messageId = await chatDB.addMessage(conversationId, role, content, currentPage, responseTime)
+
+    return NextResponse.json({ messageId })
   } catch (error) {
     console.error("Error adding message:", error)
     return NextResponse.json({ error: "Failed to add message" }, { status: 500 })

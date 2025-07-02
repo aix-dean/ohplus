@@ -1,67 +1,41 @@
 "use client"
 
-import { Input } from "@/components/ui/input"
-
 import type React from "react"
-import Link from "next/link"
-import { Search, ChevronDown, Plus, Eye, MessageSquare, DollarSign, Calendar } from "lucide-react"
+
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
+import {
+  Plus,
+  MoreVertical,
+  FileText,
+  LayoutGrid,
+  List,
+  Edit,
+  Trash2,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Clock,
+  Search,
+  Monitor,
+  Play,
+  AlertCircle,
+  MapPin,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { CartesianGrid, XAxis, YAxis, Line, LineChart } from "recharts"
-import { ResponsiveTable } from "@/components/responsive-table"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
 import { getPaginatedUserProducts, getUserProductsCount, softDeleteProduct, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
-
-// Sample Data for Charts and Tables
-const contentPerformanceData = [
-  { month: "Jan", views: 1200, engagements: 800 },
-  { month: "Feb", views: 1500, engagements: 950 },
-  { month: "Mar", views: 1300, engagements: 850 },
-  { month: "Apr", views: 1800, engagements: 1100 },
-  { month: "May", views: 1600, engagements: 1000 },
-  { month: "Jun", views: 1900, engagements: 1200 },
-]
-
-const recentOrdersData = [
-  { id: "ORD001", client: "Acme Corp", campaign: "Summer Sale", status: "Pending", amount: 15000, date: "2024-06-28" },
-  {
-    id: "ORD002",
-    client: "Globex Inc.",
-    campaign: "Brand Launch",
-    status: "Completed",
-    amount: 25000,
-    date: "2024-06-25",
-  },
-  {
-    id: "ORD003",
-    client: "Soylent Corp",
-    campaign: "Holiday Promo",
-    status: "Cancelled",
-    amount: 10000,
-    date: "2024-06-20",
-  },
-  { id: "ORD004", client: "Initech", campaign: "Q3 Campaign", status: "Pending", amount: 18000, date: "2024-06-18" },
-]
-
-const upcomingContentData = [
-  { id: "CON001", title: "New Product Showcase", type: "Video Ad", status: "Draft", dueDate: "2024-07-15" },
-  {
-    id: "CON002",
-    title: "Client Testimonial Series",
-    type: "Social Media",
-    status: "In Review",
-    dueDate: "2024-07-20",
-  },
-  { id: "CON003", title: "Industry Whitepaper", type: "Document", status: "Approved", dueDate: "2024-07-30" },
-]
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -91,60 +65,6 @@ const mapProductToContent = (product: Product) => {
   }
 }
 
-const orderColumns = [
-  {
-    header: "Order ID",
-    accessorKey: "id",
-    cell: (info: any) => (
-      <Link href={`/cms/details/${info.getValue()}`} className="text-blue-600 hover:underline">
-        {info.getValue()}
-      </Link>
-    ),
-  },
-  { header: "Client", accessorKey: "client" },
-  { header: "Campaign", accessorKey: "campaign" },
-  {
-    header: "Status",
-    accessorKey: "status",
-    cell: (info: any) => (
-      <Badge
-        variant={
-          info.getValue() === "Completed" ? "default" : info.getValue() === "Pending" ? "secondary" : "destructive"
-        }
-      >
-        {info.getValue()}
-      </Badge>
-    ),
-  },
-  { header: "Amount", accessorKey: "amount", cell: (info: any) => `$${info.getValue().toLocaleString()}` },
-  { header: "Date", accessorKey: "date" },
-]
-
-const upcomingContentColumns = [
-  {
-    header: "Title",
-    accessorKey: "title",
-    cell: (info: any) => (
-      <Link href={`/cms/details/${info.row.original.id}`} className="text-blue-600 hover:underline">
-        {info.getValue()}
-      </Link>
-    ),
-  },
-  { header: "Type", accessorKey: "type" },
-  {
-    header: "Status",
-    accessorKey: "status",
-    cell: (info: any) => (
-      <Badge
-        variant={info.getValue() === "Approved" ? "default" : info.getValue() === "In Review" ? "secondary" : "outline"}
-      >
-        {info.getValue()}
-      </Badge>
-    ),
-  },
-  { header: "Due Date", accessorKey: "dueDate" },
-]
-
 export default function CMSDashboardPage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [products, setProducts] = useState<Product[]>([])
@@ -152,7 +72,6 @@ export default function CMSDashboardPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedDateRange, setSelectedDateRange] = useState("Last 30 Days")
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -519,75 +438,11 @@ export default function CMSDashboardPage() {
   const content = useMockData ? mockContent : products.map(mapProductToContent)
 
   return (
-    <div className="flex-1 p-4 md:p-6">
-      <div className="flex flex-col gap-6">
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-xl md:text-2xl font-bold">CMS Dashboard</h1>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-grow">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search content or orders..."
-                className="w-full rounded-lg bg-background pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                  {selectedDateRange} <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setSelectedDateRange("Last 7 Days")}>Last 7 Days</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDateRange("Last 30 Days")}>Last 30 Days</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDateRange("Last 90 Days")}>Last 90 Days</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDateRange("This Year")}>This Year</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button size="sm" asChild>
-              <Link href="/cms/planner">
-                <Plus className="mr-2 h-4 w-4" /> New Content
-              </Link>
-            </Button>
-          </div>
-        </div>
-
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Views</CardTitle>
-              <Eye className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">7,500</div>
-              <p className="text-xs text-muted-foreground">+15.5% from last month</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Engagements</CardTitle>
-              <MessageSquare className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">4,800</div>
-              <p className="text-xs text-muted-foreground">+10.2% from last month</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Revenue Generated</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">$75,000</div>
-              <p className="text-xs text-muted-foreground">+8.1% from last month</p>
-            </CardContent>
-          </Card>
+    <div className="flex-1 p-4">
+      <div className="flex flex-col gap-3">
+        {/* Header with title and actions */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <h1 className="text-2xl font-bold">Content Management</h1>
         </div>
 
         {/* Screen Analytics Monitoring */}
@@ -605,7 +460,7 @@ export default function CMSDashboardPage() {
                       <h3 className="text-2xl font-bold">42</h3>
                     </div>
                     <div className="bg-green-100 p-1.5 rounded-full">
-                      <Eye className="h-4 w-4 text-green-600" />
+                      <Monitor className="h-4 w-4 text-green-600" />
                     </div>
                   </div>
                 </CardContent>
@@ -622,7 +477,7 @@ export default function CMSDashboardPage() {
                       <h3 className="text-2xl font-bold">1,284</h3>
                     </div>
                     <div className="bg-blue-100 p-1.5 rounded-full">
-                      <Calendar className="h-4 w-4 text-blue-600" />
+                      <Play className="h-4 w-4 text-blue-600" />
                     </div>
                   </div>
                 </CardContent>
@@ -639,7 +494,7 @@ export default function CMSDashboardPage() {
                       <h3 className="text-2xl font-bold">3</h3>
                     </div>
                     <div className="bg-amber-100 p-1.5 rounded-full">
-                      <MessageSquare className="h-4 w-4 text-amber-600" />
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
                     </div>
                   </div>
                 </CardContent>
@@ -656,65 +511,15 @@ export default function CMSDashboardPage() {
                       <h3 className="text-2xl font-bold">7</h3>
                     </div>
                     <div className="bg-purple-100 p-1.5 rounded-full">
-                      <Calendar className="h-4 w-4 text-purple-600" />
+                      <Clock className="h-4 w-4 text-purple-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
+            <Separator className="my-3" />
           </>
         )}
-
-        {/* Content Performance Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Content Performance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={{
-                views: { label: "Views", color: "hsl(var(--primary))" },
-                engagements: { label: "Engagements", color: "hsl(var(--secondary))" },
-              }}
-              className="aspect-auto h-[300px] w-full"
-            >
-              <LineChart data={contentPerformanceData}>
-                <CartesianGrid vertical={false} />
-                <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
-                <YAxis tickLine={false} tickMargin={10} axisLine={false} />
-                <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                <Line type="monotone" dataKey="views" stroke="var(--color-views)" strokeWidth={2} dot={{ r: 6 }} />
-                <Line
-                  type="monotone"
-                  dataKey="engagements"
-                  stroke="var(--color-engagements)"
-                  strokeWidth={2}
-                  dot={{ r: 6 }}
-                />
-              </LineChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        {/* Recent Orders and Upcoming Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Orders</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveTable data={recentOrdersData} columns={orderColumns} />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Upcoming Content</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveTable data={upcomingContentData} columns={upcomingContentColumns} />
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Search and controls */}
         {!loading && !useMockData && (
@@ -742,7 +547,7 @@ export default function CMSDashboardPage() {
                   className="h-8 w-8"
                   onClick={() => setViewMode("grid")}
                 >
-                  {/* Grid Icon */}
+                  <LayoutGrid size={18} />
                 </Button>
                 <Button
                   variant={viewMode === "list" ? "default" : "ghost"}
@@ -750,9 +555,13 @@ export default function CMSDashboardPage() {
                   className="h-8 w-8"
                   onClick={() => setViewMode("list")}
                 >
-                  {/* List Icon */}
+                  <List size={18} />
                 </Button>
               </div>
+              <Button onClick={handleAddContent} className="flex items-center gap-2">
+                <Plus size={16} />
+                Add Content
+              </Button>
             </div>
           </div>
         )}
@@ -760,7 +569,7 @@ export default function CMSDashboardPage() {
         {/* Loading state */}
         {loading && (
           <div className="flex justify-center items-center py-12">
-            {/* Loader Icon */}
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <span className="ml-2 text-lg">Loading content...</span>
           </div>
         )}
@@ -769,12 +578,12 @@ export default function CMSDashboardPage() {
         {!loading && content.length === 0 && (
           <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed">
             <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              {/* File Text Icon */}
+              <FileText size={24} className="text-gray-400" />
             </div>
             <h3 className="text-lg font-medium mb-2">No content yet</h3>
             <p className="text-gray-500 mb-4">Add your first content item to get started</p>
             <Button onClick={handleAddContent}>
-              {/* Plus Icon */}
+              <Plus size={16} className="mr-2" />
               Add Content
             </Button>
           </div>
@@ -797,14 +606,94 @@ export default function CMSDashboardPage() {
 
         {/* List View */}
         {!loading && content.length > 0 && viewMode === "list" && (
-          <div className="border rounded-lg overflow-hidden">{/* Table Component */}</div>
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[80px]">Thumbnail</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Last Modified</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {content.map((item) => (
+                  <TableRow
+                    key={item.id}
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => handleViewDetails(item.id)}
+                  >
+                    <TableCell>
+                      <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
+                        <Image
+                          src={item.thumbnail || "/placeholder.svg"}
+                          alt={item.title || "Content thumbnail"}
+                          width={48}
+                          height={48}
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = "/abstract-geometric-sculpture.png"
+                            target.className = "opacity-50"
+                          }}
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium">{item.title}</TableCell>
+                    <TableCell>{item.type}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={`${
+                          item.status === "Published"
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : item.status === "Draft"
+                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                        }`}
+                      >
+                        {item.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>{item.dateModified}</TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) =>
+                            handleEditClick(useMockData ? item : products.find((p) => p.id === item.id)!, e)
+                          }
+                        >
+                          <Edit size={16} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={(e) =>
+                            handleDeleteClick(useMockData ? item : products.find((p) => p.id === item.id)!, e)
+                          }
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
 
         {/* Loading More Indicator */}
         {loadingMore && (
           <div className="flex justify-center my-4">
             <div className="flex items-center gap-2">
-              {/* Loader Icon */}
+              <Loader2 size={18} className="animate-spin" />
               <span>Loading more...</span>
             </div>
           </div>
@@ -816,7 +705,7 @@ export default function CMSDashboardPage() {
             <div className="text-sm text-gray-500 flex items-center">
               {loadingCount ? (
                 <div className="flex items-center">
-                  {/* Loader Icon */}
+                  <Loader2 size={14} className="animate-spin mr-2" />
                   <span>Calculating pages...</span>
                 </div>
               ) : (
@@ -832,9 +721,9 @@ export default function CMSDashboardPage() {
                 size="sm"
                 onClick={goToPreviousPage}
                 disabled={currentPage === 1}
-                className="h-8 w-8 p-0 bg-transparent"
+                className="h-8 w-8 p-0"
               >
-                {/* Chevron Left Icon */}
+                <ChevronLeft size={16} />
               </Button>
 
               {/* Page numbers */}
@@ -865,12 +754,22 @@ export default function CMSDashboardPage() {
                 disabled={currentPage >= totalPages}
                 className="h-8 w-8 p-0"
               >
-                {/* Chevron Right Icon */}
+                <ChevronRight size={16} />
               </Button>
             </div>
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Content"
+        description="This content will be permanently removed. This action cannot be undone."
+        itemName={productToDelete?.name}
+      />
     </div>
   )
 }
@@ -888,7 +787,7 @@ function ContentCard({
   onDelete: (e: React.MouseEvent) => void
 }) {
   return (
-    <div
+    <Card
       className="overflow-hidden cursor-pointer transition-all border border-gray-200 shadow-sm hover:shadow-md"
       onClick={onView}
     >
@@ -922,31 +821,51 @@ function ContentCard({
         </div>
 
         <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
-          {/* Dropdown Menu Component */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary" size="icon" className="h-8 w-8 bg-white/80 backdrop-blur-sm">
+                <MoreVertical size={16} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onView}>
+                <Eye className="mr-2 h-4 w-4" />
+                View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onEdit}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Content
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Content
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      <div className="p-4">
+      <CardContent className="p-4">
         <div className="flex flex-col">
           <h3 className="text-lg font-semibold line-clamp-1 mb-1">{content.title}</h3>
           <p className="text-sm text-gray-500 mb-2 flex items-center gap-1">
-            {/* Map Pin Icon */}
+            <MapPin className="h-3.5 w-3.5" />
             <span>Edsa corner Aurora Blvd.</span>
           </p>
 
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 text-sm">
             <div className="flex items-center gap-1 text-gray-600">
-              {/* Monitor Icon */}
+              <Monitor className="h-3.5 w-3.5" />
               <span>{content.dimensions}</span>
             </div>
 
             <div className="flex items-center gap-1 text-gray-600">
-              {/* Clock Icon */}
+              <Clock className="h-3.5 w-3.5" />
               <span>{content.duration}</span>
             </div>
 
             <div className="flex items-center gap-1 text-gray-600">
-              {/* File Text Icon */}
+              <FileText className="h-3.5 w-3.5" />
               <span>{content.format}</span>
             </div>
 
@@ -964,7 +883,7 @@ function ContentCard({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }

@@ -5,24 +5,8 @@ import { LayoutGrid, List, Plus } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
+import { Card, CardContent } from "@/components/ui/card"
 import type { Product } from "@/lib/firebase-service"
-
-const structureTypeData = [
-  { type: "Freestanding", count: 50 },
-  { type: "Wall-Mounted", count: 30 },
-  { type: "Rooftop", count: 15 },
-  { type: "Gantry", count: 5 },
-]
-
-const chartConfig = {
-  count: {
-    label: "Number of Sites",
-    color: "hsl(var(--primary))",
-  },
-}
 
 export default function LEDSitesStructureTab({ products = [] }: { products?: Product[] }) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -75,11 +59,6 @@ export default function LEDSitesStructureTab({ products = [] }: { products?: Pro
             <LEDStructureCard product={product} />
           </Link>
         ))}
-      </div>
-
-      {/* LED Sites by Structure Type Chart */}
-      <div className="mt-4">
-        <LEDSitesStructure />
       </div>
 
       {/* Create Service Assignment Button */}
@@ -144,7 +123,7 @@ function LEDStructureCard({ product }: { product: Product }) {
           {/* Maintenance Status Indicator */}
           <div className="mt-1 p-3 rounded-lg bg-white shadow-sm">
             <div className="text-sm text-gray-700 mb-1">
-              Last Maintained: <span className="font-medium">{formattedDate}</span>
+              Last Maintained: <span className="font-medium">July 5, 2024</span>
             </div>
             <div className="flex items-center gap-2 mb-1">
               <div
@@ -186,27 +165,6 @@ function LEDStructureCard({ product }: { product: Product }) {
             <div className="h-2 w-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full"></div>
           </div>
         </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-export function LEDSitesStructure() {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xl font-bold">LED Sites by Structure Type</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
-          <BarChart data={structureTypeData}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey="type" tickLine={false} tickMargin={10} axisLine={false} />
-            <YAxis tickLine={false} tickMargin={10} axisLine={false} />
-            <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-            <Bar dataKey="count" fill="var(--color-count)" radius={8} />
-          </BarChart>
-        </ChartContainer>
       </CardContent>
     </Card>
   )

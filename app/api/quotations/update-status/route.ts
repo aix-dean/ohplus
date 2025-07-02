@@ -1,23 +1,27 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { updateQuotationStatus } from "@/lib/quotation-service"
+import { doc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const { id, status } = await req.json()
+    const { quotationId, status } = await request.json()
 
-    if (!id || !status) {
-      return NextResponse.json({ message: "Missing required fields: id and status" }, { status: 400 })
+    if (!quotationId || !status) {
+      return NextResponse.json({ error: "Missing quotationId or status" }, { status: 400 })
     }
 
-    const updatedQuotation = await updateQuotationStatus(id, status)
+    const quotationRef = doc(db, "quotations", quotationId)
 
-    if (!updatedQuotation) {
-      return NextResponse.json({ message: "Quotation not found or status not updated" }, { status: 404 })
-    }
+    await updateDoc(quotationRef, {
+      status: status.toUpperCase(),
+      updated: serverTimestamp(),
+      ...(status.toLowerCase() === "accepted" && { accepted_at: serverTimestamp() }),
+      ...(status.toLowerCase() === "rejected" && { rejected_at: serverTimestamp() }),
+    })
 
-    return NextResponse.json(updatedQuotation)
+    return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error updating quotation status:", error)
-    return NextResponse.json({ message: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to update quotation status" }, { status: 500 })
   }
 }

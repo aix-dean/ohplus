@@ -1,6 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { generateText } from "ai"
-import { openai } from "@ai-sdk/openai"
+import { generateContent } from "@/lib/gemini-service"
 import type { ChatMessage } from "@/lib/gemini-service"
 import { saveChatMessage, saveConversation } from "@/lib/chat-database-service"
 
@@ -93,7 +92,7 @@ BEST PRACTICES:
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, currentPage, userId, userEmail, userName, prompt } = await request.json()
+    const { messages, currentPage, userId, userEmail, userName } = await request.json()
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: "Invalid messages format" }, { status: 400 })
@@ -113,18 +112,8 @@ Please provide helpful assistance based on the OH Plus platform context.`,
       ...messages,
     ]
 
-    // Generate response using AI
-    const { text } = await generateText({
-      model: openai("gpt-4"),
-      prompt:
-        prompt ||
-        `${SYSTEM_CONTEXT}
-
-Current page context: ${currentPage}
-User: ${userName} (${userEmail})
-
-Please provide helpful assistance based on the OH Plus platform context.`,
-    })
+    // Generate response using Gemini
+    const response = await generateContent(contextualMessages)
 
     // Save conversation and messages to database
     try {
@@ -137,13 +126,13 @@ Please provide helpful assistance based on the OH Plus platform context.`,
       }
 
       // Save the assistant's response
-      await saveChatMessage(conversationId, "assistant", text, currentPage)
+      await saveChatMessage(conversationId, "assistant", response.parts, currentPage)
     } catch (dbError) {
       console.error("Database save error:", dbError)
       // Continue even if database save fails
     }
 
-    return NextResponse.json({ response: text })
+    return NextResponse.json({ response })
   } catch (error) {
     console.error("Assistant API error:", error)
     return NextResponse.json({ error: "Failed to generate response" }, { status: 500 })

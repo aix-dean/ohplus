@@ -5,7 +5,7 @@ import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRig
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -14,35 +14,9 @@ import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { getServiceAssignmentsByProductId } from "@/lib/firebase-service"
 import type { ServiceAssignment } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
-
-const staticSitesData = [
-  { month: "Jan", active: 50, maintenance: 2, inactive: 1 },
-  { month: "Feb", active: 51, maintenance: 1, inactive: 0 },
-  { month: "Mar", active: 50, maintenance: 2, inactive: 1 },
-  { month: "Apr", active: 52, maintenance: 1, inactive: 0 },
-  { month: "May", active: 53, maintenance: 0, inactive: 0 },
-  { month: "Jun", active: 52, maintenance: 1, inactive: 0 },
-]
-
-const chartConfig = {
-  active: {
-    label: "Active",
-    color: "hsl(var(--chart-1))",
-  },
-  maintenance: {
-    label: "Under Maintenance",
-    color: "hsl(var(--chart-2))",
-  },
-  inactive: {
-    label: "Inactive",
-    color: "hsl(var(--chart-3))",
-  },
-}
 
 export default function StaticSitesTab() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -301,9 +275,6 @@ export default function StaticSitesTab() {
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Static Sites Overview */}
-      <StaticSitesOverview />
-
       {/* Content Type Tabs */}
       <Tabs defaultValue="content" className="w-full" onValueChange={(value) => setContentTab(value as any)}>
         <TabsList className="grid w-[450px] grid-cols-4">
@@ -368,7 +339,7 @@ export default function StaticSitesTab() {
         <div className="bg-red-50 border border-red-200 rounded-md p-4 text-center">
           <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
           <p className="text-red-700">{error}</p>
-          <Button variant="outline" className="mt-4 bg-transparent" onClick={() => fetchProducts(1, true)}>
+          <Button variant="outline" className="mt-4" onClick={() => fetchProducts(1, true)}>
             Try Again
           </Button>
         </div>
@@ -449,7 +420,7 @@ export default function StaticSitesTab() {
               size="sm"
               onClick={goToPreviousPage}
               disabled={currentPage === 1}
-              className="h-8 w-8 p-0 bg-transparent"
+              className="h-8 w-8 p-0"
             >
               <ChevronLeft size={16} />
             </Button>
@@ -743,29 +714,6 @@ function ComplianceCard({ site }: { site: any }) {
             <span className="text-gray-600">Documents</span>
           </div>
         </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-export function StaticSitesOverview() {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xl font-bold">Static Sites Overview</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
-          <BarChart data={staticSitesData}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
-            <YAxis tickLine={false} tickMargin={10} axisLine={false} />
-            <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-            <Bar dataKey="active" fill="var(--color-active)" stackId="a" />
-            <Bar dataKey="maintenance" fill="var(--color-maintenance)" stackId="a" />
-            <Bar dataKey="inactive" fill="var(--color-inactive)" stackId="a" />
-          </BarChart>
-        </ChartContainer>
       </CardContent>
     </Card>
   )

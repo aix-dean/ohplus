@@ -52,11 +52,23 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Custom colors for headers - NOW CORRECTLY DEFINED AT TOP LEVEL
-        adminHeaderPurple: "#0000FF", // Bright Blue for Admin pages
-        adminHeaderPurpleLight: "#3333FF", // Lighter Blue for hover
-        salesHeaderRose: "#FF0000", // Bright Red for Sales pages
-        salesHeaderRoseLight: "#FF3333", // Lighter Red for hover
+        // Custom colors for department headers based on the image
+        "department-sales-red": "#E74C3C",
+        "department-logistics-blue": "#3498DB",
+        "department-accounting-purple": "#9B59B6",
+        "department-treasury-green": "#27AE60",
+        "department-it-teal": "#1ABC9C",
+        "department-fleet-gray": "#7F8C8D",
+        "department-creatives-orange": "#F39C12",
+        "department-finance-green": "#2ECC71",
+        "department-media-lightblue": "#5DADE2",
+        "department-businessdev-darkpurple": "#8E44AD",
+        "department-legal-darkred": "#C0392B",
+        "department-corporate-lightblue": "#5DADE2", // Same as media
+        "department-hr-pink": "#E91E63",
+        "department-specialteam-lightpurple": "#AF7AC5",
+        "department-marketing-red": "#E74C3C", // Same as sales
+        "department-add-darkgray": "#2C3E50",
       },
       borderRadius: {
         lg: "var(--radius)",
