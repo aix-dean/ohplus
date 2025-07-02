@@ -254,7 +254,7 @@ export default function AdminInventoryPage() {
           <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
             {/* The "+ Add Site" card is now the first item in the grid */}
             <Card
-              className="w-full h-48 flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
+              className="w-full min-h-[284px] flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
               onClick={() => router.push("/admin/products/create")}
             >
               <Plus className="h-8 w-8 mb-2" />
