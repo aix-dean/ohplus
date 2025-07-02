@@ -30,10 +30,7 @@ function DepartmentCard({
 }) {
   const cardContent = (
     <>
-      <CardHeader
-        className={cn("relative p-4 rounded-t-lg", department.headerColor)}
-        // Removed style={{ backgroundColor: headerColorMap[department.headerColor] }}
-      >
+      <CardHeader className={cn("relative p-4 rounded-t-lg", department.headerColor)}>
         <CardTitle className="text-white text-lg font-semibold flex justify-between items-center">
           {department.name}
           {department.badgeCount !== undefined && (
@@ -43,7 +40,7 @@ function DepartmentCard({
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-4 bg-white rounded-b-lg flex flex-col justify-between flex-grow">
+      <CardContent className="p-4 bg-card-content-background rounded-b-lg flex flex-col justify-between flex-grow">
         <div>
           {department.members.map((member, index) => (
             <p key={index} className="text-sm text-gray-700 flex items-center gap-1">
