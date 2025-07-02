@@ -9,12 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FirebaseError } from "firebase/app"
-// Removed Separator import as it's no longer needed
-// import { Separator } from "@/components/ui/separator"
-// Removed ChromeIcon and FacebookIcon imports
-// import { ChromeIcon, FacebookIcon } from 'lucide-react'
-// Removed Select import as Gender field is removed
-// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function RegisterPage() {
   const [step, setStep] = useState(1) // 1 for personal info, 2 for password and company info
@@ -27,8 +21,6 @@ export default function RegisterPage() {
   const [companyName, setCompanyName] = useState("")
   const [companyLocation, setCompanyLocation] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
-  // Removed gender state
-  // const [gender, setGender] = useState("")
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -58,7 +50,6 @@ export default function RegisterPage() {
 
   const handleNext = () => {
     setErrorMessage(null)
-    // Removed gender check
     if (!firstName || !lastName || !email || !phoneNumber) {
       setErrorMessage("Please fill in all required personal information fields.")
       return
@@ -190,22 +181,6 @@ export default function RegisterPage() {
                     required
                   />
                 </div>
-                {/* Removed Separator and social login buttons */}
-                <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                  By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
-                  <a href="#" className="text-blue-600 hover:underline">
-                    Terms and Conditions
-                  </a>
-                  ,{" "}
-                  <a href="#" className="text-blue-600 hover:underline">
-                    Privacy Policy
-                  </a>
-                  , and all platform{" "}
-                  <a href="#" className="text-blue-600 hover:underline">
-                    rules and regulations
-                  </a>{" "}
-                  set by OH!Plus.
-                </p>
                 <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={handleNext}>
                   Next
                 </Button>
