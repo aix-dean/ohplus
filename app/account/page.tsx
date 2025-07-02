@@ -1,5 +1,7 @@
 "use client"
 
+import { Progress } from "@/components/ui/progress"
+
 import { Separator } from "@/components/ui/separator"
 
 import type React from "react"
@@ -37,7 +39,6 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { storage } from "@/lib/firebase"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { Progress } from "@/components/ui/progress"
 import { getUserProductsCount } from "@/lib/firebase-service" // Corrected import path
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
@@ -867,24 +868,22 @@ export default function AccountPage() {
                         <Package className="h-4 w-4 text-blue-600" />
                         Product Usage
                       </h3>
-                      <>
-                        <div className="flex justify-between text-sm font-medium text-gray-700">
-                          <span>{currentProductsCount !== null ? currentProductsCount : "N/A"} products uploaded</span>
-                          <span>{maxProducts === null ? "Unlimited" : `${maxProducts} max`}</span>
-                        </div>
-                        {maxProducts !== null && currentProductsCount !== null && (
-                          <Progress
-                            value={(currentProductsCount / maxProducts) * 100}
-                            className="h-2 rounded-full bg-gray-200 [&>*]:bg-primary"
-                          />
-                        )}
-                        {isLimitReached && (
-                          <p className="mt-2 flex items-center gap-1.5 text-sm text-red-600">
-                            <Info className="h-4 w-4" />
-                            You have reached your product upload limit. Please upgrade your plan.
-                          </p>
-                        )}
-                      </>
+                      <div className="flex justify-between text-sm font-medium text-gray-700">
+                        <span>{currentProductsCount !== null ? currentProductsCount : "N/A"} products uploaded</span>
+                        <span>{maxProducts === null ? "Unlimited" : `${maxProducts} max`}</span>
+                      </div>
+                      {maxProducts !== null && currentProductsCount !== null && (
+                        <Progress
+                          value={(currentProductsCount / maxProducts) * 100}
+                          className="h-2 rounded-full bg-gray-200 [&>*]:bg-primary"
+                        />
+                      )}
+                      {isLimitReached && (
+                        <p className="mt-2 flex items-center gap-1.5 text-sm text-red-600">
+                          <Info className="h-4 w-4" />
+                          You have reached your product upload limit. Please upgrade your plan.
+                        </p>
+                      )}
                     </div>
                   </div>
 
