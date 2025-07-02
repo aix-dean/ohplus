@@ -241,14 +241,7 @@ export default function AdminInventoryPage() {
     <div className="flex-1 p-4 md:p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
-        {/* Replaced the Button with a Card for "New Product" */}
-        <Card
-          className="w-48 h-48 flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
-          onClick={() => router.push("/admin/products/create")}
-        >
-          <Plus className="h-8 w-8 mb-2" />
-          <span className="text-lg font-semibold">New Product</span>
-        </Card>
+        {/* The "New Product" button is now part of the grid */}
       </div>
 
       {loading ? (
@@ -259,6 +252,14 @@ export default function AdminInventoryPage() {
         <div className="grid gap-6">
           {/* Product List */}
           <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
+            {/* "+ Add Site" card as the first item */}
+            <Card
+              className="w-full h-48 flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
+              onClick={() => router.push("/admin/products/create")}
+            >
+              <Plus className="h-8 w-8 mb-2" />
+              <span className="text-lg font-semibold">+ Add Site</span>
+            </Card>
             {products.map((product) => (
               <Card
                 key={product.id}
