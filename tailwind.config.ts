@@ -69,8 +69,8 @@ const config: Config = {
         "department-specialteam-lightpurple": "#AF7AC5",
         "department-marketing-red": "#E74C3C", // Same as sales
         "department-add-darkgray": "#2C3E50",
-        // New custom color for card content background
-        "card-content-background": "#F8F8F8", // Very light gray
+        // Updated custom color for card content background to blue
+        "card-content-background": "#E0F2F7", // A light blue shade
       },
       borderRadius: {
         lg: "var(--radius)",
