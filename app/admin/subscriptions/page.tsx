@@ -1,5 +1,7 @@
 "use client"
 
+import React from "react"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/contexts/auth-context"
@@ -147,13 +149,12 @@ export default function SubscriptionPage() {
           {plans
             .filter((plan) => plan.id !== "trial" && plan.id !== "graphic-expo-event")
             .map((plan) => (
-              <>
+              <React.Fragment key={plan.id}>
                 {plan.id === "solo" && (
-                  <div className="col-span-full flex justify-center">
-                    <div className="w-[280px]">
-                      <PromoBanner promoEndDate={promoEndDate} />
-                    </div>
-                  </div>
+                  <PromoBanner
+                    promoEndDate={promoEndDate}
+                    className="bg-gradient-to-r from-green-500 to-green-600 text-white"
+                  />
                 )}
                 <Card
                   key={plan.id}
@@ -210,7 +211,7 @@ export default function SubscriptionPage() {
                     )}
                   </CardContent>
                 </Card>
-              </>
+              </React.Fragment>
             ))}
         </div>
       </div>

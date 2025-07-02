@@ -4,12 +4,14 @@ import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
+import { cn } from "@/lib/utils" // Import cn for conditional class names
 
 interface PromoBannerProps {
   promoEndDate: Date
+  className?: string // Add className prop
 }
 
-export function PromoBanner({ promoEndDate }: PromoBannerProps) {
+export function PromoBanner({ promoEndDate, className }: PromoBannerProps) {
   const [timeLeft, setTimeLeft] = useState<{
     days: number
     hours: number
@@ -41,28 +43,33 @@ export function PromoBanner({ promoEndDate }: PromoBannerProps) {
     return () => clearInterval(timer)
   }, [promoEndDate])
 
-  if (!timeLeft) {
-    return null
+  if (!timeLeft || (timeLeft.days === 0 && timeLeft.hours === 0 && timeLeft.minutes === 0 && timeLeft.seconds === 0)) {
+    return null // Don't render if time is up or not calculated yet
   }
 
   return (
-    <Card className="mb-8 rounded-xl bg-gradient-to-r from-green-500 to-green-600 p-6 text-white shadow-lg">
-      <CardContent className="flex flex-col items-center justify-between gap-4 p-0 md:flex-row">
-        <div className="flex items-center gap-4">
+    <Card className={cn("rounded-xl border-2 shadow-sm transition-all duration-200", className)}>
+      <CardContent className="flex flex-col items-center justify-between gap-4 p-6 text-white md:flex-row">
+        {/* Left side: Graphic Expo badge and promo text */}
+        <div className="flex items-start gap-4">
           <div className="relative flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-full bg-red-500 text-white">
             <span className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-700 text-xs font-bold">
               '25
             </span>
             <span className="text-lg font-bold">GRAPHIC EXPO</span>
           </div>
-          <div>
-            <h2 className="text-2xl font-bold">90 DAYS FREE TRIAL</h2>
+          <div className="flex flex-col text-left">
+            <h2 className="text-3xl font-bold">90 DAYS FREE TRIAL</h2>
             <p className="text-sm text-gray-200">Limited time offer for new sign-ups!</p>
           </div>
         </div>
-        <div className="flex flex-col items-center gap-2">
+
+        {/* Right side: Countdown and Get Now button */}
+        <div className="flex flex-col items-end gap-2 text-right">
           <p className="text-lg font-semibold whitespace-nowrap">
-            {timeLeft.days} days : {timeLeft.hours} hours : {timeLeft.minutes} minutes : {timeLeft.seconds} seconds left
+            {timeLeft.days} days : {timeLeft.hours.toString().padStart(2, "0")} hours :{" "}
+            {timeLeft.minutes.toString().padStart(2, "0")} minutes : {timeLeft.seconds.toString().padStart(2, "0")}{" "}
+            seconds left
           </p>
           <Button variant="secondary" className="bg-white text-green-600 hover:bg-gray-100">
             GET NOW <ArrowRight className="ml-2 h-4 w-4" />
