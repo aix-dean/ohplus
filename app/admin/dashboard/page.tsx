@@ -24,22 +24,22 @@ interface Department {
 
 // Map header color names to their hex values for inline styling
 const headerColorMap: Record<string, string> = {
-  salesHeader: "#FF6B6B",
-  logisticsHeader: "#5DADE2",
-  accountingHeader: "#C34A8D",
-  treasuryHeader: "#347C4B",
-  itHeader: "#00B8A9",
-  fleetHeader: "#808080",
-  creativesHeader: "#E67E22",
-  financeHeader: "#8BC34A",
-  mediaHeader: "#4ECDC4",
-  businessDevHeader: "#6A5ACD",
-  legalHeader: "#B22222",
-  corporateHeader: "#00BFFF",
-  hrHeader: "#FF69B4",
-  specialTeamHeader: "#8A2BE2",
-  marketingHeader: "#FF0000",
-  addDepartmentHeader: "#333333",
+  salesHeader: "#E74C3C", // Red
+  logisticsHeader: "#3498DB", // Blue
+  accountingHeader: "#9B59B6", // Amethyst
+  treasuryHeader: "#27AE60", // Emerald Green
+  itHeader: "#1ABC9C", // Turquoise
+  fleetHeader: "#7F8C8D", // Asbestos Gray
+  creativesHeader: "#F39C12", // Orange
+  financeHeader: "#2ECC71", // Nephritis Green
+  mediaHeader: "#5DADE2", // Light Blue
+  businessDevHeader: "#8E44AD", // Wisteria Purple
+  legalHeader: "#C0392B", // Pomegranate Red
+  corporateHeader: "#5DADE2", // Light Blue
+  hrHeader: "#E91E63", // Deep Pink
+  specialTeamHeader: "#AF7AC5", // Lighter Purple
+  marketingHeader: "#E74C3C", // Red
+  addDepartmentHeader: "#2C3E50", // Dark Blue/Black
 }
 
 // Department Card Component
