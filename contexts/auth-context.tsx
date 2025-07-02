@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useCallback } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -58,7 +58,7 @@ interface ProjectData {
   updated?: Date
 }
 
-export function AuthProvider({ children }: { ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
@@ -67,7 +67,8 @@ export function AuthProvider({ children }: { ReactNode }) {
 
   const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
     try {
-      const userDocRef = doc(db, "users", firebaseUser.uid)
+      // Corrected collection name to "iboard_users"
+      const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
       const userDocSnap = await getDoc(userDocRef)
 
       let fetchedUserData: UserData
@@ -78,13 +79,13 @@ export function AuthProvider({ children }: { ReactNode }) {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
+          license_key: (data.license_key as string | null) || null, // Explicitly cast to string | null
           role: data.role || "user", // Default role
           permissions: data.permissions || [], // Default empty permissions
-          ...data, // Spread any other fields first
-          license_key: (data.license_key as string | null) || null, // Ensure license_key is explicitly set last
+          ...data, // Spread any other fields
         }
       } else {
-        // If user document doesn't exist, create a basic one
+        // If user document doesn't exist, create a basic one in "iboard_users"
         fetchedUserData = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -153,7 +154,8 @@ export function AuthProvider({ children }: { ReactNode }) {
   const assignLicenseKey = useCallback(
     async (uid: string, licenseKey: string) => {
       try {
-        const userDocRef = doc(db, "users", uid)
+        // Corrected collection name to "iboard_users"
+        const userDocRef = doc(db, "iboard_users", uid)
         await setDoc(userDocRef, { license_key: licenseKey }, { merge: true })
         // Update local state immediately
         setUserData((prev) => (prev ? { ...prev, license_key: licenseKey } : null))
@@ -188,8 +190,8 @@ export function AuthProvider({ children }: { ReactNode }) {
 
       const licenseKey = generateLicenseKey() // Generate a new license key
 
-      // Create user document
-      const userDocRef = doc(db, "users", firebaseUser.uid)
+      // Create user document in "iboard_users"
+      const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
       await setDoc(userDocRef, {
         email: firebaseUser.email,
         uid: firebaseUser.uid,
@@ -243,7 +245,8 @@ export function AuthProvider({ children }: { ReactNode }) {
 
   const updateUserData = async (updates: Partial<UserData>) => {
     if (!user) throw new Error("User not authenticated.")
-    const userDocRef = doc(db, "users", user.uid)
+    // Corrected collection name to "iboard_users"
+    const userDocRef = doc(db, "iboard_users", user.uid)
     const updatedFields = { ...updates, updated: serverTimestamp() }
     await updateDoc(userDocRef, updatedFields)
     // Optimistically update state
