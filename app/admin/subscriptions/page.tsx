@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth } from "@/contexts/auth-context"
 import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-service"
 import type { BillingCycle, SubscriptionPlanType } from "@/lib/types/subscription"
-import { CheckCircle, Loader2 } from "lucide-react"
+import { CheckCircle, Loader2 } from "lucide-react" // Added ArrowRight
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -147,10 +147,125 @@ export default function SubscriptionPage() {
   }
 
   const currentPlan = subscriptionData?.planType || "None"
+  const currentPlanDetails = plans.find((plan) => plan.id === currentPlan)
+
+  const formatDate = (date: Date | null) => {
+    if (!date) return "N/A"
+    return new Date(date).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+  }
 
   return (
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
+        {/* Current Plan Details Section */}
+        {subscriptionData && (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl mb-6">
+              Current Plan:{" "}
+              <span
+                className={cn(
+                  "font-extrabold",
+                  subscriptionData.status === "active" && "text-green-600",
+                  subscriptionData.status === "trialing" && "text-blue-600",
+                  (subscriptionData.status === "inactive" ||
+                    subscriptionData.status === "expired" ||
+                    subscriptionData.status === "cancelled") &&
+                    "text-red-600",
+                )}
+              >
+                {currentPlanDetails?.name || "No Active Plan"}
+              </span>
+            </h2>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+              {/* Plan Card */}
+              <Card className="flex flex-col rounded-xl border-2 shadow-sm">
+                <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
+                  <CardTitle className="text-xl font-bold">Plan</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col justify-between p-6">
+                  <div>
+                    <h3 className="text-xl font-semibold capitalize text-gray-900">
+                      {currentPlanDetails?.name || "N/A"}
+                    </h3>
+                    {currentPlanDetails?.price !== 0 && currentPlanDetails?.billingCycle !== "N/A" && (
+                      <p className="text-lg text-gray-700 mt-1">
+                        Php {currentPlanDetails?.price.toLocaleString()}{" "}
+                        <span className="text-base font-medium text-gray-500">
+                          /{currentPlanDetails?.billingCycle === "monthly" ? "month" : "year"}
+                        </span>
+                      </p>
+                    )}
+                    <ul className="mt-4 space-y-2 text-sm text-gray-700">
+                      {currentPlanDetails?.features.map((feature, index) => (
+                        <li key={index} className="flex items-center">
+                          <CheckCircle className="mr-2 h-4 w-4 flex-shrink-0 text-green-500" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Cycle Card */}
+              <Card className="flex flex-col rounded-xl border-2 shadow-sm">
+                <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
+                  <CardTitle className="text-xl font-bold">Cycle</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col justify-between p-6">
+                  <div>
+                    <p className="text-lg font-semibold text-gray-900">
+                      Start: {formatDate(subscriptionData.startDate)}
+                    </p>
+                    <p className="text-lg font-semibold text-gray-900">End: {formatDate(subscriptionData.endDate)}</p>
+                  </div>
+                  <Button variant="outline" className="mt-4 w-full bg-transparent">
+                    Extend
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Users Card (Placeholder Data) */}
+              <Card className="flex flex-col rounded-xl border-2 shadow-sm">
+                <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
+                  <CardTitle className="text-xl font-bold">Users</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col justify-between p-6">
+                  <div>
+                    <p className="text-lg font-semibold text-gray-900">23 users</p>
+                    <p className="text-sm text-gray-600">(Max of 30 users)</p>
+                  </div>
+                  <Button variant="outline" className="mt-4 w-full bg-transparent">
+                    Expand
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Inventory Card (Placeholder Data) */}
+              <Card className="flex flex-col rounded-xl border-2 shadow-sm">
+                <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
+                  <CardTitle className="text-xl font-bold">Inventory</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col justify-between p-6">
+                  <div>
+                    <p className="text-lg font-semibold text-gray-900">100 static sites</p>
+                    <p className="text-lg font-semibold text-gray-900">15 dynamic sites</p>
+                    <p className="text-lg font-semibold text-gray-900">3 developments</p>
+                    <p className="text-sm text-gray-600">(Max of {subscriptionData.maxProducts} sites)</p>
+                  </div>
+                  <Button variant="outline" className="mt-4 w-full bg-transparent">
+                    Expand
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Choose Your Plan</h1>
           <p className="mt-3 text-lg text-gray-600">Select the perfect plan that fits your business needs.</p>

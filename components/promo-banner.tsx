@@ -9,24 +9,17 @@ interface PromoBannerProps {
 
 export function PromoBanner({ className }: PromoBannerProps) {
   return (
-    <Card className={cn("relative overflow-hidden rounded-lg shadow-lg", className)}>
-      <CardContent className="relative flex items-center justify-between p-6">
-        {/* Graphic Expo Badge */}
-        <div className="absolute -left-4 -top-4 flex h-20 w-20 items-center justify-center rounded-full bg-red-500 text-center text-xs font-bold uppercase text-white shadow-md rotate-[-25deg]">
-          <div className="rotate-[25deg]">
-            GRAPHIC EXPO
-            <br />
-            '25 PROMO
-          </div>
+    <Card className={cn("rounded-xl border-2 shadow-sm", className)}>
+      <CardContent className="flex items-center justify-between p-4">
+        <div className="relative flex items-center justify-center h-16 w-16 rounded-full bg-red-500 text-white text-center font-bold text-xs uppercase mr-4 flex-shrink-0">
+          <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">GRAPHIC EXPO '25 PROMO</span>
         </div>
-
-        <div className="flex flex-1 items-center justify-center">
-          <h2 className="text-4xl font-extrabold leading-tight text-white">90 DAYS FREE TRIAL</h2>
+        <div className="flex-grow text-center">
+          <h2 className="text-3xl font-extrabold">90 DAYS FREE TRIAL</h2>
+          <p className="text-sm mt-1">Limited time offer for new sign-ups!</p>
         </div>
-
-        <Button variant="secondary" className="ml-4 flex items-center gap-2">
-          GET NOW
-          <ArrowRight className="h-4 w-4" />
+        <Button variant="secondary" className="ml-4 flex-shrink-0">
+          GET NOW <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </CardContent>
     </Card>
