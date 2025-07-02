@@ -241,12 +241,14 @@ export default function AdminInventoryPage() {
     <div className="flex-1 p-4 md:p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
-        <Button
+        {/* Replaced the Button with a Card for "New Product" */}
+        <Card
+          className="w-48 h-48 flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
           onClick={() => router.push("/admin/products/create")}
-          className="bg-primary text-white hover:bg-primary/90"
         >
-          <Plus className="mr-2 h-5 w-5" /> New Product
-        </Button>
+          <Plus className="h-8 w-8 mb-2" />
+          <span className="text-lg font-semibold">New Product</span>
+        </Card>
       </div>
 
       {loading ? (
