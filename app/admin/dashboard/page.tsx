@@ -15,31 +15,12 @@ interface Department {
   id: string
   name: string
   headerColor: string // Tailwind class name for header background
+  contentBgColor: string // New: Tailwind class name for content background
   members: string[]
   metricLabel?: string
   metricValue?: string
   badgeCount?: number
   href?: string // Optional link for the card
-}
-
-// Map header color names to their hex values for inline styling
-const headerColorMap: Record<string, string> = {
-  salesHeader: "#FF6B6B",
-  logisticsHeader: "#5DADE2",
-  accountingHeader: "#C34A8D",
-  treasuryHeader: "#347C4B",
-  itHeader: "#00B8A9",
-  fleetHeader: "#808080",
-  creativesHeader: "#E67E22",
-  financeHeader: "#8BC34A",
-  mediaHeader: "#4ECDC4",
-  businessDevHeader: "#6A5ACD",
-  legalHeader: "#B22222",
-  corporateHeader: "#00BFFF",
-  hrHeader: "#FF69B4",
-  specialTeamHeader: "#8A2BE2",
-  marketingHeader: "#FF0000",
-  addDepartmentHeader: "#333333",
 }
 
 // Department Card Component
@@ -50,10 +31,7 @@ function DepartmentCard({
 }) {
   const cardContent = (
     <>
-      <CardHeader
-        className={cn("relative p-4 rounded-t-lg", department.headerColor)}
-        style={{ backgroundColor: headerColorMap[department.headerColor] }}
-      >
+      <CardHeader className={cn("relative p-4 rounded-t-lg", department.headerColor)}>
         <CardTitle className="text-white text-lg font-semibold flex justify-between items-center">
           {department.name}
           {department.badgeCount !== undefined && (
@@ -63,7 +41,9 @@ function DepartmentCard({
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="p-4 bg-white rounded-b-lg flex flex-col justify-between flex-grow">
+      <CardContent
+        className={cn("p-4 rounded-b-lg flex flex-col justify-between flex-grow", department.contentBgColor)}
+      >
         <div>
           {department.members.map((member, index) => (
             <p key={index} className="text-sm text-gray-700 flex items-center gap-1">
@@ -106,7 +86,8 @@ export default function AdminDashboardPage() {
     {
       id: "sales",
       name: "Sales",
-      headerColor: "salesHeader",
+      headerColor: "bg-department-sales-red",
+      contentBgColor: "bg-card-content-sales",
       members: ["Noemi", "Matthew"],
       metricLabel: "Monthly Revenue",
       metricValue: "4,000,000",
@@ -116,7 +97,8 @@ export default function AdminDashboardPage() {
     {
       id: "logistics",
       name: "Logistics/ Operations",
-      headerColor: "logisticsHeader",
+      headerColor: "bg-department-logistics-blue",
+      contentBgColor: "bg-card-content-logistics",
       members: ["Chona", "May"],
       metricLabel: "Total Service Assignments",
       metricValue: "5",
@@ -126,91 +108,114 @@ export default function AdminDashboardPage() {
     {
       id: "accounting",
       name: "Accounting",
-      headerColor: "accountingHeader",
+      headerColor: "bg-department-accounting-purple",
+      contentBgColor: "bg-card-content-accounting",
       members: ["Chairman"],
     },
     {
       id: "treasury",
       name: "Treasury",
-      headerColor: "treasuryHeader",
+      headerColor: "bg-department-treasury-green",
+      contentBgColor: "bg-card-content-treasury",
       members: ["Juvy"],
     },
     {
       id: "it",
       name: "I.T.",
-      headerColor: "itHeader",
+      headerColor: "bg-department-it-teal",
+      contentBgColor: "bg-card-content-it",
       members: ["Emmerson"],
     },
     {
       id: "fleet",
       name: "Fleet",
-      headerColor: "fleetHeader",
+      headerColor: "bg-department-fleet-gray",
+      contentBgColor: "bg-card-content-fleet",
       members: ["Jonathan"],
     },
     {
       id: "creatives",
       name: "Creatives/Contents",
-      headerColor: "creativesHeader",
+      headerColor: "bg-department-creatives-orange",
+      contentBgColor: "bg-card-content-creatives",
       members: ["Eda"],
     },
     {
       id: "finance",
       name: "Finance",
-      headerColor: "financeHeader",
+      headerColor: "bg-department-finance-green",
+      contentBgColor: "bg-card-content-finance",
       members: ["Juvy"],
     },
     {
       id: "media",
       name: "Media/ Procurement",
-      headerColor: "mediaHeader",
+      headerColor: "bg-department-media-lightblue",
+      contentBgColor: "bg-card-content-media",
       members: ["Zen"],
     },
     {
       id: "businessDev",
       name: "Business Dev.",
-      headerColor: "businessDevHeader",
+      headerColor: "bg-department-businessdev-darkpurple",
+      contentBgColor: "bg-card-content-businessdev",
       members: ["Nikki"],
     },
     {
       id: "legal",
       name: "Legal",
-      headerColor: "legalHeader",
+      headerColor: "bg-department-legal-darkred",
+      contentBgColor: "bg-card-content-legal",
       members: ["Chona"],
       badgeCount: 2,
     },
     {
       id: "corporate",
       name: "Corporate",
-      headerColor: "corporateHeader",
+      headerColor: "bg-department-corporate-lightblue",
+      contentBgColor: "bg-card-content-corporate",
       members: ["Anthony"],
       badgeCount: 1,
     },
     {
       id: "hr",
       name: "Human Resources",
-      headerColor: "hrHeader",
+      headerColor: "bg-department-hr-pink",
+      contentBgColor: "bg-card-content-hr",
       members: ["Vanessa"],
       badgeCount: 1,
     },
     {
       id: "specialTeam",
       name: "Special Team",
-      headerColor: "specialTeamHeader",
+      headerColor: "bg-department-specialteam-lightpurple",
+      contentBgColor: "bg-card-content-specialteam",
       members: ["Mark"],
     },
     {
       id: "marketing",
       name: "Marketing",
-      headerColor: "marketingHeader",
+      headerColor: "bg-department-marketing-red",
+      contentBgColor: "bg-card-content-marketing",
       members: ["John"],
     },
     {
       id: "addDepartment",
       name: "+ Add New Department",
-      headerColor: "addDepartmentHeader",
+      headerColor: "bg-department-add-darkgray",
+      contentBgColor: "bg-card-content-add",
       members: [], // No members for this card
     },
   ]
+
+  // Filter departments based on search term
+  const filteredDepartments = departmentData.filter((department) => {
+    const lowerCaseSearchTerm = searchTerm.toLowerCase()
+    return (
+      department.name.toLowerCase().includes(lowerCaseSearchTerm) ||
+      department.members.some((member) => member.toLowerCase().includes(lowerCaseSearchTerm))
+    )
+  })
 
   return (
     <div className="flex-1 p-4 md:p-6">
@@ -249,7 +254,7 @@ export default function AdminDashboardPage() {
 
         {/* Department Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {departmentData.map((department) => (
+          {filteredDepartments.map((department) => (
             <DepartmentCard key={department.id} department={department} />
           ))}
         </div>

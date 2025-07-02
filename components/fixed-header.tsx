@@ -4,7 +4,7 @@ import React from "react"
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, Bell, Search, Settings, LogOut, User, ChevronLeft } from "lucide-react"
+import { Menu, Bell, Search, ChevronLeft } from "lucide-react" // Removed LogOut, User, Settings as they are no longer needed for the profile dropdown
 
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -12,9 +12,9 @@ import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -43,7 +43,7 @@ interface BreadcrumbItemData {
 
 export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderProps) {
   const pathname = usePathname()
-  const { user, userData, signOut } = useAuth()
+  const { user, userData } = useAuth() // Removed signOut as it's no longer in this component's direct interaction
   const { unreadCount } = useUnreadMessages()
   const isAdmin = useIsAdmin()
 
@@ -248,53 +248,25 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           <DropdownMenuItem>No new notifications</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "overflow-hidden rounded-full text-white",
-              isAdminPage ? "hover:bg-adminHeaderPurpleLight" : "hover:bg-salesHeaderRoseLight",
-            )}
-          >
-            <Avatar>
-              <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} alt="User Avatar" />
-              <AvatarFallback>
-                {userData?.first_name ? userData.first_name.charAt(0) : user?.email?.charAt(0) || "U"}
-              </AvatarFallback>
-            </Avatar>
-            <span className="sr-only">User Menu</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>
-            {userData?.first_name && userData?.last_name
-              ? `${userData.first_name} ${userData.last_name}`
-              : user?.email || "My Account"}
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-            <Link href="/account">
-              <User className="mr-2 h-4 w-4" />
-              Account
-            </Link>
-          </DropdownMenuItem>
-          {isAdmin && (
-            <DropdownMenuItem asChild>
-              <Link href="/admin/dashboard">
-                <Settings className="mr-2 h-4 w-4" />
-                Admin
-              </Link>
-            </DropdownMenuItem>
+      {/* Directly link the profile icon to the /account page */}
+      <Link href="/account" passHref>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "overflow-hidden rounded-full text-white",
+            isAdminPage ? "hover:bg-adminHeaderPurpleLight" : "hover:bg-salesHeaderRoseLight",
           )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={signOut}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          asChild
+        >
+          <Avatar>
+            <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} alt="User Avatar" />
+            <AvatarFallback>
+              {userData?.first_name ? userData.first_name.charAt(0) : user?.email?.charAt(0) || "U"}
+            </AvatarFallback>
+          </Avatar>
+        </Button>
+      </Link>
     </header>
   )
 }

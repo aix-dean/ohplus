@@ -1,63 +1,33 @@
 "use client"
 
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { useEffect, useState } from "react"
+import { ArrowRight } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface PromoBannerProps {
-  promoEndDate: Date
+  className?: string
+  onClick?: () => void // Add onClick prop
+  disabled?: boolean // Add disabled prop
 }
 
-export function PromoBanner({ promoEndDate }: PromoBannerProps) {
-  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout
-
-    const calculateTimeLeft = () => {
-      const now = new Date().getTime()
-      const difference = promoEndDate.getTime() - now
-
-      if (difference > 0) {
-        const days = Math.floor(difference / (1000 * 60 * 60 * 24))
-        const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-        const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60))
-        const seconds = Math.floor((difference % (1000 * 60)) / 1000)
-        setTimeLeft({ days, hours, minutes, seconds })
-      } else {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
-        clearInterval(timer)
-      }
-    }
-
-    calculateTimeLeft()
-    timer = setInterval(calculateTimeLeft, 1000)
-
-    return () => clearInterval(timer)
-  }, [promoEndDate])
-
-  if (promoEndDate.getTime() <= new Date().getTime()) {
-    return null // Don't render if the promo has ended
-  }
-
+export function PromoBanner({ className, onClick, disabled }: PromoBannerProps) {
   return (
-    <div className="relative mb-8 flex flex-col items-center">
-      <div className="relative flex items-center justify-center bg-[#22C55E] text-white rounded-lg p-4 pr-6 shadow-md overflow-hidden">
-        <div className="absolute -top-4 -left-4 w-24 h-24 bg-[#EF4444] rounded-full flex items-center justify-center text-center text-xs font-bold uppercase leading-tight shadow-lg transform -rotate-12">
-          GRAPHIC EXPO '25 PROMO
+    <Card className={cn("rounded-xl border-2 shadow-sm", className)}>
+      <CardContent className="flex items-center justify-between p-4">
+        <div className="relative flex items-center justify-center h-16 w-16 rounded-full bg-red-500 text-white text-center font-bold text-xs uppercase mr-4 flex-shrink-0">
+          <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">GRAPHIC EXPO '25 PROMO</span>
         </div>
-        <div className="flex items-center gap-4 pl-16">
+        <div className="flex-grow text-center">
+          <h2 className="text-3xl font-extrabold">90 DAYS FREE TRIAL</h2>
+          <p className="text-sm mt-1">Limited time offer for new sign-ups!</p>
+        </div>
+        <Button variant="secondary" className="ml-4 flex-shrink-0" onClick={onClick} disabled={disabled}>
           {" "}
-          {/* Added padding-left to account for the badge */}
-          <span className="text-3xl font-bold whitespace-nowrap">90 DAYS FREE TRIAL</span>
-          <Button variant="secondary" size="lg" className="bg-white text-[#22C55E] font-bold hover:bg-gray-100">
-            GET NOW
-          </Button>
-        </div>
-      </div>
-      <p className="mt-2 text-lg font-medium text-gray-700">
-        {timeLeft.days} days : {timeLeft.hours.toString().padStart(2, "0")} hours :{" "}
-        {timeLeft.seconds.toString().padStart(2, "0")} seconds left
-      </p>
-    </div>
+          {/* Pass onClick and disabled to Button */}
+          GET NOW <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </CardContent>
+    </Card>
   )
 }

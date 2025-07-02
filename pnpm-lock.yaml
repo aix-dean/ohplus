@@ -115,7 +115,7 @@ importers:
         version: 0.25.0
       ai:
         specifier: ^3.4.32
-        version: 3.4.32(react@19.0.0)(sswr@2.2.0(svelte@5.34.6))(svelte@5.34.6)(vue@3.5.17(typescript@5.0.2))(zod@3.25.67)
+        version: 3.4.32(react@19.0.0)(sswr@2.2.0(svelte@5.34.9))(svelte@5.34.9)(vue@3.5.17(typescript@5.0.2))(zod@3.25.67)
       algoliasearch:
         specifier: ^5.12.0
         version: 5.12.0
@@ -376,8 +376,8 @@ packages:
     resolution: {integrity: sha512-D2hP9eA+Sqx1kBZgzxZh0y1trbuU+JoDkiEwqhQ36nodYqJwyEIhPSdMNd7lOm/4io72luTPWH20Yda0xOuUow==}
     engines: {node: '>=6.9.0'}
 
-  '@babel/parser@7.27.5':
-    resolution: {integrity: sha512-OsQd175SxWkGlzbny8J3K8TnnDD0N3lrIUtB92xwyRpzaenGZhxDvxN/JgU00U3CDZNj9tPuDJ5H0WS4Nt3vKg==}
+  '@babel/parser@7.27.7':
+    resolution: {integrity: sha512-qnzXzDXdr/po3bOTbTIQZ7+TxNKxpkN5IifVLXS+r7qwynkZfPyjZfE7hCXbo7IoO9TNcSyibgONsf2HauUd3Q==}
     engines: {node: '>=6.0.0'}
     hasBin: true
 
@@ -385,8 +385,8 @@ packages:
     resolution: {integrity: sha512-vbavdySgbTTrmFE+EsiqUTzlOr5bzlnJtUv9PynGCAKvfQqjIXbvFdumPM/GxMDfyuGMJaJAU6TO4zc1Jf1i8Q==}
     engines: {node: '>=6.9.0'}
 
-  '@babel/types@7.27.6':
-    resolution: {integrity: sha512-ETyHEk2VHHvl9b9jZP5IHPavHYk57EhanlRRuae9XCpb/j5bDCbPPMOBfCWhnl/7EDJz0jEMCi/RhccCE8r1+Q==}
+  '@babel/types@7.27.7':
+    resolution: {integrity: sha512-8OLQgDScAOHXnAz2cV+RfzzNMipuLVBz2biuAJFMV9bfkNf393je3VM8CLkjQodW5+iWsSJdSgSWT6rsZoXHPw==}
     engines: {node: '>=6.9.0'}
 
   '@date-fns/tz@1.2.0':
@@ -3733,8 +3733,8 @@ packages:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
 
-  svelte@5.34.6:
-    resolution: {integrity: sha512-dNhOyaHEHXItGojz2e6aCeoU0FUD+teDcbqJkPI/iMBMKwP9MyHtXYRKIzN4ehlBnLB6Do0pUY0RUSZQ/Zpcog==}
+  svelte@5.34.9:
+    resolution: {integrity: sha512-sld35zFpooaSRSj4qw8Vl/cyyK0/sLQq9qhJ7BGZo/Kd0ggYtEnvNYLlzhhoqYsYQzA0hJqkzt3RBO/8KoTZOg==}
     engines: {node: '>=18'}
 
   svg-pathdata@6.0.3:
@@ -4094,13 +4094,13 @@ snapshots:
     transitivePeerDependencies:
       - zod
 
-  '@ai-sdk/svelte@0.0.57(svelte@5.34.6)(zod@3.25.67)':
+  '@ai-sdk/svelte@0.0.57(svelte@5.34.9)(zod@3.25.67)':
     dependencies:
       '@ai-sdk/provider-utils': 1.0.22(zod@3.25.67)
       '@ai-sdk/ui-utils': 0.0.50(zod@3.25.67)
-      sswr: 2.2.0(svelte@5.34.6)
+      sswr: 2.2.0(svelte@5.34.9)
     optionalDependencies:
-      svelte: 5.34.6
+      svelte: 5.34.9
     transitivePeerDependencies:
       - zod
 
@@ -4212,13 +4212,13 @@ snapshots:
 
   '@babel/helper-validator-identifier@7.27.1': {}
 
-  '@babel/parser@7.27.5':
+  '@babel/parser@7.27.7':
     dependencies:
-      '@babel/types': 7.27.6
+      '@babel/types': 7.27.7
 
   '@babel/runtime@7.27.6': {}
 
-  '@babel/types@7.27.6':
+  '@babel/types@7.27.7':
     dependencies:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.27.1
@@ -5844,7 +5844,7 @@ snapshots:
 
   '@vue/compiler-core@3.5.17':
     dependencies:
-      '@babel/parser': 7.27.5
+      '@babel/parser': 7.27.7
       '@vue/shared': 3.5.17
       entities: 4.5.0
       estree-walker: 2.0.2
@@ -5857,7 +5857,7 @@ snapshots:
 
   '@vue/compiler-sfc@3.5.17':
     dependencies:
-      '@babel/parser': 7.27.5
+      '@babel/parser': 7.27.7
       '@vue/compiler-core': 3.5.17
       '@vue/compiler-dom': 3.5.17
       '@vue/compiler-ssr': 3.5.17
@@ -5906,13 +5906,13 @@ snapshots:
 
   acorn@8.15.0: {}
 
-  ai@3.4.32(react@19.0.0)(sswr@2.2.0(svelte@5.34.6))(svelte@5.34.6)(vue@3.5.17(typescript@5.0.2))(zod@3.25.67):
+  ai@3.4.32(react@19.0.0)(sswr@2.2.0(svelte@5.34.9))(svelte@5.34.9)(vue@3.5.17(typescript@5.0.2))(zod@3.25.67):
     dependencies:
       '@ai-sdk/provider': 0.0.26
       '@ai-sdk/provider-utils': 1.0.22(zod@3.25.67)
       '@ai-sdk/react': 0.0.70(react@19.0.0)(zod@3.25.67)
       '@ai-sdk/solid': 0.0.54(zod@3.25.67)
-      '@ai-sdk/svelte': 0.0.57(svelte@5.34.6)(zod@3.25.67)
+      '@ai-sdk/svelte': 0.0.57(svelte@5.34.9)(zod@3.25.67)
       '@ai-sdk/ui-utils': 0.0.50(zod@3.25.67)
       '@ai-sdk/vue': 0.0.59(vue@3.5.17(typescript@5.0.2))(zod@3.25.67)
       '@opentelemetry/api': 1.9.0
@@ -5923,8 +5923,8 @@ snapshots:
       zod-to-json-schema: 3.24.5(zod@3.25.67)
     optionalDependencies:
       react: 19.0.0
-      sswr: 2.2.0(svelte@5.34.6)
-      svelte: 5.34.6
+      sswr: 2.2.0(svelte@5.34.9)
+      svelte: 5.34.9
       zod: 3.25.67
     transitivePeerDependencies:
       - solid-js
@@ -7856,9 +7856,9 @@ snapshots:
 
   source-map-js@1.2.1: {}
 
-  sswr@2.2.0(svelte@5.34.6):
+  sswr@2.2.0(svelte@5.34.9):
     dependencies:
-      svelte: 5.34.6
+      svelte: 5.34.9
       swrev: 4.0.0
 
   stable-hash@0.0.5: {}
@@ -7968,7 +7968,7 @@ snapshots:
 
   supports-preserve-symlinks-flag@1.0.0: {}
 
-  svelte@5.34.6:
+  svelte@5.34.9:
     dependencies:
       '@ampproject/remapping': 2.3.0
       '@jridgewell/sourcemap-codec': 1.5.0
