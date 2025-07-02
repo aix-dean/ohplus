@@ -9,8 +9,6 @@ import {
   serverTimestamp,
   Timestamp,
   updateDoc,
-  orderBy,
-  limit,
 } from "firebase/firestore"
 import {
   type Subscription,
@@ -108,45 +106,6 @@ export const subscriptionService = {
       updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : data.updatedAt,
     }
     console.log("subscriptionService: Found subscription:", subscription)
-    return subscription
-  },
-
-  async getLatestActiveSubscriptionByUid(uid: string): Promise<Subscription | null> {
-    console.log("subscriptionService: Fetching latest active subscription for UID:", uid)
-    const subscriptionsRef = collection(db, "subscriptions")
-    const q = query(
-      subscriptionsRef,
-      where("uid", "==", uid),
-      where("status", "==", "active"), // Only consider active subscriptions
-      orderBy("createdAt", "desc"), // Order by creation date descending
-      limit(1), // Get only the latest one
-    )
-    const querySnapshot = await getDocs(q)
-
-    if (querySnapshot.empty) {
-      console.log("subscriptionService: No active subscription found for UID:", uid)
-      return null
-    }
-
-    const docSnap = querySnapshot.docs[0]
-    const data = docSnap.data()
-
-    // Convert Firestore Timestamps to JavaScript Date objects
-    const subscription: Subscription = {
-      id: docSnap.id,
-      licenseKey: data.licenseKey,
-      planType: data.planType,
-      billingCycle: data.billingCycle,
-      uid: data.uid,
-      startDate: data.startDate instanceof Timestamp ? data.startDate.toDate() : data.startDate,
-      endDate: data.endDate instanceof Timestamp ? data.endDate.toDate() : data.endDate,
-      status: data.status,
-      maxProducts: data.maxProducts,
-      trialEndDate: data.trialEndDate instanceof Timestamp ? data.trialEndDate.toDate() : data.trialEndDate,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : data.createdAt,
-      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : data.updatedAt,
-    }
-    console.log("subscriptionService: Found latest active subscription:", subscription)
     return subscription
   },
 
