@@ -12,6 +12,9 @@ import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { PromoBanner } from "@/components/promo-banner"
 
+// Move promoEndDate outside the component to ensure it's a stable reference
+const promoEndDate = new Date(2025, 6, 19, 23, 59, 0) // July 19, 2025, 11:59 PM PH time (UTC+8)
+
 export default function SubscriptionPage() {
   const { user, userData, subscriptionData, loading, refreshSubscriptionData } = useAuth()
   const { toast } = useToast()
@@ -26,9 +29,6 @@ export default function SubscriptionPage() {
   } | null>(null)
 
   const plans = getSubscriptionPlans()
-
-  // Set promoEndDate to July 19, 2025, 11:59 PM PH time (UTC+8) in one line
-  const promoEndDate = new Date(2025, 6, 19, 23, 59, 0)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -58,7 +58,8 @@ export default function SubscriptionPage() {
     const timer = setInterval(calculateTimeLeft, 1000)
 
     return () => clearInterval(timer)
-  }, [promoEndDate])
+  }, []) // Removed promoEndDate from dependency array as it's now a stable outside reference
+  // The effect only needs to run once on mount and clean up on unmount.
 
   const handleUpgrade = useCallback(
     async (planId: string) => {
