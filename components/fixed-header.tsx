@@ -152,6 +152,149 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
     pathname.startsWith("/logistics/dashboard")
 
   return (
-    
+    <header
+      className={cn(
+        "sticky top-0 z-30 flex h-14 items-center gap-4 border-b-0 px-4 sm:static sm:h-auto",
+        isAdminPage ? "bg-adminHeaderPurple" : "bg-salesHeaderRose", // Conditional background
+        className,
+      )}
+      {...props}
+    >
+      {/* New: Back button for admin sub-pages, sales dashboard, and logistics dashboard */}
+      {showAdminBackButton && (
+        <Link href="/admin/dashboard" passHref>
+          <Button
+            variant="default"
+            className="bg-black hover:bg-black/90 text-white rounded-full px-4 py-2 flex items-center gap-1"
+          >
+            <ChevronLeft className="h-4 w-4" /> Admin
+          </Button>
+        </Link>
+      )}
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button size="icon" variant="outline" className="sm:hidden bg-transparent" onClick={onMenuClick}>
+            <Menu className="h-5 w-5" />
+            <span className="sr-only">Toggle Menu</span>
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="sm:max-w-xs">
+          {/* Mobile navigation content would go here, if needed */}
+        </SheetContent>
+      </Sheet>
+      {/* Replaced h1 with Breadcrumb component */}
+      <Breadcrumb>
+        <BreadcrumbList className="text-white">
+          {breadcrumbs.map((item, index) => (
+            <React.Fragment key={index}>
+              <BreadcrumbItem>
+                {item.label === "Admin - Dashboard" && item.href && !showAdminBackButton ? (
+                  <Link href={item.href} passHref>
+                    <Button
+                      variant="default"
+                      className="bg-black hover:bg-black/90 text-white rounded-full px-4 py-2 flex items-center gap-1"
+                      asChild
+                    >
+                      <span>
+                        <ChevronLeft className="h-4 w-4" /> Admin
+                      </span>
+                    </Button>
+                  </Link>
+                ) : item.isPage ? (
+                  <BreadcrumbPage className="font-normal text-white">{item.label}</BreadcrumbPage>
+                ) : (
+                  <BreadcrumbLink asChild>
+                    <Link href={item.href || "#"} className="transition-colors hover:text-gray-200 text-white">
+                      {item.label}
+                    </Link>
+                  </BreadcrumbLink>
+                )}
+              </BreadcrumbItem>
+              {index < breadcrumbs.length - 1 && <BreadcrumbSeparator className="text-white" />}
+            </React.Fragment>
+          ))}
+        </BreadcrumbList>
+      </Breadcrumb>
+      <div className="relative ml-auto flex-1 md:grow-0">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white" />
+        <Input
+          type="search"
+          placeholder="Search..."
+          className="w-full rounded-lg bg-gray-700 placeholder:text-gray-300 text-white pl-8 md:w-[200px] lg:w-[336px]"
+        />
+      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "relative rounded-full text-white",
+              isAdminPage ? "hover:bg-adminHeaderPurpleLight" : "hover:bg-salesHeaderRoseLight",
+            )}
+          >
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                {unreadCount}
+              </span>
+            )}
+            <span className="sr-only">Notifications</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>No new notifications</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "overflow-hidden rounded-full text-white",
+              isAdminPage ? "hover:bg-adminHeaderPurpleLight" : "hover:bg-salesHeaderRoseLight",
+            )}
+          >
+            <Avatar>
+              <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} alt="User Avatar" />
+              <AvatarFallback>
+                {userData?.first_name ? userData.first_name.charAt(0) : user?.email?.charAt(0) || "U"}
+              </AvatarFallback>
+            </Avatar>
+            <span className="sr-only">User Menu</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>
+            {userData?.first_name && userData?.last_name
+              ? `${userData.first_name} ${userData.last_name}`
+              : user?.email || "My Account"}
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href="/account">
+              <User className="mr-2 h-4 w-4" />
+              Account
+            </Link>
+          </DropdownMenuItem>
+          {isAdmin && (
+            <DropdownMenuItem asChild>
+              <Link href="/admin/dashboard">
+                <Settings className="mr-2 h-4 w-4" />
+                Admin
+              </Link>
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={signOut}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </header>
   )
 }

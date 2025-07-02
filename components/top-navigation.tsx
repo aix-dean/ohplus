@@ -143,6 +143,7 @@ export function TopNavigation() {
   const isLogisticsSection = pathname.startsWith("/logistics")
   const isCmsSection = pathname.startsWith("/cms")
   const isAdminSection = pathname.startsWith("/admin")
+  const isAccountPage = pathname === "/account" // New check for account page
 
   const navBgColor = isSalesSection ? "bg-[#ff3333]" : "bg-[#0a1433]"
 
@@ -172,83 +173,85 @@ export function TopNavigation() {
           <div className="top-nav-right flex items-center h-full relative z-20 flex-shrink-0">
             {" "}
             {/* Added relative z-20 and flex-shrink-0 */}
-            {/* User controls section (bell and profile) */}
-            <div className="flex items-center mr-2 md:mr-8 relative z-10">
-              {" "}
-              {/* Added relative z-10 */}
-              <button
-                className="p-2 rounded-full text-white hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary relative"
-                aria-label="View notifications"
-              >
-                <Bell className="h-5 w-5 md:h-6 md:w-6" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-              {/* Profile dropdown */}
-              <div className="ml-3 relative z-10" ref={profileRef}>
+            {/* User controls section (bell and profile) - Conditionally rendered */}
+            {!isAccountPage && ( // Only render if NOT on the account page
+              <div className="flex items-center mr-2 md:mr-8 relative z-10">
                 {" "}
                 {/* Added relative z-10 */}
                 <button
-                  type="button"
-                  className="max-w-xs bg-white rounded-full flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-                  id="user-menu-button"
-                  aria-expanded={profileOpen}
-                  aria-haspopup="true"
-                  onClick={() => {
-                    setProfileOpen(!profileOpen)
-                  }}
+                  className="p-2 rounded-full text-white hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary relative"
+                  aria-label="View notifications"
                 >
-                  <span className="sr-only">Open user menu</span>
-                  <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                    <User className="h-5 w-5 text-gray-500" />
-                  </div>
+                  <Bell className="h-5 w-5 md:h-6 md:w-6" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                      {unreadCount}
+                    </span>
+                  )}
                 </button>
-                {/* Profile dropdown menu */}
-                {profileOpen && (
-                  <div
-                    className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
-                    role="menu"
-                    aria-orientation="vertical"
-                    aria-labelledby="user-menu-button"
+                {/* Profile dropdown */}
+                <div className="ml-3 relative z-10" ref={profileRef}>
+                  {" "}
+                  {/* Added relative z-10 */}
+                  <button
+                    type="button"
+                    className="max-w-xs bg-white rounded-full flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                    id="user-menu-button"
+                    aria-expanded={profileOpen}
+                    aria-haspopup="true"
+                    onClick={() => {
+                      setProfileOpen(!profileOpen)
+                    }}
                   >
-                    <div className="py-1">
-                      <Link
-                        href="/account"
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        onClick={() => setProfileOpen(false)}
-                      >
-                        Your Profile
-                      </Link>
-                      <Link
-                        href="/settings"
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        onClick={() => setProfileOpen(false)}
-                      >
-                        Settings
-                      </Link>
-                      {isAdmin && (
+                    <span className="sr-only">Open user menu</span>
+                    <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
+                      <User className="h-5 w-5 text-gray-500" />
+                    </div>
+                  </button>
+                  {/* Profile dropdown menu */}
+                  {profileOpen && (
+                    <div
+                      className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
+                      role="menu"
+                      aria-orientation="vertical"
+                      aria-labelledby="user-menu-button"
+                    >
+                      <div className="py-1">
                         <Link
-                          href="/admin"
+                          href="/account"
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                           onClick={() => setProfileOpen(false)}
                         >
-                          Admin
+                          Your Profile
                         </Link>
-                      )}
-                      <button
-                        onClick={signOut}
-                        className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        Sign out
-                      </button>
+                        <Link
+                          href="/settings"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setProfileOpen(false)}
+                        >
+                          Settings
+                        </Link>
+                        {isAdmin && (
+                          <Link
+                            href="/admin"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setProfileOpen(false)}
+                          >
+                            Admin
+                          </Link>
+                        )}
+                        <button
+                          onClick={signOut}
+                          className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          Sign out
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            )}
             {/* Date display in the light blue section with adjusted padding */}
             <div className="hidden md:flex items-center justify-end h-full pl-8 pr-8 relative z-10">
               {" "}

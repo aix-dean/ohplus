@@ -1,5 +1,7 @@
 "use client"
 
+import { Progress } from "@/components/ui/progress"
+
 import { Separator } from "@/components/ui/separator"
 
 import type React from "react"
@@ -37,7 +39,6 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { storage } from "@/lib/firebase"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { Progress } from "@/components/ui/progress"
 import { getUserProductsCount } from "@/lib/firebase-service" // Corrected import path
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
