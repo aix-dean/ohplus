@@ -21,8 +21,7 @@ export default function SubscriptionPage() {
 
   const plans = getSubscriptionPlans()
 
-  // Set promoEndDate to July 19, 2025, 11:59 PM PH time (UTC+8)
-  // Month is 0-indexed, so July is 6.
+  // Set promoEndDate to July 19, 2025, 11:59 PM PH time (UTC+8) in one line
   const promoEndDate = new Date(2025, 6, 19, 23, 59, 0)
 
   useEffect(() => {
