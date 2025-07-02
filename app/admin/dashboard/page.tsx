@@ -24,22 +24,22 @@ interface Department {
 
 // Map header color names to their hex values for inline styling
 const headerColorMap: Record<string, string> = {
-  salesHeader: "#E74C3C", // Red
-  logisticsHeader: "#3498DB", // Blue
+  salesHeader: "#E74C3C", // Alizarin Crimson
+  logisticsHeader: "#3498DB", // Peter River
   accountingHeader: "#9B59B6", // Amethyst
-  treasuryHeader: "#27AE60", // Emerald Green
+  treasuryHeader: "#27AE60", // Emerald
   itHeader: "#1ABC9C", // Turquoise
-  fleetHeader: "#7F8C8D", // Asbestos Gray
+  fleetHeader: "#95A5A6", // Concrete
   creativesHeader: "#F39C12", // Orange
-  financeHeader: "#2ECC71", // Nephritis Green
-  mediaHeader: "#5DADE2", // Light Blue
-  businessDevHeader: "#8E44AD", // Wisteria Purple
-  legalHeader: "#C0392B", // Pomegranate Red
-  corporateHeader: "#5DADE2", // Light Blue
-  hrHeader: "#E91E63", // Deep Pink
-  specialTeamHeader: "#AF7AC5", // Lighter Purple
-  marketingHeader: "#E74C3C", // Red
-  addDepartmentHeader: "#2C3E50", // Dark Blue/Black
+  financeHeader: "#2ECC71", // Nephritis
+  mediaHeader: "#76D7C4", // Medium Aquamarine
+  businessDevHeader: "#8E44AD", // Wisteria
+  legalHeader: "#C0392B", // Pomegranate
+  corporateHeader: "#85C1E9", // Light Blue
+  hrHeader: "#F78DA7", // Pink
+  specialTeamHeader: "#A569BD", // Medium Purple
+  marketingHeader: "#E74C3C", // Alizarin Crimson
+  addDepartmentHeader: "#34495E", // Wet Asphalt
 }
 
 // Department Card Component

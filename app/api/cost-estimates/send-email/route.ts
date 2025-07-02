@@ -2,12 +2,35 @@ import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 
 export async function POST(request: NextRequest) {
   try {
-    const { costEstimate, clientEmail, client, currentUserEmail, ccEmail, subject, body } = await request.json() // Destructure new fields
+    const {
+      costEstimate,
+      clientEmail,
+      client,
+      currentUserEmail,
+      ccEmail,
+      subject,
+      body,
+      to,
+      costEstimateId,
+      clientName,
+      totalAmount,
+    } = await request.json() // Destructure new fields
 
-    if (!costEstimate || !clientEmail || !client || !subject || !body) {
+    if (
+      !costEstimate ||
+      !clientEmail ||
+      !client ||
+      !subject ||
+      !body ||
+      !to ||
+      !costEstimateId ||
+      !clientName ||
+      !totalAmount
+    ) {
       return NextResponse.json({ error: "Missing required data" }, { status: 400 })
     }
 
@@ -33,8 +56,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-    const costEstimateUrl = `${baseUrl}/cost-estimates/view/${costEstimate.id}`
+    const baseUrl = APP_URL
+    const costEstimateUrl = `${baseUrl}/cost-estimates/view/${costEstimateId}`
 
     const emailHtml = `
       <!DOCTYPE html>
@@ -166,7 +189,7 @@ export async function POST(request: NextRequest) {
 
             <div class="content">
               <div class="greeting">
-                Dear ${client.contactPerson || client.company || "Valued Client"},
+                Dear ${clientName || client.contactPerson || client.company || "Valued Client"},
               </div>
 
               <p>${body.replace(/\n/g, "<br>")}</p> {/* Use dynamic body and replace newlines with <br> */}
@@ -188,7 +211,7 @@ export async function POST(request: NextRequest) {
               </div>
 
               <div class="total-amount">
-                Total Estimated Cost: ₱${(costEstimate.totalAmount || 0).toLocaleString()}
+                Total Estimated Cost: ₱${totalAmount.toLocaleString()}
               </div>
 
               <div class="action-button">
@@ -221,8 +244,8 @@ export async function POST(request: NextRequest) {
     `
 
     const { data, error } = await resend.emails.send({
-      from: "OH Plus <noreply@resend.dev>",
-      to: [clientEmail],
+      from: "Jiven <onboarding@resend.dev>",
+      to: [to],
       subject: subject, // Use dynamic subject
       html: emailHtml,
       reply_to: currentUserEmail ? [currentUserEmail] : undefined, // Set reply-to to current user's email

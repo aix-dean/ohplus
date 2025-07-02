@@ -1,18 +1,23 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { AlertCircle } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
-export default function SiteNotFound() {
+export default function NotFound() {
   return (
-    <div className="container mx-auto py-12 flex flex-col items-center justify-center text-center">
-      <div className="bg-red-100 p-4 rounded-full mb-4">
-        <AlertCircle className="h-12 w-12 text-red-600" />
-      </div>
-      <h1 className="text-2xl font-bold mb-2">Site Not Found</h1>
-      <p className="text-gray-500 mb-6 max-w-md">The site you're looking for doesn't exist or has been removed.</p>
-      <Button asChild>
-        <Link href="/operations/dashboard">Return to Dashboard</Link>
-      </Button>
+    <div className="flex min-h-[calc(100vh-60px)] items-center justify-center bg-muted/40 p-4">
+      <Card className="w-full max-w-md text-center">
+        <CardHeader>
+          <CardTitle className="text-3xl font-bold">404 - Site Not Found</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <p className="text-muted-foreground">
+            The site you are looking for does not exist or you do not have permission to view it.
+          </p>
+          <Button asChild>
+            <Link href="/logistics/dashboard">Go to Logistics Dashboard</Link>
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }

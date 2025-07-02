@@ -1,371 +1,181 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
+import { useState } from "react"
+import Link from "next/link"
+import { Search, Plus, Filter, ListFilter } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Loader2, Plus, MapPin, ChevronLeft, ChevronRight } from "lucide-react"
-import { getPaginatedUserProducts, getUserProductsCount, softDeleteProduct, type Product } from "@/lib/firebase-service"
-import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
-import { toast } from "@/components/ui/use-toast"
-import { useResponsive } from "@/hooks/use-responsive"
-import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
-import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
-import Image from "next/image"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { ResponsiveTable } from "@/components/responsive-table"
+import { Badge } from "@/components/ui/badge"
 
-// Number of items to display per page
-const ITEMS_PER_PAGE = 12
+interface InventoryItem {
+  id: string
+  name: string
+  type: string
+  status: string
+  location: string
+  lastMaintenance: string
+  nextMaintenance: string
+}
 
-export default function AdminInventoryPage() {
-  const router = useRouter()
-  const { user, userData } = useAuth()
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null)
-  const { isMobile, isTablet } = useResponsive()
+const mockInventoryData: InventoryItem[] = [
+  {
+    id: "1",
+    name: "LED Billboard - EDSA",
+    type: "LED Billboard",
+    status: "Active",
+    location: "EDSA, Mandaluyong City",
+    lastMaintenance: "2024-05-10",
+    nextMaintenance: "2025-05-10",
+  },
+  {
+    id: "2",
+    name: "Static Billboard - C5",
+    type: "Static Billboard",
+    status: "Under Maintenance",
+    location: "C5 Road, Taguig City",
+    lastMaintenance: "2024-06-01",
+    nextMaintenance: "2024-06-15",
+  },
+  {
+    id: "3",
+    name: "Digital Kiosk - Mall A",
+    type: "Digital Kiosk",
+    status: "Active",
+    location: "SM Megamall, Mandaluyong City",
+    lastMaintenance: "2024-04-20",
+    nextMaintenance: "2025-04-20",
+  },
+  {
+    id: "4",
+    name: "LED Billboard - SLEX",
+    type: "LED Billboard",
+    status: "Inactive",
+    location: "SLEX, Laguna",
+    lastMaintenance: "2023-12-01",
+    nextMaintenance: "N/A",
+  },
+  {
+    id: "5",
+    name: "Digital Display - Airport",
+    type: "Digital Display",
+    status: "Active",
+    location: "NAIA Terminal 3, Pasay City",
+    lastMaintenance: "2024-05-25",
+    nextMaintenance: "2025-05-25",
+  },
+]
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalItems, setTotalItems] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null)
-  const [pageCache, setPageCache] = useState<
-    Map<number, { items: Product[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null }>
-  >(new Map())
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [loadingCount, setLoadingCount] = useState(false)
+export default function InventoryPage() {
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filterStatus, setFilterStatus] = useState("All")
+  const [filterType, setFilterType] = useState("All")
 
-  // Fetch total count of products
-  const fetchTotalCount = useCallback(async () => {
-    if (!user?.uid) return
+  const filteredInventory = mockInventoryData.filter((item) => {
+    const matchesSearch =
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.location.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = filterStatus === "All" || item.status === filterStatus
+    const matchesType = filterType === "All" || item.type === filterType
+    return matchesSearch && matchesStatus && matchesType
+  })
 
-    setLoadingCount(true)
-    try {
-      const count = await getUserProductsCount(user.uid, { active: true })
-      setTotalItems(count)
-      setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
-    } catch (error) {
-      console.error("Error fetching total count:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load product count. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoadingCount(false)
-    }
-  }, [user, toast])
-
-  // Fetch products for the current page
-  const fetchProducts = useCallback(
-    async (page: number) => {
-      if (!user?.uid) return
-
-      // Check if we have this page in cache
-      if (pageCache.has(page)) {
-        const cachedData = pageCache.get(page)!
-        setProducts(cachedData.items)
-        setLastDoc(cachedData.lastDoc)
-        return
-      }
-
-      const isFirstPage = page === 1
-      setLoading(isFirstPage)
-      setLoadingMore(!isFirstPage)
-
-      try {
-        // For the first page, start from the beginning
-        // For subsequent pages, use the last document from the previous page
-        const startDoc = isFirstPage ? null : lastDoc
-
-        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, { active: true })
-
-        setProducts(result.items)
-        setLastDoc(result.lastDoc)
-        setHasMore(result.hasMore)
-
-        // Cache this page
-        setPageCache((prev) => {
-          const newCache = new Map(prev)
-          newCache.set(page, {
-            items: result.items,
-            lastDoc: result.lastDoc,
-          })
-          return newCache
-        })
-      } catch (error) {
-        console.error("Error fetching products:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load product count. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-        setLoadingMore(false)
-      }
+  const columns = [
+    {
+      header: "Item Name",
+      accessorKey: "name",
+      cell: (info: any) => (
+        <Link href={`/admin/inventory/${info.row.original.id}`} className="text-blue-600 hover:underline">
+          {info.getValue()}
+        </Link>
+      ),
     },
-    [user, lastDoc, pageCache, toast],
-  )
-
-  // Load initial data and count
-  useEffect(() => {
-    if (user?.uid) {
-      fetchProducts(1)
-      fetchTotalCount()
-    }
-  }, [user, fetchProducts, fetchTotalCount])
-
-  // Load data when page changes
-  useEffect(() => {
-    if (user?.uid && currentPage > 0) {
-      fetchProducts(currentPage)
-    }
-  }, [currentPage, fetchProducts, user])
-
-  // Pagination handlers
-  const goToPage = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page)
-      // Scroll to top when changing pages
-      window.scrollTo({ top: 0, behavior: "smooth" })
-    }
-  }
-
-  const goToPreviousPage = () => goToPage(currentPage - 1)
-  const goToNextPage = () => goToPage(currentPage + 1)
-
-  // Generate page numbers for pagination
-  const getPageNumbers = () => {
-    const pageNumbers = []
-    const maxPagesToShow = 5
-
-    if (totalPages <= maxPagesToShow) {
-      // If we have 5 or fewer pages, show all of them
-      for (let i = 1; i <= totalPages; i++) {
-        pageNumbers.push(i)
-      }
-    } else {
-      // Always include first page
-      pageNumbers.push(1)
-
-      // Calculate start and end of page range around current page
-      let startPage = Math.max(2, currentPage - 1)
-      let endPage = Math.min(totalPages - 1, currentPage + 1)
-
-      // Adjust if we're near the beginning
-      if (currentPage <= 3) {
-        endPage = Math.min(totalPages - 1, 4)
-      }
-
-      // Adjust if we're near the end
-      if (currentPage >= totalPages - 2) {
-        startPage = Math.max(2, totalPages - 3)
-      }
-
-      // Add ellipsis if needed before the range
-      if (startPage > 2) {
-        pageNumbers.push("...")
-      }
-
-      // Add the range of pages
-      for (let i = startPage; i <= endPage; i++) {
-        pageNumbers.push(i)
-      }
-
-      // Add ellipsis if needed after the range
-      if (endPage < totalPages - 1) {
-        pageNumbers.push("...")
-      }
-
-      // Always include last page
-      pageNumbers.push(totalPages)
-    }
-
-    return pageNumbers
-  }
-
-  // Handle product deletion
-  const handleDeleteClick = (product: Product, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setProductToDelete(product)
-    setDeleteDialogOpen(true)
-  }
-
-  const handleDeleteConfirm = async () => {
-    if (!productToDelete) return
-
-    try {
-      await softDeleteProduct(productToDelete.id)
-
-      // Update the UI by removing the deleted product
-      setProducts((prevProducts) => prevProducts.filter((p) => p.id !== productToDelete.id))
-
-      // Update total count
-      setTotalItems((prev) => prev - 1)
-
-      // Recalculate total pages
-      setTotalPages(Math.max(1, Math.ceil((totalItems - 1) / ITEMS_PER_PAGE)))
-
-      // Clear cache to force refresh
-      setPageCache(new Map())
-
-      toast({
-        title: "Product deleted",
-        description: `${productToDelete.name} has been successfully deleted.`,
-      })
-    } catch (error) {
-      console.error("Error deleting product:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete the product. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleEditClick = (product: Product, e: React.MouseEvent) => {
-    e.stopPropagation()
-    router.push(`/admin/products/edit/${product.id}`)
-  }
-
-  const handleViewDetails = (productId: string) => {
-    router.push(`/admin/products/${productId}`)
-  }
+    { header: "Type", accessorKey: "type" },
+    {
+      header: "Status",
+      accessorKey: "status",
+      cell: (info: any) => (
+        <Badge
+          variant={
+            info.getValue() === "Active" ? "default" : info.getValue() === "Under Maintenance" ? "secondary" : "outline"
+          }
+        >
+          {info.getValue()}
+        </Badge>
+      ),
+    },
+    { header: "Location", accessorKey: "location" },
+    { header: "Last Maintenance", accessorKey: "lastMaintenance" },
+    { header: "Next Maintenance", accessorKey: "nextMaintenance" },
+  ]
 
   return (
     <div className="flex-1 p-4 md:p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
-        <Button
-          onClick={() => router.push("/admin/products/create")}
-          className="bg-primary text-white hover:bg-primary/90"
-        >
-          <Plus className="mr-2 h-5 w-5" /> New Product
-        </Button>
-      </div>
-
-      {loading ? (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        </div>
-      ) : (
-        <div className="grid gap-6">
-          {/* Product List */}
-          <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
-            {products.map((product) => (
-              <Card
-                key={product.id}
-                className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
-              >
-                <div className="h-48 bg-gray-200 relative">
-                  <Image
-                    src={
-                      product.media && product.media.length > 0
-                        ? product.media[0].url
-                        : "/abstract-geometric-sculpture.png"
-                    }
-                    alt={product.name || "Product image"}
-                    fill
-                    className="object-cover"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.src = "/abstract-geometric-sculpture.png"
-                      target.className = "opacity-50"
-                    }}
-                  />
-                </div>
-
-                <CardContent className="p-4">
-                  <div className="flex flex-col">
-                    <h3 className="font-semibold line-clamp-1">{product.name}</h3>
-                    <div className="mt-2 text-sm font-medium text-green-700">
-                      ₱{Number(product.price).toLocaleString()}
-                    </div>
-                    <div className="mt-1 text-xs text-gray-500 flex items-center">
-                      <MapPin size={12} className="mr-1 flex-shrink-0" />
-                      <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </ResponsiveCardGrid>
-
-          {/* Pagination Controls */}
-          <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
-            <div className="text-sm text-gray-500 flex items-center">
-              {loadingCount ? (
-                <div className="flex items-center">
-                  <Loader2 size={14} className="animate-spin mr-2" />
-                  <span>Calculating pages...</span>
-                </div>
-              ) : (
-                <span>
-                  Page {currentPage} of {totalPages} ({products.length} items)
-                </span>
-              )}
+      <div className="flex flex-col gap-6">
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <h1 className="text-xl md:text-2xl font-bold">Inventory Management</h1>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="relative flex-grow">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search inventory..."
+                className="w-full rounded-lg bg-background pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToPreviousPage}
-                disabled={currentPage === 1}
-                className="h-8 w-8 p-0 bg-transparent"
-              >
-                <ChevronLeft size={16} />
-              </Button>
-
-              {/* Page numbers - Hide on mobile */}
-              <div className="hidden sm:flex items-center gap-1">
-                {getPageNumbers().map((page, index) =>
-                  page === "..." ? (
-                    <span key={`ellipsis-${index}`} className="px-2">
-                      ...
-                    </span>
-                  ) : (
-                    <Button
-                      key={`page-${page}`}
-                      variant={currentPage === page ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => goToPage(page as number)}
-                      className="h-8 w-8 p-0"
-                    >
-                      {page}
-                    </Button>
-                  ),
-                )}
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToNextPage}
-                disabled={currentPage >= totalPages}
-                className="h-8 w-8 p-0"
-              >
-                <ChevronRight size={16} />
-              </Button>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                  <ListFilter className="h-4 w-4" /> Status: {filterStatus}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setFilterStatus("All")}>All</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterStatus("Active")}>Active</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterStatus("Inactive")}>Inactive</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterStatus("Under Maintenance")}>
+                  Under Maintenance
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterStatus("Damaged")}>Damaged</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                  <Filter className="h-4 w-4" /> Type: {filterType}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setFilterType("All")}>All</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterType("LED Billboard")}>LED Billboard</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterType("Static Billboard")}>Static Billboard</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterType("Digital Display")}>Digital Display</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterType("Digital Kiosk")}>Digital Kiosk</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button size="sm" asChild>
+              <Link href="/admin/products/create">
+                <Plus className="mr-2 h-4 w-4" /> Add Item
+              </Link>
+            </Button>
           </div>
         </div>
-      )}
 
-      {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        isOpen={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-        onConfirm={handleDeleteConfirm}
-        title="Delete Product"
-        description="This product will be removed from your inventory. This action cannot be undone."
-        itemName={productToDelete?.name}
-      />
+        {/* Inventory Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>All Inventory Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveTable data={filteredInventory} columns={columns} />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

@@ -4,97 +4,101 @@ import type React from "react"
 
 import { useState } from "react"
 import Link from "next/link"
-import { Maximize2, ArrowLeft } from "lucide-react"
-import { sendPasswordResetEmail } from "firebase/auth"
-import { auth } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useToast } from "@/hooks/use-toast"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
-  const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const [message, setMessage] = useState("")
+  const [isError, setIsError] = useState(false)
+  const { toast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError("")
-    setSuccess("")
-    setIsLoading(true)
+    setMessage("")
+    setIsError(false)
 
+    if (!email) {
+      setMessage("Please enter your email address.")
+      setIsError(true)
+      return
+    }
+
+    // Simulate API call for password reset
     try {
-      await sendPasswordResetEmail(auth, email)
-      setSuccess("Password reset email sent. Check your inbox.")
-      setEmail("")
-    } catch (error: any) {
-      console.error("Password reset error:", error)
-      setError(error.message || "Failed to send password reset email.")
-    } finally {
-      setIsLoading(false)
+      // In a real application, you would call your backend API here
+      // const response = await fetch('/api/auth/forgot-password', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ email }),
+      // });
+      // const data = await response.json();
+
+      // if (response.ok) {
+      //   setMessage(data.message || "Password reset link sent to your email.");
+      //   setIsError(false);
+      // } else {
+      //   setMessage(data.error || "Failed to send reset link. Please try again.");
+      //   setIsError(true);
+      // }
+
+      // Mock success for demonstration
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      setMessage("If an account with that email exists, a password reset link has been sent.")
+      setIsError(false)
+      toast({
+        title: "Password Reset Email Sent",
+        description: "Please check your inbox for instructions to reset your password.",
+      })
+    } catch (error) {
+      setMessage("An unexpected error occurred. Please try again later.")
+      setIsError(true)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again later.",
+        variant: "destructive",
+      })
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-md">
-        <div className="flex justify-center mb-8">
-          <div className="flex items-center gap-2">
-            <div className="bg-black text-white p-1.5 rounded">
-              <Maximize2 size={24} />
-            </div>
-            <span className="text-xl font-semibold">OOH Operator</span>
-          </div>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl text-center">Reset Password</CardTitle>
-            <CardDescription className="text-center">
-              Enter your email address and we'll send you a link to reset your password
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              {success && (
-                <Alert className="bg-green-50 text-green-800 border-green-200">
-                  <AlertDescription>{success}</AlertDescription>
-                </Alert>
-              )}
-
-              <div className="space-y-2">
+    <div className="flex min-h-screen items-center justify-center bg-gray-100 dark:bg-gray-950">
+      <Card className="mx-auto max-w-sm">
+        <CardHeader>
+          <CardTitle className="text-xl">Forgot Password</CardTitle>
+          <CardDescription>Enter your email to receive a password reset link.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit}>
+            <div className="grid gap-4">
+              <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder="m@example.com"
+                  required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
                 />
               </div>
-
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Sending..." : "Send Reset Link"}
+              {message && <p className={`text-sm ${isError ? "text-red-500" : "text-green-500"}`}>{message}</p>}
+              <Button type="submit" className="w-full">
+                Send Reset Link
               </Button>
-            </form>
-          </CardContent>
-          <CardFooter className="flex justify-center">
-            <Link href="/login" className="flex items-center text-sm text-primary hover:underline">
-              <ArrowLeft size={16} className="mr-1" />
-              Back to login
+            </div>
+          </form>
+          <div className="mt-4 text-center text-sm">
+            Remember your password?{" "}
+            <Link href="/login" className="underline">
+              Login
             </Link>
-          </CardFooter>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

@@ -1,20 +1,80 @@
 "use client"
 
+import { Input } from "@/components/ui/input"
+
 import { useState, useEffect, useCallback } from "react"
-import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
+import { AlertCircle, Search, Loader2, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { ResponsiveTable } from "@/components/responsive-table"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Progress } from "@/components/ui/progress"
 import { getProductsByContentType, getProductsCountByContentType, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
+
+interface Site {
+  id: string
+  name: string
+  type: string
+  location: string
+  status: "Active" | "Inactive" | "Under Maintenance"
+  lastCheck: string
+  issues: number
+}
+
+const mockSites: Site[] = [
+  {
+    id: "1",
+    name: "LED Billboard - EDSA",
+    type: "LED Billboard",
+    location: "EDSA, Mandaluyong",
+    status: "Active",
+    lastCheck: "2024-07-01",
+    issues: 0,
+  },
+  {
+    id: "2",
+    name: "Static Billboard - C5",
+    type: "Static Billboard",
+    location: "C5, Taguig",
+    status: "Under Maintenance",
+    lastCheck: "2024-06-28",
+    issues: 1,
+  },
+  {
+    id: "3",
+    name: "Digital Kiosk - Mall A",
+    type: "Digital Kiosk",
+    location: "SM Megamall, Mandaluyong",
+    status: "Active",
+    lastCheck: "2024-07-02",
+    issues: 0,
+  },
+  {
+    id: "4",
+    name: "LED Billboard - SLEX",
+    type: "LED Billboard",
+    location: "SLEX, Laguna",
+    status: "Inactive",
+    lastCheck: "2024-06-20",
+    issues: 2,
+  },
+  {
+    id: "5",
+    name: "Digital Display - Airport",
+    type: "Digital Display",
+    location: "NAIA T3, Pasay",
+    status: "Active",
+    lastCheck: "2024-07-01",
+    issues: 0,
+  },
+]
 
 export default function AllSitesTab() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -23,6 +83,8 @@ export default function AllSitesTab() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
+  const [filterStatus, setFilterStatus] = useState("All")
+  const [filterType, setFilterType] = useState("All")
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -262,58 +324,112 @@ export default function AllSitesTab() {
     return {
       id: product.id,
       name: product.name,
+      type: product.content_type || "static",
+      location: product.specs_rental?.location || product.light?.location || "Unknown location",
       status: product.status,
       statusColor,
       image,
       notifications,
-      location: product.specs_rental?.location || product.light?.location || "Unknown location",
-      contentType: product.content_type || "static",
-      healthPercentage,
+      lastCheck: currentDate,
+      issues: notifications,
     }
   }
+
+  const filteredSites = products.map(productToSite).filter((site) => {
+    const matchesSearch =
+      site.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      site.location.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = filterStatus === "All" || site.status === filterStatus
+    const matchesType = filterType === "All" || site.type === filterType
+    return matchesSearch && matchesStatus && matchesType
+  })
+
+  const columns = [
+    {
+      header: "Site Name",
+      accessorKey: "name",
+      cell: (info: any) => (
+        <Link href={`/logistics/sites/${info.row.original.id}`} className="text-blue-600 hover:underline">
+          {info.getValue()}
+        </Link>
+      ),
+    },
+    { header: "Type", accessorKey: "type" },
+    { header: "Location", accessorKey: "location" },
+    {
+      header: "Status",
+      accessorKey: "status",
+      cell: (info: any) => (
+        <Badge
+          variant={
+            info.getValue() === "Active" ? "default" : info.getValue() === "Under Maintenance" ? "secondary" : "outline"
+          }
+        >
+          {info.getValue()}
+        </Badge>
+      ),
+    },
+    { header: "Last Check", accessorKey: "lastCheck" },
+    {
+      header: "Issues",
+      accessorKey: "issues",
+      cell: (info: any) => (
+        <span className={info.getValue() > 0 ? "text-red-500 font-medium" : "text-green-600"}>
+          {info.getValue() > 0 ? `${info.getValue()} Issues` : "No Issues"}
+        </span>
+      ),
+    },
+  ]
 
   return (
     <div className="flex flex-col gap-5">
       {/* Date, Search and View Toggle */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="text-sm text-gray-600 font-medium">
-          {currentDate}, {currentTime}
-        </div>
-
-        <div className="flex flex-1 max-w-md mx-auto md:mx-0">
-          <div className="relative w-full">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              type="search"
-              placeholder="Search sites..."
-              className="pl-8 w-full"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-xl font-bold">All Sites</CardTitle>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search sites..."
+                className="w-full rounded-lg bg-background pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                  Status: {filterStatus} <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setFilterStatus("All")}>All</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterStatus("Active")}>Active</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterStatus("Inactive")}>Inactive</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterStatus("Under Maintenance")}>
+                  Under Maintenance
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                  Type: {filterType} <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setFilterType("All")}>All</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterType("LED Billboard")}>LED Billboard</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterType("Static Billboard")}>Static Billboard</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterType("Digital Kiosk")}>Digital Kiosk</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilterType("Digital Display")}>Digital Display</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        </div>
-
-        <div className="flex gap-2">
-          <div className="border rounded-md p-1 flex">
-            <Button
-              variant={viewMode === "grid" ? "default" : "ghost"}
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setViewMode("grid")}
-            >
-              <LayoutGrid size={18} />
-            </Button>
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setViewMode("list")}
-            >
-              <List size={18} />
-            </Button>
-          </div>
-        </div>
-      </div>
+        </CardHeader>
+      </Card>
 
       {/* Loading State */}
       {loading && (
@@ -328,14 +444,14 @@ export default function AllSitesTab() {
         <div className="bg-red-50 border border-red-200 rounded-md p-4 text-center">
           <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
           <p className="text-red-700">{error}</p>
-          <Button variant="outline" className="mt-4" onClick={() => fetchProducts(1, true)}>
+          <Button variant="outline" className="mt-4 bg-transparent" onClick={() => fetchProducts(1, true)}>
             Try Again
           </Button>
         </div>
       )}
 
       {/* Empty State */}
-      {!loading && !error && products.length === 0 && (
+      {!loading && !error && filteredSites.length === 0 && (
         <div className="bg-gray-50 border border-gray-200 border-dashed rounded-md p-8 text-center">
           <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <AlertCircle size={24} className="text-gray-400" />
@@ -355,14 +471,19 @@ export default function AllSitesTab() {
       )}
 
       {/* Site Grid */}
-      {!loading && !error && products.length > 0 && (
+      {!loading && !error && filteredSites.length > 0 && viewMode === "grid" && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
-          {products.map((product) => (
-            <Link href={`/logistics/sites/${product.id}`} key={product.id}>
-              <UnifiedSiteCard site={productToSite(product)} />
+          {filteredSites.map((site) => (
+            <Link href={`/logistics/sites/${site.id}`} key={site.id}>
+              <UnifiedSiteCard site={site} />
             </Link>
           ))}
         </div>
+      )}
+
+      {/* Site List */}
+      {!loading && !error && filteredSites.length > 0 && viewMode === "list" && (
+        <ResponsiveTable data={filteredSites} columns={columns} />
       )}
 
       {/* Loading More Indicator */}
@@ -376,7 +497,7 @@ export default function AllSitesTab() {
       )}
 
       {/* Pagination Controls */}
-      {!loading && !error && products.length > 0 && (
+      {!loading && !error && filteredSites.length > 0 && (
         <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
           <div className="text-sm text-gray-500 flex items-center">
             {loadingCount ? (
@@ -397,7 +518,7 @@ export default function AllSitesTab() {
               size="sm"
               onClick={goToPreviousPage}
               disabled={currentPage === 1}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 bg-transparent"
             >
               <ChevronLeft size={16} />
             </Button>
@@ -451,13 +572,13 @@ function UnifiedSiteCard({ site }: { site: any }) {
           className="object-cover"
           onError={(e) => {
             const target = e.target as HTMLImageElement
-            target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
+            target.src = site.type === "LED Billboard" ? "/led-billboard-1.png" : "/roadside-billboard.png"
             target.className = "opacity-50 object-contain"
           }}
         />
-        {site.notifications > 0 && (
+        {site.issues > 0 && (
           <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-            {site.notifications}
+            {site.issues}
           </div>
         )}
 
@@ -466,10 +587,13 @@ function UnifiedSiteCard({ site }: { site: any }) {
           <Badge
             variant="outline"
             className={`
-              ${site.contentType === "dynamic" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-amber-50 text-amber-700 border-amber-200"}
+              ${site.type === "LED Billboard" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
+              ${site.type === "Static Billboard" ? "bg-amber-50 text-amber-700 border-amber-200" : ""}
+              ${site.type === "Digital Kiosk" ? "bg-green-50 text-green-700 border-green-200" : ""}
+              ${site.type === "Digital Display" ? "bg-purple-50 text-purple-700 border-purple-200" : ""}
             `}
           >
-            {site.contentType === "dynamic" ? "Digital" : "Static"}
+            {site.type}
           </Badge>
         </div>
       </div>
@@ -502,23 +626,33 @@ function UnifiedSiteCard({ site }: { site: any }) {
               <span className="text-sm font-medium">Health:</span>
               <span className="text-sm">{site.healthPercentage}%</span>
             </div>
-            <Progress
-              value={site.healthPercentage}
-              className="h-2"
-              indicatorClassName={`
-                ${site.healthPercentage > 80 ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
-                ${site.healthPercentage > 60 && site.healthPercentage <= 80 ? "bg-gradient-to-r from-yellow-500 to-green-300" : ""}
-                ${site.healthPercentage > 40 && site.healthPercentage <= 60 ? "bg-gradient-to-r from-orange-500 to-yellow-300" : ""}
-                ${site.healthPercentage <= 40 ? "bg-gradient-to-r from-red-500 to-orange-300" : ""}
-              `}
-            />
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r"
+                style={{
+                  width: `${site.healthPercentage}%`,
+                  ...(site.healthPercentage > 80
+                    ? { backgroundImage: "linear-gradient(to right, green, lightgreen)" }
+                    : ""),
+                  ...(site.healthPercentage > 60 && site.healthPercentage <= 80
+                    ? { backgroundImage: "linear-gradient(to right, yellow, lightyellow)" }
+                    : ""),
+                  ...(site.healthPercentage > 40 && site.healthPercentage <= 60
+                    ? { backgroundImage: "linear-gradient(to right, orange, lightorange)" }
+                    : ""),
+                  ...(site.healthPercentage <= 40
+                    ? { backgroundImage: "linear-gradient(to right, red, lightcoral)" }
+                    : ""),
+                }}
+              />
+            </div>
           </div>
 
           {/* Additional Information */}
           <div className="mt-3 pt-3 border-t border-gray-100">
             <div className="flex justify-between items-center">
               <span className="text-sm">Last Updated:</span>
-              <span className="text-sm text-gray-500">Today</span>
+              <span className="text-sm text-gray-500">{site.lastCheck}</span>
             </div>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { Resend } from "resend"
 import { generateProposalPDF } from "@/lib/pdf-service"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,18 +33,37 @@ export async function POST(request: NextRequest) {
       ccEmail: body.ccEmail, // Now a string that might contain multiple emails
     })
 
-    const { proposal, clientEmail, subject, body: customBody, currentUserEmail, ccEmail } = body
+    const {
+      proposal,
+      clientEmail,
+      subject,
+      body: customBody,
+      currentUserEmail,
+      ccEmail,
+      to,
+      proposalId,
+      clientName,
+      proposalTitle,
+    } = body
 
-    if (!proposal || !clientEmail) {
-      console.error("Missing required fields:", { proposal: !!proposal, clientEmail: !!clientEmail })
+    if (!proposal || !clientEmail || !to || !subject || !proposalId || !clientName || !proposalTitle) {
+      console.error("Missing required fields:", {
+        proposal: !!proposal,
+        clientEmail: !!clientEmail,
+        to: !!to,
+        subject: !!subject,
+        proposalId: !!proposalId,
+        clientName: !!clientName,
+        proposalTitle: !!proposalTitle,
+      })
       return NextResponse.json({ error: "Missing proposal or client email address" }, { status: 400 })
     }
 
     // Validate email format for 'To'
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(clientEmail)) {
-      console.error("Invalid 'To' email format:", clientEmail)
-      return NextResponse.json({ error: "Invalid 'To' email address format" }, { status: 400 })
+    if (!emailRegex.test(clientEmail) || !emailRegex.test(to)) {
+      console.error("Invalid email format:", clientEmail || to)
+      return NextResponse.json({ error: "Invalid email address format" }, { status: 400 })
     }
 
     // Process and validate multiple CC emails
@@ -61,7 +81,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const proposalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/proposals/view/${proposal.id}`
+    const publicUrl = `${APP_URL}/proposals/view/${proposalId}`
 
     // Generate PDF as base64 for attachment
     let pdfBase64 = null
@@ -74,10 +94,10 @@ export async function POST(request: NextRequest) {
       // Continue without PDF attachment if generation fails
     }
 
-    console.log("Generated proposal URL:", proposalUrl)
+    console.log("Generated proposal URL:", publicUrl)
 
     // Use custom subject and body if provided, otherwise fall back to default
-    const finalSubject = subject || `Proposal: ${proposal.title || "Custom Advertising Solution"} - OH Plus`
+    const finalSubject = subject || `Proposal: ${proposalTitle} - OH Plus`
     const finalBody =
       customBody ||
       `
@@ -218,7 +238,7 @@ export async function POST(request: NextRequest) {
 
           <div class="content">
             <div class="greeting">
-              Dear ${proposal.client?.contactPerson || proposal.client?.company || "Valued Client"},
+              Dear ${clientName},
             </div>
 
             <p>We are excited to present you with a customized advertising proposal tailored to your specific needs. Our team has carefully crafted this proposal to help you achieve your marketing objectives.</p>
@@ -227,7 +247,7 @@ export async function POST(request: NextRequest) {
               <h3 style="margin-top: 0; color: #1f2937;">Proposal Summary</h3>
               <div class="summary-item">
                 <span class="summary-label">Proposal Title:</span>
-                <span class="summary-value">${proposal.title || "Custom Advertising Proposal"}</span>
+                <span class="summary-value">${proposalTitle}</span>
               </div>
               <div class="summary-item">
                 <span class="summary-label">Number of Products:</span>
@@ -265,7 +285,7 @@ export async function POST(request: NextRequest) {
             }
 
             <div class="action-button">
-              <a href="${proposalUrl}" class="btn">View Full Proposal Online</a>
+              <a href="${publicUrl}" class="btn">View Full Proposal Online</a>
             </div>
 
             <p>We believe this proposal offers excellent value and aligns perfectly with your advertising goals. Our team is ready to discuss any questions you may have and work with you to bring this campaign to life.</p>
@@ -293,12 +313,12 @@ export async function POST(request: NextRequest) {
       </html>
     `
 
-    console.log("Attempting to send email to:", clientEmail)
+    console.log("Attempting to send email to:", to)
 
     // Prepare email data with optional PDF attachment
     const emailData: any = {
-      from: "OH Plus <noreply@resend.dev>",
-      to: [clientEmail],
+      from: "Jiven <onboarding@resend.dev>",
+      to: [to],
       subject: finalSubject, // Use the final subject
       html: finalBody, // Use the final body
       reply_to: currentUserEmail ? [currentUserEmail] : undefined, // Set reply-to to current user's email
@@ -309,7 +329,7 @@ export async function POST(request: NextRequest) {
     if (pdfBase64) {
       emailData.attachments = [
         {
-          filename: `${(proposal.title || "Proposal").replace(/[^a-z0-9]/gi, "_")}_${proposal.id}.pdf`,
+          filename: `${proposalTitle.replace(/[^a-z0-9]/gi, "_")}_${proposalId}.pdf`,
           content: pdfBase64,
           type: "application/pdf",
         },

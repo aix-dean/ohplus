@@ -1,30 +1,24 @@
 import { Skeleton } from "@/components/ui/skeleton"
 
-export default function NewsAndAlertsLoading() {
+export default function Loading() {
   return (
-    <div className="flex-1 overflow-auto">
-      <header className="flex justify-between items-center p-4 border-b border-gray-200">
-        <div>
-          <Skeleton className="h-6 w-48" />
-          <Skeleton className="h-4 w-64 mt-1" />
-        </div>
-      </header>
-
-      <main className="p-4 space-y-6">
-        <section>
-          <Skeleton className="h-6 w-40 mb-3" />
-          <Skeleton className="h-4 w-80 mb-3" />
-
-          <div className="w-full">
-            <Skeleton className="h-[400px] w-full rounded-lg" />
+    <div className="flex-1 p-4 md:p-6">
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <Skeleton className="h-8 w-64" />
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Skeleton className="h-9 w-full sm:w-48" />
+            <Skeleton className="h-9 w-24" />
           </div>
-        </section>
+        </div>
 
-        <section>
-          <Skeleton className="h-6 w-40 mb-3" />
-          <Skeleton className="h-[100px] w-full rounded-lg" />
-        </section>
-      </main>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Skeleton className="h-[200px] w-full" />
+          <Skeleton className="h-[200px] w-full" />
+        </div>
+
+        <Skeleton className="h-[400px] w-full" />
+      </div>
     </div>
   )
 }

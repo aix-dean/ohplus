@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
+import { getPagasaWeatherForecast } from "@/lib/pagasa-service"
 
 // Define types for our response
 type WeatherResponse = {
@@ -79,97 +80,19 @@ function getIconFromCondition(condition: string | null): string {
   }
 }
 
-export async function GET(request: Request) {
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url)
+  const region = searchParams.get("region")
+
+  if (!region) {
+    return NextResponse.json({ error: "Region parameter is required" }, { status: 400 })
+  }
+
   try {
-    const { searchParams } = new URL(request.url)
-    const regionId = searchParams.get("region") || "NCR"
-    const regionName = regionMapping[regionId] || "Philippines"
-
-    // According to the pagasa-parser documentation, it's primarily a type definitions package
-    // We need to use a different approach to get the actual data
-
-    // For tropical cyclone data, we'll use the PAGASA API directly
-    const pagasaApiUrl = "https://bagong.pagasa.dost.gov.ph/tropical-cyclone/api"
-
-    let cycloneData = []
-    try {
-      const cycloneResponse = await fetch(pagasaApiUrl, {
-        headers: {
-          Accept: "application/json",
-        },
-        next: { revalidate: 1800 }, // Cache for 30 minutes
-      })
-
-      if (cycloneResponse.ok) {
-        cycloneData = await cycloneResponse.json()
-      }
-    } catch (cycloneError) {
-      console.error("Error fetching cyclone data:", cycloneError)
-    }
-
-    // Process alerts from cyclone data
-    const alerts: WeatherAlert[] = []
-
-    if (cycloneData && cycloneData.length > 0) {
-      for (const cyclone of cycloneData) {
-        if (cyclone) {
-          // Determine severity based on cyclone category
-          let severity: "low" | "moderate" | "high" | "severe" = "low"
-          const category = cyclone.category || ""
-
-          if (category.includes("Super Typhoon")) {
-            severity = "severe"
-          } else if (category.includes("Typhoon")) {
-            severity = "high"
-          } else if (category.includes("Storm")) {
-            severity = "moderate"
-          }
-
-          alerts.push({
-            type: `Tropical Cyclone: ${cyclone.name || "Unnamed"}`,
-            severity,
-            description: cyclone.details || "Tropical cyclone detected in the Philippine Area of Responsibility",
-            issuedAt: new Date().toISOString(),
-          })
-        }
-      }
-    }
-
-    // For regional weather data, we'll use the PAGASA regional forecast API
-    // This is a simplified approach as PAGASA doesn't have a public API for this
-    // In a production environment, you would need to integrate with PAGASA's official data sources
-
-    const weatherResponse: WeatherResponse = {
-      location: regionName,
-      date: new Date().toISOString(),
-      temperature: {
-        current: null,
-        min: null,
-        max: null,
-      },
-      humidity: null,
-      windSpeed: null,
-      windDirection: null,
-      condition: null,
-      icon: "cloud", // Default icon
-      rainChance: null,
-      alerts,
-      forecast: [],
-      source: "PAGASA Tropical Cyclone Data",
-      raw: cycloneData,
-    }
-
-    return NextResponse.json(weatherResponse)
+    const weatherData = await getPagasaWeatherForecast(region)
+    return NextResponse.json(weatherData)
   } catch (error) {
-    console.error("Error processing PAGASA data:", error)
-
-    // Return an error response without dummy data
-    return NextResponse.json(
-      {
-        error: "Failed to fetch weather data from PAGASA. The service may be temporarily unavailable.",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 503 }, // Service Unavailable
-    )
+    console.error(`Error fetching PAGASA weather for region ${region}:`, error)
+    return NextResponse.json({ error: "Failed to fetch PAGASA weather data" }, { status: 500 })
   }
 }

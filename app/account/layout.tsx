@@ -1,18 +1,18 @@
 import type React from "react"
+import { AuthProvider } from "@/contexts/auth-context"
 import { FixedHeader } from "@/components/fixed-header"
 import { SideNavigation } from "@/components/side-navigation"
-import { TopNavigation } from "@/components/top-navigation"
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen w-full flex-col">
-      <FixedHeader>
-        <TopNavigation />
-      </FixedHeader>
-      <div className="flex flex-1">
+    <AuthProvider>
+      <div className="flex min-h-screen w-full flex-col bg-muted/40">
         <SideNavigation />
-        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">{children}</main>
+        <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
+          <FixedHeader />
+          {children}
+        </div>
       </div>
-    </div>
+    </AuthProvider>
   )
 }

@@ -4,22 +4,13 @@ import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import {
-  Send,
-  Star,
-  Sparkles,
-  MessageCircle,
-  Zap,
-  BookOpen,
-  HelpCircle,
-  ArrowRight,
-  Bot,
-  User,
-  Mic,
-  ImageIcon,
-} from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { AssistantChat } from "@/components/ai-assistant/assistant-chat"
+import { AssistantChatOptimized } from "@/components/ai-assistant/assistant-chat-optimized"
+import { AssistantChatWithDB } from "@/components/ai-assistant/assistant-chat-with-db"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Sparkles, MessageCircle, Zap, BookOpen, HelpCircle, Search, ChevronDown, Plus } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { chatDB } from "@/lib/chat-database-service"
 import type { ChatMessage } from "@/lib/gemini-service"
@@ -30,7 +21,7 @@ const suggestedQuestions = [
   "How do I create a new proposal?",
   "How do I send quotations via email?",
   "How do I generate a quotation from a proposal?",
-  "How do I manage client information?",
+  "How do I manage client information",
   "How do I track quotation responses?",
   "How do I create service assignments?",
   "How do I schedule content with weather data?",
@@ -96,7 +87,7 @@ const recentUpdates = [
 const helpCategories = [
   {
     icon: <MessageCircle className="h-6 w-6" />,
-    title: "Sales & Proposals",
+    title: "Sales & Prop Props",
     description: "Proposals, quotations, client management, and team chat",
     color: "text-blue-500",
     bgColor: "bg-blue-50",
@@ -141,6 +132,8 @@ export default function AIAssistantPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const pathname = usePathname()
   const [isInitialized, setIsInitialized] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedFilter, setSelectedFilter] = useState("All")
 
   // Get authenticated user data from auth context
   const { user, userData } = useAuth()
@@ -406,249 +399,79 @@ export default function AIAssistantPage() {
       </div>
 
       {/* Chat Container */}
-      <div className="container mx-auto px-6 py-8 max-w-7xl">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Recent Updates */}
-            <Card className="p-6 bg-white/70 backdrop-blur-sm border-white/30 shadow-xl">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-blue-500" />
-                Latest Updates
-              </h3>
-              <div className="space-y-3">
-                {recentUpdates.map((update, index) => (
-                  <div key={index} className="group">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge className={`text-white text-xs px-2 py-1 ${update.badgeColor}`}>{update.badge}</Badge>
-                    </div>
-                    <h4 className="font-medium text-gray-900 text-sm group-hover:text-blue-600 transition-colors">
-                      {update.title}
-                    </h4>
-                    <p className="text-xs text-gray-600 mt-1">{update.description}</p>
-                  </div>
-                ))}
+      <div className="flex-1 p-4 md:p-6">
+        <div className="flex flex-col gap-6">
+          {/* Header Section */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h1 className="text-xl md:text-2xl font-bold">AI Assistant</h1>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-grow">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search conversations..."
+                  className="w-full rounded-lg bg-background pl-8"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card className="p-6 bg-white/70 backdrop-blur-sm border-white/30 shadow-xl">
-              <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Zap className="h-5 w-5 text-orange-500" />
-                Quick Actions
-              </h3>
-              <div className="space-y-3">
-                {quickActions.map((action, index) => (
-                  <a key={index} href={action.href} className="block group">
-                    <div
-                      className={`p-3 rounded-xl bg-gradient-to-r ${action.gradient} text-white transform group-hover:scale-105 transition-all duration-200 shadow-lg`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg">{action.icon}</span>
-                        <div className="flex-1">
-                          <h4 className="font-medium text-sm">{action.title}</h4>
-                          <p className="text-xs opacity-90">{action.description}</p>
-                        </div>
-                        <ArrowRight className="h-4 w-4 opacity-70 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </div>
-                  </a>
-                ))}
-              </div>
-            </Card>
-          </div>
-
-          {/* Main Chat Area */}
-          <div className="lg:col-span-3">
-            <Card className="h-[calc(100vh-12rem)] bg-white/70 backdrop-blur-sm border-white/30 shadow-xl flex flex-col overflow-hidden">
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {messages.length === 1 && (
-                  <div className="space-y-8">
-                    {/* Welcome Message */}
-                    <div className="flex justify-start">
-                      <div className="flex items-start gap-4 max-w-4xl">
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                          <Bot className="h-5 w-5 text-white" />
-                        </div>
-                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl px-6 py-4 shadow-sm border border-blue-100">
-                          <p className="text-gray-800 leading-relaxed">{messages[0].parts}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Quick Suggestions */}
-                    <div>
-                      <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <MessageCircle className="h-5 w-5 text-blue-500" />
-                        Popular Questions
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {suggestedQuestions.slice(0, 8).map((suggestion, index) => (
-                          <button
-                            key={index}
-                            onClick={() => handleSendMessage(suggestion)}
-                            className="text-left p-4 rounded-xl bg-white/80 backdrop-blur-sm border border-gray-200 hover:border-blue-300 hover:bg-blue-50 hover:shadow-md transition-all duration-200 text-sm group"
-                            disabled={isAiThinking}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="group-hover:text-blue-700 transition-colors">{suggestion}</span>
-                              <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Help Categories */}
-                    <div>
-                      <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <HelpCircle className="h-5 w-5 text-purple-500" />I can help you with
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {helpCategories.map((category, index) => (
-                          <div key={index} className="group">
-                            <div className="p-5 rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-200 hover:shadow-lg transition-all duration-200 hover:border-gray-300">
-                              <div className="flex items-start gap-4">
-                                <div className={`p-3 rounded-xl ${category.bgColor}`}>
-                                  <div className={category.color}>{category.icon}</div>
-                                </div>
-                                <div className="flex-1">
-                                  <h4 className="font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
-                                    {category.title}
-                                  </h4>
-                                  <p className="text-sm text-gray-600 leading-relaxed">{category.description}</p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Chat Messages */}
-                {messages.slice(1).map((message, index) => (
-                  <div
-                    key={`message-${index}-${message.role}`}
-                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`flex items-start gap-4 max-w-4xl ${message.role === "user" ? "flex-row-reverse" : ""}`}
-                    >
-                      {message.role === "model" && (
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                          <Bot className="h-5 w-5 text-white" />
-                        </div>
-                      )}
-                      {message.role === "user" && (
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-gray-600 to-gray-800 flex items-center justify-center flex-shrink-0">
-                          <User className="h-5 w-5 text-white" />
-                        </div>
-                      )}
-                      <div
-                        className={`rounded-2xl px-6 py-4 shadow-sm max-w-2xl ${
-                          message.role === "user"
-                            ? "bg-gradient-to-br from-blue-600 to-blue-700 text-white"
-                            : "bg-white/80 backdrop-blur-sm border border-gray-200"
-                        }`}
-                      >
-                        {message.isLoading ? (
-                          <div className="flex items-center gap-2 py-2">
-                            <div className="flex gap-1">
-                              <div className="h-2 w-2 animate-bounce rounded-full bg-current"></div>
-                              <div
-                                className="h-2 w-2 animate-bounce rounded-full bg-current"
-                                style={{ animationDelay: "0.2s" }}
-                              ></div>
-                              <div
-                                className="h-2 w-2 animate-bounce rounded-full bg-current"
-                                style={{ animationDelay: "0.4s" }}
-                              ></div>
-                            </div>
-                            <span className="text-sm opacity-70">OHLIVER is thinking...</span>
-                          </div>
-                        ) : (
-                          <div className="whitespace-pre-wrap leading-relaxed">
-                            {message.parts.split("\n").map((part, i) => (
-                              <p key={i} className={i > 0 ? "mt-3" : ""}>
-                                {part}
-                              </p>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Rating */}
-                {showRating && (
-                  <div className="flex justify-start">
-                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-sm border border-gray-200 max-w-md">
-                      <p className="text-gray-700 mb-4 font-medium">How was this conversation?</p>
-                      <div className="flex gap-2">
-                        {[1, 2, 3, 4, 5].map((stars) => (
-                          <Button
-                            key={stars}
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRating(stars)}
-                            className="p-2 hover:bg-yellow-50"
-                          >
-                            <Star
-                              className={`h-5 w-5 transition-colors ${
-                                stars <= rating
-                                  ? "fill-yellow-400 text-yellow-400"
-                                  : "text-gray-300 hover:text-yellow-300"
-                              }`}
-                            />
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Modern Input Area */}
-              <div className="border-t border-gray-200/50 bg-white/50 backdrop-blur-sm p-6">
-                <div className="flex gap-4">
-                  <div className="flex-1 relative">
-                    <Input
-                      placeholder="Ask OHLIVER anything about OH Plus..."
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyPress}
-                      disabled={isAiThinking}
-                      className="h-12 pl-4 pr-12 text-base bg-white/80 backdrop-blur-sm border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm"
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-100">
-                        <Mic className="h-4 w-4 text-gray-400" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-100">
-                        <ImageIcon className="h-4 w-4 text-gray-400" />
-                      </Button>
-                    </div>
-                  </div>
-                  <Button
-                    onClick={() => handleSendMessage()}
-                    disabled={!input.trim() || isAiThinking}
-                    className="h-12 w-12 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50"
-                  >
-                    <Send className="h-5 w-5" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                    Filter: {selectedFilter} <ChevronDown className="h-4 w-4" />
                   </Button>
-                </div>
-                <p className="text-xs text-gray-500 mt-3 text-center">
-                  OHLIVER can help with platform navigation, feature explanations, and step-by-step guidance
-                </p>
-              </div>
-            </Card>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setSelectedFilter("All")}>All</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSelectedFilter("Sales")}>Sales</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSelectedFilter("Support")}>Support</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSelectedFilter("Technical")}>Technical</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button size="sm">
+                <Plus className="mr-2 h-4 w-4" /> New Chat
+              </Button>
+            </div>
           </div>
+
+          {/* AI Assistant Chat Interface */}
+          <Tabs defaultValue="basic" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="basic">Basic Chat</TabsTrigger>
+              <TabsTrigger value="optimized">Optimized Chat</TabsTrigger>
+              <TabsTrigger value="with-db">Chat with DB</TabsTrigger>
+            </TabsList>
+            <TabsContent value="basic">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Basic AI Assistant</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AssistantChat />
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="optimized">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Optimized AI Assistant</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AssistantChatOptimized />
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="with-db">
+              <Card>
+                <CardHeader>
+                  <CardTitle>AI Assistant with Database Integration</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <AssistantChatWithDB />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

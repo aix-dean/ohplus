@@ -62,28 +62,23 @@ export default function SiteDetailsLoading() {
       </div>
 
       {/* Job Orders Section */}
-      <div>
-        <div className="flex justify-between items-center mb-4">
-          <Skeleton className="h-6 w-32" />
-          <Skeleton className="h-6 w-16" />
-        </div>
+      <div className="flex-1 p-4 md:p-6">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <Skeleton className="h-8 w-64" />
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Skeleton className="h-9 w-24" />
+              <Skeleton className="h-9 w-24" />
+            </div>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array(3)
-            .fill(0)
-            .map((_, i) => (
-              <Card key={i}>
-                <CardContent className="p-4">
-                  <Skeleton className="h-4 w-24 mb-2" />
-                  <Skeleton className="h-5 w-48" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Skeleton className="h-[300px] w-full lg:col-span-2" />
+            <Skeleton className="h-[300px] w-full" />
+          </div>
 
-                  <div className="flex justify-between items-center mt-4">
-                    <Skeleton className="h-6 w-32" />
-                    <Skeleton className="h-8 w-8 rounded-full" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+          <Skeleton className="h-[400px] w-full" />
+          <Skeleton className="h-[400px] w-full" />
         </div>
       </div>
     </div>

@@ -5,14 +5,30 @@ import { LayoutGrid, List, Play, Square, AlertCircle, Plus, Search } from "lucid
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import type { Product } from "@/lib/firebase-service"
 import { getServiceAssignmentsByProductId, type ServiceAssignment } from "@/lib/firebase-service"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
+
+const contentStatusData = [
+  { status: "Published", count: 120 },
+  { status: "Scheduled", count: 45 },
+  { status: "Draft", count: 30 },
+  { status: "Expired", count: 15 },
+]
+
+const chartConfig = {
+  count: {
+    label: "Number of Contents",
+    color: "hsl(var(--primary))",
+  },
+}
 
 export default function LEDSitesContentTab({ products = [] }: { products?: Product[] }) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -94,6 +110,9 @@ export default function LEDSitesContentTab({ products = [] }: { products?: Produ
           </div>
         </div>
       </div>
+
+      {/* Content Status Chart */}
+      <LEDSitesContent />
 
       {/* Empty state */}
       {filteredProducts.length === 0 && (
@@ -251,6 +270,27 @@ function LEDSiteCard({ product }: { product: Product }) {
             />
           </div>
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+export function LEDSitesContent() {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-xl font-bold">LED Sites Content Status</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer config={chartConfig} className="aspect-auto h-[250px] w-full">
+          <BarChart data={contentStatusData}>
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey="status" tickLine={false} tickMargin={10} axisLine={false} />
+            <YAxis tickLine={false} tickMargin={10} axisLine={false} />
+            <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+            <Bar dataKey="count" fill="var(--color-count)" radius={8} />
+          </BarChart>
+        </ChartContainer>
       </CardContent>
     </Card>
   )
