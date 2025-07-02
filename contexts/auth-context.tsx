@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -58,7 +58,7 @@ interface ProjectData {
   updated?: Date
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [projectData, setProjectData] = useState<ProjectData | null>(null)

@@ -1,9 +1,7 @@
 "use client"
 
 import { Progress } from "@/components/ui/progress"
-
 import { Separator } from "@/components/ui/separator"
-
 import type React from "react"
 import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
@@ -23,9 +21,6 @@ import {
   Users,
   Star,
   Calendar,
-  Facebook,
-  Instagram,
-  Youtube,
   CreditCard,
   Info,
   Copy,
@@ -55,8 +50,17 @@ const maskLicenseKey = (key: string | undefined | null) => {
 }
 
 export default function AccountPage() {
-  const { user, userData, projectData, subscriptionData, loading, updateUserData, updateProjectData, logout } =
-    useAuth()
+  const {
+    user,
+    userData,
+    projectData,
+    subscriptionData,
+    loading,
+    updateUserData,
+    updateProjectData,
+    logout,
+    refreshUserData,
+  } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
@@ -71,18 +75,18 @@ export default function AccountPage() {
   const [firstName, setFirstName] = useState("")
   const [middleName, setMiddleName] = useState("")
   const [lastName, setLastName] = useState("")
-  const [displayName, setDisplayName] = useState("")
+  const [displayName, setDisplayName] = useState(userData?.displayName || "")
   const [phoneNumber, setPhoneNumber] = useState("")
   const [gender, setGender] = useState("")
   const [photoURL, setPhotoURL] = useState("")
 
-  const [companyName, setCompanyName] = useState("")
-  const [companyLocation, setCompanyLocation] = useState("")
-  const [companyWebsite, setCompanyWebsite] = useState("")
-  const [projectName, setProjectName] = useState("")
-  const [facebook, setFacebook] = useState("")
-  const [instagram, setInstagram] = useState("")
-  const [youtube, setYoutube] = useState("")
+  const [companyName, setCompanyName] = useState(userData?.company_name || "")
+  const [companyLocation, setCompanyLocation] = useState(userData?.company_location || "")
+  const [companyWebsite, setCompanyWebsite] = useState(userData?.company_website || "")
+  const [projectName, setProjectName] = useState(userData?.project_name || "")
+  const [facebook, setFacebook] = useState(userData?.social_media?.facebook || "")
+  const [instagram, setInstagram] = useState(userData?.social_media?.instagram || "")
+  const [youtube, setYoutube] = useState(userData?.social_media?.youtube || "")
 
   const router = useRouter()
 
@@ -170,7 +174,8 @@ export default function AccountPage() {
     }
   }, [user])
 
-  const handleSave = async () => {
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
     setIsSaving(true)
 
     try {
@@ -182,6 +187,15 @@ export default function AccountPage() {
         phone_number: phoneNumber,
         gender,
         photo_url: photoURL,
+        company_name: companyName,
+        company_location: companyLocation,
+        company_website: companyWebsite,
+        project_name: projectName,
+        social_media: {
+          facebook,
+          instagram,
+          youtube,
+        },
       })
 
       await updateProjectData({
@@ -196,6 +210,7 @@ export default function AccountPage() {
         },
       })
 
+      await refreshUserData() // Refresh to get the latest data
       toast({
         title: "Success",
         description: "Account information updated successfully!",
@@ -706,70 +721,64 @@ export default function AccountPage() {
 
               {/* Social Media Card */}
               <Card className="rounded-xl shadow-sm">
-                <CardHeader className="border-b px-5 py-3">
-                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
-                    <Globe className="h-5 w-5 text-primary" />
-                    Social Media
-                  </CardTitle>
-                  <CardDescription className="text-xs text-gray-600">
-                    Connect your company's social media accounts.
-                  </CardDescription>
+                <CardHeader>
+                  <CardTitle>Social Media</CardTitle>
+                  <CardDescription>Connect your company's social media accounts.</CardDescription>
                 </CardHeader>
-                <CardContent className="p-5">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100">
-                        <Facebook className="h-4 w-4 text-gray-600" />
-                      </div>
-                      <Input
-                        value={facebook}
-                        onChange={(e) => setFacebook(e.target.value)}
-                        disabled={!isEditing}
-                        placeholder="Facebook URL"
-                        className={cn(
-                          "flex-1 rounded-md border px-3 py-2 text-sm shadow-sm",
-                          isEditing
-                            ? "border-primary/40 focus:border-primary"
-                            : "border-gray-200 bg-gray-50 text-gray-700",
-                        )}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100">
-                        <Instagram className="h-4 w-4 text-gray-600" />
-                      </div>
-                      <Input
-                        value={instagram}
-                        onChange={(e) => setInstagram(e.target.value)}
-                        disabled={!isEditing}
-                        placeholder="Instagram URL"
-                        className={cn(
-                          "flex-1 rounded-md border px-3 py-2 text-sm shadow-sm",
-                          isEditing
-                            ? "border-primary/40 focus:border-primary"
-                            : "border-gray-200 bg-gray-50 text-gray-700",
-                        )}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100">
-                        <Youtube className="h-4 w-4 text-gray-600" />
-                      </div>
-                      <Input
-                        value={youtube}
-                        onChange={(e) => setYoutube(e.target.value)}
-                        disabled={!isEditing}
-                        placeholder="YouTube URL"
-                        className={cn(
-                          "flex-1 rounded-md border px-3 py-2 text-sm shadow-sm",
-                          isEditing
-                            ? "border-primary/40 focus:border-primary"
-                            : "border-gray-200 bg-gray-50 text-gray-700",
-                        )}
-                      />
-                    </div>
+                <CardContent className="space-y-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="facebook" className="text-xs font-medium text-gray-700">
+                      Facebook
+                    </Label>
+                    <Input
+                      id="facebook"
+                      value={facebook}
+                      onChange={(e) => setFacebook(e.target.value)}
+                      disabled={!isEditing}
+                      placeholder="Facebook URL"
+                      className={cn(
+                        "rounded-md border px-3 py-2 text-sm shadow-sm",
+                        isEditing
+                          ? "border-primary/40 focus:border-primary"
+                          : "border-gray-200 bg-gray-50 text-gray-700",
+                      )}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="instagram" className="text-xs font-medium text-gray-700">
+                      Instagram
+                    </Label>
+                    <Input
+                      id="instagram"
+                      value={instagram}
+                      onChange={(e) => setInstagram(e.target.value)}
+                      disabled={!isEditing}
+                      placeholder="Instagram URL"
+                      className={cn(
+                        "rounded-md border px-3 py-2 text-sm shadow-sm",
+                        isEditing
+                          ? "border-primary/40 focus:border-primary"
+                          : "border-gray-200 bg-gray-50 text-gray-700",
+                      )}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="youtube" className="text-xs font-medium text-gray-700">
+                      YouTube
+                    </Label>
+                    <Input
+                      id="youtube"
+                      value={youtube}
+                      onChange={(e) => setYoutube(e.target.value)}
+                      disabled={!isEditing}
+                      placeholder="YouTube URL"
+                      className={cn(
+                        "rounded-md border px-3 py-2 text-sm shadow-sm",
+                        isEditing
+                          ? "border-primary/40 focus:border-primary"
+                          : "border-gray-200 bg-gray-50 text-gray-700",
+                      )}
+                    />
                   </div>
                 </CardContent>
               </Card>
