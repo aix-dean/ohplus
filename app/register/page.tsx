@@ -11,7 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FirebaseError } from "firebase/app"
 import { Separator } from "@/components/ui/separator"
 import { ChromeIcon, FacebookIcon } from "lucide-react" // Using Lucide React for icons
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+// Removed Select import as Gender field is removed
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function RegisterPage() {
   const [step, setStep] = useState(1) // 1 for personal info, 2 for password and company info
@@ -24,7 +25,8 @@ export default function RegisterPage() {
   const [companyName, setCompanyName] = useState("")
   const [companyLocation, setCompanyLocation] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
-  const [gender, setGender] = useState("")
+  // Removed gender state
+  // const [gender, setGender] = useState("")
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -54,7 +56,8 @@ export default function RegisterPage() {
 
   const handleNext = () => {
     setErrorMessage(null)
-    if (!firstName || !lastName || !email || !phoneNumber || !gender) {
+    // Removed gender check
+    if (!firstName || !lastName || !email || !phoneNumber) {
       setErrorMessage("Please fill in all required personal information fields.")
       return
     }
@@ -83,7 +86,7 @@ export default function RegisterPage() {
           last_name: lastName,
           middle_name: middleName,
           phone_number: phoneNumber,
-          gender: gender,
+          gender: "", // Pass empty string for gender as it's no longer collected
         },
         {
           company_name: companyName,
@@ -185,19 +188,7 @@ export default function RegisterPage() {
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="gender">Gender</Label>
-                  <Select value={gender} onValueChange={setGender} required>
-                    <SelectTrigger id="gender">
-                      <SelectValue placeholder="Select Gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Male">Male</SelectItem>
-                      <SelectItem value="Female">Female</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Removed Gender Select */}
                 <Separator className="my-6" />
                 <div className="relative flex justify-center text-xs uppercase">
                   <span className="bg-white px-2 text-muted-foreground dark:bg-gray-950">or</span>
