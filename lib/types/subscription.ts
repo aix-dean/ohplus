@@ -4,17 +4,14 @@ export type SubscriptionStatus = "active" | "inactive" | "trialing" | "cancelled
 
 export interface Subscription {
   id: string
-  licenseKey: string
-  planType: SubscriptionPlanType
-  billingCycle: BillingCycle
-  uid: string // User ID
-  startDate: Date // When the subscription started
-  endDate: Date | null // When the subscription ends (null for lifetime or ongoing)
+  license_key: string
+  plan_id: string // e.g., "free", "basic", "pro"
   status: SubscriptionStatus
-  maxProducts: number // Max products allowed for this subscription
-  trialEndDate: Date | null // End date of the trial period, if applicable
-  createdAt: Date // Timestamp of creation
-  updatedAt: Date // Last updated timestamp
+  start_date: Date
+  end_date: Date
+  created_at: Date
+  updated_at: Date
+  // Add other subscription-related fields as needed, e.g., features, limits
 }
 
 export interface SubscriptionPlan {

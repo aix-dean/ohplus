@@ -1,21 +1,14 @@
 import { db } from "@/lib/firebase"
 import { collection, doc, getDoc, getDocs, query, where, addDoc, deleteDoc, updateDoc } from "firebase/firestore"
+import type { Role as ImportedRole, Permission as ImportedPermission } from "@/lib/types/access-management"
 
 // Define types for permissions and roles
-export type Permission = {
-  id: string
-  name: string
-  description: string
-  module: "sales" | "logistics" | "cms" | "admin"
-  action: "view" | "create" | "edit" | "delete"
+export type Permission = ImportedPermission & {
   createdAt?: number
   updatedAt?: number
 }
 
-export type Role = {
-  id: string
-  name: string
-  description: string
+export type Role = ImportedRole & {
   isAdmin?: boolean
   permissions?: string[] // Array of permission IDs
   createdAt?: number
@@ -50,6 +43,7 @@ export type User = {
   lastLogin?: any
   created?: any
   updated?: any
+  role?: string // Single role field for simplicity
 }
 
 // Permission Management
@@ -107,112 +101,145 @@ export async function deletePermission(permissionId: string): Promise<void> {
 }
 
 // Role Management
-export async function getRoles(): Promise<Role[]> {
-  try {
-    const rolesSnapshot = await getDocs(collection(db, "roles"))
-    return rolesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Role)
-  } catch (error) {
-    console.error("Error getting roles:", error)
-    throw new Error("Failed to get roles")
-  }
-}
-
-export async function createRole(role: Omit<Role, "id" | "createdAt" | "updatedAt">): Promise<string> {
-  try {
-    const timestamp = Date.now()
-    const roleWithTimestamp = {
-      ...role,
-      permissions: role.permissions || [],
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    }
-
-    const docRef = await addDoc(collection(db, "roles"), roleWithTimestamp)
-    return docRef.id
-  } catch (error) {
-    console.error("Error creating role:", error)
-    throw new Error("Failed to create role")
-  }
-}
-
-export async function updateRole(
-  roleId: string,
-  role: Partial<Omit<Role, "id" | "createdAt" | "updatedAt">>,
-): Promise<void> {
-  try {
-    const roleRef = doc(db, "roles", roleId)
-    await updateDoc(roleRef, {
-      ...role,
-      updatedAt: Date.now(),
-    })
-  } catch (error) {
-    console.error("Error updating role:", error)
-    throw new Error("Failed to update role")
-  }
-}
-
-export async function deleteRole(roleId: string): Promise<void> {
-  try {
-    const roleRef = doc(db, "roles", roleId)
-    await deleteDoc(roleRef)
-  } catch (error) {
-    console.error("Error deleting role:", error)
-    throw new Error("Failed to delete role")
-  }
-}
-
-// Role Permission Management
-export async function getRolePermissions(roleId: string): Promise<string[]> {
-  try {
-    const roleDoc = await getDoc(doc(db, "roles", roleId))
-    if (roleDoc.exists()) {
-      const role = roleDoc.data() as Role
-      return role.permissions || []
-    }
-    return []
-  } catch (error) {
-    console.error("Error getting role permissions:", error)
-    return []
-  }
-}
-
-export async function assignPermissionToRole(roleId: string, permissionId: string): Promise<void> {
-  try {
-    const roleRef = doc(db, "roles", roleId)
-    const roleDoc = await getDoc(roleRef)
-    if (roleDoc.exists()) {
-      const role = roleDoc.data() as Role
-      const permissions = role.permissions || []
-      if (!permissions.includes(permissionId)) {
-        await updateDoc(roleRef, {
-          permissions: [...permissions, permissionId],
-          updatedAt: Date.now(),
-        })
+export const accessManagementService = {
+  // User Roles
+  async getUserRoles(uid: string): Promise<string[]> {
+    try {
+      const userDocRef = doc(db, "iboard_users", uid)
+      const userDocSnap = await getDoc(userDocRef)
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data()
+        // Assuming 'role' is a single string field in user document
+        // If you have multiple roles, you might store them as an array
+        return userData.role ? [userData.role] : []
       }
+      return []
+    } catch (error) {
+      console.error("Error fetching user roles:", error)
+      throw error
     }
-  } catch (error) {
-    console.error("Error assigning permission to role:", error)
-    throw new Error("Failed to assign permission to role")
-  }
-}
+  },
 
-export async function removePermissionFromRole(roleId: string, permissionId: string): Promise<void> {
-  try {
-    const roleRef = doc(db, "roles", roleId)
-    const roleDoc = await getDoc(roleRef)
-    if (roleDoc.exists()) {
-      const role = roleDoc.data() as Role
-      const permissions = role.permissions || []
-      const updatedPermissions = permissions.filter((id) => id !== permissionId)
-      await updateDoc(roleRef, {
-        permissions: updatedPermissions,
-        updatedAt: Date.now(),
-      })
+  async assignUserRole(uid: string, roleName: string): Promise<void> {
+    try {
+      const userDocRef = doc(db, "iboard_users", uid)
+      await updateDoc(userDocRef, { role: roleName })
+    } catch (error) {
+      console.error("Error assigning user role:", error)
+      throw error
     }
-  } catch (error) {
-    console.error("Error removing permission from role:", error)
-    throw new Error("Failed to remove permission from role")
-  }
+  },
+
+  // Permissions
+  async hasPermission(
+    uid: string,
+    permissionName: string,
+    module: string,
+    action: "view" | "create" | "edit" | "delete",
+  ): Promise<boolean> {
+    try {
+      const userRoles = await this.getUserRoles(uid)
+      if (userRoles.length === 0) return false
+
+      // Fetch all roles that the user has
+      const rolesRef = collection(db, "roles")
+      const q = query(rolesRef, where("name", "in", userRoles))
+      const querySnapshot = await getDocs(q)
+
+      let userPermissions: string[] = []
+      querySnapshot.forEach((docSnap) => {
+        const roleData = docSnap.data() as Role
+        userPermissions = [...userPermissions, ...roleData.permissions]
+      })
+
+      // Check if the user has the specific permission
+      const requiredPermission = `${module}:${action}:${permissionName}`
+      return userPermissions.includes(requiredPermission)
+    } catch (error) {
+      console.error("Error checking permission:", error)
+      throw error
+    }
+  },
+
+  async getRolePermissions(roleId: string): Promise<string[]> {
+    try {
+      const roleDocRef = doc(db, "roles", roleId)
+      const roleDocSnap = await getDoc(roleDocRef)
+      if (roleDocSnap.exists()) {
+        const roleData = roleDocSnap.data() as Role
+        return roleData.permissions || []
+      }
+      return []
+    } catch (error) {
+      console.error("Error fetching role permissions:", error)
+      throw error
+    }
+  },
+
+  async updateRolePermissions(roleId: string, permissions: string[]): Promise<void> {
+    try {
+      const roleDocRef = doc(db, "roles", roleId)
+      await updateDoc(roleDocRef, { permissions })
+    } catch (error) {
+      console.error("Error updating role permissions:", error)
+      throw error
+    }
+  },
+
+  // Roles Management
+  async createRole(role: Omit<Role, "id">): Promise<Role> {
+    try {
+      const docRef = await addDoc(collection(db, "roles"), role)
+      return { id: docRef.id, ...role }
+    } catch (error) {
+      console.error("Error creating role:", error)
+      throw error
+    }
+  },
+
+  async getRole(id: string): Promise<Role | null> {
+    try {
+      const docRef = doc(db, "roles", id)
+      const docSnap = await getDoc(docRef)
+      if (docSnap.exists()) {
+        return { id: docSnap.id, ...docSnap.data() } as Role
+      }
+      return null
+    } catch (error) {
+      console.error("Error getting role:", error)
+      throw error
+    }
+  },
+
+  async getAllRoles(): Promise<Role[]> {
+    try {
+      const rolesCollection = collection(db, "roles")
+      const querySnapshot = await getDocs(rolesCollection)
+      return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Role)
+    } catch (error) {
+      console.error("Error getting all roles:", error)
+      throw error
+    }
+  },
+
+  async updateRole(id: string, updates: Partial<Role>): Promise<void> {
+    try {
+      const docRef = doc(db, "roles", id)
+      await updateDoc(docRef, updates)
+    } catch (error) {
+      console.error("Error updating role:", error)
+      throw error
+    }
+  },
+
+  async deleteRole(id: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, "roles", id))
+    } catch (error) {
+      console.error("Error deleting role:", error)
+      throw error
+    }
+  },
 }
 
 // User Management
@@ -247,24 +274,6 @@ export async function getUsers(licenseKey?: string): Promise<User[]> {
 }
 
 // User Role Management
-export async function getUserRoles(userId: string): Promise<string[]> {
-  try {
-    const userRolesCollection = collection(db, "user_roles")
-    const userRolesQuery = query(userRolesCollection, where("userId", "==", userId))
-    const userRolesSnapshot = await getDocs(userRolesQuery)
-
-    const roleIds: string[] = []
-    userRolesSnapshot.forEach((doc) => {
-      roleIds.push(doc.data().roleId)
-    })
-
-    return roleIds
-  } catch (error) {
-    console.error("Error getting user roles:", error)
-    throw new Error("Failed to get user roles")
-  }
-}
-
 export async function assignRoleToUser(userId: string, roleId: string): Promise<void> {
   try {
     // Check if the user already has this role
@@ -434,7 +443,7 @@ export async function initializeDefaultPermissions(): Promise<void> {
 export async function initializeAdminRole(): Promise<string> {
   try {
     // Check if admin role already exists
-    const existingRoles = await getRoles()
+    const existingRoles = await accessManagementService.getAllRoles()
     const adminRole = existingRoles.find((role) => role.name === "Administrator")
 
     if (adminRole) {
@@ -443,16 +452,20 @@ export async function initializeAdminRole(): Promise<string> {
     }
 
     // Create admin role
-    const adminRoleId = await createRole({
+    const adminRoleId = await accessManagementService.createRole({
       name: "Administrator",
       description: "Full access to all system features",
       isAdmin: true,
+      permissions: [],
     })
 
     // Get all permissions and assign them to the admin role
     const permissions = await getPermissions()
     for (const permission of permissions) {
-      await assignPermissionToRole(adminRoleId, permission.id)
+      await accessManagementService.updateRolePermissions(adminRoleId, [
+        ...(permission.permissions || []),
+        permission.id,
+      ])
     }
 
     console.log("Admin role initialized successfully")
@@ -460,64 +473,5 @@ export async function initializeAdminRole(): Promise<string> {
   } catch (error) {
     console.error("Error initializing admin role:", error)
     throw new Error("Failed to initialize admin role")
-  }
-}
-
-// Check if user has permission
-export async function hasPermission(
-  userId: string,
-  module: "sales" | "logistics" | "cms" | "admin",
-  action: "view" | "create" | "edit" | "delete",
-): Promise<boolean> {
-  try {
-    // Get user roles
-    const userRoles = await getUserRoles(userId)
-
-    if (userRoles.length === 0) {
-      return false // User has no roles
-    }
-
-    // Check each role
-    for (const roleId of userRoles) {
-      const roleDoc = await getDoc(doc(db, "roles", roleId))
-
-      if (!roleDoc.exists()) {
-        continue // Role doesn't exist
-      }
-
-      const role = roleDoc.data() as Role
-
-      // Admin roles have all permissions
-      if (role.isAdmin) {
-        return true
-      }
-
-      // Check role permissions
-      const rolePermissions = await getRolePermissions(roleId)
-
-      if (rolePermissions.length === 0) {
-        continue // Role has no permissions
-      }
-
-      // Get all permissions that match the module and action
-      const permissionsQuery = query(
-        collection(db, "permissions"),
-        where("module", "==", module),
-        where("action", "==", action),
-      )
-
-      const permissionsSnapshot = await getDocs(permissionsQuery)
-
-      for (const permissionDoc of permissionsSnapshot.docs) {
-        if (rolePermissions.includes(permissionDoc.id)) {
-          return true // User has the permission through this role
-        }
-      }
-    }
-
-    return false // User doesn't have the permission
-  } catch (error) {
-    console.error("Error checking permission:", error)
-    return false // Assume no permission on error
   }
 }

@@ -26,267 +26,257 @@ import {
   LineChartIcon,
 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { useUserRoles, useIsAdmin } from "@/hooks/use-permissions" // Corrected import
+import { useUserRoles, useIsAdmin } from "@/hooks/use-permissions"
+
+interface NavItem {
+  href: string
+  label: string
+  icon: React.ElementType
+  roles?: string[] // Roles that can access this item
+  "data-tour-id"?: string // Optional ID for tour targeting
+}
 
 export function SideNavigation() {
   const pathname = usePathname()
-  const { userRoles } = useUserRoles()
-  const isAdmin = useIsAdmin()
+  const { userRoles, loading: rolesLoading } = useUserRoles() // Corrected destructuring
+  const { isAdmin, loading: isAdminLoading } = useIsAdmin() // Corrected destructuring
 
-  const isSales = userRoles.includes("Sales")
-  const isLogistics = userRoles.includes("Logistics")
-  const isCMS = userRoles.includes("CMS")
+  if (rolesLoading || isAdminLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <p>Loading navigation...</p>
+      </div>
+    )
+  }
 
-  const navItems = [
+  const navItems: NavItem[] = [
     {
-      section: "General",
-      items: [
-        {
-          href: "/dashboard",
-          label: "Dashboard",
-          icon: HomeIcon,
-          active: pathname === "/dashboard",
-          roles: ["Admin", "Sales", "Logistics", "CMS"],
-        },
-        {
-          href: "/ai-assistant",
-          label: "AI Assistant",
-          icon: MessageSquareIcon,
-          active: pathname.startsWith("/ai-assistant"),
-          roles: ["Admin", "Sales", "Logistics", "CMS"],
-        },
-        {
-          href: "/account",
-          label: "Account",
-          icon: UsersIcon,
-          active: pathname.startsWith("/account"),
-          roles: ["Admin", "Sales", "Logistics", "CMS"],
-        },
-        {
-          href: "/settings",
-          label: "Settings",
-          icon: SettingsIcon,
-          active: pathname.startsWith("/settings"),
-          roles: ["Admin", "Sales", "Logistics", "CMS"],
-        },
-        {
-          href: "/help",
-          label: "Help",
-          icon: BookOpenIcon,
-          active: pathname.startsWith("/help"),
-          roles: ["Admin", "Sales", "Logistics", "CMS"],
-        },
-      ],
+      href: "/dashboard",
+      label: "Dashboard",
+      icon: HomeIcon,
+      roles: ["Admin", "Sales", "Logistics", "CMS"],
     },
     {
-      section: "Sales",
-      items: [
-        {
-          href: "/sales/dashboard",
-          label: "Dashboard",
-          icon: LayoutDashboardIcon,
-          active: pathname === "/sales/dashboard",
-          roles: ["Admin", "Sales"],
-        },
-        {
-          href: "/sales/clients",
-          label: "Clients",
-          icon: BuildingIcon,
-          active: pathname.startsWith("/sales/clients"),
-          roles: ["Admin", "Sales"],
-        },
-        {
-          href: "/sales/products",
-          label: "Products",
-          icon: ShoppingCartIcon,
-          active: pathname.startsWith("/sales/products"),
-          roles: ["Admin", "Sales"],
-        },
-        {
-          href: "/sales/proposals",
-          label: "Proposals",
-          icon: FileTextIcon,
-          active: pathname.startsWith("/sales/proposals"),
-          roles: ["Admin", "Sales"],
-        },
-        {
-          href: "/sales/job-orders",
-          label: "Job Orders",
-          icon: BriefcaseIcon,
-          active: pathname.startsWith("/sales/job-orders"),
-          roles: ["Admin", "Sales"],
-        },
-        {
-          href: "/sales/bookings",
-          label: "Bookings",
-          icon: CalendarIcon,
-          active: pathname.startsWith("/sales/bookings"),
-          roles: ["Admin", "Sales"],
-        },
-        {
-          href: "/sales/project-campaigns",
-          label: "Project Campaigns",
-          icon: MegaphoneIcon,
-          active: pathname.startsWith("/sales/project-campaigns"),
-          roles: ["Admin", "Sales"],
-        },
-        {
-          href: "/sales/chat",
-          label: "Chat",
-          icon: MessageSquareIcon,
-          active: pathname.startsWith("/sales/chat"),
-          roles: ["Admin", "Sales"],
-        },
-        {
-          href: "/sales/bulletin-board",
-          label: "Bulletin Board",
-          icon: ClipboardListIcon,
-          active: pathname.startsWith("/sales/bulletin-board"),
-          roles: ["Admin", "Sales"],
-        },
-        {
-          href: "/sales/planner",
-          label: "Planner",
-          icon: CalendarIcon,
-          active: pathname.startsWith("/sales/planner"),
-          roles: ["Admin", "Sales"],
-        },
-      ],
+      href: "/ai-assistant",
+      label: "AI Assistant",
+      icon: MessageSquareIcon,
+      roles: ["Admin", "Sales", "Logistics", "CMS"],
     },
     {
-      section: "Logistics",
-      items: [
-        {
-          href: "/logistics/dashboard",
-          label: "Dashboard",
-          icon: LayoutDashboardIcon,
-          active: pathname === "/logistics/dashboard",
-          roles: ["Admin", "Logistics"],
-        },
-        {
-          href: "/logistics/sites",
-          label: "Sites",
-          icon: MapPinIcon,
-          active: pathname.startsWith("/logistics/sites"),
-          roles: ["Admin", "Logistics"],
-        },
-        {
-          href: "/logistics/assignments",
-          label: "Assignments",
-          icon: ClipboardListIcon,
-          active: pathname.startsWith("/logistics/assignments"),
-          roles: ["Admin", "Logistics"],
-        },
-        {
-          href: "/logistics/alerts",
-          label: "Alerts",
-          icon: BellIcon,
-          active: pathname.startsWith("/logistics/alerts"),
-          roles: ["Admin", "Logistics"],
-        },
-        {
-          href: "/logistics/planner",
-          label: "Planner",
-          icon: CalendarIcon,
-          active: pathname.startsWith("/logistics/planner"),
-          roles: ["Admin", "Logistics"],
-        },
-      ],
+      href: "/account",
+      label: "Account",
+      icon: UsersIcon,
+      roles: ["Admin", "Sales", "Logistics", "CMS"],
     },
     {
-      section: "CMS",
-      items: [
-        {
-          href: "/cms/dashboard",
-          label: "Dashboard",
-          icon: LayoutDashboardIcon,
-          active: pathname === "/cms/dashboard",
-          roles: ["Admin", "CMS"],
-        },
-        {
-          href: "/cms/orders",
-          label: "Orders",
-          icon: ShoppingCartIcon,
-          active: pathname.startsWith("/cms/orders"),
-          roles: ["Admin", "CMS"],
-        },
-        {
-          href: "/cms/planner",
-          label: "Planner",
-          icon: CalendarIcon,
-          active: pathname.startsWith("/cms/planner"),
-          roles: ["Admin", "CMS"],
-        },
-      ],
+      href: "/settings",
+      label: "Settings",
+      icon: SettingsIcon,
+      roles: ["Admin", "Sales", "Logistics", "CMS"],
     },
     {
-      section: "Admin",
-      items: [
-        {
-          href: "/admin/dashboard",
-          label: "Dashboard",
-          icon: LayoutDashboardIcon,
-          active: pathname === "/admin/dashboard",
-          roles: ["Admin"],
-        },
-        {
-          href: "/admin/inventory",
-          label: "Inventory",
-          icon: FactoryIcon,
-          active: pathname.startsWith("/admin/inventory"),
-          roles: ["Admin"],
-          "data-tour-id": "inventory-nav-item", // Tour target
-        },
-        {
-          href: "/admin/access-management",
-          label: "Access Management",
-          icon: UsersIcon,
-          active: pathname.startsWith("/admin/access-management"),
-          roles: ["Admin"],
-        },
-        {
-          href: "/admin/documents",
-          label: "Documents",
-          icon: FileTextIcon,
-          active: pathname.startsWith("/admin/documents"),
-          roles: ["Admin"],
-        },
-        {
-          href: "/admin/chat-analytics",
-          label: "Chat Analytics",
-          icon: LineChartIcon,
-          active: pathname.startsWith("/admin/chat-analytics"),
-          roles: ["Admin"],
-        },
-        {
-          href: "/admin/subscriptions",
-          label: "Subscriptions",
-          icon: DollarSignIcon,
-          active: pathname.startsWith("/admin/subscriptions"),
-          roles: ["Admin"],
-        },
-      ],
+      href: "/help",
+      label: "Help",
+      icon: BookOpenIcon,
+      roles: ["Admin", "Sales", "Logistics", "CMS"],
+    },
+    {
+      href: "/sales/dashboard",
+      label: "Sales Dashboard",
+      icon: LayoutDashboardIcon,
+      roles: ["Admin", "Sales"],
+    },
+    {
+      href: "/sales/clients",
+      label: "Clients",
+      icon: BuildingIcon,
+      roles: ["Admin", "Sales"],
+    },
+    {
+      href: "/sales/products",
+      label: "Products",
+      icon: ShoppingCartIcon,
+      roles: ["Admin", "Sales"],
+    },
+    {
+      href: "/sales/proposals",
+      label: "Proposals",
+      icon: FileTextIcon,
+      roles: ["Admin", "Sales"],
+    },
+    {
+      href: "/sales/quotation-requests",
+      label: "Quotation Requests",
+      icon: DollarSignIcon,
+      roles: ["Admin", "Sales"],
+    },
+    {
+      href: "/sales/job-orders",
+      label: "Job Orders",
+      icon: BriefcaseIcon,
+      roles: ["Admin", "Sales"],
+    },
+    {
+      href: "/sales/bookings",
+      label: "Bookings",
+      icon: CalendarIcon,
+      roles: ["Admin", "Sales"],
+    },
+    {
+      href: "/sales/project-campaigns",
+      label: "Project Campaigns",
+      icon: MegaphoneIcon,
+      roles: ["Admin", "Sales"],
+    },
+    {
+      href: "/sales/chat",
+      label: "Chat",
+      icon: MessageSquareIcon,
+      roles: ["Admin", "Sales"],
+    },
+    {
+      href: "/sales/bulletin-board",
+      label: "Bulletin Board",
+      icon: ClipboardListIcon,
+      roles: ["Admin", "Sales"],
+    },
+    {
+      href: "/sales/planner",
+      label: "Planner",
+      icon: CalendarIcon,
+      roles: ["Admin", "Sales"],
+    },
+    {
+      href: "/logistics/dashboard",
+      label: "Logistics Dashboard",
+      icon: LayoutDashboardIcon,
+      roles: ["Admin", "Logistics"],
+    },
+    {
+      href: "/logistics/sites",
+      label: "Sites",
+      icon: MapPinIcon,
+      roles: ["Admin", "Logistics"],
+    },
+    {
+      href: "/logistics/assignments",
+      label: "Assignments",
+      icon: ClipboardListIcon,
+      roles: ["Admin", "Logistics"],
+    },
+    {
+      href: "/logistics/alerts",
+      label: "Alerts",
+      icon: BellIcon,
+      roles: ["Admin", "Logistics"],
+    },
+    {
+      href: "/logistics/planner",
+      label: "Planner",
+      icon: CalendarIcon,
+      roles: ["Admin", "Logistics"],
+    },
+    {
+      href: "/cms/dashboard",
+      label: "CMS Dashboard",
+      icon: LayoutDashboardIcon,
+      roles: ["Admin", "CMS"],
+    },
+    {
+      href: "/cms/orders",
+      label: "Orders",
+      icon: ShoppingCartIcon,
+      roles: ["Admin", "CMS"],
+    },
+    {
+      href: "/cms/planner",
+      label: "Planner",
+      icon: CalendarIcon,
+      roles: ["Admin", "CMS"],
+    },
+    {
+      href: "/admin/dashboard",
+      label: "Admin Dashboard",
+      icon: LayoutDashboardIcon,
+      roles: ["Admin"],
+    },
+    {
+      href: "/admin/inventory",
+      label: "Inventory",
+      icon: FactoryIcon,
+      roles: ["Admin"],
+      "data-tour-id": "inventory-nav-item", // Tour target
+    },
+    {
+      href: "/admin/access-management",
+      label: "Access Management",
+      icon: UsersIcon,
+      roles: ["Admin"],
+    },
+    {
+      href: "/admin/documents",
+      label: "Documents",
+      icon: FileTextIcon,
+      roles: ["Admin"],
+    },
+    {
+      href: "/admin/chat-analytics",
+      label: "Chat Analytics",
+      icon: LineChartIcon,
+      roles: ["Admin"],
+    },
+    {
+      href: "/admin/subscriptions",
+      label: "Subscriptions",
+      icon: DollarSignIcon,
+      roles: ["Admin"],
     },
   ]
 
-  const filteredNavItems = navItems
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => {
-        if (isAdmin) return true // Admin sees everything
-        return item.roles.some((role) => userRoles.includes(role))
-      }),
-    }))
-    .filter((section) => section.items.length > 0) // Remove empty sections
+  const filteredNavItems = navItems.filter((item) => {
+    // If item has no specific roles, it's visible to everyone
+    if (!item.roles || item.roles.length === 0) {
+      return true
+    }
+    // If user is admin, they see all admin-specific items and general items
+    if (isAdmin) {
+      return true
+    }
+    // Otherwise, check if user has any of the required roles
+    return item.roles.some((role) => userRoles.includes(role))
+  })
+
+  // Group items by section for display
+  const sections = [
+    { title: "General", items: [] as NavItem[] },
+    { title: "Sales", items: [] as NavItem[] },
+    { title: "Logistics", items: [] as NavItem[] },
+    { title: "CMS", items: [] as NavItem[] },
+    { title: "Admin", items: [] as NavItem[] },
+  ]
+
+  filteredNavItems.forEach((item) => {
+    if (item.href.startsWith("/sales")) {
+      sections[1].items.push(item)
+    } else if (item.href.startsWith("/logistics")) {
+      sections[2].items.push(item)
+    } else if (item.href.startsWith("/cms")) {
+      sections[3].items.push(item)
+    } else if (item.href.startsWith("/admin")) {
+      sections[4].items.push(item)
+    } else {
+      sections[0].items.push(item) // General items
+    }
+  })
 
   return (
     <nav className="grid items-start px-4 text-sm font-medium lg:px-6">
       <TooltipProvider>
-        {filteredNavItems.map((section, sectionIndex) => (
-          <React.Fragment key={section.section}>
+        {sections.map((section, sectionIndex) => (
+          <React.Fragment key={section.title}>
             {section.items.length > 0 && (
               <div className="mt-4 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                {section.section}
+                {section.title}
               </div>
             )}
             {section.items.map((item) => (
@@ -296,11 +286,13 @@ export function SideNavigation() {
                     href={item.href}
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 transition-all hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-50",
-                      item.active && "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-50",
+                      pathname.startsWith(item.href)
+                        ? "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-50"
+                        : "",
                     )}
                     {...(item["data-tour-id"] && { "data-tour-id": item["data-tour-id"] })}
                   >
-                    <item.icon className="h-4 w-4" />
+                    {React.createElement(item.icon, { className: "h-4 w-4" })}
                     {item.label}
                   </Link>
                 </TooltipTrigger>

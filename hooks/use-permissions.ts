@@ -35,46 +35,51 @@ export function usePermission(permissionName: string, module: string, action: "v
 }
 
 export function useUserRoles() {
-  const { user } = useAuth()
-  const [roles, setRoles] = useState<string[]>([])
+  const { user, userData, loading: authLoading } = useAuth()
+  const [userRoles, setUserRoles] = useState<string[]>([])
   const [loading, setLoading] = useState<boolean>(true)
 
   useEffect(() => {
     async function fetchUserRoles() {
-      if (!user) {
-        setRoles([])
+      if (authLoading) {
+        // Wait for auth to load
+        return
+      }
+      if (!user || !userData) {
+        setUserRoles([])
         setLoading(false)
         return
       }
 
       try {
-        const userRoles = await getUserRoles(user.uid)
-        setRoles(userRoles)
+        // Assuming userData.role is already available and is the primary role
+        // If you have multiple roles from a service, use getUserRoles
+        const rolesFromService = await getUserRoles(user.uid) // Fetch roles from service
+        const combinedRoles = userData.role ? [...new Set([userData.role, ...rolesFromService])] : rolesFromService
+        setUserRoles(combinedRoles)
       } catch (error) {
         console.error("Error fetching user roles:", error)
-        setRoles([])
+        setUserRoles([])
       } finally {
         setLoading(false)
       }
     }
 
     fetchUserRoles()
-  }, [user])
+  }, [user, userData, authLoading])
 
-  return { roles, loading }
+  return { userRoles, loading }
 }
 
 export function useIsAdmin() {
-  const { roles, loading } = useUserRoles()
+  const { userRoles, loading } = useUserRoles()
   const [isAdmin, setIsAdmin] = useState<boolean>(false)
 
   useEffect(() => {
-    // This is a simplified check. In a real app, you'd check if the user has the admin role
-    // by comparing role IDs or names from your database
     if (!loading) {
-      setIsAdmin(roles.some((role) => role === "admin"))
+      setIsAdmin(userRoles.includes("admin") || userRoles.includes("Admin")) // Check for both lowercase and uppercase 'Admin'
     }
-  }, [roles, loading])
+  }, [userRoles, loading])
 
   return { isAdmin, loading }
 }

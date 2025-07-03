@@ -1,124 +1,100 @@
 "use client"
 
-import type React from "react"
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from "react"
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
 import { useRouter, usePathname } from "next/navigation"
-import { tourSteps, type TourStep } from "@/lib/tour-steps"
+import { onboardingTourSteps, type TourStep } from "@/lib/tour-steps"
+import { useAuth } from "./auth-context"
 
 interface TourContextType {
   currentStep: number | null
-  startTour: (initialStep?: number) => void
+  startTour: (tourName: string) => void
   nextStep: () => void
   prevStep: () => void
   endTour: () => void
-  activeStep: TourStep | null
-  isTourActive: boolean
-  highlightElement: (selector: string) => void
+  tourActive: boolean
+  activeTourSteps: TourStep[]
+  highlightElement: (elementId: string) => void
   clearHighlight: () => void
-  highlightedElement: HTMLElement | null
+  highlightedElementId: string | null
 }
 
 const TourContext = createContext<TourContextType | undefined>(undefined)
 
-export function TourProvider({ children }: { children: React.ReactNode }) {
-  const [currentStepIndex, setCurrentStepIndex] = useState<number | null>(null)
-  const [isTourActive, setIsTourActive] = useState(false)
-  const [highlightedElement, setHighlightedElement] = useState<HTMLElement | null>(null)
+export function TourProvider({ children }: { children: ReactNode }) {
+  const [currentStep, setCurrentStep] = useState<number | null>(null)
+  const [tourActive, setTourActive] = useState(false)
+  const [activeTourSteps, setActiveTourSteps] = useState<TourStep[]>([])
+  const [highlightedElementId, setHighlightedElementId] = useState<string | null>(null)
   const router = useRouter()
   const pathname = usePathname()
-  const initialPathRef = useRef<string | null>(null)
+  const { userData, updateUserData } = useAuth()
 
-  const activeStep = currentStepIndex !== null ? tourSteps[currentStepIndex] : null
-
-  const startTour = useCallback(
-    (initialStep = 0) => {
-      setIsTourActive(true)
-      setCurrentStepIndex(initialStep)
-      initialPathRef.current = pathname // Store the path where the tour started
-    },
-    [pathname],
-  )
-
-  const endTour = useCallback(() => {
-    setIsTourActive(false)
-    setCurrentStepIndex(null)
-    setHighlightedElement(null)
-    initialPathRef.current = null
+  const startTour = useCallback((tourName: string) => {
+    if (tourName === "onboarding") {
+      setActiveTourSteps(onboardingTourSteps)
+      setCurrentStep(0)
+      setTourActive(true)
+      setHighlightedElementId(null) // Clear any previous highlight
+    }
   }, [])
 
+  const endTour = useCallback(async () => {
+    setCurrentStep(null)
+    setTourActive(false)
+    setActiveTourSteps([])
+    setHighlightedElementId(null)
+    if (userData && !userData.has_completed_onboarding_tour) {
+      await updateUserData({ has_completed_onboarding_tour: true } as any) // Mark tour as completed
+    }
+  }, [userData, updateUserData])
+
   const nextStep = useCallback(() => {
-    if (currentStepIndex !== null && currentStepIndex < tourSteps.length - 1) {
-      setCurrentStepIndex((prev) => (prev !== null ? prev + 1 : null))
+    if (currentStep !== null && currentStep < activeTourSteps.length - 1) {
+      setCurrentStep((prev) => (prev !== null ? prev + 1 : null))
     } else {
       endTour()
     }
-  }, [currentStepIndex, endTour])
+  }, [currentStep, activeTourSteps.length, endTour])
 
   const prevStep = useCallback(() => {
-    if (currentStepIndex !== null && currentStepIndex > 0) {
-      setCurrentStepIndex((prev) => (prev !== null ? prev - 1 : null))
+    if (currentStep !== null && currentStep > 0) {
+      setCurrentStep((prev) => (prev !== null ? prev - 1 : null))
     }
-  }, [currentStepIndex])
+  }, [currentStep])
 
-  const highlightElement = useCallback((selector: string) => {
-    const element = document.querySelector(selector) as HTMLElement
-    setHighlightedElement(element)
+  const highlightElement = useCallback((elementId: string) => {
+    setHighlightedElementId(elementId)
   }, [])
 
   const clearHighlight = useCallback(() => {
-    setHighlightedElement(null)
+    setHighlightedElementId(null)
   }, [])
 
   useEffect(() => {
-    if (isTourActive && activeStep) {
-      // If the step has a path, navigate to it
-      if (activeStep.path && pathname !== activeStep.path) {
-        router.push(activeStep.path)
-      } else {
-        // If already on the correct path or no path specified, highlight the element
-        if (activeStep.selector) {
-          highlightElement(activeStep.selector)
-        } else {
-          clearHighlight()
+    if (tourActive && currentStep !== null) {
+      const step = activeTourSteps[currentStep]
+      if (step) {
+        if (step.path && pathname !== step.path) {
+          router.push(step.path)
         }
-      }
-    } else {
-      clearHighlight()
-    }
-  }, [isTourActive, activeStep, pathname, router, highlightElement, clearHighlight])
-
-  // Effect to handle navigation during the tour
-  useEffect(() => {
-    if (isTourActive && activeStep && pathname !== activeStep.path) {
-      // If the user navigates away from the expected path for the current step,
-      // either end the tour or try to find the step that matches the new path.
-      // For simplicity, let's end the tour if they navigate off-path.
-      // A more complex implementation might try to resume or find a matching step.
-      if (
-        initialPathRef.current &&
-        pathname !== initialPathRef.current &&
-        !tourSteps.some((step) => step.path === pathname)
-      ) {
-        // Only end tour if they navigate completely off the tour's intended paths
-        // This prevents ending the tour if the step itself causes a navigation
-        // For now, let's assume the tour steps handle navigation.
+        setHighlightedElementId(step.targetId || null)
       }
     }
-  }, [pathname, isTourActive, activeStep, initialPathRef])
+  }, [tourActive, currentStep, activeTourSteps, pathname, router])
 
   return (
     <TourContext.Provider
       value={{
-        currentStep: currentStepIndex,
+        currentStep,
         startTour,
         nextStep,
         prevStep,
         endTour,
-        activeStep,
-        isTourActive,
+        tourActive,
+        activeTourSteps,
         highlightElement,
         clearHighlight,
-        highlightedElement,
+        highlightedElementId,
       }}
     >
       {children}

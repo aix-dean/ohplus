@@ -20,23 +20,28 @@ const actionTypes = {
   REMOVE_TOAST: "REMOVE_TOAST",
 } as const
 
-type ActionType = typeof actionTypes
+let count = 0
+
+function genId() {
+  count = (count + 1) % Number.MAX_SAFE_INTEGER
+  return count.toString()
+}
 
 type Action =
   | {
-      type: ActionType["ADD_TOAST"]
+      type: typeof actionTypes.ADD_TOAST
       toast: ToasterToast
     }
   | {
-      type: ActionType["UPDATE_TOAST"]
+      type: typeof actionTypes.UPDATE_TOAST
       toast: Partial<ToasterToast>
     }
   | {
-      type: ActionType["DISMISS_TOAST"]
+      type: typeof actionTypes.DISMISS_TOAST
       toastId?: ToasterToast["id"]
     }
   | {
-      type: ActionType["REMOVE_TOAST"]
+      type: typeof actionTypes.REMOVE_TOAST
       toastId?: ToasterToast["id"]
     }
 
@@ -58,9 +63,11 @@ const reducer = (state: State, action: Action): State => {
         toasts: state.toasts.map((t) => (t.id === action.toast.id ? { ...t, ...action.toast } : t)),
       }
 
-    case actionTypes.DISMISS_TOAST:
+    case actionTypes.DISMISS_TOAST: {
       const { toastId } = action
-      // ! Side effect ! - This will be executed in the reducer
+
+      // ! Side effects ! - This means you'll need to have the `useToast` hook in a place
+      // where it can affect the toasts state. We move it to the context provider.
       if (toastId) {
         return {
           ...state,
@@ -72,17 +79,12 @@ const reducer = (state: State, action: Action): State => {
           toasts: state.toasts.map((t) => ({ ...t, open: false })),
         }
       }
+    }
 
     case actionTypes.REMOVE_TOAST:
-      if (action.toastId) {
-        return {
-          ...state,
-          toasts: state.toasts.filter((t) => t.id !== action.toastId),
-        }
-      }
       return {
         ...state,
-        toasts: [],
+        toasts: state.toasts.filter((t) => t.id !== action.toastId),
       }
     default:
       return state
@@ -91,12 +93,13 @@ const reducer = (state: State, action: Action): State => {
 
 const ToastContext = React.createContext<
   | {
-      toasts: ToasterToast[]
       toast: ({ ...props }: ToastProps) => {
         id: string
         dismiss: () => void
-        update: (props: Partial<ToasterToast>) => void
+        update: (props: ToasterToast) => void
       }
+      dismiss: (toastId?: string) => void
+      toasts: ToasterToast[]
     }
   | undefined
 >(undefined)
@@ -104,74 +107,45 @@ const ToastContext = React.createContext<
 export function ToasterProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = React.useReducer(reducer, { toasts: [] })
 
+  const dismiss = React.useCallback((toastId?: string) => {
+    dispatch({ type: actionTypes.DISMISS_TOAST, toastId })
+  }, [])
+
   const addToast = React.useCallback(
-    (toast: ToasterToast) => {
-      dispatch({ type: "ADD_TOAST", toast })
-    },
-    [dispatch],
-  )
+    (props: ToastProps) => {
+      const id = genId()
 
-  const updateToast = React.useCallback(
-    (toast: Partial<ToasterToast>) => {
-      dispatch({ type: "UPDATE_TOAST", toast })
-    },
-    [dispatch],
-  )
+      const update = (props: ToasterToast) => dispatch({ type: actionTypes.UPDATE_TOAST, toast: { ...props, id } })
+      const dismissToast = () => dismiss(id)
 
-  const dismissToast = React.useCallback(
-    (toastId?: ToasterToast["id"]) => {
-      dispatch({ type: "DISMISS_TOAST", toastId })
-    },
-    [dispatch],
-  )
-
-  const removeToast = React.useCallback(
-    (toastId?: ToasterToast["id"]) => {
-      dispatch({ type: "REMOVE_TOAST", toastId })
-    },
-    [dispatch],
-  )
-
-  React.useEffect(() => {
-    state.toasts.forEach((toast) => {
-      if (toast.open === false) {
-        // We use a timeout to allow the toast to animate out before being removed
-        const timer = setTimeout(() => {
-          removeToast(toast.id)
-        }, TOAST_REMOVE_DELAY)
-        return () => clearTimeout(timer)
-      }
-    })
-  }, [state.toasts, removeToast])
-
-  const toast = React.useCallback(
-    ({ ...props }: ToastProps) => {
-      const id = Math.random().toString(36).substring(2, 9) // Simple ID generation
-      const update = (props: Partial<ToasterToast>) => updateToast({ id, ...props })
-      const dismiss = () => dismissToast(id)
-      addToast({
-        id,
-        open: true,
-        onOpenChange: (open) => {
-          if (!open) dismissToast(id)
+      dispatch({
+        type: actionTypes.ADD_TOAST,
+        toast: {
+          ...props,
+          id,
+          open: true,
+          onOpenChange: (open) => {
+            if (!open) dismissToast()
+          },
         },
-        ...props,
       })
+
       return {
-        id,
-        dismiss,
+        id: id,
+        dismiss: dismissToast,
         update,
       }
     },
-    [addToast, dismissToast, updateToast],
+    [dismiss],
   )
 
   const value = React.useMemo(
     () => ({
+      toast: addToast,
+      dismiss,
       toasts: state.toasts,
-      toast,
     }),
-    [state.toasts, toast],
+    [addToast, dismiss, state.toasts],
   )
 
   return <ToastContext.Provider value={value}>{children}</ToastContext.Provider>
@@ -179,8 +153,10 @@ export function ToasterProvider({ children }: { children: React.ReactNode }) {
 
 export function useToast() {
   const context = React.useContext(ToastContext)
-  if (context === undefined) {
+
+  if (!context) {
     throw new Error("useToast must be used within a ToasterProvider")
   }
+
   return context
 }

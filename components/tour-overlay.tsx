@@ -1,105 +1,187 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useCallback } from "react"
+
+import { useEffect, useRef, useState } from "react"
 import { useTour } from "@/contexts/tour-context"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import { ArrowLeftIcon, ArrowRightIcon, XIcon } from "lucide-react"
 
 export function TourOverlay() {
-  const { isTourActive, activeStep, nextStep, prevStep, endTour, highlightedElement } = useTour()
-  const [overlayStyle, setOverlayStyle] = useState({})
-  const [tooltipStyle, setTooltipStyle] = useState({})
+  const { tourActive, currentStep, activeTourSteps, nextStep, prevStep, endTour, highlightedElementId } = useTour()
+  const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
+  const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number; transform: string } | null>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (isTourActive && highlightedElement) {
-      const rect = highlightedElement.getBoundingClientRect()
+  const currentTourStep = tourActive && currentStep !== null ? activeTourSteps[currentStep] : null
 
-      // Calculate overlay styles to create a "hole" around the highlighted element
-      setOverlayStyle({
-        clipPath: `polygon(
-          0% 0%,
-          0% 100%,
-          ${rect.left}px 100%,
-          ${rect.left}px ${rect.top}px,
-          ${rect.right}px ${rect.top}px,
-          ${rect.right}px ${rect.bottom}px,
-          ${rect.left}px ${rect.bottom}px,
-          ${rect.left}px 100%,
-          100% 100%,
-          100% 0%
-        )`,
-      })
+  const updateTargetRect = useCallback(() => {
+    if (highlightedElementId) {
+      const targetElement = document.querySelector(`[data-tour-id="${highlightedElementId}"]`)
+      if (targetElement) {
+        const rect = targetElement.getBoundingClientRect()
+        setTargetRect(rect)
 
-      // Calculate tooltip position
-      if (tooltipRef.current) {
-        const tooltipRect = tooltipRef.current.getBoundingClientRect()
-        let top = rect.bottom + 10 // Default to below
-        let left = rect.left + rect.width / 2 - tooltipRect.width / 2
+        // Calculate tooltip position
+        if (tooltipRef.current) {
+          const tooltipWidth = tooltipRef.current.offsetWidth
+          const tooltipHeight = tooltipRef.current.offsetHeight
+          const padding = 16 // Padding around the target
 
-        // Adjust if tooltip goes off screen
-        if (top + tooltipRect.height > window.innerHeight) {
-          top = rect.top - tooltipRect.height - 10 // Place above
+          let top = rect.bottom + padding
+          let left = rect.left
+
+          // Default position: below the target
+          const transform = "translateY(0)"
+
+          // Adjust if tooltip goes off screen to the right
+          if (left + tooltipWidth > window.innerWidth - padding) {
+            left = window.innerWidth - tooltipWidth - padding
+          }
+          // Adjust if tooltip goes off screen to the left
+          if (left < padding) {
+            left = padding
+          }
+
+          // If tooltip goes off screen below, try above
+          if (top + tooltipHeight > window.innerHeight - padding) {
+            top = rect.top - tooltipHeight - padding
+            if (top < padding) {
+              // If still off screen, place it at the top of the screen
+              top = padding
+            }
+          }
+
+          setTooltipPosition({ top, left, transform })
         }
-        if (left < 0) {
-          left = 10 // Pad from left edge
-        }
-        if (left + tooltipRect.width > window.innerWidth) {
-          left = window.innerWidth - tooltipRect.width - 10 // Pad from right edge
-        }
-
-        setTooltipStyle({
-          top: `${top}px`,
-          left: `${left}px`,
-        })
+      } else {
+        setTargetRect(null)
+        setTooltipPosition(null)
       }
     } else {
-      setOverlayStyle({})
-      setTooltipStyle({})
+      setTargetRect(null)
+      setTooltipPosition(null)
     }
-  }, [isTourActive, highlightedElement, activeStep])
+  }, [highlightedElementId])
 
-  if (!isTourActive || !activeStep) {
+  useEffect(() => {
+    if (tourActive && currentTourStep) {
+      updateTargetRect()
+      window.addEventListener("resize", updateTargetRect)
+      window.addEventListener("scroll", updateTargetRect)
+    } else {
+      setTargetRect(null)
+      setTooltipPosition(null)
+    }
+
+    return () => {
+      window.removeEventListener("resize", updateTargetRect)
+      window.removeEventListener("scroll", updateTargetRect)
+    }
+  }, [tourActive, currentTourStep, updateTargetRect])
+
+  if (!tourActive || !currentTourStep) {
     return null
   }
 
   return (
-    <>
-      {/* Dark overlay with a "hole" */}
-      <div
-        className="fixed inset-0 bg-black/50 z-[9998] transition-all duration-300 pointer-events-none"
-        style={overlayStyle}
-      />
+    <div className="fixed inset-0 z-[9999] pointer-events-none">
+      {/* Overlay */}
+      {targetRect && (
+        <>
+          {/* Top overlay */}
+          <div
+            className="absolute bg-black/50"
+            style={{
+              top: 0,
+              left: 0,
+              right: 0,
+              height: targetRect.top,
+            }}
+          />
+          {/* Bottom overlay */}
+          <div
+            className="absolute bg-black/50"
+            style={{
+              top: targetRect.bottom,
+              left: 0,
+              right: 0,
+              bottom: 0,
+            }}
+          />
+          {/* Left overlay */}
+          <div
+            className="absolute bg-black/50"
+            style={{
+              top: targetRect.top,
+              left: 0,
+              width: targetRect.left,
+              height: targetRect.height,
+            }}
+          />
+          {/* Right overlay */}
+          <div
+            className="absolute bg-black/50"
+            style={{
+              top: targetRect.top,
+              left: targetRect.right,
+              right: 0,
+              height: targetRect.height,
+            }}
+          />
+          {/* Highlighted area (transparent) */}
+          <div
+            className="absolute border-4 border-blue-500 rounded-lg shadow-lg pointer-events-auto"
+            style={{
+              top: targetRect.top,
+              left: targetRect.left,
+              width: targetRect.width,
+              height: targetRect.height,
+              boxShadow: "0 0 0 9999px rgba(0,0,0,0.5)", // This creates the "hole" effect
+            }}
+          />
+        </>
+      )}
 
       {/* Tooltip */}
-      <div
-        ref={tooltipRef}
-        className={cn(
-          "fixed bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 p-4 rounded-lg shadow-lg z-[9999] max-w-xs transition-all duration-300",
-          !highlightedElement && "hidden", // Hide tooltip if no element is highlighted
-        )}
-        style={tooltipStyle}
-      >
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="font-bold text-lg">{activeStep.title}</h3>
-          <Button variant="ghost" size="icon" onClick={endTour} className="h-6 w-6">
-            <XIcon className="h-4 w-4" />
-            <span className="sr-only">End Tour</span>
-          </Button>
-        </div>
-        <p className="text-sm mb-4">{activeStep.content}</p>
-        <div className="flex justify-between items-center">
-          <Button variant="outline" size="sm" onClick={prevStep} disabled={activeStep.id === "step1"}>
-            <ArrowLeftIcon className="h-4 w-4 mr-2" />
-            Previous
-          </Button>
-          <Button size="sm" onClick={nextStep}>
-            {activeStep.id === "step2" ? "Finish Tour" : "Next"}
-            <ArrowRightIcon className="h-4 w-4 ml-2" />
-          </Button>
-        </div>
-      </div>
-    </>
+      {currentTourStep && tooltipPosition && (
+        <Card
+          ref={tooltipRef}
+          className={cn(
+            "absolute z-[10000] w-80 pointer-events-auto",
+            currentTourStep.position === "center" && "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+          )}
+          style={
+            currentTourStep.position !== "center"
+              ? {
+                  top: tooltipPosition.top,
+                  left: tooltipPosition.left,
+                  transform: tooltipPosition.transform,
+                }
+              : {}
+          }
+        >
+          <CardHeader>
+            <CardTitle>{currentTourStep.title}</CardTitle>
+            {currentTourStep.description && <CardDescription>{currentTourStep.description}</CardDescription>}
+          </CardHeader>
+          <CardContent>{currentTourStep.content}</CardContent>
+          <CardFooter className="flex justify-between">
+            <Button variant="ghost" onClick={endTour}>
+              Skip Tour
+            </Button>
+            <div className="flex gap-2">
+              {currentStep !== 0 && (
+                <Button variant="outline" onClick={prevStep}>
+                  Previous
+                </Button>
+              )}
+              <Button onClick={nextStep}>{currentStep === activeTourSteps.length - 1 ? "Finish" : "Next"}</Button>
+            </div>
+          </CardFooter>
+        </Card>
+      )}
+    </div>
   )
 }
