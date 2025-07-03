@@ -1,144 +1,206 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { SearchIcon, PlusIcon } from "lucide-react"
 import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
-import { Search, Plus, Filter } from "lucide-react"
-import Link from "next/link"
+import { ResponsiveTable } from "@/components/responsive-table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useDebounce } from "@/hooks/use-debounce"
+import { useToast } from "@/hooks/use-toast"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useTour } from "@/contexts/tour-context" // Import useTour
 
-// Mock data for inventory items
-const inventoryItems = [
+// Mock data for demonstration
+const mockInventoryItems = [
   {
     id: "1",
-    name: "EDSA Billboard Site A",
-    location: "EDSA, Mandaluyong",
+    name: "EDSA Billboard - Northbound",
     type: "LED Billboard",
+    location: "EDSA, Quezon City",
     status: "Active",
-    imageUrl: "/led-billboard-1.png",
+    size: "10m x 20m",
+    lastMaintenance: "2024-05-10",
   },
   {
     id: "2",
-    name: "BGC Digital Display",
-    location: "Bonifacio Global City, Taguig",
-    type: "Digital Display",
-    status: "Active",
-    imageUrl: "/led-billboard-2.png",
+    name: "C5 Flyover - Southbound",
+    type: "Static Billboard",
+    location: "C5, Taguig City",
+    status: "Under Maintenance",
+    size: "12m x 24m",
+    lastMaintenance: "2024-06-01",
   },
   {
     id: "3",
-    name: "Cebu Roadside Billboard",
-    location: "Cebu City",
-    type: "Static Billboard",
-    status: "Maintenance",
-    imageUrl: "/roadside-billboard.png",
+    name: "Makati Ave. Digital Screen",
+    type: "Digital Screen",
+    location: "Makati Avenue, Makati City",
+    status: "Active",
+    size: "5m x 3m",
+    lastMaintenance: "2024-04-20",
   },
   {
     id: "4",
-    name: "Davao LED Screen",
-    location: "Davao City",
-    type: "LED Screen",
+    name: "BGC High Street LED",
+    type: "LED Billboard",
+    location: "Bonifacio Global City, Taguig",
     status: "Active",
-    imageUrl: "/led-billboard-3.png",
+    size: "8m x 15m",
+    lastMaintenance: "2024-05-25",
   },
   {
     id: "5",
-    name: "Makati Flyover Billboard",
-    location: "Makati City",
+    name: "Ortigas Center Static",
     type: "Static Billboard",
-    status: "Booked",
-    imageUrl: "/led-billboard-4.png",
+    location: "Ortigas Center, Pasig City",
+    status: "Inactive",
+    size: "15m x 30m",
+    lastMaintenance: "2023-11-15",
+  },
+]
+
+const inventoryColumns = [
+  {
+    accessorKey: "name",
+    header: "Name",
+  },
+  {
+    accessorKey: "type",
+    header: "Type",
+  },
+  {
+    accessorKey: "location",
+    header: "Location",
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+  },
+  {
+    accessorKey: "size",
+    header: "Size",
+  },
+  {
+    accessorKey: "lastMaintenance",
+    header: "Last Maintenance",
   },
 ]
 
 export default function AdminInventoryPage() {
   const [searchTerm, setSearchTerm] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [inventoryItems, setInventoryItems] = useState<typeof mockInventoryItems>([])
+  const debouncedSearchTerm = useDebounce(searchTerm, 500)
+  const { toast } = useToast()
+  const { activeStep } = useTour() // Get active tour step
 
-  const filteredItems = inventoryItems.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.type.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  useEffect(() => {
+    const fetchInventory = async () => {
+      setLoading(true)
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const filteredItems = mockInventoryItems.filter(
+        (item) =>
+          item.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+          item.location.toLowerCase().includes(debouncedSearchTerm.toLowerCase()),
+      )
+      setInventoryItems(filteredItems)
+      setLoading(false)
+    }
+
+    fetchInventory()
+  }, [debouncedSearchTerm])
+
+  const handleAddProduct = () => {
+    toast({
+      title: "Add Product",
+      description: "Navigating to product creation page...",
+    })
+    // Simulate navigation
+    console.log("Navigate to /admin/products/create")
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Inventory Management</h1>
-          <p className="text-muted-foreground">Manage your outdoor advertising sites and assets.</p>
-        </div>
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search inventory..."
-              className="w-full rounded-lg bg-background pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <Button variant="outline">
-            <Filter className="h-4 w-4" />
-          </Button>
-          <Link href="/admin/products/create" passHref>
-            <Button data-tour-id="add-site-button">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Site
-            </Button>
-          </Link>
-        </div>
+    <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Inventory Management</h1>
+        <Button onClick={handleAddProduct} data-tour-id="add-site-button">
+          {" "}
+          {/* Tour target */}
+          <PlusIcon className="mr-2 h-4 w-4" />
+          Add Site
+        </Button>
       </div>
 
-      {/* Inventory Grid */}
-      <ResponsiveCardGrid>
-        {filteredItems.map((item) => (
-          <Link key={item.id} href={`/admin/inventory/${item.id}`} passHref>
-            <Card className="flex flex-col overflow-hidden cursor-pointer hover:shadow-lg transition-shadow h-full">
-              <div className="relative w-full h-48 bg-muted">
-                {item.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={item.imageUrl || "/placeholder.svg"}
-                    alt={item.name}
-                    className="object-cover w-full h-full"
-                    width={400}
-                    height={200}
-                  />
-                ) : (
-                  <div className="flex items-center justify-center w-full h-full text-muted-foreground">No Image</div>
-                )}
-              </div>
-              <CardHeader>
-                <CardTitle className="text-lg">{item.name}</CardTitle>
-                <CardDescription className="text-sm">{item.location}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex-grow">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="font-medium">{item.type}</span>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      item.status === "Active"
-                        ? "bg-green-100 text-green-800"
-                        : item.status === "Booked"
-                          ? "bg-blue-100 text-blue-800"
-                          : "bg-yellow-100 text-yellow-800"
-                    }`}
-                  >
-                    {item.status}
-                  </span>
+      <div className="relative">
+        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400" />
+        <Input
+          type="text"
+          placeholder="Search inventory..."
+          className="pl-10 pr-4 py-2 rounded-md border border-gray-200 dark:border-gray-800 focus:ring-blue-500 focus:border-blue-500 w-full"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      <Tabs defaultValue="table">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="table">Table View</TabsTrigger>
+          <TabsTrigger value="card">Card View</TabsTrigger>
+        </TabsList>
+        <TabsContent value="table">
+          <Card>
+            <CardHeader>
+              <CardTitle>All Inventory Items</CardTitle>
+              <CardDescription>Manage your outdoor advertising sites.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <Skeleton className="h-[300px] w-full rounded-md" />
+              ) : (
+                <ResponsiveTable data={inventoryItems} columns={inventoryColumns} />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="card">
+          <Card>
+            <CardHeader>
+              <CardTitle>All Inventory Items</CardTitle>
+              <CardDescription>Manage your outdoor advertising sites.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[...Array(6)].map((_, i) => (
+                    <Skeleton key={i} className="h-[150px] w-full rounded-md" />
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-        {filteredItems.length === 0 && (
-          <div className="col-span-full text-center text-muted-foreground py-8">No inventory items found.</div>
-        )}
-      </ResponsiveCardGrid>
+              ) : (
+                <ResponsiveCardGrid
+                  data={inventoryItems}
+                  renderCard={(item) => (
+                    <Card key={item.id} className="flex flex-col">
+                      <CardHeader>
+                        <CardTitle>{item.name}</CardTitle>
+                        <CardDescription>{item.type}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="flex-1">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Location: {item.location}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Status: {item.status}</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Size: {item.size}</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

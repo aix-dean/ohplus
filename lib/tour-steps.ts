@@ -1,36 +1,26 @@
-import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime"
+export interface TourStep {
+  id: string
+  title: string
+  content: string
+  selector: string // CSS selector for the element to highlight
+  path?: string // Optional path to navigate to for this step
+}
 
-export const onboardingTourSteps = (router: AppRouterInstance) => [
+export const tourSteps: TourStep[] = [
   {
-    id: "welcome",
-    title: "Welcome to OOH Operator!",
-    content: "Let's take a quick tour to get you familiar with the platform.",
-    target: "body", // Center of the screen
-    placement: "center",
+    id: "step1",
+    title: "Welcome to OH Plus!",
+    content:
+      "Let's get your company online. First, let's explore the Inventory section where you can manage your billboard sites.",
+    selector: '[data-tour-id="inventory-nav-item"]',
+    path: "/admin/dashboard", // Ensure we are on a page where the nav is visible
   },
   {
-    id: "inventory-nav",
-    title: "Manage Your Inventory",
-    content: "This is where you'll add and manage all your billboard sites.",
-    target: '[data-tour-id="inventory-nav-item"]', // Target the Inventory link in side-navigation
-    placement: "right",
-    action: () => {
-      router.push("/admin/inventory")
-    },
-    isNavigationStep: true,
-  },
-  {
-    id: "add-site-button",
+    id: "step2",
     title: "Add Your First Site",
-    content: "Click here to add a new billboard site to your inventory.",
-    target: '[data-tour-id="add-site-button"]', // Target the Add Site button on the inventory page
-    placement: "bottom",
+    content: 'This is where you\'ll add new billboard sites to your inventory. Click "Add Site" to get started!',
+    selector: '[data-tour-id="add-site-button"]',
+    path: "/admin/inventory", // Navigate to the inventory page
   },
-  {
-    id: "tour-complete",
-    title: "Tour Complete!",
-    content: "You're all set! Start by adding your first billboard site.",
-    target: "body", // Center of the screen
-    placement: "center",
-  },
+  // Add more steps as needed
 ]

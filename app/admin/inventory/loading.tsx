@@ -1,28 +1,18 @@
 import { Skeleton } from "@/components/ui/skeleton"
-import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
 
 export default function Loading() {
   return (
-    <div className="space-y-6">
-      {/* Header Skeleton */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-5 w-96" />
-        </div>
-        <div className="flex gap-2">
-          <Skeleton className="h-10 w-48" />
-          <Skeleton className="h-10 w-24" />
-          <Skeleton className="h-10 w-24" />
-        </div>
+    <div className="flex flex-col gap-4 p-4 md:gap-8 md:p-6">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-10 w-32" />
       </div>
-
-      {/* Inventory Grid Skeletons */}
-      <ResponsiveCardGrid>
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-[300px] w-full rounded-lg" />
-        ))}
-      </ResponsiveCardGrid>
+      <Skeleton className="h-10 w-full" />
+      <div className="grid grid-cols-2 gap-4">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-10 w-full" />
+      </div>
+      <Skeleton className="h-[400px] w-full" />
     </div>
   )
 }
