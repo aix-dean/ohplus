@@ -1,14 +1,17 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
+import type React from "react"
+import { createContext, useContext, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 
-interface TourStep {
+export interface TourStep {
   id: string
-  target: string
   title: string
-  description: string
+  content: string
+  target: string
   placement?: "top" | "bottom" | "left" | "right"
-  action?: () => void | Promise<void>
+  action?: () => void
+  nextRoute?: string
 }
 
 interface TourContextType {
@@ -24,10 +27,11 @@ interface TourContextType {
 
 const TourContext = createContext<TourContextType | undefined>(undefined)
 
-export function TourProvider({ children }: { children: ReactNode }) {
+export function TourProvider({ children }: { children: React.ReactNode }) {
   const [isActive, setIsActive] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
   const [steps, setSteps] = useState<TourStep[]>([])
+  const router = useRouter()
 
   const startTour = useCallback((tourSteps: TourStep[]) => {
     setSteps(tourSteps)
@@ -35,21 +39,24 @@ export function TourProvider({ children }: { children: ReactNode }) {
     setIsActive(true)
   }, [])
 
-  const nextStep = useCallback(async () => {
+  const nextStep = useCallback(() => {
     if (currentStep < steps.length - 1) {
       const nextStepIndex = currentStep + 1
       const nextStepData = steps[nextStepIndex]
 
-      // Execute any action associated with the current step
+      if (nextStepData.nextRoute) {
+        router.push(nextStepData.nextRoute)
+      }
+
       if (nextStepData.action) {
-        await nextStepData.action()
+        nextStepData.action()
       }
 
       setCurrentStep(nextStepIndex)
     } else {
       endTour()
     }
-  }, [currentStep, steps])
+  }, [currentStep, steps, router])
 
   const prevStep = useCallback(() => {
     if (currentStep > 0) {
@@ -67,18 +74,22 @@ export function TourProvider({ children }: { children: ReactNode }) {
     endTour()
   }, [endTour])
 
-  const value = {
-    isActive,
-    currentStep,
-    steps,
-    startTour,
-    nextStep,
-    prevStep,
-    endTour,
-    skipTour,
-  }
-
-  return <TourContext.Provider value={value}>{children}</TourContext.Provider>
+  return (
+    <TourContext.Provider
+      value={{
+        isActive,
+        currentStep,
+        steps,
+        startTour,
+        nextStep,
+        prevStep,
+        endTour,
+        skipTour,
+      }}
+    >
+      {children}
+    </TourContext.Provider>
+  )
 }
 
 export function useTour() {

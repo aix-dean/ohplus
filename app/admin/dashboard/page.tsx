@@ -1,163 +1,278 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
-import { useTour } from "@/contexts/tour-context"
-import { createOnboardingTourSteps } from "@/lib/tour-steps"
+import React from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, TrendingUp, Users, DollarSign, BarChart3 } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Building2,
+  DollarSign,
+  TrendingUp,
+  Users,
+  Calendar,
+  MapPin,
+  Activity,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  Search,
+  Filter,
+  Plus,
+} from "lucide-react"
+import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
+import { useTour } from "@/contexts/tour-context"
+import { onboardingTourSteps } from "@/lib/tour-steps"
 
-export default function AdminDashboardPage() {
-  const { user, userData, subscriptionData, loading } = useAuth()
+// Mock data for recent activities
+const recentActivities = [
+  {
+    id: "1",
+    type: "booking",
+    title: "New booking confirmed",
+    description: "EDSA Billboard Site A - McDonald's Campaign",
+    time: "2 hours ago",
+    status: "success",
+  },
+  {
+    id: "2",
+    type: "maintenance",
+    title: "Maintenance scheduled",
+    description: "BGC Digital Display - Routine inspection",
+    time: "4 hours ago",
+    status: "warning",
+  },
+  {
+    id: "3",
+    type: "proposal",
+    title: "New proposal submitted",
+    description: "Ayala Avenue Campaign - Coca-Cola",
+    time: "6 hours ago",
+    status: "info",
+  },
+]
+
+// Mock data for upcoming events
+const upcomingEvents = [
+  {
+    id: "1",
+    title: "Site Inspection",
+    location: "EDSA Billboard Site A",
+    date: "2024-01-25",
+    time: "10:00 AM",
+    type: "maintenance",
+  },
+  {
+    id: "2",
+    title: "Client Meeting",
+    location: "Makati Office",
+    date: "2024-01-26",
+    time: "2:00 PM",
+    type: "meeting",
+  },
+  {
+    id: "3",
+    title: "Campaign Launch",
+    location: "BGC Digital Display",
+    date: "2024-01-28",
+    time: "9:00 AM",
+    type: "campaign",
+  },
+]
+
+export default function AdminDashboard() {
   const { startTour } = useTour()
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const [hasStartedTour, setHasStartedTour] = useState(false)
 
-  // Check if user just registered
-  const justRegistered = searchParams?.get("registered") === "true"
-
-  useEffect(() => {
-    if (justRegistered && !hasStartedTour && !loading && user) {
-      // Start the onboarding tour for new users
-      const tourSteps = createOnboardingTourSteps(router)
-      startTour(tourSteps)
-      setHasStartedTour(true)
-
-      // Clean up the URL parameter
-      const url = new URL(window.location.href)
-      url.searchParams.delete("registered")
-      window.history.replaceState({}, "", url.toString())
+  React.useEffect(() => {
+    // Check if user just registered (you can implement this logic based on your auth system)
+    const isNewUser = localStorage.getItem("justRegistered")
+    if (isNewUser) {
+      localStorage.removeItem("justRegistered")
+      // Start tour after a short delay to ensure page is fully loaded
+      setTimeout(() => {
+        startTour(onboardingTourSteps)
+      }, 1000)
     }
-  }, [justRegistered, hasStartedTour, loading, user, startTour, router])
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    )
-  }
+  }, [startTour])
 
   return (
-    <div className="flex-1 p-4 md:p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">
-          {userData?.first_name ? `${userData.first_name}'s Dashboard` : "Dashboard"}
-        </h1>
-        <p className="text-gray-600 mt-1">Welcome to your advertising management dashboard</p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+          <p className="text-muted-foreground">Overview of your outdoor advertising operations</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline">
+            <Filter className="mr-2 h-4 w-4" />
+            Filter
+          </Button>
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Quick Add
+          </Button>
+        </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+      {/* Key Metrics */}
+      <ResponsiveCardGrid>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₱0</div>
-            <p className="text-xs text-muted-foreground">No metrics yet.</p>
+            <div className="text-2xl font-bold">₱2.4M</div>
+            <p className="text-xs text-muted-foreground">+12.5% from last month</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Sites</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">24</div>
+            <p className="text-xs text-muted-foreground">+2 new sites this month</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Occupancy Rate</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
-            <p className="text-xs text-muted-foreground">No metrics yet.</p>
+            <div className="text-2xl font-bold">87%</div>
+            <p className="text-xs text-muted-foreground">+5% from last month</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
+            <CardTitle className="text-sm font-medium">Active Clients</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
-            <p className="text-xs text-muted-foreground">No metrics yet.</p>
+            <div className="text-2xl font-bold">156</div>
+            <p className="text-xs text-muted-foreground">+8 new clients this month</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Campaign Performance</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">0%</div>
-            <p className="text-xs text-muted-foreground">No metrics yet.</p>
-          </CardContent>
-        </Card>
-      </div>
+      </ResponsiveCardGrid>
 
-      {/* Welcome Message for New Users */}
-      {justRegistered && (
-        <Card className="mb-6 border-blue-200 bg-blue-50">
-          <CardHeader>
-            <CardTitle className="text-blue-800">🎉 Welcome to OOH Operator!</CardTitle>
-            <CardDescription className="text-blue-600">
-              You're all set up! Let's get your first billboard site added to start managing your advertising inventory.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      )}
+      {/* Main Content Tabs */}
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="sites">Sites</TabsTrigger>
+          <TabsTrigger value="bookings">Bookings</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        </TabsList>
 
-      {/* Subscription Status */}
-      {subscriptionData && (
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Subscription Status</CardTitle>
-              <Badge variant={subscriptionData.status === "active" ? "default" : "secondary"}>
-                {subscriptionData.status}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600">
-              Plan: <span className="font-semibold">{subscriptionData.planName}</span>
-            </p>
-            <p className="text-sm text-gray-600">
-              Sites: <span className="font-semibold">0 / {subscriptionData.maxProducts}</span>
-            </p>
-          </CardContent>
-        </Card>
-      )}
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Recent Activities */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Activities</CardTitle>
+                <CardDescription>Latest updates from your advertising operations</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {recentActivities.map((activity) => (
+                  <div key={activity.id} className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      {activity.status === "success" && <CheckCircle className="h-5 w-5 text-green-500" />}
+                      {activity.status === "warning" && <AlertTriangle className="h-5 w-5 text-yellow-500" />}
+                      {activity.status === "info" && <Activity className="h-5 w-5 text-blue-500" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{activity.title}</p>
+                      <p className="text-sm text-gray-500">{activity.description}</p>
+                      <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
 
-      {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => router.push("/admin/inventory")}
-        >
-          <CardHeader>
-            <CardTitle className="text-lg">Manage Inventory</CardTitle>
-            <CardDescription>Add and manage your billboard sites</CardDescription>
-          </CardHeader>
-        </Card>
-        <Card
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => router.push("/sales/dashboard")}
-        >
-          <CardHeader>
-            <CardTitle className="text-lg">Sales Dashboard</CardTitle>
-            <CardDescription>Track your sales and bookings</CardDescription>
-          </CardHeader>
-        </Card>
-        <Card
-          className="cursor-pointer hover:shadow-md transition-shadow"
-          onClick={() => router.push("/logistics/dashboard")}
-        >
-          <CardHeader>
-            <CardTitle className="text-lg">Logistics</CardTitle>
-            <CardDescription>Manage service assignments and alerts</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+            {/* Upcoming Events */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Upcoming Events</CardTitle>
+                <CardDescription>Your scheduled activities and appointments</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {upcomingEvents.map((event) => (
+                  <div key={event.id} className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <Calendar className="h-5 w-5 text-blue-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900">{event.title}</p>
+                      <div className="flex items-center text-sm text-gray-500">
+                        <MapPin className="h-3 w-3 mr-1" />
+                        {event.location}
+                      </div>
+                      <div className="flex items-center text-xs text-gray-400 mt-1">
+                        <Clock className="h-3 w-3 mr-1" />
+                        {event.date} at {event.time}
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {event.type}
+                    </Badge>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="sites" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Site Management</CardTitle>
+              <CardDescription>Quick overview of your advertising sites</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center space-x-2 mb-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input placeholder="Search sites..." className="pl-8" />
+                </div>
+                <Button variant="outline">
+                  <Filter className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="text-sm text-muted-foreground">Site management features will be displayed here</div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="bookings" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Booking Overview</CardTitle>
+              <CardDescription>Current and upcoming bookings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-muted-foreground">Booking management features will be displayed here</div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Performance Analytics</CardTitle>
+              <CardDescription>Insights and metrics for your advertising operations</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-muted-foreground">Analytics dashboard will be displayed here</div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

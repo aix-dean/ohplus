@@ -1,431 +1,296 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
+import React from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Loader2, Plus, MapPin, ChevronLeft, ChevronRight } from "lucide-react"
-import { getPaginatedUserProducts, getUserProductsCount, softDeleteProduct, type Product } from "@/lib/firebase-service"
-import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
-import { toast } from "@/components/ui/use-toast"
-import { useResponsive } from "@/hooks/use-responsive"
-import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
-import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
-import Image from "next/image"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog"
+  Plus,
+  Search,
+  MoreHorizontal,
+  MapPin,
+  Calendar,
+  DollarSign,
+  Eye,
+  Edit,
+  Trash2,
+  Package,
+  Building2,
+  Activity,
+} from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
 
-// Number of items to display per page
-const ITEMS_PER_PAGE = 12
+// Mock data for demonstration
+const inventoryItems = [
+  {
+    id: "1",
+    name: "EDSA Billboard Site A",
+    type: "LED Billboard",
+    location: "EDSA, Quezon City",
+    status: "Active",
+    dimensions: "6m x 3m",
+    monthlyRate: "₱50,000",
+    occupancy: "Occupied",
+    lastMaintenance: "2024-01-15",
+    nextMaintenance: "2024-04-15",
+  },
+  {
+    id: "2",
+    name: "Ayala Avenue Digital Display",
+    type: "LED Screen",
+    location: "Ayala Avenue, Makati",
+    status: "Active",
+    dimensions: "4m x 2m",
+    monthlyRate: "₱35,000",
+    occupancy: "Available",
+    lastMaintenance: "2024-01-20",
+    nextMaintenance: "2024-04-20",
+  },
+  {
+    id: "3",
+    name: "BGC Static Billboard",
+    type: "Static Billboard",
+    location: "BGC, Taguig",
+    status: "Maintenance",
+    dimensions: "8m x 4m",
+    monthlyRate: "₱40,000",
+    occupancy: "Available",
+    lastMaintenance: "2024-01-10",
+    nextMaintenance: "2024-04-10",
+  },
+]
 
-export default function AdminInventoryPage() {
-  const router = useRouter()
-  const { user, userData, subscriptionData } = useAuth()
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null)
-  const { isMobile, isTablet } = useResponsive()
-
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalItems, setTotalItems] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null)
-  const [pageCache, setPageCache] = useState<
-    Map<number, { items: Product[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null }>
-  >(new Map())
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [loadingCount, setLoadingCount] = useState(false)
-
-  // Subscription limit dialog state
-  const [showSubscriptionLimitDialog, setShowSubscriptionLimitDialog] = useState(false)
-  const [subscriptionLimitMessage, setSubscriptionLimitMessage] = useState("")
-
-  // Fetch total count of products
-  const fetchTotalCount = useCallback(async () => {
-    if (!user?.uid) return
-
-    setLoadingCount(true)
-    try {
-      const count = await getUserProductsCount(user.uid, { active: true })
-      setTotalItems(count)
-      setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
-    } catch (error) {
-      console.error("Error fetching total count:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load product count. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoadingCount(false)
-    }
-  }, [user, toast])
-
-  // Fetch products for the current page
-  const fetchProducts = useCallback(
-    async (page: number) => {
-      if (!user?.uid) return
-
-      // Check if we have this page in cache
-      if (pageCache.has(page)) {
-        const cachedData = pageCache.get(page)!
-        setProducts(cachedData.items)
-        setLastDoc(cachedData.lastDoc)
-        return
-      }
-
-      const isFirstPage = page === 1
-      setLoading(isFirstPage)
-      setLoadingMore(!isFirstPage)
-
-      try {
-        // For the first page, start from the beginning
-        // For subsequent pages, use the last document from the previous page
-        const startDoc = isFirstPage ? null : lastDoc
-
-        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, { active: true })
-
-        setProducts(result.items)
-        setLastDoc(result.lastDoc)
-        setHasMore(result.hasMore)
-
-        // Cache this page
-        setPageCache((prev) => {
-          const newCache = new Map(prev)
-          newCache.set(page, {
-            items: result.items,
-            lastDoc: result.lastDoc,
-          })
-          return newCache
-        })
-      } catch (error) {
-        console.error("Error fetching products:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load product count. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-        setLoadingMore(false)
-      }
-    },
-    [user, lastDoc, pageCache, toast],
-  )
-
-  // Load initial data and count
-  useEffect(() => {
-    if (user?.uid) {
-      fetchProducts(1)
-      fetchTotalCount()
-    }
-  }, [user, fetchProducts, fetchTotalCount])
-
-  // Load data when page changes
-  useEffect(() => {
-    if (user?.uid && currentPage > 0) {
-      fetchProducts(currentPage)
-    }
-  }, [currentPage, fetchProducts, user])
-
-  // Pagination handlers
-  const goToPage = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page)
-      // Scroll to top when changing pages
-      window.scrollTo({ top: 0, behavior: "smooth" })
-    }
+const getStatusColor = (status: string) => {
+  switch (status.toLowerCase()) {
+    case "active":
+      return "bg-green-100 text-green-800"
+    case "maintenance":
+      return "bg-yellow-100 text-yellow-800"
+    case "inactive":
+      return "bg-red-100 text-red-800"
+    default:
+      return "bg-gray-100 text-gray-800"
   }
+}
 
-  const goToPreviousPage = () => goToPage(currentPage - 1)
-  const goToNextPage = () => goToPage(currentPage + 1)
-
-  // Generate page numbers for pagination
-  const getPageNumbers = () => {
-    const pageNumbers = []
-    const maxPagesToShow = 5
-
-    if (totalPages <= maxPagesToShow) {
-      // If we have 5 or fewer pages, show all of them
-      for (let i = 1; i <= totalPages; i++) {
-        pageNumbers.push(i)
-      }
-    } else {
-      // Always include first page
-      pageNumbers.push(1)
-
-      // Calculate start and end of page range around current page
-      let startPage = Math.max(2, currentPage - 1)
-      let endPage = Math.min(totalPages - 1, currentPage + 1)
-
-      // Adjust if we're near the beginning
-      if (currentPage <= 3) {
-        endPage = Math.min(totalPages - 1, 4)
-      }
-
-      // Adjust if we're near the end
-      if (currentPage >= totalPages - 2) {
-        startPage = Math.max(2, totalPages - 3)
-      }
-
-      // Add ellipsis if needed before the range
-      if (startPage > 2) {
-        pageNumbers.push("...")
-      }
-
-      // Add the range of pages
-      for (let i = startPage; i <= endPage; i++) {
-        pageNumbers.push(i)
-      }
-
-      // Add ellipsis if needed after the range
-      if (endPage < totalPages - 1) {
-        pageNumbers.push("...")
-      }
-
-      // Always include last page
-      pageNumbers.push(totalPages)
-    }
-
-    return pageNumbers
+const getOccupancyColor = (occupancy: string) => {
+  switch (occupancy.toLowerCase()) {
+    case "occupied":
+      return "bg-blue-100 text-blue-800"
+    case "available":
+      return "bg-green-100 text-green-800"
+    default:
+      return "bg-gray-100 text-gray-800"
   }
+}
 
-  // Handle product deletion
-  const handleDeleteClick = (product: Product, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setProductToDelete(product)
-    setDeleteDialogOpen(true)
-  }
+export default function InventoryPage() {
+  const [searchTerm, setSearchTerm] = React.useState("")
+  const [filterType, setFilterType] = React.useState("all")
+  const [filterStatus, setFilterStatus] = React.useState("all")
 
-  const handleDeleteConfirm = async () => {
-    if (!productToDelete) return
+  const filteredItems = inventoryItems.filter((item) => {
+    const matchesSearch =
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.location.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesType = filterType === "all" || item.type.toLowerCase().includes(filterType.toLowerCase())
+    const matchesStatus = filterStatus === "all" || item.status.toLowerCase() === filterStatus.toLowerCase()
 
-    try {
-      await softDeleteProduct(productToDelete.id)
-
-      // Update the UI by removing the deleted product
-      setProducts((prevProducts) => prevProducts.filter((p) => p.id !== productToDelete.id))
-
-      // Update total count
-      setTotalItems((prev) => prev - 1)
-
-      // Recalculate total pages
-      setTotalPages(Math.max(1, Math.ceil((totalItems - 1) / ITEMS_PER_PAGE)))
-
-      // Clear cache to force refresh
-      setPageCache(new Map())
-
-      toast({
-        title: "Product deleted",
-        description: `${productToDelete.name} has been successfully deleted.`,
-      })
-    } catch (error) {
-      console.error("Error deleting product:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete the product. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleEditClick = (product: Product, e: React.MouseEvent) => {
-    e.stopPropagation()
-    router.push(`/admin/products/edit/${product.id}`)
-  }
-
-  const handleViewDetails = (productId: string) => {
-    router.push(`/admin/products/${productId}`)
-  }
-
-  const handleAddSiteClick = () => {
-    if (!userData?.license_key) {
-      setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
-      setShowSubscriptionLimitDialog(true)
-      return
-    }
-
-    if (!subscriptionData || subscriptionData.status !== "active") {
-      setSubscriptionLimitMessage(
-        "Your current subscription is not active. Please activate or upgrade your plan to add more sites.",
-      )
-      setShowSubscriptionLimitDialog(true)
-      return
-    }
-
-    if (totalItems >= subscriptionData.maxProducts) {
-      setSubscriptionLimitMessage(
-        `You have reached the maximum number of sites allowed by your current plan (${subscriptionData.maxProducts}). Please upgrade your subscription to add more sites.`,
-      )
-      setShowSubscriptionLimitDialog(true)
-      return
-    }
-
-    router.push("/admin/products/create")
-  }
+    return matchesSearch && matchesType && matchesStatus
+  })
 
   return (
-    <div className="flex-1 p-4 md:p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
-        {/* The "+ New Product" button was here before. It's now moved into the grid. */}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Inventory Management</h1>
+          <p className="text-muted-foreground">
+            Manage your billboard sites, digital displays, and advertising inventory
+          </p>
+        </div>
+        <Button data-tour-target="add-site-button">
+          <Plus className="mr-2 h-4 w-4" />
+          Add Site
+        </Button>
       </div>
 
-      {loading ? (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        </div>
-      ) : (
-        <div className="grid gap-6">
-          {/* Product List */}
-          <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
-            {/* The "+ Add Site" card is now the first item in the grid */}
-            <Card
-              className="w-full min-h-[284px] flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
-              onClick={handleAddSiteClick}
-              data-tour="add-site-button"
-            >
-              <Plus className="h-8 w-8 mb-2" />
-              <span className="text-lg font-semibold">+ Add Site</span>
-            </Card>
+      {/* Stats Cards */}
+      <ResponsiveCardGrid>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Sites</CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">24</div>
+            <p className="text-xs text-muted-foreground">+2 from last month</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Sites</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">18</div>
+            <p className="text-xs text-muted-foreground">75% operational</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Occupied</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">15</div>
+            <p className="text-xs text-muted-foreground">83% occupancy rate</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">₱1.2M</div>
+            <p className="text-xs text-muted-foreground">+12% from last month</p>
+          </CardContent>
+        </Card>
+      </ResponsiveCardGrid>
 
-            {products.map((product) => (
-              <Card
-                key={product.id}
-                className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
-              >
-                <div className="h-48 bg-gray-200 relative">
-                  <Image
-                    src={
-                      product.media && product.media.length > 0
-                        ? product.media[0].url
-                        : "/abstract-geometric-sculpture.png"
-                    }
-                    alt={product.name || "Product image"}
-                    fill
-                    className="object-cover"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.src = "/abstract-geometric-sculpture.png"
-                      target.className = "opacity-50"
-                    }}
-                  />
-                </div>
-
-                <CardContent className="p-4">
-                  <div className="flex flex-col">
-                    <h3 className="font-semibold line-clamp-1">{product.name}</h3>
-                    <div className="mt-2 text-sm font-medium text-green-700">
-                      ₱{Number(product.price).toLocaleString()}
-                    </div>
-                    <div className="mt-1 text-xs text-gray-500 flex items-center">
-                      <MapPin size={12} className="mr-1 flex-shrink-0" />
-                      <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </ResponsiveCardGrid>
-
-          {/* Pagination Controls */}
-          <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
-            <div className="text-sm text-gray-500 flex items-center">
-              {loadingCount ? (
-                <div className="flex items-center">
-                  <Loader2 size={14} className="animate-spin mr-2" />
-                  <span>Calculating pages...</span>
-                </div>
-              ) : (
-                <span>
-                  Page {currentPage} of {totalPages} ({products.length} items)
-                </span>
-              )}
+      {/* Filters and Search */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Site Inventory</CardTitle>
+          <CardDescription>View and manage all your advertising sites and their details</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search sites..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8"
+              />
             </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToPreviousPage}
-                disabled={currentPage === 1}
-                className="h-8 w-8 p-0 bg-transparent"
-              >
-                <ChevronLeft size={16} />
-              </Button>
-
-              {/* Page numbers - Hide on mobile */}
-              <div className="hidden sm:flex items-center gap-1">
-                {getPageNumbers().map((page, index) =>
-                  page === "..." ? (
-                    <span key={`ellipsis-${index}`} className="px-2">
-                      ...
-                    </span>
-                  ) : (
-                    <Button
-                      key={`page-${page}`}
-                      variant={currentPage === page ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => goToPage(page as number)}
-                      className="h-8 w-8 p-0"
-                    >
-                      {page}
-                    </Button>
-                  ),
-                )}
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToNextPage}
-                disabled={currentPage >= totalPages}
-                className="h-8 w-8 p-0"
-              >
-                <ChevronRight size={16} />
-              </Button>
-            </div>
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="w-full md:w-[180px]">
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="led">LED Billboard</SelectItem>
+                <SelectItem value="static">Static Billboard</SelectItem>
+                <SelectItem value="digital">Digital Display</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-full md:w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="maintenance">Maintenance</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </div>
-      )}
+        </CardContent>
+      </Card>
 
-      {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        isOpen={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-        onConfirm={handleDeleteConfirm}
-        title="Delete Product"
-        description="This product will be removed from your inventory. This action cannot be undone."
-        itemName={productToDelete?.name}
-      />
-
-      {/* Subscription Limit Dialog */}
-      <Dialog open={showSubscriptionLimitDialog} onOpenChange={setShowSubscriptionLimitDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Subscription Required</DialogTitle>
-            <DialogDescription>{subscriptionLimitMessage}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => router.push("/admin/subscriptions/choose-plan")}>Choose Plan</Button>
-            <DialogClose asChild>
-              <Button variant="outline">Close</Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Inventory Table */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Site Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Occupancy</TableHead>
+                  <TableHead>Dimensions</TableHead>
+                  <TableHead>Monthly Rate</TableHead>
+                  <TableHead>Next Maintenance</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredItems.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">{item.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{item.type}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center">
+                        <MapPin className="mr-1 h-3 w-3 text-muted-foreground" />
+                        {item.location}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(item.status)}>{item.status}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getOccupancyColor(item.occupancy)}>{item.occupancy}</Badge>
+                    </TableCell>
+                    <TableCell>{item.dimensions}</TableCell>
+                    <TableCell className="font-medium">{item.monthlyRate}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center">
+                        <Calendar className="mr-1 h-3 w-3 text-muted-foreground" />
+                        {item.nextMaintenance}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Site
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600">
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Site
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
