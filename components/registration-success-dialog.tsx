@@ -8,13 +8,13 @@ interface RegistrationSuccessDialogProps {
   isOpen: boolean
   firstName: string
   onClose: () => void
-  onStartTour?: () => void // Made optional
+  onStartTour: () => void // This prop will now be called when "START" is clicked
 }
 
 export function RegistrationSuccessDialog({ isOpen, firstName, onClose, onStartTour }: RegistrationSuccessDialogProps) {
   const handleStart = () => {
-    onStartTour?.() // Call defensively using optional chaining
-    onClose()
+    onStartTour() // Call the function passed from the parent (which will handle redirect and param removal)
+    // onClose() is implicitly handled by onStartTour's logic if it redirects
   }
 
   return (

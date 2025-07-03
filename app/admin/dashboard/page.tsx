@@ -11,6 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge" // Added missing Badge
+import { Search, ChevronDown, Plus } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
 
 export default function AdminDashboardPage() {
   const searchParams = useSearchParams()
@@ -26,19 +30,18 @@ export default function AdminDashboardPage() {
     if (registeredParam === "true" && !sessionStorage.getItem(dialogShownKey)) {
       setShowSuccessDialog(true)
       sessionStorage.setItem(dialogShownKey, "true") // Mark as shown for this session
-      // Remove the query parameter immediately
-      router.replace("/admin/dashboard", undefined)
+      // DO NOT remove the query parameter here. OnboardingTour needs it.
     }
   }, [searchParams, router])
 
   const handleCloseSuccessDialog = () => {
     setShowSuccessDialog(false)
-    // No need to remove query param here, it's already done in useEffect
+    // Remove the query parameters after the dialog is closed
+    const newUrl = new URL(window.location.href)
+    newUrl.searchParams.delete("registered")
+    newUrl.searchParams.delete("startTour")
+    router.replace(newUrl.toString(), undefined, { shallow: true })
   }
-
-  // Existing content from app/admin/dashboard/page.tsx
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
   // Define a type for department data
   interface Department {
@@ -243,6 +246,9 @@ export default function AdminDashboardPage() {
     )
   })
 
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedDate, setSelectedDate] = useState("Jun 2025")
+
   return (
     <div className="flex-1 p-4 md:p-6">
       <div className="flex flex-col gap-6">
@@ -291,6 +297,7 @@ export default function AdminDashboardPage() {
         isOpen={showSuccessDialog}
         firstName={user?.first_name || ""} // Pass the user's first name
         onClose={handleCloseSuccessDialog}
+        onStartTour={handleCloseSuccessDialog} // Clicking START also closes the dialog and removes params
       />
 
       {/* Onboarding Tour Component */}
@@ -298,9 +305,3 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
-
-// Dummy imports for existing content to avoid errors. Replace with actual imports if needed.
-import { Search, ChevronDown, Plus } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"
