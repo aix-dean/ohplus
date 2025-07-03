@@ -1,302 +1,202 @@
-"use client" // Convert to client component
+"use client"
 
-import { useEffect, useState } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context" // Assuming useAuth provides user data
-import { RegistrationSuccessDialog } from "@/components/registration-success-dialog" // Import the dialog
-
-// Existing imports and content of app/admin/dashboard/page.tsx
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
-import { Badge } from "@/components/ui/badge" // Added missing Badge
+import { Input } from "@/components/ui/input"
+import { CalendarIcon, Search, X, Settings, Bell, MessageCircle } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useAuth } from "@/contexts/auth-context"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/components/ui/use-toast"
+import { OhliverWelcomeNotification } from "@/components/ohliver-welcome-notification"
 
 export default function AdminDashboardPage() {
-  const searchParams = useSearchParams()
+  const [date, setDate] = useState<Date | undefined>(new Date())
+  const [searchQuery, setSearchQuery] = useState("")
+  const { user, userData, logout } = useAuth()
   const router = useRouter()
-  const { user } = useAuth() // Get user data from auth context
-
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const { toast } = useToast()
+  const [showWelcomeNotification, setShowWelcomeNotification] = useState(false)
 
   useEffect(() => {
-    const registeredParam = searchParams.get("registered")
-    const dialogShownKey = "registrationSuccessDialogShown"
-
-    if (registeredParam === "true" && !sessionStorage.getItem(dialogShownKey)) {
-      setShowSuccessDialog(true)
-      sessionStorage.setItem(dialogShownKey, "true") // Mark as shown for this session
-      // Remove the query parameter immediately
-      router.replace("/admin/dashboard", undefined)
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get("registered") === "true") {
+      setShowWelcomeNotification(true)
     }
-  }, [searchParams, router])
+  }, [])
 
-  const handleCloseSuccessDialog = () => {
-    setShowSuccessDialog(false)
-    // No need to remove query param here, it's already done in useEffect
-  }
-
-  // Existing content from app/admin/dashboard/page.tsx
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedDate, setSelectedDate] = useState("Jun 2025")
-
-  // Define a type for department data
-  interface Department {
-    id: string
-    name: string
-    headerColor: string // Tailwind class name for header background
-    contentBgColor: string // New: Tailwind class name for content background
-    members: string[]
-    metricLabel?: string
-    metricValue?: string
-    badgeCount?: number
-    href?: string // Optional link for the card
-  }
-
-  // Department Card Component
-  function DepartmentCard({
-    department,
-  }: {
-    department: Department
-  }) {
-    const cardContent = (
-      <>
-        <CardHeader className={cn("relative p-4 rounded-t-lg", department.headerColor)}>
-          <CardTitle className="text-white text-lg font-semibold flex justify-between items-center">
-            {department.name}
-            {department.badgeCount !== undefined && (
-              <Badge className="bg-white text-gray-800 rounded-full px-2 py-0.5 text-xs font-bold">
-                {department.badgeCount}
-              </Badge>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent
-          className={cn("p-4 rounded-b-lg flex flex-col justify-between flex-grow", department.contentBgColor)}
-        >
-          <div>
-            {department.members.map((member, index) => (
-              <p key={index} className="text-sm text-gray-700 flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-green-500" />
-                {member}
-              </p>
-            ))}
-            {department.metricLabel && department.metricValue && (
-              <div className="mt-4 text-sm">
-                <p className="text-gray-500">{department.metricLabel}</p>
-                <p className="font-bold text-gray-800">{department.metricValue}</p>
-              </div>
-            )}
-          </div>
-          <Button variant="outline" className="mt-4 w-full bg-transparent">
-            <Plus className="mr-2 h-4 w-4" /> Add Widget
-          </Button>
-        </CardContent>
-      </>
-    )
-
-    if (department.href) {
-      return (
-        <Link href={department.href} passHref>
-          <Card className="h-full flex flex-col overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
-            {cardContent}
-          </Card>
-        </Link>
-      )
+  const handleLogout = async () => {
+    try {
+      await logout()
+      router.push("/login")
+      toast({
+        title: "Logged out",
+        description: "You have been successfully logged out.",
+      })
+    } catch (error) {
+      console.error("Error logging out:", error)
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive",
+      })
     }
-
-    return <Card className="h-full flex flex-col overflow-hidden">{cardContent}</Card>
   }
-
-  const departmentData: Department[] = [
-    {
-      id: "sales",
-      name: "Sales",
-      headerColor: "bg-department-sales-red",
-      contentBgColor: "bg-card-content-sales",
-      members: ["Noemi", "Matthew"],
-      metricLabel: "Monthly Revenue",
-      metricValue: "4,000,000",
-      badgeCount: 2,
-      href: "/sales/dashboard",
-    },
-    {
-      id: "logistics",
-      name: "Logistics/ Operations",
-      headerColor: "bg-department-logistics-blue",
-      contentBgColor: "bg-card-content-logistics",
-      members: ["Chona", "May"],
-      metricLabel: "Total Service Assignments",
-      metricValue: "5",
-      badgeCount: 1,
-      href: "/logistics/dashboard",
-    },
-    {
-      id: "accounting",
-      name: "Accounting",
-      headerColor: "bg-department-accounting-purple",
-      contentBgColor: "bg-card-content-accounting",
-      members: ["Chairman"],
-    },
-    {
-      id: "treasury",
-      name: "Treasury",
-      headerColor: "bg-department-treasury-green",
-      contentBgColor: "bg-card-content-treasury",
-      members: ["Juvy"],
-    },
-    {
-      id: "it",
-      name: "I.T.",
-      headerColor: "bg-department-it-teal",
-      contentBgColor: "bg-card-content-it",
-      members: ["Emmerson"],
-    },
-    {
-      id: "fleet",
-      name: "Fleet",
-      headerColor: "bg-department-fleet-gray",
-      contentBgColor: "bg-card-content-fleet",
-      members: ["Jonathan"],
-    },
-    {
-      id: "creatives",
-      name: "Creatives/Contents",
-      headerColor: "bg-department-creatives-orange",
-      contentBgColor: "bg-card-content-creatives",
-      members: ["Eda"],
-    },
-    {
-      id: "finance",
-      name: "Finance",
-      headerColor: "bg-department-finance-green",
-      contentBgColor: "bg-card-content-finance",
-      members: ["Juvy"],
-    },
-    {
-      id: "media",
-      name: "Media/ Procurement",
-      headerColor: "bg-department-media-lightblue",
-      contentBgColor: "bg-card-content-media",
-      members: ["Zen"],
-    },
-    {
-      id: "businessDev",
-      name: "Business Dev.",
-      headerColor: "bg-department-businessdev-darkpurple",
-      contentBgColor: "bg-card-content-businessdev",
-      members: ["Nikki"],
-    },
-    {
-      id: "legal",
-      name: "Legal",
-      headerColor: "bg-department-legal-darkred",
-      contentBgColor: "bg-card-content-legal",
-      members: ["Chona"],
-      badgeCount: 2,
-    },
-    {
-      id: "corporate",
-      name: "Corporate",
-      headerColor: "bg-department-corporate-lightblue",
-      contentBgColor: "bg-card-content-corporate",
-      members: ["Anthony"],
-      badgeCount: 1,
-    },
-    {
-      id: "hr",
-      name: "Human Resources",
-      headerColor: "bg-department-hr-pink",
-      contentBgColor: "bg-card-content-hr",
-      members: ["Vanessa"],
-      badgeCount: 1,
-    },
-    {
-      id: "specialTeam",
-      name: "Special Team",
-      headerColor: "bg-department-specialteam-lightpurple",
-      contentBgColor: "bg-card-content-specialteam",
-      members: ["Mark"],
-    },
-    {
-      id: "marketing",
-      name: "Marketing",
-      headerColor: "bg-department-marketing-red",
-      contentBgColor: "bg-card-content-marketing",
-      members: ["John"],
-    },
-    {
-      id: "addDepartment",
-      name: "+ Add New Department",
-      headerColor: "bg-department-add-darkgray",
-      contentBgColor: "bg-card-content-add",
-      members: [], // No members for this card
-    },
-  ]
-
-  // Filter departments based on search term
-  const filteredDepartments = departmentData.filter((department) => {
-    const lowerCaseSearchTerm = searchTerm.toLowerCase()
-    return (
-      department.name.toLowerCase().includes(lowerCaseSearchTerm) ||
-      department.members.some((member) => member.toLowerCase().includes(lowerCaseSearchTerm))
-    )
-  })
 
   return (
-    <div className="flex-1 p-4 md:p-6">
-      <div className="flex flex-col gap-6">
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-grow">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search..."
-                className="w-full rounded-lg bg-background pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                  {selectedDate} <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setSelectedDate("Jan 2025")}>Jan 2025</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDate("Feb 2025")}>Feb 2025</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDate("Mar 2025")}>Mar 2025</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDate("Apr 2025")}>Apr 2025</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDate("May 2025")}>May 2025</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDate("Jun 2025")}>Jun 2025</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-
-        {/* Department Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredDepartments.map((department) => (
-            <DepartmentCard key={department.id} department={department} />
-          ))}
+    <div className="flex-1 p-4 md:p-6 bg-gray-50">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">Admin- Dashboard</h1>
+        <div className="flex items-center space-x-4">
+          <Button variant="ghost" size="icon" className="relative">
+            <Bell className="h-5 w-5 text-gray-600" />
+            <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500" />
+          </Button>
+          <Button variant="ghost" size="icon">
+            <MessageCircle className="h-5 w-5 text-gray-600" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Avatar className="h-9 w-9 cursor-pointer">
+                <AvatarImage src={user?.photoURL || "/placeholder-user.jpg"} />
+                <AvatarFallback>{userData?.displayName?.charAt(0) || user?.email?.charAt(0) || "U"}</AvatarFallback>
+              </Avatar>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push("/account")}>Profile</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/settings")}>Settings</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
-      {/* Registration Success Dialog */}
-      <RegistrationSuccessDialog
-        isOpen={showSuccessDialog}
-        firstName={user?.first_name || ""} // Pass the user's first name
-        onClose={handleCloseSuccessDialog}
-      />
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <h2 className="text-xl font-semibold text-gray-800">Johnny's Dashboard</h2>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Search..."
+              className="pl-9 pr-8 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 text-gray-500 hover:bg-transparent"
+                onClick={() => setSearchQuery("")}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn("w-[200px] justify-start text-left font-normal", !date && "text-muted-foreground")}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date ? format(date, "PPP") : <span>Pick a date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
+            </PopoverContent>
+          </Popover>
+          <Button variant="outline" size="icon">
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <Card className="bg-red-500 text-white">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Sales</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">No metrics yet.</div>
+            <p className="text-xs text-white/80">No data available for this period.</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-blue-500 text-white">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Logistics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">No metrics yet.</div>
+            <p className="text-xs text-white/80">No data available for this period.</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-orange-500 text-white">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Account</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">No metrics yet.</div>
+            <p className="text-xs text-white/80">No data available for this period.</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-green-500 text-white">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Inventory</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">No metrics yet.</div>
+            <p className="text-xs text-white/80">No data available for this period.</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Placeholder for other dashboard content */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-500">No recent activity.</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Upcoming Events</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-gray-500">No upcoming events.</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {showWelcomeNotification && (
+        <OhliverWelcomeNotification
+          isOpen={showWelcomeNotification}
+          onClose={() => setShowWelcomeNotification(false)}
+        />
+      )}
     </div>
   )
 }
-
-// Dummy imports for existing content to avoid errors. Replace with actual imports if needed.
-import { Search, ChevronDown, Plus } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"

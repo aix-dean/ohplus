@@ -190,6 +190,7 @@ export function SideNavigation() {
                     <Link
                       key={item.href}
                       href={item.href}
+                      id={item.href === "/admin/inventory" ? "tour-inventory-link" : undefined}
                       className={cn(
                         "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
                         active

@@ -2,20 +2,18 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/auth-context"
-import AuthLayout from "./auth-layout"
-import { AssistantProvider } from "@/components/ai-assistant/assistant-provider"
-import { ToasterProvider } from "@/hooks/use-toast" // Import the new ToasterProvider
+import { Toaster } from "@/components/ui/toaster"
+import { TourProvider } from "@/contexts/tour-context" // Import TourProvider
+import { TourOverlay } from "@/components/tour-overlay" // Import TourOverlay
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "OH Plus",
-  description: "Manage your outdoor advertising sites",
-  icons: {
-    icon: "/oh-plus-logo.png",
-  },
-  generator: "v0.dev",
+  title: "OH!Plus ERP v2",
+  description: "Out-of-Home Advertising ERP System",
+    generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -24,18 +22,19 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <AuthProvider>
-          <AuthLayout>
-            <ToasterProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <AuthProvider>
+            <TourProvider>
               {" "}
-              {/* Wrap children with ToasterProvider */}
-              <div className="flex flex-col h-screen">{children}</div>
-              <AssistantProvider />
-            </ToasterProvider>
-          </AuthLayout>
-        </AuthProvider>
+              {/* Wrap children with TourProvider */}
+              {children}
+              <TourOverlay /> {/* Render TourOverlay here */}
+            </TourProvider>
+          </AuthProvider>
+        </ThemeProvider>
+        <Toaster />
       </body>
     </html>
   )
