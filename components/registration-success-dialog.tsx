@@ -3,19 +3,18 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
-// Removed useRouter as redirection is handled by parent component
 
 interface RegistrationSuccessDialogProps {
   isOpen: boolean
   firstName: string
   onClose: () => void
-  onStartTour: () => void // Added new prop
+  onStartTour?: () => void // Made optional
 }
 
 export function RegistrationSuccessDialog({ isOpen, firstName, onClose, onStartTour }: RegistrationSuccessDialogProps) {
   const handleStart = () => {
-    onStartTour() // Call the new prop function
-    onClose() // Then close the dialog
+    onStartTour?.() // Call defensively using optional chaining
+    onClose()
   }
 
   return (
@@ -25,13 +24,7 @@ export function RegistrationSuccessDialog({ isOpen, firstName, onClose, onStartT
           <DialogTitle className="text-4xl font-bold mb-4">Welcome {firstName}!</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col items-center justify-center space-y-4">
-          <Image
-            src="/celebration.png" // Updated image source
-            alt="Celebration"
-            width={150}
-            height={150}
-            className="mb-4"
-          />
+          <Image src="/celebration.png" alt="Celebration" width={150} height={150} className="mb-4" />
           <DialogDescription className="text-lg font-semibold text-gray-800 dark:text-gray-200">
             Congratulations!
           </DialogDescription>
