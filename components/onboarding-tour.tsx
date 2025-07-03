@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation" // Keep useSearchParams for potential future use or fallback cleanup
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 
@@ -12,10 +12,13 @@ interface HighlightRect {
   height: number
 }
 
-export function OnboardingTour() {
+interface OnboardingTourProps {
+  triggerTour: boolean // New prop to explicitly trigger the tour
+}
+
+export function OnboardingTour({ triggerTour }: OnboardingTourProps) {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const startTourParam = searchParams.get("startTour") // Re-rely on this param
+  const searchParams = useSearchParams() // Still useful for cleanup if needed
   const [currentStep, setCurrentStep] = useState(0) // 0: inactive, 1: highlight inventory, 2: highlight add site
   const [showTour, setShowTour] = useState(false)
   const [highlightRect, setHighlightRect] = useState<HighlightRect | null>(null)
@@ -61,17 +64,19 @@ export function OnboardingTour() {
     }
   }, [])
 
-  // Initialize tour based on URL param and local storage
+  // Effect to trigger the tour based on the new prop
   useEffect(() => {
-    if (startTourParam === "true" && !localStorage.getItem(tourCompletedKey)) {
+    if (triggerTour && !localStorage.getItem(tourCompletedKey)) {
       setShowTour(true)
       setCurrentStep(1)
-      // Remove the query parameter to prevent re-triggering on refresh
+      // Clean up any lingering 'startTour' param from previous attempts if it exists
       const newUrl = new URL(window.location.href)
-      newUrl.searchParams.delete("startTour")
-      router.replace(newUrl.toString(), undefined, { shallow: true })
+      if (newUrl.searchParams.has("startTour")) {
+        newUrl.searchParams.delete("startTour")
+        router.replace(newUrl.toString(), undefined, { shallow: true })
+      }
     }
-  }, [startTourParam, router])
+  }, [triggerTour, router]) // Depend on triggerTour
 
   // Handle step changes and highlight positioning
   useEffect(() => {
@@ -79,20 +84,16 @@ export function OnboardingTour() {
 
     const handleStep = () => {
       if (currentStep === 1) {
-        // Highlight Inventory in Side Nav
         calculateHighlightPosition('[data-tour-id="inventory-link"]')
       } else if (currentStep === 2) {
-        // Highlight Add Site button on Admin Inventory page
-        // Need a slight delay to ensure the element is rendered after navigation
         setTimeout(() => {
           calculateHighlightPosition('[data-tour-id="add-site-card"]')
-        }, 100) // Small delay
+        }, 100)
       }
     }
 
-    // Re-calculate position on window resize
     window.addEventListener("resize", handleStep)
-    handleStep() // Initial calculation
+    handleStep()
 
     return () => {
       window.removeEventListener("resize", handleStep)
@@ -106,7 +107,7 @@ export function OnboardingTour() {
     } else if (currentStep === 2) {
       setShowTour(false)
       localStorage.setItem(tourCompletedKey, "true")
-      setCurrentStep(0) // Reset step
+      setCurrentStep(0)
     }
   }
 
@@ -116,7 +117,6 @@ export function OnboardingTour() {
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 pointer-events-none">
-      {/* Highlighted area (invisible, but creates the "hole" effect with shadow) */}
       <div
         className="absolute rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] pointer-events-auto"
         style={{
@@ -124,13 +124,12 @@ export function OnboardingTour() {
           left: highlightRect.left,
           width: highlightRect.width,
           height: highlightRect.height,
-          background: "white", // This creates the white background for the highlighted area
-          zIndex: 1, // Ensure it's above the dimming overlay
+          background: "white",
+          zIndex: 1,
         }}
       >
-        {/* Optional: Add a visual indicator like a pulsing border or a cursor */}
         <Image
-          src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%20from%202025-07-03%2011-34-01-3CcuqvZ5BVvYJTrYajhdOvCFebs9ln.png" // Using the provided blob URL for the cursor image
+          src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%20from%202025-07-03%2011-34-01-3CcuqvZ5BVvYJTrYajhdOvCFebs9ln.png"
           alt="Cursor"
           width={40}
           height={40}
@@ -139,13 +138,12 @@ export function OnboardingTour() {
         />
       </div>
 
-      {/* Tour Message Card */}
       <div
         className="absolute bg-white p-6 rounded-lg shadow-xl text-center max-w-sm pointer-events-auto"
         style={{
           top: messagePosition.top,
           left: messagePosition.left,
-          zIndex: 2, // Ensure it's above the highlight
+          zIndex: 2,
         }}
       >
         <h2 className="text-2xl font-bold text-blue-600 mb-2">You're in!</h2>
