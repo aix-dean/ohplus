@@ -21,6 +21,7 @@ export default function AdminDashboardPage() {
   const { user } = useAuth()
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [shouldTriggerOnboardingTour, setShouldTriggerOnboardingTour] = useState(false) // New state for tour trigger
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
@@ -31,14 +32,16 @@ export default function AdminDashboardPage() {
     if (registeredParam === "true" && !sessionStorage.getItem(dialogShownKey)) {
       setShowSuccessDialog(true)
       sessionStorage.setItem(dialogShownKey, "true")
-      // IMPORTANT: Do NOT remove the query parameter here. OnboardingTour needs it.
+      // Remove the 'registered' query parameter immediately after detecting it
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete("registered")
+      router.replace(newUrl.toString(), undefined, { shallow: true })
     }
   }, [searchParams, router])
 
   const handleCloseSuccessDialog = () => {
     setShowSuccessDialog(false)
-    // The OnboardingTour component will handle removing the 'startTour' param
-    // after it has initialized. We only close the dialog here.
+    setShouldTriggerOnboardingTour(true) // Trigger the onboarding tour after dialog closes
   }
 
   interface Department {
@@ -282,10 +285,10 @@ export default function AdminDashboardPage() {
         isOpen={showSuccessDialog}
         firstName={user?.first_name || ""}
         onClose={handleCloseSuccessDialog}
-        onStartTour={handleCloseSuccessDialog} // This will now just close the dialog
+        onStartTour={handleCloseSuccessDialog} // This will now trigger setting shouldTriggerOnboardingTour to true
       />
 
-      <OnboardingTour />
+      <OnboardingTour shouldTriggerTour={shouldTriggerOnboardingTour} />
     </div>
   )
 }
