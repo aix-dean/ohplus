@@ -9,18 +9,17 @@ export interface User {
 export interface Role {
   id: string
   name: string
-  description?: string
-  permissions: string[] // e.g., ["inventory:view", "inventory:create"]
+  description: string
   createdAt: number
   updatedAt: number
 }
 
 export interface Permission {
   id: string
-  name: string // e.g., "view_inventory"
-  module: string // e.g., "inventory"
+  name: string
+  description: string
+  module: string
   action: "view" | "create" | "edit" | "delete"
-  description?: string
 }
 
 export interface UserRole {
