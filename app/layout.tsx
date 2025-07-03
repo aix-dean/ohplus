@@ -4,37 +4,35 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/auth-context"
+import { TourProvider } from "@/contexts/tour-context"
+import { TourOverlay } from "@/components/tour-overlay"
 import { Toaster } from "@/components/ui/toaster"
-import { TourProvider } from "@/contexts/tour-context" // Import TourProvider
-import { TourOverlay } from "@/components/tour-overlay" // Import TourOverlay
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "OH!Plus ERP v2",
-  description: "Out-of-Home Advertising ERP System",
+  title: "OOH Operator",
+  description: "Out-of-Home Advertising Management Platform",
     generator: 'v0.dev'
 }
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           <AuthProvider>
             <TourProvider>
-              {" "}
-              {/* Wrap children with TourProvider */}
               {children}
-              <TourOverlay /> {/* Render TourOverlay here */}
+              <TourOverlay />
+              <Toaster />
             </TourProvider>
           </AuthProvider>
         </ThemeProvider>
-        <Toaster />
       </body>
     </html>
   )

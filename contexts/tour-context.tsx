@@ -1,130 +1,81 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
-import { useRouter, usePathname, useSearchParams } from "next/navigation"
+import { createContext, useContext, useState, useCallback, type ReactNode } from "react"
 
-interface TourState {
-  tourActive: boolean
-  currentStep: number
-  tourMessage: string
-  highlightElementId: string | null
-  nextButtonText: string
-  skipButtonText: string
+interface TourStep {
+  id: string
+  target: string
+  title: string
+  description: string
+  placement?: "top" | "bottom" | "left" | "right"
+  action?: () => void | Promise<void>
 }
 
-interface TourContextType extends TourState {
-  setTourState: (state: Partial<TourState>) => void
-  advanceTour: () => void
-  completeTour: () => void
+interface TourContextType {
+  isActive: boolean
+  currentStep: number
+  steps: TourStep[]
+  startTour: (steps: TourStep[]) => void
+  nextStep: () => void
+  prevStep: () => void
+  endTour: () => void
+  skipTour: () => void
 }
 
 const TourContext = createContext<TourContextType | undefined>(undefined)
 
 export function TourProvider({ children }: { children: ReactNode }) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+  const [isActive, setIsActive] = useState(false)
+  const [currentStep, setCurrentStep] = useState(0)
+  const [steps, setSteps] = useState<TourStep[]>([])
 
-  const [tourState, setTourState] = useState<TourState>({
-    tourActive: false,
-    currentStep: 0,
-    tourMessage: "",
-    highlightElementId: null,
-    nextButtonText: "Next",
-    skipButtonText: "Skip Tour",
-  })
-
-  const advanceTour = useCallback(() => {
-    setTourState((prev) => {
-      const nextStep = prev.currentStep + 1
-      return { ...prev, currentStep: nextStep }
-    })
+  const startTour = useCallback((tourSteps: TourStep[]) => {
+    setSteps(tourSteps)
+    setCurrentStep(0)
+    setIsActive(true)
   }, [])
 
-  const completeTour = useCallback(() => {
-    setTourState({
-      tourActive: false,
-      currentStep: 0,
-      tourMessage: "",
-      highlightElementId: null,
-      nextButtonText: "Next",
-      skipButtonText: "Skip Tour",
-    })
-    localStorage.setItem("tourCompleted", "true")
-    // Clean up URL if tour is completed
-    const newSearchParams = new URLSearchParams(searchParams.toString())
-    newSearchParams.delete("registered")
-    router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false })
-  }, [searchParams, pathname, router])
+  const nextStep = useCallback(async () => {
+    if (currentStep < steps.length - 1) {
+      const nextStepIndex = currentStep + 1
+      const nextStepData = steps[nextStepIndex]
 
-  useEffect(() => {
-    const registeredParam = searchParams.get("registered")
-    const tourCompleted = localStorage.getItem("tourCompleted")
+      // Execute any action associated with the current step
+      if (nextStepData.action) {
+        await nextStepData.action()
+      }
 
-    if (registeredParam === "true" && !tourCompleted) {
-      setTourState((prev) => ({
-        ...prev,
-        tourActive: true,
-        currentStep: 1, // Start tour at step 1
-      }))
-      // Remove the 'registered' query parameter after starting the tour
-      const newSearchParams = new URLSearchParams(searchParams.toString())
-      newSearchParams.delete("registered")
-      router.replace(`${pathname}?${newSearchParams.toString()}`, { scroll: false })
+      setCurrentStep(nextStepIndex)
+    } else {
+      endTour()
     }
-  }, [searchParams, pathname, router])
+  }, [currentStep, steps])
 
-  useEffect(() => {
-    if (!tourState.tourActive) return
-
-    switch (tourState.currentStep) {
-      case 1:
-        // Step 1: Welcome message on Dashboard
-        if (pathname !== "/admin/dashboard") {
-          router.push("/admin/dashboard")
-        }
-        setTourState((prev) => ({
-          ...prev,
-          tourMessage: "You're in! Let's get your company online. Set up your first billboard site — it's quick.",
-          highlightElementId: null, // No specific highlight for this step
-          nextButtonText: "Next",
-        }))
-        break
-      case 2:
-        // Step 2: Highlight Inventory in side nav
-        if (pathname !== "/admin/dashboard") {
-          router.push("/admin/dashboard")
-        }
-        setTourState((prev) => ({
-          ...prev,
-          tourMessage: 'Now, let\'s add your first site. Click on "Inventory" in the side navigation.',
-          highlightElementId: "tour-inventory-link",
-          nextButtonText: "Go to Inventory", // Change button text to guide user
-        }))
-        break
-      case 3:
-        // Step 3: Highlight Add Site button on Inventory page
-        if (pathname !== "/admin/inventory") {
-          router.push("/admin/inventory")
-        }
-        setTourState((prev) => ({
-          ...prev,
-          tourMessage: "Great! Click here to add your first billboard site.",
-          highlightElementId: "tour-add-site-button",
-          nextButtonText: "Finish Tour",
-        }))
-        break
-      default:
-        completeTour() // End tour if no more steps
-        break
+  const prevStep = useCallback(() => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1)
     }
-  }, [tourState.currentStep, tourState.tourActive, pathname, router, completeTour])
+  }, [currentStep])
+
+  const endTour = useCallback(() => {
+    setIsActive(false)
+    setCurrentStep(0)
+    setSteps([])
+  }, [])
+
+  const skipTour = useCallback(() => {
+    endTour()
+  }, [endTour])
 
   const value = {
-    ...tourState,
-    setTourState: (updates: Partial<TourState>) => setTourState((prev) => ({ ...prev, ...updates })),
-    advanceTour,
-    completeTour,
+    isActive,
+    currentStep,
+    steps,
+    startTour,
+    nextStep,
+    prevStep,
+    endTour,
+    skipTour,
   }
 
   return <TourContext.Provider value={value}>{children}</TourContext.Provider>

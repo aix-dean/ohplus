@@ -1,120 +1,188 @@
 "use client"
 
-import type React from "react"
 import { useEffect, useState, useRef } from "react"
 import { useTour } from "@/contexts/tour-context"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { X, ChevronLeft, ChevronRight } from "lucide-react"
+import { cn } from "@/lib/utils"
+
+interface TargetElementInfo {
+  element: HTMLElement
+  rect: DOMRect
+}
 
 export function TourOverlay() {
-  const {
-    tourActive,
-    currentStep,
-    tourMessage,
-    highlightElementId,
-    advanceTour,
-    completeTour,
-    nextButtonText,
-    skipButtonText,
-  } = useTour()
-  const [targetRect, setTargetRect] = useState<DOMRect | null>(null)
-  const messageBoxRef = useRef<HTMLDivElement>(null)
+  const { isActive, currentStep, steps, nextStep, prevStep, endTour, skipTour } = useTour()
+  const [targetInfo, setTargetInfo] = useState<TargetElementInfo | null>(null)
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+  const overlayRef = useRef<HTMLDivElement>(null)
+
+  const currentStepData = steps[currentStep]
 
   useEffect(() => {
-    if (tourActive && highlightElementId) {
-      const targetElement = document.getElementById(highlightElementId)
-      if (targetElement) {
-        setTargetRect(targetElement.getBoundingClientRect())
-      } else {
-        setTargetRect(null) // Clear rect if element not found
-      }
-    } else {
-      setTargetRect(null)
+    if (!isActive || !currentStepData) {
+      setTargetInfo(null)
+      return
     }
-  }, [tourActive, highlightElementId, currentStep]) // Re-run when step changes
 
-  if (!tourActive) {
+    const findTarget = () => {
+      const target = document.querySelector(currentStepData.target) as HTMLElement
+      if (target) {
+        const rect = target.getBoundingClientRect()
+        setTargetInfo({ element: target, rect })
+
+        // Calculate tooltip position
+        const placement = currentStepData.placement || "bottom"
+        let x = rect.left + rect.width / 2
+        let y = rect.bottom + 20
+
+        switch (placement) {
+          case "top":
+            y = rect.top - 20
+            break
+          case "left":
+            x = rect.left - 20
+            y = rect.top + rect.height / 2
+            break
+          case "right":
+            x = rect.right + 20
+            y = rect.top + rect.height / 2
+            break
+          case "bottom":
+          default:
+            y = rect.bottom + 20
+            break
+        }
+
+        // Ensure tooltip stays within viewport
+        const tooltipWidth = 320
+        const tooltipHeight = 200
+
+        if (x + tooltipWidth / 2 > window.innerWidth) {
+          x = window.innerWidth - tooltipWidth / 2 - 20
+        }
+        if (x - tooltipWidth / 2 < 0) {
+          x = tooltipWidth / 2 + 20
+        }
+        if (y + tooltipHeight > window.innerHeight) {
+          y = rect.top - tooltipHeight - 20
+        }
+
+        setTooltipPosition({ x, y })
+      } else {
+        // If target not found, try again after a short delay
+        setTimeout(findTarget, 100)
+      }
+    }
+
+    findTarget()
+
+    // Re-calculate on window resize
+    const handleResize = () => findTarget()
+    window.addEventListener("resize", handleResize)
+
+    return () => {
+      window.removeEventListener("resize", handleResize)
+    }
+  }, [isActive, currentStep, currentStepData])
+
+  if (!isActive || !currentStepData || !targetInfo) {
     return null
   }
 
-  // Calculate message box position
-  let messageBoxStyle: React.CSSProperties = {}
-  let messageBoxClasses = "absolute p-4 bg-white rounded-lg shadow-lg z-[10001] max-w-xs text-center"
-
-  if (targetRect) {
-    // Position message box relative to the highlighted element
-    // Try to position below, if not enough space, then above
-    const viewportHeight = window.innerHeight
-    const spaceBelow = viewportHeight - targetRect.bottom
-    const spaceAbove = targetRect.top
-
-    if (spaceBelow >= 150) {
-      // Arbitrary space needed for message box
-      messageBoxStyle = {
-        top: targetRect.bottom + 20,
-        left: targetRect.left + targetRect.width / 2,
-        transform: "translateX(-50%)",
-      }
-    } else if (spaceAbove >= 150) {
-      messageBoxStyle = {
-        bottom: viewportHeight - targetRect.top + 20,
-        left: targetRect.left + targetRect.width / 2,
-        transform: "translateX(-50%)",
-      }
-    } else {
-      // Fallback to center if not enough space above or below
-      messageBoxStyle = {
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-      }
-    }
-  } else {
-    // Center message box if no highlight
-    messageBoxStyle = {
-      top: "50%",
-      left: "50%",
-      transform: "translate(-50%, -50%)",
-    }
-    messageBoxClasses += " w-96 text-xl font-bold" // Larger text for central message
-  }
+  const { rect } = targetInfo
 
   return (
-    <div className="fixed inset-0 z-[10000] bg-black bg-opacity-70 flex items-center justify-center">
-      {targetRect && (
-        <>
-          {/* Highlighted area (hole in the overlay) */}
-          <div
-            className="absolute bg-white rounded-lg shadow-lg z-[10001] transition-all duration-300 ease-out"
-            style={{
-              top: targetRect.top - 8, // Add some padding
-              left: targetRect.left - 8,
-              width: targetRect.width + 16,
-              height: targetRect.height + 16,
-              boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.7)", // Creates the "hole" effect
-            }}
-          />
-          {/* Pulsing border around the highlighted element */}
-          <div
-            className="absolute border-4 border-blue-500 rounded-lg z-[10002] animate-pulse"
-            style={{
-              top: targetRect.top - 8,
-              left: targetRect.left - 8,
-              width: targetRect.width + 16,
-              height: targetRect.height + 16,
-            }}
-          />
-        </>
-      )}
-
-      <div ref={messageBoxRef} className={messageBoxClasses} style={messageBoxStyle}>
-        <p className="mb-4">{tourMessage}</p>
-        <div className="flex justify-center gap-2">
-          <Button onClick={advanceTour}>{nextButtonText}</Button>
-          <Button variant="outline" onClick={completeTour}>
-            {skipButtonText}
-          </Button>
-        </div>
+    <div ref={overlayRef} className="fixed inset-0 z-[9999] pointer-events-none" style={{ zIndex: 9999 }}>
+      {/* Backdrop with cutout */}
+      <div className="absolute inset-0 pointer-events-auto">
+        <svg width="100%" height="100%" className="absolute inset-0">
+          <defs>
+            <mask id="spotlight">
+              <rect width="100%" height="100%" fill="white" />
+              <rect
+                x={rect.left - 8}
+                y={rect.top - 8}
+                width={rect.width + 16}
+                height={rect.height + 16}
+                rx="8"
+                fill="black"
+              />
+            </mask>
+          </defs>
+          <rect width="100%" height="100%" fill="rgba(0, 0, 0, 0.5)" mask="url(#spotlight)" />
+        </svg>
       </div>
+
+      {/* Highlight border */}
+      <div
+        className="absolute border-2 border-blue-500 rounded-lg animate-pulse"
+        style={{
+          left: rect.left - 8,
+          top: rect.top - 8,
+          width: rect.width + 16,
+          height: rect.height + 16,
+        }}
+      />
+
+      {/* Tooltip */}
+      <Card
+        className="absolute w-80 pointer-events-auto shadow-2xl border-2 border-blue-200"
+        style={{
+          left: tooltipPosition.x - 160, // Center the card
+          top: tooltipPosition.y,
+          transform: currentStepData.placement === "top" ? "translateY(-100%)" : "none",
+        }}
+      >
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg font-semibold text-blue-600">{currentStepData.title}</CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={skipTour}
+              className="h-6 w-6 p-0 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <p className="text-sm text-gray-600 mb-4">{currentStepData.description}</p>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-1">
+              {steps.map((_, index) => (
+                <div
+                  key={index}
+                  className={cn(
+                    "h-2 w-2 rounded-full transition-colors",
+                    index === currentStep ? "bg-blue-500" : "bg-gray-300",
+                  )}
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              {currentStep > 0 && (
+                <Button variant="outline" size="sm" onClick={prevStep}>
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Back
+                </Button>
+              )}
+              <Button size="sm" onClick={nextStep}>
+                {currentStep === steps.length - 1 ? "Finish" : "Next"}
+                {currentStep < steps.length - 1 && <ChevronRight className="h-4 w-4 ml-1" />}
+              </Button>
+            </div>
+          </div>
+
+          <div className="text-xs text-gray-500 mt-2 text-center">
+            Step {currentStep + 1} of {steps.length}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

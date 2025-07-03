@@ -1,146 +1,86 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState } from "react"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useAuth } from "@/contexts/auth-context"
-import { toast } from "@/components/ui/use-toast"
-import { Loader2 } from "lucide-react"
-import { format } from "date-fns"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Progress } from "@/components/ui/progress"
+import { Loader2, Calendar, CreditCard, User, Building } from "lucide-react"
+import { toast } from "@/components/ui/use-toast"
 
 export default function AccountPage() {
-  const {
-    user,
-    userData,
-    projectData,
-    subscriptionData,
-    loading,
-    updateUserData,
-    updateProjectData,
-    refreshUserData,
-    refreshSubscriptionData,
-  } = useAuth()
+  const { user, userData, projectData, subscriptionData, updateUserData, updateProjectData, loading } = useAuth()
+  const [isUpdating, setIsUpdating] = useState(false)
 
-  const [personalInfo, setPersonalInfo] = useState({
-    first_name: "",
-    last_name: "",
-    middle_name: "",
-    phone_number: "",
-    gender: "",
-  })
-  const [companyInfo, setCompanyInfo] = useState({
-    company_name: "",
-    company_location: "",
-    company_website: "",
-    project_name: "",
-    social_media: {
-      facebook: "",
-      instagram: "",
-      youtube: "",
-    },
-  })
-  const [isSavingPersonalInfo, setIsSavingPersonalInfo] = useState(false)
-  const [isSavingCompanyInfo, setIsSavingCompanyInfo] = useState(false)
+  // Form states for personal info
+  const [firstName, setFirstName] = useState(userData?.first_name || "")
+  const [lastName, setLastName] = useState(userData?.last_name || "")
+  const [middleName, setMiddleName] = useState(userData?.middle_name || "")
+  const [phoneNumber, setPhoneNumber] = useState(userData?.phone_number || "")
 
-  useEffect(() => {
-    if (userData) {
-      setPersonalInfo({
-        first_name: userData.first_name || "",
-        last_name: userData.last_name || "",
-        middle_name: userData.middle_name || "",
-        phone_number: userData.phone_number || "",
-        gender: userData.gender || "",
-      })
-    }
-    if (projectData) {
-      setCompanyInfo({
-        company_name: projectData.company_name || "",
-        company_location: projectData.company_location || "",
-        company_website: projectData.company_website || "",
-        project_name: projectData.project_name || "",
-        social_media: {
-          facebook: projectData.social_media?.facebook || "",
-          instagram: projectData.social_media?.instagram || "",
-          youtube: projectData.social_media?.youtube || "",
-        },
-      })
-    }
-  }, [userData, projectData])
+  // Form states for company info
+  const [companyName, setCompanyName] = useState(projectData?.company_name || "")
+  const [companyLocation, setCompanyLocation] = useState(projectData?.company_location || "")
+  const [companyWebsite, setCompanyWebsite] = useState(projectData?.company_website || "")
+  const [projectName, setProjectName] = useState(projectData?.project_name || "")
 
-  const handlePersonalInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value } = e.target
-    setPersonalInfo((prev) => ({ ...prev, [id]: value }))
-  }
-
-  const handleCompanyInfoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value } = e.target
-    if (id.startsWith("social_media.")) {
-      const socialKey = id.split(".")[1] as keyof typeof companyInfo.social_media
-      setCompanyInfo((prev) => ({
-        ...prev,
-        social_media: {
-          ...prev.social_media,
-          [socialKey]: value,
-        },
-      }))
-    } else {
-      setCompanyInfo((prev) => ({ ...prev, [id]: value }))
-    }
-  }
-
-  const handleSavePersonalInfo = async () => {
-    setIsSavingPersonalInfo(true)
+  const handlePersonalInfoUpdate = async () => {
+    setIsUpdating(true)
     try {
-      await updateUserData(personalInfo)
-      toast({
-        title: "Success",
-        description: "Personal information updated successfully.",
+      await updateUserData({
+        first_name: firstName,
+        last_name: lastName,
+        middle_name: middleName,
+        phone_number: phoneNumber,
       })
-      await refreshUserData() // Refresh data after update
+      toast({
+        title: "Personal information updated",
+        description: "Your personal information has been successfully updated.",
+      })
     } catch (error) {
-      console.error("Error updating personal info:", error)
       toast({
         title: "Error",
         description: "Failed to update personal information. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setIsSavingPersonalInfo(false)
+      setIsUpdating(false)
     }
   }
 
-  const handleSaveCompanyInfo = async () => {
-    setIsSavingCompanyInfo(true)
+  const handleCompanyInfoUpdate = async () => {
+    setIsUpdating(true)
     try {
-      await updateProjectData(companyInfo)
-      toast({
-        title: "Success",
-        description: "Company information updated successfully.",
+      await updateProjectData({
+        company_name: companyName,
+        company_location: companyLocation,
+        company_website: companyWebsite,
+        project_name: projectName,
       })
-      await refreshUserData() // Refresh data after update
+      toast({
+        title: "Company information updated",
+        description: "Your company information has been successfully updated.",
+      })
     } catch (error) {
-      console.error("Error updating company info:", error)
       toast({
         title: "Error",
         description: "Failed to update company information. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setIsSavingCompanyInfo(false)
+      setIsUpdating(false)
     }
   }
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     )
   }
@@ -149,188 +89,235 @@ export default function AccountPage() {
     <div className="flex-1 p-4 md:p-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Account Settings</h1>
-        <p className="text-gray-600">Manage your account and company details.</p>
+        <p className="text-gray-600 mt-1">Manage your account and subscription details</p>
       </div>
 
-      <Tabs defaultValue="personal-info" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 md:w-auto">
-          <TabsTrigger value="personal-info">Personal Info</TabsTrigger>
-          <TabsTrigger value="company-info">Company Info</TabsTrigger>
-          <TabsTrigger value="subscription-plan">Subscription Plan</TabsTrigger>
+      <Tabs defaultValue="personal" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="personal" className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            Personal Info
+          </TabsTrigger>
+          <TabsTrigger value="company" className="flex items-center gap-2">
+            <Building className="h-4 w-4" />
+            Company Info
+          </TabsTrigger>
+          <TabsTrigger value="subscription" className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4" />
+            Subscription Plan
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="personal-info" className="mt-6">
+        <TabsContent value="personal" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Personal Information</CardTitle>
-              <CardDescription>Update your personal details.</CardDescription>
+              <CardDescription>Update your personal details and contact information</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="first_name">First Name</Label>
-                  <Input id="first_name" value={personalInfo.first_name} onChange={handlePersonalInfoChange} />
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="Enter your first name"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="last_name">Last Name</Label>
-                  <Input id="last_name" value={personalInfo.last_name} onChange={handlePersonalInfoChange} />
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Enter your last name"
+                  />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="middle_name">Middle Name</Label>
-                <Input id="middle_name" value={personalInfo.middle_name} onChange={handlePersonalInfoChange} />
+                <Label htmlFor="middleName">Middle Name</Label>
+                <Input
+                  id="middleName"
+                  value={middleName}
+                  onChange={(e) => setMiddleName(e.target.value)}
+                  placeholder="Enter your middle name (optional)"
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" value={user?.email || ""} disabled />
+                <Label htmlFor="email">Email Address</Label>
+                <Input id="email" value={user?.email || ""} disabled className="bg-gray-50" />
+                <p className="text-sm text-gray-500">Email cannot be changed</p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone_number">Phone Number</Label>
-                <Input id="phone_number" value={personalInfo.phone_number} onChange={handlePersonalInfoChange} />
+                <Label htmlFor="phoneNumber">Phone Number</Label>
+                <Input
+                  id="phoneNumber"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="Enter your phone number"
+                />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="gender">Gender</Label>
-                <Input id="gender" value={personalInfo.gender} onChange={handlePersonalInfoChange} />
-              </div>
-              <Button onClick={handleSavePersonalInfo} disabled={isSavingPersonalInfo}>
-                {isSavingPersonalInfo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Save Changes
+              <Button onClick={handlePersonalInfoUpdate} disabled={isUpdating}>
+                {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Update Personal Information
               </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="company-info" className="mt-6">
+        <TabsContent value="company" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Company Information</CardTitle>
-              <CardDescription>Update your company and project details.</CardDescription>
+              <CardDescription>Update your company details and project information</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="company_name">Company Name</Label>
-                <Input id="company_name" value={companyInfo.company_name} onChange={handleCompanyInfoChange} />
+                <Label htmlFor="companyName">Company Name</Label>
+                <Input
+                  id="companyName"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Enter your company name"
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="company_location">Company Location</Label>
-                <Input id="company_location" value={companyInfo.company_location} onChange={handleCompanyInfoChange} />
+                <Label htmlFor="companyLocation">Company Location</Label>
+                <Input
+                  id="companyLocation"
+                  value={companyLocation}
+                  onChange={(e) => setCompanyLocation(e.target.value)}
+                  placeholder="Enter your company location"
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="company_website">Company Website</Label>
-                <Input id="company_website" value={companyInfo.company_website} onChange={handleCompanyInfoChange} />
+                <Label htmlFor="companyWebsite">Company Website</Label>
+                <Input
+                  id="companyWebsite"
+                  value={companyWebsite}
+                  onChange={(e) => setCompanyWebsite(e.target.value)}
+                  placeholder="https://www.example.com"
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="project_name">Project Name</Label>
-                <Input id="project_name" value={companyInfo.project_name} onChange={handleCompanyInfoChange} />
+                <Label htmlFor="projectName">Project Name</Label>
+                <Input
+                  id="projectName"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  placeholder="Enter your project name"
+                />
               </div>
-              <Separator className="my-4" />
-              <h3 className="text-lg font-semibold">Social Media</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="social_media.facebook">Facebook URL</Label>
-                  <Input
-                    id="social_media.facebook"
-                    value={companyInfo.social_media.facebook}
-                    onChange={handleCompanyInfoChange}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="social_media.instagram">Instagram URL</Label>
-                  <Input
-                    id="social_media.instagram"
-                    value={companyInfo.social_media.instagram}
-                    onChange={handleCompanyInfoChange}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="social_media.youtube">YouTube URL</Label>
-                  <Input
-                    id="social_media.youtube"
-                    value={companyInfo.social_media.youtube}
-                    onChange={handleCompanyInfoChange}
-                  />
-                </div>
-              </div>
-              <Button onClick={handleSaveCompanyInfo} disabled={isSavingCompanyInfo}>
-                {isSavingCompanyInfo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Save Changes
+              <Button onClick={handleCompanyInfoUpdate} disabled={isUpdating}>
+                {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Update Company Information
               </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="subscription-plan" className="mt-6">
-          <div className="grid grid-cols-1 gap-6">
-            {/* Main Subscription Plan Card */}
+        <TabsContent value="subscription" className="space-y-6">
+          {subscriptionData ? (
+            <>
+              {/* Main Plan Details */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-2xl">{subscriptionData.planName}</CardTitle>
+                      <CardDescription>
+                        ₱{subscriptionData.price.toLocaleString()}/{subscriptionData.billing_cycle}
+                      </CardDescription>
+                    </div>
+                    <Badge variant={subscriptionData.status === "active" ? "default" : "secondary"}>
+                      {subscriptionData.status}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span>Sites Used</span>
+                        <span>
+                          {subscriptionData.currentProducts} / {subscriptionData.maxProducts}
+                        </span>
+                      </div>
+                      <Progress
+                        value={(subscriptionData.currentProducts / subscriptionData.maxProducts) * 100}
+                        className="h-2"
+                      />
+                    </div>
+                    <Separator />
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-gray-500">Max Products</p>
+                        <p className="font-semibold">{subscriptionData.maxProducts}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Max Users</p>
+                        <p className="font-semibold">{subscriptionData.maxUsers}</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Subscription Dates */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Subscription Dates
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Started On</p>
+                      <p className="font-semibold">
+                        {subscriptionData.start_date
+                          ? new Date(subscriptionData.start_date).toLocaleDateString()
+                          : "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Next Billing</p>
+                      <p className="font-semibold">
+                        {subscriptionData.end_date ? new Date(subscriptionData.end_date).toLocaleDateString() : "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Manage Subscription */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Manage Subscription</CardTitle>
+                  <CardDescription>Upgrade, downgrade, or cancel your subscription</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2">
+                    <Button variant="outline">Change Plan</Button>
+                    <Button variant="outline">Update Payment Method</Button>
+                    <Button variant="destructive">Cancel Subscription</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
             <Card>
               <CardHeader>
-                <CardTitle>Your Current Plan</CardTitle>
-                <CardDescription>Details about your active subscription.</CardDescription>
+                <CardTitle>No Active Subscription</CardTitle>
+                <CardDescription>You don't have an active subscription. Choose a plan to get started.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {subscriptionData ? (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">Plan:</span>
-                      <Badge variant="default" className="text-base px-3 py-1">
-                        {subscriptionData.planName}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">Status:</span>
-                      <Badge
-                        variant={subscriptionData.status === "active" ? "default" : "destructive"}
-                        className="text-base px-3 py-1"
-                      >
-                        {subscriptionData.status.charAt(0).toUpperCase() + subscriptionData.status.slice(1)}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">Price:</span>
-                      <span>
-                        ₱{subscriptionData.price.toLocaleString()} / {subscriptionData.interval}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">Next Billing Date:</span>
-                      <span>
-                        {subscriptionData.currentPeriodEnd
-                          ? format(subscriptionData.currentPeriodEnd.toDate(), "PPP")
-                          : "N/A"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">Max Products:</span>
-                      <span>{subscriptionData.maxProducts === -1 ? "Unlimited" : subscriptionData.maxProducts}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">Max Users:</span>
-                      <span>{subscriptionData.maxUsers === -1 ? "Unlimited" : subscriptionData.maxUsers}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">License Key:</span>
-                      <span className="font-mono text-sm bg-gray-100 p-1 rounded">
-                        {userData?.license_key || "N/A"}
-                      </span>
-                    </div>
-                    <Button className="w-full" onClick={() => refreshSubscriptionData()}>
-                      Refresh Subscription
-                    </Button>
-                  </>
-                ) : (
-                  <div className="text-center text-gray-500">
-                    <p>No active subscription found.</p>
-                    <Button
-                      className="mt-4"
-                      onClick={() => (window.location.href = "/admin/subscriptions/choose-plan")}
-                    >
-                      Choose a Plan
-                    </Button>
-                  </div>
-                )}
+              <CardContent>
+                <Button>Choose a Plan</Button>
               </CardContent>
             </Card>
-          </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

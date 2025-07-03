@@ -293,9 +293,9 @@ export default function AdminInventoryPage() {
           <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
             {/* The "+ Add Site" card is now the first item in the grid */}
             <Card
-              id="tour-add-site-button" // Add ID for tour highlighting
               className="w-full min-h-[284px] flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
               onClick={handleAddSiteClick}
+              data-tour="add-site-button"
             >
               <Plus className="h-8 w-8 mb-2" />
               <span className="text-lg font-semibold">+ Add Site</span>
