@@ -149,6 +149,9 @@ export default function AccountPage() {
     }
   }, [user])
 
+  // Removed handleSave as button is removed
+  // Removed handlePhotoClick and handlePhotoChange as photo upload is removed
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
