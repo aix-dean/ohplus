@@ -1,16 +1,15 @@
-"use client" // Convert to client component
+"use client"
 
 import { useEffect, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context" // Assuming useAuth provides user data
-import { RegistrationSuccessDialog } from "@/components/registration-success-dialog" // Import the dialog
-import { OnboardingTour } from "@/components/onboarding-tour" // Import the OnboardingTour component
+import { useAuth } from "@/contexts/auth-context"
+import { RegistrationSuccessDialog } from "@/components/registration-success-dialog"
+import { OnboardingTour } from "@/components/onboarding-tour"
 
-// Existing imports and content of app/admin/dashboard/page.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { Badge } from "@/components/ui/badge" // Added missing Badge
+import { Badge } from "@/components/ui/badge"
 import { Search, ChevronDown, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -19,10 +18,9 @@ import { cn } from "@/lib/utils"
 export default function AdminDashboardPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { user } = useAuth() // Get user data from auth context
+  const { user } = useAuth()
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  // Moved these declarations to the top
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
@@ -32,39 +30,30 @@ export default function AdminDashboardPage() {
 
     if (registeredParam === "true" && !sessionStorage.getItem(dialogShownKey)) {
       setShowSuccessDialog(true)
-      sessionStorage.setItem(dialogShownKey, "true") // Mark as shown for this session
-      // DO NOT remove the query parameter here. OnboardingTour needs it.
+      sessionStorage.setItem(dialogShownKey, "true")
+      // IMPORTANT: Do NOT remove the query parameter here. OnboardingTour needs it.
     }
   }, [searchParams, router])
 
   const handleCloseSuccessDialog = () => {
     setShowSuccessDialog(false)
-    // Remove the query parameters after the dialog is closed
-    const newUrl = new URL(window.location.href)
-    newUrl.searchParams.delete("registered")
-    newUrl.searchParams.delete("startTour")
-    router.replace(newUrl.toString(), undefined, { shallow: true })
+    // The OnboardingTour component will handle removing the 'startTour' param
+    // after it has initialized. We only close the dialog here.
   }
 
-  // Define a type for department data
   interface Department {
     id: string
     name: string
-    headerColor: string // Tailwind class name for header background
-    contentBgColor: string // New: Tailwind class name for content background
+    headerColor: string
+    contentBgColor: string
     members: string[]
     metricLabel?: string
     metricValue?: string
     badgeCount?: number
-    href?: string // Optional link for the card
+    href?: string
   }
 
-  // Department Card Component
-  function DepartmentCard({
-    department,
-  }: {
-    department: Department
-  }) {
+  function DepartmentCard({ department }: { department: Department }) {
     const cardContent = (
       <>
         <CardHeader className={cn("relative p-4 rounded-t-lg", department.headerColor)}>
@@ -236,11 +225,10 @@ export default function AdminDashboardPage() {
       name: "+ Add New Department",
       headerColor: "bg-department-add-darkgray",
       contentBgColor: "bg-card-content-add",
-      members: [], // No members for this card
+      members: [],
     },
   ]
 
-  // Filter departments based on search term
   const filteredDepartments = departmentData.filter((department) => {
     const lowerCaseSearchTerm = searchTerm.toLowerCase()
     return (
@@ -252,7 +240,6 @@ export default function AdminDashboardPage() {
   return (
     <div className="flex-1 p-4 md:p-6">
       <div className="flex flex-col gap-6">
-        {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
           <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -284,7 +271,6 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Department Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredDepartments.map((department) => (
             <DepartmentCard key={department.id} department={department} />
@@ -292,15 +278,13 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Registration Success Dialog */}
       <RegistrationSuccessDialog
         isOpen={showSuccessDialog}
-        firstName={user?.first_name || ""} // Pass the user's first name
+        firstName={user?.first_name || ""}
         onClose={handleCloseSuccessDialog}
-        onStartTour={handleCloseSuccessDialog} // Clicking START also closes the dialog and removes params
+        onStartTour={handleCloseSuccessDialog} // This will now just close the dialog
       />
 
-      {/* Onboarding Tour Component */}
       <OnboardingTour />
     </div>
   )

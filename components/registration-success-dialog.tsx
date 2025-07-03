@@ -13,8 +13,8 @@ interface RegistrationSuccessDialogProps {
 
 export function RegistrationSuccessDialog({ isOpen, firstName, onClose, onStartTour }: RegistrationSuccessDialogProps) {
   const handleStart = () => {
-    onStartTour() // Call the function passed from the parent (which will handle redirect and param removal)
-    // onClose() is implicitly handled by onStartTour's logic if it redirects
+    onStartTour() // Call the function passed from the parent (which will handle closing the dialog)
+    // The URL parameters are now handled by the OnboardingTour component itself.
   }
 
   return (
