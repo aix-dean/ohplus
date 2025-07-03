@@ -13,7 +13,7 @@ interface RegistrationSuccessDialogProps {
 
 export function RegistrationSuccessDialog({ isOpen, firstName, onClose, onStartTour }: RegistrationSuccessDialogProps) {
   const handleStart = () => {
-    onStartTour() // Call the function passed from the parent (which will handle closing the dialog and triggering the tour)
+    onStartTour() // Call the function passed from the parent (which will handle closing the dialog)
   }
 
   return (
