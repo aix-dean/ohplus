@@ -1,21 +1,36 @@
-import type { TourStep } from "@/contexts/tour-context"
+import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime"
 
-export const onboardingTourSteps: TourStep[] = [
+export const onboardingTourSteps = (router: AppRouterInstance) => [
+  {
+    id: "welcome",
+    title: "Welcome to OOH Operator!",
+    content: "Let's take a quick tour to get you familiar with the platform.",
+    target: "body", // Center of the screen
+    placement: "center",
+  },
   {
     id: "inventory-nav",
-    title: "Welcome to OH Plus!",
-    content:
-      'Let\'s start by exploring your inventory. Click on "Inventory" in the sidebar to manage your billboard sites.',
-    target: "inventory-nav",
+    title: "Manage Your Inventory",
+    content: "This is where you'll add and manage all your billboard sites.",
+    target: '[data-tour-id="inventory-nav-item"]', // Target the Inventory link in side-navigation
     placement: "right",
-    nextRoute: "/admin/inventory",
+    action: () => {
+      router.push("/admin/inventory")
+    },
+    isNavigationStep: true,
   },
   {
     id: "add-site-button",
     title: "Add Your First Site",
-    content:
-      'Great! Now click the "+ Add Site" button to create your first billboard location. This is where you\'ll manage all your advertising sites.',
-    target: "add-site-button",
+    content: "Click here to add a new billboard site to your inventory.",
+    target: '[data-tour-id="add-site-button"]', // Target the Add Site button on the inventory page
     placement: "bottom",
+  },
+  {
+    id: "tour-complete",
+    title: "Tour Complete!",
+    content: "You're all set! Start by adding your first billboard site.",
+    target: "body", // Center of the screen
+    placement: "center",
   },
 ]
