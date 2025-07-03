@@ -4,7 +4,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { AuthProvider } from "@/contexts/auth-context"
 import { ThemeProvider } from "@/components/theme-provider"
 import type { Metadata } from "next"
-import { siteConfig } from "@/config/site"
+import { siteConfig } from "@/config/site" // Corrected import path
 import { cn } from "@/lib/utils"
 import { Mona_Sans as FontSans } from "next/font/google"
 
@@ -37,7 +37,7 @@ export default function AccountLayout({ children }: AccountLayoutProps) {
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <AuthProvider>
             <div className="flex min-h-screen flex-col">
-              {/* Removed TopNavigation component */}
+              {/* TopNavigation component removed */}
               <div className="flex flex-1">
                 <SideNavigation />
                 <main className="flex-1 overflow-hidden">{children}</main>
