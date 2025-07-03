@@ -26,7 +26,6 @@ import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useTour } from "@/contexts/tour-context" // Import useTour
 
 // Navigation data structure with icons
 const navigationItems = [
@@ -104,7 +103,6 @@ export function SideNavigation() {
   const pathname = usePathname()
   const { user } = useAuth()
   const { unreadCount } = useUnreadMessages()
-  const { tourActive, currentStep, nextStep } = useTour() // Use tour hook
 
   // Determine the current section from the pathname
   let currentSection = pathname?.split("/")[1] || "dashboard"
@@ -182,26 +180,21 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Documents", href: "/admin/documents", icon: FileText },
-                  { title: "Inventory", href: "/admin/inventory", icon: Package },
+                  { title: "Inventory", href: "/admin/inventory", icon: Package, "data-tour-id": "inventory-link" },
                   { title: "User Management", href: "/admin/access-management", icon: Users },
                   { title: "Subscription", href: "/admin/subscriptions", icon: FileText }, // Updated href
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
-                  const isInventoryLink = item.href === "/admin/inventory" // Check if it's the inventory link
-
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
-                      id={isInventoryLink ? "tour-inventory-link" : undefined} // Add ID for tour
-                      onClick={isInventoryLink && tourActive && currentStep === 1 ? nextStep : undefined} // Advance tour on click
                       className={cn(
                         "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
                         active
                           ? "bg-gray-100 text-gray-900 font-medium"
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                        isInventoryLink && tourActive && currentStep === 1 && "ring-4 ring-blue-500 ring-offset-2", // Highlight for tour
                       )}
                     >
                       <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />

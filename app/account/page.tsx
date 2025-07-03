@@ -1,13 +1,18 @@
 "use client"
 
 import { Progress } from "@/components/ui/progress"
+
 import { Separator } from "@/components/ui/separator"
+
 import type React from "react"
 import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   User,
   Camera,
+  Building,
+  MapPin,
+  Globe,
   Edit2,
   Save,
   Loader2,
@@ -18,6 +23,9 @@ import {
   Users,
   Star,
   Calendar,
+  Facebook,
+  Instagram,
+  Youtube,
   CreditCard,
   Info,
   Copy,
@@ -33,10 +41,8 @@ import { storage } from "@/lib/firebase"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { getUserProductsCount } from "@/lib/firebase-service" // Corrected import path
 import { cn } from "@/lib/utils"
-import { toast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { subscriptionService } from "@/lib/subscription-service"
-import { updateUserData } from "@/lib/firebase-service"
-import { format } from "date-fns"
 
 // Helper function to mask the license key
 const maskLicenseKey = (key: string | undefined | null) => {
@@ -49,36 +55,41 @@ const maskLicenseKey = (key: string | undefined | null) => {
 }
 
 export default function AccountPage() {
-  const { user, userData, projectData, subscriptionData, loading: authLoading, refreshUserData } = useAuth()
+  const { user, userData, projectData, subscriptionData, loading, updateUserData, updateProjectData, logout } =
+    useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { toast } = useToast()
+
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
-  const [firstName, setFirstName] = useState(userData?.first_name || "")
-  const [middleName, setMiddleName] = useState(userData?.middle_name || "")
-  const [lastName, setLastName] = useState(userData?.last_name || "")
-  const [displayName, setDisplayName] = useState(userData?.display_name || "")
-  const [phoneNumber, setPhoneNumber] = useState(userData?.phone_number || "")
-  const [gender, setGender] = useState(userData?.gender || "")
-  const [photoURL, setPhotoURL] = useState(userData?.photo_url || "")
-
-  const [companyName, setCompanyName] = useState(userData?.company_name || "")
-  const [companyLocation, setCompanyLocation] = useState(userData?.company_location || "")
-  const [companyWebsite, setCompanyWebsite] = useState(userData?.company_website || "")
-  const [projectName, setProjectName] = useState(projectData?.project_name || "")
-  const [facebook, setFacebook] = useState(projectData?.social_media?.facebook || "")
-  const [instagram, setInstagram] = useState(projectData?.social_media?.instagram || "")
-  const [youtube, setYoutube] = useState(projectData?.social_media?.youtube || "")
 
   const [currentProductsCount, setCurrentProductsCount] = useState<number | null>(null)
   const [productsCount, setProductsCount] = useState<number | null>(null)
   const [productsLoading, setProductsLoading] = useState(true)
 
+  const [firstName, setFirstName] = useState("")
+  const [middleName, setMiddleName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [displayName, setDisplayName] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("")
+  const [gender, setGender] = useState("")
+  const [photoURL, setPhotoURL] = useState("")
+
+  const [companyName, setCompanyName] = useState("")
+  const [companyLocation, setCompanyLocation] = useState("")
+  const [companyWebsite, setCompanyWebsite] = useState("")
+  const [projectName, setProjectName] = useState("")
+  const [facebook, setFacebook] = useState("")
+  const [instagram, setInstagram] = useState("")
+  const [youtube, setYoutube] = useState("")
+
   const router = useRouter()
 
   const handleLogout = async () => {
     try {
-      await router.push("/login")
+      await logout()
+      router.push("/login")
     } catch (error: any) {
       console.error("Logout error:", error)
       toast({
@@ -90,7 +101,7 @@ export default function AccountPage() {
   }
 
   useEffect(() => {
-    if (authLoading) return
+    if (loading) return
 
     if (!user) {
       router.push("/login")
@@ -105,15 +116,18 @@ export default function AccountPage() {
       setPhoneNumber(userData.phone_number || "")
       setGender(userData.gender || "")
       setPhotoURL(userData.photo_url || "")
-      setCompanyName(userData.company_name || "")
-      setCompanyLocation(userData.company_location || "")
     }
 
     if (projectData) {
+      setCompanyName(projectData.company_name || "")
+      setCompanyLocation(projectData.company_location || "")
       setCompanyWebsite(projectData.company_website || "")
       setProjectName(projectData.project_name || "")
+      setFacebook(projectData.social_media?.facebook || "")
+      setInstagram(projectData.social_media?.instagram || "")
+      setYoutube(projectData.social_media?.youtube || "")
     }
-  }, [user, userData, projectData, authLoading, router])
+  }, [user, userData, projectData, loading, router])
 
   useEffect(() => {
     const fetchProductCount = async () => {
@@ -160,18 +174,31 @@ export default function AccountPage() {
     setIsSaving(true)
 
     try {
-      await updateUserData(user.uid, {
+      await updateUserData({
         first_name: firstName,
-        last_name: lastName,
         middle_name: middleName,
+        last_name: lastName,
+        display_name: displayName,
         phone_number: phoneNumber,
+        gender,
+        photo_url: photoURL,
+      })
+
+      await updateProjectData({
         company_name: companyName,
         company_location: companyLocation,
+        company_website: companyWebsite,
+        project_name: projectName,
+        social_media: {
+          facebook,
+          instagram,
+          youtube,
+        },
       })
-      await refreshUserData() // Refresh context data
+
       toast({
-        title: "Profile updated",
-        description: "Your profile information has been successfully updated.",
+        title: "Success",
+        description: "Account information updated successfully!",
       })
       setIsEditing(false)
     } catch (error: any) {
@@ -203,7 +230,7 @@ export default function AccountPage() {
       const snapshot = await uploadBytes(storageRef, file)
       const downloadURL = await getDownloadURL(snapshot.ref)
       setPhotoURL(downloadURL)
-      await updateUserData(user.uid, { photo_url: downloadURL })
+      await updateUserData({ photo_url: downloadURL })
       toast({
         title: "Success",
         description: "Profile photo updated successfully!",
@@ -223,7 +250,7 @@ export default function AccountPage() {
     }
   }
 
-  if (authLoading) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -323,38 +350,32 @@ export default function AccountPage() {
         </div>
 
         {/* Main Content Area with Tabs */}
-        <Tabs defaultValue="profile" className="grid grid-cols-1 gap-x-5 md:grid-cols-[240px_1fr]">
+        <Tabs defaultValue="personal" className="grid grid-cols-1 gap-x-5 md:grid-cols-[240px_1fr]">
           {/* Sidebar/Tab Navigation */}
           <TabsList className="flex flex-col items-start space-y-1 rounded-xl bg-white shadow-sm">
             <TabsTrigger
-              value="profile"
+              value="personal"
               className="w-full justify-start rounded-lg px-5 py-3 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 data-[state=active]:bg-primary data-[state=active]:text-white"
             >
-              <User className="mr-2 h-4 w-4" /> Profile
+              <User className="mr-2 h-4 w-4" /> Personal Information
             </TabsTrigger>
             <TabsTrigger
-              value="subscription-plan"
+              value="company"
+              className="w-full justify-start rounded-lg px-5 py-3 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 data-[state=active]:bg-primary data-[state=active]:text-white"
+            >
+              <Building className="mr-2 h-4 w-4" /> Company Information
+            </TabsTrigger>
+            <TabsTrigger
+              value="subscription"
               className="w-full justify-start rounded-lg px-5 py-3 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 data-[state=active]:bg-primary data-[state=active]:text-white"
             >
               <CreditCard className="mr-2 h-4 w-4" /> Subscription Plan
-            </TabsTrigger>
-            <TabsTrigger
-              value="security"
-              className="w-full justify-start rounded-lg px-5 py-3 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 data-[state=active]:bg-primary data-[state=active]:text-white"
-            >
-              <Key className="mr-2 h-4 w-4" /> Security
-            </TabsTrigger>
-            <TabsTrigger
-              value="notifications"
-              className="w-full justify-start rounded-lg px-5 py-3 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 data-[state=active]:bg-primary data-[state=active]:text-white"
-            >
-              <Info className="mr-2 h-4 w-4" /> Notifications
             </TabsTrigger>
           </TabsList>
 
           {/* Tab Contents */}
           <div className="space-y-6">
-            <TabsContent value="profile" className="mt-0 space-y-6 pt-0">
+            <TabsContent value="personal" className="mt-0 space-y-6 pt-0">
               {/* Personal Details Card */}
               <Card className="rounded-xl shadow-sm">
                 <CardHeader className="border-b px-5 py-3">
@@ -494,21 +515,6 @@ export default function AccountPage() {
                       <p className="text-xs text-gray-500 mt-1">Email cannot be changed.</p>
                     </div>
                   </div>
-                  <div className="flex justify-end gap-2">
-                    {isEditing ? (
-                      <>
-                        <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isSaving}>
-                          Cancel
-                        </Button>
-                        <Button onClick={handleSave} disabled={isSaving}>
-                          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                          Save Changes
-                        </Button>
-                      </>
-                    ) : (
-                      <Button onClick={() => setIsEditing(true)}>Edit Profile</Button>
-                    )}
-                  </div>
                 </CardContent>
               </Card>
 
@@ -592,16 +598,193 @@ export default function AccountPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="subscription-plan" className="mt-0 space-y-6 pt-0">
+            <TabsContent value="company" className="mt-0 space-y-6 pt-0">
+              {/* Company Profile Card */}
+              <Card className="rounded-xl shadow-sm">
+                <CardHeader className="border-b px-5 py-3">
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
+                    <Building className="h-5 w-5 text-primary" />
+                    Company Profile
+                  </CardTitle>
+                  <CardDescription className="text-xs text-gray-600">
+                    Manage your company details and information.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-5">
+                  <div className="mb-5 flex flex-col items-center gap-5 sm:flex-row sm:items-start">
+                    <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-100 shadow-sm">
+                      <Building size={40} className="text-gray-400" />
+                    </div>
+
+                    <div className="flex-1 text-center sm:text-left">
+                      <h2 className="text-xl font-bold text-gray-900">{projectData?.company_name || "Your Company"}</h2>
+                      <p className="mt-0.5 text-base text-gray-600">{projectData?.project_name || "Default Project"}</p>
+                      <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-gray-700 sm:justify-start">
+                        {projectData?.company_location && (
+                          <div className="flex items-center gap-1.5">
+                            <MapPin size={14} className="text-gray-500" />
+                            <span>{projectData.company_location}</span>
+                          </div>
+                        )}
+                        {projectData?.company_website && (
+                          <div className="flex items-center gap-1.5">
+                            <Globe size={14} className="text-gray-500" />
+                            <a
+                              href={projectData.company_website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              Website
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="companyName" className="text-xs font-medium text-gray-700">
+                        Company Name
+                      </Label>
+                      <Input
+                        id="companyName"
+                        value={companyName}
+                        onChange={(e) => setCompanyName(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="Your Company Name"
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="companyLocation" className="text-xs font-medium text-gray-700">
+                        Company Address
+                      </Label>
+                      <Input
+                        id="companyLocation"
+                        value={companyLocation}
+                        onChange={(e) => setCompanyLocation(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="123 Main St, City, Country"
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="companyWebsite" className="text-xs font-medium text-gray-700">
+                        Company Website
+                      </Label>
+                      <Input
+                        id="companyWebsite"
+                        value={companyWebsite}
+                        onChange={(e) => setCompanyWebsite(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="https://www.example.com"
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Social Media Card */}
+              <Card className="rounded-xl shadow-sm">
+                <CardHeader className="border-b px-5 py-3">
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
+                    <Globe className="h-5 w-5 text-primary" />
+                    Social Media
+                  </CardTitle>
+                  <CardDescription className="text-xs text-gray-600">
+                    Connect your company's social media accounts.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-5">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100">
+                        <Facebook className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <Input
+                        value={facebook}
+                        onChange={(e) => setFacebook(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="Facebook URL"
+                        className={cn(
+                          "flex-1 rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100">
+                        <Instagram className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <Input
+                        value={instagram}
+                        onChange={(e) => setInstagram(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="Instagram URL"
+                        className={cn(
+                          "flex-1 rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100">
+                        <Youtube className="h-4 w-4 text-gray-600" />
+                      </div>
+                      <Input
+                        value={youtube}
+                        onChange={(e) => setYoutube(e.target.value)}
+                        disabled={!isEditing}
+                        placeholder="YouTube URL"
+                        className={cn(
+                          "flex-1 rounded-md border px-3 py-2 text-sm shadow-sm",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
+                        )}
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="subscription" className="mt-0 space-y-6 pt-0">
               {/* Subscription Plan Card */}
               <Card className="rounded-xl shadow-sm">
                 <CardHeader className="border-b px-5 py-3">
                   <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
                     <CreditCard className="h-5 w-5 text-primary" />
-                    Your Current Plan
+                    Subscription Plan
                   </CardTitle>
                   <CardDescription className="text-xs text-gray-600">
-                    Details about your active subscription.
+                    Your current subscription plan and usage details.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-5">
@@ -609,58 +792,74 @@ export default function AccountPage() {
                     {/* Plan Details */}
                     <div className="space-y-4">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">Plan:</span>
-                        <span>{userData?.subscription_plan || "Free"}</span>
+                        <h3 className="text-lg font-semibold text-gray-900">{subscriptionData?.planType || "N/A"}</h3>
+                        {subscriptionData?.status && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "px-3 py-1 text-xs font-medium",
+                              subscriptionData.status === "active" && "border-green-200 bg-green-100 text-green-800",
+                              subscriptionData.status === "trialing" && "border-blue-200 bg-blue-100 text-blue-800",
+                              subscriptionData.status === "expired" && "border-red-200 bg-red-100 text-red-800",
+                              subscriptionData.status === "cancelled" && "border-gray-200 bg-gray-100 text-gray-800",
+                            )}
+                          >
+                            {subscriptionData.status.charAt(0).toUpperCase() + subscriptionData.status.slice(1)}
+                          </Badge>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Status:</span>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "px-3 py-1 text-xs font-medium",
-                            userData?.subscription_status === "active" &&
-                              "border-green-200 bg-green-100 text-green-800",
-                            userData?.subscription_status === "trialing" && "border-blue-200 bg-blue-100 text-blue-800",
-                            userData?.subscription_status === "expired" && "border-red-200 bg-red-100 text-red-800",
-                            userData?.subscription_status === "cancelled" &&
-                              "border-gray-200 bg-gray-100 text-gray-800",
-                          )}
-                        >
-                          {userData?.subscription_status?.charAt(0).toUpperCase() +
-                            userData?.subscription_status?.slice(1)}
-                        </Badge>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Max Products:</span>
-                        <span>{userData?.max_products || 0}</span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Current Products:</span>
-                        <span>{userData?.current_products || 0}</span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Start Date:</span>
-                        <span>
-                          {userData?.subscription_start_date
-                            ? format(new Date(userData.subscription_start_date), "PPP")
+                      <div className="space-y-1 text-sm text-gray-700">
+                        <p>
+                          <span className="font-medium">Billing Cycle:</span>{" "}
+                          {subscriptionData?.billingCycle
+                            ? subscriptionData.billingCycle.charAt(0).toUpperCase() +
+                              subscriptionData.billingCycle.slice(1)
                             : "N/A"}
-                        </span>
+                        </p>
+                        {subscriptionData?.startDate && (
+                          <p>
+                            <span className="font-medium">Start Date:</span>{" "}
+                            {new Date(subscriptionData.startDate).toLocaleDateString()}
+                          </p>
+                        )}
+                        {subscriptionData?.endDate && (
+                          <p>
+                            <span className="font-medium">End Date:</span>{" "}
+                            {new Date(subscriptionData.endDate).toLocaleDateString()}
+                          </p>
+                        )}
+                        {subscriptionData?.trialEndDate && isTrial && (
+                          <p>
+                            <span className="font-medium">Trial Ends:</span>{" "}
+                            {new Date(subscriptionData.trialEndDate).toLocaleDateString()} ({daysRemaining} days
+                            remaining)
+                          </p>
+                        )}
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">End Date:</span>
-                        <span>
-                          {userData?.subscription_end_date
-                            ? format(new Date(userData.subscription_end_date), "PPP")
-                            : "N/A"}
-                        </span>
+                      <div className="flex gap-2">
+                        {subscriptionData?.planType === "trial" && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => router.push("/settings/subscription")}
+                            className="px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90"
+                          >
+                            Upgrade Now
+                          </Button>
+                        )}
+                        {subscriptionData?.planType !== "trial" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push("/settings/subscription")}
+                            className="px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-100"
+                          >
+                            Manage Subscription
+                          </Button>
+                        )}
                       </div>
-
-                      <Button className="w-full">Manage Subscription</Button>
                     </div>
 
                     {/* Product Usage */}
@@ -711,64 +910,6 @@ export default function AccountPage() {
                           : "N/A"}
                       </p>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="security" className="mt-0 space-y-6 pt-0">
-              <Card className="rounded-xl shadow-sm">
-                <CardHeader className="border-b px-5 py-3">
-                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
-                    <Key className="h-5 w-5 text-primary" />
-                    Security Settings
-                  </CardTitle>
-                  <CardDescription className="text-xs text-gray-600">
-                    Update your password and security preferences.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-5">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="currentPassword">Current Password</Label>
-                      <Input id="currentPassword" type="password" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="newPassword">New Password</Label>
-                      <Input id="newPassword" type="password" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
-                      <Input id="confirmNewPassword" type="password" />
-                    </div>
-                    <Button className="w-full">Change Password</Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="notifications" className="mt-0 space-y-6 pt-0">
-              <Card className="rounded-xl shadow-sm">
-                <CardHeader className="border-b px-5 py-3">
-                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
-                    <Info className="h-5 w-5 text-primary" />
-                    Notification Preferences
-                  </CardTitle>
-                  <CardDescription className="text-xs text-gray-600">
-                    Manage how you receive notifications.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-5">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="emailNotifications">Email Notifications</Label>
-                      <Input id="emailNotifications" type="checkbox" className="h-4 w-4" />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="smsNotifications">SMS Notifications</Label>
-                      <Input id="smsNotifications" type="checkbox" className="h-4 w-4" />
-                    </div>
-                    <Button className="w-full">Save Preferences</Button>
                   </div>
                 </CardContent>
               </Card>

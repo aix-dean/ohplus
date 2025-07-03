@@ -23,8 +23,6 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
-import { useTour } from "@/contexts/tour-context" // Import useTour
-import { cn } from "@/lib/utils" // Import cn for conditional classes
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -37,7 +35,6 @@ export default function AdminInventoryPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
   const { isMobile, isTablet } = useResponsive()
-  const { tourActive, currentStep, nextStep } = useTour() // Use tour hook
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -254,12 +251,6 @@ export default function AdminInventoryPage() {
   }
 
   const handleAddSiteClick = () => {
-    if (tourActive && currentStep === 2) {
-      nextStep() // Advance tour if active
-      router.push("/admin/products/create") // Still navigate to create page
-      return
-    }
-
     if (!userData?.license_key) {
       setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
       setShowSubscriptionLimitDialog(true)
@@ -302,12 +293,9 @@ export default function AdminInventoryPage() {
           <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
             {/* The "+ Add Site" card is now the first item in the grid */}
             <Card
-              id="tour-add-site-card" // Add ID for tour
-              className={cn(
-                "w-full min-h-[284px] flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors",
-                tourActive && currentStep === 2 && "ring-4 ring-blue-500 ring-offset-2", // Highlight for tour
-              )}
+              className="w-full min-h-[284px] flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
               onClick={handleAddSiteClick}
+              data-tour-id="add-site-card"
             >
               <Plus className="h-8 w-8 mb-2" />
               <span className="text-lg font-semibold">+ Add Site</span>

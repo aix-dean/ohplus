@@ -91,7 +91,7 @@ export default function RegisterPage() {
       )
       setErrorMessage(null)
       // Redirect to dashboard with a query parameter to indicate successful registration
-      router.push("/admin/dashboard?registered=true")
+      router.push("/admin/dashboard?registered=true&startTour=true")
     } catch (error: unknown) {
       setErrorMessage(getFriendlyErrorMessage(error))
     } finally {

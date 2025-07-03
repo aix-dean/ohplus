@@ -2,18 +2,20 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/auth-context"
-import { Toaster } from "@/components/ui/toaster"
-import { TourProvider } from "@/contexts/tour-context" // Import TourProvider
-import { TourOverlay } from "@/components/tour-overlay" // Import TourOverlay
+import AuthLayout from "./auth-layout"
+import { AssistantProvider } from "@/components/ai-assistant/assistant-provider"
+import { ToasterProvider } from "@/hooks/use-toast" // Import the new ToasterProvider
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "OH!PLUS",
-  description: "Out-of-Home Advertising Platform",
-    generator: 'v0.dev'
+  title: "OH Plus",
+  description: "Manage your outdoor advertising sites",
+  icons: {
+    icon: "/oh-plus-logo.png",
+  },
+  generator: "v0.dev",
 }
 
 export default function RootLayout({
@@ -22,19 +24,18 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <AuthProvider>
-            <TourProvider>
+        <AuthProvider>
+          <AuthLayout>
+            <ToasterProvider>
               {" "}
-              {/* Wrap with TourProvider */}
-              {children}
-              <TourOverlay /> {/* Render TourOverlay */}
-            </TourProvider>
-          </AuthProvider>
-          <Toaster />
-        </ThemeProvider>
+              {/* Wrap children with ToasterProvider */}
+              <div className="flex flex-col h-screen">{children}</div>
+              <AssistantProvider />
+            </ToasterProvider>
+          </AuthLayout>
+        </AuthProvider>
       </body>
     </html>
   )
