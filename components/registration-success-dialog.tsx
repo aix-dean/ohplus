@@ -9,12 +9,13 @@ interface RegistrationSuccessDialogProps {
   isOpen: boolean
   firstName: string
   onClose: () => void
+  onStartTour: () => void // Added new prop
 }
 
-export function RegistrationSuccessDialog({ isOpen, firstName, onClose }: RegistrationSuccessDialogProps) {
-  // handleStart now just closes the dialog, as redirection happens before this dialog is shown
+export function RegistrationSuccessDialog({ isOpen, firstName, onClose, onStartTour }: RegistrationSuccessDialogProps) {
   const handleStart = () => {
-    onClose()
+    onStartTour() // Call the new prop function
+    onClose() // Then close the dialog
   }
 
   return (
