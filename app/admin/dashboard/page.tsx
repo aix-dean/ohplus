@@ -22,6 +22,9 @@ export default function AdminDashboardPage() {
   const { user } = useAuth() // Get user data from auth context
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  // Moved these declarations to the top
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
   useEffect(() => {
     const registeredParam = searchParams.get("registered")
@@ -245,9 +248,6 @@ export default function AdminDashboardPage() {
       department.members.some((member) => member.toLowerCase().includes(lowerCaseSearchTerm))
     )
   })
-
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
   return (
     <div className="flex-1 p-4 md:p-6">
