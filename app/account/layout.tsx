@@ -1,52 +1,22 @@
 import type React from "react"
 import { SideNavigation } from "@/components/side-navigation"
-import { Toaster } from "@/components/ui/toaster"
 import { AuthProvider } from "@/contexts/auth-context"
+import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from "@/components/theme-provider"
-import type { Metadata } from "next"
-import { siteConfig } from "@/config/site" // Corrected import path
-import { cn } from "@/lib/utils"
-import { Mona_Sans as FontSans } from "next/font/google"
 
-const fontSans = FontSans({
-  subsets: ["latin"],
-  variable: "--font-sans",
-})
-
-export const metadata: Metadata = {
-  title: {
-    default: siteConfig.name,
-    template: `%s - ${siteConfig.name}`,
-  },
-  description: siteConfig.description,
-  icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon-16x16.png",
-    apple: "/apple-touch-icon.png",
-  },
-}
-
-interface AccountLayoutProps {
-  children: React.ReactNode
-}
-
-export default function AccountLayout({ children }: AccountLayoutProps) {
+export default function AccountLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={cn("min-h-screen bg-background font-sans antialiased", fontSans.variable)}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <AuthProvider>
-            <div className="flex min-h-screen flex-col">
-              {/* TopNavigation component removed */}
-              <div className="flex flex-1">
-                <SideNavigation />
-                <main className="flex-1 overflow-hidden">{children}</main>
-              </div>
-            </div>
-            <Toaster />
-          </AuthProvider>
-        </ThemeProvider>
-      </body>
-    </html>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+      <AuthProvider>
+        <div className="flex min-h-screen w-full flex-col">
+          {/* Removed TopNavigation component */}
+          <main className="flex flex-1">
+            <SideNavigation />
+            <div className="flex-1">{children}</div>
+          </main>
+        </div>
+        <Toaster />
+      </AuthProvider>
+    </ThemeProvider>
   )
 }

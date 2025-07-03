@@ -3,14 +3,20 @@
 import { Progress } from "@/components/ui/progress"
 
 import { Separator } from "@/components/ui/separator"
-import { useEffect, useState } from "react"
+
+import type React from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   User,
+  Camera,
   Building,
   MapPin,
   Globe,
+  Edit2,
+  Save,
   Loader2,
+  LogOut,
   Key,
   Award,
   Package,
@@ -31,6 +37,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { storage } from "@/lib/firebase"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { getUserProductsCount } from "@/lib/firebase-service" // Corrected import path
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
@@ -49,10 +57,13 @@ const maskLicenseKey = (key: string | undefined | null) => {
 export default function AccountPage() {
   const { user, userData, projectData, subscriptionData, loading, updateUserData, updateProjectData, logout } =
     useAuth()
-  // Removed fileInputRef as photo upload is removed
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
-  // Removed isEditing, isSaving, isUploading states as buttons are removed
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+
   const [currentProductsCount, setCurrentProductsCount] = useState<number | null>(null)
   const [productsCount, setProductsCount] = useState<number | null>(null)
   const [productsLoading, setProductsLoading] = useState(true)
@@ -63,7 +74,7 @@ export default function AccountPage() {
   const [displayName, setDisplayName] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
   const [gender, setGender] = useState("")
-  const [photoURL, setPhotoURL] = useState("") // Keeping photoURL state for display if it exists
+  const [photoURL, setPhotoURL] = useState("")
 
   const [companyName, setCompanyName] = useState("")
   const [companyLocation, setCompanyLocation] = useState("")
@@ -75,9 +86,19 @@ export default function AccountPage() {
 
   const router = useRouter()
 
-  // Removed handleLogout as button is removed
-  // Removed handleSave as button is removed
-  // Removed handlePhotoClick and handlePhotoChange as photo upload is removed
+  const handleLogout = async () => {
+    try {
+      await logout()
+      router.push("/login")
+    } catch (error: any) {
+      console.error("Logout error:", error)
+      toast({
+        title: "Logout Failed",
+        description: error.message || "Failed to log out. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
 
   useEffect(() => {
     if (loading) return
@@ -149,8 +170,85 @@ export default function AccountPage() {
     }
   }, [user])
 
-  // Removed handleSave as button is removed
-  // Removed handlePhotoClick and handlePhotoChange as photo upload is removed
+  const handleSave = async () => {
+    setIsSaving(true)
+
+    try {
+      await updateUserData({
+        first_name: firstName,
+        middle_name: middleName,
+        last_name: lastName,
+        display_name: displayName,
+        phone_number: phoneNumber,
+        gender,
+        photo_url: photoURL,
+      })
+
+      await updateProjectData({
+        company_name: companyName,
+        company_location: companyLocation,
+        company_website: companyWebsite,
+        project_name: projectName,
+        social_media: {
+          facebook,
+          instagram,
+          youtube,
+        },
+      })
+
+      toast({
+        title: "Success",
+        description: "Account information updated successfully!",
+      })
+      setIsEditing(false)
+    } catch (error: any) {
+      console.error("Update error:", error)
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update account information.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handlePhotoClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click()
+    }
+  }
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+
+    setIsUploading(true)
+
+    try {
+      const storageRef = ref(storage, `profile_photos/${user.uid}/${Date.now()}_${file.name}`)
+      const snapshot = await uploadBytes(storageRef, file)
+      const downloadURL = await getDownloadURL(snapshot.ref)
+      setPhotoURL(downloadURL)
+      await updateUserData({ photo_url: downloadURL })
+      toast({
+        title: "Success",
+        description: "Profile photo updated successfully!",
+      })
+    } catch (error: any) {
+      console.error("Photo upload error:", error)
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload photo.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
+    }
+  }
 
   if (loading) {
     return (
@@ -181,10 +279,74 @@ export default function AccountPage() {
   return (
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        {/* "Hello" Section - Moved here */}
-        <div className="mb-8 text-center md:text-left">
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">Hello, {userData?.first_name || "User"}!</h1>
-          <p className="mt-0.5 text-base text-gray-600">Manage your account and company details.</p>
+        {/* Header Section */}
+        <div className="mb-16 flex flex-col items-center justify-between gap-4 rounded-xl bg-white p-6 shadow-sm md:flex-row md:p-8">
+          <div className="flex flex-col items-center gap-4 md:flex-row">
+            <div className="relative group flex-shrink-0">
+              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-primary/20 p-1 shadow-md">
+                {isUploading ? (
+                  <Loader2 size={36} className="animate-spin text-primary" />
+                ) : photoURL ? (
+                  <img
+                    src={photoURL || "/placeholder.svg"}
+                    alt={userData?.display_name || "Profile"}
+                    className="h-full w-full object-cover rounded-full"
+                  />
+                ) : (
+                  <User size={36} className="text-gray-400" />
+                )}
+              </div>
+              <button
+                className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary p-1.5 text-white shadow-md transition-colors duration-200 hover:bg-primary/90"
+                onClick={handlePhotoClick}
+                disabled={isUploading}
+                aria-label="Change profile photo"
+              >
+                <Camera size={16} />
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                disabled={isUploading}
+              />
+            </div>
+            <div className="text-center md:text-left">
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+                Hello, {userData?.first_name || "User"}!
+              </h1>
+              <p className="mt-0.5 text-base text-gray-600">Manage your account and company details.</p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-100 bg-transparent"
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </Button>
+            <Button
+              onClick={() => (isEditing ? handleSave() : setIsEditing(true))}
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90"
+            >
+              {isEditing ? (
+                <>
+                  <Save className="h-4 w-4" />
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </>
+              ) : (
+                <>
+                  <Edit2 className="h-4 w-4" />
+                  Edit Profile
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Main Content Area with Tabs */}
@@ -235,10 +397,12 @@ export default function AccountPage() {
                         id="firstName"
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
-                        disabled={true} // Now always disabled as edit button is removed
+                        disabled={!isEditing}
                         className={cn(
                           "rounded-md border px-3 py-2 text-sm shadow-sm",
-                          "border-gray-200 bg-gray-50 text-gray-700", // Always disabled style
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
                         )}
                       />
                     </div>
@@ -251,10 +415,12 @@ export default function AccountPage() {
                         id="lastName"
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
-                        disabled={true} // Now always disabled
+                        disabled={!isEditing}
                         className={cn(
                           "rounded-md border px-3 py-2 text-sm shadow-sm",
-                          "border-gray-200 bg-gray-50 text-gray-700",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
                         )}
                       />
                     </div>
@@ -267,10 +433,12 @@ export default function AccountPage() {
                         id="middleName"
                         value={middleName}
                         onChange={(e) => setMiddleName(e.target.value)}
-                        disabled={true} // Now always disabled
+                        disabled={!isEditing}
                         className={cn(
                           "rounded-md border px-3 py-2 text-sm shadow-sm",
-                          "border-gray-200 bg-gray-50 text-gray-700",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
                         )}
                       />
                     </div>
@@ -283,10 +451,12 @@ export default function AccountPage() {
                         id="displayName"
                         value={displayName}
                         onChange={(e) => setDisplayName(e.target.value)}
-                        disabled={true} // Now always disabled
+                        disabled={!isEditing}
                         className={cn(
                           "rounded-md border px-3 py-2 text-sm shadow-sm",
-                          "border-gray-200 bg-gray-50 text-gray-700",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
                         )}
                       />
                     </div>
@@ -299,10 +469,12 @@ export default function AccountPage() {
                         id="phoneNumber"
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value)}
-                        disabled={true} // Now always disabled
+                        disabled={!isEditing}
                         className={cn(
                           "rounded-md border px-3 py-2 text-sm shadow-sm",
-                          "border-gray-200 bg-gray-50 text-gray-700",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
                         )}
                       />
                     </div>
@@ -315,10 +487,12 @@ export default function AccountPage() {
                         id="gender"
                         value={gender}
                         onChange={(e) => setGender(e.target.value)}
-                        disabled={true} // Now always disabled
+                        disabled={!isEditing}
                         className={cn(
                           `flex h-9 w-full rounded-md border px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm`,
-                          "border-gray-200 bg-gray-50 text-gray-700",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
                         )}
                       >
                         <option value="">Select Gender</option>
@@ -478,11 +652,13 @@ export default function AccountPage() {
                         id="companyName"
                         value={companyName}
                         onChange={(e) => setCompanyName(e.target.value)}
-                        disabled={true} // Now always disabled
+                        disabled={!isEditing}
                         placeholder="Your Company Name"
                         className={cn(
                           "rounded-md border px-3 py-2 text-sm shadow-sm",
-                          "border-gray-200 bg-gray-50 text-gray-700",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
                         )}
                       />
                     </div>
@@ -495,11 +671,13 @@ export default function AccountPage() {
                         id="companyLocation"
                         value={companyLocation}
                         onChange={(e) => setCompanyLocation(e.target.value)}
-                        disabled={true} // Now always disabled
+                        disabled={!isEditing}
                         placeholder="123 Main St, City, Country"
                         className={cn(
                           "rounded-md border px-3 py-2 text-sm shadow-sm",
-                          "border-gray-200 bg-gray-50 text-gray-700",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
                         )}
                       />
                     </div>
@@ -512,11 +690,13 @@ export default function AccountPage() {
                         id="companyWebsite"
                         value={companyWebsite}
                         onChange={(e) => setCompanyWebsite(e.target.value)}
-                        disabled={true} // Now always disabled
+                        disabled={!isEditing}
                         placeholder="https://www.example.com"
                         className={cn(
                           "rounded-md border px-3 py-2 text-sm shadow-sm",
-                          "border-gray-200 bg-gray-50 text-gray-700",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
                         )}
                       />
                     </div>
@@ -544,11 +724,13 @@ export default function AccountPage() {
                       <Input
                         value={facebook}
                         onChange={(e) => setFacebook(e.target.value)}
-                        disabled={true} // Now always disabled
+                        disabled={!isEditing}
                         placeholder="Facebook URL"
                         className={cn(
                           "flex-1 rounded-md border px-3 py-2 text-sm shadow-sm",
-                          "border-gray-200 bg-gray-50 text-gray-700",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
                         )}
                       />
                     </div>
@@ -560,11 +742,13 @@ export default function AccountPage() {
                       <Input
                         value={instagram}
                         onChange={(e) => setInstagram(e.target.value)}
-                        disabled={true} // Now always disabled
+                        disabled={!isEditing}
                         placeholder="Instagram URL"
                         className={cn(
                           "flex-1 rounded-md border px-3 py-2 text-sm shadow-sm",
-                          "border-gray-200 bg-gray-50 text-gray-700",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
                         )}
                       />
                     </div>
@@ -576,11 +760,13 @@ export default function AccountPage() {
                       <Input
                         value={youtube}
                         onChange={(e) => setYoutube(e.target.value)}
-                        disabled={true} // Now always disabled
+                        disabled={!isEditing}
                         placeholder="YouTube URL"
                         className={cn(
                           "flex-1 rounded-md border px-3 py-2 text-sm shadow-sm",
-                          "border-gray-200 bg-gray-50 text-gray-700",
+                          isEditing
+                            ? "border-primary/40 focus:border-primary"
+                            : "border-gray-200 bg-gray-50 text-gray-700",
                         )}
                       />
                     </div>
