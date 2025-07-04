@@ -71,8 +71,8 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
         breadcrumbs.push({ label: pageLabel, isPage: true })
       }
     } else if (path.startsWith("/sales/dashboard")) {
-      breadcrumbs.push({ label: "Admin - Dashboard", href: "/admin/dashboard" })
-      breadcrumbs.push({ label: "Sales - Dashboard", isPage: true })
+      breadcrumbs.push({ label: "Admin Dashboard", href: "/admin/dashboard" })
+      breadcrumbs.push({ label: "Sales Dashboard", isPage: true })
     } else if (path.startsWith("/logistics/dashboard")) {
       breadcrumbs.push({ label: "Admin - Dashboard", href: "/admin/dashboard" })
       breadcrumbs.push({ label: "Logistics - Dashboard", isPage: true })
