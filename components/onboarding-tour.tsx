@@ -14,6 +14,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
   const router = useRouter()
   const [run, setRun] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
+  const [joyrideKey, setJoyrideKey] = useState(0) // Force remount
 
   // Define the tour steps
   const steps: Step[] = [
@@ -68,8 +69,8 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
 
   // Log state changes
   useEffect(() => {
-    console.log("OnboardingTour: State changed - run:", run, "stepIndex:", stepIndex)
-  }, [run, stepIndex])
+    console.log("OnboardingTour: State changed - run:", run, "stepIndex:", stepIndex, "joyrideKey:", joyrideKey)
+  }, [run, stepIndex, joyrideKey])
 
   // Handle Joyride callbacks
   const handleJoyrideCallback = useCallback(
@@ -107,13 +108,13 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
 
               if (targetElement) {
                 console.log("OnboardingTour: Target element found, restarting tour at step 2")
-                // Set step index first
+                // Force remount by changing key, set step index, then restart
+                setJoyrideKey((prev) => prev + 1)
                 setStepIndex(1)
-                // Then restart the tour after a small delay to ensure state update
                 setTimeout(() => {
-                  console.log("OnboardingTour: Restarting tour with run=true")
+                  console.log("OnboardingTour: Restarting tour with run=true after remount")
                   setRun(true)
-                }, 100)
+                }, 200)
               } else {
                 console.log("OnboardingTour: Target element not found, retrying in 500ms")
                 setTimeout(checkElement, 500)
@@ -144,11 +145,12 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
             const targetElement = document.querySelector('[data-tour-id="inventory-link"]')
             if (targetElement) {
               console.log("OnboardingTour: Dashboard loaded, restarting tour at step 1")
+              setJoyrideKey((prev) => prev + 1)
               setStepIndex(0)
               setTimeout(() => {
-                console.log("OnboardingTour: Restarting tour on dashboard with run=true")
+                console.log("OnboardingTour: Restarting tour on dashboard with run=true after remount")
                 setRun(true)
-              }, 100)
+              }, 200)
             }
           }, 1000)
         } else {
@@ -160,10 +162,11 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
     [router],
   )
 
-  console.log("OnboardingTour: Rendering Joyride with run:", run, "stepIndex:", stepIndex)
+  console.log("OnboardingTour: Rendering Joyride with run:", run, "stepIndex:", stepIndex, "key:", joyrideKey)
 
   return (
     <Joyride
+      key={joyrideKey}
       run={run}
       steps={steps}
       stepIndex={stepIndex}
