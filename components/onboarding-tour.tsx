@@ -18,20 +18,18 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
   // Define the tour steps
   const steps: Step[] = [
     {
-      target: "body", // Start with body to ensure the tour shows
-      content:
-        "Welcome to OH!Plus! Let's get your company online. We'll show you how to set up your first billboard site — it's quick and easy.",
+      target: '[data-tour-id="inventory-link"]',
+      content: "You're in! Let's get your company online. Set up your first billboard site — it's quick.",
       disableBeacon: true,
-      placement: "center",
+      placement: "bottom",
       title: "Welcome to OH!Plus",
     },
     {
-      target: ".grid.grid-cols-1.sm\\:grid-cols-2", // Target the department cards grid
-      content:
-        "This is your main dashboard where you can access all departments. Let's start by setting up your inventory.",
+      target: '[data-tour-id="add-site-card"]',
+      content: "Click here to add your first billboard site and get started with your inventory management.",
       disableBeacon: true,
       placement: "top",
-      title: "Your Dashboard",
+      title: "Add Your First Site",
     },
   ]
 
@@ -39,9 +37,14 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
   useEffect(() => {
     console.log("OnboardingTour: useEffect triggered with startTour:", startTour)
     if (startTour) {
-      console.log("OnboardingTour: Starting tour - setting run to true")
-      setRun(true)
-      setStepIndex(0)
+      // Add a small delay to ensure DOM is ready
+      setTimeout(() => {
+        const targetElement = document.querySelector('[data-tour-id="inventory-link"]')
+        console.log("OnboardingTour: Target element found:", targetElement)
+        console.log("OnboardingTour: Starting tour - setting run to true")
+        setRun(true)
+        setStepIndex(0)
+      }, 100)
     } else {
       console.log("OnboardingTour: startTour is false, not starting tour")
     }
@@ -71,16 +74,14 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
       // Handle step progression
       if (action === "next") {
         console.log("OnboardingTour: Next button clicked, current index:", index)
-        if (index === 1) {
-          // After second step, navigate to inventory page
+        if (index === 0) {
+          // After first step, navigate to inventory page
           console.log("OnboardingTour: Navigating to /admin/inventory")
           router.push("/admin/inventory")
-          // End the tour after navigation
+          // Wait for navigation then show next step
           setTimeout(() => {
-            console.log("OnboardingTour: Ending tour after navigation")
-            setRun(false)
-            setStepIndex(0)
-            localStorage.setItem("onboardingTourCompleted", "true")
+            console.log("OnboardingTour: Setting step index to 1 after navigation")
+            setStepIndex(1)
           }, 600)
         } else {
           console.log("OnboardingTour: Moving to next step:", index + 1)
@@ -88,7 +89,18 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
         }
       } else if (action === "prev") {
         console.log("OnboardingTour: Previous button clicked, current index:", index)
-        setStepIndex(Math.max(0, index - 1))
+        if (index === 1) {
+          // Going back from inventory to dashboard
+          console.log("OnboardingTour: Navigating back to /admin/dashboard")
+          router.push("/admin/dashboard")
+          setTimeout(() => {
+            console.log("OnboardingTour: Setting step index to 0 after navigation")
+            setStepIndex(0)
+          }, 600)
+        } else {
+          console.log("OnboardingTour: Moving to previous step:", index - 1)
+          setStepIndex(index - 1)
+        }
       }
     },
     [router],

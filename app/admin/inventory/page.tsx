@@ -27,7 +27,7 @@ import {
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
 
-export default function AdminInventoryPage() {
+const InventoryPage = () => {
   const router = useRouter()
   const { user, userData, subscriptionData } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
@@ -429,3 +429,5 @@ export default function AdminInventoryPage() {
     </div>
   )
 }
+
+export default InventoryPage
