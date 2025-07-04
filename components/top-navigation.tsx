@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, X, Settings, LogOut, User, Bell, ChevronRight, Home } from "lucide-react"
+import { Menu, X, Settings, LogOut, User, Bell, ChevronRight } from "lucide-react"
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
@@ -60,64 +60,72 @@ export function TopNavigation() {
     }
   }, [isOpen])
 
-  // Build breadcrumbs based on the current pathname
+  // Track navigation history and build breadcrumbs
   useEffect(() => {
     const updateBreadcrumbs = () => {
-      const pathSegments = pathname.split("/").filter(Boolean) // e.g., ["admin", "dashboard"] or ["sales", "products", "new"]
+      const segments = pathname.split("/").filter(Boolean)
       const crumbs: Array<{ label: string; href: string }> = []
 
-      // Always start with "Dashboard" linking to the root
-      crumbs.push({ label: "Dashboard", href: "/" })
+      const currentMainSection = segments[0] // e.g., "admin", "sales"
 
-      let currentPath = ""
-      pathSegments.forEach((segment, index) => {
-        currentPath += `/${segment}`
+      // Get the last visited main section from localStorage
+      const lastVisitedSection = JSON.parse(localStorage.getItem("lastVisitedSection") || "null")
 
-        let label = segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, " ")
-        let href = currentPath
+      // Condition to add the "previous" main section:
+      // Only if we are currently on a dashboard of a *different* main section
+      // AND the current main section is NOT "admin" (to prevent prepending when navigating back to admin)
+      const isCurrentPathADashboard = segments.length === 2 && segments[1] === "dashboard"
 
-        // Special handling for main sections (admin, sales, etc.)
-        // If it's a main section and the next segment is 'dashboard',
-        // or if it's just the section itself (e.g., /admin), link to its dashboard.
-        if (["admin", "sales", "logistics", "cms"].includes(segment)) {
-          if (index + 1 < pathSegments.length && pathSegments[index + 1] === "dashboard") {
-            // If the next segment is 'dashboard', the current segment's label is enough,
-            // and its href should point to its dashboard.
-            href = `/${segment}/dashboard`
-            // We will skip adding the "dashboard" segment itself later.
-          } else if (pathSegments.length === 1) {
-            // e.g., /admin
-            href = `/${segment}/dashboard`
-          }
+      if (isCurrentPathADashboard && lastVisitedSection && lastVisitedSection !== currentMainSection) {
+        if (currentMainSection !== "admin") {
+          // Only prepend if current section is NOT admin
+          const prevLabel = lastVisitedSection.charAt(0).toUpperCase() + lastVisitedSection.slice(1)
+          crumbs.push({ label: prevLabel, href: `/${lastVisitedSection}/dashboard` })
         }
-
-        // Skip adding "dashboard" as a separate crumb if the parent is already a section (e.g., Admin, Sales)
-        if (
-          segment === "dashboard" &&
-          index > 0 &&
-          ["admin", "sales", "logistics", "cms"].includes(pathSegments[index - 1])
-        ) {
-          return // Skip this crumb
-        }
-
-        // Handle dynamic segments like [id]
-        if (segment.startsWith("[") && segment.endsWith("]")) {
-          // For simplicity, use a generic label. In a real app, you might fetch the actual name.
-          label = "Details"
-        }
-
-        crumbs.push({ label, href })
-      })
-
-      // If the current path is just "/", the only crumb should be "Dashboard"
-      if (pathname === "/" && crumbs.length > 1) {
-        setBreadcrumbs([{ label: "Dashboard", href: "/" }])
-      } else {
-        setBreadcrumbs(crumbs)
       }
+
+      // Add the current main section
+      if (currentMainSection) {
+        const label = currentMainSection.charAt(0).toUpperCase() + currentMainSection.slice(1)
+        crumbs.push({ label, href: `/${currentMainSection}/dashboard` })
+      } else {
+        // For the root path "/", just show "Dashboard"
+        crumbs.push({ label: "Dashboard", href: "/" })
+      }
+
+      // Add sub-segments, excluding "dashboard" and dynamic IDs
+      let currentPathAccumulator = `/${currentMainSection}`
+      for (let i = 1; i < segments.length; i++) {
+        const segment = segments[i]
+        if (segment === "dashboard") {
+          continue // Skip "dashboard"
+        }
+        if (segment.startsWith("[") && segment.endsWith("]")) {
+          // Stop adding segments if it's a dynamic ID (e.g., /sales/proposals/123 -> Sales > Proposals)
+          break
+        }
+
+        currentPathAccumulator += `/${segment}`
+        const label = segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, " ")
+        crumbs.push({ label, href: currentPathAccumulator })
+      }
+
+      setBreadcrumbs(crumbs)
     }
 
     updateBreadcrumbs()
+  }, [pathname])
+
+  // Update last visited section in localStorage
+  useEffect(() => {
+    const segments = pathname.split("/").filter(Boolean)
+    const currentMainSection = segments[0]
+
+    if (currentMainSection && ["admin", "sales", "logistics", "cms"].includes(currentMainSection)) {
+      localStorage.setItem("lastVisitedSection", JSON.stringify(currentMainSection))
+    } else {
+      localStorage.removeItem("lastVisitedSection")
+    }
   }, [pathname])
 
   const getPageTitle = (path: string) => {
@@ -226,15 +234,12 @@ export function TopNavigation() {
           <div className="top-nav-left">
             <div className="top-nav-logo flex items-center">
               <div className="flex items-center space-x-2">
-                {breadcrumbs.length > 1 ? (
+                {breadcrumbs.length > 0 ? (
                   <nav className="flex items-center space-x-2 text-white">
                     {breadcrumbs.map((crumb, index) => (
                       <div key={crumb.href} className="flex items-center">
-                        {index === 0 ? (
-                          <Home className="h-4 w-4 mr-1" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4 mx-1 text-white/60" />
-                        )}
+                        {/* Only show ChevronRight if it's not the first breadcrumb */}
+                        {index > 0 && <ChevronRight className="h-4 w-4 mx-1 text-white/60" />}
                         {index === breadcrumbs.length - 1 ? (
                           <span className="text-xl font-semibold">{crumb.label}</span>
                         ) : (
