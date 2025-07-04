@@ -62,11 +62,13 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
   // Get current tour step from localStorage
   const getCurrentTourStep = () => {
     const step = localStorage.getItem("onboardingTourStep")
+    console.log("OnboardingTour: Getting current tour step from localStorage:", step)
     return step ? Number.parseInt(step, 10) : -1
   }
 
   // Set current tour step in localStorage
   const setCurrentTourStep = (step: number) => {
+    console.log("OnboardingTour: Setting current tour step in localStorage:", step)
     if (step >= 0) {
       localStorage.setItem("onboardingTourStep", step.toString())
     } else {
@@ -98,8 +100,11 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
     }
 
     // Handle tour based on current page and step
-    if (currentStep >= 0) {
-      if (pathname === "/admin/dashboard" && currentStep === 0) {
+    const effectiveStep = startTour && currentStep === -1 ? 0 : currentStep
+    console.log("OnboardingTour: Effective step:", effectiveStep)
+
+    if (effectiveStep >= 0) {
+      if ((pathname === "/admin/dashboard" || pathname === "/admin") && effectiveStep === 0) {
         console.log("OnboardingTour: On dashboard, showing step 0")
         setTimeout(async () => {
           const inventoryLink = await waitForElement('[data-tour-id="inventory-link"]')
@@ -109,7 +114,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
             setRun(true)
           }
         }, 300)
-      } else if (pathname === "/admin/inventory" && currentStep === 1) {
+      } else if (pathname === "/admin/inventory" && effectiveStep === 1) {
         console.log("OnboardingTour: On inventory page, showing step 1")
         setTimeout(async () => {
           const addSiteCard = await waitForElement('[data-tour-id="add-site-card"]')
@@ -120,7 +125,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
           } else {
             console.log("OnboardingTour: Could not find add site card")
           }
-        }, 500)
+        }, 800)
       }
     }
   }, [startTour, pathname])
