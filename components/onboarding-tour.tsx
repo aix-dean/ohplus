@@ -34,31 +34,44 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
     },
   ]
 
+  // Helper function to wait for element to appear
+  const waitForElement = (selector: string, maxAttempts = 10, delay = 300): Promise<Element | null> => {
+    return new Promise((resolve) => {
+      let attempts = 0
+
+      const checkElement = () => {
+        const element = document.querySelector(selector)
+        console.log(`OnboardingTour: Attempt ${attempts + 1} to find element ${selector}:`, element)
+
+        if (element) {
+          resolve(element)
+        } else if (attempts < maxAttempts) {
+          attempts++
+          setTimeout(checkElement, delay)
+        } else {
+          console.log(`OnboardingTour: Element ${selector} not found after ${maxAttempts} attempts`)
+          resolve(null)
+        }
+      }
+
+      checkElement()
+    })
+  }
+
   // Simple effect to start tour when startTour is true
   useEffect(() => {
     console.log("OnboardingTour: useEffect triggered with startTour:", startTour)
     if (startTour) {
       // Add a small delay to ensure DOM is ready
-      setTimeout(() => {
-        const targetElement = document.querySelector('[data-tour-id="inventory-link"]')
+      setTimeout(async () => {
+        const targetElement = await waitForElement('[data-tour-id="inventory-link"]')
         console.log("OnboardingTour: Target element found:", targetElement)
         if (targetElement) {
           console.log("OnboardingTour: Starting tour - setting run to true")
           setRun(true)
           setStepIndex(0)
         } else {
-          console.log("OnboardingTour: Target element not found, retrying...")
-          // Retry after another delay if element not found
-          setTimeout(() => {
-            const retryElement = document.querySelector('[data-tour-id="inventory-link"]')
-            if (retryElement) {
-              console.log("OnboardingTour: Target element found on retry, starting tour")
-              setRun(true)
-              setStepIndex(0)
-            } else {
-              console.log("OnboardingTour: Target element still not found after retry")
-            }
-          }, 500)
+          console.log("OnboardingTour: Could not find inventory link element")
         }
       }, 100)
     } else {
@@ -73,7 +86,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
 
   // Handle Joyride callbacks
   const handleJoyrideCallback = useCallback(
-    (data: CallBackProps) => {
+    async (data: CallBackProps) => {
       console.log("OnboardingTour: Joyride callback triggered:", data)
       const { status, index, action } = data
 
@@ -93,12 +106,24 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
         if (index === 0) {
           // After first step, navigate to inventory page
           console.log("OnboardingTour: Navigating to /admin/inventory")
+          setRun(false) // Stop the tour temporarily
           router.push("/admin/inventory")
-          // Wait for navigation then show next step
-          setTimeout(() => {
-            console.log("OnboardingTour: Setting step index to 1 after navigation")
-            setStepIndex(1)
-          }, 800)
+
+          // Wait for navigation and element to appear
+          setTimeout(async () => {
+            console.log("OnboardingTour: Waiting for add-site-card element after navigation")
+            const addSiteElement = await waitForElement('[data-tour-id="add-site-card"]', 15, 400)
+
+            if (addSiteElement) {
+              console.log("OnboardingTour: Add site element found, continuing tour")
+              setStepIndex(1)
+              setRun(true) // Restart the tour
+            } else {
+              console.log("OnboardingTour: Add site element not found, ending tour")
+              setRun(false)
+              localStorage.setItem("onboardingTourCompleted", "true")
+            }
+          }, 1000)
         } else {
           console.log("OnboardingTour: Moving to next step:", index + 1)
           setStepIndex(index + 1)
@@ -108,11 +133,22 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
         if (index === 1) {
           // Going back from inventory to dashboard
           console.log("OnboardingTour: Navigating back to /admin/dashboard")
+          setRun(false) // Stop the tour temporarily
           router.push("/admin/dashboard")
-          setTimeout(() => {
-            console.log("OnboardingTour: Setting step index to 0 after navigation")
-            setStepIndex(0)
-          }, 800)
+
+          setTimeout(async () => {
+            console.log("OnboardingTour: Waiting for inventory-link element after navigation back")
+            const inventoryElement = await waitForElement('[data-tour-id="inventory-link"]', 15, 400)
+
+            if (inventoryElement) {
+              console.log("OnboardingTour: Inventory link element found, continuing tour")
+              setStepIndex(0)
+              setRun(true) // Restart the tour
+            } else {
+              console.log("OnboardingTour: Inventory link element not found, ending tour")
+              setRun(false)
+            }
+          }, 1000)
         } else {
           console.log("OnboardingTour: Moving to previous step:", index - 1)
           setStepIndex(index - 1)
