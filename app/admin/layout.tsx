@@ -1,10 +1,9 @@
 "use client"
 
 import type React from "react"
-
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAuthContext } from "@/contexts/auth-context"
+import { useAuth } from "@/contexts/auth-context"
 import { SideNavigation } from "@/components/side-navigation"
 import { TopNavigation } from "@/components/top-navigation"
 import { OnboardingTour } from "@/components/onboarding-tour"
@@ -14,7 +13,7 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { user, loading } = useAuthContext()
+  const { user, loading } = useAuth()
   const router = useRouter()
   const [startTour, setStartTour] = useState(false)
 
