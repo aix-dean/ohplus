@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation" // Removed useSearchParams as it's no longer the primary trigger
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 
@@ -12,10 +12,12 @@ interface HighlightRect {
   height: number
 }
 
-export function OnboardingTour() {
+interface OnboardingTourProps {
+  triggerTour: boolean // New prop to explicitly trigger the tour
+}
+
+export function OnboardingTour({ triggerTour }: OnboardingTourProps) {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const startTourParam = searchParams.get("startTour") // Re-rely on this param
   const [currentStep, setCurrentStep] = useState(0) // 0: inactive, 1: highlight inventory, 2: highlight add site
   const [showTour, setShowTour] = useState(false)
   const [highlightRect, setHighlightRect] = useState<HighlightRect | null>(null)
@@ -61,17 +63,16 @@ export function OnboardingTour() {
     }
   }, [])
 
-  // Initialize tour based on URL param and local storage
+  // Effect to trigger the tour based on the new prop
   useEffect(() => {
-    if (startTourParam === "true" && !localStorage.getItem(tourCompletedKey)) {
+    if (triggerTour && !localStorage.getItem(tourCompletedKey)) {
       setShowTour(true)
       setCurrentStep(1)
-      // Remove the query parameter to prevent re-triggering on refresh
-      const newUrl = new URL(window.location.href)
-      newUrl.searchParams.delete("startTour")
-      router.replace(newUrl.toString(), undefined, { shallow: true })
+      // No need to remove query param here, as it's not the primary trigger anymore
+      // The parent component (AdminDashboardPage) will handle removing its 'registered' param.
+      // OnboardingTour itself doesn't need to clean up URL params for its initial trigger anymore.
     }
-  }, [startTourParam, router])
+  }, [triggerTour]) // Depend on triggerTour
 
   // Handle step changes and highlight positioning
   useEffect(() => {
