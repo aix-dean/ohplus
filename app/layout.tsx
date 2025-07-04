@@ -6,7 +6,7 @@ import { AuthProvider } from "@/contexts/auth-context"
 import AuthLayout from "./auth-layout"
 import { AssistantProvider } from "@/components/ai-assistant/assistant-provider"
 import { ToasterProvider } from "@/hooks/use-toast"
-import { OnboardingTour } from "@/components/onboarding-tour" // Import OnboardingTour
+import { OnboardingTour } from "@/components/onboarding-tour" // Import OnboardingTour globally
 
 const inter = Inter({ subsets: ["latin"] })
 

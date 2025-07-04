@@ -7,7 +7,6 @@ import Joyride, { type CallBackProps, STATUS, type Step } from "react-joyride"
 // Removed OnboardingTourProps interface as startTour prop is no longer used
 
 export function OnboardingTour() {
-  // Removed startTour prop from function signature
   console.log("OnboardingTour: Component mounted/re-mounted")
 
   const router = useRouter()

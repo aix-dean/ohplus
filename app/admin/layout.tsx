@@ -1,13 +1,13 @@
 "use client"
 
 import type React from "react"
-// Removed OnboardingTour import and related state/effect as it's now in root layout
+// OnboardingTour import removed as it's now handled in app/layout.tsx
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // Removed startOnboardingTour state and useEffect
+  // Logic related to startOnboardingTour removed as it's now handled in app/layout.tsx
   return <>{children}</>
 }

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FirebaseError } from "firebase/app"
-import { RegistrationSuccessDialog } from "@/components/registration-success-dialog" // Import the dialog
+import { RegistrationSuccessDialog } from "@/components/registration-success-dialog"
 
 export default function RegisterPage() {
   const [step, setStep] = useState(1) // 1 for personal info, 2 for password and company info
