@@ -21,7 +21,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
     {
       target: '[data-tour-id="inventory-link"]',
       content:
-        "You're in! Let's get your company online. Set up your first billboard site — it's quick. Click on Inventory to get started.",
+        "Step 1: You're in! Let's get your company online. Set up your first billboard site — it's quick. Click on Inventory to get started.",
       disableBeacon: true,
       placement: "right",
       title: "Welcome to OH!Plus",
@@ -32,7 +32,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
   const inventorySteps: Step[] = [
     {
       target: '[data-tour-id="add-site-card"]',
-      content: "Click here to add your first billboard site and get started with your inventory management.",
+      content: "Step 2: Click here to add your first billboard site and get started with your inventory management.",
       disableBeacon: true,
       placement: "top",
       title: "Add Your First Site",
