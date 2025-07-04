@@ -2,20 +2,17 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
-import { AuthProvider } from "@/contexts/auth-context"
-import AuthLayout from "./auth-layout"
-import { AssistantProvider } from "@/components/ai-assistant/assistant-provider"
-import { ToasterProvider } from "@/hooks/use-toast" // Import the new ToasterProvider
+import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/toaster"
+import { ClerkProvider } from "@clerk/nextjs"
+import { OnboardingTour } from "@/components/onboarding-tour" // Import OnboardingTour
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "OH Plus",
-  description: "Manage your outdoor advertising sites",
-  icons: {
-    icon: "/oh-plus-logo.png",
-  },
-  generator: "v0.dev",
+  title: "OH!PLUS",
+  description: "Out-of-Home Advertising Platform",
+    generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -24,19 +21,16 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <AuthProvider>
-          <AuthLayout>
-            <ToasterProvider>
-              {" "}
-              {/* Wrap children with ToasterProvider */}
-              <div className="flex flex-col h-screen">{children}</div>
-              <AssistantProvider />
-            </ToasterProvider>
-          </AuthLayout>
-        </AuthProvider>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <body className={inter.className}>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+            {children}
+            <Toaster />
+            <OnboardingTour /> {/* Render OnboardingTour globally */}
+          </ThemeProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }
