@@ -14,62 +14,72 @@ export function OnboardingTour({ triggerTour }: OnboardingTourProps) {
   const [stepIndex, setStepIndex] = useState(0)
   const tourCompletedKey = "onboardingTourCompleted"
 
+  // Define the tour steps
   const steps: Step[] = [
     {
       target: '[data-tour-id="inventory-link"]',
       content: "You're in! Let's get your company online. Set up your first billboard site — it's quick.",
       disableBeacon: true,
       placement: "right",
-      styles: {
-        options: {
-          zIndex: 9999,
-        },
-      },
+      title: "Welcome to OH!Plus",
     },
     {
       target: '[data-tour-id="add-site-card"]',
-      content: "Click here to add your first billboard site.",
+      content: "Click here to add your first billboard site and get started with your inventory management.",
       disableBeacon: true,
       placement: "bottom",
-      styles: {
-        options: {
-          zIndex: 9999,
-        },
-      },
+      title: "Add Your First Site",
     },
   ]
 
-  // Effect to trigger the tour based on the new prop
+  // Start tour when triggerTour becomes true
   useEffect(() => {
     if (triggerTour && !localStorage.getItem(tourCompletedKey)) {
-      // Add a small delay to ensure the dialog is closed and DOM is ready
+      // Small delay to ensure DOM is ready after dialog closes
       const timer = setTimeout(() => {
         setRun(true)
         setStepIndex(0)
-      }, 100)
+      }, 200)
 
       return () => clearTimeout(timer)
     }
   }, [triggerTour])
 
-  // Joyride callback function to handle tour events
+  // Handle Joyride callbacks
   const handleJoyrideCallback = useCallback(
     (data: CallBackProps) => {
-      const { status, index, type, action } = data
+      const { status, index, action, type } = data
 
+      // Tour finished or skipped
       if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
         setRun(false)
-        localStorage.setItem(tourCompletedKey, "true")
         setStepIndex(0)
-      } else if (action === "next" && index === 0) {
-        // When user clicks "Next" on the first step, navigate to inventory
-        router.push("/admin/inventory")
-        // Small delay to allow navigation to complete before showing next step
-        setTimeout(() => {
-          setStepIndex(1)
-        }, 500)
-      } else if (type === "step:after" && index > 0) {
-        setStepIndex(index + 1)
+        localStorage.setItem(tourCompletedKey, "true")
+        return
+      }
+
+      // Handle step progression
+      if (action === "next") {
+        if (index === 0) {
+          // After first step, navigate to inventory page
+          router.push("/admin/inventory")
+          // Wait for navigation then show next step
+          setTimeout(() => {
+            setStepIndex(1)
+          }, 600)
+        } else {
+          setStepIndex(index + 1)
+        }
+      } else if (action === "prev") {
+        if (index === 1) {
+          // Going back from inventory to dashboard
+          router.push("/admin/dashboard")
+          setTimeout(() => {
+            setStepIndex(0)
+          }, 600)
+        } else {
+          setStepIndex(index - 1)
+        }
       }
     },
     [router],
@@ -79,47 +89,80 @@ export function OnboardingTour({ triggerTour }: OnboardingTourProps) {
     <Joyride
       run={run}
       steps={steps}
+      stepIndex={stepIndex}
       continuous={true}
       showProgress={true}
       showSkipButton={true}
+      disableOverlayClose={true}
+      disableCloseOnEsc={false}
       callback={handleJoyrideCallback}
-      stepIndex={stepIndex}
       locale={{
         back: "Back",
         close: "Close",
-        last: "Done",
+        last: "Finish Tour",
         next: "Next",
         skip: "Skip Tour",
       }}
       styles={{
         options: {
-          zIndex: 9999,
+          zIndex: 10000,
+          primaryColor: "#2563eb",
         },
         tooltip: {
-          backgroundColor: "white",
-          color: "#333",
-          borderRadius: "8px",
-          padding: "20px",
-          textAlign: "center",
+          backgroundColor: "#ffffff",
+          borderRadius: "12px",
+          color: "#1f2937",
           fontSize: "16px",
+          padding: "24px",
+          textAlign: "left",
+          boxShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
+        },
+        tooltipTitle: {
+          color: "#2563eb",
+          fontSize: "18px",
+          fontWeight: "600",
+          marginBottom: "8px",
+        },
+        tooltipContent: {
+          fontSize: "16px",
+          lineHeight: "1.5",
+          marginBottom: "16px",
         },
         buttonNext: {
           backgroundColor: "#2563eb",
-          color: "white",
-          borderRadius: "6px",
-          padding: "8px 16px",
+          borderRadius: "8px",
+          color: "#ffffff",
+          fontSize: "14px",
+          fontWeight: "500",
+          padding: "10px 20px",
+          border: "none",
+          cursor: "pointer",
         },
         buttonBack: {
-          color: "#2563eb",
+          color: "#6b7280",
+          fontSize: "14px",
+          fontWeight: "500",
+          marginRight: "12px",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
         },
         buttonSkip: {
-          color: "#6b7280",
+          color: "#9ca3af",
+          fontSize: "14px",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
         },
         overlay: {
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          backgroundColor: "rgba(0, 0, 0, 0.6)",
         },
         spotlight: {
           borderRadius: "12px",
+          border: "3px solid #2563eb",
+        },
+        beacon: {
+          backgroundColor: "#2563eb",
         },
       }}
     />
