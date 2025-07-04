@@ -18,10 +18,10 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
   // Define the tour steps
   const steps: Step[] = [
     {
-      target: "body", // Fallback to body if specific element not found
-      content: "Welcome! Let's get your company online. We'll guide you through setting up your first billboard site.",
+      target: '[data-tour-id="inventory-link"]',
+      content: "You're in! Let's get your company online. Set up your first billboard site — it's quick.",
       disableBeacon: true,
-      placement: "center",
+      placement: "right",
       title: "Welcome to OH!Plus",
     },
     {
@@ -37,14 +37,25 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
   useEffect(() => {
     console.log("OnboardingTour: useEffect triggered with startTour:", startTour)
     if (startTour) {
-      console.log("OnboardingTour: Starting tour - setting run to true")
+      console.log("OnboardingTour: Starting tour - checking for target element")
 
-      // Check if target elements exist
-      const inventoryLink = document.querySelector('[data-tour-id="inventory-link"]')
-      console.log("OnboardingTour: Inventory link found:", !!inventoryLink)
+      // Wait for the target element to be available
+      const checkForElement = () => {
+        const inventoryLink = document.querySelector('[data-tour-id="inventory-link"]')
+        console.log("OnboardingTour: Inventory link found:", !!inventoryLink)
 
-      setRun(true)
-      setStepIndex(0)
+        if (inventoryLink) {
+          console.log("OnboardingTour: Target element found, starting tour")
+          setRun(true)
+          setStepIndex(0)
+        } else {
+          console.log("OnboardingTour: Target element not found, retrying in 100ms")
+          setTimeout(checkForElement, 100)
+        }
+      }
+
+      // Small delay to ensure DOM is ready
+      setTimeout(checkForElement, 50)
     } else {
       console.log("OnboardingTour: startTour is false, not starting tour")
     }
@@ -128,8 +139,12 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
       }}
       styles={{
         options: {
-          zIndex: 10000,
+          zIndex: 99999,
           primaryColor: "#2563eb",
+        },
+        overlay: {
+          backgroundColor: "rgba(0, 0, 0, 0.6)",
+          zIndex: 99998,
         },
         tooltip: {
           backgroundColor: "#ffffff",
@@ -176,9 +191,6 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
           background: "transparent",
           border: "none",
           cursor: "pointer",
-        },
-        overlay: {
-          backgroundColor: "rgba(0, 0, 0, 0.6)",
         },
         spotlight: {
           borderRadius: "12px",
