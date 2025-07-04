@@ -1,65 +1,123 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import Joyride, { type CallBackProps, STATUS, ACTIONS } from "react-joyride"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import Joyride, { type CallBackProps, STATUS, type Step } from "react-joyride" // Import Joyride and types
 
-export function OnboardingTour({ triggerTour }: { triggerTour: boolean }) {
+interface OnboardingTourProps {
+  triggerTour: boolean // New prop to explicitly trigger the tour
+}
+
+export function OnboardingTour({ triggerTour }: OnboardingTourProps) {
   const router = useRouter()
-  const [run, setRun] = useState(false)
-  const [steps, setSteps] = useState([
+  const [run, setRun] = useState(false) // Control Joyride's running state
+  const [stepIndex, setStepIndex] = useState(0) // Current step index for Joyride
+  const tourCompletedKey = "onboardingTourCompleted"
+
+  // Define the tour steps
+  const steps: Step[] = [
     {
       target: '[data-tour-id="inventory-link"]',
-      content:
-        "You're in! Let's get your company online. First, navigate to the Inventory section to manage your sites.",
-      placement: "right" as const,
-      disableBeacon: true,
-      spotlightClicks: true,
+      content: "You're in! Let's get your company online. Set up your first billboard site — it's quick.",
+      disableBeacon: true, // Don't show the beacon, start directly
+      placement: "right",
+      styles: {
+        options: {
+          zIndex: 9999,
+        },
+      },
     },
     {
       target: '[data-tour-id="add-site-card"]',
-      content: "Great! Now, click here to add your first billboard site. It's quick and easy!",
-      placement: "bottom" as const,
+      content: "Click here to add your first billboard site.",
       disableBeacon: true,
-      spotlightClicks: true,
+      placement: "bottom",
+      styles: {
+        options: {
+          zIndex: 9999,
+        },
+      },
     },
-  ])
+  ]
 
+  // Effect to trigger the tour based on the new prop
   useEffect(() => {
-    const tourCompletedKey = "onboardingTourCompleted"
-    const tourCompleted = localStorage.getItem(tourCompletedKey)
-
-    if (triggerTour && !tourCompleted) {
-      setRun(true)
-    } else if (tourCompleted) {
-      setRun(false) // Ensure tour doesn't run if already completed
+    if (triggerTour && !localStorage.getItem(tourCompletedKey)) {
+      setRun(true) // Start Joyride
+      setStepIndex(0) // Start from the first step
     }
   }, [triggerTour])
 
-  const handleJoyrideCallback = (data: CallBackProps) => {
-    const { status, action, index } = data
-    const tourCompletedKey = "onboardingTourCompleted"
+  // Joyride callback function to handle tour events
+  const handleJoyrideCallback = useCallback(
+    (data: CallBackProps) => {
+      const { status, index, type } = data
 
-    if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
-      setRun(false)
-      localStorage.setItem(tourCompletedKey, "true")
-    } else if (action === ACTIONS.NEXT && index === 0) {
-      // After the first step (Inventory link), navigate to the inventory page
-      router.push("/admin/inventory")
-    }
-  }
+      if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
+        // End the tour
+        setRun(false)
+        localStorage.setItem(tourCompletedKey, "true")
+      } else if (type === "step:after") {
+        // After a step, advance to the next one
+        setStepIndex(index + 1)
+
+        // If we just finished the first step, navigate to inventory page
+        if (index === 0) {
+          router.push("/admin/inventory")
+        }
+      }
+    },
+    [router],
+  )
 
   return (
     <Joyride
       run={run}
       steps={steps}
+      continuous // Allow continuous progression
+      showProgress // Show progress indicator (e.g., "1 of 2")
+      showSkipButton // Allow skipping the tour
       callback={handleJoyrideCallback}
-      continuous
-      showSkipButton
-      showProgress
+      stepIndex={stepIndex} // Control the current step
+      locale={{
+        back: "Back",
+        close: "Close",
+        last: "Done",
+        next: "Next",
+        skip: "Skip Tour",
+      }}
       styles={{
         options: {
-          zIndex: 10000,
+          zIndex: 9999,
+        },
+        tooltip: {
+          backgroundColor: "white",
+          color: "#333",
+          borderRadius: "8px",
+          padding: "20px",
+          textAlign: "center",
+          fontSize: "16px",
+        },
+        buttonNext: {
+          backgroundColor: "#2563eb", // Blue-600
+          color: "white",
+          borderRadius: "6px",
+          padding: "8px 16px",
+          "&:hover": {
+            backgroundColor: "#1d4ed8", // Blue-700
+          },
+        },
+        buttonBack: {
+          color: "#2563eb",
+        },
+        buttonSkip: {
+          color: "#6b7280", // Gray-500
+        },
+        overlay: {
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+        },
+        spotlight: {
+          borderRadius: "12px", // Match rounded-xl
         },
       }}
     />
