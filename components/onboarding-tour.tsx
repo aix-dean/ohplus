@@ -15,7 +15,6 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
   const pathname = usePathname()
   const [run, setRun] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
-  const [tourActive, setTourActive] = useState(false)
 
   // Define the tour steps
   const steps: Step[] = [
@@ -60,51 +59,64 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
     })
   }
 
-  // Start tour when startTour is true
+  // Check if tour is in progress
+  const isTourInProgress = () => {
+    return localStorage.getItem("onboardingTourInProgress") === "true"
+  }
+
+  // Set tour in progress
+  const setTourInProgress = (inProgress: boolean) => {
+    if (inProgress) {
+      localStorage.setItem("onboardingTourInProgress", "true")
+    } else {
+      localStorage.removeItem("onboardingTourInProgress")
+    }
+  }
+
+  // Main effect to handle tour logic
   useEffect(() => {
-    console.log("OnboardingTour: useEffect triggered with startTour:", startTour)
-    if (startTour && !tourActive) {
-      setTourActive(true)
-      // Add a small delay to ensure DOM is ready
+    console.log("OnboardingTour: Main effect - startTour:", startTour, "pathname:", pathname)
+
+    if (!startTour && !isTourInProgress()) {
+      console.log("OnboardingTour: Tour not started and not in progress")
+      return
+    }
+
+    // If we're on dashboard and tour should start or is in progress
+    if (pathname === "/admin/dashboard" || pathname === "/admin") {
+      console.log("OnboardingTour: On dashboard, starting first step")
+
       setTimeout(async () => {
-        const targetElement = await waitForElement('[data-tour-id="inventory-link"]')
-        console.log("OnboardingTour: Target element found:", targetElement)
-        if (targetElement) {
-          console.log("OnboardingTour: Starting tour - setting run to true")
-          setRun(true)
+        const inventoryLink = await waitForElement('[data-tour-id="inventory-link"]')
+        if (inventoryLink) {
+          console.log("OnboardingTour: Found inventory link, starting tour")
+          setTourInProgress(true)
           setStepIndex(0)
-        } else {
-          console.log("OnboardingTour: Could not find inventory link element")
+          setRun(true)
         }
       }, 500)
     }
-  }, [startTour, tourActive])
-
-  // Handle pathname changes to continue tour on inventory page
-  useEffect(() => {
-    console.log("OnboardingTour: Pathname changed to:", pathname, "tourActive:", tourActive, "stepIndex:", stepIndex)
-
-    if (tourActive && pathname === "/admin/inventory" && stepIndex === 0) {
-      console.log("OnboardingTour: On inventory page, looking for add-site-card")
+    // If we're on inventory page and tour is in progress
+    else if (pathname === "/admin/inventory" && isTourInProgress()) {
+      console.log("OnboardingTour: On inventory page, starting second step")
 
       setTimeout(async () => {
-        const addSiteElement = await waitForElement('[data-tour-id="add-site-card"]')
-
-        if (addSiteElement) {
-          console.log("OnboardingTour: Add site element found, continuing to step 1")
+        const addSiteCard = await waitForElement('[data-tour-id="add-site-card"]')
+        if (addSiteCard) {
+          console.log("OnboardingTour: Found add site card, continuing tour")
           setStepIndex(1)
           setRun(true)
         } else {
-          console.log("OnboardingTour: Add site element not found")
+          console.log("OnboardingTour: Could not find add site card")
         }
       }, 1000)
     }
-  }, [pathname, tourActive, stepIndex])
+  }, [startTour, pathname])
 
   // Log state changes
   useEffect(() => {
-    console.log("OnboardingTour: State changed - run:", run, "stepIndex:", stepIndex, "tourActive:", tourActive)
-  }, [run, stepIndex, tourActive])
+    console.log("OnboardingTour: State changed - run:", run, "stepIndex:", stepIndex)
+  }, [run, stepIndex])
 
   // Handle Joyride callbacks
   const handleJoyrideCallback = useCallback(
@@ -117,7 +129,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
         console.log("OnboardingTour: Tour finished or skipped, status:", status)
         setRun(false)
         setStepIndex(0)
-        setTourActive(false)
+        setTourInProgress(false)
         localStorage.setItem("onboardingTourCompleted", "true")
         console.log("OnboardingTour: Set onboardingTourCompleted to true in localStorage")
         return
@@ -129,9 +141,9 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
         if (index === 0) {
           // After first step, navigate to inventory page
           console.log("OnboardingTour: Navigating to /admin/inventory")
-          setRun(false) // Stop current step
+          setRun(false)
           router.push("/admin/inventory")
-          // The useEffect for pathname will handle continuing the tour
+          // The main useEffect will handle continuing the tour
         } else {
           console.log("OnboardingTour: Moving to next step:", index + 1)
           setStepIndex(index + 1)
@@ -143,15 +155,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
           console.log("OnboardingTour: Navigating back to /admin/dashboard")
           setRun(false)
           router.push("/admin/dashboard")
-
-          setTimeout(async () => {
-            const inventoryElement = await waitForElement('[data-tour-id="inventory-link"]')
-            if (inventoryElement) {
-              console.log("OnboardingTour: Back on dashboard, continuing tour")
-              setStepIndex(0)
-              setRun(true)
-            }
-          }, 1000)
+          // The main useEffect will handle continuing the tour
         } else {
           console.log("OnboardingTour: Moving to previous step:", index - 1)
           setStepIndex(index - 1)
