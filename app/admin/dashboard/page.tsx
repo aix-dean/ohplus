@@ -244,7 +244,20 @@ export default function AdminDashboardPage() {
     <div className="flex-1 p-4 md:p-6">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
+            <Button
+              onClick={() => {
+                localStorage.removeItem("onboardingTourCompleted")
+                setShouldStartOnboardingTour(true)
+              }}
+              variant="outline"
+              size="sm"
+              className="text-xs"
+            >
+              Test Tour
+            </Button>
+          </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-grow">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
