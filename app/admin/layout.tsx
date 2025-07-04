@@ -13,18 +13,11 @@ export default function AdminLayout({
 
   useEffect(() => {
     const tourCompleted = localStorage.getItem("onboardingTourCompleted")
-    const tourTriggered = localStorage.getItem("onboardingTourTriggered")
+    const shouldStartTourFlag = localStorage.getItem("shouldStartOnboardingTour")
 
-    if (!tourCompleted && tourTriggered === "true") {
-      console.log("AdminLayout: Onboarding tour triggered from registration.")
+    if (!tourCompleted && shouldStartTourFlag === "true") {
       setStartOnboardingTour(true)
-      localStorage.removeItem("onboardingTourTriggered") // Consume the flag
-    } else if (tourCompleted) {
-      console.log("AdminLayout: Onboarding tour already completed.")
-      setStartOnboardingTour(false)
-    } else {
-      console.log("AdminLayout: Onboarding tour not triggered or completed.")
-      setStartOnboardingTour(false)
+      localStorage.removeItem("shouldStartOnboardingTour") // Clear the flag
     }
   }, [])
 

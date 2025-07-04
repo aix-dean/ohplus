@@ -6,17 +6,15 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
-import { RegistrationSuccessDialog } from "@/components/registration-success-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FirebaseError } from "firebase/app"
+import { RegistrationSuccessDialog } from "@/components/registration-success-dialog"
 
 export default function RegisterPage() {
   const [step, setStep] = useState(1) // 1 for personal info, 2 for password and company info
-  const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
-  const [registeredFirstName, setRegisteredFirstName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -28,6 +26,7 @@ export default function RegisterPage() {
   const [phoneNumber, setPhoneNumber] = useState("")
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
 
   const { register } = useAuth()
   const router = useRouter()
@@ -94,18 +93,7 @@ export default function RegisterPage() {
         password,
       )
       setErrorMessage(null)
-      setRegisteredFirstName(firstName)
-      setIsSuccessDialogOpen(true)
-      // Clear form fields
-      setEmail("")
-      setPassword("")
-      setConfirmPassword("")
-      setFirstName("")
-      setLastName("")
-      setMiddleName("")
-      setCompanyName("")
-      setCompanyLocation("")
-      setPhoneNumber("")
+      setShowSuccessDialog(true)
     } catch (error: unknown) {
       setErrorMessage(getFriendlyErrorMessage(error))
     } finally {
@@ -114,13 +102,13 @@ export default function RegisterPage() {
   }
 
   const handleStartTour = () => {
-    localStorage.setItem("onboardingTourTriggered", "true") // Set the flag to trigger the tour
-    setIsSuccessDialogOpen(false) // Close the dialog
+    localStorage.setItem("shouldStartOnboardingTour", "true")
+    setShowSuccessDialog(false) // Close the dialog
     router.push("/admin/dashboard") // Navigate to the dashboard
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen items-center justify-center bg-gray-100 dark:bg-gray-950">
       {/* Left Panel - Image and Logo */}
       <div className="relative hidden w-1/2 items-center justify-center bg-gray-900 lg:flex">
         <Image
@@ -157,6 +145,7 @@ export default function RegisterPage() {
                     <Label htmlFor="firstName">First Name</Label>
                     <Input
                       id="firstName"
+                      name="firstName"
                       placeholder="John"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
@@ -167,6 +156,7 @@ export default function RegisterPage() {
                     <Label htmlFor="lastName">Last Name</Label>
                     <Input
                       id="lastName"
+                      name="lastName"
                       placeholder="Doe"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
@@ -178,6 +168,7 @@ export default function RegisterPage() {
                   <Label htmlFor="middleName">Middle Name (Optional)</Label>
                   <Input
                     id="middleName"
+                    name="middleName"
                     placeholder=""
                     value={middleName}
                     onChange={(e) => setMiddleName(e.target.value)}
@@ -187,6 +178,7 @@ export default function RegisterPage() {
                   <Label htmlFor="phoneNumber">Cellphone number</Label>
                   <Input
                     id="phoneNumber"
+                    name="phoneNumber"
                     placeholder="+63 9XX XXX XXXX"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
@@ -197,6 +189,7 @@ export default function RegisterPage() {
                   <Label htmlFor="email">Email Address</Label>
                   <Input
                     id="email"
+                    name="email"
                     type="email"
                     placeholder="m@example.com"
                     value={email}
@@ -216,6 +209,7 @@ export default function RegisterPage() {
                   <Label htmlFor="companyName">Company Name</Label>
                   <Input
                     id="companyName"
+                    name="companyName"
                     placeholder="Acme Corp"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
@@ -226,6 +220,7 @@ export default function RegisterPage() {
                   <Label htmlFor="companyLocation">Company Location</Label>
                   <Input
                     id="companyLocation"
+                    name="companyLocation"
                     placeholder="New York, NY"
                     value={companyLocation}
                     onChange={(e) => setCompanyLocation(e.target.value)}
@@ -236,6 +231,7 @@ export default function RegisterPage() {
                   <Label htmlFor="password">Password</Label>
                   <Input
                     id="password"
+                    name="password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -246,6 +242,7 @@ export default function RegisterPage() {
                   <Label htmlFor="confirmPassword">Confirm password</Label>
                   <Input
                     id="confirmPassword"
+                    name="confirmPassword"
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
@@ -284,11 +281,10 @@ export default function RegisterPage() {
           </div>
         </Card>
       </div>
-
       <RegistrationSuccessDialog
-        isOpen={isSuccessDialogOpen}
-        firstName={registeredFirstName}
-        onClose={() => setIsSuccessDialogOpen(false)}
+        isOpen={showSuccessDialog}
+        firstName={firstName}
+        onClose={() => setShowSuccessDialog(false)}
         onStartTour={handleStartTour}
       />
     </div>
