@@ -41,9 +41,24 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
       setTimeout(() => {
         const targetElement = document.querySelector('[data-tour-id="inventory-link"]')
         console.log("OnboardingTour: Target element found:", targetElement)
-        console.log("OnboardingTour: Starting tour - setting run to true")
-        setRun(true)
-        setStepIndex(0)
+        if (targetElement) {
+          console.log("OnboardingTour: Starting tour - setting run to true")
+          setRun(true)
+          setStepIndex(0)
+        } else {
+          console.log("OnboardingTour: Target element not found, retrying...")
+          // Retry after another delay if element not found
+          setTimeout(() => {
+            const retryElement = document.querySelector('[data-tour-id="inventory-link"]')
+            if (retryElement) {
+              console.log("OnboardingTour: Target element found on retry, starting tour")
+              setRun(true)
+              setStepIndex(0)
+            } else {
+              console.log("OnboardingTour: Target element still not found after retry")
+            }
+          }, 500)
+        }
       }, 100)
     } else {
       console.log("OnboardingTour: startTour is false, not starting tour")
