@@ -1,86 +1,137 @@
 "use client"
 
-import { useState } from "react"
-import Link from "next/link"
-import { Search, ChevronDown, Plus } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useEffect, useState } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
+import { RegistrationSuccessDialog } from "@/components/registration-success-dialog"
+import { OnboardingTour } from "@/components/onboarding-tour"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
+import { Search, ChevronDown, Plus } from "lucide-react"
+import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 
-// Define a type for department data
-interface Department {
-  id: string
-  name: string
-  headerColor: string // Tailwind class name for header background
-  contentBgColor: string // New: Tailwind class name for content background
-  members: string[]
-  metricLabel?: string
-  metricValue?: string
-  badgeCount?: number
-  href?: string // Optional link for the card
-}
-
-// Department Card Component
-function DepartmentCard({
-  department,
-}: {
-  department: Department
-}) {
-  const cardContent = (
-    <>
-      <CardHeader className={cn("relative p-4 rounded-t-lg", department.headerColor)}>
-        <CardTitle className="text-white text-lg font-semibold flex justify-between items-center">
-          {department.name}
-          {department.badgeCount !== undefined && (
-            <Badge className="bg-white text-gray-800 rounded-full px-2 py-0.5 text-xs font-bold">
-              {department.badgeCount}
-            </Badge>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent
-        className={cn("p-4 rounded-b-lg flex flex-col justify-between flex-grow", department.contentBgColor)}
-      >
-        <div>
-          {department.members.map((member, index) => (
-            <p key={index} className="text-sm text-gray-700 flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-green-500" />
-              {member}
-            </p>
-          ))}
-          {department.metricLabel && department.metricValue && (
-            <div className="mt-4 text-sm">
-              <p className="text-gray-500">{department.metricLabel}</p>
-              <p className="font-bold text-gray-800">{department.metricValue}</p>
-            </div>
-          )}
-        </div>
-        <Button variant="outline" className="mt-4 w-full bg-transparent">
-          <Plus className="mr-2 h-4 w-4" /> Add Widget
-        </Button>
-      </CardContent>
-    </>
-  )
-
-  if (department.href) {
-    return (
-      <Link href={department.href} passHref>
-        <Card className="h-full flex flex-col overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
-          {cardContent}
-        </Card>
-      </Link>
-    )
-  }
-
-  return <Card className="h-full flex flex-col overflow-hidden">{cardContent}</Card>
-}
-
 export default function AdminDashboardPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const { user } = useAuth()
+
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [startTour, setStartTour] = useState(false)
+  const [tourKey, setTourKey] = useState(0)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedDate, setSelectedDate] = useState("Jun 2025")
+
+  useEffect(() => {
+    console.log("Dashboard: useEffect triggered, checking for registered param")
+    const registeredParam = searchParams.get("registered")
+    const dialogShownKey = "registrationSuccessDialogShown"
+
+    if (registeredParam === "true" && !sessionStorage.getItem(dialogShownKey)) {
+      console.log("Dashboard: Showing registration success dialog")
+      setShowSuccessDialog(true)
+      sessionStorage.setItem(dialogShownKey, "true")
+      // Remove the 'registered' query parameter immediately after detecting it
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete("registered")
+      router.replace(newUrl.toString(), undefined, { shallow: true })
+    }
+  }, [searchParams, router])
+
+  const handleCloseSuccessDialog = () => {
+    console.log("Dashboard: Registration success dialog closed, starting tour")
+    setShowSuccessDialog(false)
+    // Start tour after dialog closes
+    setStartTour(true)
+    setTourKey((prev) => prev + 1)
+    console.log("Dashboard: Set startTour to true, tourKey incremented to", tourKey + 1)
+  }
+
+  // Remove handleTestTour
+  // const handleTestTour = () => {
+  //   console.log("Dashboard: Test Tour button clicked")
+  //   // Clear any previous tour completion
+  //   localStorage.removeItem("onboardingTourCompleted")
+  //   console.log("Dashboard: Cleared onboardingTourCompleted from localStorage")
+  //   // Start the tour
+  //   setStartTour(true)
+  //   setTourKey((prev) => {
+  //     const newKey = prev + 1
+  //     console.log("Dashboard: Set startTour to true, tourKey incremented to", newKey)
+  //     return newKey
+  //   })
+  // }
+
+  // Log state changes
+  useEffect(() => {
+    console.log("Dashboard: State changed - startTour:", startTour, "tourKey:", tourKey)
+  }, [startTour, tourKey])
+
+  interface Department {
+    id: string
+    name: string
+    headerColor: string
+    contentBgColor: string
+    members: string[]
+    metricLabel?: string
+    metricValue?: string
+    badgeCount?: number
+    href?: string
+  }
+
+  function DepartmentCard({ department }: { department: Department }) {
+    const cardContent = (
+      <>
+        <CardHeader className={cn("relative p-4 rounded-t-lg", department.headerColor)}>
+          <CardTitle className="text-white text-lg font-semibold flex justify-between items-center">
+            {department.name}
+            {department.badgeCount !== undefined && (
+              <Badge className="bg-white text-gray-800 rounded-full px-2 py-0.5 text-xs font-bold">
+                {department.badgeCount}
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent
+          className={cn("p-4 rounded-b-lg flex flex-col justify-between flex-grow", department.contentBgColor)}
+        >
+          <div>
+            {department.members.map((member, index) => (
+              <p key={index} className="text-sm text-gray-700 flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-green-500" />
+                {member}
+              </p>
+            ))}
+            {department.metricLabel && department.metricValue && (
+              <div className="mt-4 text-sm">
+                <p className="text-gray-500">{department.metricLabel}</p>
+                <p className="font-bold text-gray-800">{department.metricValue}</p>
+              </div>
+            )}
+          </div>
+          <Button variant="outline" className="mt-4 w-full bg-transparent">
+            <Plus className="mr-2 h-4 w-4" /> Add Widget
+          </Button>
+        </CardContent>
+      </>
+    )
+
+    if (department.href) {
+      return (
+        <Link href={department.href} passHref>
+          <Card className="h-full flex flex-col overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
+            {cardContent}
+          </Card>
+        </Link>
+      )
+    }
+
+    return <Card className="h-full flex flex-col overflow-hidden">{cardContent}</Card>
+  }
 
   const departmentData: Department[] = [
     {
@@ -204,11 +255,10 @@ export default function AdminDashboardPage() {
       name: "+ Add New Department",
       headerColor: "bg-department-add-darkgray",
       contentBgColor: "bg-card-content-add",
-      members: [], // No members for this card
+      members: [],
     },
   ]
 
-  // Filter departments based on search term
   const filteredDepartments = departmentData.filter((department) => {
     const lowerCaseSearchTerm = searchTerm.toLowerCase()
     return (
@@ -217,12 +267,15 @@ export default function AdminDashboardPage() {
     )
   })
 
+  console.log("Dashboard: Rendering with startTour:", startTour, "tourKey:", tourKey)
+
   return (
     <div className="flex-1 p-4 md:p-6">
       <div className="flex flex-col gap-6">
-        {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
+          </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-grow">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -252,13 +305,23 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Department Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredDepartments.map((department) => (
-            <DepartmentCard key={department.id} department={department} />
+            <div key={department.id} data-tour-id={department.id === "sales" ? "inventory-link" : undefined}>
+              <DepartmentCard department={department} />
+            </div>
           ))}
         </div>
       </div>
+
+      <RegistrationSuccessDialog
+        isOpen={showSuccessDialog}
+        firstName={user?.first_name || ""}
+        onClose={handleCloseSuccessDialog}
+        onStartTour={handleCloseSuccessDialog}
+      />
+
+      <OnboardingTour key={tourKey} startTour={startTour} />
     </div>
   )
 }
