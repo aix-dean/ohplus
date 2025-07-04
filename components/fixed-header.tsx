@@ -71,11 +71,11 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
         breadcrumbs.push({ label: pageLabel, isPage: true })
       }
     } else if (path.startsWith("/sales/dashboard")) {
-      breadcrumbs.push({ label: "Admin - Dashboard", href: "/admin/dashboard" })
-      breadcrumbs.push({ label: "Sales - Dashboard", isPage: true })
+      breadcrumbs.push({ label: "Admin Dashboard", href: "/admin/dashboard" })
+      breadcrumbs.push({ label: "Sales Dashboard", isPage: true })
     } else if (path.startsWith("/logistics/dashboard")) {
-      breadcrumbs.push({ label: "Admin - Dashboard", href: "/admin/dashboard" })
-      breadcrumbs.push({ label: "Logistics - Dashboard", isPage: true })
+      breadcrumbs.push({ label: "Admin Dashboard", href: "/admin/dashboard" })
+      breadcrumbs.push({ label: "Logistics Dashboard", isPage: true })
     } else if (segments.length === 0) {
       breadcrumbs.push({ label: "Dashboard", isPage: true })
     } else {
@@ -146,7 +146,10 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
 
   const breadcrumbs = getBreadcrumbs(pathname)
 
-  const showAdminBackButton = pathname.startsWith("/admin/") && pathname !== "/admin/dashboard"
+  const showAdminBackButton =
+    (pathname.startsWith("/admin/") && pathname !== "/admin/dashboard") ||
+    pathname.startsWith("/sales/dashboard") ||
+    pathname.startsWith("/logistics/dashboard")
 
   return (
     <header
@@ -185,7 +188,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           {breadcrumbs.map((item, index) => (
             <React.Fragment key={index}>
               <BreadcrumbItem>
-                {item.label === "Admin - Dashboard" && item.href ? (
+                {item.label === "Admin - Dashboard" && item.href && !showAdminBackButton ? (
                   <Link href={item.href} passHref>
                     <Button
                       variant="default"
