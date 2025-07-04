@@ -146,10 +146,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
 
   const breadcrumbs = getBreadcrumbs(pathname)
 
-  const showAdminBackButton =
-    (pathname.startsWith("/admin/") && pathname !== "/admin/dashboard") ||
-    pathname.startsWith("/sales/dashboard") ||
-    pathname.startsWith("/logistics/dashboard")
+  const showAdminBackButton = pathname.startsWith("/admin/") && pathname !== "/admin/dashboard"
 
   return (
     <header
