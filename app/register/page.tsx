@@ -35,10 +35,10 @@ export default function RegisterPage() {
     setIsLoading(true)
 
     // Simulate registration process
-    setTimeout(() => {
-      setIsLoading(false)
-      setShowSuccessDialog(true)
-    }, 2000)
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+
+    setIsLoading(false)
+    setShowSuccessDialog(true)
   }
 
   const handleStartTour = () => {
