@@ -19,9 +19,10 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
   const steps: Step[] = [
     {
       target: '[data-tour-id="inventory-link"]',
-      content: "You're in! Let's get your company online. Set up your first billboard site — it's quick.",
+      content:
+        "You're in! Let's get your company online. Set up your first billboard site — it's quick. Click on Inventory to get started.",
       disableBeacon: true,
-      placement: "bottom",
+      placement: "right",
       title: "Welcome to OH!Plus",
     },
     {
@@ -41,9 +42,24 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
       setTimeout(() => {
         const targetElement = document.querySelector('[data-tour-id="inventory-link"]')
         console.log("OnboardingTour: Target element found:", targetElement)
-        console.log("OnboardingTour: Starting tour - setting run to true")
-        setRun(true)
-        setStepIndex(0)
+        if (targetElement) {
+          console.log("OnboardingTour: Starting tour - setting run to true")
+          setRun(true)
+          setStepIndex(0)
+        } else {
+          console.log("OnboardingTour: Target element not found, retrying...")
+          // Retry after another delay if element not found
+          setTimeout(() => {
+            const retryElement = document.querySelector('[data-tour-id="inventory-link"]')
+            if (retryElement) {
+              console.log("OnboardingTour: Target element found on retry, starting tour")
+              setRun(true)
+              setStepIndex(0)
+            } else {
+              console.log("OnboardingTour: Target element still not found after retry")
+            }
+          }, 500)
+        }
       }, 100)
     } else {
       console.log("OnboardingTour: startTour is false, not starting tour")
@@ -82,7 +98,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
           setTimeout(() => {
             console.log("OnboardingTour: Setting step index to 1 after navigation")
             setStepIndex(1)
-          }, 600)
+          }, 800)
         } else {
           console.log("OnboardingTour: Moving to next step:", index + 1)
           setStepIndex(index + 1)
@@ -96,7 +112,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
           setTimeout(() => {
             console.log("OnboardingTour: Setting step index to 0 after navigation")
             setStepIndex(0)
-          }, 600)
+          }, 800)
         } else {
           console.log("OnboardingTour: Moving to previous step:", index - 1)
           setStepIndex(index - 1)

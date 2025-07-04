@@ -190,6 +190,7 @@ export function SideNavigation() {
                     <Link
                       key={item.href}
                       href={item.href}
+                      data-tour-id={item["data-tour-id"]}
                       className={cn(
                         "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
                         active
