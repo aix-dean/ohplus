@@ -4,10 +4,12 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Joyride, { type CallBackProps, STATUS, type Step } from "react-joyride"
 
-// Removed OnboardingTourProps interface as startTour prop is no longer used
+interface OnboardingTourProps {
+  startTour: boolean
+}
 
-export function OnboardingTour() {
-  console.log("OnboardingTour: Component mounted/re-mounted")
+export function OnboardingTour({ startTour }: OnboardingTourProps) {
+  console.log("OnboardingTour: Component mounted/re-mounted with startTour:", startTour)
 
   const router = useRouter()
   const pathname = usePathname()
@@ -47,66 +49,57 @@ export function OnboardingTour() {
     return []
   }
 
-  // Effect to start tour based on localStorage flags
+  // Start tour effect
   useEffect(() => {
-    const tourCompleted = localStorage.getItem("onboardingTourCompleted")
-    const tourTriggeredByRegistration = localStorage.getItem("onboardingTourTriggeredByRegistration")
+    console.log("OnboardingTour: useEffect triggered with startTour:", startTour, "pathname:", pathname)
 
-    console.log(
-      "OnboardingTour: useEffect triggered. tourCompleted:",
-      tourCompleted,
-      "tourTriggeredByRegistration:",
-      tourTriggeredByRegistration,
-      "pathname:",
-      pathname,
-    )
+    // Check for localStorage flag to start tour
+    const shouldStartTour = localStorage.getItem("startOnboardingTour") === "true"
 
-    if (!tourCompleted && tourTriggeredByRegistration === "true" && pathname === "/admin/dashboard") {
-      console.log("OnboardingTour: Starting tour from registration trigger on dashboard.")
-      localStorage.removeItem("onboardingTourTriggeredByRegistration") // Clear the trigger
+    if ((startTour || shouldStartTour) && pathname === "/admin/dashboard") {
+      // Clear the localStorage flag
+      localStorage.removeItem("startOnboardingTour")
+
+      // Only start on dashboard
       setTimeout(() => {
         const targetElement = document.querySelector('[data-tour-id="inventory-link"]')
+        console.log("OnboardingTour: Dashboard target element found:", targetElement)
         if (targetElement) {
-          console.log("OnboardingTour: Dashboard target element found, starting tour.")
+          console.log("OnboardingTour: Starting dashboard tour")
           setCurrentStep(0)
           setRun(true)
-        } else {
-          console.log("OnboardingTour: Dashboard target element not found, retrying...")
-          // Fallback if element not immediately available
-          setTimeout(() => {
-            const retryElement = document.querySelector('[data-tour-id="inventory-link"]')
-            if (retryElement) {
-              console.log("OnboardingTour: Dashboard target element found on retry, starting tour.")
-              setCurrentStep(0)
-              setRun(true)
-            }
-          }, 500)
         }
       }, 100)
-    } else if (
-      !tourCompleted &&
-      localStorage.getItem("tourShouldContinue") === "true" &&
-      pathname === "/admin/inventory"
-    ) {
-      console.log("OnboardingTour: Continuing tour on inventory page.")
+    }
+  }, [startTour, pathname])
+
+  // Handle pathname changes to continue tour
+  useEffect(() => {
+    console.log("OnboardingTour: Pathname changed to:", pathname)
+
+    // If we're on inventory page and tour should continue
+    if (pathname === "/admin/inventory" && localStorage.getItem("tourShouldContinue") === "true") {
+      console.log("OnboardingTour: Continuing tour on inventory page")
       localStorage.removeItem("tourShouldContinue")
 
+      // Wait for inventory page to load
       const waitForInventoryElement = () => {
         const targetElement = document.querySelector('[data-tour-id="add-site-card"]')
         console.log("OnboardingTour: Checking for inventory target element:", targetElement)
 
         if (targetElement) {
-          console.log("OnboardingTour: Starting inventory tour.")
-          setCurrentStep(0)
+          console.log("OnboardingTour: Starting inventory tour")
+          setCurrentStep(0) // Reset to 0 since we're using inventory steps
           setRun(true)
         } else {
           console.log("OnboardingTour: Inventory target not found, retrying...")
           setTimeout(waitForInventoryElement, 500)
         }
       }
+
       setTimeout(waitForInventoryElement, 1000)
     }
-  }, [pathname]) // Depend on pathname to re-evaluate when route changes
+  }, [pathname])
 
   // Log state changes
   useEffect(() => {
@@ -174,8 +167,8 @@ export function OnboardingTour() {
     pathname,
   )
 
-  // Don't render if no steps for current page or if tour is completed
-  if (currentSteps.length === 0 || localStorage.getItem("onboardingTourCompleted") === "true") {
+  // Don't render if no steps for current page
+  if (currentSteps.length === 0) {
     return null
   }
 

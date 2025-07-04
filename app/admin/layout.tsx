@@ -1,13 +1,27 @@
 "use client"
 
 import type React from "react"
-// OnboardingTour import removed as it's now handled in app/layout.tsx
+import { useState, useEffect } from "react"
+import { OnboardingTour } from "@/components/onboarding-tour"
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // Logic related to startOnboardingTour removed as it's now handled in app/layout.tsx
-  return <>{children}</>
+  const [startOnboardingTour, setStartOnboardingTour] = useState(false)
+
+  useEffect(() => {
+    const tourCompleted = localStorage.getItem("onboardingTourCompleted")
+    if (!tourCompleted) {
+      setStartOnboardingTour(true)
+    }
+  }, [])
+
+  return (
+    <>
+      {children}
+      <OnboardingTour startTour={startOnboardingTour} />
+    </>
+  )
 }
