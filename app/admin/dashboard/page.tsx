@@ -309,7 +309,9 @@ export default function AdminDashboardPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredDepartments.map((department) => (
-            <DepartmentCard key={department.id} department={department} />
+            <div key={department.id} data-tour-id={department.id === "sales" ? "inventory-link" : undefined}>
+              <DepartmentCard department={department} />
+            </div>
           ))}
         </div>
       </div>
