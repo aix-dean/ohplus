@@ -21,7 +21,6 @@ import {
   ChevronRight,
   TrendingUp,
   ClipboardList,
-  ArrowLeft,
 } from "lucide-react"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
@@ -305,21 +304,6 @@ export function SideNavigation() {
                     </Link>
                   )
                 })}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-              <div className="px-3 py-2 border-b border-gray-100">
-                <h3 className="text-sm font-medium text-gray-700">Navigation</h3>
-              </div>
-              <div className="p-1">
-                <Link
-                  href="/admin/dashboard"
-                  className="flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-3 text-gray-500" />
-                  <span className="flex-1">Back to Admin Dashboard</span>
-                </Link>
               </div>
             </div>
 

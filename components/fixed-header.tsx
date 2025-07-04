@@ -188,7 +188,19 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           {breadcrumbs.map((item, index) => (
             <React.Fragment key={index}>
               <BreadcrumbItem>
-                {item.isPage ? (
+                {item.label === "Admin - Dashboard" && item.href && !showAdminBackButton ? (
+                  <Link href={item.href} passHref>
+                    <Button
+                      variant="default"
+                      className="bg-black hover:bg-black/90 text-white rounded-full px-4 py-2 flex items-center gap-1"
+                      asChild
+                    >
+                      <span>
+                        <ChevronLeft className="h-4 w-4" /> Admin
+                      </span>
+                    </Button>
+                  </Link>
+                ) : item.isPage ? (
                   <BreadcrumbPage className="font-normal text-white">{item.label}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>

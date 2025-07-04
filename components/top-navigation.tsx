@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, X, Settings, LogOut, User, Bell } from "lucide-react"
+import { Menu, X, Settings, LogOut, User, Bell, ChevronRight, Home } from "lucide-react"
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
@@ -15,6 +15,7 @@ export function TopNavigation() {
   const pathname = usePathname()
   const router = useRouter()
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [breadcrumbs, setBreadcrumbs] = useState<Array<{ label: string; href: string }>>([])
 
   const { user, userData, signOut } = useAuth()
   const { unreadCount } = useUnreadMessages()
@@ -58,6 +59,45 @@ export function TopNavigation() {
       document.body.style.overflow = ""
     }
   }, [isOpen])
+
+  // Track navigation history for breadcrumbs
+  useEffect(() => {
+    const updateBreadcrumbs = () => {
+      const segments = pathname.split("/").filter(Boolean)
+      const crumbs: Array<{ label: string; href: string }> = []
+
+      // Always start with Dashboard
+      crumbs.push({ label: "Dashboard", href: "/" })
+
+      if (segments.length > 0) {
+        let currentPath = ""
+
+        segments.forEach((segment, index) => {
+          currentPath += `/${segment}`
+
+          if (segment === "admin") {
+            crumbs.push({ label: "Admin", href: "/admin/dashboard" })
+          } else if (segment === "sales") {
+            crumbs.push({ label: "Sales", href: "/sales/dashboard" })
+          } else if (segment === "logistics") {
+            crumbs.push({ label: "Logistics", href: "/logistics/dashboard" })
+          } else if (segment === "cms") {
+            crumbs.push({ label: "CMS", href: "/cms/dashboard" })
+          } else if (segment === "dashboard" && index > 0) {
+            // Skip dashboard segment as it's already handled by the parent
+          } else if (segment !== "dashboard") {
+            // Handle other segments
+            const label = segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, " ")
+            crumbs.push({ label, href: currentPath })
+          }
+        })
+      }
+
+      setBreadcrumbs(crumbs)
+    }
+
+    updateBreadcrumbs()
+  }, [pathname])
 
   const getPageTitle = (path: string) => {
     const segments = path.split("/").filter(Boolean)
@@ -165,7 +205,33 @@ export function TopNavigation() {
         <div className="top-nav-content">
           <div className="top-nav-left">
             <div className="top-nav-logo flex items-center">
-              <h1 className="text-xl font-semibold text-white">{pageTitle}</h1>
+              <div className="flex items-center space-x-2">
+                {breadcrumbs.length > 1 ? (
+                  <nav className="flex items-center space-x-2 text-white">
+                    {breadcrumbs.map((crumb, index) => (
+                      <div key={crumb.href} className="flex items-center">
+                        {index === 0 ? (
+                          <Home className="h-4 w-4 mr-1" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 mx-1 text-white/60" />
+                        )}
+                        {index === breadcrumbs.length - 1 ? (
+                          <span className="text-xl font-semibold">{crumb.label}</span>
+                        ) : (
+                          <button
+                            onClick={() => router.push(crumb.href)}
+                            className="text-lg font-medium hover:text-white/80 transition-colors"
+                          >
+                            {crumb.label}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </nav>
+                ) : (
+                  <h1 className="text-xl font-semibold text-white">{pageTitle}</h1>
+                )}
+              </div>
             </div>
             <div className="top-nav-links hidden md:flex"></div>
           </div>
