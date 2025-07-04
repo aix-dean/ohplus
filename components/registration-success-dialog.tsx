@@ -13,6 +13,8 @@ interface RegistrationSuccessDialogProps {
 
 export function RegistrationSuccessDialog({ isOpen, firstName, onClose, onStartTour }: RegistrationSuccessDialogProps) {
   const handleStart = () => {
+    // Set flag to start onboarding tour
+    localStorage.setItem("startOnboardingTour", "true")
     onStartTour() // Call the function passed from the parent (which will handle closing the dialog and triggering the tour)
   }
 

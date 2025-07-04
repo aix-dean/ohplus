@@ -53,7 +53,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
   useEffect(() => {
     console.log("OnboardingTour: useEffect triggered with startTour:", startTour, "pathname:", pathname)
 
-    // Check for localStorage trigger from registration
+    // Check for localStorage trigger from registration success dialog
     const shouldStartTour = localStorage.getItem("startOnboardingTour") === "true"
 
     if ((startTour || shouldStartTour) && pathname === "/admin/dashboard") {
