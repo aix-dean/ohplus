@@ -59,23 +59,6 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
     })
   }
 
-  // Get current tour step from localStorage
-  const getCurrentTourStep = () => {
-    const step = localStorage.getItem("onboardingTourStep")
-    console.log("OnboardingTour: Getting current tour step from localStorage:", step)
-    return step ? Number.parseInt(step, 10) : -1
-  }
-
-  // Set current tour step in localStorage
-  const setCurrentTourStep = (step: number) => {
-    console.log("OnboardingTour: Setting current tour step in localStorage:", step)
-    if (step >= 0) {
-      localStorage.setItem("onboardingTourStep", step.toString())
-    } else {
-      localStorage.removeItem("onboardingTourStep")
-    }
-  }
-
   // Check if tour is completed
   const isTourCompleted = () => {
     return localStorage.getItem("onboardingTourCompleted") === "true"
@@ -90,43 +73,39 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
       return
     }
 
-    const currentStep = getCurrentTourStep()
-    console.log("OnboardingTour: Current step from localStorage:", currentStep)
-
-    // Initialize tour if startTour is true and no step is set
-    if (startTour && currentStep === -1) {
-      console.log("OnboardingTour: Initializing tour")
-      setCurrentTourStep(0)
+    if (!startTour) {
+      console.log("OnboardingTour: startTour is false, not starting")
+      return
     }
 
-    // Handle tour based on current page and step
-    const effectiveStep = startTour && currentStep === -1 ? 0 : currentStep
-    console.log("OnboardingTour: Effective step:", effectiveStep)
+    // Check current tour step from localStorage
+    const currentStep = localStorage.getItem("onboardingTourStep")
+    const tourStep = currentStep ? Number.parseInt(currentStep, 10) : 0
+    console.log("OnboardingTour: Current tour step:", tourStep)
 
-    if (effectiveStep >= 0) {
-      if ((pathname === "/admin/dashboard" || pathname === "/admin") && effectiveStep === 0) {
-        console.log("OnboardingTour: On dashboard, showing step 0")
-        setTimeout(async () => {
-          const inventoryLink = await waitForElement('[data-tour-id="inventory-link"]')
-          if (inventoryLink) {
-            console.log("OnboardingTour: Found inventory link, starting tour")
-            setStepIndex(0)
-            setRun(true)
-          }
-        }, 300)
-      } else if (pathname === "/admin/inventory" && effectiveStep === 1) {
-        console.log("OnboardingTour: On inventory page, showing step 1")
-        setTimeout(async () => {
-          const addSiteCard = await waitForElement('[data-tour-id="add-site-card"]')
-          if (addSiteCard) {
-            console.log("OnboardingTour: Found add site card, showing step 1")
-            setStepIndex(1)
-            setRun(true)
-          } else {
-            console.log("OnboardingTour: Could not find add site card")
-          }
-        }, 800)
-      }
+    // Handle tour based on current page and step
+    if ((pathname === "/admin/dashboard" || pathname === "/admin") && tourStep === 0) {
+      console.log("OnboardingTour: On dashboard, starting step 0")
+      setTimeout(async () => {
+        const inventoryLink = await waitForElement('[data-tour-id="inventory-link"]')
+        if (inventoryLink) {
+          console.log("OnboardingTour: Found inventory link, starting tour")
+          setStepIndex(0)
+          setRun(true)
+        }
+      }, 500)
+    } else if (pathname === "/admin/inventory" && tourStep === 1) {
+      console.log("OnboardingTour: On inventory page, starting step 1")
+      setTimeout(async () => {
+        const addSiteCard = await waitForElement('[data-tour-id="add-site-card"]')
+        if (addSiteCard) {
+          console.log("OnboardingTour: Found add site card, showing step 1")
+          setStepIndex(1)
+          setRun(true)
+        } else {
+          console.log("OnboardingTour: Could not find add site card")
+        }
+      }, 1000)
     }
   }, [startTour, pathname])
 
@@ -146,7 +125,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
         console.log("OnboardingTour: Tour finished or skipped, status:", status)
         setRun(false)
         setStepIndex(0)
-        setCurrentTourStep(-1)
+        localStorage.removeItem("onboardingTourStep")
         localStorage.setItem("onboardingTourCompleted", "true")
         console.log("OnboardingTour: Set onboardingTourCompleted to true in localStorage")
         return
@@ -158,7 +137,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
         if (index === 0) {
           // After first step, navigate to inventory page
           console.log("OnboardingTour: Moving to step 1, navigating to /admin/inventory")
-          setCurrentTourStep(1)
+          localStorage.setItem("onboardingTourStep", "1")
           setRun(false)
           router.push("/admin/inventory")
         } else {
@@ -170,7 +149,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
         if (index === 1) {
           // Going back from inventory to dashboard
           console.log("OnboardingTour: Moving to step 0, navigating back to /admin/dashboard")
-          setCurrentTourStep(0)
+          localStorage.setItem("onboardingTourStep", "0")
           setRun(false)
           router.push("/admin/dashboard")
         } else {
