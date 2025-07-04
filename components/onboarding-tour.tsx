@@ -34,8 +34,8 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
     },
   ]
 
-  // Helper function to wait for element to appear
-  const waitForElement = (selector: string, maxAttempts = 10, delay = 300): Promise<Element | null> => {
+  // Helper function to wait for element to appear and be visible
+  const waitForElement = (selector: string, maxAttempts = 20, delay = 500): Promise<Element | null> => {
     return new Promise((resolve) => {
       let attempts = 0
 
@@ -43,7 +43,9 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
         const element = document.querySelector(selector)
         console.log(`OnboardingTour: Attempt ${attempts + 1} to find element ${selector}:`, element)
 
-        if (element) {
+        // Check if element exists and is visible
+        if (element && element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0) {
+          console.log(`OnboardingTour: Element ${selector} found and visible`)
           resolve(element)
         } else if (attempts < maxAttempts) {
           attempts++
@@ -109,21 +111,36 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
           setRun(false) // Stop the tour temporarily
           router.push("/admin/inventory")
 
-          // Wait for navigation and element to appear
+          // Wait longer for navigation and page load
           setTimeout(async () => {
             console.log("OnboardingTour: Waiting for add-site-card element after navigation")
-            const addSiteElement = await waitForElement('[data-tour-id="add-site-card"]', 15, 400)
+
+            // First wait for the page to not be loading
+            let loadingSpinner = document.querySelector(".animate-spin")
+            let attempts = 0
+            while (loadingSpinner && attempts < 30) {
+              console.log("OnboardingTour: Page still loading, waiting...")
+              await new Promise((resolve) => setTimeout(resolve, 500))
+              loadingSpinner = document.querySelector(".animate-spin")
+              attempts++
+            }
+
+            console.log("OnboardingTour: Loading complete, looking for add-site-card")
+            const addSiteElement = await waitForElement('[data-tour-id="add-site-card"]', 20, 500)
 
             if (addSiteElement) {
               console.log("OnboardingTour: Add site element found, continuing tour")
-              setStepIndex(1)
-              setRun(true) // Restart the tour
+              // Small delay to ensure element is fully rendered
+              setTimeout(() => {
+                setStepIndex(1)
+                setRun(true) // Restart the tour
+              }, 300)
             } else {
               console.log("OnboardingTour: Add site element not found, ending tour")
               setRun(false)
               localStorage.setItem("onboardingTourCompleted", "true")
             }
-          }, 1000)
+          }, 1500)
         } else {
           console.log("OnboardingTour: Moving to next step:", index + 1)
           setStepIndex(index + 1)
@@ -142,8 +159,10 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
 
             if (inventoryElement) {
               console.log("OnboardingTour: Inventory link element found, continuing tour")
-              setStepIndex(0)
-              setRun(true) // Restart the tour
+              setTimeout(() => {
+                setStepIndex(0)
+                setRun(true) // Restart the tour
+              }, 300)
             } else {
               console.log("OnboardingTour: Inventory link element not found, ending tour")
               setRun(false)
