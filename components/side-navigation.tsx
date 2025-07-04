@@ -21,9 +21,11 @@ import {
   Handshake,
   HelpCircle,
   LogOut,
-  X,
+  Package2,
+  ChevronUp,
 } from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
 import {
   Sidebar,
   SidebarContent,
@@ -37,16 +39,18 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarSeparator,
-  useSidebar,
 } from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
-import { usePermission, useIsAdmin } from "@/hooks/use-permissions" // Corrected import
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useAuth } from "@/contexts/auth-context"
+import { usePermission, useIsAdmin } from "@/hooks/use-permissions"
+import { useUnreadMessagesAdvanced } from "@/hooks/use-unread-messages-advanced"
 
 export function SideNavigation() {
   const pathname = usePathname()
-  const { isMobile, openMobile, setOpenMobile } = useSidebar()
+  const { user, logout } = useAuth()
   const { isAdmin, loading: isAdminLoading } = useIsAdmin()
+  const { unreadCount: unreadSalesChatCount } = useUnreadMessagesAdvanced("sales-chat")
+  const { unreadCount: unreadAssistantChatCount } = useUnreadMessagesAdvanced("assistant-chat")
 
   // Permissions for various modules
   const { hasAccess: canViewAdminDashboard } = usePermission("view_dashboard", "admin", "view")
@@ -77,6 +81,8 @@ export function SideNavigation() {
   const { hasAccess: canViewCMSPlanner } = usePermission("view_planner", "cms", "view")
   const { hasAccess: canViewAccountSettings } = usePermission("view_account_settings", "settings", "view")
   const { hasAccess: canViewHelp } = usePermission("view_help", "help", "view")
+
+  const isLinkActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`)
 
   const navigationItems = React.useMemo(
     () => [
@@ -202,6 +208,7 @@ export function SideNavigation() {
             href: "/sales/chat",
             active: pathname.startsWith("/sales/chat"),
             visible: canViewSalesChat,
+            badge: unreadSalesChatCount,
           },
           {
             title: "Planner",
@@ -290,6 +297,7 @@ export function SideNavigation() {
             href: "/ai-assistant",
             active: pathname.startsWith("/ai-assistant"),
             visible: canViewAIAssistant,
+            badge: unreadAssistantChatCount,
           },
         ],
       },
@@ -317,6 +325,7 @@ export function SideNavigation() {
             href: "/logout", // Assuming a logout route
             active: false,
             visible: true,
+            onClick: logout, // Add logout handler
           },
         ],
       },
@@ -352,6 +361,9 @@ export function SideNavigation() {
       canViewCMSPlanner,
       canViewAccountSettings,
       canViewHelp,
+      unreadSalesChatCount,
+      unreadAssistantChatCount,
+      logout,
     ],
   )
 
@@ -359,20 +371,17 @@ export function SideNavigation() {
     return null // Or a loading spinner
   }
 
-  const sidebarContent = (
-    <>
+  // The Sidebar component from components/ui/sidebar already handles the mobile/desktop logic
+  // and uses useSidebar internally. So, we just render it directly.
+  return (
+    <Sidebar collapsible="icon" side="left">
       <SidebarHeader className="p-2">
         <div className="flex items-center justify-between">
           <Link href="/admin/dashboard" className="flex items-center gap-2 font-semibold">
-            <Package className="h-6 w-6" />
+            <Package2 className="h-6 w-6" />
             <span className="text-lg">ERP v2</span>
           </Link>
-          {isMobile && (
-            <Button variant="ghost" size="icon" onClick={() => setOpenMobile(false)}>
-              <X className="h-5 w-5" />
-              <span className="sr-only">Close sidebar</span>
-            </Button>
-          )}
+          {/* The close button for mobile sheet is handled by Sidebar component itself */}
         </div>
       </SidebarHeader>
       <SidebarSeparator />
@@ -393,10 +402,16 @@ export function SideNavigation() {
                                 asChild
                                 isActive={item.active}
                                 {...(item["data-tour-id"] && { "data-tour-id": item["data-tour-id"] })}
+                                onClick={item.onClick} // Pass onClick handler
                               >
                                 <Link href={item.href}>
                                   <item.icon className="h-4 w-4" />
                                   <span>{item.title}</span>
+                                  {item.badge !== undefined && item.badge > 0 && (
+                                    <Badge className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-full">
+                                      {item.badge}
+                                    </Badge>
+                                  )}
                                 </Link>
                               </SidebarMenuButton>
                             </SidebarMenuItem>
@@ -411,25 +426,35 @@ export function SideNavigation() {
         )}
       </SidebarContent>
       <SidebarFooter className="p-2">
-        {/* Add any footer content here, e.g., user profile, version info */}
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton>
+                  <Users /> {user?.email || "Guest"}
+                  <ChevronUp className="ml-auto" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" className="w-[--radix-popper-anchor-width]">
+                <DropdownMenuItem asChild>
+                  <Link href="/account">
+                    <span>Account</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings">
+                    <span>Settings</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={logout}>
+                  <span>Sign out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
-    </>
-  )
-
-  return (
-    <>
-      {isMobile ? (
-        <Sheet open={openMobile} onOpenChange={setOpenMobile}>
-          <SheetContent side="left" className="p-0 w-[--sidebar-width-mobile] bg-sidebar text-sidebar-foreground">
-            {sidebarContent}
-          </SheetContent>
-        </Sheet>
-      ) : (
-        <Sidebar collapsible="icon" side="left">
-          {sidebarContent}
-          <SidebarRail />
-        </Sidebar>
-      )}
-    </>
+      <SidebarRail />
+    </Sidebar>
   )
 }
