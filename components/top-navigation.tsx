@@ -16,6 +16,7 @@ export function TopNavigation() {
   const router = useRouter()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [breadcrumbs, setBreadcrumbs] = useState<Array<{ label: string; href: string }>>([])
+  const [navigationHistory, setNavigationHistory] = useState<string[]>([])
 
   const { user, userData, signOut } = useAuth()
   const { unreadCount } = useUnreadMessages()
@@ -60,43 +61,103 @@ export function TopNavigation() {
     }
   }, [isOpen])
 
-  // Track navigation history for breadcrumbs
+  // Track navigation history and build breadcrumbs
   useEffect(() => {
     const updateBreadcrumbs = () => {
       const segments = pathname.split("/").filter(Boolean)
       const crumbs: Array<{ label: string; href: string }> = []
 
-      if (segments.length > 0) {
-        let currentPath = ""
+      // Update navigation history
+      setNavigationHistory((prev) => {
+        const newHistory = [...prev]
 
-        segments.forEach((segment, index) => {
-          currentPath += `/${segment}`
+        // Only add to history if it's a different section
+        const currentSection = segments[0]
+        const lastSection = newHistory.length > 0 ? newHistory[newHistory.length - 1] : null
 
-          if (segment === "admin") {
-            crumbs.push({ label: "Admin", href: "/admin/dashboard" })
-          } else if (segment === "sales") {
-            crumbs.push({ label: "Sales", href: "/sales/dashboard" })
-          } else if (segment === "logistics") {
-            crumbs.push({ label: "Logistics", href: "/logistics/dashboard" })
-          } else if (segment === "cms") {
-            crumbs.push({ label: "CMS", href: "/cms/dashboard" })
-          } else if (segment === "dashboard" && index > 0) {
-            // Skip dashboard segment as it's already handled by the parent
-          } else if (segment !== "dashboard") {
-            // Handle other segments
-            const label = segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, " ")
-            crumbs.push({ label, href: currentPath })
-          }
+        if (currentSection && currentSection !== lastSection) {
+          // Remove the current section if it already exists in history to avoid duplicates
+          const filteredHistory = newHistory.filter((section) => section !== currentSection)
+          filteredHistory.push(currentSection)
+
+          // Keep only the last 3 sections for breadcrumbs
+          return filteredHistory.slice(-3)
+        }
+
+        return newHistory
+      })
+
+      // Build breadcrumbs based on navigation history and current location
+      const currentSection = segments[0]
+      const storedHistory = JSON.parse(localStorage.getItem("navigationHistory") || "[]")
+
+      // Get the previous section from history
+      const previousSections = storedHistory.filter((section: string) => section !== currentSection)
+
+      // Add previous sections to breadcrumbs
+      previousSections.forEach((section: string) => {
+        const sectionLabel = section.charAt(0).toUpperCase() + section.slice(1)
+        crumbs.push({
+          label: sectionLabel,
+          href: `/${section}/dashboard`,
         })
-      } else {
-        // Default to Dashboard for root path
-        crumbs.push({ label: "Dashboard", href: "/" })
+      })
+
+      // Add current section
+      if (currentSection) {
+        const currentLabel = currentSection.charAt(0).toUpperCase() + currentSection.slice(1)
+
+        if (segments.length > 1 && segments[1] === "dashboard") {
+          crumbs.push({
+            label: currentLabel,
+            href: `/${currentSection}/dashboard`,
+          })
+        } else if (segments.length > 1) {
+          // Add current section first
+          crumbs.push({
+            label: currentLabel,
+            href: `/${currentSection}/dashboard`,
+          })
+
+          // Add subsection
+          const subsection = segments[1]
+          const subsectionLabel = subsection.charAt(0).toUpperCase() + subsection.slice(1).replace(/-/g, " ")
+          crumbs.push({
+            label: subsectionLabel,
+            href: pathname,
+          })
+        } else {
+          crumbs.push({
+            label: currentLabel,
+            href: pathname,
+          })
+        }
       }
 
       setBreadcrumbs(crumbs)
     }
 
     updateBreadcrumbs()
+  }, [pathname])
+
+  // Store navigation history in localStorage
+  useEffect(() => {
+    const segments = pathname.split("/").filter(Boolean)
+    const currentSection = segments[0]
+
+    if (currentSection && ["admin", "sales", "logistics", "cms"].includes(currentSection)) {
+      const storedHistory = JSON.parse(localStorage.getItem("navigationHistory") || "[]")
+
+      if (!storedHistory.includes(currentSection)) {
+        const newHistory = [...storedHistory, currentSection].slice(-3) // Keep last 3
+        localStorage.setItem("navigationHistory", JSON.stringify(newHistory))
+      } else {
+        // Move current section to end
+        const filteredHistory = storedHistory.filter((section: string) => section !== currentSection)
+        const newHistory = [...filteredHistory, currentSection].slice(-3)
+        localStorage.setItem("navigationHistory", JSON.stringify(newHistory))
+      }
+    }
   }, [pathname])
 
   const getPageTitle = (path: string) => {
@@ -183,10 +244,9 @@ export function TopNavigation() {
   const isLogisticsSection = pathname.startsWith("/logistics")
   const isCmsSection = pathname.startsWith("/cms")
   const isAdminSection = pathname.startsWith("/admin")
-  const isAccountPage = pathname === "/account" // New check for account page
+  const isAccountPage = pathname === "/account"
 
   const navBgColor = isSalesSection ? "bg-[#ff3333]" : "bg-[#0a1433]"
-
   const diagonalBgColor = isSalesSection ? "bg-[#ffcccc]" : "bg-[#38b6ff]"
 
   const handleMobileNavigation = (href: string) => {
@@ -237,13 +297,8 @@ export function TopNavigation() {
           </div>
 
           <div className="top-nav-right flex items-center h-full relative z-20 flex-shrink-0">
-            {" "}
-            {/* Added relative z-20 and flex-shrink-0 */}
-            {/* User controls section (bell and profile) - Conditionally rendered */}
-            {!isAccountPage && ( // Only render if NOT on the account page
+            {!isAccountPage && (
               <div className="flex items-center mr-2 md:mr-8 relative z-10">
-                {" "}
-                {/* Added relative z-10 */}
                 <button
                   className="p-2 rounded-full text-white hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary relative"
                   aria-label="View notifications"
@@ -257,8 +312,6 @@ export function TopNavigation() {
                 </button>
                 {/* Profile dropdown */}
                 <div className="ml-3 relative z-10" ref={profileRef}>
-                  {" "}
-                  {/* Added relative z-10 */}
                   <button
                     type="button"
                     className="max-w-xs bg-white rounded-full flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
@@ -320,8 +373,6 @@ export function TopNavigation() {
             )}
             {/* Date display in the light blue section with adjusted padding */}
             <div className="hidden md:flex items-center justify-end h-full pl-8 pr-8 relative z-10">
-              {" "}
-              {/* Adjusted pl-8 */}
               <span className="text-sm font-medium text-[#0a1433]">{format(currentTime, "MMMM d, yyyy, h:mm a")}</span>
             </div>
             {/* Mobile menu button */}
