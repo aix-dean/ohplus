@@ -71,8 +71,8 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
         breadcrumbs.push({ label: pageLabel, isPage: true })
       }
     } else if (path.startsWith("/sales/dashboard")) {
-      breadcrumbs.push({ label: "Admin Dashboard", href: "/admin/dashboard" })
-      breadcrumbs.push({ label: "Sales Dashboard", isPage: true })
+      breadcrumbs.push({ label: "Admin - Dashboard", href: "/admin/dashboard" })
+      breadcrumbs.push({ label: "Sales - Dashboard", isPage: true })
     } else if (path.startsWith("/logistics/dashboard")) {
       breadcrumbs.push({ label: "Admin - Dashboard", href: "/admin/dashboard" })
       breadcrumbs.push({ label: "Logistics - Dashboard", isPage: true })
@@ -188,7 +188,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           {breadcrumbs.map((item, index) => (
             <React.Fragment key={index}>
               <BreadcrumbItem>
-                {item.label === "Admin - Dashboard" && item.href && !showAdminBackButton ? (
+                {item.label === "Admin - Dashboard" && item.href ? (
                   <Link href={item.href} passHref>
                     <Button
                       variant="default"
