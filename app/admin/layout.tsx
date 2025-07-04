@@ -1,15 +1,13 @@
 "use client"
 
 import type React from "react"
-// Removed OnboardingTour import and related state/effect
+// Removed OnboardingTour import and related state/effect as it's now in root layout
 
-interface AdminLayoutProps {
+export default function AdminLayout({
+  children,
+}: {
   children: React.ReactNode
-}
-
-const AdminLayout = ({ children }: AdminLayoutProps) => {
+}) {
   // Removed startOnboardingTour state and useEffect
   return <>{children}</>
 }
-
-export default AdminLayout

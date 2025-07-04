@@ -1,67 +1,100 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { useSignUp } from "@clerk/nextjs"
+import Image from "next/image"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { RegistrationSuccessDialog } from "@/components/registration-success-dialog"
+import { FirebaseError } from "firebase/app"
+import { RegistrationSuccessDialog } from "@/components/registration-success-dialog" // Import the dialog
 
 export default function RegisterPage() {
-  const { isLoaded, signUp, setActive } = useSignUp()
-  const [emailAddress, setEmailAddress] = useState("")
+  const [step, setStep] = useState(1) // 1 for personal info, 2 for password and company info
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [firstName, setFirstName] = useState("")
-  const [pendingVerification, setPendingVerification] = useState(false)
-  const [code, setCode] = useState("")
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [lastName, setLastName] = useState("")
+  const [middleName, setMiddleName] = useState("")
+  const [companyName, setCompanyName] = useState("")
+  const [companyLocation, setCompanyLocation] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false) // State for success dialog
+
+  const { register } = useAuth()
   const router = useRouter()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!isLoaded) {
-      return
+  const getFriendlyErrorMessage = (error: unknown): string => {
+    console.error("Raw error during registration:", error)
+    if (error instanceof FirebaseError) {
+      switch (error.code) {
+        case "auth/email-already-in-use":
+          return "This email address is already in use. Please use a different email or log in."
+        case "auth/invalid-email":
+          return "The email address is not valid. Please check the format."
+        case "auth/weak-password":
+          return "The password is too weak. Please choose a stronger password (at least 6 characters)."
+        case "auth/operation-not-allowed":
+          return "Email/password accounts are not enabled. Please contact support."
+        case "auth/network-request-failed":
+          return "Network error. Please check your internet connection and try again."
+        default:
+          return "An unexpected error occurred during registration. Please try again."
+      }
     }
-
-    try {
-      await signUp.create({
-        emailAddress,
-        password,
-        firstName,
-      })
-
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" })
-
-      setPendingVerification(true)
-    } catch (err: any) {
-      console.error("Error:", err.errors ? err.errors[0].longMessage : err.message)
-      // You might want to display an error message to the user here
-    }
+    return "An unknown error occurred. Please try again."
   }
 
-  const onPressVerify = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!isLoaded) {
+  const handleNext = () => {
+    setErrorMessage(null)
+    if (!firstName || !lastName || !email || !phoneNumber) {
+      setErrorMessage("Please fill in all required personal information fields.")
+      return
+    }
+    setStep(2)
+  }
+
+  const handleRegister = async () => {
+    setErrorMessage(null)
+
+    if (password !== confirmPassword) {
+      setErrorMessage("Passwords do not match.")
       return
     }
 
+    if (!companyName || !companyLocation) {
+      setErrorMessage("Please fill in all required company information fields.")
+      return
+    }
+
+    setLoading(true)
     try {
-      const completeSignUp = await signUp.attemptEmailAddressVerification({
-        code,
-      })
-      if (completeSignUp.status === "complete") {
-        await setActive({ session: completeSignUp.createdSessionId })
-        setShowSuccessDialog(true) // Show success dialog on successful registration
-      } else {
-        console.error(JSON.stringify(completeSignUp, null, 2))
-      }
-    } catch (err: any) {
-      console.error("Error:", err.errors ? err.errors[0].longMessage : err.message)
-      // You might want to display an error message to the user here
+      await register(
+        {
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          middle_name: middleName,
+          phone_number: phoneNumber,
+          gender: "", // Pass empty string for gender as it's no longer collected
+        },
+        {
+          company_name: companyName,
+          company_location: companyLocation,
+        },
+        password,
+      )
+      setErrorMessage(null)
+      setShowSuccessDialog(true) // Show success dialog on successful registration
+    } catch (error: unknown) {
+      setErrorMessage(getFriendlyErrorMessage(error))
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -72,72 +105,175 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-12 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-3xl font-bold">Register</CardTitle>
-          <CardDescription>Create your account to get started</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {!pendingVerification && (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="firstName">First Name</Label>
-                <Input
-                  id="firstName"
-                  type="text"
-                  placeholder="John"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                />
+    <div className="flex min-h-screen">
+      {/* Left Panel - Image and Logo */}
+      <div className="relative hidden w-1/2 items-center justify-center bg-gray-900 lg:flex">
+        <Image
+          src="/roadside-billboard.png"
+          alt="Background"
+          layout="fill"
+          objectFit="cover"
+          className="absolute inset-0 z-0 opacity-50"
+        />
+        <div className="relative z-10">
+          <Image src="/oh-plus-logo.png" alt="OH! Plus Logo" width={200} height={200} />
+        </div>
+      </div>
+
+      {/* Right Panel - Form */}
+      <div className="flex w-full items-center justify-center bg-white p-8 dark:bg-gray-950 lg:w-1/2">
+        <Card className="w-full max-w-md border-none shadow-none">
+          <CardHeader className="space-y-1 text-left">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-3xl font-bold">
+                {step === 1 ? "Create an Account" : "Set up your password"}
+              </CardTitle>
+              <span className="text-lg font-semibold text-gray-500 dark:text-gray-400">{step}/2</span>
+            </div>
+            <CardDescription className="text-gray-600 dark:text-gray-400">
+              {step === 1 ? "It's free to create one!" : "Make sure you'll remember it!"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {step === 1 && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      placeholder="John"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      placeholder="Doe"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="middleName">Middle Name (Optional)</Label>
+                  <Input
+                    id="middleName"
+                    placeholder=""
+                    value={middleName}
+                    onChange={(e) => setMiddleName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phoneNumber">Cellphone number</Label>
+                  <Input
+                    id="phoneNumber"
+                    placeholder="+63 9XX XXX XXXX"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="m@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={handleNext}>
+                  Next
+                </Button>
               </div>
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  value={emailAddress}
-                  onChange={(e) => setEmailAddress(e.target.value)}
-                  required
-                />
+            )}
+
+            {step === 2 && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="companyName">Company Name</Label>
+                  <Input
+                    id="companyName"
+                    placeholder="Acme Corp"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="companyLocation">Company Location</Label>
+                  <Input
+                    id="companyLocation"
+                    placeholder="New York, NY"
+                    value={companyLocation}
+                    onChange={(e) => setCompanyLocation(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+                  By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
+                  <a href="#" className="text-blue-600 hover:underline">
+                    Terms and Conditions
+                  </a>
+                  ,{" "}
+                  <a href="#" className="text-blue-600 hover:underline">
+                    Privacy Policy
+                  </a>
+                  , and all platform{" "}
+                  <a href="#" className="text-blue-600 hover:underline">
+                    rules and regulations
+                  </a>{" "}
+                  set by OH!Plus.
+                </p>
+                <Button
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  type="submit"
+                  onClick={handleRegister}
+                  disabled={loading}
+                >
+                  {loading ? "Signing Up..." : "Sign Up"}
+                </Button>
               </div>
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+            )}
+
+            {errorMessage && (
+              <div className="text-red-500 text-sm mt-4 text-center" role="alert">
+                {errorMessage}
               </div>
-              <Button type="submit" className="w-full">
-                Register
-              </Button>
-            </form>
-          )}
-          {pendingVerification && (
-            <form onSubmit={onPressVerify} className="space-y-4">
-              <div>
-                <Label htmlFor="code">Email Verification Code</Label>
-                <Input
-                  id="code"
-                  type="text"
-                  placeholder="123456"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full">
-                Verify Email
-              </Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+          <div className="absolute bottom-8 right-8 hidden lg:block">
+            <Image src="/oh-plus-logo.png" alt="OH! Plus Logo" width={80} height={80} />
+          </div>
+        </Card>
+      </div>
 
       <RegistrationSuccessDialog
         isOpen={showSuccessDialog}
