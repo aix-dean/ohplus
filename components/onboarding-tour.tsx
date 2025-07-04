@@ -18,18 +18,20 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
   // Define the tour steps
   const steps: Step[] = [
     {
-      target: '[data-tour-id="inventory-link"]',
-      content: "You're in! Let's get your company online. Set up your first billboard site — it's quick.",
+      target: "body", // Start with body to ensure the tour shows
+      content:
+        "Welcome to OH!Plus! Let's get your company online. We'll show you how to set up your first billboard site — it's quick and easy.",
       disableBeacon: true,
-      placement: "bottom",
+      placement: "center",
       title: "Welcome to OH!Plus",
     },
     {
-      target: '[data-tour-id="add-site-card"]',
-      content: "Click here to add your first billboard site and get started with your inventory management.",
+      target: ".grid.grid-cols-1.sm\\:grid-cols-2", // Target the department cards grid
+      content:
+        "This is your main dashboard where you can access all departments. Let's start by setting up your inventory.",
       disableBeacon: true,
       placement: "top",
-      title: "Add Your First Site",
+      title: "Your Dashboard",
     },
   ]
 
@@ -37,29 +39,9 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
   useEffect(() => {
     console.log("OnboardingTour: useEffect triggered with startTour:", startTour)
     if (startTour) {
-      // Add a small delay to ensure DOM is ready
-      setTimeout(() => {
-        const targetElement = document.querySelector('[data-tour-id="inventory-link"]')
-        console.log("OnboardingTour: Target element found:", targetElement)
-        if (targetElement) {
-          console.log("OnboardingTour: Starting tour - setting run to true")
-          setRun(true)
-          setStepIndex(0)
-        } else {
-          console.log("OnboardingTour: Target element not found, retrying...")
-          // Retry after another delay if element not found
-          setTimeout(() => {
-            const retryElement = document.querySelector('[data-tour-id="inventory-link"]')
-            if (retryElement) {
-              console.log("OnboardingTour: Target element found on retry, starting tour")
-              setRun(true)
-              setStepIndex(0)
-            } else {
-              console.log("OnboardingTour: Target element still not found after retry")
-            }
-          }, 500)
-        }
-      }, 100)
+      console.log("OnboardingTour: Starting tour - setting run to true")
+      setRun(true)
+      setStepIndex(0)
     } else {
       console.log("OnboardingTour: startTour is false, not starting tour")
     }
@@ -89,14 +71,16 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
       // Handle step progression
       if (action === "next") {
         console.log("OnboardingTour: Next button clicked, current index:", index)
-        if (index === 0) {
-          // After first step, navigate to inventory page
+        if (index === 1) {
+          // After second step, navigate to inventory page
           console.log("OnboardingTour: Navigating to /admin/inventory")
           router.push("/admin/inventory")
-          // Wait for navigation then show next step
+          // End the tour after navigation
           setTimeout(() => {
-            console.log("OnboardingTour: Setting step index to 1 after navigation")
-            setStepIndex(1)
+            console.log("OnboardingTour: Ending tour after navigation")
+            setRun(false)
+            setStepIndex(0)
+            localStorage.setItem("onboardingTourCompleted", "true")
           }, 600)
         } else {
           console.log("OnboardingTour: Moving to next step:", index + 1)
@@ -104,18 +88,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
         }
       } else if (action === "prev") {
         console.log("OnboardingTour: Previous button clicked, current index:", index)
-        if (index === 1) {
-          // Going back from inventory to dashboard
-          console.log("OnboardingTour: Navigating back to /admin/dashboard")
-          router.push("/admin/dashboard")
-          setTimeout(() => {
-            console.log("OnboardingTour: Setting step index to 0 after navigation")
-            setStepIndex(0)
-          }, 600)
-        } else {
-          console.log("OnboardingTour: Moving to previous step:", index - 1)
-          setStepIndex(index - 1)
-        }
+        setStepIndex(Math.max(0, index - 1))
       }
     },
     [router],
