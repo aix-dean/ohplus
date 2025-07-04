@@ -16,7 +16,6 @@ export function TopNavigation() {
   const router = useRouter()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [breadcrumbs, setBreadcrumbs] = useState<Array<{ label: string; href: string }>>([])
-  const [navigationHistory, setNavigationHistory] = useState<string[]>([])
 
   const { user, userData, signOut } = useAuth()
   const { unreadCount } = useUnreadMessages()
@@ -61,103 +60,64 @@ export function TopNavigation() {
     }
   }, [isOpen])
 
-  // Track navigation history and build breadcrumbs
+  // Build breadcrumbs based on the current pathname
   useEffect(() => {
     const updateBreadcrumbs = () => {
-      const segments = pathname.split("/").filter(Boolean)
+      const pathSegments = pathname.split("/").filter(Boolean) // e.g., ["admin", "dashboard"] or ["sales", "products", "new"]
       const crumbs: Array<{ label: string; href: string }> = []
 
-      // Update navigation history
-      setNavigationHistory((prev) => {
-        const newHistory = [...prev]
+      // Always start with "Dashboard" linking to the root
+      crumbs.push({ label: "Dashboard", href: "/" })
 
-        // Only add to history if it's a different section
-        const currentSection = segments[0]
-        const lastSection = newHistory.length > 0 ? newHistory[newHistory.length - 1] : null
+      let currentPath = ""
+      pathSegments.forEach((segment, index) => {
+        currentPath += `/${segment}`
 
-        if (currentSection && currentSection !== lastSection) {
-          // Remove the current section if it already exists in history to avoid duplicates
-          const filteredHistory = newHistory.filter((section) => section !== currentSection)
-          filteredHistory.push(currentSection)
+        let label = segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, " ")
+        let href = currentPath
 
-          // Keep only the last 3 sections for breadcrumbs
-          return filteredHistory.slice(-3)
+        // Special handling for main sections (admin, sales, etc.)
+        // If it's a main section and the next segment is 'dashboard',
+        // or if it's just the section itself (e.g., /admin), link to its dashboard.
+        if (["admin", "sales", "logistics", "cms"].includes(segment)) {
+          if (index + 1 < pathSegments.length && pathSegments[index + 1] === "dashboard") {
+            // If the next segment is 'dashboard', the current segment's label is enough,
+            // and its href should point to its dashboard.
+            href = `/${segment}/dashboard`
+            // We will skip adding the "dashboard" segment itself later.
+          } else if (pathSegments.length === 1) {
+            // e.g., /admin
+            href = `/${segment}/dashboard`
+          }
         }
 
-        return newHistory
-      })
-
-      // Build breadcrumbs based on navigation history and current location
-      const currentSection = segments[0]
-      const storedHistory = JSON.parse(localStorage.getItem("navigationHistory") || "[]")
-
-      // Get the previous section from history
-      const previousSections = storedHistory.filter((section: string) => section !== currentSection)
-
-      // Add previous sections to breadcrumbs
-      previousSections.forEach((section: string) => {
-        const sectionLabel = section.charAt(0).toUpperCase() + section.slice(1)
-        crumbs.push({
-          label: sectionLabel,
-          href: `/${section}/dashboard`,
-        })
-      })
-
-      // Add current section
-      if (currentSection) {
-        const currentLabel = currentSection.charAt(0).toUpperCase() + currentSection.slice(1)
-
-        if (segments.length > 1 && segments[1] === "dashboard") {
-          crumbs.push({
-            label: currentLabel,
-            href: `/${currentSection}/dashboard`,
-          })
-        } else if (segments.length > 1) {
-          // Add current section first
-          crumbs.push({
-            label: currentLabel,
-            href: `/${currentSection}/dashboard`,
-          })
-
-          // Add subsection
-          const subsection = segments[1]
-          const subsectionLabel = subsection.charAt(0).toUpperCase() + subsection.slice(1).replace(/-/g, " ")
-          crumbs.push({
-            label: subsectionLabel,
-            href: pathname,
-          })
-        } else {
-          crumbs.push({
-            label: currentLabel,
-            href: pathname,
-          })
+        // Skip adding "dashboard" as a separate crumb if the parent is already a section (e.g., Admin, Sales)
+        if (
+          segment === "dashboard" &&
+          index > 0 &&
+          ["admin", "sales", "logistics", "cms"].includes(pathSegments[index - 1])
+        ) {
+          return // Skip this crumb
         }
+
+        // Handle dynamic segments like [id]
+        if (segment.startsWith("[") && segment.endsWith("]")) {
+          // For simplicity, use a generic label. In a real app, you might fetch the actual name.
+          label = "Details"
+        }
+
+        crumbs.push({ label, href })
+      })
+
+      // If the current path is just "/", the only crumb should be "Dashboard"
+      if (pathname === "/" && crumbs.length > 1) {
+        setBreadcrumbs([{ label: "Dashboard", href: "/" }])
+      } else {
+        setBreadcrumbs(crumbs)
       }
-
-      setBreadcrumbs(crumbs)
     }
 
     updateBreadcrumbs()
-  }, [pathname])
-
-  // Store navigation history in localStorage
-  useEffect(() => {
-    const segments = pathname.split("/").filter(Boolean)
-    const currentSection = segments[0]
-
-    if (currentSection && ["admin", "sales", "logistics", "cms"].includes(currentSection)) {
-      const storedHistory = JSON.parse(localStorage.getItem("navigationHistory") || "[]")
-
-      if (!storedHistory.includes(currentSection)) {
-        const newHistory = [...storedHistory, currentSection].slice(-3) // Keep last 3
-        localStorage.setItem("navigationHistory", JSON.stringify(newHistory))
-      } else {
-        // Move current section to end
-        const filteredHistory = storedHistory.filter((section: string) => section !== currentSection)
-        const newHistory = [...filteredHistory, currentSection].slice(-3)
-        localStorage.setItem("navigationHistory", JSON.stringify(newHistory))
-      }
-    }
   }, [pathname])
 
   const getPageTitle = (path: string) => {
