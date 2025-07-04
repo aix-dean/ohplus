@@ -27,10 +27,12 @@ export default function AdminDashboardPage() {
   const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
   useEffect(() => {
+    console.log("Dashboard: useEffect triggered, checking for registered param")
     const registeredParam = searchParams.get("registered")
     const dialogShownKey = "registrationSuccessDialogShown"
 
     if (registeredParam === "true" && !sessionStorage.getItem(dialogShownKey)) {
+      console.log("Dashboard: Showing registration success dialog")
       setShowSuccessDialog(true)
       sessionStorage.setItem(dialogShownKey, "true")
       // Remove the 'registered' query parameter immediately after detecting it
@@ -41,19 +43,32 @@ export default function AdminDashboardPage() {
   }, [searchParams, router])
 
   const handleCloseSuccessDialog = () => {
+    console.log("Dashboard: Registration success dialog closed, starting tour")
     setShowSuccessDialog(false)
     // Start tour after dialog closes
     setStartTour(true)
     setTourKey((prev) => prev + 1)
+    console.log("Dashboard: Set startTour to true, tourKey incremented to", tourKey + 1)
   }
 
   const handleTestTour = () => {
+    console.log("Dashboard: Test Tour button clicked")
     // Clear any previous tour completion
     localStorage.removeItem("onboardingTourCompleted")
+    console.log("Dashboard: Cleared onboardingTourCompleted from localStorage")
     // Start the tour
     setStartTour(true)
-    setTourKey((prev) => prev + 1)
+    setTourKey((prev) => {
+      const newKey = prev + 1
+      console.log("Dashboard: Set startTour to true, tourKey incremented to", newKey)
+      return newKey
+    })
   }
+
+  // Log state changes
+  useEffect(() => {
+    console.log("Dashboard: State changed - startTour:", startTour, "tourKey:", tourKey)
+  }, [startTour, tourKey])
 
   interface Department {
     id: string
@@ -250,6 +265,8 @@ export default function AdminDashboardPage() {
       department.members.some((member) => member.toLowerCase().includes(lowerCaseSearchTerm))
     )
   })
+
+  console.log("Dashboard: Rendering with startTour:", startTour, "tourKey:", tourKey)
 
   return (
     <div className="flex-1 p-4 md:p-6">

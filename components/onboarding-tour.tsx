@@ -9,6 +9,8 @@ interface OnboardingTourProps {
 }
 
 export function OnboardingTour({ startTour }: OnboardingTourProps) {
+  console.log("OnboardingTour: Component mounted/re-mounted with startTour:", startTour)
+
   const router = useRouter()
   const [run, setRun] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
@@ -33,51 +35,73 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
 
   // Simple effect to start tour when startTour is true
   useEffect(() => {
+    console.log("OnboardingTour: useEffect triggered with startTour:", startTour)
     if (startTour) {
+      console.log("OnboardingTour: Starting tour - setting run to true")
       setRun(true)
       setStepIndex(0)
+    } else {
+      console.log("OnboardingTour: startTour is false, not starting tour")
     }
   }, [startTour])
+
+  // Log state changes
+  useEffect(() => {
+    console.log("OnboardingTour: State changed - run:", run, "stepIndex:", stepIndex)
+  }, [run, stepIndex])
 
   // Handle Joyride callbacks
   const handleJoyrideCallback = useCallback(
     (data: CallBackProps) => {
+      console.log("OnboardingTour: Joyride callback triggered:", data)
       const { status, index, action } = data
 
       // Tour finished or skipped
       if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
+        console.log("OnboardingTour: Tour finished or skipped, status:", status)
         setRun(false)
         setStepIndex(0)
         localStorage.setItem("onboardingTourCompleted", "true")
+        console.log("OnboardingTour: Set onboardingTourCompleted to true in localStorage")
         return
       }
 
       // Handle step progression
       if (action === "next") {
+        console.log("OnboardingTour: Next button clicked, current index:", index)
         if (index === 0) {
           // After first step, navigate to inventory page
+          console.log("OnboardingTour: Navigating to /admin/inventory")
           router.push("/admin/inventory")
           // Wait for navigation then show next step
           setTimeout(() => {
+            console.log("OnboardingTour: Setting step index to 1 after navigation")
             setStepIndex(1)
           }, 600)
         } else {
+          console.log("OnboardingTour: Moving to next step:", index + 1)
           setStepIndex(index + 1)
         }
       } else if (action === "prev") {
+        console.log("OnboardingTour: Previous button clicked, current index:", index)
         if (index === 1) {
           // Going back from inventory to dashboard
+          console.log("OnboardingTour: Navigating back to /admin/dashboard")
           router.push("/admin/dashboard")
           setTimeout(() => {
+            console.log("OnboardingTour: Setting step index to 0 after navigation")
             setStepIndex(0)
           }, 600)
         } else {
+          console.log("OnboardingTour: Moving to previous step:", index - 1)
           setStepIndex(index - 1)
         }
       }
     },
     [router],
   )
+
+  console.log("OnboardingTour: Rendering Joyride with run:", run, "stepIndex:", stepIndex)
 
   return (
     <Joyride
