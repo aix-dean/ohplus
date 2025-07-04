@@ -34,7 +34,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
     },
   ]
 
-  // Helper function to wait for element to appear and be visible
+  // Helper function to wait for element to appear
   const waitForElement = (selector: string, maxAttempts = 20, delay = 500): Promise<Element | null> => {
     return new Promise((resolve) => {
       let attempts = 0
@@ -43,9 +43,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
         const element = document.querySelector(selector)
         console.log(`OnboardingTour: Attempt ${attempts + 1} to find element ${selector}:`, element)
 
-        // Check if element exists and is visible
-        if (element && element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0) {
-          console.log(`OnboardingTour: Element ${selector} found and visible`)
+        if (element) {
           resolve(element)
         } else if (attempts < maxAttempts) {
           attempts++
@@ -108,33 +106,16 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
         if (index === 0) {
           // After first step, navigate to inventory page
           console.log("OnboardingTour: Navigating to /admin/inventory")
-          setRun(false) // Stop the tour temporarily
           router.push("/admin/inventory")
 
-          // Wait longer for navigation and page load
+          // Wait for navigation and element to appear, then continue tour
           setTimeout(async () => {
             console.log("OnboardingTour: Waiting for add-site-card element after navigation")
-
-            // First wait for the page to not be loading
-            let loadingSpinner = document.querySelector(".animate-spin")
-            let attempts = 0
-            while (loadingSpinner && attempts < 30) {
-              console.log("OnboardingTour: Page still loading, waiting...")
-              await new Promise((resolve) => setTimeout(resolve, 500))
-              loadingSpinner = document.querySelector(".animate-spin")
-              attempts++
-            }
-
-            console.log("OnboardingTour: Loading complete, looking for add-site-card")
-            const addSiteElement = await waitForElement('[data-tour-id="add-site-card"]', 20, 500)
+            const addSiteElement = await waitForElement('[data-tour-id="add-site-card"]')
 
             if (addSiteElement) {
-              console.log("OnboardingTour: Add site element found, continuing tour")
-              // Small delay to ensure element is fully rendered
-              setTimeout(() => {
-                setStepIndex(1)
-                setRun(true) // Restart the tour
-              }, 300)
+              console.log("OnboardingTour: Add site element found, moving to step 1")
+              setStepIndex(1)
             } else {
               console.log("OnboardingTour: Add site element not found, ending tour")
               setRun(false)
@@ -150,24 +131,20 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
         if (index === 1) {
           // Going back from inventory to dashboard
           console.log("OnboardingTour: Navigating back to /admin/dashboard")
-          setRun(false) // Stop the tour temporarily
           router.push("/admin/dashboard")
 
           setTimeout(async () => {
             console.log("OnboardingTour: Waiting for inventory-link element after navigation back")
-            const inventoryElement = await waitForElement('[data-tour-id="inventory-link"]', 15, 400)
+            const inventoryElement = await waitForElement('[data-tour-id="inventory-link"]')
 
             if (inventoryElement) {
-              console.log("OnboardingTour: Inventory link element found, continuing tour")
-              setTimeout(() => {
-                setStepIndex(0)
-                setRun(true) // Restart the tour
-              }, 300)
+              console.log("OnboardingTour: Inventory link element found, moving to step 0")
+              setStepIndex(0)
             } else {
               console.log("OnboardingTour: Inventory link element not found, ending tour")
               setRun(false)
             }
-          }, 1000)
+          }, 1500)
         } else {
           console.log("OnboardingTour: Moving to previous step:", index - 1)
           setStepIndex(index - 1)
