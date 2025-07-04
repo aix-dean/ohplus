@@ -14,7 +14,7 @@ import { Plus, ArrowUpRight, CreditCard, DollarSign, Users, Activity } from "luc
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/chart-container"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart" // Corrected import path for Chart components
 import { Table, TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
 import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
