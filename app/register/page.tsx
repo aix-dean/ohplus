@@ -1,260 +1,274 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { RegistrationSuccessDialog } from "@/components/registration-success-dialog" // Import the dialog
-import { useAuth } from "@/contexts/auth-context" // Assuming useAuth provides registration function
-import { useToast } from "@/hooks/use-toast" // Assuming useToast for notifications
+import { FirebaseError } from "firebase/app"
+// Removed RegistrationSuccessDialog import as it's no longer rendered here
 
 export default function RegisterPage() {
-  const [step, setStep] = useState(1)
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
+  const [step, setStep] = useState(1) // 1 for personal info, 2 for password and company info
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [middleName, setMiddleName] = useState("")
   const [companyName, setCompanyName] = useState("")
-  const [companyAddress, setCompanyAddress] = useState("")
-  const [contactNumber, setContactNumber] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false) // State to control dialog visibility
+  const [companyLocation, setCompanyLocation] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  // Removed showSuccessDialog and registeredFirstName states
 
+  const { register } = useAuth()
   const router = useRouter()
-  const { register } = useAuth() // Assuming useAuth provides a register function
-  const { toast } = useToast()
+
+  const getFriendlyErrorMessage = (error: unknown): string => {
+    console.error("Raw error during registration:", error)
+    if (error instanceof FirebaseError) {
+      switch (error.code) {
+        case "auth/email-already-in-use":
+          return "This email address is already in use. Please use a different email or log in."
+        case "auth/invalid-email":
+          return "The email address is not valid. Please check the format."
+        case "auth/weak-password":
+          return "The password is too weak. Please choose a stronger password (at least 6 characters)."
+        case "auth/operation-not-allowed":
+          return "Email/password accounts are not enabled. Please contact support."
+        case "auth/network-request-failed":
+          return "Network error. Please check your internet connection and try again."
+        default:
+          return "An unexpected error occurred during registration. Please try again."
+      }
+    }
+    return "An unknown error occurred. Please try again."
+  }
 
   const handleNext = () => {
-    if (step === 1) {
-      if (!firstName || !lastName || !email || !password || !confirmPassword) {
-        toast({
-          title: "Missing Information",
-          description: "Please fill in all required fields for personal details.",
-          variant: "destructive",
-        })
-        return
-      }
-      if (password !== confirmPassword) {
-        toast({
-          title: "Password Mismatch",
-          description: "Passwords do not match. Please try again.",
-          variant: "destructive",
-        })
-        return
-      }
-    } else if (step === 2) {
-      if (!companyName || !companyAddress || !contactNumber) {
-        toast({
-          title: "Missing Information",
-          description: "Please fill in all required fields for company details.",
-          variant: "destructive",
-        })
-        return
-      }
+    setErrorMessage(null)
+    if (!firstName || !lastName || !email || !phoneNumber) {
+      setErrorMessage("Please fill in all required personal information fields.")
+      return
     }
-    setStep(step + 1)
+    setStep(2)
   }
 
-  const handleBack = () => {
-    setStep(step - 1)
-  }
+  const handleRegister = async () => {
+    setErrorMessage(null)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
+    if (password !== confirmPassword) {
+      setErrorMessage("Passwords do not match.")
+      return
+    }
 
+    if (!companyName || !companyLocation) {
+      setErrorMessage("Please fill in all required company information fields.")
+      return
+    }
+
+    setLoading(true)
     try {
-      // Simulate registration API call
-      // Replace with actual API call using `register` from useAuth
-      await new Promise((resolve) => setTimeout(resolve, 1500)) // Simulate network delay
-
-      // Assuming register function takes these parameters
-      // await register({ firstName, lastName, email, password, companyName, companyAddress, contactNumber });
-
-      toast({
-        title: "Registration Successful!",
-        description: "Your account has been created.",
-      })
-
-      setShowSuccessDialog(true) // Show the success dialog
-      // Do NOT redirect here. The dialog will handle the next step.
-    } catch (error) {
-      console.error("Registration error:", error)
-      toast({
-        title: "Registration Failed",
-        description: "An error occurred during registration. Please try again.",
-        variant: "destructive",
-      })
+      await register(
+        {
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          middle_name: middleName,
+          phone_number: phoneNumber,
+          gender: "", // Pass empty string for gender as it's no longer collected
+        },
+        {
+          company_name: companyName,
+          company_location: companyLocation,
+        },
+        password,
+      )
+      setErrorMessage(null)
+      // Redirect to dashboard with query parameters to trigger dialog and tour
+      router.push("/admin/dashboard?registered=true&startTour=true")
+    } catch (error: unknown) {
+      setErrorMessage(getFriendlyErrorMessage(error))
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
-  }
-
-  const handleStartTourFromDialog = () => {
-    setShowSuccessDialog(false) // Close the dialog
-    // Redirect to admin dashboard with startTour=true to trigger the tour
-    router.push("/admin/dashboard?registered=true&startTour=true")
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4 py-8 dark:bg-gray-950">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl">Register</CardTitle>
-          <CardDescription>
-            {step === 1 && "Enter your personal details to create an account."}
-            {step === 2 && "Enter your company details."}
-            {step === 3 && "Review your information and complete registration."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit}>
+    <div className="flex min-h-screen">
+      {/* Left Panel - Image and Logo */}
+      <div className="relative hidden w-1/2 items-center justify-center bg-gray-900 lg:flex">
+        <Image
+          src="/roadside-billboard.png"
+          alt="Background"
+          layout="fill"
+          objectFit="cover"
+          className="absolute inset-0 z-0 opacity-50"
+        />
+        <div className="relative z-10">
+          <Image src="/oh-plus-logo.png" alt="OH! Plus Logo" width={200} height={200} />
+        </div>
+      </div>
+
+      {/* Right Panel - Form */}
+      <div className="flex w-full items-center justify-center bg-white p-8 dark:bg-gray-950 lg:w-1/2">
+        <Card className="w-full max-w-md border-none shadow-none">
+          <CardHeader className="space-y-1 text-left">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-3xl font-bold">
+                {step === 1 ? "Create an Account" : "Set up your password"}
+              </CardTitle>
+              <span className="text-lg font-semibold text-gray-500 dark:text-gray-400">{step}/2</span>
+            </div>
+            <CardDescription className="text-gray-600 dark:text-gray-400">
+              {step === 1 ? "It's free to create one!" : "Make sure you'll remember it!"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             {step === 1 && (
-              <div className="grid gap-4">
+              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="first-name">First Name</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
                     <Input
-                      id="first-name"
+                      id="firstName"
                       placeholder="John"
-                      required
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
+                      required
                     />
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="last-name">Last Name</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
                     <Input
-                      id="last-name"
+                      id="lastName"
                       placeholder="Doe"
-                      required
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
+                      required
                     />
                   </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="middleName">Middle Name (Optional)</Label>
+                  <Input
+                    id="middleName"
+                    placeholder=""
+                    value={middleName}
+                    onChange={(e) => setMiddleName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phoneNumber">Cellphone number</Label>
+                  <Input
+                    id="phoneNumber"
+                    placeholder="+63 9XX XXX XXXX"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
                   <Input
                     id="email"
                     type="email"
                     placeholder="m@example.com"
-                    required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
                     required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="confirm-password">Confirm Password</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    required
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                  />
-                </div>
-                <Button type="button" className="w-full" onClick={handleNext}>
+                <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={handleNext}>
                   Next
                 </Button>
               </div>
             )}
 
             {step === 2 && (
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="company-name">Company Name</Label>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="companyName">Company Name</Label>
                   <Input
-                    id="company-name"
+                    id="companyName"
                     placeholder="Acme Corp"
-                    required
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="company-address">Company Address</Label>
-                  <Input
-                    id="company-address"
-                    placeholder="123 Main St"
                     required
-                    value={companyAddress}
-                    onChange={(e) => setCompanyAddress(e.target.value)}
                   />
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="contact-number">Contact Number</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="companyLocation">Company Location</Label>
                   <Input
-                    id="contact-number"
-                    type="tel"
-                    placeholder="123-456-7890"
+                    id="companyLocation"
+                    placeholder="New York, NY"
+                    value={companyLocation}
+                    onChange={(e) => setCompanyLocation(e.target.value)}
                     required
-                    value={contactNumber}
-                    onChange={(e) => setContactNumber(e.target.value)}
                   />
                 </div>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" className="w-full bg-transparent" onClick={handleBack}>
-                    Back
-                  </Button>
-                  <Button type="button" className="w-full" onClick={handleNext}>
-                    Next
-                  </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+                  By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
+                  <a href="#" className="text-blue-600 hover:underline">
+                    Terms and Conditions
+                  </a>
+                  ,{" "}
+                  <a href="#" className="text-blue-600 hover:underline">
+                    Privacy Policy
+                  </a>
+                  , and all platform{" "}
+                  <a href="#" className="text-blue-600 hover:underline">
+                    rules and regulations
+                  </a>{" "}
+                  set by OH!Plus.
+                </p>
+                <Button
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  type="submit"
+                  onClick={handleRegister}
+                  disabled={loading}
+                >
+                  {loading ? "Signing Up..." : "Sign Up"}
+                </Button>
               </div>
             )}
 
-            {step === 3 && (
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label>Personal Details</Label>
-                  <p className="text-sm text-gray-500">
-                    Name: {firstName} {lastName}
-                  </p>
-                  <p className="text-sm text-gray-500">Email: {email}</p>
-                </div>
-                <div className="grid gap-2">
-                  <Label>Company Details</Label>
-                  <p className="text-sm text-gray-500">Company: {companyName}</p>
-                  <p className="text-sm text-gray-500">Address: {companyAddress}</p>
-                  <p className="text-sm text-gray-500">Contact: {contactNumber}</p>
-                </div>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" className="w-full bg-transparent" onClick={handleBack}>
-                    Back
-                  </Button>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Registering..." : "Complete Registration"}
-                  </Button>
-                </div>
+            {errorMessage && (
+              <div className="text-red-500 text-sm mt-4 text-center" role="alert">
+                {errorMessage}
               </div>
             )}
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Registration Success Dialog */}
-      <RegistrationSuccessDialog
-        isOpen={showSuccessDialog}
-        firstName={firstName}
-        onClose={() => setShowSuccessDialog(false)} // Allow closing without starting tour
-        onStartTour={handleStartTourFromDialog} // This will trigger the navigation and tour
-      />
+          </CardContent>
+          <div className="absolute bottom-8 right-8 hidden lg:block">
+            <Image src="/oh-plus-logo.png" alt="OH! Plus Logo" width={80} height={80} />
+          </div>
+        </Card>
+      </div>
     </div>
   )
 }
