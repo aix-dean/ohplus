@@ -66,34 +66,52 @@ export function TopNavigation() {
       const segments = pathname.split("/").filter(Boolean)
       const crumbs: Array<{ label: string; href: string }> = []
 
-      const currentMainSection = segments[0] // e.g., "admin", "sales"
-      const lastVisitedSection = JSON.parse(localStorage.getItem("lastVisitedSection") || "null")
+      const currentMainSection = segments[0] || ""
+      let historyStack: string[] = JSON.parse(localStorage.getItem("breadcrumbHistory") || "[]")
 
-      // Prepend the previous main section if navigating to a new main section
-      // and the previous section was 'admin' or if we are moving between main sections
-      if (lastVisitedSection && lastVisitedSection !== currentMainSection) {
-        // Only add the previous section if it's a valid main section and not the current one
-        if (["admin", "sales", "logistics", "cms"].includes(lastVisitedSection)) {
-          const prevLabel = lastVisitedSection.charAt(0).toUpperCase() + lastVisitedSection.slice(1)
-          crumbs.push({ label: prevLabel, href: `/${lastVisitedSection}/dashboard` })
+      // Manage history stack
+      if (currentMainSection && ["admin", "sales", "logistics", "cms"].includes(currentMainSection)) {
+        if (historyStack.length === 0) {
+          // First visit to a main section
+          historyStack = [currentMainSection]
+        } else if (historyStack.length === 1) {
+          // From one main section to another
+          if (historyStack[0] !== currentMainSection) {
+            historyStack.push(currentMainSection)
+          }
+        } else if (historyStack.length === 2) {
+          // From A -> B, now navigating to C or back to A
+          if (historyStack[1] === currentMainSection) {
+            // Staying in the same current main section, history remains
+            // e.g., Admin -> Sales -> Sales/Proposals (history: [Admin, Sales])
+          } else if (historyStack[0] === currentMainSection) {
+            // Navigating back to the "parent" main section
+            // e.g., Admin -> Sales -> Admin (history: [Admin])
+            historyStack = [currentMainSection]
+          } else {
+            // Navigating to a completely new third main section
+            // e.g., Admin -> Sales -> Logistics (history: [Sales, Logistics])
+            historyStack = [historyStack[1], currentMainSection]
+          }
         }
-      }
-
-      // Add the current main section
-      if (currentMainSection) {
-        const label = currentMainSection.charAt(0).toUpperCase() + currentMainSection.slice(1)
-        crumbs.push({ label, href: `/${currentMainSection}/dashboard` })
       } else {
-        // For the root path "/", just show "Dashboard"
-        crumbs.push({ label: "Dashboard", href: "/" })
+        // Not in a main section (e.g., root, login, account), clear history
+        historyStack = []
       }
+      localStorage.setItem("breadcrumbHistory", JSON.stringify(historyStack))
 
-      // Add sub-segments, excluding "dashboard" and dynamic IDs
+      // Build breadcrumbs from history stack
+      historyStack.forEach((section) => {
+        const label = section.charAt(0).toUpperCase() + section.slice(1)
+        crumbs.push({ label, href: `/${section}/dashboard` })
+      })
+
+      // Add current sub-segments if any, after the main section
       let currentPathAccumulator = `/${currentMainSection}`
       for (let i = 1; i < segments.length; i++) {
         const segment = segments[i]
         if (segment === "dashboard") {
-          continue // Skip "dashboard"
+          continue // Skip "dashboard" in sub-segments
         }
         if (segment.startsWith("[") && segment.endsWith("]")) {
           // Stop adding segments if it's a dynamic ID (e.g., /sales/proposals/123 -> Sales > Proposals)
@@ -105,23 +123,15 @@ export function TopNavigation() {
         crumbs.push({ label, href: currentPathAccumulator })
       }
 
+      // Special case for root path if no main section is active
+      if (crumbs.length === 0 && pathname === "/") {
+        crumbs.push({ label: "Dashboard", href: "/" })
+      }
+
       setBreadcrumbs(crumbs)
     }
 
     updateBreadcrumbs()
-  }, [pathname])
-
-  // Update last visited section in localStorage
-  useEffect(() => {
-    const segments = pathname.split("/").filter(Boolean)
-    const currentMainSection = segments[0]
-
-    if (currentMainSection && ["admin", "sales", "logistics", "cms"].includes(currentMainSection)) {
-      localStorage.setItem("lastVisitedSection", JSON.stringify(currentMainSection))
-    } else {
-      // Clear last visited section if not in a main section
-      localStorage.removeItem("lastVisitedSection")
-    }
   }, [pathname])
 
   const getPageTitle = (path: string) => {
