@@ -2,24 +2,23 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import Joyride, { type CallBackProps, STATUS, type Step } from "react-joyride" // Import Joyride and types
+import Joyride, { type CallBackProps, STATUS, type Step } from "react-joyride"
 
 interface OnboardingTourProps {
-  triggerTour: boolean // New prop to explicitly trigger the tour
+  triggerTour: boolean
 }
 
 export function OnboardingTour({ triggerTour }: OnboardingTourProps) {
   const router = useRouter()
-  const [run, setRun] = useState(false) // Control Joyride's running state
-  const [stepIndex, setStepIndex] = useState(0) // Current step index for Joyride
+  const [run, setRun] = useState(false)
+  const [stepIndex, setStepIndex] = useState(0)
   const tourCompletedKey = "onboardingTourCompleted"
 
-  // Define the tour steps
   const steps: Step[] = [
     {
       target: '[data-tour-id="inventory-link"]',
       content: "You're in! Let's get your company online. Set up your first billboard site — it's quick.",
-      disableBeacon: true, // Don't show the beacon, start directly
+      disableBeacon: true,
       placement: "right",
       styles: {
         options: {
@@ -43,28 +42,34 @@ export function OnboardingTour({ triggerTour }: OnboardingTourProps) {
   // Effect to trigger the tour based on the new prop
   useEffect(() => {
     if (triggerTour && !localStorage.getItem(tourCompletedKey)) {
-      setRun(true) // Start Joyride
-      setStepIndex(0) // Start from the first step
+      // Add a small delay to ensure the dialog is closed and DOM is ready
+      const timer = setTimeout(() => {
+        setRun(true)
+        setStepIndex(0)
+      }, 100)
+
+      return () => clearTimeout(timer)
     }
   }, [triggerTour])
 
   // Joyride callback function to handle tour events
   const handleJoyrideCallback = useCallback(
     (data: CallBackProps) => {
-      const { status, index, type } = data
+      const { status, index, type, action } = data
 
       if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
-        // End the tour
         setRun(false)
         localStorage.setItem(tourCompletedKey, "true")
-      } else if (type === "step:after") {
-        // After a step, advance to the next one
+        setStepIndex(0)
+      } else if (action === "next" && index === 0) {
+        // When user clicks "Next" on the first step, navigate to inventory
+        router.push("/admin/inventory")
+        // Small delay to allow navigation to complete before showing next step
+        setTimeout(() => {
+          setStepIndex(1)
+        }, 500)
+      } else if (type === "step:after" && index > 0) {
         setStepIndex(index + 1)
-
-        // If we just finished the first step, navigate to inventory page
-        if (index === 0) {
-          router.push("/admin/inventory")
-        }
       }
     },
     [router],
@@ -74,11 +79,11 @@ export function OnboardingTour({ triggerTour }: OnboardingTourProps) {
     <Joyride
       run={run}
       steps={steps}
-      continuous // Allow continuous progression
-      showProgress // Show progress indicator (e.g., "1 of 2")
-      showSkipButton // Allow skipping the tour
+      continuous={true}
+      showProgress={true}
+      showSkipButton={true}
       callback={handleJoyrideCallback}
-      stepIndex={stepIndex} // Control the current step
+      stepIndex={stepIndex}
       locale={{
         back: "Back",
         close: "Close",
@@ -99,25 +104,22 @@ export function OnboardingTour({ triggerTour }: OnboardingTourProps) {
           fontSize: "16px",
         },
         buttonNext: {
-          backgroundColor: "#2563eb", // Blue-600
+          backgroundColor: "#2563eb",
           color: "white",
           borderRadius: "6px",
           padding: "8px 16px",
-          "&:hover": {
-            backgroundColor: "#1d4ed8", // Blue-700
-          },
         },
         buttonBack: {
           color: "#2563eb",
         },
         buttonSkip: {
-          color: "#6b7280", // Gray-500
+          color: "#6b7280",
         },
         overlay: {
           backgroundColor: "rgba(0, 0, 0, 0.5)",
         },
         spotlight: {
-          borderRadius: "12px", // Match rounded-xl
+          borderRadius: "12px",
         },
       }}
     />
