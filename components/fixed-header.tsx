@@ -71,11 +71,11 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
         breadcrumbs.push({ label: pageLabel, isPage: true })
       }
     } else if (path.startsWith("/sales/dashboard")) {
-      breadcrumbs.push({ label: "Admin Dashboard", href: "/admin/dashboard" })
-      breadcrumbs.push({ label: "Sales Dashboard", isPage: true })
+      breadcrumbs.push({ label: "Admin - Dashboard", href: "/admin/dashboard" })
+      breadcrumbs.push({ label: "Sales - Dashboard", isPage: true })
     } else if (path.startsWith("/logistics/dashboard")) {
-      breadcrumbs.push({ label: "Admin Dashboard", href: "/admin/dashboard" })
-      breadcrumbs.push({ label: "Logistics Dashboard", isPage: true })
+      breadcrumbs.push({ label: "Admin - Dashboard", href: "/admin/dashboard" })
+      breadcrumbs.push({ label: "Logistics - Dashboard", isPage: true })
     } else if (segments.length === 0) {
       breadcrumbs.push({ label: "Dashboard", isPage: true })
     } else {
@@ -188,19 +188,7 @@ export function FixedHeader({ onMenuClick, className, ...props }: FixedHeaderPro
           {breadcrumbs.map((item, index) => (
             <React.Fragment key={index}>
               <BreadcrumbItem>
-                {item.label === "Admin - Dashboard" && item.href && !showAdminBackButton ? (
-                  <Link href={item.href} passHref>
-                    <Button
-                      variant="default"
-                      className="bg-black hover:bg-black/90 text-white rounded-full px-4 py-2 flex items-center gap-1"
-                      asChild
-                    >
-                      <span>
-                        <ChevronLeft className="h-4 w-4" /> Admin
-                      </span>
-                    </Button>
-                  </Link>
-                ) : item.isPage ? (
+                {item.isPage ? (
                   <BreadcrumbPage className="font-normal text-white">{item.label}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
