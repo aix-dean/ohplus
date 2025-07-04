@@ -1,38 +1,27 @@
 "use client"
 
 import type React from "react"
-
-import { Sidebar } from "@/components/sidebar"
-import { useUser } from "@clerk/nextjs"
 import { useState, useEffect } from "react"
 import { OnboardingTour } from "@/components/onboarding-tour"
 
-interface AdminLayoutProps {
+export default function AdminLayout({
+  children,
+}: {
   children: React.ReactNode
-}
-
-const AdminLayout = ({ children }: AdminLayoutProps) => {
-  const { userData } = useUser()
+}) {
   const [startOnboardingTour, setStartOnboardingTour] = useState(false)
 
   useEffect(() => {
     const tourCompleted = localStorage.getItem("onboardingTourCompleted")
-    if (!tourCompleted && userData?.email) {
+    if (!tourCompleted) {
       setStartOnboardingTour(true)
     }
-  }, [userData])
+  }, [])
 
   return (
-    <div className="h-full">
-      <div className="hidden md:flex h-full w-56 flex-col fixed inset-y-0 z-50">
-        <Sidebar />
-      </div>
-      <main className="md:pl-56 h-full">
-        {children}
-        <OnboardingTour startTour={startOnboardingTour} />
-      </main>
-    </div>
+    <>
+      {children}
+      <OnboardingTour startTour={startOnboardingTour} />
+    </>
   )
 }
-
-export default AdminLayout
