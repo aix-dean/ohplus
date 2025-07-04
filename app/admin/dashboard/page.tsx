@@ -21,8 +21,8 @@ export default function AdminDashboardPage() {
   const { user } = useAuth()
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [shouldStartOnboardingTour, setShouldStartOnboardingTour] = useState(false)
-  const [tourKey, setTourKey] = useState(0) // New state for the key prop
+  const [startTour, setStartTour] = useState(false)
+  const [tourKey, setTourKey] = useState(0)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
@@ -42,8 +42,17 @@ export default function AdminDashboardPage() {
 
   const handleCloseSuccessDialog = () => {
     setShowSuccessDialog(false)
-    setShouldStartOnboardingTour(true) // Set state to true to trigger the tour
-    setTourKey((prevKey) => prevKey + 1) // Increment key to force remount
+    // Start tour after dialog closes
+    setStartTour(true)
+    setTourKey((prev) => prev + 1)
+  }
+
+  const handleTestTour = () => {
+    // Clear any previous tour completion
+    localStorage.removeItem("onboardingTourCompleted")
+    // Start the tour
+    setStartTour(true)
+    setTourKey((prev) => prev + 1)
   }
 
   interface Department {
@@ -248,16 +257,7 @@ export default function AdminDashboardPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-4">
             <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
-            <Button
-              onClick={() => {
-                localStorage.removeItem("onboardingTourCompleted") // Clear completion state
-                setShouldStartOnboardingTour(true) // Set to true
-                setTourKey((prevKey) => prevKey + 1) // Increment key to force remount
-              }}
-              variant="outline"
-              size="sm"
-              className="text-xs"
-            >
+            <Button onClick={handleTestTour} variant="outline" size="sm" className="text-xs bg-transparent">
               Test Tour
             </Button>
           </div>
@@ -301,10 +301,10 @@ export default function AdminDashboardPage() {
         isOpen={showSuccessDialog}
         firstName={user?.first_name || ""}
         onClose={handleCloseSuccessDialog}
-        onStartTour={handleCloseSuccessDialog} // This will trigger setting shouldStartOnboardingTour to true and incrementing tourKey
+        onStartTour={handleCloseSuccessDialog}
       />
 
-      <OnboardingTour key={tourKey} triggerTour={shouldStartOnboardingTour} />
+      <OnboardingTour key={tourKey} startTour={startTour} />
     </div>
   )
 }

@@ -5,14 +5,13 @@ import { useRouter } from "next/navigation"
 import Joyride, { type CallBackProps, STATUS, type Step } from "react-joyride"
 
 interface OnboardingTourProps {
-  triggerTour: boolean
+  startTour: boolean
 }
 
-export function OnboardingTour({ triggerTour }: OnboardingTourProps) {
+export function OnboardingTour({ startTour }: OnboardingTourProps) {
   const router = useRouter()
   const [run, setRun] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
-  const tourCompletedKey = "onboardingTourCompleted"
 
   // Define the tour steps
   const steps: Step[] = [
@@ -32,28 +31,24 @@ export function OnboardingTour({ triggerTour }: OnboardingTourProps) {
     },
   ]
 
-  // Start tour when triggerTour becomes true, and stop if it becomes false
+  // Simple effect to start tour when startTour is true
   useEffect(() => {
-    const tourCompleted = localStorage.getItem(tourCompletedKey) === "true"
-    if (triggerTour && !tourCompleted) {
+    if (startTour) {
       setRun(true)
-      setStepIndex(0) // Always start from the first step when triggered
-    } else {
-      setRun(false)
-      setStepIndex(0) // Reset step index when tour is not running
+      setStepIndex(0)
     }
-  }, [triggerTour]) // Only depend on triggerTour, as key prop handles remounting
+  }, [startTour])
 
   // Handle Joyride callbacks
   const handleJoyrideCallback = useCallback(
     (data: CallBackProps) => {
-      const { status, index, action, type } = data
+      const { status, index, action } = data
 
       // Tour finished or skipped
       if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
         setRun(false)
         setStepIndex(0)
-        localStorage.setItem(tourCompletedKey, "true")
+        localStorage.setItem("onboardingTourCompleted", "true")
         return
       }
 
