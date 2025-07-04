@@ -21,7 +21,8 @@ export default function AdminDashboardPage() {
   const { user } = useAuth()
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [shouldStartOnboardingTour, setShouldStartOnboardingTour] = useState(false) // New state to explicitly trigger tour
+  const [shouldStartOnboardingTour, setShouldStartOnboardingTour] = useState(false)
+  const [tourKey, setTourKey] = useState(0) // New state for the key prop
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
@@ -42,6 +43,7 @@ export default function AdminDashboardPage() {
   const handleCloseSuccessDialog = () => {
     setShowSuccessDialog(false)
     setShouldStartOnboardingTour(true) // Set state to true to trigger the tour
+    setTourKey((prevKey) => prevKey + 1) // Increment key to force remount
   }
 
   interface Department {
@@ -249,10 +251,8 @@ export default function AdminDashboardPage() {
             <Button
               onClick={() => {
                 localStorage.removeItem("onboardingTourCompleted") // Clear completion state
-                setShouldStartOnboardingTour(false) // Reset state to false
-                setTimeout(() => {
-                  setShouldStartOnboardingTour(true) // Then set to true to trigger useEffect
-                }, 50) // Small delay to ensure state update is processed
+                setShouldStartOnboardingTour(true) // Set to true
+                setTourKey((prevKey) => prevKey + 1) // Increment key to force remount
               }}
               variant="outline"
               size="sm"
@@ -301,10 +301,10 @@ export default function AdminDashboardPage() {
         isOpen={showSuccessDialog}
         firstName={user?.first_name || ""}
         onClose={handleCloseSuccessDialog}
-        onStartTour={handleCloseSuccessDialog} // This will trigger setting shouldStartOnboardingTour to true
+        onStartTour={handleCloseSuccessDialog} // This will trigger setting shouldStartOnboardingTour to true and incrementing tourKey
       />
 
-      <OnboardingTour triggerTour={shouldStartOnboardingTour} />
+      <OnboardingTour key={tourKey} triggerTour={shouldStartOnboardingTour} />
     </div>
   )
 }

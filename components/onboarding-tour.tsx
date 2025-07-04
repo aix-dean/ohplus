@@ -37,13 +37,12 @@ export function OnboardingTour({ triggerTour }: OnboardingTourProps) {
     const tourCompleted = localStorage.getItem(tourCompletedKey) === "true"
     if (triggerTour && !tourCompleted) {
       setRun(true)
-      setStepIndex(0)
-    } else if (!triggerTour && run) {
-      // If triggerTour becomes false while tour is running, stop it
+      setStepIndex(0) // Always start from the first step when triggered
+    } else {
       setRun(false)
-      setStepIndex(0)
+      setStepIndex(0) // Reset step index when tour is not running
     }
-  }, [triggerTour, run]) // Depend on both triggerTour and run
+  }, [triggerTour]) // Only depend on triggerTour, as key prop handles remounting
 
   // Handle Joyride callbacks
   const handleJoyrideCallback = useCallback(
