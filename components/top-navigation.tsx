@@ -67,18 +67,13 @@ export function TopNavigation() {
       const crumbs: Array<{ label: string; href: string }> = []
 
       const currentMainSection = segments[0] // e.g., "admin", "sales"
-
-      // Get the last visited main section from localStorage
       const lastVisitedSection = JSON.parse(localStorage.getItem("lastVisitedSection") || "null")
 
-      // Condition to add the "previous" main section:
-      // Only if we are currently on a dashboard of a *different* main section
-      // AND the current main section is NOT "admin" (to prevent prepending when navigating back to admin)
-      const isCurrentPathADashboard = segments.length === 2 && segments[1] === "dashboard"
-
-      if (isCurrentPathADashboard && lastVisitedSection && lastVisitedSection !== currentMainSection) {
-        if (currentMainSection !== "admin") {
-          // Only prepend if current section is NOT admin
+      // Prepend the previous main section if navigating to a new main section
+      // and the previous section was 'admin' or if we are moving between main sections
+      if (lastVisitedSection && lastVisitedSection !== currentMainSection) {
+        // Only add the previous section if it's a valid main section and not the current one
+        if (["admin", "sales", "logistics", "cms"].includes(lastVisitedSection)) {
           const prevLabel = lastVisitedSection.charAt(0).toUpperCase() + lastVisitedSection.slice(1)
           crumbs.push({ label: prevLabel, href: `/${lastVisitedSection}/dashboard` })
         }
@@ -124,6 +119,7 @@ export function TopNavigation() {
     if (currentMainSection && ["admin", "sales", "logistics", "cms"].includes(currentMainSection)) {
       localStorage.setItem("lastVisitedSection", JSON.stringify(currentMainSection))
     } else {
+      // Clear last visited section if not in a main section
       localStorage.removeItem("lastVisitedSection")
     }
   }, [pathname])
