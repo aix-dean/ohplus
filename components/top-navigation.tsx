@@ -66,9 +66,6 @@ export function TopNavigation() {
       const segments = pathname.split("/").filter(Boolean)
       const crumbs: Array<{ label: string; href: string }> = []
 
-      // Always start with Dashboard
-      crumbs.push({ label: "Dashboard", href: "/" })
-
       if (segments.length > 0) {
         let currentPath = ""
 
@@ -91,6 +88,9 @@ export function TopNavigation() {
             crumbs.push({ label, href: currentPath })
           }
         })
+      } else {
+        // Default to Dashboard for root path
+        crumbs.push({ label: "Dashboard", href: "/" })
       }
 
       setBreadcrumbs(crumbs)
