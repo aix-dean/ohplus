@@ -93,6 +93,10 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
         if (index === 0) {
           // After first step, navigate to inventory page
           console.log("OnboardingTour: Navigating to /admin/inventory")
+
+          // Stop the tour temporarily
+          setRun(false)
+
           router.push("/admin/inventory")
 
           // Wait for navigation and then check for target element
@@ -102,8 +106,10 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
               console.log("OnboardingTour: Checking for add-site-card element:", targetElement)
 
               if (targetElement) {
-                console.log("OnboardingTour: Target element found, proceeding to step 2")
+                console.log("OnboardingTour: Target element found, restarting tour at step 2")
+                // Restart the tour at step 2
                 setStepIndex(1)
+                setRun(true)
               } else {
                 console.log("OnboardingTour: Target element not found, retrying in 500ms")
                 setTimeout(checkElement, 500)
@@ -124,11 +130,20 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
         if (index === 1) {
           // Going back from inventory to dashboard
           console.log("OnboardingTour: Navigating back to /admin/dashboard")
+
+          // Stop the tour temporarily
+          setRun(false)
+
           router.push("/admin/dashboard")
+
           setTimeout(() => {
-            console.log("OnboardingTour: Setting step index to 0 after navigation")
-            setStepIndex(0)
-          }, 800)
+            const targetElement = document.querySelector('[data-tour-id="inventory-link"]')
+            if (targetElement) {
+              console.log("OnboardingTour: Dashboard loaded, restarting tour at step 1")
+              setStepIndex(0)
+              setRun(true)
+            }
+          }, 1000)
         } else {
           console.log("OnboardingTour: Moving to previous step:", index - 1)
           setStepIndex(index - 1)
