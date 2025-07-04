@@ -107,9 +107,13 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
 
               if (targetElement) {
                 console.log("OnboardingTour: Target element found, restarting tour at step 2")
-                // Restart the tour at step 2
+                // Set step index first
                 setStepIndex(1)
-                setRun(true)
+                // Then restart the tour after a small delay to ensure state update
+                setTimeout(() => {
+                  console.log("OnboardingTour: Restarting tour with run=true")
+                  setRun(true)
+                }, 100)
               } else {
                 console.log("OnboardingTour: Target element not found, retrying in 500ms")
                 setTimeout(checkElement, 500)
@@ -141,7 +145,10 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
             if (targetElement) {
               console.log("OnboardingTour: Dashboard loaded, restarting tour at step 1")
               setStepIndex(0)
-              setRun(true)
+              setTimeout(() => {
+                console.log("OnboardingTour: Restarting tour on dashboard with run=true")
+                setRun(true)
+              }, 100)
             }
           }, 1000)
         } else {
