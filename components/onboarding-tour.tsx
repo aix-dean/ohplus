@@ -18,10 +18,10 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
   // Define the tour steps
   const steps: Step[] = [
     {
-      target: '[data-tour-id="inventory-link"]',
-      content: "You're in! Let's get your company online. Set up your first billboard site — it's quick.",
+      target: "body", // Fallback to body if specific element not found
+      content: "Welcome! Let's get your company online. We'll guide you through setting up your first billboard site.",
       disableBeacon: true,
-      placement: "right",
+      placement: "center",
       title: "Welcome to OH!Plus",
     },
     {
@@ -38,6 +38,11 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
     console.log("OnboardingTour: useEffect triggered with startTour:", startTour)
     if (startTour) {
       console.log("OnboardingTour: Starting tour - setting run to true")
+
+      // Check if target elements exist
+      const inventoryLink = document.querySelector('[data-tour-id="inventory-link"]')
+      console.log("OnboardingTour: Inventory link found:", !!inventoryLink)
+
       setRun(true)
       setStepIndex(0)
     } else {
