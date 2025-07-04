@@ -32,18 +32,18 @@ export function OnboardingTour({ triggerTour }: OnboardingTourProps) {
     },
   ]
 
-  // Start tour when triggerTour becomes true
+  // Start tour when triggerTour becomes true, and stop if it becomes false
   useEffect(() => {
-    if (triggerTour && !localStorage.getItem(tourCompletedKey)) {
-      // Small delay to ensure DOM is ready after dialog closes
-      const timer = setTimeout(() => {
-        setRun(true)
-        setStepIndex(0)
-      }, 200)
-
-      return () => clearTimeout(timer)
+    const tourCompleted = localStorage.getItem(tourCompletedKey) === "true"
+    if (triggerTour && !tourCompleted) {
+      setRun(true)
+      setStepIndex(0)
+    } else if (!triggerTour && run) {
+      // If triggerTour becomes false while tour is running, stop it
+      setRun(false)
+      setStepIndex(0)
     }
-  }, [triggerTour])
+  }, [triggerTour, run]) // Depend on both triggerTour and run
 
   // Handle Joyride callbacks
   const handleJoyrideCallback = useCallback(
