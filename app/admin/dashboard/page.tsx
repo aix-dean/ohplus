@@ -248,8 +248,11 @@ export default function AdminDashboardPage() {
             <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
             <Button
               onClick={() => {
-                localStorage.removeItem("onboardingTourCompleted")
-                setShouldStartOnboardingTour(true)
+                localStorage.removeItem("onboardingTourCompleted") // Clear completion state
+                setShouldStartOnboardingTour(false) // Reset state to false
+                setTimeout(() => {
+                  setShouldStartOnboardingTour(true) // Then set to true to trigger useEffect
+                }, 50) // Small delay to ensure state update is processed
               }}
               variant="outline"
               size="sm"
