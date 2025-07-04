@@ -5,15 +5,14 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Loader2, Plus, MapPin, ChevronLeft, ChevronRight } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Loader2, PlusCircle } from "lucide-react"
 import { getPaginatedUserProducts, getUserProductsCount, softDeleteProduct, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { toast } from "@/components/ui/use-toast"
 import { useResponsive } from "@/hooks/use-responsive"
-import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
-import Image from "next/image"
+import Link from "next/link"
 import {
   Dialog,
   DialogContent,
@@ -23,6 +22,8 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ResponsiveTable } from "@/components/responsive-table"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -35,6 +36,7 @@ export default function AdminInventoryPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
   const { isMobile, isTablet } = useResponsive()
+  const [activeTab, setActiveTab] = useState("all")
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -276,130 +278,119 @@ export default function AdminInventoryPage() {
     router.push("/admin/products/create")
   }
 
+  const columns = [
+    { accessorKey: "name", header: "Name" },
+    { accessorKey: "type", header: "Type" },
+    { accessorKey: "status", header: "Status" },
+    { accessorKey: "location", header: "Location" },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }: { row: any }) => (
+        <Link href={`/admin/inventory/${row.original.id}`}>
+          <Button variant="outline" size="sm">
+            View Details
+          </Button>
+        </Link>
+      ),
+    },
+  ]
+
   return (
-    <div className="flex-1 p-4 md:p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
-        {/* The "+ New Product" button was here before. It's now moved into the grid. */}
-      </div>
-
-      {loading ? (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        </div>
-      ) : (
-        <div className="grid gap-6">
-          {/* Product List */}
-          <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
-            {/* The "+ Add Site" card is now the first item in the grid */}
-            <Card
-              className="w-full min-h-[284px] flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
-              onClick={handleAddSiteClick}
-              data-tour-id="add-site-card"
-            >
-              <Plus className="h-8 w-8 mb-2" />
-              <span className="text-lg font-semibold">+ Add Site</span>
-            </Card>
-
-            {products.map((product) => (
-              <Card
-                key={product.id}
-                className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
-              >
-                <div className="h-48 bg-gray-200 relative">
-                  <Image
-                    src={
-                      product.media && product.media.length > 0
-                        ? product.media[0].url
-                        : "/abstract-geometric-sculpture.png"
-                    }
-                    alt={product.name || "Product image"}
-                    fill
-                    className="object-cover"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.src = "/abstract-geometric-sculpture.png"
-                      target.className = "opacity-50"
-                    }}
-                  />
-                </div>
-
-                <CardContent className="p-4">
-                  <div className="flex flex-col">
-                    <h3 className="font-semibold line-clamp-1">{product.name}</h3>
-                    <div className="mt-2 text-sm font-medium text-green-700">
-                      ₱{Number(product.price).toLocaleString()}
+    <div className="flex min-h-screen w-full flex-col bg-muted/40">
+      <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
+        <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+          <Tabs defaultValue="all" onValueChange={setActiveTab}>
+            <div className="flex items-center">
+              <TabsList>
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="active">Active</TabsTrigger>
+                <TabsTrigger value="inactive">Inactive</TabsTrigger>
+                <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+              </TabsList>
+              <div className="ml-auto flex items-center gap-2">
+                <Link href="/admin/inventory/create">
+                  <Button size="sm" className="h-8 gap-1" data-tour-id="add-site-card">
+                    <PlusCircle className="h-3.5 w-3.5" />
+                    <span className="sr-only sm:not-sr-only">Add New Site</span>
+                  </Button>
+                </Link>
+              </div>
+            </div>
+            <TabsContent value="all">
+              <Card x-chunk="dashboard-06-chunk-0">
+                <CardHeader>
+                  <CardTitle>Inventory</CardTitle>
+                  <CardDescription>Manage your billboard sites and other inventory items.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+                      <Loader2 className="h-10 w-10 animate-spin text-primary" />
                     </div>
-                    <div className="mt-1 text-xs text-gray-500 flex items-center">
-                      <MapPin size={12} className="mr-1 flex-shrink-0" />
-                      <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
-                    </div>
-                  </div>
+                  ) : (
+                    <ResponsiveTable data={products} columns={columns} />
+                  )}
                 </CardContent>
               </Card>
-            ))}
-          </ResponsiveCardGrid>
-
-          {/* Pagination Controls */}
-          <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
-            <div className="text-sm text-gray-500 flex items-center">
-              {loadingCount ? (
-                <div className="flex items-center">
-                  <Loader2 size={14} className="animate-spin mr-2" />
-                  <span>Calculating pages...</span>
-                </div>
-              ) : (
-                <span>
-                  Page {currentPage} of {totalPages} ({products.length} items)
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToPreviousPage}
-                disabled={currentPage === 1}
-                className="h-8 w-8 p-0 bg-transparent"
-              >
-                <ChevronLeft size={16} />
-              </Button>
-
-              {/* Page numbers - Hide on mobile */}
-              <div className="hidden sm:flex items-center gap-1">
-                {getPageNumbers().map((page, index) =>
-                  page === "..." ? (
-                    <span key={`ellipsis-${index}`} className="px-2">
-                      ...
-                    </span>
+            </TabsContent>
+            <TabsContent value="active">
+              <Card x-chunk="dashboard-06-chunk-0">
+                <CardHeader>
+                  <CardTitle>Active Inventory</CardTitle>
+                  <CardDescription>Currently active billboard sites.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+                      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    </div>
                   ) : (
-                    <Button
-                      key={`page-${page}`}
-                      variant={currentPage === page ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => goToPage(page as number)}
-                      className="h-8 w-8 p-0"
-                    >
-                      {page}
-                    </Button>
-                  ),
-                )}
-              </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToNextPage}
-                disabled={currentPage >= totalPages}
-                className="h-8 w-8 p-0"
-              >
-                <ChevronRight size={16} />
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+                    <ResponsiveTable data={products.filter((item) => item.status === "Active")} columns={columns} />
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="inactive">
+              <Card x-chunk="dashboard-06-chunk-0">
+                <CardHeader>
+                  <CardTitle>Inactive Inventory</CardTitle>
+                  <CardDescription>Billboard sites that are currently inactive.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+                      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    </div>
+                  ) : (
+                    <ResponsiveTable data={products.filter((item) => item.status === "Inactive")} columns={columns} />
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="maintenance">
+              <Card x-chunk="dashboard-06-chunk-0">
+                <CardHeader>
+                  <CardTitle>Maintenance Inventory</CardTitle>
+                  <CardDescription>Billboard sites currently under maintenance.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+                      <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    </div>
+                  ) : (
+                    <ResponsiveTable
+                      data={products.filter((item) => item.status === "Maintenance")}
+                      columns={columns}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </main>
+      </div>
 
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog

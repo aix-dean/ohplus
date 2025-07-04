@@ -1,48 +1,69 @@
 "use client"
 
+import { TableHeader } from "@/components/ui/table"
+
 import { useEffect, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
 import { RegistrationSuccessDialog } from "@/components/registration-success-dialog"
 import { OnboardingTour } from "@/components/onboarding-tour"
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
-import { Search, ChevronDown, Plus } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { Plus, ArrowUpRight, CreditCard, DollarSign, Users, Activity } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/chart-container"
+import { Table, TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table"
+import { Separator } from "@/components/ui/separator"
+import { DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 
 export default function AdminDashboardPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { user } = useAuth()
-
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [shouldStartOnboardingTour, setShouldStartOnboardingTour] = useState(false) // New state to explicitly trigger tour
+  const [showRegistrationSuccess, setShowRegistrationSuccess] = useState(false)
+  const [registeredFirstName, setRegisteredFirstName] = useState("")
+  const [triggerOnboardingTour, setTriggerOnboardingTour] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
   useEffect(() => {
-    const registeredParam = searchParams.get("registered")
-    const dialogShownKey = "registrationSuccessDialogShown"
-
-    if (registeredParam === "true" && !sessionStorage.getItem(dialogShownKey)) {
-      setShowSuccessDialog(true)
-      sessionStorage.setItem(dialogShownKey, "true")
-      // Remove the 'registered' query parameter immediately after detecting it
-      const newUrl = new URL(window.location.href)
-      newUrl.searchParams.delete("registered")
-      router.replace(newUrl.toString(), undefined, { shallow: true })
+    const registered = searchParams.get("registered")
+    const firstName = searchParams.get("firstName") // Assuming you might pass firstName via query param
+    if (registered === "true") {
+      setShowRegistrationSuccess(true)
+      setRegisteredFirstName(firstName || "User")
+      // Clear the query parameter to prevent dialog from showing on refresh
+      router.replace("/admin/dashboard", undefined, { shallow: true })
     }
   }, [searchParams, router])
 
-  const handleCloseSuccessDialog = () => {
-    setShowSuccessDialog(false)
-    setShouldStartOnboardingTour(true) // Set state to true to trigger the tour
+  const handleCloseRegistrationSuccess = () => {
+    setShowRegistrationSuccess(false)
   }
+
+  const handleStartOnboardingTour = () => {
+    setShowRegistrationSuccess(false) // Close the success dialog
+    setTriggerOnboardingTour(true) // Trigger the onboarding tour
+  }
+
+  // Placeholder data for charts and tables (replace with actual data fetching)
+  const salesData = [
+    { month: "Jan", sales: 1890 },
+    { month: "Feb", sales: 2300 },
+    { month: "Mar", sales: 2800 },
+    { month: "Apr", sales: 2200 },
+    { month: "May", sales: 3000 },
+    { month: "Jun", sales: 2700 },
+  ]
+
+  const recentOrders = [
+    { id: "ORD001", customer: "Alice Smith", amount: "$250.00", status: "Pending" },
+    { id: "ORD002", customer: "Bob Johnson", amount: "$150.00", status: "Completed" },
+    { id: "ORD003", customer: "Charlie Brown", amount: "$300.00", status: "Processing" },
+    { id: "ORD004", customer: "Diana Prince", amount: "$100.00", status: "Cancelled" },
+  ]
 
   interface Department {
     id: string
@@ -241,54 +262,237 @@ export default function AdminDashboardPage() {
   })
 
   return (
-    <div className="flex-1 p-4 md:p-6">
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-grow">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Search..."
-                className="w-full rounded-lg bg-background pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+    <div className="flex min-h-screen w-full flex-col bg-muted/40">
+      <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
+        <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8 lg:grid-cols-3 xl:grid-cols-3">
+          <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
+              <Card className="sm:col-span-2">
+                <CardHeader className="pb-3">
+                  <CardTitle>Your Orders</CardTitle>
+                  <CardDescription className="max-w-lg text-balance leading-relaxed">
+                    Introducing our new dashboard for a more streamlined experience.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button>Create New Order</Button>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">$45,231.89</div>
+                  <p className="text-xs text-muted-foreground">+20.1% from last month</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Subscriptions</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">+2350</div>
+                  <p className="text-xs text-muted-foreground">+180.1% from last month</p>
+                </CardContent>
+              </Card>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                  {selectedDate} <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setSelectedDate("Jan 2025")}>Jan 2025</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDate("Feb 2025")}>Feb 2025</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDate("Mar 2025")}>Mar 2025</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDate("Apr 2025")}>Apr 2025</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDate("May 2025")}>May 2025</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSelectedDate("Jun 2025")}>Jun 2025</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-2">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Sales Over Time</CardTitle>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" variant="outline" className="h-7 gap-1 text-sm bg-transparent">
+                        <ArrowUpRight className="h-3.5 w-3.5" />
+                        <span className="sr-only sm:not-sr-only">View All</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem>This Month</DropdownMenuItem>
+                      <DropdownMenuItem>This Year</DropdownMenuItem>
+                      <DropdownMenuItem>All Time</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer
+                    config={{
+                      sales: {
+                        label: "Sales",
+                        color: "hsl(var(--chart-1))",
+                      },
+                    }}
+                    className="h-[200px]"
+                  >
+                    <LineChart data={salesData} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+                      <CartesianGrid vertical={false} />
+                      <XAxis
+                        dataKey="month"
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                        tickFormatter={(value) => value.slice(0, 3)}
+                      />
+                      <YAxis tickLine={false} axisLine={false} tickMargin={8} />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Line type="monotone" dataKey="sales" stroke="var(--color-sales)" />
+                    </LineChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Recent Orders</CardTitle>
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Order ID</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentOrders.map((order) => (
+                        <TableRow key={order.id}>
+                          <TableCell>{order.id}</TableCell>
+                          <TableCell>{order.customer}</TableCell>
+                          <TableCell>{order.amount}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{order.status}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredDepartments.map((department) => (
-            <DepartmentCard key={department.id} department={department} />
-          ))}
-        </div>
+          <div className="grid gap-4 md:gap-8">
+            <Card className="overflow-hidden">
+              <CardHeader className="flex flex-row items-start bg-muted/50">
+                <div className="grid gap-0.5">
+                  <CardTitle className="group flex items-center gap-2 text-lg">Order #SP001</CardTitle>
+                  <CardDescription>Date: November 23, 2023</CardDescription>
+                </div>
+                <div className="ml-auto flex items-center gap-1">
+                  <Button size="sm" variant="outline" className="h-8 gap-1 bg-transparent">
+                    <CreditCard className="h-3.5 w-3.5" />
+                    <span className="sr-only sm:not-sr-only">Pay Now</span>
+                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="icon" variant="outline" className="h-8 w-8 bg-transparent">
+                        <span className="sr-only">More</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem>Edit</DropdownMenuItem>
+                      <DropdownMenuItem>Export</DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem>Trash</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6 text-sm">
+                <div className="grid gap-3">
+                  <div className="font-semibold">Order Details</div>
+                  <ul className="grid gap-3">
+                    <li className="flex items-center justify-between">
+                      <span className="text-muted-foreground">LED Billboard (x1)</span>
+                      <span>$250.00</span>
+                    </li>
+                    <li className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Installation Service (x1)</span>
+                      <span>$50.00</span>
+                    </li>
+                  </ul>
+                  <Separator className="my-2" />
+                  <ul className="grid gap-3">
+                    <li className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span>$300.00</span>
+                    </li>
+                    <li className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Shipping</span>
+                      <span>$5.00</span>
+                    </li>
+                    <li className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Tax</span>
+                      <span>$25.00</span>
+                    </li>
+                    <li className="flex items-center justify-between font-semibold">
+                      <span>Total</span>
+                      <span>$330.00</span>
+                    </li>
+                  </ul>
+                </div>
+                <Separator className="my-4" />
+                <div className="grid gap-3">
+                  <div className="font-semibold">Customer Information</div>
+                  <dl className="grid gap-3">
+                    <div className="flex items-center justify-between">
+                      <dt className="text-muted-foreground">Customer</dt>
+                      <dd>Liam Johnson</dd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <dt className="text-muted-foreground">Email</dt>
+                      <dd>
+                        <a href="mailto:">liam@example.com</a>
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <dt className="text-muted-foreground">Phone</dt>
+                      <dd>
+                        <a href="tel:">+1 234 567 890</a>
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+                <Separator className="my-4" />
+                <div className="grid gap-3">
+                  <div className="font-semibold">Shipping Information</div>
+                  <dl className="grid gap-3">
+                    <div className="flex items-center justify-between">
+                      <dt className="text-muted-foreground">Address</dt>
+                      <dd>
+                        123 Main St.
+                        <br />
+                        Anytown, CA 12345
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+                <Separator className="my-4" />
+                <div className="grid gap-3">
+                  <div className="font-semibold">Payment Information</div>
+                  <dl className="grid gap-3">
+                    <div className="flex items-center justify-between">
+                      <dt className="text-muted-foreground">Card</dt>
+                      <dd>**** **** **** 4242</dd>
+                    </div>
+                  </dl>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
       </div>
-
       <RegistrationSuccessDialog
-        isOpen={showSuccessDialog}
-        firstName={user?.first_name || ""}
-        onClose={handleCloseSuccessDialog}
-        onStartTour={handleCloseSuccessDialog} // This will trigger setting shouldStartOnboardingTour to true
+        isOpen={showRegistrationSuccess}
+        firstName={registeredFirstName}
+        onClose={handleCloseRegistrationSuccess}
+        onStartTour={handleStartOnboardingTour}
       />
-
-      <OnboardingTour triggerTour={shouldStartOnboardingTour} />
+      <OnboardingTour triggerTour={triggerOnboardingTour} />
     </div>
   )
 }
