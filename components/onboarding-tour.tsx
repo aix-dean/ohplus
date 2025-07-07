@@ -186,7 +186,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
       disableCloseOnEsc={false}
       callback={handleJoyrideCallback}
       locale={{
-        back: pathname === "/admin/dashboard" ? undefined : "Back",
+        back: pathname === "/admin/dashboard" ? "" : "Back", // Changed undefined to ""
         close: "Close",
         last: "Finish Tour",
         next: pathname === "/admin/dashboard" ? "Go to Inventory" : "Finish Tour",
