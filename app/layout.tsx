@@ -5,7 +5,7 @@ import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
 import AuthLayout from "./auth-layout"
 import { AssistantProvider } from "@/components/ai-assistant/assistant-provider"
-import { Toaster } from "@/components/ui/toaster"
+import { ToasterProvider } from "@/hooks/use-toast" // Import the new ToasterProvider
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -28,9 +28,12 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <AuthLayout>
-            <div className="flex flex-col h-screen">{children}</div>
-            <AssistantProvider />
-            <Toaster />
+            <ToasterProvider>
+              {" "}
+              {/* Wrap children with ToasterProvider */}
+              <div className="flex flex-col h-screen">{children}</div>
+              <AssistantProvider />
+            </ToasterProvider>
           </AuthLayout>
         </AuthProvider>
       </body>

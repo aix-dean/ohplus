@@ -8,6 +8,7 @@ import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useIsAdmin } from "@/hooks/use-is-admin"
+import { cn } from "@/lib/utils" // Import cn utility
 
 export function TopNavigation() {
   const [isOpen, setIsOpen] = useState(false)
@@ -229,10 +230,13 @@ export function TopNavigation() {
   }
 
   return (
-    <nav className={`top-nav relative ${navBgColor} z-40`}>
+    <nav className={cn("top-nav relative z-40", navBgColor)}>
       {/* Diagonal section - positioned to always be before the date area */}
       <div
-        className={`absolute top-0 right-0 h-full w-[320px] ${diagonalBgColor} transform skew-x-[-20deg] translate-x-[60px] z-0 hidden md:block`}
+        className={cn(
+          "absolute top-0 right-0 h-full w-[320px] transform skew-x-[-20deg] translate-x-[60px] z-0 hidden md:block",
+          diagonalBgColor,
+        )}
       ></div>
 
       <div className="top-nav-container text-white relative z-10">
@@ -378,7 +382,10 @@ export function TopNavigation() {
               <div className="space-y-2 pt-2 border-t border-gray-200">
                 <button
                   onClick={() => handleMobileNavigation("/settings")}
-                  className={`w-full text-left py-3 px-4 rounded-md flex items-center ${pathname.startsWith("/settings") ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700"}`}
+                  className={cn(
+                    "w-full text-left py-3 px-4 rounded-md flex items-center",
+                    pathname.startsWith("/settings") ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700",
+                  )}
                 >
                   <Settings className="mr-3 h-5 w-5" />
                   <span className="text-base">Settings</span>
@@ -386,7 +393,10 @@ export function TopNavigation() {
 
                 <button
                   onClick={() => handleMobileNavigation("/account")}
-                  className={`w-full text-left py-3 px-4 rounded-md flex items-center ${pathname.startsWith("/account") ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700"}`}
+                  className={cn(
+                    "w-full text-left py-3 px-4 rounded-md flex items-center",
+                    pathname.startsWith("/account") ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700",
+                  )}
                 >
                   <User className="mr-3 h-5 w-5" />
                   <span className="text-base">Account</span>
@@ -395,7 +405,10 @@ export function TopNavigation() {
                 {isAdmin && (
                   <button
                     onClick={() => handleMobileNavigation("/admin")}
-                    className={`w-full text-left py-3 px-4 rounded-md flex items-center ${pathname.startsWith("/admin") ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700"}`}
+                    className={cn(
+                      "w-full text-left py-3 px-4 rounded-md flex items-center",
+                      pathname.startsWith("/admin") ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700",
+                    )}
                   >
                     <Settings className="mr-3 h-5 w-5" />
                     <span className="text-base">Admin</span>
