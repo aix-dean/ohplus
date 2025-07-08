@@ -8,6 +8,7 @@ import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useIsAdmin } from "@/hooks/use-is-admin"
+import { cn } from "@/lib/utils" // Ensure this import is correct and cn is exported from utils.ts
 
 export function TopNavigation() {
   const [isOpen, setIsOpen] = useState(false)
@@ -217,8 +218,8 @@ export function TopNavigation() {
   const isSalesSection = pathname.startsWith("/sales")
   const isAccountPage = pathname === "/account"
 
-  const navBgClass = isSalesSection ? "bg-red-600" : "bg-blue-900"
-  const diagonalBgClass = isSalesSection ? "bg-red-100" : "bg-blue-200"
+  const navBgColor = isSalesSection ? "bg-[#ff3333]" : "bg-[#0a1433]"
+  const diagonalBgColor = isSalesSection ? "bg-[#ffcccc]" : "bg-[#38b6ff]"
 
   const handleMobileNavigation = (href: string) => {
     router.push(href)
@@ -226,10 +227,13 @@ export function TopNavigation() {
   }
 
   return (
-    <nav className={`top-nav relative z-40 ${navBgClass}`}>
-      {/* Diagonal section */}
+    <nav className={cn("top-nav relative z-40", navBgColor)}>
+      {/* Diagonal section - positioned to always be before the date area */}
       <div
-        className={`absolute top-0 right-0 h-full w-80 transform skew-x-12 translate-x-16 z-0 hidden md:block ${diagonalBgClass}`}
+        className={cn(
+          "absolute top-0 right-0 h-full w-[320px] transform skew-x-[-20deg] translate-x-[60px] z-0 hidden md:block",
+          diagonalBgColor,
+        )}
       ></div>
 
       <div className="top-nav-container text-white relative z-10">
@@ -241,13 +245,14 @@ export function TopNavigation() {
                   <nav className="flex items-center space-x-2 text-white">
                     {breadcrumbs.map((crumb, index) => (
                       <div key={crumb.href} className="flex items-center">
-                        {index > 0 && <ChevronRight className="h-4 w-4 mx-1 text-white opacity-60" />}
+                        {/* Only show ChevronRight if it's not the first breadcrumb */}
+                        {index > 0 && <ChevronRight className="h-4 w-4 mx-1 text-white/60" />}
                         {index === breadcrumbs.length - 1 ? (
                           <span className="text-xl font-semibold">{crumb.label}</span>
                         ) : (
                           <button
                             onClick={() => router.push(crumb.href)}
-                            className="text-lg font-medium hover:opacity-80 transition-opacity"
+                            className="text-lg font-medium hover:text-white/80 transition-colors"
                           >
                             {crumb.label}
                           </button>
@@ -277,6 +282,7 @@ export function TopNavigation() {
                     </span>
                   )}
                 </button>
+                {/* Profile dropdown */}
                 <div className="ml-3 relative z-10" ref={profileRef}>
                   <button
                     type="button"
@@ -284,13 +290,16 @@ export function TopNavigation() {
                     id="user-menu-button"
                     aria-expanded={profileOpen}
                     aria-haspopup="true"
-                    onClick={() => setProfileOpen(!profileOpen)}
+                    onClick={() => {
+                      setProfileOpen(!profileOpen)
+                    }}
                   >
                     <span className="sr-only">Open user menu</span>
                     <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
                       <User className="h-5 w-5 text-gray-500" />
                     </div>
                   </button>
+                  {/* Profile dropdown menu */}
                   {profileOpen && (
                     <div
                       className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
@@ -334,9 +343,11 @@ export function TopNavigation() {
                 </div>
               </div>
             )}
+            {/* Date display in the light blue section with adjusted padding */}
             <div className="hidden md:flex items-center justify-end h-full pl-8 pr-8 relative z-10">
-              <span className="text-sm font-medium text-blue-900">{format(currentTime, "MMMM d, yyyy, h:mm a")}</span>
+              <span className="text-sm font-medium text-[#0a1433]">{format(currentTime, "MMMM d, yyyy, h:mm a")}</span>
             </div>
+            {/* Mobile menu button */}
             <div className="top-nav-mobile md:hidden">
               <button
                 type="button"
@@ -356,17 +367,22 @@ export function TopNavigation() {
         </div>
       </div>
 
+      {/* Mobile menu, show/hide based on menu state */}
       {isOpen && (
         <>
+          {/* Backdrop */}
           <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setIsOpen(false)}></div>
-          <div className="top-nav-mobile-menu bg-white fixed inset-x-0 top-16 z-50 overflow-y-auto max-h-screen shadow-lg">
+
+          {/* Mobile menu */}
+          <div className="top-nav-mobile-menu bg-white fixed inset-x-0 top-16 z-50 overflow-y-auto max-h-[calc(100vh-4rem)] shadow-lg">
             <div className="top-nav-mobile-links p-4">
               <div className="space-y-2 pt-2 border-t border-gray-200">
                 <button
                   onClick={() => handleMobileNavigation("/settings")}
-                  className={`w-full text-left py-3 px-4 rounded-md flex items-center ${
-                    pathname.startsWith("/settings") ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700"
-                  }`}
+                  className={cn(
+                    "w-full text-left py-3 px-4 rounded-md flex items-center",
+                    pathname.startsWith("/settings") ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700",
+                  )}
                 >
                   <Settings className="mr-3 h-5 w-5" />
                   <span className="text-base">Settings</span>
@@ -374,9 +390,10 @@ export function TopNavigation() {
 
                 <button
                   onClick={() => handleMobileNavigation("/account")}
-                  className={`w-full text-left py-3 px-4 rounded-md flex items-center ${
-                    pathname.startsWith("/account") ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700"
-                  }`}
+                  className={cn(
+                    "w-full text-left py-3 px-4 rounded-md flex items-center",
+                    pathname.startsWith("/account") ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700",
+                  )}
                 >
                   <User className="mr-3 h-5 w-5" />
                   <span className="text-base">Account</span>
@@ -385,9 +402,10 @@ export function TopNavigation() {
                 {isAdmin && (
                   <button
                     onClick={() => handleMobileNavigation("/admin")}
-                    className={`w-full text-left py-3 px-4 rounded-md flex items-center ${
-                      pathname.startsWith("/admin") ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700"
-                    }`}
+                    className={cn(
+                      "w-full text-left py-3 px-4 rounded-md flex items-center",
+                      pathname.startsWith("/admin") ? "bg-gray-100 text-gray-900 font-medium" : "text-gray-700",
+                    )}
                   >
                     <Settings className="mr-3 h-5 w-5" />
                     <span className="text-base">Admin</span>
