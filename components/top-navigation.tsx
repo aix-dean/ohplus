@@ -8,7 +8,7 @@ import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useIsAdmin } from "@/hooks/use-is-admin"
-import { cn } from "@/lib/utils" // Ensure this import is correct and cn is exported from utils.ts
+import { cn } from "@/lib/utils" // Ensure cn is correctly imported from your utils.ts
 
 export function TopNavigation() {
   const [isOpen, setIsOpen] = useState(false)
