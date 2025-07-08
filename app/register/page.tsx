@@ -17,7 +17,6 @@ export default function RegisterPage() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [middleName, setMiddleName] = useState("")
-  // Removed companyName and companyLocation states
   const [phoneNumber, setPhoneNumber] = useState("")
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -71,8 +70,8 @@ export default function RegisterPage() {
           gender: "",
         },
         {
-          company_name: "", // Pass empty string or null for company_name
-          company_location: "", // Pass empty string or null for company_location
+          company_name: "",
+          company_location: "",
         },
         password,
       )
@@ -88,9 +87,9 @@ export default function RegisterPage() {
   return (
     <div className="flex min-h-screen">
       {/* Left Panel - Image and Logo */}
-      <div className="relative hidden w-1/2 items-center justify-center bg-gray-900 lg:flex">
+      <div className="relative hidden w-[40%] items-center justify-center bg-gray-900 lg:flex">
         <Image
-          src="/roadside-billboard.png"
+          src="/registration-background.png"
           alt="Background"
           layout="fill"
           objectFit="cover"
@@ -102,7 +101,7 @@ export default function RegisterPage() {
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex w-full items-center justify-center bg-white p-8 dark:bg-gray-950 lg:w-1/2">
+      <div className="flex w-full items-center justify-center bg-white p-8 dark:bg-gray-950 lg:w-[60%]">
         <Card className="w-full max-w-md border-none shadow-none">
           <CardHeader className="space-y-1 text-left">
             <div className="flex items-center justify-between">
@@ -164,7 +163,6 @@ export default function RegisterPage() {
                   required
                 />
               </div>
-              {/* Removed Company Name and Company Location fields */}
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
