@@ -17,8 +17,6 @@ export function TopNavigation() {
   const pathname = usePathname()
   const router = useRouter()
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [breadcrumbs, setBreadcrumbs] = useState<Array<{ label: string; href: string }>>([])
-  const [siteCode, setSiteCode] = useState<string>("")
 
   const { user, userData, signOut } = useAuth()
   const { unreadCount } = useUnreadMessages()
@@ -62,105 +60,6 @@ export function TopNavigation() {
       document.body.style.overflow = ""
     }
   }, [isOpen])
-
-  // Fetch site code for site details pages
-  useEffect(() => {
-    const fetchSiteCode = async () => {
-      const pathSegments = pathname.split("/").filter(Boolean)
-      if (pathSegments[0] === "logistics" && pathSegments[1] === "sites" && pathSegments[2]) {
-        try {
-          const productDoc = await getDoc(doc(db, "products", pathSegments[2]))
-          if (productDoc.exists()) {
-            const productData = productDoc.data()
-            setSiteCode(productData.site_code || pathSegments[2])
-          } else {
-            setSiteCode(pathSegments[2])
-          }
-        } catch (error) {
-          console.error("Error fetching site code:", error)
-          setSiteCode(pathSegments[2])
-        }
-      } else {
-        setSiteCode("")
-      }
-    }
-
-    fetchSiteCode()
-  }, [pathname])
-
-  // Track navigation history and build breadcrumbs
-  useEffect(() => {
-    const updateBreadcrumbs = () => {
-      const segments = pathname.split("/").filter(Boolean)
-      const crumbs: Array<{ label: string; href: string }> = []
-
-      const currentMainSection = segments[0] || ""
-      let historyStack: string[] = JSON.parse(localStorage.getItem("breadcrumbHistory") || "[]")
-
-      // Manage history stack
-      if (currentMainSection && ["admin", "sales", "logistics", "cms"].includes(currentMainSection)) {
-        if (historyStack.length === 0) {
-          // First visit to a main section
-          historyStack = [currentMainSection]
-        } else if (historyStack.length === 1) {
-          // From one main section to another
-          if (historyStack[0] !== currentMainSection) {
-            historyStack.push(currentMainSection)
-          }
-        } else if (historyStack.length === 2) {
-          // From A -> B, now navigating to C or back to A
-          if (historyStack[1] === currentMainSection) {
-            // Staying in the same current main section, history remains
-            // e.g., Admin -> Sales -> Sales/Proposals (history: [Admin, Sales])
-          } else if (historyStack[0] === currentMainSection) {
-            // Navigating back to the "parent" main section
-            // e.g., Admin -> Sales -> Admin (history: [Admin])
-            historyStack = [currentMainSection]
-          } else {
-            // Navigating to a completely new third main section
-            // e.g., Admin -> Sales -> Logistics (history: [Sales, Logistics])
-            historyStack = [historyStack[1], currentMainSection]
-          }
-        }
-      } else {
-        // Not in a main section (e.g., root, login, account), clear history
-        historyStack = []
-      }
-      localStorage.setItem("breadcrumbHistory", JSON.stringify(historyStack))
-
-      // Build breadcrumbs from history stack
-      historyStack.forEach((section) => {
-        const label = section.charAt(0).toUpperCase() + section.slice(1)
-        crumbs.push({ label, href: `/${section}/dashboard` })
-      })
-
-      // Add current sub-segments if any, after the main section
-      let currentPathAccumulator = `/${currentMainSection}`
-      for (let i = 1; i < segments.length; i++) {
-        const segment = segments[i]
-        if (segment === "dashboard") {
-          continue // Skip "dashboard" in sub-segments
-        }
-        if (segment.startsWith("[") && segment.endsWith("]")) {
-          // Stop adding segments if it's a dynamic ID (e.g., /sales/proposals/123 -> Sales > Proposals)
-          break
-        }
-
-        currentPathAccumulator += `/${segment}`
-        const label = segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, " ")
-        crumbs.push({ label, href: currentPathAccumulator })
-      }
-
-      // Special case for root path if no main section is active
-      if (crumbs.length === 0 && pathname === "/") {
-        crumbs.push({ label: "Dashboard", href: "/" })
-      }
-
-      setBreadcrumbs(crumbs)
-    }
-
-    updateBreadcrumbs()
-  }, [pathname])
 
   const getPageTitle = (path: string) => {
     const segments = path.split("/").filter(Boolean)
@@ -268,32 +167,7 @@ export function TopNavigation() {
         <div className="top-nav-content">
           <div className="top-nav-left">
             <div className="top-nav-logo flex items-center">
-              <div className="flex items-center space-x-2">
-                {breadcrumbs.length > 0 ? (
-                  <nav className="flex items-center space-x-2 text-white">
-                    {breadcrumbs.map((crumb, index) => (
-                      <div key={crumb.href} className="flex items-center">
-                        {/* Only show ChevronRight if it's not the first breadcrumb */}
-                        {index > 0 && <ChevronRight className="h-4 w-4 mx-1 text-white/60" />}
-                        {index === breadcrumbs.length - 1 ? (
-                          <span className="text-xl font-semibold">
-                            {pathname.includes("/logistics/sites/") && siteCode ? siteCode : crumb.label}
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => router.push(crumb.href)}
-                            className="text-lg font-medium hover:text-white/80 transition-colors"
-                          >
-                            {crumb.label}
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </nav>
-                ) : (
-                  <h1 className="text-xl font-semibold text-white">{pageTitle}</h1>
-                )}
-              </div>
+              <h1 className="text-xl font-semibold text-white">{pageTitle}</h1>
             </div>
             <div className="top-nav-links hidden md:flex"></div>
           </div>
