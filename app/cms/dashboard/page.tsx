@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/hooks/use-toast"
 import {
   Plus,
   MoreVertical,
@@ -86,6 +87,7 @@ export default function CMSDashboardPage() {
 
   const { user } = useAuth()
   const router = useRouter()
+  const { toast } = useToast()
 
   // Navigation handlers for analytics cards
   const handleNavigateToActiveScreens = () => {
@@ -119,11 +121,15 @@ export default function CMSDashboardPage() {
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
       console.error("Error fetching total count:", error)
-      // Removed toast notification
+      toast({
+        title: "Error",
+        description: "Failed to load content count. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setLoadingCount(false)
     }
-  }, [user, searchTerm])
+  }, [user, toast, searchTerm])
 
   // Fetch products for the current page
   const fetchProducts = useCallback(
@@ -165,13 +171,17 @@ export default function CMSDashboardPage() {
         })
       } catch (error) {
         console.error("Error fetching products:", error)
-        // Removed toast notification
+        toast({
+          title: "Error",
+          description: "Failed to load content. Please try again.",
+          variant: "destructive",
+        })
       } finally {
         setLoading(false)
         setLoadingMore(false)
       }
     },
-    [user, lastDoc, pageCache, searchTerm],
+    [user, lastDoc, pageCache, toast, searchTerm],
   )
 
   // Store products in localStorage for use in breadcrumbs
@@ -302,11 +312,17 @@ export default function CMSDashboardPage() {
       // Clear cache to force refresh
       setPageCache(new Map())
 
-      // Removed toast notification - content deleted successfully
-      console.log(`Content deleted: ${productToDelete.name}`)
+      toast({
+        title: "Content deleted",
+        description: `${productToDelete.name} has been successfully deleted.`,
+      })
     } catch (error) {
       console.error("Error deleting product:", error)
-      // Removed toast notification - show error in console instead
+      toast({
+        title: "Error",
+        description: "Failed to delete the content. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setDeleteDialogOpen(false)
       setProductToDelete(null)
@@ -705,7 +721,7 @@ export default function CMSDashboardPage() {
                 size="sm"
                 onClick={goToPreviousPage}
                 disabled={currentPage === 1}
-                className="h-8 w-8 p-0 bg-transparent"
+                className="h-8 w-8 p-0"
               >
                 <ChevronLeft size={16} />
               </Button>
