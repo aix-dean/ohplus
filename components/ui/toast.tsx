@@ -4,11 +4,9 @@ import * as React from "react"
 import * as ToastPrimitives from "@radix-ui/react-toast"
 import { cva, type VariantProps } from "class-variance-authority"
 import { X } from "lucide-react"
-import { Toaster as SonnerToaster, type toast as sonnerToast } from "sonner" // Import sonner's Toaster and toast function
 
 import { cn } from "@/lib/utils"
 
-// --- Radix UI Toast Primitives (for ToastProvider, ToastViewport, etc.) ---
 const ToastProvider = ToastPrimitives.Provider
 
 const ToastViewport = React.forwardRef<
@@ -74,7 +72,6 @@ const ToastClose = React.forwardRef<
       "absolute right-2 top-2 rounded-md p-1 text-foreground/50 opacity-0 transition-opacity hover:text-foreground focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100 group-[.destructive]:text-red-300 group-[.destructive]:hover:text-red-50 group-[.destructive]:focus:ring-red-400 group-[.destructive]:focus:ring-offset-red-600",
       className,
     )}
-    // Removed the problematic toast-close="" attribute
     {...props}
   >
     <X className="h-4 w-4" />
@@ -98,30 +95,18 @@ const ToastDescription = React.forwardRef<
 ))
 ToastDescription.displayName = ToastPrimitives.Description.displayName
 
-// --- Sonner Toaster Integration ---
-// This type is used by the useToast hook to define the shape of toast arguments.
-export type ToastProps = Parameters<typeof sonnerToast>[0] & {
-  variant?: "default" | "destructive"
+type ToastProps = React.ComponentPropsWithoutRef<typeof Toast>
+
+type ToastActionElement = React.ReactElement<typeof ToastAction>
+
+export {
+  type ToastProps,
+  type ToastActionElement,
+  ToastProvider,
+  ToastViewport,
+  Toast,
+  ToastTitle,
+  ToastDescription,
+  ToastAction,
+  ToastClose,
 }
-
-type ToasterProps = React.ComponentProps<typeof SonnerToaster>
-
-function Toaster({ ...props }: ToasterProps) {
-  return (
-    <SonnerToaster
-      className="toaster group"
-      toastOptions={{
-        classNames: {
-          toast:
-            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-muted-foreground",
-          actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
-          cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
-        },
-      }}
-      {...props}
-    />
-  )
-}
-
-export { ToastProvider, ToastViewport, Toast, ToastTitle, ToastDescription, ToastClose, ToastAction, Toaster }
