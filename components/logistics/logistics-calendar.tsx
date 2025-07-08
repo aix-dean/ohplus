@@ -3,7 +3,9 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { ChevronDown } from "lucide-react"
 
 // Sample logistics events data
 const sampleEvents = [
@@ -37,6 +39,7 @@ export function LogisticsCalendar() {
   const [currentYear, setCurrentYear] = useState(2025)
   const [saType, setSaType] = useState("")
   const [sites, setSites] = useState("")
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
 
   // Get days in month and starting day
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate()
@@ -55,21 +58,11 @@ export function LogisticsCalendar() {
     calendarDays.push(day)
   }
 
-  const navigateMonth = (direction: "prev" | "next") => {
-    if (direction === "prev") {
-      if (currentMonth === 0) {
-        setCurrentMonth(11)
-        setCurrentYear(currentYear - 1)
-      } else {
-        setCurrentMonth(currentMonth - 1)
-      }
-    } else {
-      if (currentMonth === 11) {
-        setCurrentMonth(0)
-        setCurrentYear(currentYear + 1)
-      } else {
-        setCurrentMonth(currentMonth + 1)
-      }
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date) {
+      setCurrentMonth(date.getMonth())
+      setCurrentYear(date.getFullYear())
+      setIsCalendarOpen(false)
     }
   }
 
@@ -81,21 +74,29 @@ export function LogisticsCalendar() {
     <div className="bg-white rounded-lg border border-gray-200 p-6">
       {/* Calendar Header */}
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" size="sm" onClick={() => navigateMonth("prev")} className="p-1">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-
-          <div className="flex items-center space-x-2">
-            <span className="text-lg font-semibold">
-              {months[currentMonth]} {currentYear}
-            </span>
-            <ChevronDown className="h-4 w-4 text-gray-500" />
-          </div>
-
-          <Button variant="ghost" size="sm" onClick={() => navigateMonth("next")} className="p-1">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center">
+          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                className="flex items-center space-x-2 text-lg font-semibold p-0 h-auto hover:bg-transparent"
+              >
+                <span>
+                  {months[currentMonth]} {currentYear}
+                </span>
+                <ChevronDown className="h-4 w-4 text-gray-500" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={new Date(currentYear, currentMonth)}
+                onSelect={handleDateSelect}
+                defaultMonth={new Date(currentYear, currentMonth)}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
         <div className="flex items-center space-x-4">
@@ -126,7 +127,7 @@ export function LogisticsCalendar() {
         </div>
       </div>
 
-      {/* Day Headers - Removed blue border */}
+      {/* Day Headers */}
       <div className="grid grid-cols-7 rounded-t-md">
         {dayHeaders.map((day) => (
           <div

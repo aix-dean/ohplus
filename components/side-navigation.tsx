@@ -1,409 +1,391 @@
 "use client"
-import Link from "next/link"
+
+import type React from "react"
+
+import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
-import { cn } from "@/lib/utils"
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
 import {
   LayoutDashboard,
-  Users,
+  MessageSquare,
   Calendar,
-  BarChart3,
-  Truck,
-  AlertTriangle,
   FileText,
-  Settings,
-  ShieldCheck,
-  BookOpen,
   Package,
-  MessageCircle,
-  FileCheck,
+  Users,
+  CreditCard,
+  MapPin,
+  AlertTriangle,
+  UserCheck,
+  CalendarIcon,
+  BarChart3,
+  ClipboardList,
+  Target,
+  Briefcase,
+  ShoppingCart,
   Sparkles,
   ChevronLeft,
   ChevronRight,
-  TrendingUp,
-  ClipboardList,
 } from "lucide-react"
-import { useUnreadMessages } from "@/hooks/use-unread-messages"
-import { useAuth } from "@/contexts/auth-context"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
-// Navigation data structure with icons
-const navigationItems = [
-  {
-    section: "dashboard",
-    title: "Dashboard",
-    icon: LayoutDashboard,
-    items: [],
-  },
-  {
-    section: "features",
-    title: "Features",
-    icon: Package,
-    items: [{ title: "Overview", href: "/features", icon: LayoutDashboard }],
-  },
-  {
-    section: "sales",
-    title: "Sales",
-    icon: BarChart3,
-    items: [
-      { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
-      { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
-      { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
-      { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
-      { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
-      { title: "Clients", href: "/sales/clients", icon: Users },
-      { title: "Billings", href: "#", icon: FileText },
-      { title: "Planner", href: "/sales/planner", icon: Calendar },
-      { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
-    ],
-  },
-  {
-    section: "logistics",
-    title: "Logistics",
-    icon: Truck,
-    items: [
-      { title: "Dashboard", href: "/logistics/dashboard", icon: LayoutDashboard },
-      { title: "Service Assignments", href: "/logistics/assignments", icon: FileText },
-      { title: "Planner", href: "/logistics/planner", icon: Calendar },
-      { title: "Calendar", href: "/logistics/calendar", icon: Calendar },
-      { title: "Alerts", href: "/logistics/alerts", icon: AlertTriangle },
-    ],
-  },
-  {
-    section: "cms",
-    title: "CMS",
-    icon: FileText,
-    items: [
-      { title: "Dashboard", href: "/cms/dashboard", icon: LayoutDashboard },
-      { title: "Planner", href: "/cms/planner", icon: Calendar },
-      { title: "Orders", href: "/cms/orders", icon: FileText },
-    ],
-  },
-  {
-    section: "admin",
-    title: "Admin",
-    icon: ShieldCheck,
-    items: [],
-  },
-  {
-    section: "settings",
-    title: "Settings",
-    icon: Settings,
-    items: [
-      { title: "General", href: "/settings", icon: Settings },
-      { title: "Subscription", href: "/admin/subscriptions", icon: FileText },
-    ],
-  },
-]
+interface NavigationItem {
+  name: string
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  badge?: string
+  isActive?: boolean
+}
 
-function isActive(pathname: string, href: string) {
-  return pathname === href
+interface NavigationSection {
+  title: string
+  items: NavigationItem[]
 }
 
 export function SideNavigation() {
   const pathname = usePathname()
-  const { user } = useAuth()
-  const { unreadCount } = useUnreadMessages()
+  const [currentSlide, setCurrentSlide] = useState(0)
 
-  // Determine the current section from the pathname
-  let currentSection = pathname?.split("/")[1] || "dashboard"
-  if (pathname?.startsWith("/sales/project-campaigns")) {
-    currentSection = "sales"
+  // Show admin navigation for admin routes and logistics calendar
+  const isAdminNavigation = pathname?.startsWith("/admin") || pathname === "/logistics/calendar"
+
+  const adminSections: NavigationSection[] = [
+    {
+      title: "To Go",
+      items: [
+        {
+          name: "Dashboard",
+          href: "/admin/dashboard",
+          icon: LayoutDashboard,
+          isActive: pathname === "/admin/dashboard",
+        },
+        {
+          name: "Bulletin Board",
+          href: "/admin/bulletin-board",
+          icon: MessageSquare,
+          isActive: pathname === "/admin/bulletin-board",
+        },
+        {
+          name: "Calendar",
+          href: "/logistics/calendar",
+          icon: Calendar,
+          isActive: pathname === "/logistics/calendar",
+        },
+      ],
+    },
+    {
+      title: "To Do",
+      items: [
+        {
+          name: "Documents",
+          href: "/admin/documents",
+          icon: FileText,
+          isActive: pathname === "/admin/documents",
+        },
+        {
+          name: "Inventory",
+          href: "/admin/inventory",
+          icon: Package,
+          isActive: pathname?.startsWith("/admin/inventory"),
+        },
+        {
+          name: "User Management",
+          href: "/admin/access-management",
+          icon: Users,
+          isActive: pathname === "/admin/access-management",
+        },
+        {
+          name: "Subscription",
+          href: "/admin/subscriptions",
+          icon: CreditCard,
+          isActive: pathname?.startsWith("/admin/subscriptions"),
+        },
+      ],
+    },
+  ]
+
+  const logisticsSections: NavigationSection[] = [
+    {
+      title: "Overview",
+      items: [
+        {
+          name: "Dashboard",
+          href: "/logistics/dashboard",
+          icon: LayoutDashboard,
+          isActive: pathname === "/logistics/dashboard",
+        },
+        {
+          name: "Sites",
+          href: "/logistics/sites",
+          icon: MapPin,
+          isActive: pathname?.startsWith("/logistics/sites"),
+        },
+      ],
+    },
+    {
+      title: "Operations",
+      items: [
+        {
+          name: "Assignments",
+          href: "/logistics/assignments",
+          icon: UserCheck,
+          isActive: pathname === "/logistics/assignments",
+        },
+        {
+          name: "Alerts",
+          href: "/logistics/alerts",
+          icon: AlertTriangle,
+          isActive: pathname === "/logistics/alerts",
+        },
+        {
+          name: "Planner",
+          href: "/logistics/planner",
+          icon: CalendarIcon,
+          isActive: pathname === "/logistics/planner",
+        },
+      ],
+    },
+  ]
+
+  const salesSections: NavigationSection[] = [
+    {
+      title: "Sales",
+      items: [
+        {
+          name: "Dashboard",
+          href: "/sales/dashboard",
+          icon: BarChart3,
+          isActive: pathname === "/sales/dashboard",
+        },
+        {
+          name: "Clients",
+          href: "/sales/clients",
+          icon: Users,
+          isActive: pathname === "/sales/clients",
+        },
+        {
+          name: "Products",
+          href: "/sales/products",
+          icon: Package,
+          isActive: pathname?.startsWith("/sales/products"),
+        },
+        {
+          name: "Proposals",
+          href: "/sales/proposals",
+          icon: FileText,
+          isActive: pathname?.startsWith("/sales/proposals"),
+        },
+        {
+          name: "Job Orders",
+          href: "/sales/job-orders",
+          icon: ClipboardList,
+          isActive: pathname?.startsWith("/sales/job-orders"),
+        },
+        {
+          name: "Bookings",
+          href: "/sales/bookings",
+          icon: Calendar,
+          isActive: pathname?.startsWith("/sales/bookings"),
+        },
+        {
+          name: "Chat",
+          href: "/sales/chat",
+          icon: MessageSquare,
+          badge: "3",
+          isActive: pathname?.startsWith("/sales/chat"),
+        },
+        {
+          name: "Planner",
+          href: "/sales/planner",
+          icon: Target,
+          isActive: pathname === "/sales/planner",
+        },
+        {
+          name: "Campaigns",
+          href: "/sales/project-campaigns",
+          icon: Briefcase,
+          isActive: pathname?.startsWith("/sales/project-campaigns"),
+        },
+        {
+          name: "Bulletin Board",
+          href: "/sales/bulletin-board",
+          icon: MessageSquare,
+          isActive: pathname === "/sales/bulletin-board",
+        },
+      ],
+    },
+  ]
+
+  const cmsSections: NavigationSection[] = [
+    {
+      title: "Content",
+      items: [
+        {
+          name: "Dashboard",
+          href: "/cms/dashboard",
+          icon: LayoutDashboard,
+          isActive: pathname === "/cms/dashboard",
+        },
+        {
+          name: "Orders",
+          href: "/cms/orders",
+          icon: ShoppingCart,
+          isActive: pathname === "/cms/orders",
+        },
+        {
+          name: "Planner",
+          href: "/cms/planner",
+          icon: Calendar,
+          isActive: pathname === "/cms/planner",
+        },
+      ],
+    },
+  ]
+
+  const getCurrentSections = () => {
+    if (isAdminNavigation) return adminSections
+    if (pathname?.startsWith("/logistics")) return logisticsSections
+    if (pathname?.startsWith("/sales")) return salesSections
+    if (pathname?.startsWith("/cms")) return cmsSections
+    return adminSections
   }
-  // Show admin sidebar for both admin routes AND logistics/calendar
-  if (pathname?.startsWith("/admin") || pathname === "/logistics/calendar") {
-    currentSection = "admin"
+
+  const sections = getCurrentSections()
+
+  const intelligenceSlides = [
+    {
+      title: "Analytics Insights",
+      description: "View performance metrics and trends",
+      color: "bg-purple-500",
+    },
+    {
+      title: "AI Recommendations",
+      description: "Get smart suggestions for optimization",
+      color: "bg-blue-500",
+    },
+    {
+      title: "Predictive Analytics",
+      description: "Forecast future trends and patterns",
+      color: "bg-green-500",
+    },
+  ]
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % intelligenceSlides.length)
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [intelligenceSlides.length])
+
+  const nextSlide = () => {
+    setCurrentSlide((prev) => (prev + 1) % intelligenceSlides.length)
   }
 
-  // Find the navigation item for the current section
-  const currentNavItem = navigationItems.find((item) => item.section === currentSection)
-
-  if (!currentNavItem && currentSection !== "admin" && currentSection !== "sales") {
-    return null
+  const prevSlide = () => {
+    setCurrentSlide((prev) => (prev - 1 + intelligenceSlides.length) % intelligenceSlides.length)
   }
-
-  const SectionIcon = currentNavItem?.icon
 
   return (
-    <div className="w-64 h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 overflow-y-auto shadow-sm">
-      <nav className="p-3 space-y-4">
-        {currentSection === "admin" ? (
-          <>
-            {/* Notification Section */}
-            <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg p-3 text-white">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs text-white/90">No notification for now.</p>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
-              </div>
+    <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
+      {/* Notification Section */}
+      <div className="p-4">
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-blue-900">Notification</h3>
+              <Button variant="link" size="sm" className="text-blue-600 p-0 h-auto">
+                See All
+              </Button>
             </div>
+            <p className="text-sm text-blue-700">No notification for now.</p>
+          </CardContent>
+        </Card>
+      </div>
 
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-              <div className="px-3 py-2 border-b border-gray-100">
-                <h3 className="text-sm font-medium text-gray-700">To Go</h3>
-              </div>
-              <div className="p-1">
-                {[
-                  { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-                  { title: "Bulletin Board", href: "/admin/bulletin-board", icon: ClipboardList },
-                  { title: "Calendar", href: "/logistics/calendar", icon: Calendar },
-                ].map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(pathname, item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
-                        active
-                          ? "bg-gray-100 text-gray-900 font-medium"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                      )}
+      {/* Navigation Sections */}
+      <div className="flex-1 px-4 space-y-6">
+        {sections.map((section) => (
+          <div key={section.title}>
+            <h3 className="text-sm font-medium text-gray-500 mb-3">{section.title}</h3>
+            <nav className="space-y-1">
+              {section.items.map((item) => {
+                const Icon = item.icon
+                return (
+                  <Link key={item.name} href={item.href}>
+                    <Button
+                      variant={item.isActive ? "secondary" : "ghost"}
+                      className={`w-full justify-start ${
+                        item.isActive ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:text-gray-900"
+                      }`}
                     >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                      <span className="flex-1">{item.title}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-              <div className="px-3 py-2 border-b border-gray-100">
-                <h3 className="text-sm font-medium text-gray-700">To Do</h3>
-              </div>
-              <div className="p-1">
-                {[
-                  { title: "Documents", href: "/admin/documents", icon: FileText },
-                  { title: "Inventory", href: "/admin/inventory", icon: Package, "data-tour-id": "inventory-link" },
-                  { title: "User Management", href: "/admin/access-management", icon: Users },
-                  { title: "Subscription", href: "/admin/subscriptions", icon: FileText },
-                ].map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(pathname, item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      data-tour-id={item["data-tour-id"]}
-                      className={cn(
-                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
-                        active
-                          ? "bg-gray-100 text-gray-900 font-medium"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                      )}
-                    >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                      <span className="flex-1">{item.title}</span>
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Intelligence Section */}
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
-              <div className="flex items-center space-x-2 mb-3">
-                <h3 className="text-sm font-medium">Intelligence</h3>
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <div className="relative">
-                <div className="flex items-center space-x-2">
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <div className="flex-1 grid grid-cols-2 gap-2">
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                  </div>
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
-              </div>
-            </div>
-          </>
-        ) : currentSection === "sales" ? (
-          <>
-            {/* Notification Section */}
-            <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg p-3 text-white">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                    <AvatarFallback className="bg-white/20 text-white text-xs">JD</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/30 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/20 rounded-full w-3/4"></div>
-                  </div>
-                  <button className="w-2 h-2 bg-white rounded-full"></button>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="/placeholder.svg?height=32&width=32" />
-                    <AvatarFallback className="bg-white/20 text-white text-xs">SM</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/30 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/20 rounded-full w-2/3"></div>
-                  </div>
-                  <button className="w-2 h-2 bg-white rounded-full"></button>
-                </div>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-              <div className="px-3 py-2 border-b border-gray-100">
-                <h3 className="text-sm font-medium text-gray-700">To Do</h3>
-              </div>
-              <div className="p-1">
-                {[
-                  { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
-                  { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
-                  { title: "Bulletin Board", href: "/sales/bulletin-board", icon: ClipboardList },
-                ].map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(pathname, item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
-                        active
-                          ? "bg-gray-100 text-gray-900 font-medium"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                      )}
-                    >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                      <span className="flex-1">{item.title}</span>
-                      {item.href === "/sales/chat" && unreadCount > 0 && (
-                        <Badge
-                          variant="destructive"
-                          className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
-                        >
-                          {unreadCount > 99 ? "99+" : unreadCount}
+                      <Icon className="mr-3 h-4 w-4" />
+                      {item.name}
+                      {item.badge && (
+                        <Badge variant="secondary" className="ml-auto bg-red-100 text-red-800">
+                          {item.badge}
                         </Badge>
                       )}
-                    </Link>
-                  )
-                })}
+                    </Button>
+                  </Link>
+                )
+              })}
+            </nav>
+          </div>
+        ))}
+      </div>
+
+      <Separator className="mx-4" />
+
+      {/* Intelligence Section */}
+      <div className="p-4">
+        <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center">
+                <Sparkles className="h-4 w-4 mr-2" />
+                <h3 className="font-semibold">Intelligence</h3>
               </div>
+              <Button variant="link" size="sm" className="text-white p-0 h-auto">
+                See All
+              </Button>
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-              <div className="px-3 py-2 border-b border-gray-100">
-                <h3 className="text-sm font-medium text-gray-700">To Go</h3>
-              </div>
-              <div className="p-1">
-                {[
-                  { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
-                  { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
-                  { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
-                  { title: "Clients", href: "/sales/clients", icon: Users },
-                  { title: "Billings", href: "#", icon: FileText },
-                  { title: "Planner", href: "/sales/planner", icon: Calendar },
-                  { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
-                ].map((item) => {
-                  const Icon = item.icon
-                  const active = isActive(pathname, item.href)
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
-                        active
-                          ? "bg-gray-100 text-gray-900 font-medium"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                      )}
-                    >
-                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                      <span className="flex-1">{item.title}</span>
-                      {item.href === "/sales/chat" && unreadCount > 0 && (
-                        <Badge
-                          variant="destructive"
-                          className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
-                        >
-                          {unreadCount > 99 ? "99+" : unreadCount}
-                        </Badge>
-                      )}
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Intelligence Section */}
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
-              <div className="flex items-center space-x-2 mb-3">
-                <h3 className="text-sm font-medium">Intelligence</h3>
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <div className="relative">
-                <div className="flex items-center space-x-2">
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <div className="flex-1 grid grid-cols-2 gap-2">
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                    <div className="h-12 bg-white/20 rounded-md"></div>
+            <div className="relative h-20 mb-3">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div
+                  className={`w-full h-16 rounded-lg ${intelligenceSlides[currentSlide].color} bg-opacity-30 flex items-center justify-center`}
+                >
+                  <div className="text-center">
+                    <div className="text-xs font-medium mb-1">{intelligenceSlides[currentSlide].title}</div>
+                    <div className="text-xs opacity-80">{intelligenceSlides[currentSlide].description}</div>
                   </div>
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
                 </div>
               </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
-              </div>
             </div>
-          </>
-        ) : (
-          // Default layout for other sections
-          currentNavItem?.items.map((item) => {
-            const Icon = item.icon
-            const active = isActive(pathname, item.href)
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center py-2.5 px-3 text-sm rounded-md mx-2 my-1 transition-all duration-200",
-                  active
-                    ? "bg-gray-200 text-gray-900 font-medium shadow-sm"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
-                )}
-              >
-                <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                <span className="flex-1">{item.title}</span>
-                {item.href === "/sales/chat" && unreadCount > 0 && (
-                  <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </Badge>
-                )}
-                {active && <div className="ml-auto w-1 h-5 bg-gray-700 rounded-full"></div>}
-              </Link>
-            )
-          })
-        )}
-      </nav>
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="sm" onClick={prevSlide} className="text-white hover:bg-white/20 p-1 h-auto">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+
+              <div className="flex space-x-1">
+                {intelligenceSlides.map((_, index) => (
+                  <div
+                    key={index}
+                    className={`w-2 h-2 rounded-full ${index === currentSlide ? "bg-white" : "bg-white/50"}`}
+                  />
+                ))}
+              </div>
+
+              <Button variant="ghost" size="sm" onClick={nextSlide} className="text-white hover:bg-white/20 p-1 h-auto">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }
