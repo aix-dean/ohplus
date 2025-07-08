@@ -5,8 +5,7 @@ import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
 import AuthLayout from "./auth-layout"
 import { AssistantProvider } from "@/components/ai-assistant/assistant-provider"
-import { ToastProvider } from "@/hooks/use-toast-provider"
-import { Toaster } from "@/components/ui/toast"
+import { ToastProvider, Toaster, ToastViewport } from "@/components/ui/toast" // Import all from components/ui/toast
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -30,9 +29,10 @@ export default function RootLayout({
         <AuthProvider>
           <AuthLayout>
             <ToastProvider>
+              <ToastViewport /> {/* Render ToastViewport from Radix */}
               <div className="flex flex-col h-screen">{children}</div>
               <AssistantProvider />
-              <Toaster />
+              <Toaster /> {/* Render Sonner Toaster */}
             </ToastProvider>
           </AuthLayout>
         </AuthProvider>
