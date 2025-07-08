@@ -135,9 +135,9 @@ function dispatch(action: Action) {
   })
 }
 
-type Toast = Omit<ToasterToast, "id">
+type ToastType = typeof sonnerToast
 
-function toast(props: Toast) {
+function toast(props: ToastProps) {
   const id = genId()
 
   const update = (props: ToasterToast) =>
@@ -199,4 +199,4 @@ function useToast() {
   }
 }
 
-export { useToast, toast }
+export { useToast, sonnerToast as toast }
