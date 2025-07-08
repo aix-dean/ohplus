@@ -521,13 +521,20 @@ function UnifiedSiteCard({ site }: { site: any }) {
               <span className="text-sm text-gray-500">Today</span>
             </div>
           </div>
+          {/* Create Report Button */}
+          <Button
+            variant="outline"
+            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              // Handle create report functionality here
+              console.log("Create report for site:", site.id)
+            }}
+          >
+            Create Report
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-        >
-          Create Report
-        </Button>
       </CardContent>
     </Card>
   )
