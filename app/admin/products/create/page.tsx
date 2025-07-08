@@ -305,6 +305,11 @@ export default function AdminProductCreatePage() {
         categories: selectedCategories,
         category_names: getCategoryNames(),
         company_id: userData?.company_id || null,
+        seller_id: user?.uid || "",
+        seller_name:
+          userData?.first_name && userData?.last_name
+            ? `${userData.first_name} ${userData.last_name}`
+            : user?.email || "",
         active: true,
         deleted: false,
         created: serverTimestamp(),
