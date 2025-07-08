@@ -127,6 +127,7 @@ export function LogisticsCalendar() {
       </div>
 
       {/* Day Headers */}
+      {/* Days of week header */}
       <div className="grid grid-cols-7 border-2 border-blue-400 rounded-t-md">
         {dayHeaders.map((day) => (
           <div
