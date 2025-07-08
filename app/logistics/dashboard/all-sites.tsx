@@ -328,7 +328,7 @@ export default function AllSitesTab() {
         <div className="bg-red-50 border border-red-200 rounded-md p-4 text-center">
           <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
           <p className="text-red-700">{error}</p>
-          <Button variant="outline" className="mt-4" onClick={() => fetchProducts(1, true)}>
+          <Button variant="outline" className="mt-4 bg-transparent" onClick={() => fetchProducts(1, true)}>
             Try Again
           </Button>
         </div>
@@ -397,7 +397,7 @@ export default function AllSitesTab() {
               size="sm"
               onClick={goToPreviousPage}
               disabled={currentPage === 1}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 bg-transparent"
             >
               <ChevronLeft size={16} />
             </Button>
@@ -522,6 +522,12 @@ function UnifiedSiteCard({ site }: { site: any }) {
             </div>
           </div>
         </div>
+        <Button
+          variant="outline"
+          className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+        >
+          Create Report
+        </Button>
       </CardContent>
     </Card>
   )
