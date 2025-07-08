@@ -56,13 +56,6 @@ export default function AdminInventoryPage() {
   const [showSubscriptionLimitDialog, setShowSubscriptionLimitDialog] = useState(false)
   const [subscriptionLimitMessage, setSubscriptionLimitMessage] = useState("")
 
-  // Check if user has company_id when component mounts
-  useEffect(() => {
-    if (userData && !userData.company_id) {
-      setShowCompanyDialog(true)
-    }
-  }, [userData])
-
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
     if (!user?.uid) return
@@ -138,18 +131,18 @@ export default function AdminInventoryPage() {
 
   // Load initial data and count
   useEffect(() => {
-    if (user?.uid && userData?.company_id) {
+    if (user?.uid) {
       fetchProducts(1)
       fetchTotalCount()
     }
-  }, [user, userData?.company_id, fetchProducts, fetchTotalCount])
+  }, [user, fetchProducts, fetchTotalCount])
 
   // Load data when page changes
   useEffect(() => {
-    if (user?.uid && userData?.company_id && currentPage > 0) {
+    if (user?.uid && currentPage > 0) {
       fetchProducts(currentPage)
     }
-  }, [currentPage, fetchProducts, user, userData?.company_id])
+  }, [currentPage, fetchProducts, user])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -262,6 +255,12 @@ export default function AdminInventoryPage() {
   }
 
   const handleAddSiteClick = () => {
+    // Check if user has company_id first
+    if (!userData?.company_id) {
+      setShowCompanyDialog(true)
+      return
+    }
+
     if (!userData?.license_key) {
       setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
       setShowSubscriptionLimitDialog(true)
@@ -290,32 +289,8 @@ export default function AdminInventoryPage() {
   const handleCompanyRegistrationSuccess = async () => {
     await refreshUserData()
     setShowCompanyDialog(false)
-  }
-
-  // Show loading screen if user data is still loading or company dialog is open
-  if (loading && !userData) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  // Don't render main content if company dialog is open
-  if (showCompanyDialog) {
-    return (
-      <>
-        <div className="flex min-h-screen items-center justify-center bg-gray-50">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        </div>
-        <CompanyRegistrationDialog
-          isOpen={showCompanyDialog}
-          onClose={() => {}} // Prevent closing without completing registration
-          onSuccess={handleCompanyRegistrationSuccess}
-          userId={user?.uid || ""}
-        />
-      </>
-    )
+    // After successful company registration, proceed to add site
+    router.push("/admin/products/create")
   }
 
   return (
@@ -470,7 +445,7 @@ export default function AdminInventoryPage() {
       {/* Company Registration Dialog */}
       <CompanyRegistrationDialog
         isOpen={showCompanyDialog}
-        onClose={() => {}} // Prevent closing without completing registration
+        onClose={() => setShowCompanyDialog(false)}
         onSuccess={handleCompanyRegistrationSuccess}
         userId={user?.uid || ""}
       />
