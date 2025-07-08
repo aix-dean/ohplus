@@ -51,20 +51,19 @@ export default function AdminDashboardPage() {
     console.log("Dashboard: Set startTour to true, tourKey incremented to", tourKey + 1)
   }
 
-  // Remove handleTestTour
-  // const handleTestTour = () => {
-  //   console.log("Dashboard: Test Tour button clicked")
-  //   // Clear any previous tour completion
-  //   localStorage.removeItem("onboardingTourCompleted")
-  //   console.log("Dashboard: Cleared onboardingTourCompleted from localStorage")
-  //   // Start the tour
-  //   setStartTour(true)
-  //   setTourKey((prev) => {
-  //     const newKey = prev + 1
-  //     console.log("Dashboard: Set startTour to true, tourKey incremented to", newKey)
-  //     return newKey
-  //   })
-  // }
+  const handleTestTour = () => {
+    console.log("Dashboard: Test Tour button clicked")
+    // Clear any previous tour completion
+    localStorage.removeItem("onboardingTourCompleted")
+    console.log("Dashboard: Cleared onboardingTourCompleted from localStorage")
+    // Start the tour
+    setStartTour(true)
+    setTourKey((prev) => {
+      const newKey = prev + 1
+      console.log("Dashboard: Set startTour to true, tourKey incremented to", newKey)
+      return newKey
+    })
+  }
 
   // Log state changes
   useEffect(() => {
@@ -275,6 +274,9 @@ export default function AdminDashboardPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-4">
             <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
+            <Button onClick={handleTestTour} variant="outline" size="sm" className="text-xs bg-transparent">
+              Test Tour
+            </Button>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-grow">
