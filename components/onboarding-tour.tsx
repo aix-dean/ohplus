@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import Joyride, { type CallBackProps, STATUS, type Step } from "react-joyride"
 import { useAuth } from "@/contexts/auth-context"
+import { usePathname } from "next/navigation"
 
 const dashboardSteps: Step[] = [
   {
@@ -16,63 +17,46 @@ const dashboardSteps: Step[] = [
 ]
 
 export function OnboardingTour() {
-  const [run, setRun] = useState(false)
-  const [stepIndex, setStepIndex] = useState(0)
   const { user } = useAuth()
+  const pathname = usePathname()
+  const [runTour, setRunTour] = useState(false)
+  const [tourKey, setTourKey] = useState(0)
 
   useEffect(() => {
-    // Check if user has completed onboarding
-    const hasCompletedOnboarding = localStorage.getItem(`onboarding-completed-${user?.uid}`)
-
-    if (!hasCompletedOnboarding && user) {
-      // Start the tour after a short delay
-      const timer = setTimeout(() => {
-        setRun(true)
-      }, 1000)
-
-      return () => clearTimeout(timer)
+    if (user && pathname === "/admin/dashboard") {
+      const hasSeenTour = localStorage.getItem(`onboarding-tour-${user.uid}`)
+      if (!hasSeenTour) {
+        setRunTour(true)
+      }
     }
-  }, [user])
+  }, [user, pathname])
 
   const handleJoyrideCallback = (data: CallBackProps) => {
-    const { status, type, index } = data
+    const { status, action, type } = data
 
-    if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
-      // Mark onboarding as completed
-      if (user?.uid) {
-        localStorage.setItem(`onboarding-completed-${user.uid}`, "true")
+    if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status) || action === "close") {
+      setRunTour(false)
+      if (user) {
+        localStorage.setItem(`onboarding-tour-${user.uid}`, "true")
       }
-      setRun(false)
-      setStepIndex(0)
-    } else if (type === "step:after") {
-      setStepIndex(index + 1)
-    }
-
-    // Handle close button click
-    if (status === STATUS.FINISHED || status === STATUS.SKIPPED || type === "overlay:click") {
-      if (user?.uid) {
-        localStorage.setItem(`onboarding-completed-${user.uid}`, "true")
-      }
-      setRun(false)
-      setStepIndex(0)
     }
   }
 
-  if (!user) return null
+  if (!runTour || !user) {
+    return null
+  }
 
   return (
     <Joyride
-      callback={handleJoyrideCallback}
-      continuous={true}
-      run={run}
-      stepIndex={stepIndex}
+      key={tourKey}
       steps={dashboardSteps}
-      hideCloseButton={false}
-      scrollToFirstStep={true}
-      showProgress={false}
+      run={runTour}
+      continuous={true}
+      showProgress={true}
       showSkipButton={true}
       disableOverlayClose={false}
       disableCloseOnEsc={false}
+      callback={handleJoyrideCallback}
       styles={{
         options: {
           primaryColor: "#3b82f6",
@@ -84,52 +68,46 @@ export function OnboardingTour() {
         },
         tooltip: {
           borderRadius: 8,
+          boxShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
+          fontSize: 14,
           padding: 20,
         },
         tooltipTitle: {
           color: "#3b82f6",
-          fontSize: "18px",
-          fontWeight: "bold",
-          marginBottom: "10px",
+          fontSize: 18,
+          fontWeight: 600,
+          marginBottom: 10,
         },
         tooltipContent: {
-          fontSize: "14px",
-          lineHeight: "1.5",
-          padding: "10px 0",
+          lineHeight: 1.5,
+          marginBottom: 15,
         },
         buttonNext: {
           backgroundColor: "#3b82f6",
           borderRadius: 6,
           color: "#ffffff",
-          fontSize: "14px",
-          fontWeight: "500",
+          fontSize: 14,
+          fontWeight: 500,
           padding: "8px 16px",
+        },
+        buttonBack: {
+          color: "#6b7280",
+          fontSize: 14,
+          marginRight: 10,
         },
         buttonSkip: {
           color: "#6b7280",
-          fontSize: "14px",
-          fontWeight: "500",
+          fontSize: 14,
         },
         buttonClose: {
           color: "#6b7280",
-          fontSize: "16px",
-          fontWeight: "bold",
+          fontSize: 18,
+          height: 24,
+          width: 24,
           position: "absolute",
-          right: "10px",
-          top: "10px",
-          width: "20px",
-          height: "20px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          right: 8,
+          top: 8,
         },
-      }}
-      locale={{
-        back: "Back",
-        close: "×",
-        last: "Finish Tour",
-        next: "Next",
-        skip: "Skip Tour",
       }}
     />
   )
