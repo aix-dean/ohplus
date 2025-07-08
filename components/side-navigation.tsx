@@ -1,14 +1,11 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   LayoutDashboard,
   MessageSquare,
@@ -17,375 +14,256 @@ import {
   Package,
   Users,
   CreditCard,
-  MapPin,
-  AlertTriangle,
-  UserCheck,
-  CalendarIcon,
-  BarChart3,
-  ClipboardList,
-  Target,
-  Briefcase,
-  ShoppingCart,
-  Sparkles,
+  Bell,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
+  MapPin,
+  Truck,
+  AlertTriangle,
+  CalendarIcon,
+  ShoppingCart,
+  Briefcase,
+  Target,
+  MessageCircle,
+  FileBarChart,
+  ClipboardList,
 } from "lucide-react"
 
-interface NavigationItem {
-  name: string
-  href: string
-  icon: React.ComponentType<{ className?: string }>
-  badge?: string
-  isActive?: boolean
+interface SideNavigationProps {
+  isCollapsed?: boolean
+  onToggle?: () => void
 }
 
-interface NavigationSection {
-  title: string
-  items: NavigationItem[]
-}
-
-export function SideNavigation() {
+export function SideNavigation({ isCollapsed = false, onToggle }: SideNavigationProps) {
   const pathname = usePathname()
-  const [currentSlide, setCurrentSlide] = useState(0)
+  const [unreadCount, setUnreadCount] = useState(3)
 
-  // Show admin navigation for admin routes and logistics calendar
-  const isAdminNavigation = pathname?.startsWith("/admin") || pathname === "/logistics/calendar"
+  // Determine which navigation to show based on current path
+  const isAdminPath = pathname?.startsWith("/admin") || pathname === "/logistics/calendar"
+  const isLogisticsPath = pathname?.startsWith("/logistics") && pathname !== "/logistics/calendar"
+  const isSalesPath = pathname?.startsWith("/sales")
+  const isCMSPath = pathname?.startsWith("/cms")
 
-  const adminSections: NavigationSection[] = [
-    {
-      title: "To Go",
-      items: [
-        {
-          name: "Dashboard",
-          href: "/admin/dashboard",
-          icon: LayoutDashboard,
-          isActive: pathname === "/admin/dashboard",
-        },
-        {
-          name: "Bulletin Board",
-          href: "/admin/bulletin-board",
-          icon: MessageSquare,
-          isActive: pathname === "/admin/bulletin-board",
-        },
-        {
-          name: "Calendar",
-          href: "/logistics/calendar",
-          icon: Calendar,
-          isActive: pathname === "/logistics/calendar",
-        },
-      ],
-    },
-    {
-      title: "To Do",
-      items: [
-        {
-          name: "Documents",
-          href: "/admin/documents",
-          icon: FileText,
-          isActive: pathname === "/admin/documents",
-        },
-        {
-          name: "Inventory",
-          href: "/admin/inventory",
-          icon: Package,
-          isActive: pathname?.startsWith("/admin/inventory"),
-        },
-        {
-          name: "User Management",
-          href: "/admin/access-management",
-          icon: Users,
-          isActive: pathname === "/admin/access-management",
-        },
-        {
-          name: "Subscription",
-          href: "/admin/subscriptions",
-          icon: CreditCard,
-          isActive: pathname?.startsWith("/admin/subscriptions"),
-        },
-      ],
-    },
-  ]
-
-  const logisticsSections: NavigationSection[] = [
-    {
-      title: "Overview",
-      items: [
-        {
-          name: "Dashboard",
-          href: "/logistics/dashboard",
-          icon: LayoutDashboard,
-          isActive: pathname === "/logistics/dashboard",
-        },
-        {
-          name: "Sites",
-          href: "/logistics/sites",
-          icon: MapPin,
-          isActive: pathname?.startsWith("/logistics/sites"),
-        },
-      ],
-    },
-    {
-      title: "Operations",
-      items: [
-        {
-          name: "Assignments",
-          href: "/logistics/assignments",
-          icon: UserCheck,
-          isActive: pathname === "/logistics/assignments",
-        },
-        {
-          name: "Alerts",
-          href: "/logistics/alerts",
-          icon: AlertTriangle,
-          isActive: pathname === "/logistics/alerts",
-        },
-        {
-          name: "Planner",
-          href: "/logistics/planner",
-          icon: CalendarIcon,
-          isActive: pathname === "/logistics/planner",
-        },
-      ],
-    },
-  ]
-
-  const salesSections: NavigationSection[] = [
-    {
-      title: "Sales",
-      items: [
-        {
-          name: "Dashboard",
-          href: "/sales/dashboard",
-          icon: BarChart3,
-          isActive: pathname === "/sales/dashboard",
-        },
-        {
-          name: "Clients",
-          href: "/sales/clients",
-          icon: Users,
-          isActive: pathname === "/sales/clients",
-        },
-        {
-          name: "Products",
-          href: "/sales/products",
-          icon: Package,
-          isActive: pathname?.startsWith("/sales/products"),
-        },
-        {
-          name: "Proposals",
-          href: "/sales/proposals",
-          icon: FileText,
-          isActive: pathname?.startsWith("/sales/proposals"),
-        },
-        {
-          name: "Job Orders",
-          href: "/sales/job-orders",
-          icon: ClipboardList,
-          isActive: pathname?.startsWith("/sales/job-orders"),
-        },
-        {
-          name: "Bookings",
-          href: "/sales/bookings",
-          icon: Calendar,
-          isActive: pathname?.startsWith("/sales/bookings"),
-        },
-        {
-          name: "Chat",
-          href: "/sales/chat",
-          icon: MessageSquare,
-          badge: "3",
-          isActive: pathname?.startsWith("/sales/chat"),
-        },
-        {
-          name: "Planner",
-          href: "/sales/planner",
-          icon: Target,
-          isActive: pathname === "/sales/planner",
-        },
-        {
-          name: "Campaigns",
-          href: "/sales/project-campaigns",
-          icon: Briefcase,
-          isActive: pathname?.startsWith("/sales/project-campaigns"),
-        },
-        {
-          name: "Bulletin Board",
-          href: "/sales/bulletin-board",
-          icon: MessageSquare,
-          isActive: pathname === "/sales/bulletin-board",
-        },
-      ],
-    },
-  ]
-
-  const cmsSections: NavigationSection[] = [
-    {
-      title: "Content",
-      items: [
-        {
-          name: "Dashboard",
-          href: "/cms/dashboard",
-          icon: LayoutDashboard,
-          isActive: pathname === "/cms/dashboard",
-        },
-        {
-          name: "Orders",
-          href: "/cms/orders",
-          icon: ShoppingCart,
-          isActive: pathname === "/cms/orders",
-        },
-        {
-          name: "Planner",
-          href: "/cms/planner",
-          icon: Calendar,
-          isActive: pathname === "/cms/planner",
-        },
-      ],
-    },
-  ]
-
-  const getCurrentSections = () => {
-    if (isAdminNavigation) return adminSections
-    if (pathname?.startsWith("/logistics")) return logisticsSections
-    if (pathname?.startsWith("/sales")) return salesSections
-    if (pathname?.startsWith("/cms")) return cmsSections
-    return adminSections
+  // Admin navigation items
+  const adminNavItems = {
+    toGo: [
+      { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+      { href: "/admin/chat-analytics", icon: MessageSquare, label: "Bulletin Board" },
+      { href: "/logistics/calendar", icon: Calendar, label: "Calendar" },
+    ],
+    toDo: [
+      { href: "/admin/documents", icon: FileText, label: "Documents" },
+      { href: "/admin/inventory", icon: Package, label: "Inventory" },
+      { href: "/admin/access-management", icon: Users, label: "User Management" },
+      { href: "/admin/subscriptions", icon: CreditCard, label: "Subscription" },
+    ],
   }
 
-  const sections = getCurrentSections()
-
-  const intelligenceSlides = [
-    {
-      title: "Analytics Insights",
-      description: "View performance metrics and trends",
-      color: "bg-purple-500",
-    },
-    {
-      title: "AI Recommendations",
-      description: "Get smart suggestions for optimization",
-      color: "bg-blue-500",
-    },
-    {
-      title: "Predictive Analytics",
-      description: "Forecast future trends and patterns",
-      color: "bg-green-500",
-    },
-  ]
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % intelligenceSlides.length)
-    }, 5000)
-    return () => clearInterval(timer)
-  }, [intelligenceSlides.length])
-
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % intelligenceSlides.length)
+  // Logistics navigation items
+  const logisticsNavItems = {
+    main: [
+      { href: "/logistics/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+      { href: "/logistics/sites", icon: MapPin, label: "Sites" },
+      { href: "/logistics/assignments", icon: Truck, label: "Assignments" },
+      { href: "/logistics/alerts", icon: AlertTriangle, label: "Alerts" },
+      { href: "/logistics/planner", icon: CalendarIcon, label: "Planner" },
+    ],
   }
 
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + intelligenceSlides.length) % intelligenceSlides.length)
+  // Sales navigation items
+  const salesNavItems = {
+    main: [
+      { href: "/sales/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+      { href: "/sales/clients", icon: Users, label: "Clients" },
+      { href: "/sales/proposals", icon: FileText, label: "Proposals" },
+      { href: "/sales/quotations", icon: FileBarChart, label: "Quotations" },
+      { href: "/sales/bookings", icon: ClipboardList, label: "Bookings" },
+      { href: "/sales/job-orders", icon: Briefcase, label: "Job Orders" },
+      { href: "/sales/project-campaigns", icon: Target, label: "Campaigns" },
+      { href: "/sales/products", icon: Package, label: "Products" },
+      { href: "/sales/chat", icon: MessageCircle, label: "Chat" },
+      { href: "/sales/planner", icon: CalendarIcon, label: "Planner" },
+      { href: "/sales/bulletin-board", icon: MessageSquare, label: "Bulletin Board" },
+    ],
+  }
+
+  // CMS navigation items
+  const cmsNavItems = {
+    main: [
+      { href: "/cms/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+      { href: "/cms/orders", icon: ShoppingCart, label: "Orders" },
+      { href: "/cms/planner", icon: CalendarIcon, label: "Planner" },
+    ],
+  }
+
+  const renderNavItem = (item: any, isActive: boolean) => (
+    <Link key={item.href} href={item.href}>
+      <Button
+        variant={isActive ? "secondary" : "ghost"}
+        className={`w-full justify-start gap-3 h-10 ${
+          isActive ? "bg-blue-50 text-blue-700 border-blue-200" : "text-gray-700 hover:bg-gray-50"
+        }`}
+      >
+        <item.icon className="h-4 w-4" />
+        {!isCollapsed && <span className="text-sm">{item.label}</span>}
+      </Button>
+    </Link>
+  )
+
+  if (isCollapsed) {
+    return (
+      <div className="w-16 border-r border-gray-200 bg-white flex flex-col">
+        <div className="p-3">
+          <Button variant="ghost" size="sm" onClick={onToggle} className="w-full">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        <ScrollArea className="flex-1">
+          <div className="space-y-2 p-2">
+            {isAdminPath &&
+              [...adminNavItems.toGo, ...adminNavItems.toDo].map((item) => (
+                <Link key={item.href} href={item.href}>
+                  <Button variant={pathname === item.href ? "secondary" : "ghost"} size="sm" className="w-full p-2">
+                    <item.icon className="h-4 w-4" />
+                  </Button>
+                </Link>
+              ))}
+            {isLogisticsPath &&
+              logisticsNavItems.main.map((item) => (
+                <Link key={item.href} href={item.href}>
+                  <Button variant={pathname === item.href ? "secondary" : "ghost"} size="sm" className="w-full p-2">
+                    <item.icon className="h-4 w-4" />
+                  </Button>
+                </Link>
+              ))}
+            {isSalesPath &&
+              salesNavItems.main.map((item) => (
+                <Link key={item.href} href={item.href}>
+                  <Button variant={pathname === item.href ? "secondary" : "ghost"} size="sm" className="w-full p-2">
+                    <item.icon className="h-4 w-4" />
+                  </Button>
+                </Link>
+              ))}
+            {isCMSPath &&
+              cmsNavItems.main.map((item) => (
+                <Link key={item.href} href={item.href}>
+                  <Button variant={pathname === item.href ? "secondary" : "ghost"} size="sm" className="w-full p-2">
+                    <item.icon className="h-4 w-4" />
+                  </Button>
+                </Link>
+              ))}
+          </div>
+        </ScrollArea>
+      </div>
+    )
   }
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
-      {/* Notification Section */}
+    <div className="w-64 border-r border-gray-200 bg-white flex flex-col">
       <div className="p-4">
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-blue-900">Notification</h3>
-              <Button variant="link" size="sm" className="text-blue-600 p-0 h-auto">
-                See All
-              </Button>
-            </div>
-            <p className="text-sm text-blue-700">No notification for now.</p>
-          </CardContent>
-        </Card>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Navigation</h2>
+          <Button variant="ghost" size="sm" onClick={onToggle}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
-      {/* Navigation Sections */}
-      <div className="flex-1 px-4 space-y-6">
-        {sections.map((section) => (
-          <div key={section.title}>
-            <h3 className="text-sm font-medium text-gray-500 mb-3">{section.title}</h3>
-            <nav className="space-y-1">
-              {section.items.map((item) => {
-                const Icon = item.icon
-                return (
-                  <Link key={item.name} href={item.href}>
-                    <Button
-                      variant={item.isActive ? "secondary" : "ghost"}
-                      className={`w-full justify-start ${
-                        item.isActive ? "bg-gray-100 text-gray-900" : "text-gray-600 hover:text-gray-900"
-                      }`}
-                    >
-                      <Icon className="mr-3 h-4 w-4" />
-                      {item.name}
-                      {item.badge && (
-                        <Badge variant="secondary" className="ml-auto bg-red-100 text-red-800">
-                          {item.badge}
-                        </Badge>
-                      )}
-                    </Button>
-                  </Link>
-                )
-              })}
-            </nav>
-          </div>
-        ))}
-      </div>
-
-      <Separator className="mx-4" />
-
-      {/* Intelligence Section */}
-      <div className="p-4">
-        <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center">
-                <Sparkles className="h-4 w-4 mr-2" />
-                <h3 className="font-semibold">Intelligence</h3>
-              </div>
-              <Button variant="link" size="sm" className="text-white p-0 h-auto">
-                See All
-              </Button>
-            </div>
-
-            <div className="relative h-20 mb-3">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div
-                  className={`w-full h-16 rounded-lg ${intelligenceSlides[currentSlide].color} bg-opacity-30 flex items-center justify-center`}
-                >
-                  <div className="text-center">
-                    <div className="text-xs font-medium mb-1">{intelligenceSlides[currentSlide].title}</div>
-                    <div className="text-xs opacity-80">{intelligenceSlides[currentSlide].description}</div>
+      <ScrollArea className="flex-1 px-4">
+        <div className="space-y-6">
+          {/* Admin Navigation */}
+          {isAdminPath && (
+            <>
+              {/* Notification Card */}
+              <Card className="bg-blue-50 border-blue-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Bell className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm font-medium text-blue-900">Notification</span>
+                    </div>
                   </div>
+                  <p className="text-xs text-blue-700 mb-3">No notification for now.</p>
+                  <Button variant="outline" size="sm" className="w-full text-blue-700 border-blue-300 bg-transparent">
+                    See All
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* To Go Section */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-3">To Go</h3>
+                <div className="space-y-1">
+                  {adminNavItems.toGo.map((item) => renderNavItem(item, pathname === item.href))}
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center justify-between">
-              <Button variant="ghost" size="sm" onClick={prevSlide} className="text-white hover:bg-white/20 p-1 h-auto">
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-
-              <div className="flex space-x-1">
-                {intelligenceSlides.map((_, index) => (
-                  <div
-                    key={index}
-                    className={`w-2 h-2 rounded-full ${index === currentSlide ? "bg-white" : "bg-white/50"}`}
-                  />
-                ))}
+              {/* To Do Section */}
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-3">To Do</h3>
+                <div className="space-y-1">
+                  {adminNavItems.toDo.map((item) => renderNavItem(item, pathname === item.href))}
+                </div>
               </div>
 
-              <Button variant="ghost" size="sm" onClick={nextSlide} className="text-white hover:bg-white/20 p-1 h-auto">
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              {/* Intelligence Card */}
+              <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4" />
+                      <span className="text-sm font-medium">Intelligence</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-4">
+                    <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 p-1">
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="flex-1 mx-2 bg-white/20 rounded h-16"></div>
+                    <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 p-1">
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Button variant="outline" size="sm" className="w-full mt-3 text-purple-600 bg-white border-white">
+                    See All
+                  </Button>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {/* Logistics Navigation */}
+          {isLogisticsPath && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-3">Logistics</h3>
+              <div className="space-y-1">
+                {logisticsNavItems.main.map((item) => renderNavItem(item, pathname === item.href))}
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          )}
+
+          {/* Sales Navigation */}
+          {isSalesPath && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-3">Sales</h3>
+              <div className="space-y-1">
+                {salesNavItems.main.map((item) => renderNavItem(item, pathname === item.href))}
+              </div>
+            </div>
+          )}
+
+          {/* CMS Navigation */}
+          {isCMSPath && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-500 mb-3">Content Management</h3>
+              <div className="space-y-1">
+                {cmsNavItems.main.map((item) => renderNavItem(item, pathname === item.href))}
+              </div>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
     </div>
   )
 }

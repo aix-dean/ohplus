@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
@@ -66,6 +65,10 @@ export function LogisticsCalendar() {
     }
   }
 
+  const handleMonthClick = () => {
+    setIsCalendarOpen(!isCalendarOpen)
+  }
+
   const getEventsForDay = (day: number) => {
     return sampleEvents.filter((event) => event.date === day)
   }
@@ -77,22 +80,22 @@ export function LogisticsCalendar() {
         <div className="flex items-center">
           <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
             <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                className="flex items-center space-x-2 text-lg font-semibold p-0 h-auto hover:bg-transparent"
+              <button
+                onClick={handleMonthClick}
+                className="flex items-center space-x-2 text-lg font-semibold hover:bg-gray-100 px-2 py-1 rounded transition-colors"
               >
                 <span>
                   {months[currentMonth]} {currentYear}
                 </span>
                 <ChevronDown className="h-4 w-4 text-gray-500" />
-              </Button>
+              </button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
                 mode="single"
-                selected={new Date(currentYear, currentMonth)}
+                selected={new Date(currentYear, currentMonth, 1)}
                 onSelect={handleDateSelect}
-                defaultMonth={new Date(currentYear, currentMonth)}
+                defaultMonth={new Date(currentYear, currentMonth, 1)}
                 initialFocus
               />
             </PopoverContent>
