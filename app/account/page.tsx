@@ -913,58 +913,6 @@ export default function AccountPage() {
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>User Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <p>
-                      <strong>Email:</strong> {userData?.email || "N/A"}
-                    </p>
-                    <p>
-                      <strong>Display Name:</strong> {userData?.displayName || "N/A"}
-                    </p>
-                    <p>
-                      <strong>User ID:</strong> {userData?.uid || "N/A"}
-                    </p>
-                    <p>
-                      <strong>Role:</strong> {userData?.role || "N/A"}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Subscription Details</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <p>
-                      <strong>Plan Type:</strong>{" "}
-                      <span className="capitalize">{subscriptionData?.planType || "N/A"}</span>
-                    </p>
-                    <p>
-                      <strong>Status:</strong> <span className="capitalize">{subscriptionData?.status || "N/A"}</span>
-                    </p>
-                    <p>
-                      <strong>License Key:</strong> {userData?.license_key || "N/A"}
-                    </p>
-                    <p>
-                      <strong>Max Products:</strong>{" "}
-                      {subscriptionData?.maxProducts === 99999 ? "Unlimited" : subscriptionData?.maxProducts || "N/A"}
-                    </p>
-                    <p>
-                      <strong>Your Products:</strong>{" "}
-                      {productsLoading ? <Loader2 className="h-4 w-4 animate-spin inline-block" /> : productsCount}
-                    </p>
-                    <Button onClick={() => router.push("/settings/subscription")} className="mt-4">
-                      Manage Subscription
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
             </TabsContent>
           </div>
         </Tabs>
