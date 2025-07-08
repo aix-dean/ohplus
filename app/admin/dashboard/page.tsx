@@ -1,53 +1,41 @@
-"use client"
+"use client" // Convert to client component
 
 import { useEffect, useState } from "react"
-import { useAuth } from "@/contexts/auth-context"
-import { RegistrationSuccessDialog } from "@/components/registration-success-dialog"
-import { OnboardingTour } from "@/components/onboarding-tour"
+import { useSearchParams, useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context" // Assuming useAuth provides user data
+import { RegistrationSuccessDialog } from "@/components/registration-success-dialog" // Import the dialog
+
+// Existing imports and content of app/admin/dashboard/page.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
-import { Search, ChevronDown, Plus } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge" // Added missing Badge
 
 export default function AdminDashboardPage() {
-  const { userData } = useAuth()
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const { user } = useAuth() // Get user data from auth context
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [showOnboardingTour, setShowOnboardingTour] = useState(false)
-  const [registeredUserName, setRegisteredUserName] = useState("")
 
   useEffect(() => {
-    // Check if user just registered using sessionStorage
-    const justRegistered = sessionStorage.getItem("justRegistered")
-    const userName = sessionStorage.getItem("registeredUserName")
+    const registeredParam = searchParams.get("registered")
+    const dialogShownKey = "registrationSuccessDialogShown"
 
-    if (justRegistered === "true" && userName) {
+    if (registeredParam === "true" && !sessionStorage.getItem(dialogShownKey)) {
       setShowSuccessDialog(true)
-      setRegisteredUserName(userName)
-      // Clear the flags so dialog doesn't show again on refresh
-      sessionStorage.removeItem("justRegistered")
-      sessionStorage.removeItem("registeredUserName")
+      sessionStorage.setItem(dialogShownKey, "true") // Mark as shown for this session
+      // Remove the query parameter immediately
+      router.replace("/admin/dashboard", undefined)
     }
-  }, [])
+  }, [searchParams, router])
 
   const handleCloseSuccessDialog = () => {
     setShowSuccessDialog(false)
+    // No need to remove query param here, it's already done in useEffect
   }
 
-  const handleStartOnboardingFromDialog = () => {
-    setShowSuccessDialog(false)
-    setShowOnboardingTour(true)
-  }
-
-  const handleOnboardingTourComplete = () => {
-    setShowOnboardingTour(false)
-    localStorage.setItem("admin-onboarding-completed", "true")
-  }
-
+  // Existing content from app/admin/dashboard/page.tsx
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
@@ -55,13 +43,13 @@ export default function AdminDashboardPage() {
   interface Department {
     id: string
     name: string
-    headerColor: string
-    contentBgColor: string
+    headerColor: string // Tailwind class name for header background
+    contentBgColor: string // New: Tailwind class name for content background
     members: string[]
     metricLabel?: string
     metricValue?: string
     badgeCount?: number
-    href?: string
+    href?: string // Optional link for the card
   }
 
   // Department Card Component
@@ -123,8 +111,8 @@ export default function AdminDashboardPage() {
     {
       id: "sales",
       name: "Sales",
-      headerColor: "bg-red-500",
-      contentBgColor: "bg-red-50",
+      headerColor: "bg-department-sales-red",
+      contentBgColor: "bg-card-content-sales",
       members: ["Noemi", "Matthew"],
       metricLabel: "Monthly Revenue",
       metricValue: "4,000,000",
@@ -134,8 +122,8 @@ export default function AdminDashboardPage() {
     {
       id: "logistics",
       name: "Logistics/ Operations",
-      headerColor: "bg-blue-600",
-      contentBgColor: "bg-blue-50",
+      headerColor: "bg-department-logistics-blue",
+      contentBgColor: "bg-card-content-logistics",
       members: ["Chona", "May"],
       metricLabel: "Total Service Assignments",
       metricValue: "5",
@@ -145,103 +133,103 @@ export default function AdminDashboardPage() {
     {
       id: "accounting",
       name: "Accounting",
-      headerColor: "bg-purple-600",
-      contentBgColor: "bg-purple-50",
+      headerColor: "bg-department-accounting-purple",
+      contentBgColor: "bg-card-content-accounting",
       members: ["Chairman"],
     },
     {
       id: "treasury",
       name: "Treasury",
-      headerColor: "bg-green-600",
-      contentBgColor: "bg-green-50",
+      headerColor: "bg-department-treasury-green",
+      contentBgColor: "bg-card-content-treasury",
       members: ["Juvy"],
     },
     {
       id: "it",
       name: "I.T.",
-      headerColor: "bg-teal-600",
-      contentBgColor: "bg-teal-50",
+      headerColor: "bg-department-it-teal",
+      contentBgColor: "bg-card-content-it",
       members: ["Emmerson"],
     },
     {
       id: "fleet",
       name: "Fleet",
-      headerColor: "bg-gray-600",
-      contentBgColor: "bg-gray-50",
+      headerColor: "bg-department-fleet-gray",
+      contentBgColor: "bg-card-content-fleet",
       members: ["Jonathan"],
     },
     {
       id: "creatives",
       name: "Creatives/Contents",
-      headerColor: "bg-orange-500",
-      contentBgColor: "bg-orange-50",
+      headerColor: "bg-department-creatives-orange",
+      contentBgColor: "bg-card-content-creatives",
       members: ["Eda"],
     },
     {
       id: "finance",
       name: "Finance",
-      headerColor: "bg-emerald-600",
-      contentBgColor: "bg-emerald-50",
+      headerColor: "bg-department-finance-green",
+      contentBgColor: "bg-card-content-finance",
       members: ["Juvy"],
     },
     {
       id: "media",
       name: "Media/ Procurement",
-      headerColor: "bg-sky-500",
-      contentBgColor: "bg-sky-50",
+      headerColor: "bg-department-media-lightblue",
+      contentBgColor: "bg-card-content-media",
       members: ["Zen"],
     },
     {
       id: "businessDev",
       name: "Business Dev.",
-      headerColor: "bg-indigo-700",
-      contentBgColor: "bg-indigo-50",
+      headerColor: "bg-department-businessdev-darkpurple",
+      contentBgColor: "bg-card-content-businessdev",
       members: ["Nikki"],
     },
     {
       id: "legal",
       name: "Legal",
-      headerColor: "bg-red-700",
-      contentBgColor: "bg-red-50",
+      headerColor: "bg-department-legal-darkred",
+      contentBgColor: "bg-card-content-legal",
       members: ["Chona"],
       badgeCount: 2,
     },
     {
       id: "corporate",
       name: "Corporate",
-      headerColor: "bg-cyan-500",
-      contentBgColor: "bg-cyan-50",
+      headerColor: "bg-department-corporate-lightblue",
+      contentBgColor: "bg-card-content-corporate",
       members: ["Anthony"],
       badgeCount: 1,
     },
     {
       id: "hr",
       name: "Human Resources",
-      headerColor: "bg-pink-500",
-      contentBgColor: "bg-pink-50",
+      headerColor: "bg-department-hr-pink",
+      contentBgColor: "bg-card-content-hr",
       members: ["Vanessa"],
       badgeCount: 1,
     },
     {
       id: "specialTeam",
       name: "Special Team",
-      headerColor: "bg-violet-500",
-      contentBgColor: "bg-violet-50",
+      headerColor: "bg-department-specialteam-lightpurple",
+      contentBgColor: "bg-card-content-specialteam",
       members: ["Mark"],
     },
     {
       id: "marketing",
       name: "Marketing",
-      headerColor: "bg-rose-500",
-      contentBgColor: "bg-rose-50",
+      headerColor: "bg-department-marketing-red",
+      contentBgColor: "bg-card-content-marketing",
       members: ["John"],
     },
     {
       id: "addDepartment",
       name: "+ Add New Department",
-      headerColor: "bg-gray-700",
-      contentBgColor: "bg-gray-100",
-      members: [],
+      headerColor: "bg-department-add-darkgray",
+      contentBgColor: "bg-card-content-add",
+      members: [], // No members for this card
     },
   ]
 
@@ -300,13 +288,15 @@ export default function AdminDashboardPage() {
       {/* Registration Success Dialog */}
       <RegistrationSuccessDialog
         isOpen={showSuccessDialog}
-        firstName={registeredUserName || userData?.first_name || ""}
+        firstName={user?.first_name || ""} // Pass the user's first name
         onClose={handleCloseSuccessDialog}
-        onStartTour={handleStartOnboardingFromDialog}
       />
-
-      {/* Onboarding Tour */}
-      <OnboardingTour shouldRun={showOnboardingTour} onComplete={handleOnboardingTourComplete} />
     </div>
   )
 }
+
+// Dummy imports for existing content to avoid errors. Replace with actual imports if needed.
+import { Search, ChevronDown, Plus } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
