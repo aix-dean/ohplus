@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ChevronDown } from "lucide-react"
 import { collection, query, getDocs, where, Timestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { useRouter } from "next/navigation"
 
 interface ServiceAssignment {
   id: string
@@ -60,6 +61,8 @@ const getUniqueServiceTypes = (assignments: ServiceAssignment[]): string[] => {
 }
 
 export function LogisticsCalendar() {
+  const router = useRouter()
+
   // Get current date
   const currentDate = new Date()
   const [currentMonth, setCurrentMonth] = useState(currentDate.getMonth()) // Current month (0-indexed)
@@ -173,6 +176,11 @@ export function LogisticsCalendar() {
     }
   }
 
+  const handleAssignmentClick = (assignment: ServiceAssignment) => {
+    // Navigate to Logistic Site Information page with assignment ID
+    router.push(`/logistics/site-information/${assignment.id}`)
+  }
+
   const getEventsForDay = (day: number) => {
     let filteredAssignments = serviceAssignments.filter((assignment) => assignment.date === day)
 
@@ -276,13 +284,14 @@ export function LogisticsCalendar() {
                     <div className="text-xs text-gray-400">Loading...</div>
                   ) : (
                     getEventsForDay(day).map((assignment) => (
-                      <div
+                      <button
                         key={assignment.id}
-                        className={`${assignment.color} text-white text-xs px-2 py-1 rounded text-center font-medium`}
+                        onClick={() => handleAssignmentClick(assignment)}
+                        className={`${assignment.color} text-white text-xs px-2 py-1 rounded text-center font-medium w-full hover:opacity-80 transition-opacity cursor-pointer`}
                         title={`SA: ${assignment.saNumber || "N/A"} - ${assignment.projectSiteName || "Unknown Site"} - ${assignment.alarmTime || "No time"} - Status: ${assignment.status || "Unknown"}`}
                       >
                         {assignment.saNumber || assignment.id}: {assignment.serviceType || assignment.type}
-                      </div>
+                      </button>
                     ))
                   )}
                 </div>
