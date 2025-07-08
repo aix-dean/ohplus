@@ -19,26 +19,12 @@ import {
   Sparkles,
   ChevronLeft,
   ChevronRight,
-  TrendingUp,
-  ClipboardList,
-  CloudRain,
-  Cog,
   Bell,
-  BarChart3,
-  Sparkles,
-  FileCheck,
-  BookOpen,
-  MessageCircle,
+  Lightbulb,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
-import { useUnreadMessages } from "@/hooks/use-unread-messages"
-import { useAuth } from "@/contexts/auth-context"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-
-
-// Navigation data structure with icons
-const navigationItems = [
+const adminNavItems = [
   {
     section: "dashboard",
     title: "Dashboard",
@@ -104,12 +90,6 @@ const navigationItems = [
     ],
   },
 ]
-
-function isActive(pathname: string, href: string) {
-  return pathname === href
-}
-
-
 export function SideNavigation() {
   const pathname = usePathname()
   const { user } = useAuth()
@@ -334,60 +314,14 @@ export function SideNavigation() {
                 })}
               </div>
             </div>
-
-            {/* Intelligence Section */}
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
-              <div className="flex items-center space-x-2 mb-3">
-                <h3 className="text-sm font-medium">Intelligence</h3>
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <div className="relative">
-                <div className="flex items-center space-x-2">
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <div className="flex-1 grid grid-cols-2 gap-2">
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                  </div>
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
-              </div>
-            </div>
-          </>
-        ) : currentSection === "sales" ? (
-          // Special grouped layout for sales
-          <>
-            {/* Notification Section */}
-            <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg p-3 text-white">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <Avatar className="h-8 w-8">{/* Placeholder for AvatarImage and AvatarFallback */}</Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/30 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/20 rounded-full w-3/4"></div>
-                  </div>
-                  <button className="w-2 h-2 bg-white rounded-full"></button>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Avatar className="h-8 w-8">{/* Placeholder for AvatarImage and AvatarFallback */}</Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/30 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/20 rounded-full w-2/3"></div>
-                  </div>
-                  <button className="w-2 h-2 bg-white rounded-full"></button>
-                </div>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
+      {/* Admin-specific Intelligence section */}
+      {isAdminLayout && !isCollapsed && (
+        <div className="mx-4 mb-4">
+          <div className="bg-purple-500 text-white p-4 rounded-lg">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center">
+                <Lightbulb className="h-4 w-4 mr-2" />
+                <h3 className="font-semibold text-sm">Intelligence</h3>
               </div>
             </div>
 
@@ -472,64 +406,9 @@ export function SideNavigation() {
                 })}
               </div>
             </div>
-
-            {/* Intelligence Section */}
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
-              <div className="flex items-center space-x-2 mb-3">
-                <h3 className="text-sm font-medium">Intelligence</h3>
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <div className="relative">
-                <div className="flex items-center space-x-2">
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <div className="flex-1 grid grid-cols-2 gap-2">
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                  </div>
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
-              </div>
-            </div>
-          </>
-        ) : (
-          // Default layout for other sections
-          navigationItems
-            .find((item) => item.section === currentSection)
-            ?.items.map((item) => {
-              const Icon = item.icon
-              const active = isActive(pathname, item.href)
-
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center py-2.5 px-3 text-sm rounded-md mx-2 my-1 transition-all duration-200",
-                    active
-                      ? "bg-gray-200 text-gray-900 font-medium shadow-sm"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
-                  )}
-                >
-                  <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                  <span className="flex-1">{item.title}</span>
-                  {item.href === "/sales/chat" && unreadCount > 0 && (
-                    <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </Badge>
-                  )}
-                  {active && <div className="ml-auto w-1 h-5 bg-gray-700 rounded-full"></div>}
-                </Link>
-              )
-            })
-        )}
-      </nav>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
