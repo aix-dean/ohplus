@@ -3,12 +3,10 @@
 import { useState, useEffect, useCallback } from "react"
 import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import Image from "next/image"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Progress } from "@/components/ui/progress"
 import { getProductsByContentType, getProductsCountByContentType, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
@@ -269,6 +267,8 @@ export default function AllSitesTab() {
       location: product.specs_rental?.location || product.light?.location || "Unknown location",
       contentType: product.content_type || "static",
       healthPercentage,
+      siteCode: product.id, // Use product ID as site code
+      price: product.specs_rental?.price || "₱48,000/month", // Default price or from product data
     }
   }
 
@@ -358,9 +358,7 @@ export default function AllSitesTab() {
       {!loading && !error && products.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
           {products.map((product) => (
-            <Link href={`/logistics/sites/${product.id}`} key={product.id}>
-              <UnifiedSiteCard site={productToSite(product)} />
-            </Link>
+            <UnifiedSiteCard key={product.id} site={productToSite(product)} />
           ))}
         </div>
       )}
@@ -439,7 +437,7 @@ export default function AllSitesTab() {
   )
 }
 
-// Unified Site Card that shows all UI elements without conditions
+// Unified Site Card that matches the reference image layout
 function UnifiedSiteCard({ site }: { site: any }) {
   return (
     <Card className="erp-card overflow-hidden hover:shadow-md transition-shadow">
@@ -460,72 +458,39 @@ function UnifiedSiteCard({ site }: { site: any }) {
             {site.notifications}
           </div>
         )}
-
-        {/* Content Type Badge */}
-        <div className="absolute top-2 left-2">
-          <Badge
-            variant="outline"
-            className={`
-              ${site.contentType === "dynamic" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-amber-50 text-amber-700 border-amber-200"}
-            `}
-          >
-            {site.contentType === "dynamic" ? "Digital" : "Static"}
-          </Badge>
-        </div>
       </div>
 
       <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-semibold">{site.name}</h3>
+        <div className="flex flex-col gap-2">
+          {/* Site Code */}
+          <div className="text-sm text-gray-500">Site Code: {site.siteCode}</div>
 
-          <div className="text-sm text-gray-500 mt-1">{site.location}</div>
+          {/* Site Name */}
+          <h3 className="font-bold text-lg">{site.name}</h3>
 
-          {/* Status Badge */}
-          <div className="mt-2 flex items-center gap-2">
-            <div className="text-sm font-medium">Status:</div>
+          {/* Price */}
+          <div className="text-green-600 font-semibold">{site.price}</div>
+
+          {/* Current Status */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm">Current:</span>
             <Badge
               variant="outline"
               className={`
-                ${site.statusColor === "green" ? "bg-green-50 text-green-700 border-green-200" : ""}
-                ${site.statusColor === "blue" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
-                ${site.statusColor === "red" ? "bg-red-50 text-red-700 border-red-200" : ""}
-                ${site.statusColor === "orange" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
+                ${site.status === "PENDING" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
+                ${site.status === "ACTIVE" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
+                ${site.status === "MAINTENANCE" ? "bg-red-50 text-red-700 border-red-200" : ""}
+                ${site.status === "AVAILABLE" ? "bg-green-50 text-green-700 border-green-200" : ""}
               `}
             >
               {site.status}
             </Badge>
           </div>
 
-          {/* Health Percentage */}
-          <div className="mt-3">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-sm font-medium">Health:</span>
-              <span className="text-sm">{site.healthPercentage}%</span>
-            </div>
-            <Progress
-              value={site.healthPercentage}
-              className="h-2"
-              indicatorClassName={`
-                ${site.healthPercentage > 80 ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
-                ${site.healthPercentage > 60 && site.healthPercentage <= 80 ? "bg-gradient-to-r from-yellow-500 to-green-300" : ""}
-                ${site.healthPercentage > 40 && site.healthPercentage <= 60 ? "bg-gradient-to-r from-orange-500 to-yellow-300" : ""}
-                ${site.healthPercentage <= 40 ? "bg-gradient-to-r from-red-500 to-orange-300" : ""}
-              `}
-            />
-          </div>
-
-          {/* Additional Information */}
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Last Updated:</span>
-              <span className="text-sm text-gray-500">Today</span>
-            </div>
-          </div>
-
           {/* Create Report Button */}
           <Button
             variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+            className="w-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200 font-medium"
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
