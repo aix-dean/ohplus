@@ -3,17 +3,23 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 
 interface RegistrationSuccessDialogProps {
   isOpen: boolean
   firstName: string
   onClose: () => void
-  onStartTour: () => void // This prop is kept for compatibility but will just call onClose
+  onStartTour: () => void // This prop will now be called when "START" is clicked
 }
 
 export function RegistrationSuccessDialog({ isOpen, firstName, onClose, onStartTour }: RegistrationSuccessDialogProps) {
+  const router = useRouter()
+
   const handleStart = () => {
-    onStartTour() // This now just closes the dialog via the prop from the dashboard
+    // Set flag to start tour and navigate to dashboard
+    localStorage.setItem("shouldStartTour", "true")
+    onClose() // Close the dialog
+    router.push("/admin/dashboard") // Navigate to dashboard where tour will start
   }
 
   return (

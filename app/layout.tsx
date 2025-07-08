@@ -5,7 +5,8 @@ import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
 import AuthLayout from "./auth-layout"
 import { AssistantProvider } from "@/components/ai-assistant/assistant-provider"
-import { ToasterProvider } from "@/hooks/use-toast" // Import the new ToasterProvider
+import { Toaster } from "@/components/ui/toaster"
+import { ThemeProvider } from "@/components/theme-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -24,18 +25,17 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <AuthProvider>
-          <AuthLayout>
-            <ToasterProvider>
-              {" "}
-              {/* Wrap children with ToasterProvider */}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <AuthProvider>
+            <AuthLayout>
               <div className="flex flex-col h-screen">{children}</div>
               <AssistantProvider />
-            </ToasterProvider>
-          </AuthLayout>
-        </AuthProvider>
+              <Toaster />
+            </AuthLayout>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
