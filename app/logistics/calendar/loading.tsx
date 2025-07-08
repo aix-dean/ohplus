@@ -1,48 +1,40 @@
-import { Skeleton } from "@/components/ui/skeleton"
-import { Card, CardContent } from "@/components/ui/card"
-
-export default function LogisticsCalendarLoading() {
+export default function Loading() {
   return (
-    <div className="container mx-auto p-6">
-      <div className="text-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-        <p className="mt-2 text-gray-600">Loading calendar...</p>
+    <div className="container mx-auto py-6">
+      <div className="mb-6">
+        <div className="w-48 h-8 bg-gray-300 rounded animate-pulse mb-2"></div>
+        <div className="w-64 h-5 bg-gray-300 rounded animate-pulse"></div>
       </div>
 
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+      <div className="bg-white rounded-lg border border-gray-200 p-6">
+        {/* Header skeleton */}
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-4">
-            <Skeleton className="h-10 w-10" />
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-10 w-10" />
+            <div className="w-32 h-8 bg-gray-300 rounded animate-pulse"></div>
           </div>
           <div className="flex items-center space-x-4">
-            <Skeleton className="h-10 w-40" />
-            <Skeleton className="h-10 w-40" />
+            <div className="w-32 h-10 bg-gray-300 rounded animate-pulse"></div>
+            <div className="w-32 h-10 bg-gray-300 rounded animate-pulse"></div>
           </div>
         </div>
 
-        {/* Calendar */}
-        <Card>
-          <CardContent className="p-0">
-            <div className="grid grid-cols-7">
-              {Array.from({ length: 7 }).map((_, i) => (
-                <div key={i} className="p-3 text-center bg-gray-50 border-r border-gray-200">
-                  <Skeleton className="h-4 w-16 mx-auto" />
-                </div>
-              ))}
+        {/* Calendar skeleton */}
+        <div className="grid grid-cols-7 rounded-t-md">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div key={i} className="p-3 bg-gray-50 border-r border-gray-200">
+              <div className="w-16 h-4 bg-gray-300 rounded animate-pulse mx-auto"></div>
             </div>
-            <div className="grid grid-cols-7">
-              {Array.from({ length: 35 }).map((_, i) => (
-                <div key={i} className="h-24 border-r border-b border-gray-200 p-1">
-                  <Skeleton className="h-4 w-6 mb-1" />
-                  <Skeleton className="h-6 w-full" />
-                </div>
-              ))}
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 border border-gray-200">
+          {Array.from({ length: 35 }).map((_, i) => (
+            <div key={i} className="min-h-[100px] p-2 border-r border-b border-gray-200">
+              <div className="w-6 h-4 bg-gray-300 rounded animate-pulse mb-2"></div>
+              {Math.random() > 0.7 && <div className="w-full h-6 bg-gray-300 rounded animate-pulse"></div>}
             </div>
-          </CardContent>
-        </Card>
+          ))}
+        </div>
       </div>
     </div>
   )

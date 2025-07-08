@@ -2,23 +2,25 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { collection, query, where, getDocs, Timestamp } from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import { Button } from "@/components/ui/button"
+import { useState, useRef, useEffect } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { collection, query, getDocs, where, Timestamp } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { useRouter } from "next/navigation"
 
 interface ServiceAssignment {
   id: string
-  saNumber?: string
+  type: string
+  date: number
+  color: string
+  alarmDate?: Timestamp
   serviceType?: string
   status?: string
-  alarmDate?: Timestamp
-  alarmTime?: string
+  saNumber?: string
   projectSiteName?: string
   assignedTo?: string
+  alarmTime?: string
 }
 
 const MONTHS = [
@@ -38,80 +40,134 @@ const MONTHS = [
 
 const DAYS = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
 
+// Color mapping for different service types
+const getColorForType = (type: string): string => {
+  const colorMap: { [key: string]: string } = {
+    "Roll up": "bg-blue-500",
+    Maintenance: "bg-green-500",
+    Repair: "bg-purple-500",
+    Installation: "bg-cyan-500",
+    Inspection: "bg-orange-500",
+    Cleaning: "bg-red-500",
+    default: "bg-gray-500",
+  }
+  return colorMap[type] || colorMap.default
+}
+
+// Get unique service types for filter
+const getUniqueServiceTypes = (assignments: ServiceAssignment[]): string[] => {
+  const types = assignments.map((assignment) => assignment.serviceType || assignment.type).filter(Boolean)
+  return Array.from(new Set(types))
+}
+
 export default function LogisticsCalendar() {
   const router = useRouter()
   const currentDate = new Date()
   const [currentMonth, setCurrentMonth] = useState(currentDate.getMonth())
   const [currentYear, setCurrentYear] = useState(currentDate.getFullYear())
-  const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
-  const [filteredAssignments, setFilteredAssignments] = useState<ServiceAssignment[]>([])
-  const [selectedSAType, setSelectedSAType] = useState<string>("all")
-  const [availableTypes, setAvailableTypes] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
+  const [saType, setSaType] = useState("all") // Updated default value to "all"
+  const [sites, setSites] = useState("all") // Updated default value to "all"
   const [showFallbackPicker, setShowFallbackPicker] = useState(false)
-
-  let hiddenInputRef: HTMLInputElement | null = null
+  const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([])
+  const [loading, setLoading] = useState(true)
+  const [availableServiceTypes, setAvailableServiceTypes] = useState<string[]>([])
+  const hiddenInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    const fetchServiceAssignments = async () => {
+      try {
+        setLoading(true)
+
+        const startOfMonth = new Date(currentYear, currentMonth, 1)
+        const endOfMonth = new Date(currentYear, currentMonth + 1, 0)
+
+        const q = query(
+          collection(db, "service_assignments"),
+          where("alarmDate", ">=", Timestamp.fromDate(startOfMonth)),
+          where("alarmDate", "<=", Timestamp.fromDate(endOfMonth)),
+        )
+
+        const querySnapshot = await getDocs(q)
+        const assignments: ServiceAssignment[] = []
+
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          const alarmDate = data.alarmDate?.toDate()
+
+          if (alarmDate) {
+            const serviceType = data.serviceType || "Unknown"
+            assignments.push({
+              id: doc.id,
+              type: serviceType,
+              date: alarmDate.getDate(),
+              color: getColorForType(serviceType),
+              alarmDate: data.alarmDate,
+              serviceType: data.serviceType,
+              status: data.status,
+              saNumber: data.saNumber,
+              projectSiteName: data.projectSiteName,
+              assignedTo: data.assignedTo,
+              alarmTime: data.alarmTime,
+            })
+          }
+        })
+
+        setServiceAssignments(assignments)
+        setAvailableServiceTypes(getUniqueServiceTypes(assignments))
+      } catch (error) {
+        console.error("Error fetching service assignments:", error)
+        setServiceAssignments([])
+        setAvailableServiceTypes([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
     fetchServiceAssignments()
   }, [currentMonth, currentYear])
 
-  useEffect(() => {
-    filterAssignments()
-  }, [assignments, selectedSAType])
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate()
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay()
 
-  const fetchServiceAssignments = async () => {
-    try {
-      setLoading(true)
+  const calendarDays = []
 
-      // Create date range for the current month
-      const startOfMonth = new Date(currentYear, currentMonth, 1)
-      const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59)
+  for (let i = 0; i < firstDayOfMonth; i++) {
+    calendarDays.push(null)
+  }
 
-      const q = query(
-        collection(db, "service_assignments"),
-        where("alarmDate", ">=", Timestamp.fromDate(startOfMonth)),
-        where("alarmDate", "<=", Timestamp.fromDate(endOfMonth)),
-      )
+  for (let day = 1; day <= daysInMonth; day++) {
+    calendarDays.push(day)
+  }
 
-      const querySnapshot = await getDocs(q)
-      const assignmentsData: ServiceAssignment[] = []
+  const handleDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedDate = new Date(event.target.value)
+    setCurrentMonth(selectedDate.getMonth())
+    setCurrentYear(selectedDate.getFullYear())
+    setShowFallbackPicker(false)
+  }
 
-      querySnapshot.forEach((doc) => {
-        const data = doc.data()
-        assignmentsData.push({
-          id: doc.id,
-          ...data,
-        } as ServiceAssignment)
-      })
+  const handleMonthClick = () => {
+    setShowFallbackPicker(true)
 
-      setAssignments(assignmentsData)
+    setTimeout(() => {
+      if (hiddenInputRef.current) {
+        hiddenInputRef.current.focus()
+      }
+    }, 100)
+  }
 
-      // Extract unique service types for filter
-      const types = [...new Set(assignmentsData.map((a) => a.serviceType).filter(Boolean))]
-      setAvailableTypes(types)
-    } catch (error) {
-      console.error("Error fetching service assignments:", error)
-      setAssignments([])
-    } finally {
-      setLoading(false)
+  const handleAssignmentClick = (assignment: ServiceAssignment) => {
+    router.push(`/logistics/site-information/${assignment.id}`)
+  }
+
+  const getEventsForDay = (day: number) => {
+    let filteredAssignments = serviceAssignments.filter((assignment) => assignment.date === day)
+
+    if (saType !== "all") {
+      filteredAssignments = filteredAssignments.filter((assignment) => assignment.serviceType === saType)
     }
-  }
 
-  const filterAssignments = () => {
-    if (selectedSAType === "all") {
-      setFilteredAssignments(assignments)
-    } else {
-      setFilteredAssignments(assignments.filter((a) => a.serviceType === selectedSAType))
-    }
-  }
-
-  const getDaysInMonth = (month: number, year: number) => {
-    return new Date(year, month + 1, 0).getDate()
-  }
-
-  const getFirstDayOfMonth = (month: number, year: number) => {
-    return new Date(year, month, 1).getDay()
+    return filteredAssignments
   }
 
   const isToday = (day: number) => {
@@ -119,159 +175,67 @@ export default function LogisticsCalendar() {
     return day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear()
   }
 
-  const getAssignmentsForDay = (day: number) => {
-    return filteredAssignments.filter((assignment) => {
-      if (!assignment.alarmDate) return false
-      const assignmentDate = assignment.alarmDate.toDate()
-      return (
-        assignmentDate.getDate() === day &&
-        assignmentDate.getMonth() === currentMonth &&
-        assignmentDate.getFullYear() === currentYear
-      )
-    })
-  }
-
-  const getColorForType = (serviceType: string) => {
-    const colors = {
-      "Roll up": "bg-blue-500",
-      Installation: "bg-green-500",
-      Maintenance: "bg-orange-500",
-      Repair: "bg-red-500",
-      Inspection: "bg-purple-500",
-    }
-    return colors[serviceType as keyof typeof colors] || "bg-gray-500"
-  }
-
-  const handlePrevMonth = () => {
-    if (currentMonth === 0) {
-      setCurrentMonth(11)
-      setCurrentYear(currentYear - 1)
-    } else {
-      setCurrentMonth(currentMonth - 1)
-    }
-  }
-
-  const handleNextMonth = () => {
-    if (currentMonth === 11) {
-      setCurrentMonth(0)
-      setCurrentYear(currentYear + 1)
-    } else {
-      setCurrentMonth(currentMonth + 1)
-    }
-  }
-
-  const handleMonthClick = () => {
-    try {
-      if (hiddenInputRef && typeof hiddenInputRef.showPicker === "function") {
-        hiddenInputRef.showPicker()
-      } else if (hiddenInputRef) {
-        hiddenInputRef.focus()
-        hiddenInputRef.click()
-      } else {
-        setShowFallbackPicker(true)
-      }
-    } catch (error) {
-      console.error("Error showing picker:", error)
-      setShowFallbackPicker(true)
-    }
-  }
-
-  const handleMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const [year, month] = e.target.value.split("-")
-    setCurrentYear(Number.parseInt(year))
-    setCurrentMonth(Number.parseInt(month) - 1)
-    setShowFallbackPicker(false)
-  }
-
-  const handleAssignmentClick = (assignmentId: string) => {
-    router.push(`/logistics/site-information/${assignmentId}`)
-  }
-
-  const renderCalendarDays = () => {
-    const daysInMonth = getDaysInMonth(currentMonth, currentYear)
-    const firstDay = getFirstDayOfMonth(currentMonth, currentYear)
-    const days = []
-
-    // Empty cells for days before the first day of the month
-    for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="min-h-[120px] border border-gray-200 bg-gray-50"></div>)
-    }
-
-    // Days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dayAssignments = getAssignmentsForDay(day)
-      const todayClass = isToday(day) ? "bg-blue-50 text-blue-600 font-bold" : ""
-
-      days.push(
-        <div key={day} className={`min-h-[120px] border border-gray-200 p-2 ${todayClass}`}>
-          <div className="flex justify-between items-start mb-2">
-            <span className={`text-sm font-medium ${isToday(day) ? "text-blue-600" : "text-gray-900"}`}>{day}</span>
-            {isToday(day) && <div className="w-2 h-2 bg-blue-600 rounded-full"></div>}
-          </div>
-          <div className="space-y-1">
-            {dayAssignments.map((assignment) => (
-              <button
-                key={assignment.id}
-                onClick={() => handleAssignmentClick(assignment.id)}
-                className={`w-full text-left px-2 py-1 rounded text-xs text-white font-medium hover:opacity-80 transition-opacity cursor-pointer ${getColorForType(assignment.serviceType || "")}`}
-              >
-                {assignment.saNumber}: {assignment.serviceType}
-              </button>
-            ))}
-          </div>
-        </div>,
-      )
-    }
-
-    return days
-  }
+  const currentDateValue = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`
 
   return (
     <div className="p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <Button variant="ghost" onClick={handlePrevMonth}>
+          <button variant="ghost" onClick={() => setCurrentMonth((prev) => (prev === 0 ? 11 : prev - 1))}>
             <ChevronLeft className="h-4 w-4" />
-          </Button>
+          </button>
 
           <button onClick={handleMonthClick} className="text-xl font-semibold hover:text-blue-600 transition-colors">
             {MONTHS[currentMonth]} {currentYear}
           </button>
 
-          <Button variant="ghost" onClick={handleNextMonth}>
+          <button variant="ghost" onClick={() => setCurrentMonth((prev) => (prev === 11 ? 0 : prev + 1))}>
             <ChevronRight className="h-4 w-4" />
-          </Button>
+          </button>
         </div>
 
         <div className="flex items-center space-x-4">
-          <Select value={selectedSAType} onValueChange={setSelectedSAType}>
+          <Select value={saType} onValueChange={setSaType}>
             <SelectTrigger className="w-40">
               <SelectValue placeholder="SA Type" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Sites</SelectItem>
-              {availableTypes.map((type) => (
+              {availableServiceTypes.map((type) => (
                 <SelectItem key={type} value={type}>
                   {type}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+
+          <Select value={sites} onValueChange={setSites}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All sites" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Sites</SelectItem>
+              <SelectItem value="site1">Site 1</SelectItem>
+              <SelectItem value="site2">Site 2</SelectItem>
+              <SelectItem value="site3">Site 3</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       {/* Hidden month input for native picker */}
-      <input
-        ref={(ref) => {
-          hiddenInputRef = ref
-        }}
-        type="month"
-        value={`${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`}
-        onChange={handleMonthChange}
-        className={showFallbackPicker ? "mb-4" : "sr-only absolute -left-[9999px]"}
-        style={showFallbackPicker ? {} : { position: "absolute", left: "-9999px", opacity: 0 }}
-      />
+      {showFallbackPicker && (
+        <input
+          ref={hiddenInputRef}
+          type="month"
+          value={currentDateValue}
+          onChange={handleDateChange}
+          className="mb-4"
+          onBlur={() => setShowFallbackPicker(false)}
+          autoFocus
+        />
+      )}
 
       {/* Calendar Grid */}
       <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -289,11 +253,38 @@ export default function LogisticsCalendar() {
 
         {/* Calendar days */}
         <div className="grid grid-cols-7">
-          {loading ? (
-            <div className="col-span-7 p-8 text-center text-gray-500">Loading assignments...</div>
-          ) : (
-            renderCalendarDays()
-          )}
+          {calendarDays.map((day, index) => (
+            <div key={index} className="min-h-[120px] border border-gray-200 p-2">
+              {day && (
+                <>
+                  <div className="flex justify-between items-start mb-2">
+                    <span
+                      className={`text-sm font-medium ${isToday(day) ? "text-blue-600 font-bold" : "text-gray-900"}`}
+                    >
+                      {day}
+                    </span>
+                    {isToday(day) && <div className="w-2 h-2 bg-blue-600 rounded-full"></div>}
+                  </div>
+                  <div className="space-y-1">
+                    {loading ? (
+                      <div className="text-xs text-gray-400">Loading...</div>
+                    ) : (
+                      getEventsForDay(day).map((assignment) => (
+                        <button
+                          key={assignment.id}
+                          onClick={() => handleAssignmentClick(assignment)}
+                          className={`${assignment.color} text-white text-xs px-2 py-1 rounded text-center font-medium w-full hover:opacity-80 transition-opacity cursor-pointer`}
+                          title={`SA: ${assignment.saNumber || "N/A"} - ${assignment.projectSiteName || "Unknown Site"} - ${assignment.alarmTime || "No time"} - Status: ${assignment.status || "Unknown"}`}
+                        >
+                          {assignment.saNumber || assignment.id}: {assignment.serviceType || assignment.type}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </div>
