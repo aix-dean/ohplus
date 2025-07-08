@@ -219,7 +219,7 @@ export default function SiteDetailsPage({ params }: Props) {
 
               {/* Site Details */}
               <div className="space-y-2">
-                <h2 className="font-semibold text-lg">{product.id}</h2>
+                <h2 className="font-semibold text-lg">{product.site_code || product.id}</h2>
                 <h3 className="text-base">{product.name}</h3>
 
                 <div className="space-y-1 text-sm">
