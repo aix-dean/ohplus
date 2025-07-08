@@ -54,23 +54,18 @@ export default function ClientLayout({
         </div>
 
         {/* Main content */}
-        <main className="flex-1 flex flex-col min-h-0">
+        <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8 overflow-y-auto">
           {/* Mobile sidebar toggle */}
           {isSmallScreen && (
-            <div className="py-4 px-4 sm:px-6 lg:px-8 bg-gray-50 border-b border-gray-200">
-              <button
-                className="p-2 rounded-md bg-white shadow-sm border border-gray-200"
-                onClick={() => setSidebarOpen(true)}
-              >
-                <Menu size={20} />
-              </button>
-            </div>
+            <button
+              className="mb-4 p-2 rounded-md bg-white shadow-sm border border-gray-200"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu size={20} />
+            </button>
           )}
 
-          {/* Router content area */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="py-6 px-4 sm:px-6 lg:px-8">{children}</div>
-          </div>
+          {children}
         </main>
       </div>
     </div>

@@ -1,16 +1,17 @@
 "use client"
 
 import * as React from "react"
+import { toast as sonnerToast } from "sonner"
 
 type ToastProps = {
-  id: string
   title?: React.ReactNode
   description?: React.ReactNode
-  action?: React.ReactNode
   variant?: "default" | "destructive"
+  action?: React.ReactNode
 }
 
 type ToasterToast = ToastProps & {
+  id: string
   open: boolean
 }
 
@@ -64,6 +65,7 @@ const reducer = (state: State, action: Action): State => {
 
     case actionTypes.DISMISS_TOAST:
       const { toastId } = action
+      // ! Side effect ! - This will be executed in the reducer
       if (toastId) {
         return {
           ...state,
@@ -92,73 +94,111 @@ const reducer = (state: State, action: Action): State => {
   }
 }
 
-const listeners: Array<(state: State) => void> = []
-
-let memoryState: State = { toasts: [] }
-
-function dispatch(action: Action) {
-  memoryState = reducer(memoryState, action)
-  listeners.forEach((listener) => {
-    listener(memoryState)
-  })
-}
-
-type Toast = Omit<ToasterToast, "id">
-
-function toast({ ...props }: Toast) {
-  const id = genId()
-
-  const update = (props: ToasterToast) =>
-    dispatch({
-      type: "UPDATE_TOAST",
-      toast: { ...props, id },
-    })
-  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
-
-  dispatch({
-    type: "ADD_TOAST",
-    toast: {
-      ...props,
-      id,
-      open: true,
-      onOpenChange: (open) => {
-        if (!open) dismiss()
-      },
-    },
-  })
-
-  return {
-    id: id,
-    dismiss,
-    update,
-  }
-}
-
-function useToast() {
-  const [state, setState] = React.useState<State>(memoryState)
-
-  React.useEffect(() => {
-    listeners.push(setState)
-    return () => {
-      const index = listeners.indexOf(setState)
-      if (index > -1) {
-        listeners.splice(index, 1)
+const ToastContext = React.createContext<
+  | {
+      toasts: ToasterToast[]
+      toast: ({ ...props }: ToastProps) => {
+        id: string
+        dismiss: () => void
+        update: (props: Partial<ToasterToast>) => void
       }
     }
-  }, [state])
+  | undefined
+>(undefined)
 
-  return {
-    ...state,
-    toast,
-    dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
+export function ToasterProvider({ children }: { children: React.ReactNode }) {
+  const [state, dispatch] = React.useReducer(reducer, { toasts: [] })
+
+  const addToast = React.useCallback(
+    (toast: ToasterToast) => {
+      dispatch({ type: "ADD_TOAST", toast })
+    },
+    [dispatch],
+  )
+
+  const updateToast = React.useCallback(
+    (toast: Partial<ToasterToast>) => {
+      dispatch({ type: "UPDATE_TOAST", toast })
+    },
+    [dispatch],
+  )
+
+  const dismissToast = React.useCallback(
+    (toastId?: ToasterToast["id"]) => {
+      dispatch({ type: "DISMISS_TOAST", toastId })
+    },
+    [dispatch],
+  )
+
+  const removeToast = React.useCallback(
+    (toastId?: ToasterToast["id"]) => {
+      dispatch({ type: "REMOVE_TOAST", toastId })
+    },
+    [dispatch],
+  )
+
+  React.useEffect(() => {
+    state.toasts.forEach((toast) => {
+      if (toast.open === false) {
+        // We use a timeout to allow the toast to animate out before being removed
+        const timer = setTimeout(() => {
+          removeToast(toast.id)
+        }, TOAST_REMOVE_DELAY)
+        return () => clearTimeout(timer)
+      }
+    })
+  }, [state.toasts, removeToast])
+
+  const toastFunction = React.useCallback(({ title, description, variant, action }: ToastProps) => {
+    if (variant === "destructive") {
+      sonnerToast.error(title, {
+        description,
+        action,
+      })
+    } else {
+      sonnerToast.success(title, {
+        description,
+        action,
+      })
+    }
+  }, [])
+
+  const value = React.useMemo(
+    () => ({
+      toasts: state.toasts,
+      toast: toastFunction,
+    }),
+    [state.toasts, toastFunction],
+  )
+
+  return <ToastContext.Provider value={value}>{children}</ToastContext.Provider>
+}
+
+export function useToastHook() {
+  const context = React.useContext(ToastContext)
+  if (context === undefined) {
+    throw new Error("useToastHook must be used within a ToasterProvider")
+  }
+  return context
+}
+
+const toast = ({ title, description, variant, action }: ToastProps) => {
+  if (variant === "destructive") {
+    sonnerToast.error(title, {
+      description,
+      action,
+    })
+  } else {
+    sonnerToast.success(title, {
+      description,
+      action,
+    })
   }
 }
 
-let count = 0
-
-function genId() {
-  count = (count + 1) % Number.MAX_SAFE_INTEGER
-  return count.toString()
+// Export a useToast hook for backward compatibility to prevent breaking changes.
+const useToast = () => {
+  return { toast }
 }
 
 export { useToast, toast }
