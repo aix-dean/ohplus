@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2 } from "lucide-react"
-import { doc, setDoc, serverTimestamp } from "firebase/firestore"
+import { addDoc, collection, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { toast } from "@/components/ui/use-toast"
 
@@ -76,12 +76,8 @@ export function CompanyRegistrationDialog({ isOpen, onClose, onSuccess }: Compan
 
     setLoading(true)
     try {
-      // Generate a unique company ID
-      const companyId = `company_${user.uid}_${Date.now()}`
-
-      // Create company document
-      const companyDocRef = doc(db, "companies", companyId)
-      await setDoc(companyDocRef, {
+      // Create company document and let Firestore generate the ID
+      const companyDocRef = await addDoc(collection(db, "companies"), {
         name: formData.name,
         business_type: formData.business_type,
         position: formData.position,
@@ -96,7 +92,10 @@ export function CompanyRegistrationDialog({ isOpen, onClose, onSuccess }: Compan
         updated_at: serverTimestamp(),
       })
 
-      // Update user document with company_id
+      // Use the Firestore-generated document ID
+      const companyId = companyDocRef.id
+
+      // Update user document with the Firestore-generated company_id
       await updateUserData({ company_id: companyId })
 
       toast({
