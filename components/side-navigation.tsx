@@ -1,22 +1,17 @@
 "use client"
-import Link from "next/link"
+
+import { useState } from "react"
 import { usePathname } from "next/navigation"
+import Link from "next/link"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
-  Users,
-  Calendar,
-  BarChart3,
-  Truck,
-  AlertTriangle,
   FileText,
-  Settings,
-  ShieldCheck,
-  BookOpen,
+  Calendar,
   Package,
-  MessageCircle,
-  FileCheck,
-  Sparkles,
+  Users,
+  CreditCard,
+  Settings,
   ChevronLeft,
   ChevronRight,
   TrendingUp,
@@ -24,29 +19,11 @@ import {
   CloudRain,
   Cog,
 } from "lucide-react"
-import { useUnreadMessages } from "@/hooks/use-unread-messages"
-import { useAuth } from "@/contexts/auth-context"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from "@/components/ui/button"
 
-// Navigation data structure with icons
-const navigationItems = [
+const adminNavItems = [
   {
-    section: "dashboard",
-    title: "Dashboard",
-    icon: LayoutDashboard,
-    items: [],
-  },
-  {
-    section: "features",
-    title: "Features",
-    icon: Package,
-    items: [{ title: "Overview", href: "/features", icon: LayoutDashboard }],
-  },
-  {
-    section: "sales",
-    title: "Sales",
-    icon: BarChart3,
+    title: "To Go",
     items: [
       { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
       { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
@@ -60,36 +37,77 @@ const navigationItems = [
     ],
   },
   {
-    section: "logistics",
-    title: "Logistics",
-    icon: Truck,
+    title: "To Do",
     items: [
-      { title: "Dashboard", href: "/logistics/dashboard", icon: LayoutDashboard },
-      { title: "Service Assignments", href: "/logistics/assignments", icon: FileText },
-      { title: "Planner", href: "/logistics/planner", icon: Calendar },
-      { title: "Alerts", href: "/logistics/alerts", icon: AlertTriangle },
+      {
+        title: "Documents",
+        href: "/admin/documents",
+        icon: FileText,
+      },
+      {
+        title: "Inventory",
+        href: "/admin/inventory",
+        icon: Package,
+      },
+      {
+        title: "User Management",
+        href: "/admin/access-management",
+        icon: Users,
+      },
+      {
+        title: "Subscription",
+        href: "/admin/subscriptions",
+        icon: CreditCard,
+      },
     ],
   },
+]
+
+const logisticsNavItems = [
   {
-    section: "cms",
-    title: "CMS",
-    icon: FileText,
+    title: "Navigation",
     items: [
-      { title: "Dashboard", href: "/cms/dashboard", icon: LayoutDashboard },
-      { title: "Planner", href: "/cms/planner", icon: Calendar },
-      { title: "Orders", href: "/cms/orders", icon: FileText },
+      {
+        title: "Dashboard",
+        href: "/logistics/dashboard",
+        icon: LayoutDashboard,
+      },
+      {
+        title: "Sites",
+        href: "/logistics/sites",
+        icon: Package,
+      },
+      {
+        title: "Assignments",
+        href: "/logistics/assignments",
+        icon: Users,
+      },
+      {
+        title: "Alerts",
+        href: "/logistics/alerts",
+        icon: Bell,
+      },
+      {
+        title: "Planner",
+        href: "/logistics/planner",
+        icon: Calendar,
+      },
     ],
   },
+]
+
+const salesNavItems = [
   {
     section: "admin",
     title: "Admin",
     icon: ShieldCheck,
     items: [],
   },
+]
+
+const cmsNavItems = [
   {
-    section: "settings",
-    title: "Settings",
-    icon: Settings,
+    title: "Navigation",
     items: [
       { title: "General", href: "/settings", icon: Settings },
       { title: "Subscription", href: "/admin/subscriptions", icon: FileText },
@@ -97,11 +115,8 @@ const navigationItems = [
   },
 ]
 
-function isActive(pathname: string, href: string) {
-  return pathname === href
-}
-
 export function SideNavigation() {
+  const [isCollapsed, setIsCollapsed] = useState(false)
   const pathname = usePathname()
   const { user } = useAuth()
   const { unreadCount } = useUnreadMessages()
@@ -292,7 +307,11 @@ export function SideNavigation() {
                   )
                 })}
               </div>
+              <p className="text-xs opacity-90">No notification for now.</p>
             </div>
+          </div>
+        </>
+      )}
 
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
               <div className="px-3 py-2 border-b border-gray-100">
@@ -469,30 +488,10 @@ export function SideNavigation() {
                 })}
               </div>
             </div>
-
-            {/* Intelligence Section */}
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
-              <div className="flex items-center space-x-2 mb-3">
-                <h3 className="text-sm font-medium">Intelligence</h3>
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <div className="relative">
-                <div className="flex items-center space-x-2">
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <div className="flex-1 grid grid-cols-2 gap-2">
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                  </div>
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
-              </div>
+            <div className="flex justify-end mt-2">
+              <Button variant="ghost" size="sm" className="text-white hover:bg-purple-600 h-6 px-2 text-xs">
+                See All
+              </Button>
             </div>
           </>
         ) : (
