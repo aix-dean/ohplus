@@ -5,6 +5,8 @@ import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
 import AuthLayout from "./auth-layout"
 import { AssistantProvider } from "@/components/ai-assistant/assistant-provider"
+import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -14,7 +16,7 @@ export const metadata: Metadata = {
   icons: {
     icon: "/oh-plus-logo.png",
   },
-    generator: 'v0.dev'
+  generator: "v0.dev",
 }
 
 export default function RootLayout({
@@ -23,14 +25,17 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <AuthProvider>
-          <AuthLayout>
-            <div className="flex flex-col h-screen">{children}</div>
-            <AssistantProvider />
-          </AuthLayout>
-        </AuthProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <AuthProvider>
+            <AuthLayout>
+              <div className="flex flex-col h-screen">{children}</div>
+              <AssistantProvider />
+              <Toaster />
+            </AuthLayout>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
