@@ -38,6 +38,7 @@ export function LogisticsCalendar() {
   const [currentYear, setCurrentYear] = useState(2025)
   const [saType, setSaType] = useState("")
   const [sites, setSites] = useState("")
+  const [showFallbackPicker, setShowFallbackPicker] = useState(false)
   const hiddenInputRef = useRef<HTMLInputElement>(null)
 
   // Get days in month and starting day
@@ -61,11 +62,28 @@ export function LogisticsCalendar() {
     const selectedDate = new Date(event.target.value)
     setCurrentMonth(selectedDate.getMonth())
     setCurrentYear(selectedDate.getFullYear())
+    setShowFallbackPicker(false)
   }
 
   const handleMonthClick = () => {
-    if (hiddenInputRef.current) {
-      hiddenInputRef.current.showPicker()
+    try {
+      if (hiddenInputRef.current && typeof hiddenInputRef.current.showPicker === "function") {
+        hiddenInputRef.current.showPicker()
+      } else {
+        // Fallback: focus the input to trigger the picker
+        if (hiddenInputRef.current) {
+          hiddenInputRef.current.focus()
+          hiddenInputRef.current.click()
+        }
+        setShowFallbackPicker(true)
+      }
+    } catch (error) {
+      console.warn("showPicker not supported, using fallback", error)
+      // Fallback approach
+      setShowFallbackPicker(true)
+      if (hiddenInputRef.current) {
+        hiddenInputRef.current.focus()
+      }
     }
   }
 
@@ -91,14 +109,16 @@ export function LogisticsCalendar() {
             <ChevronDown className="h-4 w-4 text-gray-500" />
           </button>
 
-          {/* Hidden month input that will be triggered programmatically */}
+          {/* Hidden month input */}
           <input
             ref={hiddenInputRef}
             type="month"
             value={currentDateValue}
             onChange={handleDateChange}
-            className="absolute opacity-0 pointer-events-none"
-            style={{ position: "absolute", left: "-9999px" }}
+            className={`absolute ${showFallbackPicker ? "opacity-100 z-10" : "opacity-0 pointer-events-none"} 
+              ${showFallbackPicker ? "top-full left-0 mt-1 border border-gray-300 rounded px-2 py-1 bg-white shadow-lg" : ""}`}
+            style={showFallbackPicker ? {} : { position: "absolute", left: "-9999px" }}
+            onBlur={() => setShowFallbackPicker(false)}
           />
         </div>
 
