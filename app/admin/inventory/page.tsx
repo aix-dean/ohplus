@@ -27,7 +27,7 @@ import {
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
 
-export default function AdminInventoryPage() {
+const InventoryPage = () => {
   const router = useRouter()
   const { user, userData, subscriptionData } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
@@ -295,6 +295,7 @@ export default function AdminInventoryPage() {
             <Card
               className="w-full min-h-[284px] flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
               onClick={handleAddSiteClick}
+              data-tour-id="add-site-card"
             >
               <Plus className="h-8 w-8 mb-2" />
               <span className="text-lg font-semibold">+ Add Site</span>
@@ -428,3 +429,5 @@ export default function AdminInventoryPage() {
     </div>
   )
 }
+
+export default InventoryPage
