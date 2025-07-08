@@ -486,11 +486,11 @@ function UnifiedSiteCard({ site }: { site: any }) {
             <Badge
               variant="outline"
               className={`
-                ${site.statusColor === "green" ? "bg-green-50 text-green-700 border-green-200" : ""}
-                ${site.statusColor === "blue" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
-                ${site.statusColor === "red" ? "bg-red-50 text-red-700 border-red-200" : ""}
-                ${site.statusColor === "orange" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
-              `}
+          ${site.statusColor === "green" ? "bg-green-50 text-green-700 border-green-200" : ""}
+          ${site.statusColor === "blue" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
+          ${site.statusColor === "red" ? "bg-red-50 text-red-700 border-red-200" : ""}
+          ${site.statusColor === "orange" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
+        `}
             >
               {site.status}
             </Badge>
@@ -506,11 +506,11 @@ function UnifiedSiteCard({ site }: { site: any }) {
               value={site.healthPercentage}
               className="h-2"
               indicatorClassName={`
-                ${site.healthPercentage > 80 ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
-                ${site.healthPercentage > 60 && site.healthPercentage <= 80 ? "bg-gradient-to-r from-yellow-500 to-green-300" : ""}
-                ${site.healthPercentage > 40 && site.healthPercentage <= 60 ? "bg-gradient-to-r from-orange-500 to-yellow-300" : ""}
-                ${site.healthPercentage <= 40 ? "bg-gradient-to-r from-red-500 to-orange-300" : ""}
-              `}
+          ${site.healthPercentage > 80 ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
+          ${site.healthPercentage > 60 && site.healthPercentage <= 80 ? "bg-gradient-to-r from-yellow-500 to-green-300" : ""}
+          ${site.healthPercentage > 40 && site.healthPercentage <= 60 ? "bg-gradient-to-r from-orange-500 to-yellow-300" : ""}
+          ${site.healthPercentage <= 40 ? "bg-gradient-to-r from-red-500 to-orange-300" : ""}
+        `}
             />
           </div>
 
@@ -521,20 +521,21 @@ function UnifiedSiteCard({ site }: { site: any }) {
               <span className="text-sm text-gray-500">Today</span>
             </div>
           </div>
-
-          {/* Create Report Button */}
-          <Button
-            variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              // Add report creation logic here
-            }}
-          >
-            Create Report
-          </Button>
         </div>
+
+        {/* Create Report Button - Outside the flex container */}
+        <Button
+          variant="outline"
+          className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            // Add report creation logic here
+            console.log("Create report for site:", site.id)
+          }}
+        >
+          Create Report
+        </Button>
       </CardContent>
     </Card>
   )
