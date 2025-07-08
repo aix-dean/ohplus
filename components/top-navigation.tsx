@@ -8,6 +8,8 @@ import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useIsAdmin } from "@/hooks/use-is-admin"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export function TopNavigation() {
   const [isOpen, setIsOpen] = useState(false)
@@ -16,6 +18,7 @@ export function TopNavigation() {
   const router = useRouter()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [breadcrumbs, setBreadcrumbs] = useState<Array<{ label: string; href: string }>>([])
+  const [siteCode, setSiteCode] = useState<string>("")
 
   const { user, userData, signOut } = useAuth()
   const { unreadCount } = useUnreadMessages()
@@ -59,6 +62,31 @@ export function TopNavigation() {
       document.body.style.overflow = ""
     }
   }, [isOpen])
+
+  // Fetch site code for site details pages
+  useEffect(() => {
+    const fetchSiteCode = async () => {
+      const pathSegments = pathname.split("/").filter(Boolean)
+      if (pathSegments[0] === "logistics" && pathSegments[1] === "sites" && pathSegments[2]) {
+        try {
+          const productDoc = await getDoc(doc(db, "products", pathSegments[2]))
+          if (productDoc.exists()) {
+            const productData = productDoc.data()
+            setSiteCode(productData.site_code || pathSegments[2])
+          } else {
+            setSiteCode(pathSegments[2])
+          }
+        } catch (error) {
+          console.error("Error fetching site code:", error)
+          setSiteCode(pathSegments[2])
+        }
+      } else {
+        setSiteCode("")
+      }
+    }
+
+    fetchSiteCode()
+  }, [pathname])
 
   // Track navigation history and build breadcrumbs
   useEffect(() => {
@@ -247,7 +275,9 @@ export function TopNavigation() {
                         {/* Only show ChevronRight if it's not the first breadcrumb */}
                         {index > 0 && <ChevronRight className="h-4 w-4 mx-1 text-white/60" />}
                         {index === breadcrumbs.length - 1 ? (
-                          <span className="text-xl font-semibold">{crumb.label}</span>
+                          <span className="text-xl font-semibold">
+                            {pathname.includes("/logistics/sites/") && siteCode ? siteCode : crumb.label}
+                          </span>
                         ) : (
                           <button
                             onClick={() => router.push(crumb.href)}
