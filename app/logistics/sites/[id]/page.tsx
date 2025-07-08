@@ -242,13 +242,13 @@ export default function SiteDetailsPage({ params }: Props) {
                     <span className="font-medium">Geopoint:</span> {geopoint}
                   </div>
                   <div>
-                    <span className="font-medium">Site Orientation:</span> Facing
+                    <span className="font-medium">Site Orientation:</span> {product.site_orientation || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Site Owner:</span> GTIS
+                    <span className="font-medium">Site Owner:</span> {product.site_owner || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Land Owner:</span> Arotronics Corp.
+                    <span className="font-medium">Land Owner:</span> {product.land_owner || ""}
                   </div>
                 </div>
               </div>
@@ -336,26 +336,23 @@ export default function SiteDetailsPage({ params }: Props) {
               <CardContent>
                 <div className="space-y-2 text-sm">
                   <div>
-                    <span className="font-medium">Upper:</span> 5- 240 Lux metal halides
+                    <span className="font-medium">Upper:</span> {product.illumination?.upper || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Lower:</span> 5- 240 Lux metal halides
+                    <span className="font-medium">Lower:</span> {product.illumination?.lower || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Side (Left):</span> N/A
+                    <span className="font-medium">Side (Left):</span> {product.illumination?.side_left || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Side (Right):</span> N/A
+                    <span className="font-medium">Side (Right):</span> {product.illumination?.side_right || ""}
                   </div>
-                  <div className="mt-3 text-xs text-gray-500">
-                    July 1, 2025 (Tue), 2:00 pm
-                    <br />
-                    Light ON by 6:00pm everyday
-                  </div>
+                  <div className="mt-3 text-xs text-gray-500">{product.light_schedule || ""}</div>
                   <div className="mt-2">
-                    <span className="font-medium">Power Consumption:</span> 150 kWh/month
+                    <span className="font-medium">Power Consumption:</span> {product.power_consumption || ""}
                     <br />
-                    <span className="font-medium">Average Power Consumption:</span> 160 kWh/over last 3 months
+                    <span className="font-medium">Average Power Consumption:</span>{" "}
+                    {product.avg_power_consumption || ""}
                   </div>
                 </div>
                 <Button variant="outline" size="sm" className="mt-3 w-full bg-transparent">
@@ -371,32 +368,25 @@ export default function SiteDetailsPage({ params }: Props) {
                   <Shield className="h-4 w-4 mr-2" />
                   Compliance{" "}
                   <Badge variant="secondary" className="ml-2">
-                    4/5
+                    {product.compliance ? product.compliance.filter((item) => item.status === "Done").length : 0}/
+                    {product.compliance?.length || 0}
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-1 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span>✓ Mayor's Permit</span>
-                    <span className="text-green-600">Done</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>✗ Barangay Clearance</span>
-                    <span className="text-red-600">Ongoing</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>✓ DTI Registration</span>
-                    <span className="text-green-600">Done</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>✓ BIR Registration</span>
-                    <span className="text-green-600">Done</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>✓ Property Insurance</span>
-                    <span className="text-green-600">Done</span>
-                  </div>
+                  {product.compliance && product.compliance.length > 0 ? (
+                    product.compliance.map((item, index) => (
+                      <div className="flex items-center justify-between" key={index}>
+                        <span>{item.name}</span>
+                        <span className={item.status === "Done" ? "text-green-600" : "text-red-600"}>
+                          {item.status}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div>No compliance data available.</div>
+                  )}
                 </div>
                 <Button variant="outline" size="sm" className="mt-3 w-full bg-transparent">
                   <Eye className="h-4 w-4 mr-2" />
@@ -416,13 +406,16 @@ export default function SiteDetailsPage({ params }: Props) {
               <CardContent>
                 <div className="space-y-2 text-sm">
                   <div>
-                    <span className="font-medium">Color:</span> Blue
+                    <span className="font-medium">Color:</span> {product.structure?.color || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Contractor:</span> ABC Construction
+                    <span className="font-medium">Contractor:</span> {product.structure?.contractor || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Condition:</span> Maintained (Last Maintenance: Dec 2024)
+                    <span className="font-medium">Condition:</span> {product.structure?.condition || ""}
+                  </div>
+                  <div>
+                    <span className="font-medium">Last Maintenance:</span> {product.structure?.last_maintenance || ""}
                   </div>
                 </div>
                 <div className="flex gap-2 mt-3">
@@ -446,17 +439,20 @@ export default function SiteDetailsPage({ params }: Props) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2 text-sm">
-                  <div>
-                    <span className="font-medium">Jan 5- May 6, 2025:</span> Lilo & Stitch
+                {product.content_schedule && product.content_schedule.length > 0 ? (
+                  <div className="space-y-2 text-sm">
+                    {product.content_schedule.map((content, index) => (
+                      <div key={index}>
+                        <span className="font-medium">
+                          {content.start_date} - {content.end_date}:
+                        </span>{" "}
+                        {content.name}
+                      </div>
+                    ))}
                   </div>
-                  <div>
-                    <span className="font-medium">Nov 5- Dec 28, 2025:</span> Wolverine
-                  </div>
-                  <div>
-                    <span className="font-medium">Sep 5- Oct 28, 2025:</span> Moana
-                  </div>
-                </div>
+                ) : (
+                  <div className="text-sm">No content scheduled</div>
+                )}
                 <Button variant="outline" size="sm" className="mt-3 w-full bg-transparent">
                   <History className="h-4 w-4 mr-2" />
                   View History
@@ -548,16 +544,16 @@ export default function SiteDetailsPage({ params }: Props) {
                     <h4 className="text-sm font-semibold mb-2">Lights Specification</h4>
                     <div className="space-y-1 text-xs">
                       <div>
-                        <span className="font-medium">Upper:</span> 5- 240 Lux metal halides
+                        <span className="font-medium">Upper:</span> {product.illumination?.upper || ""}
                       </div>
                       <div>
-                        <span className="font-medium">Lower:</span> 5- 240 Lux metal halides
+                        <span className="font-medium">Lower:</span> {product.illumination?.lower || ""}
                       </div>
                       <div>
-                        <span className="font-medium">Side (Left):</span> N/A
+                        <span className="font-medium">Side (Left):</span> {product.illumination?.side_left || ""}
                       </div>
                       <div>
-                        <span className="font-medium">Side (Right):</span> N/A
+                        <span className="font-medium">Side (Right):</span> {product.illumination?.side_right || ""}
                       </div>
                     </div>
                   </div>
@@ -635,10 +631,10 @@ export default function SiteDetailsPage({ params }: Props) {
             <CardContent>
               <div className="space-y-2 text-sm">
                 <div>
-                  <span className="font-medium">Security:</span> Juan Dela Cruz
+                  <span className="font-medium">Security:</span> {product.crew?.security || ""}
                 </div>
                 <div>
-                  <span className="font-medium">Caretaker:</span> Jave Santos
+                  <span className="font-medium">Caretaker:</span> {product.crew?.caretaker || ""}
                 </div>
               </div>
               <Button variant="outline" size="sm" className="mt-3 bg-transparent">
