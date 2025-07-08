@@ -41,6 +41,10 @@ interface AuthContextType {
       phone_number: string
       gender: string
     },
+    companyInfo: {
+      company_name: string
+      company_location: string
+    },
     password: string,
   ) => Promise<void>
   logout: () => Promise<void>
@@ -205,6 +209,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       phone_number: string
       gender: string
     },
+    companyInfo: {
+      company_name: string
+      company_location: string
+    },
     password: string,
   ) => {
     setLoading(true)
@@ -238,6 +246,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Create a default project for the user
       const projectDocRef = doc(db, "projects", firebaseUser.uid) // Using UID as project ID for simplicity
       await setDoc(projectDocRef, {
+        company_name: companyInfo.company_name,
+        company_location: companyInfo.company_location,
         project_name: "My First Project",
         license_key: licenseKey, // Now also saving license_key to the project document
         created: serverTimestamp(),
