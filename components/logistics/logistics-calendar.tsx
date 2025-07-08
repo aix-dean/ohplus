@@ -13,9 +13,13 @@ interface ServiceAssignment {
   type: string
   date: number
   color: string
-  scheduledDate?: Timestamp
-  assignmentType?: string
+  alarmDate?: Timestamp
+  serviceType?: string
   status?: string
+  saNumber?: string
+  projectSiteName?: string
+  assignedTo?: string
+  alarmTime?: string
 }
 
 const months = [
@@ -35,18 +39,24 @@ const months = [
 
 const dayHeaders = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
 
-// Color mapping for different assignment types
+// Color mapping for different service types
 const getColorForType = (type: string): string => {
   const colorMap: { [key: string]: string } = {
-    CMG: "bg-blue-500",
-    MAI: "bg-green-500",
-    REP: "bg-purple-500",
-    STRETCH: "bg-cyan-500",
-    MP: "bg-orange-500",
-    PEL: "bg-red-500",
+    "Roll up": "bg-blue-500",
+    Maintenance: "bg-green-500",
+    Repair: "bg-purple-500",
+    Installation: "bg-cyan-500",
+    Inspection: "bg-orange-500",
+    Cleaning: "bg-red-500",
     default: "bg-gray-500",
   }
   return colorMap[type] || colorMap.default
+}
+
+// Get unique service types for filter
+const getUniqueServiceTypes = (assignments: ServiceAssignment[]): string[] => {
+  const types = assignments.map((assignment) => assignment.serviceType || assignment.type).filter(Boolean)
+  return Array.from(new Set(types))
 }
 
 export function LogisticsCalendar() {
@@ -59,6 +69,7 @@ export function LogisticsCalendar() {
   const [showFallbackPicker, setShowFallbackPicker] = useState(false)
   const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([])
   const [loading, setLoading] = useState(true)
+  const [availableServiceTypes, setAvailableServiceTypes] = useState<string[]>([])
   const hiddenInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch service assignments from Firestore
@@ -73,8 +84,8 @@ export function LogisticsCalendar() {
 
         const q = query(
           collection(db, "service_assignments"),
-          where("scheduledDate", ">=", Timestamp.fromDate(startOfMonth)),
-          where("scheduledDate", "<=", Timestamp.fromDate(endOfMonth)),
+          where("alarmDate", ">=", Timestamp.fromDate(startOfMonth)),
+          where("alarmDate", "<=", Timestamp.fromDate(endOfMonth)),
         )
 
         const querySnapshot = await getDocs(q)
@@ -82,32 +93,39 @@ export function LogisticsCalendar() {
 
         querySnapshot.forEach((doc) => {
           const data = doc.data()
-          const scheduledDate = data.scheduledDate?.toDate()
+          const alarmDate = data.alarmDate?.toDate()
 
-          if (scheduledDate) {
+          if (alarmDate) {
+            const serviceType = data.serviceType || "Unknown"
             assignments.push({
               id: doc.id,
-              type: data.assignmentType || data.type || "UNKNOWN",
-              date: scheduledDate.getDate(),
-              color: getColorForType(data.assignmentType || data.type || "UNKNOWN"),
-              scheduledDate: data.scheduledDate,
-              assignmentType: data.assignmentType,
+              type: serviceType,
+              date: alarmDate.getDate(),
+              color: getColorForType(serviceType),
+              alarmDate: data.alarmDate,
+              serviceType: data.serviceType,
               status: data.status,
+              saNumber: data.saNumber,
+              projectSiteName: data.projectSiteName,
+              assignedTo: data.assignedTo,
+              alarmTime: data.alarmTime,
             })
           }
         })
 
         setServiceAssignments(assignments)
+        setAvailableServiceTypes(getUniqueServiceTypes(assignments))
       } catch (error) {
         console.error("Error fetching service assignments:", error)
         setServiceAssignments([])
+        setAvailableServiceTypes([])
       } finally {
         setLoading(false)
       }
     }
 
     fetchServiceAssignments()
-  }, [currentMonth, currentYear, saType, sites])
+  }, [currentMonth, currentYear])
 
   // Get days in month and starting day
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate()
@@ -160,7 +178,7 @@ export function LogisticsCalendar() {
 
     // Filter by SA Type if selected
     if (saType) {
-      filteredAssignments = filteredAssignments.filter((assignment) => assignment.type === saType)
+      filteredAssignments = filteredAssignments.filter((assignment) => assignment.serviceType === saType)
     }
 
     return filteredAssignments
@@ -209,12 +227,11 @@ export function LogisticsCalendar() {
               <SelectValue placeholder="-SA Type-" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="CMG">CMG</SelectItem>
-              <SelectItem value="MAI">MAI</SelectItem>
-              <SelectItem value="REP">REP</SelectItem>
-              <SelectItem value="STRETCH">STRETCH</SelectItem>
-              <SelectItem value="MP">MP</SelectItem>
-              <SelectItem value="PEL">PEL</SelectItem>
+              {availableServiceTypes.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
 
@@ -262,8 +279,9 @@ export function LogisticsCalendar() {
                       <div
                         key={assignment.id}
                         className={`${assignment.color} text-white text-xs px-2 py-1 rounded text-center font-medium`}
+                        title={`SA: ${assignment.saNumber || "N/A"} - ${assignment.projectSiteName || "Unknown Site"} - ${assignment.alarmTime || "No time"} - Status: ${assignment.status || "Unknown"}`}
                       >
-                        {assignment.id}: {assignment.type}
+                        {assignment.saNumber || assignment.id}: {assignment.serviceType || assignment.type}
                       </div>
                     ))
                   )}

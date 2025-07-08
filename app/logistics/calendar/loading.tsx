@@ -18,16 +18,17 @@ export default function LogisticsCalendarLoading() {
           </div>
         </div>
 
-        {/* Calendar grid skeleton */}
-        <div className="grid grid-cols-7 gap-1">
-          {/* Day headers */}
+        {/* Day headers skeleton */}
+        <div className="grid grid-cols-7 rounded-t-md mb-4">
           {Array.from({ length: 7 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
+            <Skeleton key={i} className="h-12 border-r last:border-r-0" />
           ))}
+        </div>
 
-          {/* Calendar days */}
+        {/* Calendar grid skeleton */}
+        <div className="grid grid-cols-7 gap-px">
           {Array.from({ length: 35 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full" />
+            <Skeleton key={i} className="h-24" />
           ))}
         </div>
       </div>

@@ -6,7 +6,7 @@ export default function LogisticsCalendarPage() {
     <div className="container mx-auto p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Logistics Calendar</h1>
-        <p className="text-gray-600">View and manage service assignments</p>
+        <p className="text-gray-600">View and manage service assignments schedule</p>
       </div>
 
       <Suspense fallback={<div>Loading calendar...</div>}>
