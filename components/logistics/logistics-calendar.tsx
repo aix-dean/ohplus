@@ -2,9 +2,9 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CalendarIcon } from "lucide-react"
+import { ChevronDown } from "lucide-react"
 
 // Sample logistics events data
 const sampleEvents = [
@@ -38,7 +38,7 @@ export function LogisticsCalendar() {
   const [currentYear, setCurrentYear] = useState(2025)
   const [saType, setSaType] = useState("")
   const [sites, setSites] = useState("")
-  const [showCalendarInput, setShowCalendarInput] = useState(false)
+  const hiddenInputRef = useRef<HTMLInputElement>(null)
 
   // Get days in month and starting day
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate()
@@ -61,11 +61,12 @@ export function LogisticsCalendar() {
     const selectedDate = new Date(event.target.value)
     setCurrentMonth(selectedDate.getMonth())
     setCurrentYear(selectedDate.getFullYear())
-    setShowCalendarInput(false)
   }
 
-  const handleCalendarClick = () => {
-    setShowCalendarInput(!showCalendarInput)
+  const handleMonthClick = () => {
+    if (hiddenInputRef.current) {
+      hiddenInputRef.current.showPicker()
+    }
   }
 
   const getEventsForDay = (day: number) => {
@@ -73,31 +74,32 @@ export function LogisticsCalendar() {
   }
 
   // Format current date for input value
-  const currentDateValue = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`
+  const currentDateValue = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6">
       {/* Calendar Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center relative">
-          <span className="text-lg font-semibold mr-2">
-            {months[currentMonth]} {currentYear}
-          </span>
-
-          <button onClick={handleCalendarClick} className="p-1 hover:bg-gray-100 rounded transition-colors">
-            <CalendarIcon className="h-5 w-5 text-gray-500" />
+          <button
+            onClick={handleMonthClick}
+            className="flex items-center space-x-2 text-lg font-semibold hover:bg-gray-100 px-2 py-1 rounded transition-colors cursor-pointer"
+          >
+            <span>
+              {months[currentMonth]} {currentYear}
+            </span>
+            <ChevronDown className="h-4 w-4 text-gray-500" />
           </button>
 
-          {showCalendarInput && (
-            <input
-              type="month"
-              value={currentDateValue}
-              onChange={handleDateChange}
-              className="absolute top-full left-0 mt-1 border border-gray-300 rounded px-2 py-1 bg-white shadow-lg z-10"
-              autoFocus
-              onBlur={() => setShowCalendarInput(false)}
-            />
-          )}
+          {/* Hidden month input that will be triggered programmatically */}
+          <input
+            ref={hiddenInputRef}
+            type="month"
+            value={currentDateValue}
+            onChange={handleDateChange}
+            className="absolute opacity-0 pointer-events-none"
+            style={{ position: "absolute", left: "-9999px" }}
+          />
         </div>
 
         <div className="flex items-center space-x-4">
