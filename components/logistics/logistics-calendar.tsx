@@ -1,9 +1,9 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
 import { ChevronDown } from "lucide-react"
 
 // Sample logistics events data
@@ -38,7 +38,7 @@ export function LogisticsCalendar() {
   const [currentYear, setCurrentYear] = useState(2025)
   const [saType, setSaType] = useState("")
   const [sites, setSites] = useState("")
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+  const [showCalendarInput, setShowCalendarInput] = useState(false)
 
   // Get days in month and starting day
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate()
@@ -57,49 +57,49 @@ export function LogisticsCalendar() {
     calendarDays.push(day)
   }
 
-  const handleDateSelect = (date: Date | undefined) => {
-    if (date) {
-      setCurrentMonth(date.getMonth())
-      setCurrentYear(date.getFullYear())
-      setIsCalendarOpen(false)
-    }
+  const handleDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedDate = new Date(event.target.value)
+    setCurrentMonth(selectedDate.getMonth())
+    setCurrentYear(selectedDate.getFullYear())
+    setShowCalendarInput(false)
   }
 
   const handleMonthClick = () => {
-    setIsCalendarOpen(!isCalendarOpen)
+    setShowCalendarInput(!showCalendarInput)
   }
 
   const getEventsForDay = (day: number) => {
     return sampleEvents.filter((event) => event.date === day)
   }
 
+  // Format current date for input value
+  const currentDateValue = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`
+
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6">
       {/* Calendar Header */}
       <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
-          <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-            <PopoverTrigger asChild>
-              <button
-                onClick={handleMonthClick}
-                className="flex items-center space-x-2 text-lg font-semibold hover:bg-gray-100 px-2 py-1 rounded transition-colors"
-              >
-                <span>
-                  {months[currentMonth]} {currentYear}
-                </span>
-                <ChevronDown className="h-4 w-4 text-gray-500" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={new Date(currentYear, currentMonth, 1)}
-                onSelect={handleDateSelect}
-                defaultMonth={new Date(currentYear, currentMonth, 1)}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+        <div className="flex items-center relative">
+          <button
+            onClick={handleMonthClick}
+            className="flex items-center space-x-2 text-lg font-semibold hover:bg-gray-100 px-2 py-1 rounded transition-colors"
+          >
+            <span>
+              {months[currentMonth]} {currentYear}
+            </span>
+            <ChevronDown className="h-4 w-4 text-gray-500" />
+          </button>
+
+          {showCalendarInput && (
+            <input
+              type="month"
+              value={currentDateValue}
+              onChange={handleDateChange}
+              className="absolute top-full left-0 mt-1 border border-gray-300 rounded px-2 py-1 bg-white shadow-lg z-10"
+              autoFocus
+              onBlur={() => setShowCalendarInput(false)}
+            />
+          )}
         </div>
 
         <div className="flex items-center space-x-4">
