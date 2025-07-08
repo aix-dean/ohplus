@@ -1,17 +1,22 @@
 "use client"
-
-import { useState } from "react"
-import { usePathname } from "next/navigation"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
-  FileText,
-  Calendar,
-  Package,
   Users,
-  CreditCard,
+  Calendar,
+  BarChart3,
+  Truck,
+  AlertTriangle,
+  FileText,
   Settings,
+  ShieldCheck,
+  BookOpen,
+  Package,
+  MessageCircle,
+  FileCheck,
+  Sparkles,
   ChevronLeft,
   ChevronRight,
   TrendingUp,
@@ -25,21 +30,31 @@ import {
   BookOpen,
   MessageCircle,
 } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
+
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
-import { Button } from "@/components/ui/button"
-import { Avatar } from "@/components/ui/avatar"
+import { useAuth } from "@/contexts/auth-context"
 import { Badge } from "@/components/ui/badge"
-import { ShieldCheck } from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
-function isActive(pathname: string | null, href: string): boolean {
-  if (!pathname) return false
-  return pathname === href
-}
 
-const adminNavItems = [
+// Navigation data structure with icons
+const navigationItems = [
   {
-    title: "To Go",
+    section: "dashboard",
+    title: "Dashboard",
+    icon: LayoutDashboard,
+    items: [],
+  },
+  {
+    section: "features",
+    title: "Features",
+    icon: Package,
+    items: [{ title: "Overview", href: "/features", icon: LayoutDashboard }],
+  },
+  {
+    section: "sales",
+    title: "Sales",
+    icon: BarChart3,
     items: [
       { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
       { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
@@ -53,77 +68,36 @@ const adminNavItems = [
     ],
   },
   {
-    title: "To Do",
+    section: "logistics",
+    title: "Logistics",
+    icon: Truck,
     items: [
-      {
-        title: "Documents",
-        href: "/admin/documents",
-        icon: FileText,
-      },
-      {
-        title: "Inventory",
-        href: "/admin/inventory",
-        icon: Package,
-      },
-      {
-        title: "User Management",
-        href: "/admin/access-management",
-        icon: Users,
-      },
-      {
-        title: "Subscription",
-        href: "/admin/subscriptions",
-        icon: CreditCard,
-      },
+      { title: "Dashboard", href: "/logistics/dashboard", icon: LayoutDashboard },
+      { title: "Service Assignments", href: "/logistics/assignments", icon: FileText },
+      { title: "Planner", href: "/logistics/planner", icon: Calendar },
+      { title: "Alerts", href: "/logistics/alerts", icon: AlertTriangle },
     ],
   },
-]
-
-const logisticsNavItems = [
   {
-    title: "Navigation",
+    section: "cms",
+    title: "CMS",
+    icon: FileText,
     items: [
-      {
-        title: "Dashboard",
-        href: "/logistics/dashboard",
-        icon: LayoutDashboard,
-      },
-      {
-        title: "Sites",
-        href: "/logistics/sites",
-        icon: Package,
-      },
-      {
-        title: "Assignments",
-        href: "/logistics/assignments",
-        icon: Users,
-      },
-      {
-        title: "Alerts",
-        href: "/logistics/alerts",
-        icon: Bell,
-      },
-      {
-        title: "Planner",
-        href: "/logistics/planner",
-        icon: Calendar,
-      },
+      { title: "Dashboard", href: "/cms/dashboard", icon: LayoutDashboard },
+      { title: "Planner", href: "/cms/planner", icon: Calendar },
+      { title: "Orders", href: "/cms/orders", icon: FileText },
     ],
   },
-]
-
-const salesNavItems = [
   {
     section: "admin",
     title: "Admin",
     icon: ShieldCheck,
     items: [],
   },
-]
-
-const cmsNavItems = [
   {
-    title: "Navigation",
+    section: "settings",
+    title: "Settings",
+    icon: Settings,
     items: [
       { title: "General", href: "/settings", icon: Settings },
       { title: "Subscription", href: "/admin/subscriptions", icon: FileText },
@@ -131,29 +105,12 @@ const cmsNavItems = [
   },
 ]
 
-const navigationItems = [
-  {
-    section: "admin",
-    title: "Admin",
-    icon: Cog,
-    items: [],
-  },
-  {
-    section: "sales",
-    title: "Sales",
-    icon: TrendingUp,
-    items: [],
-  },
-  {
-    section: "logistics",
-    title: "Logistics",
-    icon: Package,
-    items: [],
-  },
-]
+function isActive(pathname: string, href: string) {
+  return pathname === href
+}
+
 
 export function SideNavigation() {
-  const [isCollapsed, setIsCollapsed] = useState(false)
   const pathname = usePathname()
   const { user } = useAuth()
   const { unreadCount } = useUnreadMessages()
@@ -515,10 +472,30 @@ export function SideNavigation() {
                 })}
               </div>
             </div>
-            <div className="flex justify-end mt-2">
-              <Button variant="ghost" size="sm" className="text-white hover:bg-purple-600 h-6 px-2 text-xs">
-                See All
-              </Button>
+
+            {/* Intelligence Section */}
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
+              <div className="flex items-center space-x-2 mb-3">
+                <h3 className="text-sm font-medium">Intelligence</h3>
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <div className="relative">
+                <div className="flex items-center space-x-2">
+                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <div className="flex-1 grid grid-cols-2 gap-2">
+                    <div className="h-12 bg-white/20 rounded-md"></div>
+                    <div className="h-12 bg-white/20 rounded-md"></div>
+                  </div>
+                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex justify-end mt-3">
+                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
+              </div>
             </div>
           </>
         ) : (
