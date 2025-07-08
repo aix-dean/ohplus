@@ -524,11 +524,11 @@ function UnifiedSiteCard({ site }: { site: any }) {
           {/* Create Report Button */}
           <Button
             variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+            className="mt-4 w-full rounded-md bg-white text-gray-700 hover:bg-gray-50 border-gray-300"
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              // Handle create report functionality here
+              // Handle create report logic here
               console.log("Create report for site:", site.id)
             }}
           >
