@@ -114,9 +114,9 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
       console.log("OnboardingTour: Joyride callback triggered:", data, "pathname:", pathname)
       const { status, index, action } = data
 
-      // Tour finished or skipped
-      if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
-        console.log("OnboardingTour: Tour finished or skipped, status:", status)
+      // Tour finished, skipped, or closed
+      if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status) || action === "close") {
+        console.log("OnboardingTour: Tour finished, skipped, or closed, status:", status, "action:", action)
         setRun(false)
         setCurrentStep(0)
         localStorage.setItem("onboardingTourCompleted", "true")
@@ -182,7 +182,7 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
       continuous={true}
       showProgress={true}
       showSkipButton={true}
-      disableOverlayClose={true}
+      disableOverlayClose={false}
       disableCloseOnEsc={false}
       callback={handleJoyrideCallback}
       locale={{
@@ -242,6 +242,21 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
           background: "transparent",
           border: "none",
           cursor: "pointer",
+        },
+        buttonClose: {
+          color: "#9ca3af",
+          fontSize: "18px",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          position: "absolute",
+          right: "12px",
+          top: "12px",
+          width: "24px",
+          height: "24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         },
         overlay: {
           backgroundColor: "rgba(0, 0, 0, 0.6)",
