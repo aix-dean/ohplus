@@ -214,6 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         license_key: licenseKey, // Assign the generated license key
         role: "user", // Default role
         permissions: [], // Default empty permissions
+        type: "OHPLUS", // Add this field
         created: serverTimestamp(),
         updated: serverTimestamp(),
         first_name: personalInfo.first_name,
