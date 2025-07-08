@@ -42,7 +42,7 @@ interface Category {
 
 export default function AdminProductCreatePage() {
   const router = useRouter()
-  const { userData } = useAuth()
+  const { user, userData } = useAuth()
   const [productName, setProductName] = useState("")
   const [description, setDescription] = useState("")
   const [price, setPrice] = useState("")
@@ -304,11 +304,11 @@ export default function AdminProductCreatePage() {
         media: mediaData,
         categories: selectedCategories,
         category_names: getCategoryNames(),
+        company_id: userData?.company_id || null,
         active: true,
         deleted: false,
         created: serverTimestamp(),
         updated: serverTimestamp(),
-        company_id: userData?.company_id || null, // Add company_id from current user
         cms:
           contentType === "Dynamic"
             ? {

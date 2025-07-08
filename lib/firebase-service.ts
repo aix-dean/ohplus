@@ -29,7 +29,7 @@ export interface Product {
   position: number
   seller_id: string
   seller_name: string
-  company_id?: string // Add company_id field
+  company_id?: string | null
   specs_rental?: {
     audience_type?: string
     audience_types?: string[]
@@ -386,7 +386,7 @@ export async function getUserProductsCount(
   }
 }
 
-// Create a new product - Updated to use the new signature
+// Create a new product
 export async function createProduct(productData: Partial<Product>): Promise<string> {
   try {
     const newProduct = {
@@ -399,6 +399,7 @@ export async function createProduct(productData: Partial<Product>): Promise<stri
     }
 
     const docRef = await addDoc(collection(db, "products"), newProduct)
+
     return docRef.id
   } catch (error) {
     console.error("Error creating product:", error)
@@ -407,7 +408,7 @@ export async function createProduct(productData: Partial<Product>): Promise<stri
 }
 
 // Soft delete a product (mark as deleted)
-export async function softDeleteProduct(productId: string, licenseKey: string): Promise<void> {
+export async function softDeleteProduct(productId: string): Promise<void> {
   try {
     const productRef = doc(db, "products", productId)
     await updateDoc(productRef, {
