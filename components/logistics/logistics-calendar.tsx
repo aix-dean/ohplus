@@ -2,19 +2,21 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChevronDown } from "lucide-react"
+import { collection, query, getDocs, where, Timestamp } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
-// Sample logistics events data
-const sampleEvents = [
-  { id: "SA-001934", type: "CMG", date: 8, color: "bg-blue-500" },
-  { id: "SA-005809", type: "MAI", date: 10, color: "bg-green-500" },
-  { id: "SA-002053", type: "REP", date: 13, color: "bg-purple-500" },
-  { id: "SA-005366", type: "STRETCH", date: 17, color: "bg-cyan-500" },
-  { id: "SA-007361", type: "MP", date: 21, color: "bg-orange-500" },
-  { id: "SA-007732", type: "PEL", date: 23, color: "bg-red-500" },
-]
+interface ServiceAssignment {
+  id: string
+  type: string
+  date: number
+  color: string
+  scheduledDate?: Timestamp
+  assignmentType?: string
+  status?: string
+}
 
 const months = [
   "January",
@@ -33,6 +35,20 @@ const months = [
 
 const dayHeaders = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
 
+// Color mapping for different assignment types
+const getColorForType = (type: string): string => {
+  const colorMap: { [key: string]: string } = {
+    CMG: "bg-blue-500",
+    MAI: "bg-green-500",
+    REP: "bg-purple-500",
+    STRETCH: "bg-cyan-500",
+    MP: "bg-orange-500",
+    PEL: "bg-red-500",
+    default: "bg-gray-500",
+  }
+  return colorMap[type] || colorMap.default
+}
+
 export function LogisticsCalendar() {
   // Get current date
   const currentDate = new Date()
@@ -41,7 +57,57 @@ export function LogisticsCalendar() {
   const [saType, setSaType] = useState("")
   const [sites, setSites] = useState("")
   const [showFallbackPicker, setShowFallbackPicker] = useState(false)
+  const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([])
+  const [loading, setLoading] = useState(true)
   const hiddenInputRef = useRef<HTMLInputElement>(null)
+
+  // Fetch service assignments from Firestore
+  useEffect(() => {
+    const fetchServiceAssignments = async () => {
+      try {
+        setLoading(true)
+
+        // Create date range for the current month
+        const startOfMonth = new Date(currentYear, currentMonth, 1)
+        const endOfMonth = new Date(currentYear, currentMonth + 1, 0)
+
+        const q = query(
+          collection(db, "service_assignments"),
+          where("scheduledDate", ">=", Timestamp.fromDate(startOfMonth)),
+          where("scheduledDate", "<=", Timestamp.fromDate(endOfMonth)),
+        )
+
+        const querySnapshot = await getDocs(q)
+        const assignments: ServiceAssignment[] = []
+
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          const scheduledDate = data.scheduledDate?.toDate()
+
+          if (scheduledDate) {
+            assignments.push({
+              id: doc.id,
+              type: data.assignmentType || data.type || "UNKNOWN",
+              date: scheduledDate.getDate(),
+              color: getColorForType(data.assignmentType || data.type || "UNKNOWN"),
+              scheduledDate: data.scheduledDate,
+              assignmentType: data.assignmentType,
+              status: data.status,
+            })
+          }
+        })
+
+        setServiceAssignments(assignments)
+      } catch (error) {
+        console.error("Error fetching service assignments:", error)
+        setServiceAssignments([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchServiceAssignments()
+  }, [currentMonth, currentYear, saType, sites])
 
   // Get days in month and starting day
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate()
@@ -90,7 +156,14 @@ export function LogisticsCalendar() {
   }
 
   const getEventsForDay = (day: number) => {
-    return sampleEvents.filter((event) => event.date === day)
+    let filteredAssignments = serviceAssignments.filter((assignment) => assignment.date === day)
+
+    // Filter by SA Type if selected
+    if (saType) {
+      filteredAssignments = filteredAssignments.filter((assignment) => assignment.type === saType)
+    }
+
+    return filteredAssignments
   }
 
   // Check if a day is today
@@ -182,14 +255,18 @@ export function LogisticsCalendar() {
                   {day}
                 </div>
                 <div className="space-y-1">
-                  {getEventsForDay(day).map((event) => (
-                    <div
-                      key={event.id}
-                      className={`${event.color} text-white text-xs px-2 py-1 rounded text-center font-medium`}
-                    >
-                      {event.id}: {event.type}
-                    </div>
-                  ))}
+                  {loading ? (
+                    <div className="text-xs text-gray-400">Loading...</div>
+                  ) : (
+                    getEventsForDay(day).map((assignment) => (
+                      <div
+                        key={assignment.id}
+                        className={`${assignment.color} text-white text-xs px-2 py-1 rounded text-center font-medium`}
+                      >
+                        {assignment.id}: {assignment.type}
+                      </div>
+                    ))
+                  )}
                 </div>
               </>
             )}

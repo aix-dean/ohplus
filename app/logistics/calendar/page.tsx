@@ -1,14 +1,17 @@
-"use client"
-
+import { Suspense } from "react"
 import { LogisticsCalendar } from "@/components/logistics/logistics-calendar"
 
 export default function LogisticsCalendarPage() {
   return (
-    <div className="flex flex-col space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Logistics Calendar</h1>
+    <div className="container mx-auto p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Logistics Calendar</h1>
+        <p className="text-gray-600">View and manage service assignments</p>
       </div>
-      <LogisticsCalendar />
+
+      <Suspense fallback={<div>Loading calendar...</div>}>
+        <LogisticsCalendar />
+      </Suspense>
     </div>
   )
 }
