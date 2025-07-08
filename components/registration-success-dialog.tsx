@@ -3,7 +3,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
 
 interface RegistrationSuccessDialogProps {
   isOpen: boolean
@@ -13,13 +12,8 @@ interface RegistrationSuccessDialogProps {
 }
 
 export function RegistrationSuccessDialog({ isOpen, firstName, onClose, onStartTour }: RegistrationSuccessDialogProps) {
-  const router = useRouter()
-
   const handleStart = () => {
-    // Set flag to start tour and navigate to dashboard
-    localStorage.setItem("shouldStartTour", "true")
-    onClose() // Close the dialog
-    router.push("/admin/dashboard") // Navigate to dashboard where tour will start
+    onStartTour() // Call the function passed from the parent (which will handle closing the dialog and triggering the tour)
   }
 
   return (
