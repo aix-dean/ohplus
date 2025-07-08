@@ -216,9 +216,6 @@ export default function RegisterPage() {
               </div>
             )}
           </CardContent>
-          <div className="absolute bottom-8 right-8 hidden lg:block">
-            <Image src="/oh-plus-logo.png" alt="OH! Plus Logo" width={80} height={80} />
-          </div>
         </Card>
       </div>
     </div>
