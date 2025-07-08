@@ -1,18 +1,18 @@
 "use client"
 
 import { useState } from "react"
+import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { ChevronDown } from "lucide-react"
+import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react"
 
-// Sample logistics event data
-const sampleLogisticsEvents = [
-  { id: "SA-001934", type: "CMG", date: 8, color: "bg-blue-500", title: "SA-001934: CMG" },
-  { id: "SA-005809", type: "MAI", date: 10, color: "bg-green-500", title: "SA-005809: MAI" },
-  { id: "SA-002053", type: "REP", date: 13, color: "bg-purple-500", title: "SA-002053: REP" },
-  { id: "SA-005366", type: "STRETCH", date: 17, color: "bg-cyan-500", title: "SA-005366: STRETCH" },
-  { id: "SA-007361", type: "MP", date: 21, color: "bg-orange-500", title: "SA-007361: MP" },
-  { id: "SA-007732", type: "PEL", date: 23, color: "bg-red-500", title: "SA-007732: PEL" },
+// Sample logistics events data
+const sampleEvents = [
+  { id: "SA-001934", type: "CMG", date: 8, color: "bg-blue-500" },
+  { id: "SA-005809", type: "MAI", date: 10, color: "bg-green-500" },
+  { id: "SA-002053", type: "REP", date: 13, color: "bg-purple-500" },
+  { id: "SA-005366", type: "STRETCH", date: 17, color: "bg-cyan-500" },
+  { id: "SA-007361", type: "MP", date: 21, color: "bg-orange-500" },
+  { id: "SA-007732", type: "PEL", date: 23, color: "bg-red-500" },
 ]
 
 const months = [
@@ -30,161 +30,135 @@ const months = [
   "December",
 ]
 
-const daysOfWeek = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
+const dayHeaders = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
 
 export function LogisticsCalendar() {
   const [currentMonth, setCurrentMonth] = useState(4) // May = 4 (0-indexed)
   const [currentYear, setCurrentYear] = useState(2025)
-  const [selectedType, setSelectedType] = useState("all")
-  const [selectedSites, setSelectedSites] = useState("all")
+  const [saType, setSaType] = useState("")
+  const [sites, setSites] = useState("")
 
-  // Get the first day of the month and number of days
-  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay()
+  // Get days in month and starting day
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate()
-  const daysInPrevMonth = new Date(currentYear, currentMonth, 0).getDate()
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay()
 
   // Create calendar grid
   const calendarDays = []
 
-  // Previous month's trailing days
-  for (let i = firstDayOfMonth - 1; i >= 0; i--) {
-    calendarDays.push({
-      day: daysInPrevMonth - i,
-      isCurrentMonth: false,
-      isNextMonth: false,
-    })
+  // Add empty cells for days before the first day of the month
+  for (let i = 0; i < firstDayOfMonth; i++) {
+    calendarDays.push(null)
   }
 
-  // Current month's days
+  // Add days of the month
   for (let day = 1; day <= daysInMonth; day++) {
-    calendarDays.push({
-      day,
-      isCurrentMonth: true,
-      isNextMonth: false,
-    })
+    calendarDays.push(day)
   }
 
-  // Next month's leading days
-  const remainingCells = 42 - calendarDays.length
-  for (let day = 1; day <= remainingCells; day++) {
-    calendarDays.push({
-      day,
-      isCurrentMonth: false,
-      isNextMonth: true,
-    })
+  const navigateMonth = (direction: "prev" | "next") => {
+    if (direction === "prev") {
+      if (currentMonth === 0) {
+        setCurrentMonth(11)
+        setCurrentYear(currentYear - 1)
+      } else {
+        setCurrentMonth(currentMonth - 1)
+      }
+    } else {
+      if (currentMonth === 11) {
+        setCurrentMonth(0)
+        setCurrentYear(currentYear + 1)
+      } else {
+        setCurrentMonth(currentMonth + 1)
+      }
+    }
   }
 
   const getEventsForDay = (day: number) => {
-    return sampleLogisticsEvents.filter((event) => event.date === day)
+    return sampleEvents.filter((event) => event.date === day)
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-      {/* Calendar Header - Updated to match the image */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        <div className="flex items-center">
-          <Select
-            value={`${currentMonth}-${currentYear}`}
-            onValueChange={(value) => {
-              const [month, year] = value.split("-")
-              setCurrentMonth(Number.parseInt(month))
-              setCurrentYear(Number.parseInt(year))
-            }}
-          >
-            <SelectTrigger className="w-32 border-0 shadow-none text-lg font-semibold p-0 h-auto">
-              <SelectValue />
-              <ChevronDown className="h-4 w-4 ml-2" />
-            </SelectTrigger>
-            <SelectContent>
-              {months.map((month, index) => (
-                <SelectItem key={`${index}-${currentYear}`} value={`${index}-${currentYear}`}>
-                  {month} {currentYear}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <div className="bg-white rounded-lg border border-gray-200 p-6">
+      {/* Calendar Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-4">
+          <Button variant="ghost" size="sm" onClick={() => navigateMonth("prev")} className="p-1">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
+          <div className="flex items-center space-x-2">
+            <span className="text-lg font-semibold">
+              {months[currentMonth]} {currentYear}
+            </span>
+            <ChevronDown className="h-4 w-4 text-gray-500" />
+          </div>
+
+          <Button variant="ghost" size="sm" onClick={() => navigateMonth("next")} className="p-1">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
 
         <div className="flex items-center space-x-4">
-          <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger className="w-32 border border-gray-300">
+          <Select value={saType} onValueChange={setSaType}>
+            <SelectTrigger className="w-32">
               <SelectValue placeholder="-SA Type-" />
-              <ChevronDown className="h-4 w-4" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">-SA Type-</SelectItem>
-              <SelectItem value="cmg">CMG</SelectItem>
-              <SelectItem value="mai">MAI</SelectItem>
-              <SelectItem value="rep">REP</SelectItem>
-              <SelectItem value="stretch">STRETCH</SelectItem>
-              <SelectItem value="mp">MP</SelectItem>
-              <SelectItem value="pel">PEL</SelectItem>
+              <SelectItem value="CMG">CMG</SelectItem>
+              <SelectItem value="MAI">MAI</SelectItem>
+              <SelectItem value="REP">REP</SelectItem>
+              <SelectItem value="STRETCH">STRETCH</SelectItem>
+              <SelectItem value="MP">MP</SelectItem>
+              <SelectItem value="PEL">PEL</SelectItem>
             </SelectContent>
           </Select>
 
-          <Select value={selectedSites} onValueChange={setSelectedSites}>
-            <SelectTrigger className="w-32 border border-gray-300">
+          <Select value={sites} onValueChange={setSites}>
+            <SelectTrigger className="w-32">
               <SelectValue placeholder="-All sites-" />
-              <ChevronDown className="h-4 w-4" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">-All sites-</SelectItem>
               <SelectItem value="site1">Site 1</SelectItem>
               <SelectItem value="site2">Site 2</SelectItem>
               <SelectItem value="site3">Site 3</SelectItem>
-              <SelectItem value="site4">Site 4</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
+      {/* Day Headers */}
+      <div className="grid grid-cols-7 border-2 border-blue-400 rounded-t-md">
+        {dayHeaders.map((day) => (
+          <div
+            key={day}
+            className="p-3 text-center text-sm font-medium text-gray-600 bg-gray-50 border-r border-gray-200 last:border-r-0"
+          >
+            {day}
+          </div>
+        ))}
+      </div>
+
       {/* Calendar Grid */}
-      <div className="p-4">
-        {/* Days of week header with colored border as shown in image */}
-        <div className="grid grid-cols-7 gap-1 mb-2 border-2 border-blue-400 rounded">
-          {daysOfWeek.map((day) => (
-            <div key={day} className="p-3 text-xs font-medium text-gray-600 text-center bg-gray-50">
-              {day}
-            </div>
-          ))}
-        </div>
-
-        {/* Calendar days */}
-        <div className="grid grid-cols-7 gap-1">
-          {calendarDays.map((calendarDay, index) => {
-            const events = calendarDay.isCurrentMonth ? getEventsForDay(calendarDay.day) : []
-
-            return (
-              <div
-                key={index}
-                className={`
-                  min-h-[96px] p-2 border border-gray-200 rounded-sm cursor-pointer
-                  ${calendarDay.isCurrentMonth ? "bg-white hover:bg-gray-50" : "bg-gray-50 text-gray-400"}
-                `}
-              >
-                <div className="text-sm font-medium mb-1">{calendarDay.day}</div>
-
-                {/* Events */}
+      <div className="grid grid-cols-7 border-l border-r border-b border-gray-200">
+        {calendarDays.map((day, index) => (
+          <div key={index} className="min-h-[100px] p-2 border-r border-b border-gray-200 last:border-r-0">
+            {day && (
+              <>
+                <div className="text-sm font-medium text-gray-900 mb-1">{day}</div>
                 <div className="space-y-1">
-                  {events.map((event) => (
-                    <Badge
+                  {getEventsForDay(day).map((event) => (
+                    <div
                       key={event.id}
-                      className={`
-                        ${event.color} text-white text-xs px-1 py-0.5 
-                        block w-full text-center truncate cursor-pointer
-                        hover:opacity-80 transition-opacity
-                      `}
-                      variant="secondary"
-                      title={event.title}
+                      className={`${event.color} text-white text-xs px-2 py-1 rounded text-center font-medium`}
                     >
-                      {event.title}
-                    </Badge>
+                      {event.id}: {event.type}
+                    </div>
                   ))}
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              </>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   )

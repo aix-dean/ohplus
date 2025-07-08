@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { LogisticsCalendar } from "@/components/logistics/logistics-calendar"
 
 export default function LogisticsCalendarPage() {
@@ -6,7 +7,9 @@ export default function LogisticsCalendarPage() {
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">Logistics Calendar</h2>
       </div>
-      <LogisticsCalendar />
+      <Suspense fallback={<div>Loading calendar...</div>}>
+        <LogisticsCalendar />
+      </Suspense>
     </div>
   )
 }

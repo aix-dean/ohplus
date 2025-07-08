@@ -110,7 +110,8 @@ export function SideNavigation() {
   if (pathname?.startsWith("/sales/project-campaigns")) {
     currentSection = "sales"
   }
-  if (pathname?.startsWith("/admin")) {
+  // Show admin sidebar for both admin routes AND logistics/calendar
+  if (pathname?.startsWith("/admin") || pathname === "/logistics/calendar") {
     currentSection = "admin"
   }
 
