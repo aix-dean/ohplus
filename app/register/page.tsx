@@ -17,8 +17,7 @@ export default function RegisterPage() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [middleName, setMiddleName] = useState("")
-  const [companyName, setCompanyName] = useState("")
-  const [companyLocation, setCompanyLocation] = useState("")
+  // Removed companyName and companyLocation states
   const [phoneNumber, setPhoneNumber] = useState("")
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -50,16 +49,7 @@ export default function RegisterPage() {
   const handleRegister = async () => {
     setErrorMessage(null)
 
-    if (
-      !firstName ||
-      !lastName ||
-      !email ||
-      !phoneNumber ||
-      !companyName ||
-      !companyLocation ||
-      !password ||
-      !confirmPassword
-    ) {
+    if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
       setErrorMessage("Please fill in all required fields.")
       return
     }
@@ -81,8 +71,8 @@ export default function RegisterPage() {
           gender: "",
         },
         {
-          company_name: companyName,
-          company_location: companyLocation,
+          company_name: "", // Pass empty string or null for company_name
+          company_location: "", // Pass empty string or null for company_location
         },
         password,
       )
@@ -174,26 +164,7 @@ export default function RegisterPage() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="companyName">Company Name</Label>
-                <Input
-                  id="companyName"
-                  placeholder="Acme Corp"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="companyLocation">Company Location</Label>
-                <Input
-                  id="companyLocation"
-                  placeholder="New York, NY"
-                  value={companyLocation}
-                  onChange={(e) => setCompanyLocation(e.target.value)}
-                  required
-                />
-              </div>
+              {/* Removed Company Name and Company Location fields */}
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
