@@ -149,7 +149,7 @@ export function SideNavigation() {
                 {[
                   { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
                   { title: "Bulletin Board", href: "/admin/bulletin-board", icon: ClipboardList },
-                  { title: "Calendar", href: "/admin/calendar", icon: Calendar },
+                  { title: "Calendar", href: "/logistics/calendar", icon: Calendar },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
