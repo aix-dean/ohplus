@@ -475,12 +475,12 @@ export default function CMSContentCreatePage() {
                   />
                 </div>
 
-                {/* Content Type Selection */}
+                {/* Type Selection */}
                 <div className="grid gap-2">
-                  <Label htmlFor="content_type">Type</Label>
+                  <Label htmlFor="type">Type</Label>
                   <Select value={formData.content_type} onValueChange={handleContentTypeChange}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select content type" />
+                      <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Static">Static</SelectItem>
@@ -489,83 +489,65 @@ export default function CMSContentCreatePage() {
                   </Select>
                 </div>
 
-                {/* Dynamic Content Settings */}
-                {isDynamicContent && (
-                  <section className="space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                {/* Dynamic Content Fields - Only show when Dynamic is selected */}
+                {formData.content_type === "Dynamic" && (
+                  <div className="space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
                     <h3 className="text-lg font-semibold text-gray-800">Dynamic Content Settings</h3>
-
-                    {validationError && (
-                      <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                        <p className="text-sm text-red-600">{validationError}</p>
-                      </div>
-                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="cms.start_time">
-                          Start Time <span className="text-red-500">*</span>
-                        </Label>
+                        <Label htmlFor="start_time">Start Time</Label>
                         <Input
-                          id="cms.start_time"
+                          id="start_time"
                           name="cms.start_time"
                           type="time"
                           value={formData.cms.start_time}
                           onChange={handleInputChange}
-                          required={isDynamicContent}
-                          disabled={loading}
+                          required={formData.content_type === "Dynamic"}
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="cms.end_time">
-                          End Time <span className="text-red-500">*</span>
-                        </Label>
+                        <Label htmlFor="end_time">End Time</Label>
                         <Input
-                          id="cms.end_time"
+                          id="end_time"
                           name="cms.end_time"
                           type="time"
                           value={formData.cms.end_time}
                           onChange={handleInputChange}
-                          required={isDynamicContent}
-                          disabled={loading}
+                          required={formData.content_type === "Dynamic"}
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="cms.spot_duration">
-                          Spot Duration (seconds) <span className="text-red-500">*</span>
-                        </Label>
+                        <Label htmlFor="spot_duration">Spot Duration (seconds)</Label>
                         <Input
-                          id="cms.spot_duration"
+                          id="spot_duration"
                           name="cms.spot_duration"
                           type="number"
                           value={formData.cms.spot_duration}
                           onChange={handleInputChange}
                           placeholder="Enter duration in seconds"
                           min="1"
-                          required={isDynamicContent}
-                          disabled={loading}
+                          required={formData.content_type === "Dynamic"}
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="cms.loops_per_day">
-                          Loops Per Day <span className="text-red-500">*</span>
-                        </Label>
+                        <Label htmlFor="spot_per_loop">Spot Per Loop</Label>
                         <Input
-                          id="cms.loops_per_day"
+                          id="spot_per_loop"
                           name="cms.loops_per_day"
                           type="number"
                           value={formData.cms.loops_per_day}
                           onChange={handleInputChange}
-                          placeholder="Enter number of loops"
+                          placeholder="Enter spots per loop"
                           min="1"
-                          required={isDynamicContent}
-                          disabled={loading}
+                          required={formData.content_type === "Dynamic"}
                         />
                       </div>
                     </div>
-                  </section>
+                  </div>
                 )}
 
                 <section className="space-y-6 p-6 border border-gray-200 rounded-lg bg-white">
