@@ -5,7 +5,6 @@ import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
 import AuthLayout from "./auth-layout"
 import { AssistantProvider } from "@/components/ai-assistant/assistant-provider"
-import { ToasterProvider } from "@/hooks/use-toast" // Import the new ToasterProvider
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -15,7 +14,7 @@ export const metadata: Metadata = {
   icons: {
     icon: "/oh-plus-logo.png",
   },
-  generator: "v0.dev",
+    generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -28,12 +27,8 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <AuthLayout>
-            <ToasterProvider>
-              {" "}
-              {/* Wrap children with ToasterProvider */}
-              <div className="flex flex-col h-screen">{children}</div>
-              <AssistantProvider />
-            </ToasterProvider>
+            <div className="flex flex-col h-screen">{children}</div>
+            <AssistantProvider />
           </AuthLayout>
         </AuthProvider>
       </body>
