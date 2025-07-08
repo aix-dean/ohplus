@@ -34,8 +34,10 @@ const months = [
 const dayHeaders = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
 
 export function LogisticsCalendar() {
-  const [currentMonth, setCurrentMonth] = useState(4) // May = 4 (0-indexed)
-  const [currentYear, setCurrentYear] = useState(2025)
+  // Get current date
+  const currentDate = new Date()
+  const [currentMonth, setCurrentMonth] = useState(currentDate.getMonth()) // Current month (0-indexed)
+  const [currentYear, setCurrentYear] = useState(currentDate.getFullYear()) // Current year
   const [saType, setSaType] = useState("")
   const [sites, setSites] = useState("")
   const [showFallbackPicker, setShowFallbackPicker] = useState(false)
@@ -89,6 +91,12 @@ export function LogisticsCalendar() {
 
   const getEventsForDay = (day: number) => {
     return sampleEvents.filter((event) => event.date === day)
+  }
+
+  // Check if a day is today
+  const isToday = (day: number) => {
+    const today = new Date()
+    return day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear()
   }
 
   // Format current date for input value
@@ -168,7 +176,11 @@ export function LogisticsCalendar() {
           <div key={index} className="min-h-[100px] p-2 border-r border-b border-gray-200 last:border-r-0">
             {day && (
               <>
-                <div className="text-sm font-medium text-gray-900 mb-1">{day}</div>
+                <div
+                  className={`text-sm font-medium mb-1 ${isToday(day) ? "text-blue-600 font-bold bg-blue-100 rounded-full w-6 h-6 flex items-center justify-center" : "text-gray-900"}`}
+                >
+                  {day}
+                </div>
                 <div className="space-y-1">
                   {getEventsForDay(day).map((event) => (
                     <div

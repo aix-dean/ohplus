@@ -1,6 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton"
 
-export default function Loading() {
+export default function LogisticsCalendarLoading() {
   return (
     <div className="container mx-auto p-6">
       <div className="mb-6">
@@ -9,23 +9,31 @@ export default function Loading() {
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 p-6">
+        {/* Header skeleton */}
         <div className="flex items-center justify-between mb-6">
-          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-8 w-32" />
           <div className="flex items-center space-x-4">
             <Skeleton className="h-10 w-32" />
             <Skeleton className="h-10 w-32" />
           </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <Skeleton key={i} className="h-12" />
-          ))}
-        </div>
+        {/* Calendar grid skeleton */}
+        <div className="space-y-2">
+          {/* Day headers */}
+          <div className="grid grid-cols-7 gap-2">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full" />
+            ))}
+          </div>
 
-        <div className="grid grid-cols-7 gap-1">
-          {Array.from({ length: 35 }).map((_, i) => (
-            <Skeleton key={i} className="h-24" />
+          {/* Calendar days */}
+          {Array.from({ length: 5 }).map((_, weekIndex) => (
+            <div key={weekIndex} className="grid grid-cols-7 gap-2">
+              {Array.from({ length: 7 }).map((_, dayIndex) => (
+                <Skeleton key={dayIndex} className="h-24 w-full" />
+              ))}
+            </div>
           ))}
         </div>
       </div>
