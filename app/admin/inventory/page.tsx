@@ -13,6 +13,7 @@ import { toast } from "@/components/ui/use-toast"
 import { useResponsive } from "@/hooks/use-responsive"
 import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
 import Image from "next/image"
 import {
   Dialog,
@@ -29,12 +30,15 @@ const ITEMS_PER_PAGE = 12
 
 export default function AdminInventoryPage() {
   const router = useRouter()
-  const { user, userData, subscriptionData } = useAuth()
+  const { user, userData, subscriptionData, refreshUserData } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
   const { isMobile, isTablet } = useResponsive()
+
+  // Company registration dialog state
+  const [showCompanyDialog, setShowCompanyDialog] = useState(false)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -51,6 +55,13 @@ export default function AdminInventoryPage() {
   // Subscription limit dialog state
   const [showSubscriptionLimitDialog, setShowSubscriptionLimitDialog] = useState(false)
   const [subscriptionLimitMessage, setSubscriptionLimitMessage] = useState("")
+
+  // Check if user has company_id when component mounts
+  useEffect(() => {
+    if (userData && !userData.company_id) {
+      setShowCompanyDialog(true)
+    }
+  }, [userData])
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
@@ -127,18 +138,18 @@ export default function AdminInventoryPage() {
 
   // Load initial data and count
   useEffect(() => {
-    if (user?.uid) {
+    if (user?.uid && userData?.company_id) {
       fetchProducts(1)
       fetchTotalCount()
     }
-  }, [user, fetchProducts, fetchTotalCount])
+  }, [user, userData?.company_id, fetchProducts, fetchTotalCount])
 
   // Load data when page changes
   useEffect(() => {
-    if (user?.uid && currentPage > 0) {
+    if (user?.uid && userData?.company_id && currentPage > 0) {
       fetchProducts(currentPage)
     }
-  }, [currentPage, fetchProducts, user])
+  }, [currentPage, fetchProducts, user, userData?.company_id])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -276,11 +287,41 @@ export default function AdminInventoryPage() {
     router.push("/admin/products/create")
   }
 
+  const handleCompanyRegistrationSuccess = async () => {
+    await refreshUserData()
+    setShowCompanyDialog(false)
+  }
+
+  // Show loading screen if user data is still loading or company dialog is open
+  if (loading && !userData) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  // Don't render main content if company dialog is open
+  if (showCompanyDialog) {
+    return (
+      <>
+        <div className="flex min-h-screen items-center justify-center bg-gray-50">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        </div>
+        <CompanyRegistrationDialog
+          isOpen={showCompanyDialog}
+          onClose={() => {}} // Prevent closing without completing registration
+          onSuccess={handleCompanyRegistrationSuccess}
+          userId={user?.uid || ""}
+        />
+      </>
+    )
+  }
+
   return (
     <div className="flex-1 p-4 md:p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
-        {/* The "+ New Product" button was here before. It's now moved into the grid. */}
       </div>
 
       {loading ? (
@@ -425,6 +466,14 @@ export default function AdminInventoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Company Registration Dialog */}
+      <CompanyRegistrationDialog
+        isOpen={showCompanyDialog}
+        onClose={() => {}} // Prevent closing without completing registration
+        onSuccess={handleCompanyRegistrationSuccess}
+        userId={user?.uid || ""}
+      />
     </div>
   )
 }

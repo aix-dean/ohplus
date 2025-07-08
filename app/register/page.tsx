@@ -1,219 +1,307 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
-import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FirebaseError } from "firebase/app"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Loader2, Eye, EyeOff } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
+import { toast } from "@/components/ui/use-toast"
+import { RegistrationSuccessDialog } from "@/components/registration-success-dialog"
+import Image from "next/image"
+
+interface PersonalInfo {
+  email: string
+  first_name: string
+  last_name: string
+  middle_name: string
+  phone_number: string
+  gender: string
+}
 
 export default function RegisterPage() {
-  const [email, setEmail] = useState("")
+  const router = useRouter()
+  const { register } = useAuth()
+  const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+
+  const [personalInfo, setPersonalInfo] = useState<PersonalInfo>({
+    email: "",
+    first_name: "",
+    last_name: "",
+    middle_name: "",
+    phone_number: "",
+    gender: "",
+  })
+
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [middleName, setMiddleName] = useState("")
-  const [phoneNumber, setPhoneNumber] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const { register } = useAuth()
-  const router = useRouter()
-
-  const getFriendlyErrorMessage = (error: unknown): string => {
-    console.error("Raw error during registration:", error)
-    if (error instanceof FirebaseError) {
-      switch (error.code) {
-        case "auth/email-already-in-use":
-          return "This email address is already in use. Please use a different email or log in."
-        case "auth/invalid-email":
-          return "The email address is not valid. Please check the format."
-        case "auth/weak-password":
-          return "The password is too weak. Please choose a stronger password (at least 6 characters)."
-        case "auth/operation-not-allowed":
-          return "Email/password accounts are not enabled. Please contact support."
-        case "auth/network-request-failed":
-          return "Network error. Please check your internet connection and try again."
-        default:
-          return "An unexpected error occurred during registration. Please try again."
-      }
-    }
-    return "An unknown error occurred. Please try again."
+  const handlePersonalInfoChange = (field: keyof PersonalInfo, value: string) => {
+    setPersonalInfo((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleRegister = async () => {
-    setErrorMessage(null)
+  const validateForm = () => {
+    if (!personalInfo.email || !personalInfo.first_name || !personalInfo.last_name || !personalInfo.gender) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      })
+      return false
+    }
 
-    if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
-      setErrorMessage("Please fill in all required fields.")
-      return
+    if (!password || !confirmPassword) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter and confirm your password.",
+        variant: "destructive",
+      })
+      return false
     }
 
     if (password !== confirmPassword) {
-      setErrorMessage("Passwords do not match.")
-      return
+      toast({
+        title: "Validation Error",
+        description: "Passwords do not match.",
+        variant: "destructive",
+      })
+      return false
     }
+
+    if (password.length < 6) {
+      toast({
+        title: "Validation Error",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(personalInfo.email)) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    return true
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!validateForm()) return
 
     setLoading(true)
     try {
-      await register(
-        {
-          email,
-          first_name: firstName,
-          last_name: lastName,
-          middle_name: middleName,
-          phone_number: phoneNumber,
-          gender: "",
-        },
-        {
-          company_name: "",
-          company_location: "",
-        },
-        password,
-      )
-      setErrorMessage(null)
-      router.push("/admin/dashboard?registered=true")
-    } catch (error: unknown) {
-      setErrorMessage(getFriendlyErrorMessage(error))
+      await register(personalInfo, password)
+      setShowSuccessDialog(true)
+    } catch (error: any) {
+      console.error("Registration error:", error)
+      toast({
+        title: "Registration Failed",
+        description: error.message || "An error occurred during registration. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
   }
 
+  const handleSuccessDialogClose = () => {
+    setShowSuccessDialog(false)
+    router.push("/login")
+  }
+
   return (
-    <div className="flex min-h-screen">
+    <div className="min-h-screen flex">
       {/* Left Panel - Image */}
-      <div className="relative hidden w-[40%] items-center justify-center bg-gray-900 lg:flex">
+      <div className="hidden lg:flex lg:w-[40%] relative">
         <Image
           src="/registration-background.png"
-          alt="Background"
-          layout="fill"
-          objectFit="cover"
-          className="absolute inset-0 z-0 opacity-50"
+          alt="Registration background"
+          fill
+          className="object-cover"
+          priority
         />
-        {/* Removed the OH! Plus Logo */}
       </div>
 
-      {/* Right Panel - Form */}
-      <div className="flex w-full items-center justify-center bg-white p-8 dark:bg-gray-950 lg:w-[60%]">
-        <Card className="w-full max-w-md border-none shadow-none">
-          <CardHeader className="space-y-1 text-left">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-3xl font-bold">Create an Account</CardTitle>
-            </div>
-            <CardDescription className="text-gray-600 dark:text-gray-400">It's free to create one!</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+      {/* Right Panel - Registration Form */}
+      <div className="w-full lg:w-[60%] flex items-center justify-center p-8 bg-white">
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-gray-900">Create Account</h1>
+            <p className="mt-2 text-gray-600">Join us and start managing your outdoor advertising</p>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Personal Information</CardTitle>
+              <CardDescription>Please provide your personal details to create your account.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="first_name">
+                      First Name <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="first_name"
+                      value={personalInfo.first_name}
+                      onChange={(e) => handlePersonalInfoChange("first_name", e.target.value)}
+                      placeholder="Enter your first name"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="last_name">
+                      Last Name <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="last_name"
+                      value={personalInfo.last_name}
+                      onChange={(e) => handlePersonalInfoChange("last_name", e.target.value)}
+                      placeholder="Enter your last name"
+                      required
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
+                  <Label htmlFor="middle_name">Middle Name</Label>
                   <Input
-                    id="firstName"
-                    placeholder="John"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
+                    id="middle_name"
+                    value={personalInfo.middle_name}
+                    onChange={(e) => handlePersonalInfoChange("middle_name", e.target.value)}
+                    placeholder="Enter your middle name (optional)"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email">
+                    Email Address <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={personalInfo.email}
+                    onChange={(e) => handlePersonalInfoChange("email", e.target.value)}
+                    placeholder="Enter your email address"
                     required
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
+                  <Label htmlFor="phone_number">Phone Number</Label>
                   <Input
-                    id="lastName"
-                    placeholder="Doe"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    required
+                    id="phone_number"
+                    value={personalInfo.phone_number}
+                    onChange={(e) => handlePersonalInfoChange("phone_number", e.target.value)}
+                    placeholder="Enter your phone number"
                   />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="middleName">Middle Name (Optional)</Label>
-                <Input
-                  id="middleName"
-                  placeholder=""
-                  value={middleName}
-                  onChange={(e) => setMiddleName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Cellphone number</Label>
-                <Input
-                  id="phoneNumber"
-                  placeholder="+63 9XX XXX XXXX"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
-                <a href="#" className="text-blue-600 hover:underline">
-                  Terms and Conditions
-                </a>
-                ,{" "}
-                <a href="#" className="text-blue-600 hover:underline">
-                  Privacy Policy
-                </a>
-                , and all platform{" "}
-                <a href="#" className="text-blue-600 hover:underline">
-                  rules and regulations
-                </a>{" "}
-                set by OH!Plus.
-              </p>
-              <Button
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                type="submit"
-                onClick={handleRegister}
-                disabled={loading}
-              >
-                {loading ? "Signing Up..." : "Sign Up"}
-              </Button>
-            </div>
 
-            {errorMessage && (
-              <div className="text-red-500 text-sm mt-4 text-center" role="alert">
-                {errorMessage}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                <div className="space-y-2">
+                  <Label htmlFor="gender">
+                    Gender <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={personalInfo.gender}
+                    onValueChange={(value) => handlePersonalInfoChange("gender", value)}
+                    required
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">
+                    Password <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter your password"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirm_password">
+                    Confirm Password <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="confirm_password"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Confirm your password"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Create Account
+                </Button>
+
+                <div className="text-center text-sm text-gray-600">
+                  Already have an account?{" "}
+                  <Button variant="link" className="p-0 h-auto font-normal" onClick={() => router.push("/login")}>
+                    Sign in here
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      <RegistrationSuccessDialog isOpen={showSuccessDialog} onClose={handleSuccessDialogClose} />
     </div>
   )
 }
