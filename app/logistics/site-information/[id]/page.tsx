@@ -6,6 +6,7 @@ import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
+import Image from "next/image"
 
 interface ServiceAssignmentDetails {
   id: string
@@ -94,11 +95,11 @@ export default function LogisticSiteInformationPage() {
     )
   }
 
-  const calculateServiceDuration = (start: any, end: any) => {
+  const calculateDuration = (start: any, end: any) => {
     if (!start || !end) return "N/A"
     const startDate = start.toDate ? start.toDate() : new Date(start)
     const endDate = end.toDate ? end.toDate() : new Date(end)
-    const diffTime = Math.abs(endDate - startDate)
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     return `${diffDays} days`
   }
@@ -134,122 +135,129 @@ export default function LogisticSiteInformationPage() {
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       {/* Header */}
-      <div className="flex items-center mb-8">
-        <Button variant="ghost" onClick={() => router.back()} className="p-0 hover:bg-transparent">
-          <ArrowLeft className="h-5 w-5 mr-2" />
+      <div className="flex items-center mb-6">
+        <Button variant="ghost" onClick={() => router.back()} className="p-0 h-auto">
+          <ArrowLeft className="h-4 w-4 mr-2" />
           <span className="text-lg font-semibold">Service Assignment</span>
         </Button>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-12 gap-8">
+      <div className="grid grid-cols-12 gap-6">
         {/* Left Column */}
         <div className="col-span-4 space-y-6">
           {/* Service Type and Tagged to */}
-          <div className="space-y-4">
-            <div className="flex items-center space-x-4">
-              <span className="font-semibold">Service Type:</span>
-              <span className="text-blue-600 font-medium">{assignment.serviceType || "N/A"}</span>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <span className="text-sm font-medium text-gray-900">Service Type:</span>
+              <span className="ml-2 text-sm font-medium text-blue-600">{assignment.serviceType || "Installation"}</span>
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="font-semibold">Tagged to:</span>
-              <span className="text-blue-600 font-medium">{assignment.saNumber || "N/A"}</span>
+            <div>
+              <span className="text-sm font-medium text-gray-900">Tagged to:</span>
+              <span className="ml-2 text-sm font-medium text-blue-600">{assignment.saNumber || "JO_0531"}</span>
             </div>
           </div>
 
           {/* Project Information */}
           <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Project Information</h3>
+            <h3 className="text-base font-semibold text-gray-900">Project Information</h3>
 
-            {/* Site */}
-            <div className="space-y-2">
-              <span className="font-semibold">Site:</span>
-              <div className="bg-gray-100 rounded-lg p-4 flex items-center space-x-3">
-                <div className="w-16 h-16 bg-gray-300 rounded-lg flex items-center justify-center overflow-hidden">
-                  <img src="/placeholder.svg?height=64&width=64" alt="Site" className="w-full h-full object-cover" />
-                </div>
-                <div>
-                  <div className="text-xs text-gray-500 uppercase tracking-wide">
-                    {assignment.projectSiteId || "SITE001"}
+            <div>
+              <span className="text-sm font-medium text-gray-900">Site:</span>
+              <div className="mt-2 bg-gray-100 rounded-lg p-3">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-gray-300 rounded overflow-hidden">
+                    <Image
+                      src="/placeholder.svg?height=48&width=48"
+                      alt="Site"
+                      width={48}
+                      height={48}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
-                  <div className="font-medium">{assignment.projectSiteName || "Unknown Site"}</div>
+                  <div>
+                    <p className="text-sm text-gray-500">HAN20013</p>
+                    <p className="text-sm font-medium text-gray-900">{assignment.projectSiteName || "Petplans NB"}</p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* SA#, Dates, Duration */}
             <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="font-semibold">SA#:</span>
-                <span>{assignment.saNumber || "N/A"}</span>
+              <div>
+                <span className="text-sm font-medium text-gray-900">SA#:</span>
+                <span className="ml-16 text-sm font-medium text-gray-900">{assignment.saNumber || "SA00821"}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="font-semibold">Start Date:</span>
-                <span>{formatDate(assignment.coveredDateStart)}</span>
+              <div>
+                <span className="text-sm font-medium text-gray-900">Start Date:</span>
+                <span className="ml-8 text-sm font-medium text-gray-900">
+                  {formatDate(assignment.coveredDateStart)}
+                </span>
               </div>
-              <div className="flex justify-between">
-                <span className="font-semibold">End Date:</span>
-                <span>{formatDate(assignment.coveredDateEnd)}</span>
+              <div>
+                <span className="text-sm font-medium text-gray-900">End Date:</span>
+                <span className="ml-10 text-sm font-medium text-gray-900">{formatDate(assignment.coveredDateEnd)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="font-semibold">Service Duration:</span>
-                <span>{calculateServiceDuration(assignment.coveredDateStart, assignment.coveredDateEnd)}</span>
+              <div>
+                <span className="text-sm font-medium text-gray-900">Service Duration:</span>
+                <span className="ml-2 text-sm font-medium text-gray-900">
+                  {calculateDuration(assignment.coveredDateStart, assignment.coveredDateEnd)}
+                </span>
               </div>
             </div>
           </div>
 
           {/* Remarks */}
-          <div className="space-y-2">
-            <span className="font-semibold">Remarks:</span>
-            <div className="bg-gray-100 rounded-lg p-4">
-              <p className="text-sm text-blue-600">
-                {assignment.message || assignment.jobDescription || "No remarks provided."}
+          <div className="space-y-3">
+            <span className="text-sm font-medium text-gray-900">Remarks:</span>
+            <div className="bg-gray-50 border border-gray-200 rounded p-3">
+              <p className="text-sm text-gray-700">
+                {assignment.message || assignment.jobDescription || "Install only from 6pm to 3:00am in the morning."}
               </p>
             </div>
           </div>
 
           {/* Requested By */}
-          <div className="flex items-center space-x-2">
-            <span className="font-semibold">Requested By:</span>
-            <span>{assignment.requestedBy?.name || "Unknown User"}</span>
+          <div>
+            <span className="text-sm font-medium text-gray-900">Requested By:</span>
+            <span className="ml-2 text-sm font-medium text-gray-900">
+              {assignment.requestedBy?.name || "Mae Tuyan"}
+            </span>
           </div>
         </div>
 
         {/* Middle Column */}
         <div className="col-span-4 space-y-4">
-          <div className="flex justify-between">
-            <span className="font-semibold">Content:</span>
-            <span className="text-red-600">Lilo and Stitch</span>
+          <div>
+            <span className="text-sm font-medium text-gray-900">Content:</span>
+            <span className="ml-12 text-sm font-medium text-gray-900">Lilo and Stitch</span>
           </div>
-          <div className="flex justify-between">
-            <span className="font-semibold">Material Specs:</span>
-            <span>Material Specs.</span>
+          <div>
+            <span className="text-sm font-medium text-gray-900">Material Specs:</span>
+            <span className="ml-2 text-sm font-medium text-gray-900">Material Specs.</span>
           </div>
-          <div className="flex justify-between">
-            <span className="font-semibold">Crew:</span>
-            <span>{assignment.assignedTo || "Team C"}</span>
+          <div>
+            <span className="text-sm font-medium text-gray-900">Crew:</span>
+            <span className="ml-16 text-sm font-medium text-gray-900">{assignment.assignedTo || "Team C"}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="font-semibold">Illumination/ Nits:</span>
-            <span>250 lumens</span>
+          <div>
+            <span className="text-sm font-medium text-gray-900">Illumination/ Nits:</span>
+            <span className="ml-2 text-sm font-medium text-gray-900">250 lumens</span>
           </div>
-          <div className="flex justify-between">
-            <span className="font-semibold">Gondola:</span>
-            <span>Yes</span>
+          <div>
+            <span className="text-sm font-medium text-gray-900">Gondola:</span>
+            <span className="ml-10 text-sm font-medium text-gray-900">Yes</span>
           </div>
-          <div className="flex justify-between">
-            <span className="font-semibold">Technology:</span>
-            <span className="text-blue-600">Double Sided</span>
+          <div>
+            <span className="text-sm font-medium text-gray-900">Technology:</span>
+            <span className="ml-6 text-sm font-medium text-gray-900">Double Sided</span>
           </div>
-          <div className="flex justify-between">
-            <span className="font-semibold">Sales:</span>
-            <span>Noemi</span>
+          <div>
+            <span className="text-sm font-medium text-gray-900">Sales:</span>
+            <span className="ml-16 text-sm font-medium text-gray-900">Noemi</span>
           </div>
-
-          {/* Attachments */}
-          <div className="space-y-2 pt-4">
-            <span className="font-semibold">Attachments:</span>
-            <p className="text-sm">
+          <div className="pt-4">
+            <span className="text-sm font-medium text-gray-900">Attachments:</span>
+            <p className="mt-1 text-sm text-gray-900">
               {assignment.attachments && assignment.attachments.length > 0
                 ? `${assignment.attachments.length} attachment(s)`
                 : "No attachments."}
@@ -257,19 +265,19 @@ export default function LogisticSiteInformationPage() {
           </div>
         </div>
 
-        {/* Right Column - Status Tracker */}
-        <div className="col-span-4">
-          <div className="space-y-4">
-            <h3 className="font-semibold text-lg">Status Tracker</h3>
-
-            <div className="space-y-2">
-              <div className="font-semibold">Created</div>
-              <div className="text-sm text-gray-600">{formatDateTime(assignment.created)}</div>
+        {/* Right Column */}
+        <div className="col-span-4 space-y-4">
+          <div className="text-right">
+            <h3 className="text-base font-semibold text-gray-900">Status Tracker</h3>
+            <div className="mt-4 space-y-2">
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900">Created</p>
+                <p className="text-sm text-gray-600">{formatDateTime(assignment.created)}</p>
+              </div>
             </div>
-
-            <Button className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg">
-              Mark as Complete
-            </Button>
+            <div className="mt-6">
+              <Button className="bg-green-600 hover:bg-green-700 text-white px-6 py-2">Mark as Complete</Button>
+            </div>
           </div>
         </div>
       </div>
