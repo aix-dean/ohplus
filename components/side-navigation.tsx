@@ -52,7 +52,7 @@ const navigationItems = [
       { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
       { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
       { title: "Clients", href: "/sales/clients", icon: Users },
-      { title: "Billings", href: "#", icon: FileText }, // Added Billings here
+      { title: "Billings", href: "#", icon: FileText },
       { title: "Planner", href: "/sales/planner", icon: Calendar },
       { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
     ],
@@ -65,6 +65,7 @@ const navigationItems = [
       { title: "Dashboard", href: "/logistics/dashboard", icon: LayoutDashboard },
       { title: "Service Assignments", href: "/logistics/assignments", icon: FileText },
       { title: "Planner", href: "/logistics/planner", icon: Calendar },
+      { title: "Calendar", href: "/logistics/calendar", icon: Calendar },
       { title: "Alerts", href: "/logistics/alerts", icon: AlertTriangle },
     ],
   },
@@ -82,7 +83,7 @@ const navigationItems = [
     section: "admin",
     title: "Admin",
     icon: ShieldCheck,
-    items: [], // Custom content will be rendered below
+    items: [],
   },
   {
     section: "settings",
@@ -90,7 +91,7 @@ const navigationItems = [
     icon: Settings,
     items: [
       { title: "General", href: "/settings", icon: Settings },
-      { title: "Subscription", href: "/admin/subscriptions", icon: FileText }, // Updated href
+      { title: "Subscription", href: "/admin/subscriptions", icon: FileText },
     ],
   },
 ]
@@ -109,7 +110,6 @@ export function SideNavigation() {
   if (pathname?.startsWith("/sales/project-campaigns")) {
     currentSection = "sales"
   }
-  // Explicitly set currentSection to "admin" if path starts with /admin or /admin/dashboard
   if (pathname?.startsWith("/admin")) {
     currentSection = "admin"
   }
@@ -117,13 +117,11 @@ export function SideNavigation() {
   // Find the navigation item for the current section
   const currentNavItem = navigationItems.find((item) => item.section === currentSection)
 
-  // IMPORTANT: Modified condition.
-  // Only return null if there's no currentNavItem AND it's not one of the custom sections ("admin", "sales")
   if (!currentNavItem && currentSection !== "admin" && currentSection !== "sales") {
     return null
   }
 
-  const SectionIcon = currentNavItem?.icon // Use optional chaining as currentNavItem might be undefined for custom sections
+  const SectionIcon = currentNavItem?.icon
 
   return (
     <div className="w-64 h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 overflow-y-auto shadow-sm">
@@ -149,9 +147,9 @@ export function SideNavigation() {
               </div>
               <div className="p-1">
                 {[
-                  { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard }, // Updated href
+                  { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
                   { title: "Bulletin Board", href: "/admin/bulletin-board", icon: ClipboardList },
-                  { title: "Calendar", href: "/admin/calendar", icon: Calendar }, // Add this new Calendar item
+                  { title: "Calendar", href: "/admin/calendar", icon: Calendar },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
@@ -183,7 +181,7 @@ export function SideNavigation() {
                   { title: "Documents", href: "/admin/documents", icon: FileText },
                   { title: "Inventory", href: "/admin/inventory", icon: Package, "data-tour-id": "inventory-link" },
                   { title: "User Management", href: "/admin/access-management", icon: Users },
-                  { title: "Subscription", href: "/admin/subscriptions", icon: FileText }, // Updated href
+                  { title: "Subscription", href: "/admin/subscriptions", icon: FileText },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
@@ -233,7 +231,6 @@ export function SideNavigation() {
             </div>
           </>
         ) : currentSection === "sales" ? (
-          // Special grouped layout for sales
           <>
             {/* Notification Section */}
             <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg p-3 text-white">
@@ -277,7 +274,7 @@ export function SideNavigation() {
                 {[
                   { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
                   { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
-                  { title: "Bulletin Board", href: "/sales/bulletin-board", icon: ClipboardList }, // New item
+                  { title: "Bulletin Board", href: "/sales/bulletin-board", icon: ClipboardList },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
@@ -318,7 +315,7 @@ export function SideNavigation() {
                   { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
                   { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
                   { title: "Clients", href: "/sales/clients", icon: Users },
-                  { title: "Billings", href: "#", icon: FileText }, // Added Billings here
+                  { title: "Billings", href: "#", icon: FileText },
                   { title: "Planner", href: "/sales/planner", icon: Calendar },
                   { title: "Customer Chat", href: "/sales/chat", icon: MessageCircle },
                 ].map((item) => {
@@ -379,7 +376,6 @@ export function SideNavigation() {
         ) : (
           // Default layout for other sections
           currentNavItem?.items.map((item) => {
-            // Use optional chaining here
             const Icon = item.icon
             const active = isActive(pathname, item.href)
 
