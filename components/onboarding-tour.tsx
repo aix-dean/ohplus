@@ -1,56 +1,54 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import Joyride, { STATUS, EVENTS, ACTIONS, type Step, type CallBackProps } from "react-joyride"
+import { useEffect, useState } from "react"
+import Joyride, { type CallBackProps, STATUS, type Step } from "react-joyride"
+import { useAuth } from "@/contexts/auth-context"
 
-interface OnboardingTourProps {
-  steps: Step[]
-  run?: boolean
-  onComplete?: () => void
-  onSkip?: () => void
-}
+const dashboardSteps: Step[] = [
+  {
+    target: '[data-tour-id="inventory-link"]',
+    content:
+      "Step 1: You're in! Let's get your company online. Set up your first billboard site — it's quick. Click on Inventory to get started.",
+    disableBeacon: true,
+    placement: "right",
+    title: "Welcome to OH!Plus",
+  },
+]
 
-export function OnboardingTour({ steps, run = true, onComplete, onSkip }: OnboardingTourProps) {
+export function OnboardingTour() {
   const [runTour, setRunTour] = useState(false)
+  const { user } = useAuth()
 
   useEffect(() => {
-    if (run) {
-      // Small delay to ensure DOM elements are ready
+    // Check if user is new and hasn't seen the tour
+    const hasSeenTour = localStorage.getItem("hasSeenOnboardingTour")
+    if (user && !hasSeenTour) {
+      // Small delay to ensure DOM is ready
       const timer = setTimeout(() => {
         setRunTour(true)
-      }, 500)
+      }, 1000)
       return () => clearTimeout(timer)
     }
-  }, [run])
+  }, [user])
 
   const handleJoyrideCallback = (data: CallBackProps) => {
-    const { status, action, type } = data
+    const { status, action } = data
 
-    if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+    if (status === STATUS.FINISHED || status === STATUS.SKIPPED || action === "close") {
       setRunTour(false)
-      if (status === STATUS.FINISHED && onComplete) {
-        onComplete()
-      } else if (status === STATUS.SKIPPED && onSkip) {
-        onSkip()
-      }
-    }
-
-    // Handle close button click
-    if (action === ACTIONS.CLOSE || type === EVENTS.TARGET_NOT_FOUND) {
-      setRunTour(false)
-      if (onSkip) {
-        onSkip()
-      }
+      localStorage.setItem("hasSeenOnboardingTour", "true")
     }
   }
 
+  if (!user || !runTour) return null
+
   return (
     <Joyride
-      steps={steps}
+      steps={dashboardSteps}
       run={runTour}
-      continuous
-      showProgress
-      showSkipButton
+      continuous={true}
+      showProgress={true}
+      showSkipButton={true}
       disableOverlayClose={false}
       disableCloseOnEsc={false}
       callback={handleJoyrideCallback}
@@ -64,82 +62,44 @@ export function OnboardingTour({ steps, run = true, onComplete, onSkip }: Onboar
           zIndex: 10000,
         },
         tooltip: {
-          borderRadius: 12,
+          borderRadius: 8,
           boxShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
           fontSize: 14,
           padding: 20,
-          maxWidth: 400,
         },
         tooltipTitle: {
+          color: "#3b82f6",
           fontSize: 18,
           fontWeight: 600,
-          color: "#3b82f6",
-          marginBottom: 8,
+          marginBottom: 10,
         },
         tooltipContent: {
-          lineHeight: 1.5,
           color: "#6b7280",
+          lineHeight: 1.5,
         },
         buttonNext: {
           backgroundColor: "#3b82f6",
-          borderRadius: 8,
+          borderRadius: 6,
+          color: "#ffffff",
           fontSize: 14,
           fontWeight: 500,
           padding: "8px 16px",
         },
-        buttonBack: {
-          color: "#6b7280",
-          fontSize: 14,
-          marginRight: 8,
-        },
         buttonSkip: {
-          color: "#9ca3af",
+          color: "#6b7280",
           fontSize: 14,
         },
         buttonClose: {
-          display: "block",
-          position: "absolute",
-          top: 8,
-          right: 8,
-          width: 24,
-          height: 24,
-          border: "none",
-          background: "transparent",
-          cursor: "pointer",
-          fontSize: 18,
           color: "#9ca3af",
+          fontSize: 16,
+          fontWeight: "bold",
+          position: "absolute",
+          right: 10,
+          top: 10,
+          width: 20,
+          height: 20,
         },
       }}
     />
   )
-}
-
-// Dashboard tour steps
-const dashboardSteps: Step[] = [
-  {
-    target: '[data-tour-id="inventory-link"]',
-    content:
-      "Step 1: You're in! Let's get your company online. Set up your first billboard site — it's quick. Click on Inventory to get started.",
-    disableBeacon: true,
-    placement: "right",
-    title: "Welcome to OH!Plus",
-  },
-  {
-    target: '[data-tour-id="sales-link"]',
-    content:
-      "Step 2: Once you have inventory, you can start creating proposals and managing client relationships here.",
-    placement: "right",
-    title: "Sales Management",
-  },
-  {
-    target: '[data-tour-id="logistics-link"]',
-    content: "Step 3: Monitor and manage your billboard sites, track maintenance, and oversee operations.",
-    placement: "right",
-    title: "Site Operations",
-  },
-]
-
-// Onboarding tour for dashboard
-export function DashboardOnboardingTour({ onComplete }: { onComplete?: () => void }) {
-  return <OnboardingTour steps={dashboardSteps} onComplete={onComplete} onSkip={onComplete} />
 }
