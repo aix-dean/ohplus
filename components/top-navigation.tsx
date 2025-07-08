@@ -3,11 +3,13 @@
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, X, Settings, LogOut, User, Bell, ChevronRight } from "lucide-react"
+import { Menu, X, Settings, LogOut, User, Bell } from "lucide-react"
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useIsAdmin } from "@/hooks/use-is-admin"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export function TopNavigation() {
   const [isOpen, setIsOpen] = useState(false)
@@ -15,7 +17,6 @@ export function TopNavigation() {
   const pathname = usePathname()
   const router = useRouter()
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [breadcrumbs, setBreadcrumbs] = useState<Array<{ label: string; href: string }>>([])
 
   const { user, userData, signOut } = useAuth()
   const { unreadCount } = useUnreadMessages()
@@ -59,80 +60,6 @@ export function TopNavigation() {
       document.body.style.overflow = ""
     }
   }, [isOpen])
-
-  // Track navigation history and build breadcrumbs
-  useEffect(() => {
-    const updateBreadcrumbs = () => {
-      const segments = pathname.split("/").filter(Boolean)
-      const crumbs: Array<{ label: string; href: string }> = []
-
-      const currentMainSection = segments[0] || ""
-      let historyStack: string[] = JSON.parse(localStorage.getItem("breadcrumbHistory") || "[]")
-
-      // Manage history stack
-      if (currentMainSection && ["admin", "sales", "logistics", "cms"].includes(currentMainSection)) {
-        if (historyStack.length === 0) {
-          // First visit to a main section
-          historyStack = [currentMainSection]
-        } else if (historyStack.length === 1) {
-          // From one main section to another
-          if (historyStack[0] !== currentMainSection) {
-            historyStack.push(currentMainSection)
-          }
-        } else if (historyStack.length === 2) {
-          // From A -> B, now navigating to C or back to A
-          if (historyStack[1] === currentMainSection) {
-            // Staying in the same current main section, history remains
-            // e.g., Admin -> Sales -> Sales/Proposals (history: [Admin, Sales])
-          } else if (historyStack[0] === currentMainSection) {
-            // Navigating back to the "parent" main section
-            // e.g., Admin -> Sales -> Admin (history: [Admin])
-            historyStack = [currentMainSection]
-          } else {
-            // Navigating to a completely new third main section
-            // e.g., Admin -> Sales -> Logistics (history: [Sales, Logistics])
-            historyStack = [historyStack[1], currentMainSection]
-          }
-        }
-      } else {
-        // Not in a main section (e.g., root, login, account), clear history
-        historyStack = []
-      }
-      localStorage.setItem("breadcrumbHistory", JSON.stringify(historyStack))
-
-      // Build breadcrumbs from history stack
-      historyStack.forEach((section) => {
-        const label = section.charAt(0).toUpperCase() + section.slice(1)
-        crumbs.push({ label, href: `/${section}/dashboard` })
-      })
-
-      // Add current sub-segments if any, after the main section
-      let currentPathAccumulator = `/${currentMainSection}`
-      for (let i = 1; i < segments.length; i++) {
-        const segment = segments[i]
-        if (segment === "dashboard") {
-          continue // Skip "dashboard" in sub-segments
-        }
-        if (segment.startsWith("[") && segment.endsWith("]")) {
-          // Stop adding segments if it's a dynamic ID (e.g., /sales/proposals/123 -> Sales > Proposals)
-          break
-        }
-
-        currentPathAccumulator += `/${segment}`
-        const label = segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, " ")
-        crumbs.push({ label, href: currentPathAccumulator })
-      }
-
-      // Special case for root path if no main section is active
-      if (crumbs.length === 0 && pathname === "/") {
-        crumbs.push({ label: "Dashboard", href: "/" })
-      }
-
-      setBreadcrumbs(crumbs)
-    }
-
-    updateBreadcrumbs()
-  }, [pathname])
 
   const getPageTitle = (path: string) => {
     const segments = path.split("/").filter(Boolean)
@@ -218,9 +145,10 @@ export function TopNavigation() {
   const isLogisticsSection = pathname.startsWith("/logistics")
   const isCmsSection = pathname.startsWith("/cms")
   const isAdminSection = pathname.startsWith("/admin")
-  const isAccountPage = pathname === "/account"
+  const isAccountPage = pathname === "/account" // New check for account page
 
   const navBgColor = isSalesSection ? "bg-[#ff3333]" : "bg-[#0a1433]"
+
   const diagonalBgColor = isSalesSection ? "bg-[#ffcccc]" : "bg-[#38b6ff]"
 
   const handleMobileNavigation = (href: string) => {
@@ -239,37 +167,19 @@ export function TopNavigation() {
         <div className="top-nav-content">
           <div className="top-nav-left">
             <div className="top-nav-logo flex items-center">
-              <div className="flex items-center space-x-2">
-                {breadcrumbs.length > 0 ? (
-                  <nav className="flex items-center space-x-2 text-white">
-                    {breadcrumbs.map((crumb, index) => (
-                      <div key={crumb.href} className="flex items-center">
-                        {/* Only show ChevronRight if it's not the first breadcrumb */}
-                        {index > 0 && <ChevronRight className="h-4 w-4 mx-1 text-white/60" />}
-                        {index === breadcrumbs.length - 1 ? (
-                          <span className="text-xl font-semibold">{crumb.label}</span>
-                        ) : (
-                          <button
-                            onClick={() => router.push(crumb.href)}
-                            className="text-lg font-medium hover:text-white/80 transition-colors"
-                          >
-                            {crumb.label}
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </nav>
-                ) : (
-                  <h1 className="text-xl font-semibold text-white">{pageTitle}</h1>
-                )}
-              </div>
+              <h1 className="text-xl font-semibold text-white">{pageTitle}</h1>
             </div>
             <div className="top-nav-links hidden md:flex"></div>
           </div>
 
           <div className="top-nav-right flex items-center h-full relative z-20 flex-shrink-0">
-            {!isAccountPage && (
+            {" "}
+            {/* Added relative z-20 and flex-shrink-0 */}
+            {/* User controls section (bell and profile) - Conditionally rendered */}
+            {!isAccountPage && ( // Only render if NOT on the account page
               <div className="flex items-center mr-2 md:mr-8 relative z-10">
+                {" "}
+                {/* Added relative z-10 */}
                 <button
                   className="p-2 rounded-full text-white hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary relative"
                   aria-label="View notifications"
@@ -283,6 +193,8 @@ export function TopNavigation() {
                 </button>
                 {/* Profile dropdown */}
                 <div className="ml-3 relative z-10" ref={profileRef}>
+                  {" "}
+                  {/* Added relative z-10 */}
                   <button
                     type="button"
                     className="max-w-xs bg-white rounded-full flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
@@ -344,6 +256,8 @@ export function TopNavigation() {
             )}
             {/* Date display in the light blue section with adjusted padding */}
             <div className="hidden md:flex items-center justify-end h-full pl-8 pr-8 relative z-10">
+              {" "}
+              {/* Adjusted pl-8 */}
               <span className="text-sm font-medium text-[#0a1433]">{format(currentTime, "MMMM d, yyyy, h:mm a")}</span>
             </div>
             {/* Mobile menu button */}
