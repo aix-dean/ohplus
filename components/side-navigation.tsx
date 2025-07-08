@@ -129,11 +129,6 @@ export function SideNavigation() {
       <nav className="p-3 space-y-4">
         {currentSection === "logistics" ? (
           <>
-            {/* Header */}
-            <div className="bg-slate-800 text-white rounded-lg p-3 text-center">
-              <h2 className="text-sm font-semibold">Logistics- Dashboard</h2>
-            </div>
-
             {/* Notification Section */}
             <div className="bg-gradient-to-br from-sky-300 to-sky-400 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
