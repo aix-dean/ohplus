@@ -151,6 +151,7 @@ export function SideNavigation() {
                 {[
                   { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard }, // Updated href
                   { title: "Bulletin Board", href: "/admin/bulletin-board", icon: ClipboardList },
+                  { title: "Calendar", href: "/admin/calendar", icon: Calendar }, // Add this new Calendar item
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
