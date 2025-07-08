@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { RegistrationSuccessDialog } from "@/components/registration-success-dialog"
-import { OnboardingTour } from "@/components/onboarding-tour"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -21,18 +20,14 @@ export default function AdminDashboardPage() {
   const { user } = useAuth()
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [startTour, setStartTour] = useState(false)
-  const [tourKey, setTourKey] = useState(0)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
   useEffect(() => {
-    console.log("Dashboard: useEffect triggered, checking for registered param")
     const registeredParam = searchParams.get("registered")
     const dialogShownKey = "registrationSuccessDialogShown"
 
     if (registeredParam === "true" && !sessionStorage.getItem(dialogShownKey)) {
-      console.log("Dashboard: Showing registration success dialog")
       setShowSuccessDialog(true)
       sessionStorage.setItem(dialogShownKey, "true")
       // Remove the 'registered' query parameter immediately after detecting it
@@ -43,33 +38,8 @@ export default function AdminDashboardPage() {
   }, [searchParams, router])
 
   const handleCloseSuccessDialog = () => {
-    console.log("Dashboard: Registration success dialog closed, starting tour")
     setShowSuccessDialog(false)
-    // Start tour after dialog closes
-    setStartTour(true)
-    setTourKey((prev) => prev + 1)
-    console.log("Dashboard: Set startTour to true, tourKey incremented to", tourKey + 1)
   }
-
-  // Remove handleTestTour
-  // const handleTestTour = () => {
-  //   console.log("Dashboard: Test Tour button clicked")
-  //   // Clear any previous tour completion
-  //   localStorage.removeItem("onboardingTourCompleted")
-  //   console.log("Dashboard: Cleared onboardingTourCompleted from localStorage")
-  //   // Start the tour
-  //   setStartTour(true)
-  //   setTourKey((prev) => {
-  //     const newKey = prev + 1
-  //     console.log("Dashboard: Set startTour to true, tourKey incremented to", newKey)
-  //     return newKey
-  //   })
-  // }
-
-  // Log state changes
-  useEffect(() => {
-    console.log("Dashboard: State changed - startTour:", startTour, "tourKey:", tourKey)
-  }, [startTour, tourKey])
 
   interface Department {
     id: string
@@ -267,8 +237,6 @@ export default function AdminDashboardPage() {
     )
   })
 
-  console.log("Dashboard: Rendering with startTour:", startTour, "tourKey:", tourKey)
-
   return (
     <div className="flex-1 p-4 md:p-6">
       <div className="flex flex-col gap-6">
@@ -307,7 +275,7 @@ export default function AdminDashboardPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredDepartments.map((department) => (
-            <div key={department.id} data-tour-id={department.id === "sales" ? "inventory-link" : undefined}>
+            <div key={department.id}>
               <DepartmentCard department={department} />
             </div>
           ))}
@@ -320,8 +288,6 @@ export default function AdminDashboardPage() {
         onClose={handleCloseSuccessDialog}
         onStartTour={handleCloseSuccessDialog}
       />
-
-      <OnboardingTour key={tourKey} startTour={startTour} />
     </div>
   )
 }
