@@ -107,12 +107,6 @@ export default function LogisticSiteInformationPage() {
   if (loading) {
     return (
       <div className="container mx-auto p-6">
-        <div className="flex items-center space-x-4 mb-6">
-          <Button variant="ghost" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-        </div>
         <div className="text-center py-8">Loading...</div>
       </div>
     )
@@ -121,12 +115,6 @@ export default function LogisticSiteInformationPage() {
   if (!assignment) {
     return (
       <div className="container mx-auto p-6">
-        <div className="flex items-center space-x-4 mb-6">
-          <Button variant="ghost" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-        </div>
         <div className="text-center py-8">Service assignment not found.</div>
       </div>
     )
