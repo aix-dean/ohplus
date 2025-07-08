@@ -1,453 +1,251 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Loader2, Plus, MapPin, ChevronLeft, ChevronRight } from "lucide-react"
-import { getPaginatedUserProducts, getUserProductsCount, softDeleteProduct, type Product } from "@/lib/firebase-service"
-import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
-import { toast } from "@/components/ui/use-toast"
-import { useResponsive } from "@/hooks/use-responsive"
-import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
-import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Plus, Search, MapPin, Eye, Edit, Trash2 } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
 import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
-import Image from "next/image"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog"
 
-// Number of items to display per page
-const ITEMS_PER_PAGE = 12
+// Mock data for demonstration
+const mockSites = [
+  {
+    id: "1",
+    name: "EDSA Billboard - Ortigas",
+    type: "LED Billboard",
+    location: "EDSA, Ortigas Center, Pasig City",
+    status: "active",
+    dimensions: "12m x 6m",
+    price: "₱150,000/month",
+    availability: "Available",
+    lastUpdated: "2024-01-15",
+  },
+  {
+    id: "2",
+    name: "Ayala Avenue Digital Display",
+    type: "Digital Display",
+    location: "Ayala Avenue, Makati City",
+    status: "occupied",
+    dimensions: "8m x 4m",
+    price: "₱80,000/month",
+    availability: "Occupied until March 2024",
+    lastUpdated: "2024-01-10",
+  },
+  {
+    id: "3",
+    name: "BGC Transit Billboard",
+    type: "Static Billboard",
+    location: "Bonifacio Global City, Taguig",
+    status: "maintenance",
+    dimensions: "10m x 5m",
+    price: "₱120,000/month",
+    availability: "Under Maintenance",
+    lastUpdated: "2024-01-12",
+  },
+]
 
-export default function AdminInventoryPage() {
+export default function InventoryPage() {
   const router = useRouter()
-  const { user, userData, subscriptionData, refreshUserData } = useAuth()
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [productToDelete, setProductToDelete] = useState<Product | null>(null)
-  const { isMobile, isTablet } = useResponsive()
-
-  // Company registration dialog state
+  const { userData } = useAuth()
+  const [sites, setSites] = useState(mockSites)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [typeFilter, setTypeFilter] = useState("all")
   const [showCompanyDialog, setShowCompanyDialog] = useState(false)
 
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalItems, setTotalItems] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
-  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null)
-  const [pageCache, setPageCache] = useState<
-    Map<number, { items: Product[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null }>
-  >(new Map())
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [loadingCount, setLoadingCount] = useState(false)
+  const filteredSites = sites.filter((site) => {
+    const matchesSearch =
+      site.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      site.location.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = statusFilter === "all" || site.status === statusFilter
+    const matchesType = typeFilter === "all" || site.type === typeFilter
 
-  // Subscription limit dialog state
-  const [showSubscriptionLimitDialog, setShowSubscriptionLimitDialog] = useState(false)
-  const [subscriptionLimitMessage, setSubscriptionLimitMessage] = useState("")
+    return matchesSearch && matchesStatus && matchesType
+  })
 
-  // Fetch total count of products
-  const fetchTotalCount = useCallback(async () => {
-    if (!user?.uid) return
-
-    setLoadingCount(true)
-    try {
-      const count = await getUserProductsCount(user.uid, { active: true })
-      setTotalItems(count)
-      setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
-    } catch (error) {
-      console.error("Error fetching total count:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load product count. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoadingCount(false)
-    }
-  }, [user, toast])
-
-  // Fetch products for the current page
-  const fetchProducts = useCallback(
-    async (page: number) => {
-      if (!user?.uid) return
-
-      // Check if we have this page in cache
-      if (pageCache.has(page)) {
-        const cachedData = pageCache.get(page)!
-        setProducts(cachedData.items)
-        setLastDoc(cachedData.lastDoc)
-        return
-      }
-
-      const isFirstPage = page === 1
-      setLoading(isFirstPage)
-      setLoadingMore(!isFirstPage)
-
-      try {
-        // For the first page, start from the beginning
-        // For subsequent pages, use the last document from the previous page
-        const startDoc = isFirstPage ? null : lastDoc
-
-        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, { active: true })
-
-        setProducts(result.items)
-        setLastDoc(result.lastDoc)
-        setHasMore(result.hasMore)
-
-        // Cache this page
-        setPageCache((prev) => {
-          const newCache = new Map(prev)
-          newCache.set(page, {
-            items: result.items,
-            lastDoc: result.lastDoc,
-          })
-          return newCache
-        })
-      } catch (error) {
-        console.error("Error fetching products:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load product count. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-        setLoadingMore(false)
-      }
-    },
-    [user, lastDoc, pageCache, toast],
-  )
-
-  // Load initial data and count
-  useEffect(() => {
-    if (user?.uid) {
-      fetchProducts(1)
-      fetchTotalCount()
-    }
-  }, [user, fetchProducts, fetchTotalCount])
-
-  // Load data when page changes
-  useEffect(() => {
-    if (user?.uid && currentPage > 0) {
-      fetchProducts(currentPage)
-    }
-  }, [currentPage, fetchProducts, user])
-
-  // Pagination handlers
-  const goToPage = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page)
-      // Scroll to top when changing pages
-      window.scrollTo({ top: 0, behavior: "smooth" })
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active":
+        return "bg-green-100 text-green-800"
+      case "occupied":
+        return "bg-blue-100 text-blue-800"
+      case "maintenance":
+        return "bg-yellow-100 text-yellow-800"
+      default:
+        return "bg-gray-100 text-gray-800"
     }
   }
 
-  const goToPreviousPage = () => goToPage(currentPage - 1)
-  const goToNextPage = () => goToPage(currentPage + 1)
-
-  // Generate page numbers for pagination
-  const getPageNumbers = () => {
-    const pageNumbers = []
-    const maxPagesToShow = 5
-
-    if (totalPages <= maxPagesToShow) {
-      // If we have 5 or fewer pages, show all of them
-      for (let i = 1; i <= totalPages; i++) {
-        pageNumbers.push(i)
-      }
-    } else {
-      // Always include first page
-      pageNumbers.push(1)
-
-      // Calculate start and end of page range around current page
-      let startPage = Math.max(2, currentPage - 1)
-      let endPage = Math.min(totalPages - 1, currentPage + 1)
-
-      // Adjust if we're near the beginning
-      if (currentPage <= 3) {
-        endPage = Math.min(totalPages - 1, 4)
-      }
-
-      // Adjust if we're near the end
-      if (currentPage >= totalPages - 2) {
-        startPage = Math.max(2, totalPages - 3)
-      }
-
-      // Add ellipsis if needed before the range
-      if (startPage > 2) {
-        pageNumbers.push("...")
-      }
-
-      // Add the range of pages
-      for (let i = startPage; i <= endPage; i++) {
-        pageNumbers.push(i)
-      }
-
-      // Add ellipsis if needed after the range
-      if (endPage < totalPages - 1) {
-        pageNumbers.push("...")
-      }
-
-      // Always include last page
-      pageNumbers.push(totalPages)
-    }
-
-    return pageNumbers
-  }
-
-  // Handle product deletion
-  const handleDeleteClick = (product: Product, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setProductToDelete(product)
-    setDeleteDialogOpen(true)
-  }
-
-  const handleDeleteConfirm = async () => {
-    if (!productToDelete) return
-
-    try {
-      await softDeleteProduct(productToDelete.id)
-
-      // Update the UI by removing the deleted product
-      setProducts((prevProducts) => prevProducts.filter((p) => p.id !== productToDelete.id))
-
-      // Update total count
-      setTotalItems((prev) => prev - 1)
-
-      // Recalculate total pages
-      setTotalPages(Math.max(1, Math.ceil((totalItems - 1) / ITEMS_PER_PAGE)))
-
-      // Clear cache to force refresh
-      setPageCache(new Map())
-
-      toast({
-        title: "Product deleted",
-        description: `${productToDelete.name} has been successfully deleted.`,
-      })
-    } catch (error) {
-      console.error("Error deleting product:", error)
-      toast({
-        title: "Error",
-        description: "Failed to delete the product. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleEditClick = (product: Product, e: React.MouseEvent) => {
-    e.stopPropagation()
-    router.push(`/admin/products/edit/${product.id}`)
-  }
-
-  const handleViewDetails = (productId: string) => {
-    router.push(`/admin/products/${productId}`)
-  }
-
-  const handleAddSiteClick = () => {
-    // Check if user has company_id first
+  const handleAddSite = () => {
+    // Check if user has company_id
     if (!userData?.company_id) {
       setShowCompanyDialog(true)
       return
     }
 
-    if (!userData?.license_key) {
-      setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
-      setShowSubscriptionLimitDialog(true)
-      return
+    // Check subscription status and redirect accordingly
+    if (userData.subscription_status === "active") {
+      router.push("/admin/products/create")
+    } else {
+      router.push("/admin/subscriptions/choose-plan")
     }
-
-    if (!subscriptionData || subscriptionData.status !== "active") {
-      setSubscriptionLimitMessage(
-        "Your current subscription is not active. Please activate or upgrade your plan to add more sites.",
-      )
-      setShowSubscriptionLimitDialog(true)
-      return
-    }
-
-    if (totalItems >= subscriptionData.maxProducts) {
-      setSubscriptionLimitMessage(
-        `You have reached the maximum number of sites allowed by your current plan (${subscriptionData.maxProducts}). Please upgrade your subscription to add more sites.`,
-      )
-      setShowSubscriptionLimitDialog(true)
-      return
-    }
-
-    router.push("/admin/products/create")
   }
 
-  const handleCompanyRegistrationSuccess = async () => {
-    await refreshUserData()
+  const handleCompanyRegistrationSuccess = () => {
     setShowCompanyDialog(false)
-    // After successful company registration, proceed to add site
-    router.push("/admin/products/create")
+    // After company registration, check subscription and redirect
+    if (userData?.subscription_status === "active") {
+      router.push("/admin/products/create")
+    } else {
+      router.push("/admin/subscriptions/choose-plan")
+    }
   }
 
   return (
-    <div className="flex-1 p-4 md:p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Site Inventory</h1>
+          <p className="text-gray-600 mt-2">Manage your outdoor advertising sites</p>
+        </div>
+        <Button onClick={handleAddSite} className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Add Site
+        </Button>
       </div>
 
-      {loading ? (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        </div>
-      ) : (
-        <div className="grid gap-6">
-          {/* Product List */}
-          <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
-            {/* The "+ Add Site" card is now the first item in the grid */}
-            <Card
-              className="w-full min-h-[284px] flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
-              onClick={handleAddSiteClick}
-            >
-              <Plus className="h-8 w-8 mb-2" />
-              <span className="text-lg font-semibold">+ Add Site</span>
-            </Card>
-
-            {products.map((product) => (
-              <Card
-                key={product.id}
-                className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
-              >
-                <div className="h-48 bg-gray-200 relative">
-                  <Image
-                    src={
-                      product.media && product.media.length > 0
-                        ? product.media[0].url
-                        : "/abstract-geometric-sculpture.png"
-                    }
-                    alt={product.name || "Product image"}
-                    fill
-                    className="object-cover"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.src = "/abstract-geometric-sculpture.png"
-                      target.className = "opacity-50"
-                    }}
-                  />
-                </div>
-
-                <CardContent className="p-4">
-                  <div className="flex flex-col">
-                    <h3 className="font-semibold line-clamp-1">{product.name}</h3>
-                    <div className="mt-2 text-sm font-medium text-green-700">
-                      ₱{Number(product.price).toLocaleString()}
-                    </div>
-                    <div className="mt-1 text-xs text-gray-500 flex items-center">
-                      <MapPin size={12} className="mr-1 flex-shrink-0" />
-                      <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </ResponsiveCardGrid>
-
-          {/* Pagination Controls */}
-          <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
-            <div className="text-sm text-gray-500 flex items-center">
-              {loadingCount ? (
-                <div className="flex items-center">
-                  <Loader2 size={14} className="animate-spin mr-2" />
-                  <span>Calculating pages...</span>
-                </div>
-              ) : (
-                <span>
-                  Page {currentPage} of {totalPages} ({products.length} items)
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToPreviousPage}
-                disabled={currentPage === 1}
-                className="h-8 w-8 p-0 bg-transparent"
-              >
-                <ChevronLeft size={16} />
-              </Button>
-
-              {/* Page numbers - Hide on mobile */}
-              <div className="hidden sm:flex items-center gap-1">
-                {getPageNumbers().map((page, index) =>
-                  page === "..." ? (
-                    <span key={`ellipsis-${index}`} className="px-2">
-                      ...
-                    </span>
-                  ) : (
-                    <Button
-                      key={`page-${page}`}
-                      variant={currentPage === page ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => goToPage(page as number)}
-                      className="h-8 w-8 p-0"
-                    >
-                      {page}
-                    </Button>
-                  ),
-                )}
+      {/* Filters and Search */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Search sites by name or location..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
               </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToNextPage}
-                disabled={currentPage >= totalPages}
-                className="h-8 w-8 p-0"
-              >
-                <ChevronRight size={16} />
-              </Button>
             </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="occupied">Occupied</SelectItem>
+                <SelectItem value="maintenance">Maintenance</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="LED Billboard">LED Billboard</SelectItem>
+                <SelectItem value="Digital Display">Digital Display</SelectItem>
+                <SelectItem value="Static Billboard">Static Billboard</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        </div>
+        </CardContent>
+      </Card>
+
+      {/* Sites Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredSites.map((site) => (
+          <Card key={site.id} className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <div>
+                  <CardTitle className="text-lg">{site.name}</CardTitle>
+                  <CardDescription className="flex items-center gap-1 mt-1">
+                    <MapPin className="h-3 w-3" />
+                    {site.location}
+                  </CardDescription>
+                </div>
+                <Badge className={getStatusColor(site.status)}>
+                  {site.status.charAt(0).toUpperCase() + site.status.slice(1)}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Type:</span>
+                  <span className="font-medium">{site.type}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Dimensions:</span>
+                  <span className="font-medium">{site.dimensions}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Price:</span>
+                  <span className="font-medium text-green-600">{site.price}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Availability:</span>
+                  <span className="font-medium">{site.availability}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Last Updated:</span>
+                  <span className="text-gray-500">{site.lastUpdated}</span>
+                </div>
+
+                <div className="flex gap-2 pt-3">
+                  <Button variant="outline" size="sm" className="flex-1 bg-transparent">
+                    <Eye className="h-3 w-3 mr-1" />
+                    View
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-1 bg-transparent">
+                    <Edit className="h-3 w-3 mr-1" />
+                    Edit
+                  </Button>
+                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {filteredSites.length === 0 && (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <div className="text-gray-400 mb-4">
+              <MapPin className="h-12 w-12 mx-auto" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No sites found</h3>
+            <p className="text-gray-600 mb-4">
+              {searchTerm || statusFilter !== "all" || typeFilter !== "all"
+                ? "Try adjusting your search or filters"
+                : "Get started by adding your first advertising site"}
+            </p>
+            {!searchTerm && statusFilter === "all" && typeFilter === "all" && (
+              <Button onClick={handleAddSite}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Your First Site
+              </Button>
+            )}
+          </CardContent>
+        </Card>
       )}
-
-      {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        isOpen={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-        onConfirm={handleDeleteConfirm}
-        title="Delete Product"
-        description="This product will be removed from your inventory. This action cannot be undone."
-        itemName={productToDelete?.name}
-      />
-
-      {/* Subscription Limit Dialog */}
-      <Dialog open={showSubscriptionLimitDialog} onOpenChange={setShowSubscriptionLimitDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Subscription Required</DialogTitle>
-            <DialogDescription>{subscriptionLimitMessage}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => router.push("/admin/subscriptions/choose-plan")}>Choose Plan</Button>
-            <DialogClose asChild>
-              <Button variant="outline">Close</Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Company Registration Dialog */}
       <CompanyRegistrationDialog
         isOpen={showCompanyDialog}
         onClose={() => setShowCompanyDialog(false)}
         onSuccess={handleCompanyRegistrationSuccess}
-        userId={user?.uid || ""}
       />
     </div>
   )
