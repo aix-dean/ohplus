@@ -462,7 +462,7 @@ export default function LogisticsCalendarPage() {
                         className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 ${getServiceTypeColor(assignment.serviceType)}`}
                         onClick={(e) => {
                           e.stopPropagation()
-                          router.push(`/logistics/assignments/${assignment.id}`)
+                          router.push(`/logistics/service-assignments/${assignment.id}`)
                         }}
                       >
                         <div className="flex items-center gap-1">
@@ -547,7 +547,7 @@ export default function LogisticsCalendarPage() {
                     className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm ${getServiceTypeColor(assignment.serviceType)}`}
                     onClick={(e) => {
                       e.stopPropagation()
-                      router.push(`/logistics/assignments/${assignment.id}`)
+                      router.push(`/logistics/service-assignments/${assignment.id}`)
                     }}
                   >
                     <div className="font-medium truncate">SA#{assignment.saNumber}</div>
@@ -637,7 +637,7 @@ export default function LogisticsCalendarPage() {
                       }}
                       onClick={(e) => {
                         e.stopPropagation()
-                        router.push(`/logistics/assignments/${assignment.id}`)
+                        router.push(`/logistics/service-assignments/${assignment.id}`)
                       }}
                     >
                       <div className="font-medium truncate">SA#{assignment.saNumber}</div>
@@ -726,7 +726,7 @@ export default function LogisticsCalendarPage() {
                         className={`flex-1 min-w-[80px] sm:min-w-[150px] p-1 sm:p-2 rounded border shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50 ${getServiceTypeColor(assignment.serviceType)}`}
                         onClick={(e) => {
                           e.stopPropagation()
-                          router.push(`/logistics/assignments/${assignment.id}`)
+                          router.push(`/logistics/service-assignments/${assignment.id}`)
                         }}
                       >
                         <div className="font-medium truncate">SA#{assignment.saNumber}</div>
@@ -822,7 +822,7 @@ export default function LogisticsCalendarPage() {
                         className={`flex-1 min-w-[70px] sm:min-w-[120px] p-1 rounded border shadow-sm text-[8px] sm:text-[10px] cursor-pointer hover:bg-gray-50 ${getServiceTypeColor(assignment.serviceType)}`}
                         onClick={(e) => {
                           e.stopPropagation()
-                          router.push(`/logistics/assignments/${assignment.id}`)
+                          router.push(`/logistics/service-assignments/${assignment.id}`)
                         }}
                       >
                         <div className="font-medium truncate">SA#{assignment.saNumber}</div>
