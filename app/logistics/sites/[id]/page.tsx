@@ -323,7 +323,7 @@ export default function SiteDetailsPage({ params }: Props) {
             </CardContent>
           </Card>
 
-          {/* Site Data Grid */}
+          {/* Site Data Grid - 2x2 layout */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Illumination */}
             <Card>
@@ -461,166 +461,7 @@ export default function SiteDetailsPage({ params }: Props) {
             </Card>
           </div>
 
-          {/* Content Schedule Section - Only show when coming from content view */}
-          {isFromContent && isDynamic && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Content Schedule</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="py-2 px-3 text-left font-medium text-xs">Time</th>
-                        <th className="py-2 px-3 text-left font-medium text-xs">Spot</th>
-                        <th className="py-2 px-3 text-left font-medium text-xs">Status</th>
-                        <th className="py-2 px-3 text-left font-medium text-xs">Client</th>
-                        <th className="py-2 px-3 text-left font-medium text-xs">Length</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-b border-gray-100">
-                        <td className="py-1 px-3 text-xs">14:30</td>
-                        <td className="py-1 px-3 text-xs">1</td>
-                        <td className="py-1 px-3 text-xs">Filler</td>
-                        <td className="py-1 px-3 text-xs">GT</td>
-                        <td className="py-1 px-3 text-xs">10 s</td>
-                      </tr>
-                      <tr className="border-b border-gray-100">
-                        <td className="py-1 px-3 text-xs">14:40</td>
-                        <td className="py-1 px-3 text-xs">2</td>
-                        <td className="py-1 px-3 text-xs">Payee</td>
-                        <td className="py-1 px-3 text-xs">Political party 1</td>
-                        <td className="py-1 px-3 text-xs">10 s</td>
-                      </tr>
-                      <tr className="border-b border-gray-100 bg-blue-50">
-                        <td className="py-1 px-3 text-xs">15:00</td>
-                        <td className="py-1 px-3 text-xs">4</td>
-                        <td className="py-1 px-3 text-xs">Payee</td>
-                        <td className="py-1 px-3 text-xs">Senator A</td>
-                        <td className="py-1 px-3 text-xs">10 s</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Lights Health Section - Only show when coming from illumination view */}
-          {isFromIllumination && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">
-                  Lights Health <span className="text-green-500">80%</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="border border-gray-100 rounded-lg p-3">
-                    <table className="w-full">
-                      <tbody>
-                        <tr className="border-b border-gray-100">
-                          <td className="py-1 text-xs">Upper</td>
-                          <td className="py-1 text-center text-green-500 font-medium text-xs">U1</td>
-                          <td className="py-1 text-center text-green-500 font-medium text-xs">U2</td>
-                          <td className="py-1 text-center text-green-500 font-medium text-xs">U3</td>
-                          <td className="py-1 text-center text-green-500 font-medium text-xs">U4</td>
-                          <td className="py-1 text-center text-green-500 font-medium text-xs">U5</td>
-                        </tr>
-                        <tr className="border-b border-gray-100">
-                          <td className="py-1 text-xs">Lower</td>
-                          <td className="py-1 text-center text-green-500 font-medium text-xs">L1</td>
-                          <td className="py-1 text-center text-green-500 font-medium text-xs">L2</td>
-                          <td className="py-1 text-center text-green-500 font-medium text-xs">L3</td>
-                          <td className="py-1 text-center text-red-500 font-medium text-xs">L4</td>
-                          <td className="py-1 text-center text-green-500 font-medium text-xs">L5</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="border border-gray-100 rounded-lg p-3">
-                    <h4 className="text-sm font-semibold mb-2">Lights Specification</h4>
-                    <div className="space-y-1 text-xs">
-                      <div>
-                        <span className="font-medium">Upper:</span> {product.illumination?.upper || ""}
-                      </div>
-                      <div>
-                        <span className="font-medium">Lower:</span> {product.illumination?.lower || ""}
-                      </div>
-                      <div>
-                        <span className="font-medium">Side (Left):</span> {product.illumination?.side_left || ""}
-                      </div>
-                      <div>
-                        <span className="font-medium">Side (Right):</span> {product.illumination?.side_right || ""}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* LED Panels Health Section - Only show when coming from display-health view */}
-          {isFromDisplayHealth && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">LED Panels Health</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="border border-gray-100 rounded-lg p-3">
-                    <div className="flex">
-                      <div className="w-1/3">
-                        <Image
-                          src="/led-panel-grid.png"
-                          alt="LED Panel Grid"
-                          width={200}
-                          height={200}
-                          className="object-contain"
-                        />
-                      </div>
-                      <div className="w-2/3 pl-4 flex flex-col justify-between">
-                        <div>
-                          <div className="text-sm text-gray-500">
-                            as of {new Date().toLocaleDateString()}, {new Date().toLocaleTimeString()}
-                          </div>
-                          <div className="text-2xl font-bold text-green-500">56/56</div>
-                        </div>
-                        <div>
-                          <div className="text-sm font-medium">Report:</div>
-                          <div className="text-sm">All panels are working. No issues currently.</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="border border-gray-100 rounded-lg p-3">
-                    <h4 className="text-sm font-semibold mb-2">Specifications</h4>
-                    <div className="space-y-1 text-xs">
-                      <div>
-                        <span className="font-medium">LED Age:</span> 5 years
-                      </div>
-                      <div>
-                        <span className="font-medium">Pitch:</span> P6
-                      </div>
-                      <div>
-                        <span className="font-medium">Nits:</span> 8,000 nits
-                      </div>
-                      <div>
-                        <span className="font-medium">Color Depth:</span> 16 bit
-                      </div>
-                      <div>
-                        <span className="font-medium">Cabinet Size:</span> 960mm x 960mm
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Crew */}
+          {/* Crew - Full width */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center">
@@ -644,7 +485,7 @@ export default function SiteDetailsPage({ params }: Props) {
             </CardContent>
           </Card>
 
-          {/* Issues */}
+          {/* Issues - Full width */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center">
@@ -658,24 +499,39 @@ export default function SiteDetailsPage({ params }: Props) {
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-2">Issue</th>
-                      <th className="text-left py-2">Issue</th>
+                      <th className="text-left py-2">Type</th>
                       <th className="text-left py-2">Content</th>
                       <th className="text-left py-2">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td colSpan={4} className="text-center py-4 text-gray-500">
-                        No issues reported
-                      </td>
-                    </tr>
+                    {product.issues && product.issues.length > 0 ? (
+                      product.issues.map((issue, index) => (
+                        <tr key={index} className="border-b border-gray-100">
+                          <td className="py-2">{issue.title}</td>
+                          <td className="py-2">{issue.type}</td>
+                          <td className="py-2">{issue.description}</td>
+                          <td className="py-2">
+                            <Badge variant={issue.status === "resolved" ? "default" : "destructive"}>
+                              {issue.status}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="text-center py-4 text-gray-500">
+                          No issues reported
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
             </CardContent>
           </Card>
 
-          {/* Automation */}
+          {/* Automation - Full width */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center">
@@ -684,7 +540,20 @@ export default function SiteDetailsPage({ params }: Props) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-gray-500">No automation configured</div>
+              {product.automation && product.automation.length > 0 ? (
+                <div className="space-y-2 text-sm">
+                  {product.automation.map((auto, index) => (
+                    <div key={index} className="flex justify-between items-center">
+                      <span>{auto.name}</span>
+                      <Badge variant={auto.active ? "default" : "secondary"}>
+                        {auto.active ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">No automation configured</div>
+              )}
             </CardContent>
           </Card>
         </div>
