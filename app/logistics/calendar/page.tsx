@@ -7,39 +7,38 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { collection, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
-import type { ServiceAssignment } from "@/types/service-assignment" // Import ServiceAssignment type
-import { AssignmentDetailsDialog } from "@/components/assignment-details-dialog" // Import AssignmentDetailsDialog component
 
 // Types for our calendar data
-// type ServiceAssignment = {
-//   id: string
-//   saNumber: string
-//   projectSiteId: string
-//   projectSiteName: string
-//   projectSiteLocation: string
-//   serviceType: string
-//   assignedTo: string
-//   jobDescription: string
-//   requestedBy: {
-//     id: string
-//     name: string
-//     department: string
-//   }
-//   message: string
-//   coveredDateStart: Date | null
-//   coveredDateEnd: Date | null
-//   alarmDate: Date | null
-//   alarmTime: string
-//   attachments: { name: string; type: string }[]
-//   status: string
-//   created: any
-//   updated: any
-// }
+type ServiceAssignment = {
+  id: string
+  saNumber: string
+  projectSiteId: string
+  projectSiteName: string
+  projectSiteLocation: string
+  serviceType: string
+  assignedTo: string
+  jobDescription: string
+  requestedBy: {
+    id: string
+    name: string
+    department: string
+  }
+  message: string
+  coveredDateStart: Date | null
+  coveredDateEnd: Date | null
+  alarmDate: Date | null
+  alarmTime: string
+  attachments: { name: string; type: string }[]
+  status: string
+  created: any
+  updated: any
+}
 
 type CalendarViewType = "month" | "week" | "day" | "hour" | "minute"
 
@@ -70,8 +69,6 @@ export default function LogisticsCalendarPage() {
   const [searchTerm, setSearchTerm] = useState("")
 
   const [serviceAssignmentDialogOpen, setServiceAssignmentDialogOpen] = useState(false)
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
-  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
 
   // Fetch service assignments from Firebase
   const fetchAssignments = useCallback(async () => {
@@ -462,19 +459,15 @@ export default function LogisticsCalendarPage() {
                     {dayAssignments.slice(0, 2).map((assignment, j) => (
                       <div
                         key={`assignment-${day}-${j}`}
-                        className={`text-[10px] sm:text-xs p-1 mb-1 rounded-full truncate cursor-pointer hover:bg-gray-100 text-white font-medium ${getServiceTypeColor(
-                          assignment.serviceType,
-                        )}`}
+                        className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 ${getServiceTypeColor(assignment.serviceType)}`}
                         onClick={(e) => {
                           e.stopPropagation()
-                          setSelectedAssignmentId(assignment.id)
-                          setDetailsDialogOpen(true)
+                          router.push(`/logistics/assignments/${assignment.id}`)
                         }}
                       >
                         <div className="flex items-center gap-1">
-                          <span className="truncate">
-                            SA#{assignment.saNumber}: {assignment.projectSiteName}
-                          </span>
+                          <span>{getTypeIcon(assignment.serviceType)}</span>
+                          <span className="truncate">SA#{assignment.saNumber}</span>
                         </div>
                       </div>
                     ))}
@@ -551,17 +544,24 @@ export default function LogisticsCalendarPage() {
                 {dayAssignments.map((assignment, j) => (
                   <div
                     key={`assignment-${i}-${j}`}
-                    className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded-full cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm text-white font-medium ${getServiceTypeColor(
-                      assignment.serviceType,
-                    )}`}
+                    className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm ${getServiceTypeColor(assignment.serviceType)}`}
                     onClick={(e) => {
                       e.stopPropagation()
-                      setSelectedAssignmentId(assignment.id)
-                      setDetailsDialogOpen(true)
+                      router.push(`/logistics/assignments/${assignment.id}`)
                     }}
                   >
-                    <div className="font-medium truncate">
-                      SA#{assignment.saNumber}: {assignment.projectSiteName}
+                    <div className="font-medium truncate">SA#{assignment.saNumber}</div>
+                    <div className="text-[8px] sm:text-xs text-gray-500 mt-1">{assignment.projectSiteName}</div>
+                    <div className="flex items-center justify-between mt-1 sm:mt-2">
+                      <Badge
+                        variant="outline"
+                        className={`${getStatusColor(assignment.status)} text-[8px] sm:text-xs px-1`}
+                      >
+                        {assignment.status}
+                      </Badge>
+                      <span className="text-[8px] sm:text-xs truncate max-w-[60px] sm:max-w-none">
+                        {assignment.serviceType}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -628,9 +628,7 @@ export default function LogisticsCalendarPage() {
                   {hourAssignments.map((assignment, i) => (
                     <div
                       key={`assignment-${hour}-${i}`}
-                      className={`absolute left-1 right-1 p-1 rounded-full shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50 text-white font-medium ${getServiceTypeColor(
-                        assignment.serviceType,
-                      )}`}
+                      className={`absolute left-1 right-1 p-1 rounded border shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50 ${getServiceTypeColor(assignment.serviceType)}`}
                       style={{
                         top: `${(assignment.coveredDateEnd?.getMinutes() || 0 / 60) * 100}%`,
                         height: "40%",
@@ -639,12 +637,18 @@ export default function LogisticsCalendarPage() {
                       }}
                       onClick={(e) => {
                         e.stopPropagation()
-                        setSelectedAssignmentId(assignment.id)
-                        setDetailsDialogOpen(true)
+                        router.push(`/logistics/assignments/${assignment.id}`)
                       }}
                     >
-                      <div className="font-medium truncate">
-                        SA#{assignment.saNumber}: {assignment.projectSiteName}
+                      <div className="font-medium truncate">SA#{assignment.saNumber}</div>
+                      <div className="flex items-center justify-between mt-0 sm:mt-1">
+                        <Badge
+                          variant="outline"
+                          className={`${getStatusColor(assignment.status)} text-[8px] sm:text-[10px] px-1`}
+                        >
+                          {assignment.status}
+                        </Badge>
+                        <span className="text-[8px] sm:text-[10px]">{getTypeIcon(assignment.serviceType)}</span>
                       </div>
                     </div>
                   ))}
@@ -719,17 +723,21 @@ export default function LogisticsCalendarPage() {
                     {intervalAssignments.map((assignment, i) => (
                       <div
                         key={`assignment-${interval}-${i}`}
-                        className={`flex-1 min-w-[80px] sm:min-w-[150px] p-1 sm:p-2 rounded-full shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50 text-white font-medium ${getServiceTypeColor(
-                          assignment.serviceType,
-                        )}`}
+                        className={`flex-1 min-w-[80px] sm:min-w-[150px] p-1 sm:p-2 rounded border shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50 ${getServiceTypeColor(assignment.serviceType)}`}
                         onClick={(e) => {
                           e.stopPropagation()
-                          setSelectedAssignmentId(assignment.id)
-                          setDetailsDialogOpen(true)
+                          router.push(`/logistics/assignments/${assignment.id}`)
                         }}
                       >
-                        <div className="font-medium truncate">
-                          SA#{assignment.saNumber}: {assignment.projectSiteName}
+                        <div className="font-medium truncate">SA#{assignment.saNumber}</div>
+                        <div className="flex items-center justify-between mt-0 sm:mt-1">
+                          <Badge
+                            variant="outline"
+                            className={`${getStatusColor(assignment.status)} text-[8px] sm:text-[10px] px-1`}
+                          >
+                            {assignment.status}
+                          </Badge>
+                          <span className="text-[8px] sm:text-[10px]">{assignment.serviceType}</span>
                         </div>
                       </div>
                     ))}
@@ -811,17 +819,21 @@ export default function LogisticsCalendarPage() {
                     {minuteAssignments.map((assignment, i) => (
                       <div
                         key={`assignment-${minute}-${i}`}
-                        className={`flex-1 min-w-[70px] sm:min-w-[120px] p-1 rounded-full shadow-sm text-[8px] sm:text-[10px] cursor-pointer hover:bg-gray-50 text-white font-medium ${getServiceTypeColor(
-                          assignment.serviceType,
-                        )}`}
+                        className={`flex-1 min-w-[70px] sm:min-w-[120px] p-1 rounded border shadow-sm text-[8px] sm:text-[10px] cursor-pointer hover:bg-gray-50 ${getServiceTypeColor(assignment.serviceType)}`}
                         onClick={(e) => {
                           e.stopPropagation()
-                          setSelectedAssignmentId(assignment.id)
-                          setDetailsDialogOpen(true)
+                          router.push(`/logistics/assignments/${assignment.id}`)
                         }}
                       >
-                        <div className="font-medium truncate">
-                          SA#{assignment.saNumber}: {assignment.projectSiteName}
+                        <div className="font-medium truncate">SA#{assignment.saNumber}</div>
+                        <div className="flex items-center justify-between">
+                          <Badge
+                            variant="outline"
+                            className={`${getStatusColor(assignment.status)} text-[6px] sm:text-[8px] px-1`}
+                          >
+                            {assignment.status}
+                          </Badge>
+                          <span className="text-[6px] sm:text-[8px]">{assignment.serviceType}</span>
                         </div>
                       </div>
                     ))}
@@ -986,7 +998,8 @@ export default function LogisticsCalendarPage() {
                   </div>
                 </div>
               </div>
-            </CardContent>
+            </div>
+          </CardContent>
         </Card>
 
         {/* Calendar view */}
@@ -1009,15 +1022,6 @@ export default function LogisticsCalendarPage() {
           }}
         />
       </div>
-      <AssignmentDetailsDialog
-        assignmentId={selectedAssignmentId}
-        open={detailsDialogOpen}
-        onOpenChange={setDetailsDialogOpen}
-        onSuccess={() => {
-          // Refresh assignments after updating
-          fetchAssignments()
-        }}
-      />
     </div>
-  )\
+  )
 }
