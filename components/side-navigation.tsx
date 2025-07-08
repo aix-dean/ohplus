@@ -90,7 +90,6 @@ const adminNavItems = [
     ],
   },
 ]
-
 export function SideNavigation() {
   const pathname = usePathname()
   const { user } = useAuth()
@@ -315,7 +314,6 @@ export function SideNavigation() {
                 })}
               </div>
             </div>
-
       {/* Admin-specific Intelligence section */}
       {isAdminLayout && !isCollapsed && (
         <div className="mx-4 mb-4">
