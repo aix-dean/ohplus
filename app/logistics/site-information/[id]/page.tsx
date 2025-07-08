@@ -1,256 +1,367 @@
-import { notFound } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+"use client"
+
+import { useState, useEffect } from "react"
+import { useParams, useRouter } from "next/navigation"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Calendar, Clock, MapPin, User, Phone, Mail } from "lucide-react"
-import Link from "next/link"
+import { ArrowLeft } from "lucide-react"
 
-// This would typically come from your database
-async function getServiceAssignment(id: string) {
-  // Mock data - replace with actual database call
-  const mockData = {
-    id,
-    saNumber: "SA-2024-001",
-    serviceType: "Maintenance",
-    status: "Scheduled",
-    alarmDate: new Date("2024-01-15"),
-    alarmTime: "09:00 AM",
-    projectSiteName: "EDSA Billboard Site A",
-    assignedTo: "John Doe",
-    clientName: "ABC Corporation",
-    location: "EDSA Ortigas, Pasig City",
-    description: "Regular maintenance check for LED display panels",
-    priority: "Medium",
-    estimatedDuration: "2 hours",
-    contactPerson: "Jane Smith",
-    contactPhone: "+63 912 345 6789",
-    contactEmail: "jane.smith@abccorp.com",
-    notes: "Check all LED panels for proper functionality and clean display surface",
-    equipment: ["LED Display Panels", "Control System", "Power Supply"],
-    lastService: new Date("2023-12-15"),
+interface ServiceAssignment {
+  id: string
+  saNumber?: string
+  serviceType?: string
+  status?: string
+  alarmDate?: any
+  alarmTime?: string
+  coveredDateStart?: any
+  coveredDateEnd?: any
+  projectSiteName?: string
+  projectSiteLocation?: string
+  projectSiteId?: string
+  assignedTo?: string
+  jobDescription?: string
+  message?: string
+  requestedBy?: {
+    name?: string
+    department?: string
+    id?: string
   }
-
-  // Simulate not found
-  if (id === "not-found") {
-    return null
-  }
-
-  return mockData
+  attachments?: any[]
+  created?: any
+  updated?: any
 }
 
-export default async function ServiceAssignmentPage({ params }: { params: { id: string } }) {
-  const assignment = await getServiceAssignment(params.id)
+export default function SiteInformationPage() {
+  const params = useParams()
+  const router = useRouter()
+  const [assignment, setAssignment] = useState<ServiceAssignment | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Hide breadcrumb navigation
+    const hideBreadcrumb = () => {
+      const selectors = [
+        '[data-testid="breadcrumb"]',
+        ".breadcrumb",
+        'nav[aria-label="breadcrumb"]',
+        ".top-navigation",
+        ".navigation-breadcrumb",
+      ]
+
+      selectors.forEach((selector) => {
+        const elements = document.querySelectorAll(selector)
+        elements.forEach((element) => {
+          if (element instanceof HTMLElement) {
+            element.style.display = "none"
+          }
+        })
+      })
+
+      // Also hide any element that contains the document ID
+      const allElements = document.querySelectorAll("*")
+      allElements.forEach((element) => {
+        if (
+          element.textContent?.includes(params.id as string) &&
+          element.textContent.includes("Admin") &&
+          element.textContent.includes("Logistics")
+        ) {
+          if (element instanceof HTMLElement) {
+            element.style.display = "none"
+          }
+        }
+      })
+    }
+
+    hideBreadcrumb()
+
+    // Run again after a short delay to catch dynamically loaded elements
+    const timer = setTimeout(hideBreadcrumb, 500)
+
+    return () => {
+      clearTimeout(timer)
+      // Restore breadcrumb when leaving the page
+      const selectors = [
+        '[data-testid="breadcrumb"]',
+        ".breadcrumb",
+        'nav[aria-label="breadcrumb"]',
+        ".top-navigation",
+        ".navigation-breadcrumb",
+      ]
+
+      selectors.forEach((selector) => {
+        const elements = document.querySelectorAll(selector)
+        elements.forEach((element) => {
+          if (element instanceof HTMLElement) {
+            element.style.display = ""
+          }
+        })
+      })
+    }
+  }, [params.id])
+
+  useEffect(() => {
+    const fetchAssignment = async () => {
+      if (!params.id) return
+
+      try {
+        setLoading(true)
+        const docRef = doc(db, "service_assignments", params.id as string)
+        const docSnap = await getDoc(docRef)
+
+        if (docSnap.exists()) {
+          setAssignment({
+            id: docSnap.id,
+            ...docSnap.data(),
+          } as ServiceAssignment)
+        } else {
+          console.error("No such document!")
+        }
+      } catch (error) {
+        console.error("Error fetching assignment:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAssignment()
+  }, [params.id])
+
+  const handleBack = () => {
+    router.back()
+  }
+
+  const handleMarkComplete = () => {
+    // TODO: Implement mark as complete functionality
+    console.log("Mark as complete clicked")
+  }
+
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return "N/A"
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    } catch (error) {
+      return "Invalid Date"
+    }
+  }
+
+  const formatDateTime = (timestamp: any) => {
+    if (!timestamp) return "N/A"
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    } catch (error) {
+      return "Invalid Date"
+    }
+  }
+
+  const calculateServiceDuration = () => {
+    if (!assignment?.coveredDateStart || !assignment?.coveredDateEnd) return "N/A"
+
+    try {
+      const startDate = assignment.coveredDateStart.toDate
+        ? assignment.coveredDateStart.toDate()
+        : new Date(assignment.coveredDateStart)
+      const endDate = assignment.coveredDateEnd.toDate
+        ? assignment.coveredDateEnd.toDate()
+        : new Date(assignment.coveredDateEnd)
+
+      const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+      return `${diffDays} day${diffDays !== 1 ? "s" : ""}`
+    } catch (error) {
+      return "N/A"
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg">Loading...</div>
+      </div>
+    )
+  }
 
   if (!assignment) {
-    notFound()
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "scheduled":
-        return "bg-blue-100 text-blue-800"
-      case "in-progress":
-        return "bg-yellow-100 text-yellow-800"
-      case "completed":
-        return "bg-green-100 text-green-800"
-      case "cancelled":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority.toLowerCase()) {
-      case "high":
-        return "bg-red-100 text-red-800"
-      case "medium":
-        return "bg-yellow-100 text-yellow-800"
-      case "low":
-        return "bg-green-100 text-green-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-lg text-red-600">Assignment not found</div>
+      </div>
+    )
   }
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="mb-6">
-        <Link href="/logistics/calendar">
-          <Button variant="ghost" className="mb-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Calendar
-          </Button>
-        </Link>
-        <h1 className="text-2xl font-bold text-gray-900">Service Assignment Details</h1>
-        <p className="text-gray-600">View and manage service assignment information</p>
-      </div>
+    <>
+      <style jsx global>{`
+        [data-testid="breadcrumb"],
+        .breadcrumb,
+        nav[aria-label="breadcrumb"],
+        .top-navigation,
+        .navigation-breadcrumb {
+          display: none !important;
+        }
+      `}</style>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Basic Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Basic Information</CardTitle>
-            <CardDescription>Service assignment overview</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="font-medium">SA Number:</span>
-              <span>{assignment.saNumber}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-medium">Service Type:</span>
-              <span>{assignment.serviceType}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-medium">Status:</span>
-              <Badge className={getStatusColor(assignment.status)}>{assignment.status}</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-medium">Priority:</span>
-              <Badge className={getPriorityColor(assignment.priority)}>{assignment.priority}</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-medium">Estimated Duration:</span>
-              <span>{assignment.estimatedDuration}</span>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          {/* Header */}
+          <div className="flex items-center mb-6">
+            <Button
+              variant="ghost"
+              onClick={handleBack}
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-lg font-semibold">Service Assignment</span>
+            </Button>
+          </div>
 
-        {/* Schedule Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Schedule Information</CardTitle>
-            <CardDescription>Date and time details</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4 text-gray-500" />
-              <span className="font-medium">Date:</span>
-              <span>{assignment.alarmDate.toLocaleDateString()}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Clock className="h-4 w-4 text-gray-500" />
-              <span className="font-medium">Time:</span>
-              <span>{assignment.alarmTime}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <User className="h-4 w-4 text-gray-500" />
-              <span className="font-medium">Assigned To:</span>
-              <span>{assignment.assignedTo}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4 text-gray-500" />
-              <span className="font-medium">Last Service:</span>
-              <span>{assignment.lastService.toLocaleDateString()}</span>
-            </div>
-          </CardContent>
-        </Card>
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-12 gap-6">
+            {/* Left Column */}
+            <div className="col-span-4 space-y-6">
+              {/* Service Type and Tagged To */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Service Type:</span>
+                  <div className="text-blue-600 font-medium">{assignment.serviceType || "N/A"}</div>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-gray-700">Tagged to:</span>
+                  <div className="text-blue-600 font-medium">{assignment.saNumber || "N/A"}</div>
+                </div>
+              </div>
 
-        {/* Site Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Site Information</CardTitle>
-            <CardDescription>Location and client details</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start space-x-2">
-              <MapPin className="h-4 w-4 text-gray-500 mt-1" />
+              {/* Project Information */}
               <div>
-                <span className="font-medium">Site Name:</span>
-                <p>{assignment.projectSiteName}</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Project Information</h3>
+
+                {/* Site */}
+                <div className="mb-4">
+                  <span className="text-sm font-medium text-gray-700">Site:</span>
+                  <div className="mt-2 p-4 bg-gray-100 rounded-lg flex items-center space-x-3">
+                    <div className="w-16 h-16 bg-gray-300 rounded flex items-center justify-center">
+                      <span className="text-xs text-gray-600">HAN20013</span>
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900">{assignment.projectSiteName || "Unknown Site"}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SA Details */}
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-700">SA#:</span>
+                    <span className="text-gray-900">{assignment.saNumber || "N/A"}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-700">Start Date:</span>
+                    <span className="text-gray-900">{formatDate(assignment.coveredDateStart)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-700">End Date:</span>
+                    <span className="text-gray-900">{formatDate(assignment.coveredDateEnd)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm font-medium text-gray-700">Service Duration:</span>
+                    <span className="text-gray-900">{calculateServiceDuration()}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Remarks */}
+              <div>
+                <span className="text-sm font-medium text-gray-700">Remarks:</span>
+                <div className="mt-2 p-3 bg-gray-50 rounded border text-sm text-gray-700">
+                  {assignment.message || assignment.jobDescription || "No remarks provided."}
+                </div>
+              </div>
+
+              {/* Requested By */}
+              <div>
+                <span className="text-sm font-medium text-gray-700">Requested By:</span>
+                <div className="text-gray-900">{assignment.requestedBy?.name || "Unknown User"}</div>
               </div>
             </div>
-            <div className="flex items-start space-x-2">
-              <MapPin className="h-4 w-4 text-gray-500 mt-1" />
-              <div>
-                <span className="font-medium">Location:</span>
-                <p>{assignment.location}</p>
+
+            {/* Middle Column */}
+            <div className="col-span-4 space-y-4">
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-700">Content:</span>
+                  <span className="text-gray-900">Lilo and Stitch</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-700">Material Specs:</span>
+                  <span className="text-gray-900">Material Specs.</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-700">Crew:</span>
+                  <span className="text-gray-900">{assignment.assignedTo || "Team C"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-700">Illumination/ Nits:</span>
+                  <span className="text-gray-900">250 lumens</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-700">Gondola:</span>
+                  <span className="text-gray-900">Yes</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-700">Technology:</span>
+                  <span className="text-gray-900">Double Sided</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm font-medium text-gray-700">Sales:</span>
+                  <span className="text-gray-900">Noemi</span>
+                </div>
+              </div>
+
+              {/* Attachments */}
+              <div className="mt-6">
+                <span className="text-sm font-medium text-gray-700">Attachments:</span>
+                <div className="text-gray-900">
+                  {assignment.attachments && assignment.attachments.length > 0
+                    ? `${assignment.attachments.length} attachment(s)`
+                    : "No attachments."}
+                </div>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <span className="font-medium">Client:</span>
-              <span>{assignment.clientName}</span>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Contact Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Contact Information</CardTitle>
-            <CardDescription>Client contact details</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <User className="h-4 w-4 text-gray-500" />
-              <span className="font-medium">Contact Person:</span>
-              <span>{assignment.contactPerson}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Phone className="h-4 w-4 text-gray-500" />
-              <span className="font-medium">Phone:</span>
-              <a href={`tel:${assignment.contactPhone}`} className="text-blue-600 hover:underline">
-                {assignment.contactPhone}
-              </a>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Mail className="h-4 w-4 text-gray-500" />
-              <span className="font-medium">Email:</span>
-              <a href={`mailto:${assignment.contactEmail}`} className="text-blue-600 hover:underline">
-                {assignment.contactEmail}
-              </a>
-            </div>
-          </CardContent>
-        </Card>
+            {/* Right Column - Status Tracker */}
+            <div className="col-span-4">
+              <div className="text-right">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Status Tracker</h3>
 
-        {/* Description */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Description</CardTitle>
-            <CardDescription>Service details and requirements</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p>{assignment.description}</p>
-          </CardContent>
-        </Card>
+                <div className="mb-4">
+                  <div className="text-sm font-medium text-gray-700">Created</div>
+                  <div className="text-sm text-gray-600">{formatDateTime(assignment.created)}</div>
+                </div>
 
-        {/* Equipment */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Equipment</CardTitle>
-            <CardDescription>Equipment to be serviced</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2">
-              {assignment.equipment.map((item, index) => (
-                <li key={index} className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-
-        {/* Notes */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Notes</CardTitle>
-            <CardDescription>Additional information</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-gray-600">{assignment.notes}</p>
-          </CardContent>
-        </Card>
+                <Button
+                  onClick={handleMarkComplete}
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded"
+                >
+                  Mark as Complete
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-
-      {/* Action Buttons */}
-      <div className="mt-6 flex space-x-4">
-        <Button>Update Status</Button>
-        <Button variant="outline">Edit Assignment</Button>
-        <Button variant="outline">Add Notes</Button>
-      </div>
-    </div>
+    </>
   )
 }
