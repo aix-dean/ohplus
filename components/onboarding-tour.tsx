@@ -53,7 +53,15 @@ export function OnboardingTour({ startTour }: OnboardingTourProps) {
   useEffect(() => {
     console.log("OnboardingTour: useEffect triggered with startTour:", startTour, "pathname:", pathname)
 
-    if (startTour && pathname === "/admin/dashboard") {
+    // Check if tour should start from registration
+    const shouldStartFromRegistration = localStorage.getItem("shouldStartTour") === "true"
+
+    if ((startTour || shouldStartFromRegistration) && pathname === "/admin/dashboard") {
+      // Clear the flag
+      if (shouldStartFromRegistration) {
+        localStorage.removeItem("shouldStartTour")
+      }
+
       // Only start on dashboard
       setTimeout(() => {
         const targetElement = document.querySelector('[data-tour-id="inventory-link"]')
