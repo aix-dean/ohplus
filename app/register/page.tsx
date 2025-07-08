@@ -86,7 +86,7 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Left Panel - Image and Logo */}
+      {/* Left Panel - Image */}
       <div className="relative hidden w-[40%] items-center justify-center bg-gray-900 lg:flex">
         <Image
           src="/registration-background.png"
@@ -95,9 +95,7 @@ export default function RegisterPage() {
           objectFit="cover"
           className="absolute inset-0 z-0 opacity-50"
         />
-        <div className="relative z-10">
-          <Image src="/oh-plus-logo.png" alt="OH! Plus Logo" width={200} height={200} />
-        </div>
+        {/* Removed the OH! Plus Logo */}
       </div>
 
       {/* Right Panel - Form */}
