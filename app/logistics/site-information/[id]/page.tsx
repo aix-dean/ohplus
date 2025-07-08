@@ -40,6 +40,24 @@ export default function LogisticSiteInformationPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Hide breadcrumb navigation
+    const breadcrumb =
+      document.querySelector('[data-testid="breadcrumb"]') ||
+      document.querySelector(".breadcrumb") ||
+      document.querySelector('nav[aria-label="breadcrumb"]')
+    if (breadcrumb) {
+      ;(breadcrumb as HTMLElement).style.display = "none"
+    }
+
+    // Also try to hide any top navigation that shows the document ID
+    const topNav =
+      document.querySelector(".top-navigation") ||
+      document.querySelector('[class*="breadcrumb"]') ||
+      document.querySelector("header nav")
+    if (topNav && topNav.textContent?.includes(params.id as string)) {
+      ;(topNav as HTMLElement).style.display = "none"
+    }
+
     const fetchAssignmentDetails = async () => {
       if (!params.id) return
 
@@ -65,6 +83,25 @@ export default function LogisticSiteInformationPage() {
     }
 
     fetchAssignmentDetails()
+
+    // Cleanup function to restore breadcrumb when leaving the page
+    return () => {
+      const breadcrumb =
+        document.querySelector('[data-testid="breadcrumb"]') ||
+        document.querySelector(".breadcrumb") ||
+        document.querySelector('nav[aria-label="breadcrumb"]')
+      if (breadcrumb) {
+        ;(breadcrumb as HTMLElement).style.display = ""
+      }
+
+      const topNav =
+        document.querySelector(".top-navigation") ||
+        document.querySelector('[class*="breadcrumb"]') ||
+        document.querySelector("header nav")
+      if (topNav) {
+        ;(topNav as HTMLElement).style.display = ""
+      }
+    }
   }, [params.id])
 
   const formatDate = (timestamp: any) => {
@@ -122,6 +159,15 @@ export default function LogisticSiteInformationPage() {
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
+      <style jsx>{`
+        :global(.breadcrumb),
+        :global([data-testid="breadcrumb"]),
+        :global(nav[aria-label="breadcrumb"]),
+        :global(.top-navigation) {
+          display: none !important;
+        }
+      `}</style>
+
       {/* Header */}
       <div className="flex items-center mb-6">
         <Button variant="ghost" onClick={() => router.back()} className="p-0 h-auto">

@@ -4,11 +4,10 @@ import { Card, CardContent } from "@/components/ui/card"
 export default function LogisticsCalendarLoading() {
   return (
     <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <div className="h-8 bg-gray-200 rounded w-64 mb-2"></div>
-        <div className="h-4 bg-gray-200 rounded w-96"></div>
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+        <p className="mt-2 text-gray-600">Loading calendar...</p>
       </div>
-      <div className="text-center py-8">Loading calendar...</div>
 
       <div className="space-y-6">
         {/* Header */}

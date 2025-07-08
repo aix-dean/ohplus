@@ -3,7 +3,10 @@ import { Skeleton } from "@/components/ui/skeleton"
 export default function LogisticSiteInformationLoading() {
   return (
     <div className="container mx-auto p-6">
-      <div className="text-center py-8">Loading...</div>
+      <div className="text-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+        <p className="mt-2 text-gray-600">Loading service assignment...</p>
+      </div>
 
       <div className="grid grid-cols-12 gap-6">
         {/* Left Column */}
