@@ -323,9 +323,9 @@ export default function SiteDetailsPage({ params }: Props) {
             </CardContent>
           </Card>
 
-          {/* Site Data Grid - 2x2 layout */}
+          {/* Site Data Grid - Exact 2x2 layout */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Illumination */}
+            {/* Illumination - Top Left */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center">
@@ -361,7 +361,7 @@ export default function SiteDetailsPage({ params }: Props) {
               </CardContent>
             </Card>
 
-            {/* Compliance */}
+            {/* Compliance - Top Right */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center">
@@ -395,7 +395,7 @@ export default function SiteDetailsPage({ params }: Props) {
               </CardContent>
             </Card>
 
-            {/* Structure */}
+            {/* Structure - Bottom Left */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center">
@@ -430,7 +430,7 @@ export default function SiteDetailsPage({ params }: Props) {
               </CardContent>
             </Card>
 
-            {/* Content */}
+            {/* Content - Bottom Right */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center">
