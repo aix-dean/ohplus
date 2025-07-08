@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { collection, getDocs, query, where } from "firebase/firestore"
+import { collection, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
 import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
@@ -21,13 +21,24 @@ type ServiceAssignment = {
   saNumber: string
   projectSiteId: string
   projectSiteName: string
+  projectSiteLocation: string
   serviceType: string
+  assignedTo: string
+  jobDescription: string
+  requestedBy: {
+    id: string
+    name: string
+    department: string
+  }
+  message: string
   coveredDateStart: Date | null
   coveredDateEnd: Date | null
+  alarmDate: Date | null
+  alarmTime: string
+  attachments: { name: string; type: string }[]
   status: string
-  location: string
-  notes: string
-  assignedTo: string
+  created: any
+  updated: any
 }
 
 type CalendarViewType = "month" | "week" | "day" | "hour" | "minute"
@@ -62,19 +73,19 @@ export default function LogisticsCalendarPage() {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
   const [serviceAssignmentDialogOpen, setServiceAssignmentDialogOpen] = useState(false)
 
-  // Fetch service assignments
+  // Fetch service assignments from Firebase
   const fetchAssignments = useCallback(async () => {
     if (!userData?.license_key) return
 
     try {
       setLoading(true)
       const assignmentsRef = collection(db, "service_assignments")
-      const q = query(assignmentsRef, where("project_key", "==", userData.license_key))
-      const querySnapshot = await getDocs(q)
+      const querySnapshot = await getDocs(assignmentsRef)
 
       const fetchedAssignments: ServiceAssignment[] = []
       querySnapshot.forEach((doc) => {
         const data = doc.data()
+
         // Convert Firestore timestamps to Date objects
         const coveredDateStart = data.coveredDateStart?.toDate
           ? data.coveredDateStart.toDate()
@@ -88,18 +99,31 @@ export default function LogisticsCalendarPage() {
             ? new Date(data.coveredDateEnd)
             : null
 
+        const alarmDate = data.alarmDate?.toDate
+          ? data.alarmDate.toDate()
+          : data.alarmDate
+            ? new Date(data.alarmDate)
+            : null
+
         fetchedAssignments.push({
           id: doc.id,
           saNumber: data.saNumber || "",
           projectSiteId: data.projectSiteId || "",
           projectSiteName: data.projectSiteName || "",
+          projectSiteLocation: data.projectSiteLocation || "",
           serviceType: data.serviceType || "",
+          assignedTo: data.assignedTo || "",
+          jobDescription: data.jobDescription || "",
+          requestedBy: data.requestedBy || { id: "", name: "", department: "" },
+          message: data.message || "",
           coveredDateStart,
           coveredDateEnd,
+          alarmDate,
+          alarmTime: data.alarmTime || "",
+          attachments: data.attachments || [],
           status: data.status || "",
-          location: data.location || "",
-          notes: data.notes || "",
-          assignedTo: data.assignedTo || "",
+          created: data.created,
+          updated: data.updated,
         })
       })
 
@@ -221,7 +245,7 @@ export default function LogisticsCalendarPage() {
           assignment.projectSiteName.toLowerCase().includes(term) ||
           assignment.saNumber.toLowerCase().includes(term) ||
           assignment.serviceType.toLowerCase().includes(term) ||
-          assignment.location?.toLowerCase().includes(term) ||
+          assignment.projectSiteLocation?.toLowerCase().includes(term) ||
           assignment.assignedTo?.toLowerCase().includes(term),
       )
     }
@@ -306,6 +330,10 @@ export default function LogisticsCalendarPage() {
         return "bg-green-100 text-green-800 border-green-200"
       case "CANCELLED":
         return "bg-red-100 text-red-800 border-red-200"
+      case "PENDING":
+        return "bg-orange-100 text-orange-800 border-orange-200"
+      case "ONGOING":
+        return "bg-purple-100 text-purple-800 border-purple-200"
       default:
         return "bg-gray-100 text-gray-800 border-gray-200"
     }
@@ -348,6 +376,16 @@ export default function LogisticsCalendarPage() {
         return "🛠️"
       case "inspection":
         return "🔍"
+      case "roll up":
+        return "⬆️"
+      case "roll down":
+        return "⬇️"
+      case "change material":
+        return "🔄"
+      case "monitoring":
+        return "👁️"
+      case "spot booking":
+        return "📍"
       default:
         return "📋"
     }
@@ -875,8 +913,15 @@ export default function LogisticsCalendarPage() {
                       <DropdownMenuItem>Maintenance</DropdownMenuItem>
                       <DropdownMenuItem>Repair</DropdownMenuItem>
                       <DropdownMenuItem>Inspection</DropdownMenuItem>
+                      <DropdownMenuItem>Roll Up</DropdownMenuItem>
+                      <DropdownMenuItem>Roll Down</DropdownMenuItem>
+                      <DropdownMenuItem>Change Material</DropdownMenuItem>
+                      <DropdownMenuItem>Monitoring</DropdownMenuItem>
+                      <DropdownMenuItem>Spot Booking</DropdownMenuItem>
                       <DropdownMenuItem>Scheduled</DropdownMenuItem>
                       <DropdownMenuItem>In Progress</DropdownMenuItem>
+                      <DropdownMenuItem>Ongoing</DropdownMenuItem>
+                      <DropdownMenuItem>Pending</DropdownMenuItem>
                       <DropdownMenuItem>Completed</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
