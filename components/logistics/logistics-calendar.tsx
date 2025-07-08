@@ -172,35 +172,29 @@ export function LogisticsCalendar() {
 
       {/* Calendar Grid */}
       <div className="grid grid-cols-7 border border-gray-200">
-        {calendarDays.map((day, index) => {
-          const isLastColumn = (index + 1) % 7 === 0
-          return (
-            <div
-              key={index}
-              className={`min-h-[100px] p-2 border-b border-gray-200 ${!isLastColumn ? "border-r border-gray-200" : ""}`}
-            >
-              {day && (
-                <>
-                  <div
-                    className={`text-sm font-medium mb-1 ${isToday(day) ? "text-blue-600 font-bold bg-blue-100 rounded-full w-6 h-6 flex items-center justify-center" : "text-gray-900"}`}
-                  >
-                    {day}
-                  </div>
-                  <div className="space-y-1">
-                    {getEventsForDay(day).map((event) => (
-                      <div
-                        key={event.id}
-                        className={`${event.color} text-white text-xs px-2 py-1 rounded text-center font-medium`}
-                      >
-                        {event.id}: {event.type}
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )
-        })}
+        {calendarDays.map((day, index) => (
+          <div key={index} className="min-h-[100px] p-2 border-r border-b border-gray-200">
+            {day && (
+              <>
+                <div
+                  className={`text-sm font-medium mb-1 ${isToday(day) ? "text-blue-600 font-bold bg-blue-100 rounded-full w-6 h-6 flex items-center justify-center" : "text-gray-900"}`}
+                >
+                  {day}
+                </div>
+                <div className="space-y-1">
+                  {getEventsForDay(day).map((event) => (
+                    <div
+                      key={event.id}
+                      className={`${event.color} text-white text-xs px-2 py-1 rounded text-center font-medium`}
+                    >
+                      {event.id}: {event.type}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   )
