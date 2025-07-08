@@ -1,4 +1,4 @@
-import { LogisticsCalendar } from "@/components/logistics/logistics-calendar"
+import LogisticsCalendar from "@/components/logistics/logistics-calendar"
 
 export default function LogisticsCalendarPage() {
   return (
