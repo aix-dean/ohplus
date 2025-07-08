@@ -1,40 +1,41 @@
 import type React from "react"
-import "./globals.css"
+import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import { ThemeProvider } from "@/components/theme-provider"
+import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
+import AuthLayout from "./auth-layout"
 import { AssistantProvider } from "@/components/ai-assistant/assistant-provider"
-import { Toaster } from "@/components/ui/toaster" // Correctly import Toaster from components/ui/toaster
-import { ToastProvider, ToastViewport } from "@/components/ui/toast" // Import Radix ToastProvider and ToastViewport
+import { ToasterProvider } from "@/hooks/use-toast" // Import the new ToasterProvider
 
 const inter = Inter({ subsets: ["latin"] })
 
-export const metadata = {
-  title: "ERP v2",
-  description: "Enterprise Resource Planning system",
-    generator: 'v0.dev'
+export const metadata: Metadata = {
+  title: "OH Plus",
+  description: "Manage your outdoor advertising sites",
+  icons: {
+    icon: "/oh-plus-logo.png",
+  },
+  generator: "v0.dev",
 }
 
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode
-}) {
+}>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <AuthProvider>
-            <ToastProvider>
+        <AuthProvider>
+          <AuthLayout>
+            <ToasterProvider>
               {" "}
-              {/* Radix ToastProvider for useToast hook */}
+              {/* Wrap children with ToasterProvider */}
               <div className="flex flex-col h-screen">{children}</div>
               <AssistantProvider />
-              <Toaster /> {/* Sonner Toaster for display */}
-              <ToastViewport /> {/* Radix ToastViewport for positioning */}
-            </ToastProvider>
-          </AuthProvider>
-        </ThemeProvider>
+            </ToasterProvider>
+          </AuthLayout>
+        </AuthProvider>
       </body>
     </html>
   )
