@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronDown } from "lucide-react"
+import { CalendarIcon } from "lucide-react"
 
 // Sample logistics events data
 const sampleEvents = [
@@ -64,7 +64,7 @@ export function LogisticsCalendar() {
     setShowCalendarInput(false)
   }
 
-  const handleMonthClick = () => {
+  const handleCalendarClick = () => {
     setShowCalendarInput(!showCalendarInput)
   }
 
@@ -80,14 +80,12 @@ export function LogisticsCalendar() {
       {/* Calendar Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center relative">
-          <button
-            onClick={handleMonthClick}
-            className="flex items-center space-x-2 text-lg font-semibold hover:bg-gray-100 px-2 py-1 rounded transition-colors"
-          >
-            <span>
-              {months[currentMonth]} {currentYear}
-            </span>
-            <ChevronDown className="h-4 w-4 text-gray-500" />
+          <span className="text-lg font-semibold mr-2">
+            {months[currentMonth]} {currentYear}
+          </span>
+
+          <button onClick={handleCalendarClick} className="p-1 hover:bg-gray-100 rounded transition-colors">
+            <CalendarIcon className="h-5 w-5 text-gray-500" />
           </button>
 
           {showCalendarInput && (
