@@ -15,19 +15,16 @@ import {
   History,
   FileCheck,
   ArrowLeft,
-  MoreVertical,
-  Edit,
-  Bell,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useState, useEffect } from "react"
+import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
 import Link from "next/link"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 type Props = {
   params: { id: string }
@@ -59,6 +56,7 @@ export default function SiteDetailsPage({ params }: Props) {
   const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const [openServiceAssignmentDialog, setOpenServiceAssignmentDialog] = useState(false)
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
   const router = useRouter()
@@ -106,10 +104,6 @@ export default function SiteDetailsPage({ params }: Props) {
 
     fetchData()
   }, [params.id])
-
-  const handleCreateServiceAssignment = () => {
-    router.push(`/logistics/assignments/create?projectSite=${params.id}`)
-  }
 
   if (loading) {
     return (
@@ -270,7 +264,10 @@ export default function SiteDetailsPage({ params }: Props) {
 
               {/* Action Buttons */}
               <div className="space-y-2">
-                <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={handleCreateServiceAssignment}>
+                <Button
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  onClick={() => setOpenServiceAssignmentDialog(true)}
+                >
                   Create Service Assignment
                 </Button>
                 <Button variant="outline" className="w-full bg-transparent">
@@ -330,68 +327,35 @@ export default function SiteDetailsPage({ params }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Illumination - Top Left */}
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader>
                 <CardTitle className="text-base flex items-center">
                   <Zap className="h-4 w-4 mr-2" />
                   Illumination
                 </CardTitle>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => console.log("Edit illumination clicked")}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => console.log("Alarm Settings clicked")}>
-                      <Bell className="mr-2 h-4 w-4" />
-                      Alarm Settings
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </CardHeader>
               <CardContent>
-                <div className="flex items-start gap-4">
-                  {/* Left side - Date and Power info */}
-                  <div className="flex-1 space-y-3">
-                    <div className="text-sm">
-                      <div className="font-medium">July 3, 2020 (Tues), 2:00 pm</div>
-                      <div className="text-gray-600 text-xs">Lights ON at 6:00pm everyday</div>
-                    </div>
-
-                    <div className="space-y-1 text-sm">
-                      <div>
-                        <span className="font-medium">Power Consumption:</span> 150 kWh/month
-                      </div>
-                      <div>
-                        <span className="font-medium">Average Power Consumption:</span> 160 kWh over last 3 months
-                      </div>
-                    </div>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <span className="font-medium">Upper:</span> {product.illumination?.upper || ""}
                   </div>
-
-                  {/* Right side - Illumination details */}
-                  <div className="space-y-1 text-sm min-w-[200px]">
-                    <div>
-                      <span className="font-medium">Upper:</span> 5: 240 Lux metal halides
-                    </div>
-                    <div>
-                      <span className="font-medium">Lower:</span> 5: 240 Lux metal halides
-                    </div>
-                    <div>
-                      <span className="font-medium">Side (Left):</span> N/A
-                    </div>
-                    <div>
-                      <span className="font-medium">Side (Right):</span> N/A
-                    </div>
+                  <div>
+                    <span className="font-medium">Lower:</span> {product.illumination?.lower || ""}
                   </div>
-
-                  {/* Status indicators */}
+                  <div>
+                    <span className="font-medium">Side (Left):</span> {product.illumination?.side_left || ""}
+                  </div>
+                  <div>
+                    <span className="font-medium">Side (Right):</span> {product.illumination?.side_right || ""}
+                  </div>
+                  <div className="mt-3 text-xs text-gray-500">{product.light_schedule || ""}</div>
+                  <div className="mt-2">
+                    <span className="font-medium">Power Consumption:</span> {product.power_consumption || ""}
+                    <br />
+                    <span className="font-medium">Average Power Consumption:</span>{" "}
+                    {product.avg_power_consumption || ""}
+                  </div>
                 </div>
-
-                <Button variant="outline" size="sm" className="mt-4 w-full bg-transparent">
+                <Button variant="outline" size="sm" className="mt-3 w-full bg-transparent">
                   View Index Card
                 </Button>
               </CardContent>
@@ -594,6 +558,41 @@ export default function SiteDetailsPage({ params }: Props) {
           </Card>
         </div>
       </div>
+
+      {/* Service Assignment Dialog */}
+      <ServiceAssignmentDialog
+        open={openServiceAssignmentDialog}
+        onOpenChange={setOpenServiceAssignmentDialog}
+        onSuccess={() => {
+          // Refresh service assignments after successful creation
+          const fetchAssignments = async () => {
+            try {
+              const assignmentsQuery = query(
+                collection(db, "service_assignments"),
+                where("projectSiteId", "==", params.id),
+                orderBy("created", "desc"),
+              )
+
+              const assignmentsSnapshot = await getDocs(assignmentsQuery)
+              const assignmentsData: ServiceAssignment[] = []
+
+              assignmentsSnapshot.forEach((doc) => {
+                assignmentsData.push({
+                  id: doc.id,
+                  ...doc.data(),
+                } as ServiceAssignment)
+              })
+
+              setServiceAssignments(assignmentsData)
+            } catch (err) {
+              console.error("Error refreshing assignments:", err)
+            }
+          }
+
+          fetchAssignments()
+        }}
+        initialProjectSite={product.id}
+      />
 
       <ServiceAssignmentDetailsDialog
         open={detailsDialogOpen}
