@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FirebaseError } from "firebase/app"
+// Removed RegistrationSuccessDialog import as it's no longer rendered here
 
 export default function RegisterPage() {
   const [step, setStep] = useState(1) // 1 for personal info, 2 for password and company info
@@ -23,6 +24,7 @@ export default function RegisterPage() {
   const [phoneNumber, setPhoneNumber] = useState("")
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  // Removed showSuccessDialog state
 
   const { register } = useAuth()
   const router = useRouter()
@@ -88,7 +90,7 @@ export default function RegisterPage() {
         password,
       )
       setErrorMessage(null)
-      // Redirect to dashboard with query parameter to trigger dialog
+      // Redirect to dashboard with a query parameter to indicate successful registration
       router.push("/admin/dashboard?registered=true")
     } catch (error: unknown) {
       setErrorMessage(getFriendlyErrorMessage(error))

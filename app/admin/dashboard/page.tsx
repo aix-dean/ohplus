@@ -1,88 +1,63 @@
-"use client"
+"use client" // Convert to client component
 
 import { useEffect, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
-import { RegistrationSuccessDialog } from "@/components/registration-success-dialog"
-import { OnboardingTour } from "@/components/onboarding-tour"
+import { useAuth } from "@/contexts/auth-context" // Assuming useAuth provides user data
+import { RegistrationSuccessDialog } from "@/components/registration-success-dialog" // Import the dialog
 
+// Existing imports and content of app/admin/dashboard/page.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
-import { Search, ChevronDown, Plus } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge" // Added missing Badge
 
 export default function AdminDashboardPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { user } = useAuth()
+  const { user } = useAuth() // Get user data from auth context
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [startTour, setStartTour] = useState(false)
-  const [tourKey, setTourKey] = useState(0)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
   useEffect(() => {
-    console.log("Dashboard: useEffect triggered, checking for registered param")
     const registeredParam = searchParams.get("registered")
     const dialogShownKey = "registrationSuccessDialogShown"
 
     if (registeredParam === "true" && !sessionStorage.getItem(dialogShownKey)) {
-      console.log("Dashboard: Showing registration success dialog")
       setShowSuccessDialog(true)
-      sessionStorage.setItem(dialogShownKey, "true")
-      // Remove the 'registered' query parameter immediately after detecting it
-      const newUrl = new URL(window.location.href)
-      newUrl.searchParams.delete("registered")
-      router.replace(newUrl.toString(), undefined, { shallow: true })
+      sessionStorage.setItem(dialogShownKey, "true") // Mark as shown for this session
+      // Remove the query parameter immediately
+      router.replace("/admin/dashboard", undefined)
     }
   }, [searchParams, router])
 
   const handleCloseSuccessDialog = () => {
-    console.log("Dashboard: Registration success dialog closed, starting tour")
     setShowSuccessDialog(false)
-    // Start tour after dialog closes
-    setStartTour(true)
-    setTourKey((prev) => prev + 1)
-    console.log("Dashboard: Set startTour to true, tourKey incremented to", tourKey + 1)
+    // No need to remove query param here, it's already done in useEffect
   }
 
-  const handleTestTour = () => {
-    console.log("Dashboard: Test Tour button clicked")
-    // Clear any previous tour completion
-    localStorage.removeItem("onboardingTourCompleted")
-    console.log("Dashboard: Cleared onboardingTourCompleted from localStorage")
-    // Start the tour
-    setStartTour(true)
-    setTourKey((prev) => {
-      const newKey = prev + 1
-      console.log("Dashboard: Set startTour to true, tourKey incremented to", newKey)
-      return newKey
-    })
-  }
+  // Existing content from app/admin/dashboard/page.tsx
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
-  // Log state changes
-  useEffect(() => {
-    console.log("Dashboard: State changed - startTour:", startTour, "tourKey:", tourKey)
-  }, [startTour, tourKey])
-
+  // Define a type for department data
   interface Department {
     id: string
     name: string
-    headerColor: string
-    contentBgColor: string
+    headerColor: string // Tailwind class name for header background
+    contentBgColor: string // New: Tailwind class name for content background
     members: string[]
     metricLabel?: string
     metricValue?: string
     badgeCount?: number
-    href?: string
+    href?: string // Optional link for the card
   }
 
-  function DepartmentCard({ department }: { department: Department }) {
+  // Department Card Component
+  function DepartmentCard({
+    department,
+  }: {
+    department: Department
+  }) {
     const cardContent = (
       <>
         <CardHeader className={cn("relative p-4 rounded-t-lg", department.headerColor)}>
@@ -254,10 +229,11 @@ export default function AdminDashboardPage() {
       name: "+ Add New Department",
       headerColor: "bg-department-add-darkgray",
       contentBgColor: "bg-card-content-add",
-      members: [],
+      members: [], // No members for this card
     },
   ]
 
+  // Filter departments based on search term
   const filteredDepartments = departmentData.filter((department) => {
     const lowerCaseSearchTerm = searchTerm.toLowerCase()
     return (
@@ -266,18 +242,12 @@ export default function AdminDashboardPage() {
     )
   })
 
-  console.log("Dashboard: Rendering with startTour:", startTour, "tourKey:", tourKey)
-
   return (
     <div className="flex-1 p-4 md:p-6">
       <div className="flex flex-col gap-6">
+        {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex items-center gap-4">
-            <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
-            <Button onClick={handleTestTour} variant="outline" size="sm" className="text-xs bg-transparent">
-              Test Tour
-            </Button>
-          </div>
+          <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-grow">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -307,23 +277,26 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
+        {/* Department Cards Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredDepartments.map((department) => (
-            <div key={department.id} data-tour-id={department.id === "sales" ? "inventory-link" : undefined}>
-              <DepartmentCard department={department} />
-            </div>
+            <DepartmentCard key={department.id} department={department} />
           ))}
         </div>
       </div>
 
+      {/* Registration Success Dialog */}
       <RegistrationSuccessDialog
         isOpen={showSuccessDialog}
-        firstName={user?.first_name || ""}
+        firstName={user?.first_name || ""} // Pass the user's first name
         onClose={handleCloseSuccessDialog}
-        onStartTour={handleCloseSuccessDialog}
       />
-
-      <OnboardingTour key={tourKey} startTour={startTour} />
     </div>
   )
 }
+
+// Dummy imports for existing content to avoid errors. Replace with actual imports if needed.
+import { Search, ChevronDown, Plus } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"

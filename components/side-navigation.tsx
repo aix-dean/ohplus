@@ -180,7 +180,7 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Documents", href: "/admin/documents", icon: FileText },
-                  { title: "Inventory", href: "/admin/inventory", icon: Package, "data-tour-id": "inventory-link" },
+                  { title: "Inventory", href: "/admin/inventory", icon: Package },
                   { title: "User Management", href: "/admin/access-management", icon: Users },
                   { title: "Subscription", href: "/admin/subscriptions", icon: FileText }, // Updated href
                 ].map((item) => {
