@@ -4,10 +4,9 @@ import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react"
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
+import { ChevronLeft, ChevronRight } from "lucide-react"
+import { collection, query, where, getDocs, Timestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useRouter } from "next/navigation"
 
@@ -16,31 +15,10 @@ interface ServiceAssignment {
   saNumber?: string
   serviceType?: string
   status?: string
-  alarmDate?: any
+  alarmDate?: Timestamp
   alarmTime?: string
-  coveredDateStart?: any
-  coveredDateEnd?: any
   projectSiteName?: string
-  projectSiteLocation?: string
-  projectSiteId?: string
   assignedTo?: string
-  jobDescription?: string
-  message?: string
-  requestedBy?: {
-    name?: string
-    department?: string
-    id?: string
-  }
-  attachments?: any[]
-  created?: any
-  updated?: any
-}
-
-interface CalendarEvent {
-  id: string
-  type: string
-  date: Date
-  color: string
 }
 
 export default function LogisticsCalendar() {
@@ -48,16 +26,14 @@ export default function LogisticsCalendar() {
   const currentDate = new Date()
   const [currentMonth, setCurrentMonth] = useState(currentDate.getMonth())
   const [currentYear, setCurrentYear] = useState(currentDate.getFullYear())
-  const [selectedSAType, setSelectedSAType] = useState("all")
-  const [selectedSite, setSelectedSite] = useState("all")
+  const [selectedSAType, setSelectedSAType] = useState<string>("all")
+  const [selectedSite, setSelectedSite] = useState<string>("all")
   const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
-  const [events, setEvents] = useState<CalendarEvent[]>([])
-  const [serviceTypes, setServiceTypes] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [showFallbackPicker, setShowFallbackPicker] = useState(false)
   const hiddenInputRef = useRef<HTMLInputElement>(null)
 
-  const monthNames = [
+  const months = [
     "January",
     "February",
     "March",
@@ -72,88 +48,48 @@ export default function LogisticsCalendar() {
     "December",
   ]
 
-  const dayNames = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
+  const daysOfWeek = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
 
   useEffect(() => {
     fetchServiceAssignments()
   }, [currentMonth, currentYear])
 
-  useEffect(() => {
-    filterEvents()
-  }, [assignments, selectedSAType, selectedSite])
-
   const fetchServiceAssignments = async () => {
     try {
       setLoading(true)
-
-      // Create date range for the current month
-      const startDate = new Date(currentYear, currentMonth, 1)
-      const endDate = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59)
+      const startOfMonth = new Date(currentYear, currentMonth, 1)
+      const endOfMonth = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59)
 
       const q = query(
         collection(db, "service_assignments"),
-        where("alarmDate", ">=", startDate),
-        where("alarmDate", "<=", endDate),
-        orderBy("alarmDate"),
+        where("alarmDate", ">=", Timestamp.fromDate(startOfMonth)),
+        where("alarmDate", "<=", Timestamp.fromDate(endOfMonth)),
       )
 
       const querySnapshot = await getDocs(q)
-      const fetchedAssignments: ServiceAssignment[] = []
-      const types = new Set<string>()
+      const assignmentsData: ServiceAssignment[] = []
 
       querySnapshot.forEach((doc) => {
-        const data = doc.data() as ServiceAssignment
-        fetchedAssignments.push({
+        const data = doc.data()
+        assignmentsData.push({
           id: doc.id,
-          ...data,
+          saNumber: data.saNumber,
+          serviceType: data.serviceType,
+          status: data.status,
+          alarmDate: data.alarmDate,
+          alarmTime: data.alarmTime,
+          projectSiteName: data.projectSiteName,
+          assignedTo: data.assignedTo,
         })
-        if (data.serviceType) {
-          types.add(data.serviceType)
-        }
       })
 
-      setAssignments(fetchedAssignments)
-      setServiceTypes(Array.from(types))
+      setAssignments(assignmentsData)
     } catch (error) {
       console.error("Error fetching service assignments:", error)
+      setAssignments([])
     } finally {
       setLoading(false)
     }
-  }
-
-  const filterEvents = () => {
-    let filteredAssignments = assignments
-
-    if (selectedSAType !== "all") {
-      filteredAssignments = filteredAssignments.filter((assignment) => assignment.serviceType === selectedSAType)
-    }
-
-    if (selectedSite !== "all") {
-      filteredAssignments = filteredAssignments.filter((assignment) => assignment.projectSiteName === selectedSite)
-    }
-
-    const calendarEvents: CalendarEvent[] = filteredAssignments.map((assignment) => ({
-      id: assignment.id,
-      type: assignment.serviceType || "Unknown",
-      date: assignment.alarmDate?.toDate() || new Date(),
-      color: getColorForType(assignment.serviceType || "Unknown"),
-    }))
-
-    setEvents(calendarEvents)
-  }
-
-  const getColorForType = (type: string) => {
-    const colorMap: { [key: string]: string } = {
-      Installation: "bg-blue-500",
-      Maintenance: "bg-green-500",
-      Repair: "bg-red-500",
-      Inspection: "bg-yellow-500",
-      "Roll up": "bg-blue-500",
-      Cleaning: "bg-purple-500",
-      Setup: "bg-orange-500",
-      Removal: "bg-gray-500",
-    }
-    return colorMap[type] || "bg-gray-500"
   }
 
   const getDaysInMonth = (month: number, year: number) => {
@@ -167,6 +103,44 @@ export default function LogisticsCalendar() {
   const isToday = (day: number) => {
     const today = new Date()
     return day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear()
+  }
+
+  const getAssignmentsForDay = (day: number) => {
+    return assignments.filter((assignment) => {
+      if (!assignment.alarmDate) return false
+      const assignmentDate = assignment.alarmDate.toDate()
+      return (
+        assignmentDate.getDate() === day &&
+        assignmentDate.getMonth() === currentMonth &&
+        assignmentDate.getFullYear() === currentYear
+      )
+    })
+  }
+
+  const getFilteredAssignmentsForDay = (day: number) => {
+    let dayAssignments = getAssignmentsForDay(day)
+
+    if (selectedSAType !== "all") {
+      dayAssignments = dayAssignments.filter((assignment) => assignment.serviceType === selectedSAType)
+    }
+
+    if (selectedSite !== "all") {
+      dayAssignments = dayAssignments.filter((assignment) => assignment.projectSiteName === selectedSite)
+    }
+
+    return dayAssignments
+  }
+
+  const getColorForType = (serviceType: string) => {
+    const colors = {
+      "Roll up": "bg-blue-500",
+      Installation: "bg-green-500",
+      Maintenance: "bg-orange-500",
+      Repair: "bg-red-500",
+      Inspection: "bg-purple-500",
+      Cleaning: "bg-cyan-500",
+    }
+    return colors[serviceType as keyof typeof colors] || "bg-gray-500"
   }
 
   const handlePrevMonth = () => {
@@ -190,18 +164,15 @@ export default function LogisticsCalendar() {
   const handleMonthClick = () => {
     try {
       if (hiddenInputRef.current) {
-        // Try to use showPicker if available
-        if (typeof hiddenInputRef.current.showPicker === "function") {
+        if (hiddenInputRef.current.showPicker) {
           hiddenInputRef.current.showPicker()
         } else {
-          // Fallback: focus and click the input
           hiddenInputRef.current.focus()
           hiddenInputRef.current.click()
         }
       }
     } catch (error) {
       console.error("Error showing picker:", error)
-      // Final fallback: show visible input
       setShowFallbackPicker(true)
     }
   }
@@ -217,48 +188,40 @@ export default function LogisticsCalendar() {
     router.push(`/logistics/site-information/${assignmentId}`)
   }
 
-  const getEventsForDay = (day: number) => {
-    return events.filter((event) => {
-      const eventDate = new Date(event.date)
-      return (
-        eventDate.getDate() === day && eventDate.getMonth() === currentMonth && eventDate.getFullYear() === currentYear
-      )
-    })
-  }
-
   const renderCalendarDays = () => {
     const daysInMonth = getDaysInMonth(currentMonth, currentYear)
     const firstDay = getFirstDayOfMonth(currentMonth, currentYear)
     const days = []
 
-    // Add empty cells for days before the first day of the month
+    // Empty cells for days before the first day of the month
     for (let i = 0; i < firstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="h-24 border-b border-r border-gray-200"></div>)
+      days.push(<div key={`empty-${i}`} className="h-32 border border-gray-200"></div>)
     }
 
-    // Add days of the month
+    // Days of the month
     for (let day = 1; day <= daysInMonth; day++) {
-      const dayEvents = getEventsForDay(day)
-      const todayClass = isToday(day) ? "text-blue-600 font-bold bg-blue-50" : ""
+      const dayAssignments = getFilteredAssignmentsForDay(day)
+      const todayClass = isToday(day) ? "bg-blue-50 text-blue-600 font-bold" : ""
 
       days.push(
-        <div key={day} className={`h-24 border-b border-r border-gray-200 p-1 ${todayClass}`}>
-          <div className="text-sm font-medium mb-1">{day}</div>
+        <div key={day} className={`h-32 border border-gray-200 p-2 ${todayClass}`}>
+          <div className="flex justify-between items-start mb-1">
+            <span className={`text-sm ${isToday(day) ? "font-bold" : ""}`}>{day}</span>
+            {isToday(day) && <div className="w-2 h-2 bg-blue-500 rounded-full"></div>}
+          </div>
           <div className="space-y-1">
-            {dayEvents.slice(0, 2).map((event, index) => {
-              const assignment = assignments.find((a) => a.id === event.id)
-              return (
-                <button
-                  key={index}
-                  onClick={() => handleAssignmentClick(event.id)}
-                  className={`${event.color} text-white text-xs px-2 py-1 rounded block w-full text-left truncate hover:opacity-80 cursor-pointer`}
-                  title={`${assignment?.saNumber}: ${event.type}`}
-                >
-                  {assignment?.saNumber}: {event.type}
-                </button>
-              )
-            })}
-            {dayEvents.length > 2 && <div className="text-xs text-gray-500">+{dayEvents.length - 2} more</div>}
+            {dayAssignments.slice(0, 3).map((assignment) => (
+              <button
+                key={assignment.id}
+                onClick={() => handleAssignmentClick(assignment.id)}
+                className={`w-full text-left px-2 py-1 rounded text-xs text-white font-medium hover:opacity-80 transition-opacity ${getColorForType(assignment.serviceType || "")}`}
+              >
+                {assignment.saNumber}: {assignment.serviceType}
+              </button>
+            ))}
+            {dayAssignments.length > 3 && (
+              <div className="text-xs text-gray-500">+{dayAssignments.length - 3} more</div>
+            )}
           </div>
         </div>,
       )
@@ -267,39 +230,21 @@ export default function LogisticsCalendar() {
     return days
   }
 
-  const currentMonthValue = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`
+  const uniqueServiceTypes = Array.from(new Set(assignments.map((a) => a.serviceType).filter(Boolean)))
+  const uniqueSites = Array.from(new Set(assignments.map((a) => a.projectSiteName).filter(Boolean)))
 
   return (
-    <div className="space-y-6">
+    <div className="p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
-          <Button variant="outline" size="sm" onClick={handlePrevMonth}>
+          <Button variant="ghost" onClick={handlePrevMonth}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-
-          <button
-            onClick={handleMonthClick}
-            className="flex items-center space-x-2 text-lg font-semibold hover:text-blue-600"
-          >
-            <span>
-              {monthNames[currentMonth]} {currentYear}
-            </span>
-            <CalendarIcon className="h-4 w-4" />
+          <button onClick={handleMonthClick} className="text-xl font-semibold hover:text-blue-600 transition-colors">
+            {months[currentMonth]} {currentYear}
           </button>
-
-          <input
-            ref={hiddenInputRef}
-            type="month"
-            value={currentMonthValue}
-            onChange={handleMonthChange}
-            className={
-              showFallbackPicker ? "px-2 py-1 border rounded" : "absolute -left-[9999px] -top-[9999px] opacity-0"
-            }
-            style={showFallbackPicker ? {} : { position: "absolute", left: "-9999px", top: "-9999px" }}
-          />
-
-          <Button variant="outline" size="sm" onClick={handleNextMonth}>
+          <Button variant="ghost" onClick={handleNextMonth}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -311,7 +256,7 @@ export default function LogisticsCalendar() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
-              {serviceTypes.map((type) => (
+              {uniqueServiceTypes.map((type) => (
                 <SelectItem key={type} value={type}>
                   {type}
                 </SelectItem>
@@ -325,8 +270,8 @@ export default function LogisticsCalendar() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Sites</SelectItem>
-              {Array.from(new Set(assignments.map((a) => a.projectSiteName).filter(Boolean))).map((site) => (
-                <SelectItem key={site} value={site!}>
+              {uniqueSites.map((site) => (
+                <SelectItem key={site} value={site}>
                   {site}
                 </SelectItem>
               ))}
@@ -335,27 +280,47 @@ export default function LogisticsCalendar() {
         </div>
       </div>
 
-      {/* Calendar */}
-      <Card>
-        <CardContent className="p-0">
-          {/* Day Headers */}
-          <div className="grid grid-cols-7 border border-gray-200">
-            {dayNames.map((day) => (
-              <div
-                key={day}
-                className="p-3 text-center text-sm font-medium text-gray-500 bg-gray-50 border-r border-gray-200 last:border-r-0"
-              >
-                {day}
-              </div>
-            ))}
-          </div>
+      {/* Hidden month input for native picker */}
+      <input
+        ref={hiddenInputRef}
+        type="month"
+        value={`${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`}
+        onChange={handleMonthChange}
+        className={showFallbackPicker ? "mb-4" : "absolute -left-full opacity-0"}
+        style={showFallbackPicker ? {} : { position: "absolute", left: "-9999px" }}
+      />
 
-          {/* Calendar Grid */}
-          <div className="grid grid-cols-7 border-l border-gray-200">
-            {loading ? <div className="col-span-7 text-center py-8">Loading events...</div> : renderCalendarDays()}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Calendar Grid */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        {/* Days of week header */}
+        <div className="grid grid-cols-7 bg-gray-50">
+          {daysOfWeek.map((day) => (
+            <div
+              key={day}
+              className="p-3 text-center text-sm font-medium text-gray-600 border-r border-gray-200 last:border-r-0"
+            >
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar days */}
+        <div className="grid grid-cols-7">
+          {loading
+            ? Array.from({ length: 35 }).map((_, index) => (
+                <div key={index} className="h-32 border border-gray-200 p-2">
+                  <div className="animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded w-6 mb-2"></div>
+                    <div className="space-y-1">
+                      <div className="h-3 bg-gray-200 rounded"></div>
+                      <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            : renderCalendarDays()}
+        </div>
+      </div>
     </div>
   )
 }
