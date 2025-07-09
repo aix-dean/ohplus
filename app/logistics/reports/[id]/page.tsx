@@ -1,97 +1,56 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
+import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { Download, Send, ArrowLeft, FileText, ImageIcon, Video, File, X, ZoomIn } from "lucide-react"
-import Link from "next/link"
-import { useToast } from "@/hooks/use-toast"
-import { SendReportDialog } from "@/components/send-report-dialog"
+import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send } from "lucide-react"
+import { getReports, type ReportData } from "@/lib/report-service"
+import { getProductById, type Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
-import { getReportById, type ReportData } from "@/lib/report-service"
-import { getProductById } from "@/lib/firebase-service"
+import { useAuth } from "@/contexts/auth-context"
+import { SendReportDialog } from "@/components/send-report-dialog"
 
-export default function ReportDetailPage() {
+export default function ReportPreviewPage() {
   const params = useParams()
-  const { toast } = useToast()
+  const router = useRouter()
+  const reportId = params.id as string
   const [report, setReport] = useState<ReportData | null>(null)
-  const [product, setProduct] = useState<any>(null)
+  const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
-  const [sendDialogOpen, setSendDialogOpen] = useState(false)
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [fullScreenAttachment, setFullScreenAttachment] = useState<any>(null)
   const [isFullScreenOpen, setIsFullScreenOpen] = useState(false)
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
+  const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
+  const { user } = useAuth()
 
   useEffect(() => {
-    const fetchReportData = async () => {
-      try {
-        if (params.id) {
-          const reportData = await getReportById(params.id as string)
-          if (reportData) {
-            setReport(reportData)
-
-            // Fetch product data if available
-            if (reportData.siteId) {
-              const productData = await getProductById(reportData.siteId)
-              setProduct(productData)
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching report:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load report data.",
-          variant: "destructive",
-        })
-      } finally {
-        setLoading(false)
-      }
+    if (reportId) {
+      fetchReportData()
     }
+  }, [reportId])
 
-    fetchReportData()
-  }, [params.id, toast])
-
-  const handleDownloadPDF = async () => {
-    if (!report) return
-
-    setIsGeneratingPDF(true)
+  const fetchReportData = async () => {
     try {
-      await generateReportPDF(report, product, true)
-      toast({
-        title: "PDF Downloaded",
-        description: "The report has been downloaded successfully.",
-      })
+      // Get all reports and find the one with matching ID
+      const reports = await getReports()
+      const foundReport = reports.find((r) => r.id === reportId)
+
+      if (foundReport) {
+        setReport(foundReport)
+
+        // Fetch product data for additional details
+        if (foundReport.siteId) {
+          const productData = await getProductById(foundReport.siteId)
+          setProduct(productData)
+        }
+      }
     } catch (error) {
-      console.error("Error generating PDF:", error)
-      toast({
-        title: "Error",
-        description: "Failed to generate PDF. Please try again.",
-        variant: "destructive",
-      })
+      console.error("Error fetching report data:", error)
     } finally {
-      setIsGeneratingPDF(false)
-    }
-  }
-
-  const handleSendOption = (option: "email" | "whatsapp" | "viber" | "messenger") => {
-    setSendDialogOpen(false)
-
-    if (option === "email") {
-      // Placeholder for email functionality
-      toast({
-        title: "Email Feature",
-        description: "Email functionality will be implemented soon.",
-      })
-    } else {
-      toast({
-        title: "Not Implemented",
-        description: `Sharing via ${option} is not yet implemented.`,
-        variant: "destructive",
-      })
+      setLoading(false)
     }
   }
 
@@ -108,19 +67,6 @@ export default function ReportDetailPage() {
       .split("-")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ")
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "completed":
-        return "bg-green-100 text-green-800"
-      case "in-progress":
-        return "bg-yellow-100 text-yellow-800"
-      case "pending":
-        return "bg-orange-100 text-orange-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
   }
 
   const getFileIcon = (fileName: string) => {
@@ -187,45 +133,68 @@ export default function ReportDetailPage() {
     document.body.removeChild(link)
   }
 
+  const handleDownloadPDF = async () => {
+    if (!report || !product) return
+
+    setIsGeneratingPDF(true)
+    try {
+      await generateReportPDF(report, product, false)
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+      alert("Failed to generate PDF. Please try again.")
+    } finally {
+      setIsGeneratingPDF(false)
+    }
+  }
+
+  const handleSendReport = () => {
+    setIsSendDialogOpen(true)
+  }
+
+  const handleSendOption = (option: "email" | "whatsapp" | "viber" | "messenger") => {
+    setIsSendDialogOpen(false)
+
+    if (option === "email") {
+      // Handle email sending logic here
+      console.log("Send via email")
+    } else {
+      console.log(`Send via ${option}`)
+    }
+  }
+
+  const handleBack = () => {
+    router.back()
+  }
+
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading report...</div>
       </div>
     )
   }
 
   if (!report) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="text-center py-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Report Not Found</h2>
-          <p className="text-gray-600 mb-6">The requested report could not be found.</p>
-          <Link href="/logistics/reports">
-            <Button>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Reports
-            </Button>
-          </Link>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Report not found</div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Back Button and Content Title Section */}
       <div className="bg-white px-6 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-4">
-          <Link href="/logistics/reports">
-            <Button variant="ghost" size="lg" className="text-black rounded-full p-3 hover:bg-gray-100">
-              <ArrowLeft className="h-6 w-6" />
-            </Button>
-          </Link>
+          <Button
+            variant="ghost"
+            size="lg"
+            onClick={handleBack}
+            className="text-black rounded-full p-3 hover:bg-gray-100"
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </Button>
           <Badge className="bg-cyan-400 text-white px-4 py-2 rounded-full font-medium text-lg">
             {product?.content_type || "Content"}
           </Badge>
@@ -233,13 +202,16 @@ export default function ReportDetailPage() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3">
+          {/* Send Button */}
           <Button
-            onClick={() => setSendDialogOpen(true)}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+            onClick={handleSendReport}
+            className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-full flex items-center gap-2"
           >
             <Send className="h-4 w-4" />
             Send
           </Button>
+
+          {/* Download PDF Button */}
           <Button
             onClick={handleDownloadPDF}
             disabled={isGeneratingPDF}
@@ -251,7 +223,7 @@ export default function ReportDetailPage() {
         </div>
       </div>
 
-      {/* Header Image */}
+      {/* Header */}
       <div className="w-full">
         <img src="/logistics-header.png" alt="Logistics Header" className="w-full h-auto object-cover" />
       </div>
@@ -285,7 +257,7 @@ export default function ReportDetailPage() {
                 </div>
                 <div>
                   <span className="font-semibold">Job Order Date:</span>{" "}
-                  {formatDate(report.created?.toDate?.()?.toISOString()?.split("T")[0] || report.date)}
+                  {formatDate(report.created?.toDate().toISOString().split("T")[0] || report.date)}
                 </div>
                 <div>
                   <span className="font-semibold">Site:</span> {report.siteName}
@@ -364,9 +336,40 @@ export default function ReportDetailPage() {
                             src={attachment.fileUrl || "/placeholder.svg"}
                             alt={attachment.fileName || `Attachment ${index + 1}`}
                             className="max-w-full max-h-full object-contain rounded"
+                            onError={(e) => {
+                              // Fallback to icon if image fails to load
+                              const target = e.target as HTMLImageElement
+                              target.style.display = "none"
+                              const parent = target.parentElement
+                              if (parent) {
+                                parent.innerHTML = `
+                                  <div class="text-center space-y-2">
+                                    ${getFileIcon(attachment.fileName || "").props.children}
+                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
+                                  </div>
+                                `
+                              }
+                            }}
                           />
                         ) : isVideoFile(attachment.fileName || "") ? (
-                          <video src={attachment.fileUrl} className="max-w-full max-h-full object-contain rounded" />
+                          <video
+                            src={attachment.fileUrl}
+                            className="max-w-full max-h-full object-contain rounded"
+                            onError={(e) => {
+                              // Fallback to icon if video fails to load
+                              const target = e.target as HTMLVideoElement
+                              target.style.display = "none"
+                              const parent = target.parentElement
+                              if (parent) {
+                                parent.innerHTML = `
+                                  <div class="text-center space-y-2">
+                                    ${getFileIcon(attachment.fileName || "").props.children}
+                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
+                                  </div>
+                                `
+                              }
+                            }}
+                          />
                         ) : (
                           <div className="text-center space-y-2">
                             {getFileIcon(attachment.fileName || "")}
@@ -385,6 +388,12 @@ export default function ReportDetailPage() {
                         {attachment.note && (
                           <p className="text-xs text-gray-500 italic mt-2 text-center">"{attachment.note}"</p>
                         )}
+                      </div>
+                    ) : attachment.fileName ? (
+                      <div className="text-center space-y-2">
+                        {getFileIcon(attachment.fileName)}
+                        <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
+                        {attachment.note && <p className="text-xs text-gray-500 italic">"{attachment.note}"</p>}
                       </div>
                     ) : (
                       <div className="text-center space-y-2">
@@ -418,7 +427,7 @@ export default function ReportDetailPage() {
             <div className="text-sm text-gray-600">
               <div>{report.createdByName}</div>
               <div>LOGISTICS</div>
-              <div>{formatDate(report.created?.toDate?.()?.toISOString()?.split("T")[0] || report.date)}</div>
+              <div>{formatDate(report.created?.toDate().toISOString().split("T")[0] || report.date)}</div>
             </div>
           </div>
           <div className="text-right text-sm text-gray-500 italic">
@@ -436,10 +445,9 @@ export default function ReportDetailPage() {
       {/* Send Report Dialog */}
       {report && (
         <SendReportDialog
-          isOpen={sendDialogOpen}
-          onClose={() => setSendDialogOpen(false)}
+          isOpen={isSendDialogOpen}
+          onClose={() => setIsSendDialogOpen(false)}
           report={report}
-          product={product}
           onSelectOption={handleSendOption}
         />
       )}

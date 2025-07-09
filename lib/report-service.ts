@@ -5,7 +5,6 @@ import {
   doc,
   updateDoc,
   deleteDoc,
-  getDoc,
   query,
   where,
   orderBy,
@@ -62,8 +61,6 @@ export interface ReportData {
   tags?: string[]
   category?: string
   subcategory?: string
-  notes?: string
-  productId?: string
   created?: Timestamp
   updated?: Timestamp
 }
@@ -153,26 +150,6 @@ export async function getReports(siteId?: string): Promise<ReportData[]> {
     })) as ReportData[]
   } catch (error) {
     console.error("Error fetching reports:", error)
-    throw error
-  }
-}
-
-export async function getReportById(reportId: string): Promise<ReportData | null> {
-  try {
-    const docRef = doc(db, REPORTS_COLLECTION, reportId)
-    const docSnap = await getDoc(docRef)
-
-    if (docSnap.exists()) {
-      return {
-        id: docSnap.id,
-        ...docSnap.data(),
-      } as ReportData
-    } else {
-      console.log("No such report!")
-      return null
-    }
-  } catch (error) {
-    console.error("Error fetching report by ID:", error)
     throw error
   }
 }
