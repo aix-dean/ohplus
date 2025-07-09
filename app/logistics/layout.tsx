@@ -1,35 +1,27 @@
 "use client"
 
 import type React from "react"
-import { useAuth } from "@/contexts/auth-context"
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+
+import { RoleGuard } from "@/components/role-guard"
+import { SideNavigation } from "@/components/side-navigation"
+import { TopNavigation } from "@/components/top-navigation"
 
 export default function LogisticsLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { user, loading } = useAuth()
-  const router = useRouter()
-
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login")
-    }
-  }, [user, loading, router])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  return (
+    <RoleGuard allowedRoles={["admin", "logistics"]}>
+      <div className="flex h-screen bg-gray-100">
+        <SideNavigation />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <TopNavigation />
+          <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100">
+            <div className="container mx-auto px-6 py-8">{children}</div>
+          </main>
+        </div>
       </div>
-    )
-  }
-
-  if (!user) {
-    return null
-  }
-
-  return <>{children}</>
+    </RoleGuard>
+  )
 }

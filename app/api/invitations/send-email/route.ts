@@ -18,22 +18,21 @@ export async function POST(request: NextRequest) {
       expiresAt,
     } = await request.json()
 
-    // Validate required fields
     if (!recipientEmail || !invitationCode || !registrationUrl) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    // Create HTML email template
+    // Create the email HTML content
     const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Invitation to Join ${companyName || "Our Organization"}</title>
+          <title>Invitation to ${companyName || "OH Plus"}</title>
           <style>
             body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
               line-height: 1.6;
               color: #333;
               max-width: 600px;
@@ -53,7 +52,7 @@ export async function POST(request: NextRequest) {
               border: 1px solid #e1e5e9;
               border-top: none;
             }
-            .code-box {
+            .invitation-code {
               background: #f8f9fa;
               border: 2px dashed #dee2e6;
               padding: 20px;
@@ -74,57 +73,32 @@ export async function POST(request: NextRequest) {
               color: white;
               padding: 12px 30px;
               text-decoration: none;
-              border-radius: 6px;
+              border-radius: 5px;
+              margin: 20px 0;
               font-weight: 500;
-              margin: 20px 0;
-            }
-            .info-grid {
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 15px;
-              margin: 20px 0;
-              padding: 20px;
-              background: #f8f9fa;
-              border-radius: 8px;
-            }
-            .info-item {
-              display: flex;
-              flex-direction: column;
-            }
-            .info-label {
-              font-weight: 600;
-              color: #6c757d;
-              font-size: 14px;
-              margin-bottom: 4px;
-            }
-            .info-value {
-              color: #495057;
             }
             .footer {
               background: #f8f9fa;
-              padding: 20px 30px;
+              padding: 20px;
+              text-align: center;
               border: 1px solid #e1e5e9;
               border-top: none;
               border-radius: 0 0 8px 8px;
-              text-align: center;
+              font-size: 14px;
               color: #6c757d;
-              font-size: 14px;
             }
-            .role-badge {
-              display: inline-block;
-              background: #e9ecef;
-              color: #495057;
-              padding: 4px 12px;
-              border-radius: 20px;
-              font-size: 14px;
-              font-weight: 500;
+            .info-box {
+              background: #e3f2fd;
+              border-left: 4px solid #2196f3;
+              padding: 15px;
+              margin: 20px 0;
             }
           </style>
         </head>
         <body>
           <div class="header">
-            <h1>🎉 You're Invited!</h1>
-            <p>Join ${companyName || "our organization"} and start collaborating</p>
+            <h1>You're Invited!</h1>
+            <p>Join ${companyName || "OH Plus"} team</p>
           </div>
           
           <div class="content">
@@ -132,53 +106,38 @@ export async function POST(request: NextRequest) {
             
             <p>${message}</p>
             
-            <div class="code-box">
-              <p style="margin: 0 0 10px 0; font-weight: 600;">Your invitation code:</p>
+            <div class="invitation-code">
+              <p><strong>Your Invitation Code:</strong></p>
               <div class="code">${invitationCode}</div>
-              <p style="margin: 10px 0 0 0; font-size: 14px; color: #6c757d;">
-                Copy this code and use it during registration
-              </p>
             </div>
             
-            <div class="info-grid">
-              <div class="info-item">
-                <span class="info-label">Assigned Role</span>
-                <span class="info-value">
-                  <span class="role-badge">${role}</span>
-                </span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Valid Until</span>
-                <span class="info-value">${expiresAt}</span>
-              </div>
+            <div class="info-box">
+              <p><strong>How to get started:</strong></p>
+              <ol>
+                <li>Click the registration button below</li>
+                <li>Use the invitation code: <code>${invitationCode}</code></li>
+                <li>Complete your account setup</li>
+                <li>Start collaborating with the team!</li>
+              </ol>
             </div>
             
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${registrationUrl}" class="button">
-                Register Your Account
-              </a>
+            <div style="text-align: center;">
+              <a href="${registrationUrl}" class="button">Create Your Account</a>
             </div>
             
-            <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 6px; margin: 20px 0;">
-              <p style="margin: 0; color: #856404; font-size: 14px;">
-                <strong>📋 Registration Instructions:</strong><br>
-                1. Click the button above or visit: <code>${registrationUrl}</code><br>
-                2. Fill out the registration form<br>
-                3. Your invitation code will be automatically applied<br>
-                4. Complete your profile setup
-              </p>
-            </div>
+            <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #007bff;">${registrationUrl}</p>
             
-            <p>If you have any questions or need assistance, please don't hesitate to reach out.</p>
+            ${role ? `<p><strong>Role:</strong> ${role}</p>` : ""}
+            ${expiresAt ? `<p><strong>Expires:</strong> ${expiresAt}</p>` : ""}
             
-            <p>
-              Best regards,<br>
-              <strong>${senderName}</strong>
-            </p>
+            <p>If you have any questions, please don't hesitate to reach out to ${senderName || "the team"}.</p>
+            
+            <p>Welcome aboard!</p>
           </div>
           
           <div class="footer">
-            <p>This invitation was sent by ${senderName} from ${companyName || "OH Plus"}.</p>
+            <p>This invitation was sent by ${senderName || "OH Plus"}</p>
             <p>If you didn't expect this invitation, you can safely ignore this email.</p>
           </div>
         </body>
@@ -187,7 +146,7 @@ export async function POST(request: NextRequest) {
 
     // Create plain text version
     const textContent = `
-You're invited to join ${companyName || "our organization"}!
+You're invited to join ${companyName || "OH Plus"}!
 
 Hello ${recipientName || "there"},
 
@@ -195,47 +154,48 @@ ${message}
 
 Your invitation code: ${invitationCode}
 
-Role: ${role}
-Valid until: ${expiresAt}
+To get started:
+1. Visit: ${registrationUrl}
+2. Use the invitation code: ${invitationCode}
+3. Complete your account setup
+4. Start collaborating with the team!
 
-To register your account, visit: ${registrationUrl}
+${role ? `Role: ${role}` : ""}
+${expiresAt ? `Expires: ${expiresAt}` : ""}
 
-Registration Instructions:
-1. Visit the registration link above
-2. Fill out the registration form
-3. Your invitation code will be automatically applied
-4. Complete your profile setup
+If you have any questions, please reach out to ${senderName || "the team"}.
 
-If you have any questions or need assistance, please don't hesitate to reach out.
-
-Best regards,
-${senderName}
+Welcome aboard!
 
 ---
-This invitation was sent by ${senderName} from ${companyName || "OH Plus"}.
+This invitation was sent by ${senderName || "OH Plus"}
 If you didn't expect this invitation, you can safely ignore this email.
     `
 
-    // Send email using Resend
-    const { data, error } = await resend.emails.send({
-      from: `${senderName} <noreply@${process.env.NEXT_PUBLIC_APP_URL?.replace("https://", "") || "ohplus.com"}>`,
-      to: [recipientEmail],
+    // Send the email using Resend
+    const emailResponse = await resend.emails.send({
+      from: "noreply@resend.dev",
+      to: recipientEmail,
       subject: subject,
       html: htmlContent,
       text: textContent,
     })
 
-    if (error) {
-      console.error("Resend error:", error)
-      return NextResponse.json({ error: "Failed to send email" }, { status: 500 })
+    if (emailResponse.error) {
+      console.error("Resend error:", emailResponse.error)
+      return NextResponse.json({ error: "Failed to send email", details: emailResponse.error }, { status: 500 })
     }
 
     return NextResponse.json({
       success: true,
-      messageId: data?.id,
+      message: "Invitation email sent successfully",
+      emailId: emailResponse.data?.id,
     })
   } catch (error) {
-    console.error("Email sending error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("Error sending invitation email:", error)
+    return NextResponse.json(
+      { error: "Internal server error", details: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 },
+    )
   }
 }

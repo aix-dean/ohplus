@@ -1,21 +1,5 @@
-"use client"
+import { DashboardRedirect } from "@/components/dashboard-redirect"
 
-import { useEffect } from "react"
-import { redirect } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
-
-export default function Home() {
-  const { user, loading } = useAuth()
-
-  useEffect(() => {
-    if (!loading) {
-      if (user) {
-        redirect("/sales/dashboard")
-      } else {
-        redirect("/login")
-      }
-    }
-  }, [user, loading])
-
-  return null
+export default function HomePage() {
+  return <DashboardRedirect />
 }
