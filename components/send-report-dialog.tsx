@@ -59,7 +59,7 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto p-0">
+      <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto p-0">
         {/* Header */}
         <DialogHeader className="p-6 pb-4">
           <div className="flex items-center justify-between">
@@ -70,7 +70,7 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
           </div>
         </DialogHeader>
 
-        <div className="px-6 pb-6">
+        <div className="px-8 pb-6">
           {/* Report Preview */}
           <div className="flex items-center gap-4 mb-4">
             <div className="relative w-16 h-20 flex-shrink-0 bg-blue-50 rounded border">
@@ -110,7 +110,7 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
             <Separator className="my-4" />
 
             {/* Sharing Options */}
-            <div className="grid grid-cols-4 gap-4 text-center">
+            <div className="grid grid-cols-4 gap-6 text-center">
               {/* Email */}
               <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={() => onSelectOption("email")}>
                 <Button
