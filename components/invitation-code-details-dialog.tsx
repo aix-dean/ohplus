@@ -1,244 +1,248 @@
 "use client"
-
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import { Users, Shield, Clock, Hash } from "lucide-react"
-
-interface InvitationCode {
-  id: string
-  code: string
-  usage_count: number
-  max_usage: number | null
-  expires_at: Date
-  status: "active" | "inactive" | "expired"
-  role: string
-  permissions: string[]
-  created_at: Date
-  created_by: string
-  used_by?: string[]
-}
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Copy, Calendar, Users, Shield, Clock, Activity, CheckCircle, XCircle, Ban } from "lucide-react"
+import { toast } from "sonner"
+import type { Timestamp } from "firebase/firestore"
 
 interface InvitationCodeDetailsDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  code: InvitationCode
-}
-
-const PERMISSION_LABELS: Record<string, string> = {
-  read_proposals: "Read Proposals",
-  write_proposals: "Write Proposals",
-  read_clients: "Read Clients",
-  write_clients: "Write Clients",
-  read_inventory: "Read Inventory",
-  write_inventory: "Write Inventory",
-  read_analytics: "Read Analytics",
-  admin_access: "Admin Access",
+  code: {
+    id: string
+    code: string
+    createdAt: Timestamp
+    expiresAt: Timestamp
+    usageLimit: number
+    usageCount: number
+    role: string
+    permissions: string[]
+    status: "active" | "inactive" | "expired"
+    createdBy: string
+    companyId: string
+    usedBy?: string[]
+    description?: string
+  }
 }
 
 export function InvitationCodeDetailsDialog({ open, onOpenChange, code }: InvitationCodeDetailsDialogProps) {
-  const getStatusBadge = (status: string) => {
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    toast.success("Copied to clipboard")
+  }
+
+  const formatDate = (timestamp: Timestamp) => {
+    return timestamp.toDate().toLocaleString()
+  }
+
+  const getStatusIcon = (status: string) => {
     switch (status) {
       case "active":
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Active</Badge>
+        return <CheckCircle className="h-4 w-4 text-green-500" />
       case "inactive":
-        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Inactive</Badge>
+        return <Ban className="h-4 w-4 text-gray-500" />
       case "expired":
-        return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">Expired</Badge>
+        return <XCircle className="h-4 w-4 text-red-500" />
       default:
-        return <Badge variant="secondary">{status}</Badge>
+        return <Clock className="h-4 w-4 text-yellow-500" />
     }
   }
 
-  const getUsageDisplay = () => {
-    if (code.max_usage === null) {
-      return `${code.usage_count} (Unlimited)`
-    }
-    return `${code.usage_count} / ${code.max_usage}`
+  const getStatusBadge = (status: string) => {
+    const variants = {
+      active: "default",
+      inactive: "secondary",
+      expired: "destructive",
+    } as const
+
+    return (
+      <Badge variant={variants[status as keyof typeof variants] || "secondary"}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    )
   }
 
-  const getDaysUntilExpiry = () => {
-    const now = new Date()
-    const diffTime = code.expires_at.getTime() - now.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-    if (diffDays < 0) return "Expired"
-    if (diffDays === 0) return "Expires today"
-    if (diffDays === 1) return "Expires tomorrow"
-    return `${diffDays} days remaining`
-  }
+  const registrationUrl = `${window.location.origin}/register?code=${code.code}`
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Hash className="h-5 w-5" />
-            Invitation Code Details
-          </DialogTitle>
-          <DialogDescription>View detailed information about this invitation code</DialogDescription>
+          <DialogTitle>Invitation Code Details</DialogTitle>
+          <DialogDescription>Complete information about this invitation code</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Code Information */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Hash className="h-5 w-5" />
-                Code Information
+              <CardTitle className="text-lg flex items-center space-x-2">
+                <span>Code Information</span>
+                {getStatusIcon(code.status)}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Code</p>
-                  <p className="font-mono font-medium text-lg">{code.code}</p>
+                  <label className="text-sm font-medium text-muted-foreground">Code</label>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <code className="bg-muted px-3 py-2 rounded text-lg font-mono">{code.code}</code>
+                    <Button variant="outline" size="sm" onClick={() => copyToClipboard(code.code)}>
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  <div className="mt-1">{getStatusBadge(code.status)}</div>
+                  <label className="text-sm font-medium text-muted-foreground">Status</label>
+                  <div className="flex items-center space-x-2 mt-1">
+                    {getStatusIcon(code.status)}
+                    {getStatusBadge(code.status)}
+                  </div>
                 </div>
               </div>
-
-              <Separator />
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Created</p>
-                  <p className="font-medium">
-                    {code.created_at.toLocaleDateString()} at {code.created_at.toLocaleTimeString()}
-                  </p>
+                  <label className="text-sm font-medium text-muted-foreground">Created</label>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{formatDate(code.createdAt)}</span>
+                  </div>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Expires</p>
-                  <p className="font-medium">
-                    {code.expires_at.toLocaleDateString()} at {code.expires_at.toLocaleTimeString()}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">{getDaysUntilExpiry()}</p>
+                  <label className="text-sm font-medium text-muted-foreground">Expires</label>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{formatDate(code.expiresAt)}</span>
+                  </div>
                 </div>
               </div>
+
+              {code.description && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Description</label>
+                  <p className="text-sm mt-1 p-3 bg-muted rounded-md">{code.description}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
           {/* Usage Information */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Usage Information
+              <CardTitle className="text-lg flex items-center space-x-2">
+                <Activity className="h-5 w-5" />
+                <span>Usage Information</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Usage Count</p>
-                  <p className="font-medium text-lg">{getUsageDisplay()}</p>
+                  <label className="text-sm font-medium text-muted-foreground">Usage Count</label>
+                  <div className="text-2xl font-bold mt-1">{code.usageCount}</div>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Remaining Uses</p>
-                  <p className="font-medium text-lg">
-                    {code.max_usage === null ? "Unlimited" : Math.max(0, code.max_usage - code.usage_count)}
-                  </p>
+                  <label className="text-sm font-medium text-muted-foreground">Usage Limit</label>
+                  <div className="text-2xl font-bold mt-1">
+                    {code.usageLimit === 0 ? <Badge variant="secondary">Unlimited</Badge> : code.usageLimit}
+                  </div>
                 </div>
               </div>
 
-              {code.used_by && code.used_by.length > 0 && (
-                <>
-                  <Separator />
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-2">Used By</p>
-                    <div className="space-y-1">
-                      {code.used_by.map((userId, index) => (
-                        <div key={index} className="text-sm bg-muted p-2 rounded">
-                          User ID: {userId}
-                        </div>
-                      ))}
+              {code.usageLimit > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Usage Progress</label>
+                  <div className="mt-2">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>{code.usageCount} used</span>
+                      <span>{code.usageLimit - code.usageCount} remaining</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${Math.min((code.usageCount / code.usageLimit) * 100, 100)}%`,
+                        }}
+                      ></div>
                     </div>
                   </div>
-                </>
+                </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Role & Permissions */}
+          {/* Role and Permissions */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
+              <CardTitle className="text-lg flex items-center space-x-2">
                 <Shield className="h-5 w-5" />
-                Role & Permissions
+                <span>Role & Permissions</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <p className="text-sm text-muted-foreground">Assigned Role</p>
-                <Badge variant="outline" className="mt-1 capitalize">
-                  {code.role}
-                </Badge>
+                <label className="text-sm font-medium text-muted-foreground">Assigned Role</label>
+                <div className="mt-1">
+                  <Badge variant="outline" className="text-sm px-3 py-1">
+                    {code.role}
+                  </Badge>
+                </div>
               </div>
 
-              <Separator />
+              {code.permissions.length > 0 && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Permissions</label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {code.permissions.map((permission) => (
+                      <Badge key={permission} variant="secondary" className="text-xs">
+                        {permission.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-              <div>
-                <p className="text-sm text-muted-foreground mb-3">Permissions ({code.permissions.length})</p>
-                <div className="grid grid-cols-1 gap-2">
-                  {code.permissions.map((permission) => (
-                    <div key={permission} className="flex items-center gap-2 p-2 bg-muted rounded">
-                      <Shield className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{PERMISSION_LABELS[permission] || permission}</span>
+          {/* Registration Link */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Registration Link</CardTitle>
+              <CardDescription>Share this link for easy registration with this code</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center space-x-2">
+                <div className="flex-1 p-3 bg-muted rounded-md text-sm font-mono break-all">{registrationUrl}</div>
+                <Button variant="outline" onClick={() => copyToClipboard(registrationUrl)}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Usage History */}
+          {code.usedBy && code.usedBy.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center space-x-2">
+                  <Users className="h-5 w-5" />
+                  <span>Usage History</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {code.usedBy.map((userId, index) => (
+                    <div key={index} className="flex items-center space-x-2 p-2 bg-muted rounded">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-mono">{userId}</span>
                     </div>
                   ))}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Timeline */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Timeline
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <div>
-                    <p className="text-sm font-medium">Code Created</p>
-                    <p className="text-xs text-muted-foreground">
-                      {code.created_at.toLocaleDateString()} at {code.created_at.toLocaleTimeString()}
-                    </p>
-                  </div>
-                </div>
-
-                {code.usage_count > 0 && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <div>
-                      <p className="text-sm font-medium">First Use</p>
-                      <p className="text-xs text-muted-foreground">
-                        Used {code.usage_count} time{code.usage_count > 1 ? "s" : ""}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-2 h-2 rounded-full ${code.status === "expired" ? "bg-red-500" : "bg-gray-300"}`}
-                  ></div>
-                  <div>
-                    <p className="text-sm font-medium">{code.status === "expired" ? "Expired" : "Will Expire"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {code.expires_at.toLocaleDateString()} at {code.expires_at.toLocaleTimeString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </DialogContent>
     </Dialog>

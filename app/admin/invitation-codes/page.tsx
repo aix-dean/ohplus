@@ -4,368 +4,364 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Plus, Eye, Trash2, Mail } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
-import { toast } from "sonner"
+import { Input } from "@/components/ui/input"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  doc,
-  updateDoc,
-  deleteDoc,
-  addDoc,
-  serverTimestamp,
-} from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import { ResponsiveTable } from "@/components/responsive-table"
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Plus, Search, MoreHorizontal, Copy, Eye, Mail, Ban, CheckCircle, XCircle, Clock, Activity } from "lucide-react"
+import { toast } from "sonner"
 import { GenerateInvitationCodeDialog } from "@/components/generate-invitation-code-dialog"
 import { InvitationCodeDetailsDialog } from "@/components/invitation-code-details-dialog"
 import { SendInvitationEmailDialog } from "@/components/send-invitation-email-dialog"
-import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { useAuth } from "@/contexts/auth-context"
+import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, type Timestamp } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 interface InvitationCode {
   id: string
   code: string
-  usage_count: number
-  max_usage: number | null
-  expires_at: Date
-  status: "active" | "inactive" | "expired"
+  createdAt: Timestamp
+  expiresAt: Timestamp
+  usageLimit: number
+  usageCount: number
   role: string
   permissions: string[]
-  created_at: Date
-  created_by: string
-  used_by?: string[]
+  status: "active" | "inactive" | "expired"
+  createdBy: string
+  companyId: string
+  usedBy?: string[]
 }
 
 export default function InvitationCodesPage() {
   const { userData } = useAuth()
   const [codes, setCodes] = useState<InvitationCode[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedCode, setSelectedCode] = useState<InvitationCode | null>(null)
   const [showGenerateDialog, setShowGenerateDialog] = useState(false)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
   const [showEmailDialog, setShowEmailDialog] = useState(false)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [selectedCode, setSelectedCode] = useState<InvitationCode | null>(null)
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false)
+  const [codeToDeactivate, setCodeToDeactivate] = useState<InvitationCode | null>(null)
 
+  // Real-time listener for invitation codes
   useEffect(() => {
-    if (!userData?.company_id) return
+    if (!userData?.companyId) return
 
     const q = query(
-      collection(db, "invitation_codes"),
-      where("company_id", "==", userData.company_id),
-      orderBy("created_at", "desc"),
+      collection(db, "invitationCodes"),
+      where("companyId", "==", userData.companyId),
+      orderBy("createdAt", "desc"),
     )
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const codesData = snapshot.docs.map((doc) => {
-        const data = doc.data()
-        const expiresAt = data.expires_at?.toDate()
+      const codesData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as InvitationCode[]
+
+      // Update status based on expiration
+      const updatedCodes = codesData.map((code) => {
         const now = new Date()
+        const expiresAt = code.expiresAt.toDate()
 
-        let status: "active" | "inactive" | "expired" = data.active === false ? "inactive" : "active"
-        if (expiresAt && expiresAt < now) {
-          status = "expired"
+        if (code.status === "active" && expiresAt < now) {
+          return { ...code, status: "expired" as const }
         }
-
-        return {
-          id: doc.id,
-          code: data.code,
-          usage_count: data.usage_count || 0,
-          max_usage: data.max_usage || null,
-          expires_at: expiresAt,
-          status,
-          role: data.role || "user",
-          permissions: data.permissions || [],
-          created_at: data.created_at?.toDate(),
-          created_by: data.created_by,
-          used_by: data.used_by || [],
-        }
+        return code
       })
-      setCodes(codesData)
+
+      setCodes(updatedCodes)
       setLoading(false)
     })
 
     return () => unsubscribe()
-  }, [userData?.company_id])
+  }, [userData?.companyId])
 
-  const generateCode = () => {
-    return (
-      Math.random().toString(36).substring(2, 6).toUpperCase() +
-      "-" +
-      Math.random().toString(36).substring(2, 6).toUpperCase()
-    )
+  // Filter codes based on search term
+  const filteredCodes = codes.filter(
+    (code) =>
+      code.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      code.role.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
+
+  // Get status counts
+  const statusCounts = {
+    active: codes.filter((code) => code.status === "active").length,
+    inactive: codes.filter((code) => code.status === "inactive").length,
+    expired: codes.filter((code) => code.status === "expired").length,
+    total: codes.length,
   }
 
-  const handleGenerateCodes = async (params: {
-    count: number
-    validityDays: number
-    maxUsage: number | null
-    role: string
-    permissions: string[]
-  }) => {
-    try {
-      const expiresAt = new Date()
-      expiresAt.setDate(expiresAt.getDate() + params.validityDays)
-
-      const promises = []
-      for (let i = 0; i < params.count; i++) {
-        const codeData = {
-          code: generateCode(),
-          company_id: userData?.company_id,
-          license_key: userData?.license_key,
-          usage_count: 0,
-          max_usage: params.maxUsage,
-          expires_at: expiresAt,
-          active: true,
-          role: params.role,
-          permissions: params.permissions,
-          created_at: serverTimestamp(),
-          created_by: userData?.uid,
-          used_by: [],
-        }
-        promises.push(addDoc(collection(db, "invitation_codes"), codeData))
-      }
-
-      await Promise.all(promises)
-      toast.success(`Successfully generated ${params.count} invitation code(s)`)
-      setShowGenerateDialog(false)
-    } catch (error) {
-      console.error("Error generating codes:", error)
-      toast.error("Failed to generate invitation codes")
-    }
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    toast.success("Code copied to clipboard")
   }
 
-  const copyToClipboard = async (code: string) => {
-    try {
-      await navigator.clipboard.writeText(code)
-      toast.success("Code copied to clipboard")
-    } catch (error) {
-      toast.error("Failed to copy code")
-    }
+  const handleViewDetails = (code: InvitationCode) => {
+    setSelectedCode(code)
+    setShowDetailsDialog(true)
   }
 
-  const handleDeactivate = async (codeId: string) => {
+  const handleSendEmail = (code: InvitationCode) => {
+    setSelectedCode(code)
+    setShowEmailDialog(true)
+  }
+
+  const handleDeactivateClick = (code: InvitationCode) => {
+    setCodeToDeactivate(code)
+    setShowDeactivateDialog(true)
+  }
+
+  const handleDeactivateConfirm = async () => {
+    if (!codeToDeactivate) return
+
     try {
-      await updateDoc(doc(db, "invitation_codes", codeId), {
-        active: false,
-        updated_at: serverTimestamp(),
+      await updateDoc(doc(db, "invitationCodes", codeToDeactivate.id), {
+        status: "inactive",
       })
       toast.success("Code deactivated successfully")
     } catch (error) {
       console.error("Error deactivating code:", error)
       toast.error("Failed to deactivate code")
+    } finally {
+      setShowDeactivateDialog(false)
+      setCodeToDeactivate(null)
     }
   }
 
-  const handleActivate = async (codeId: string) => {
-    try {
-      await updateDoc(doc(db, "invitation_codes", codeId), {
-        active: true,
-        updated_at: serverTimestamp(),
-      })
-      toast.success("Code activated successfully")
-    } catch (error) {
-      console.error("Error activating code:", error)
-      toast.error("Failed to activate code")
-    }
-  }
-
-  const handleDelete = async (codeId: string) => {
-    try {
-      await deleteDoc(doc(db, "invitation_codes", codeId))
-      toast.success("Code deleted successfully")
-      setShowDeleteDialog(false)
-      setSelectedCode(null)
-    } catch (error) {
-      console.error("Error deleting code:", error)
-      toast.error("Failed to delete code")
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "active":
+        return <CheckCircle className="h-4 w-4 text-green-500" />
+      case "inactive":
+        return <Ban className="h-4 w-4 text-gray-500" />
+      case "expired":
+        return <XCircle className="h-4 w-4 text-red-500" />
+      default:
+        return <Clock className="h-4 w-4 text-yellow-500" />
     }
   }
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Active</Badge>
-      case "inactive":
-        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Inactive</Badge>
-      case "expired":
-        return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">Expired</Badge>
-      default:
-        return <Badge variant="secondary">{status}</Badge>
-    }
+    const variants = {
+      active: "default",
+      inactive: "secondary",
+      expired: "destructive",
+    } as const
+
+    return (
+      <Badge variant={variants[status as keyof typeof variants] || "secondary"}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    )
   }
 
-  const getUsageDisplay = (code: InvitationCode) => {
-    if (code.max_usage === null) {
-      return code.usage_count.toString()
-    }
-    return `${code.usage_count} / ${code.max_usage}`
+  const formatDate = (timestamp: Timestamp) => {
+    return timestamp.toDate().toLocaleDateString()
   }
 
-  const columns = [
-    {
-      key: "code",
-      label: "Code",
-      render: (code: InvitationCode) => (
-        <div className="flex items-center gap-2">
-          <span className="font-mono font-medium">{code.code}</span>
-          <Button variant="ghost" size="sm" onClick={() => copyToClipboard(code.code)} className="h-6 w-6 p-0">
-            <Copy className="h-3 w-3" />
-          </Button>
-        </div>
-      ),
-    },
-    {
-      key: "usage",
-      label: "Usage",
-      render: (code: InvitationCode) => <span className="text-sm">{getUsageDisplay(code)}</span>,
-    },
-    {
-      key: "expires",
-      label: "Expires",
-      render: (code: InvitationCode) => <span className="text-sm">{code.expires_at.toLocaleDateString()}</span>,
-    },
-    {
-      key: "role",
-      label: "Role",
-      render: (code: InvitationCode) => (
-        <Badge variant="outline" className="capitalize">
-          {code.role}
-        </Badge>
-      ),
-    },
-    {
-      key: "status",
-      label: "Status",
-      render: (code: InvitationCode) => getStatusBadge(code.status),
-    },
-    {
-      key: "actions",
-      label: "Actions",
-      render: (code: InvitationCode) => (
-        <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSelectedCode(code)
-              setShowDetailsDialog(true)
-            }}
-            className="h-8 w-8 p-0"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-          {code.status === "active" && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSelectedCode(code)
-                setShowEmailDialog(true)
-              }}
-              className="h-8 w-8 p-0"
-            >
-              <Mail className="h-4 w-4" />
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              if (code.status === "active") {
-                handleDeactivate(code.id)
-              } else if (code.status === "inactive") {
-                handleActivate(code.id)
-              }
-            }}
-            disabled={code.status === "expired"}
-            className="h-8 px-2 text-xs"
-          >
-            {code.status === "active" ? "Deactivate" : code.status === "inactive" ? "Activate" : "Expired"}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setSelectedCode(code)
-              setShowDeleteDialog(true)
-            }}
-            className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      ),
-    },
-  ]
+  const isExpiringSoon = (expiresAt: Timestamp) => {
+    const now = new Date()
+    const expires = expiresAt.toDate()
+    const daysUntilExpiry = Math.ceil((expires.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    return daysUntilExpiry <= 7 && daysUntilExpiry > 0
+  }
 
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">Invitation Codes</h1>
-            <p className="text-muted-foreground">Manage invitation codes for your organization.</p>
-          </div>
+      <div className="container mx-auto py-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-32 bg-gray-200 rounded"></div>
+          <div className="h-64 bg-gray-200 rounded"></div>
         </div>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-center h-32">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="container mx-auto py-6 space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold">Invitation Codes</h1>
-          <p className="text-muted-foreground">Manage invitation codes for your organization.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Invitation Codes</h1>
+          <p className="text-muted-foreground">Generate and manage invitation codes for user registration</p>
         </div>
-        <Button onClick={() => setShowGenerateDialog(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
+        <Button onClick={() => setShowGenerateDialog(true)}>
+          <Plus className="h-4 w-4 mr-2" />
           Generate Code
         </Button>
       </div>
 
-      {codes.length === 0 ? (
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
-          <CardContent className="p-6">
-            <div className="text-center py-8">
-              <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-4">
-                <Plus className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-medium mb-2">No invitation codes found</h3>
-              <p className="text-muted-foreground mb-4">
-                Create your first invitation code to start inviting users to your organization.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Invitation Codes ({codes.length})</CardTitle>
-            <CardDescription>Manage and track your organization's invitation codes</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Codes</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <ResponsiveTable data={codes} columns={columns} searchKey="code" searchPlaceholder="Search codes..." />
+            <div className="text-2xl font-bold">{statusCounts.total}</div>
           </CardContent>
         </Card>
-      )}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">{statusCounts.active}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Inactive</CardTitle>
+            <Ban className="h-4 w-4 text-gray-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-600">{statusCounts.inactive}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Expired</CardTitle>
+            <XCircle className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{statusCounts.expired}</div>
+          </CardContent>
+        </Card>
+      </div>
 
-      <GenerateInvitationCodeDialog
-        open={showGenerateDialog}
-        onOpenChange={setShowGenerateDialog}
-        onGenerate={handleGenerateCodes}
-      />
+      {/* Search and Filters */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center space-x-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search codes or roles..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-sm"
+            />
+          </div>
+        </CardHeader>
+      </Card>
+
+      {/* Codes Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Invitation Codes</CardTitle>
+          <CardDescription>Manage all invitation codes and their usage</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Code</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Usage</TableHead>
+                <TableHead>Expires</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCodes.map((code) => (
+                <TableRow key={code.id}>
+                  <TableCell>
+                    <div className="flex items-center space-x-2">
+                      <code className="bg-muted px-2 py-1 rounded text-sm font-mono">{code.code}</code>
+                      <Button variant="ghost" size="sm" onClick={() => copyToClipboard(code.code)}>
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{code.role}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center space-x-2">
+                      <span>{code.usageCount}</span>
+                      {code.usageLimit > 0 && (
+                        <>
+                          <span>/</span>
+                          <span>{code.usageLimit}</span>
+                        </>
+                      )}
+                      {code.usageLimit === 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          Unlimited
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center space-x-2">
+                      <span>{formatDate(code.expiresAt)}</span>
+                      {isExpiringSoon(code.expiresAt) && code.status === "active" && (
+                        <Badge variant="destructive" className="text-xs">
+                          Expiring Soon
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center space-x-2">
+                      {getStatusIcon(code.status)}
+                      {getStatusBadge(code.status)}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleViewDetails(code)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleSendEmail(code)}>
+                          <Mail className="h-4 w-4 mr-2" />
+                          Send Email
+                        </DropdownMenuItem>
+                        {code.status === "active" && (
+                          <DropdownMenuItem onClick={() => handleDeactivateClick(code)} className="text-red-600">
+                            <Ban className="h-4 w-4 mr-2" />
+                            Deactivate
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+
+          {filteredCodes.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              {searchTerm ? "No codes found matching your search." : "No invitation codes found."}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Dialogs */}
+      <GenerateInvitationCodeDialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog} />
 
       {selectedCode && (
         <>
@@ -375,21 +371,26 @@ export default function InvitationCodesPage() {
             code={selectedCode}
           />
 
-          <SendInvitationEmailDialog
-            open={showEmailDialog}
-            onOpenChange={setShowEmailDialog}
-            code={selectedCode.code}
-          />
-
-          <DeleteConfirmationDialog
-            open={showDeleteDialog}
-            onOpenChange={setShowDeleteDialog}
-            title="Delete Invitation Code"
-            description={`Are you sure you want to delete the invitation code "${selectedCode.code}"? This action cannot be undone.`}
-            onConfirm={() => handleDelete(selectedCode.id)}
-          />
+          <SendInvitationEmailDialog open={showEmailDialog} onOpenChange={setShowEmailDialog} code={selectedCode} />
         </>
       )}
+
+      {/* Deactivate Confirmation Dialog */}
+      <AlertDialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate Invitation Code</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to deactivate the code "{codeToDeactivate?.code}"? This action cannot be undone and
+              the code will no longer be usable for registration.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeactivateConfirm}>Deactivate</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

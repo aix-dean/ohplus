@@ -5,90 +5,224 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, code, senderName, customMessage } = await request.json()
+    const {
+      recipientEmail,
+      recipientName,
+      subject,
+      message,
+      invitationCode,
+      registrationUrl,
+      senderName,
+      companyName,
+      role,
+      expiresAt,
+    } = await request.json()
 
-    if (!email || !code) {
-      return NextResponse.json({ error: "Email and code are required" }, { status: 400 })
+    // Validate required fields
+    if (!recipientEmail || !invitationCode || !registrationUrl) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    const registrationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/register?code=${code}`
-
-    const emailHtml = `
+    // Create HTML email template
+    const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Invitation to Join OH Plus</title>
+          <title>Invitation to Join ${companyName || "Our Organization"}</title>
           <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f5f5f5; }
-            .container { max-width: 600px; margin: 0 auto; background-color: white; }
-            .header { background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 40px 30px; text-align: center; }
-            .logo { font-size: 32px; font-weight: bold; margin-bottom: 10px; }
-            .content { padding: 40px 30px; }
-            .code-box { background-color: #f8fafc; border: 2px dashed #e2e8f0; border-radius: 8px; padding: 20px; text-align: center; margin: 30px 0; }
-            .code { font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; color: #2563eb; letter-spacing: 2px; }
-            .button { display: inline-block; background-color: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0; }
-            .steps { background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; }
-            .step { margin: 10px 0; padding-left: 20px; position: relative; }
-            .step::before { content: counter(step-counter); counter-increment: step-counter; position: absolute; left: 0; top: 0; background-color: #2563eb; color: white; width: 18px; height: 18px; border-radius: 50%; font-size: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center; }
-            .steps { counter-reset: step-counter; }
-            .footer { background-color: #f8fafc; padding: 30px; text-align: center; color: #64748b; font-size: 14px; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .header {
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              padding: 30px;
+              text-align: center;
+              border-radius: 8px 8px 0 0;
+            }
+            .content {
+              background: #ffffff;
+              padding: 30px;
+              border: 1px solid #e1e5e9;
+              border-top: none;
+            }
+            .code-box {
+              background: #f8f9fa;
+              border: 2px dashed #dee2e6;
+              padding: 20px;
+              text-align: center;
+              margin: 20px 0;
+              border-radius: 8px;
+            }
+            .code {
+              font-family: 'Courier New', monospace;
+              font-size: 24px;
+              font-weight: bold;
+              color: #495057;
+              letter-spacing: 2px;
+            }
+            .button {
+              display: inline-block;
+              background: #007bff;
+              color: white;
+              padding: 12px 30px;
+              text-decoration: none;
+              border-radius: 6px;
+              font-weight: 500;
+              margin: 20px 0;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 15px;
+              margin: 20px 0;
+              padding: 20px;
+              background: #f8f9fa;
+              border-radius: 8px;
+            }
+            .info-item {
+              display: flex;
+              flex-direction: column;
+            }
+            .info-label {
+              font-weight: 600;
+              color: #6c757d;
+              font-size: 14px;
+              margin-bottom: 4px;
+            }
+            .info-value {
+              color: #495057;
+            }
+            .footer {
+              background: #f8f9fa;
+              padding: 20px 30px;
+              border: 1px solid #e1e5e9;
+              border-top: none;
+              border-radius: 0 0 8px 8px;
+              text-align: center;
+              color: #6c757d;
+              font-size: 14px;
+            }
+            .role-badge {
+              display: inline-block;
+              background: #e9ecef;
+              color: #495057;
+              padding: 4px 12px;
+              border-radius: 20px;
+              font-size: 14px;
+              font-weight: 500;
+            }
           </style>
         </head>
         <body>
-          <div class="container">
-            <div class="header">
-              <div class="logo">OH!</div>
-              <h1 style="margin: 0; font-size: 24px; font-weight: 600;">You're Invited to Join Our Organization</h1>
-            </div>
+          <div class="header">
+            <h1>🎉 You're Invited!</h1>
+            <p>Join ${companyName || "our organization"} and start collaborating</p>
+          </div>
+          
+          <div class="content">
+            <p>Hello ${recipientName || "there"},</p>
             
-            <div class="content">
-              <p>Hello!</p>
-              
-              <p><strong>${senderName}</strong> has invited you to join their organization on OH Plus.</p>
-              
-              ${customMessage ? `<div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px;"><p style="margin: 0; font-style: italic;">"${customMessage}"</p></div>` : ""}
-              
-              <div class="code-box">
-                <p style="margin: 0 0 10px 0; font-weight: 600; color: #64748b;">Your Invitation Code</p>
-                <div class="code">${code}</div>
-              </div>
-              
-              <div style="text-align: center;">
-                <a href="${registrationUrl}" class="button">Join Organization</a>
-              </div>
-              
-              <div class="steps">
-                <h3 style="margin-top: 0; color: #374151;">How to join:</h3>
-                <div class="step">Click the "Join Organization" button above</div>
-                <div class="step">Complete the registration form</div>
-                <div class="step">Your invitation code will be automatically applied</div>
-                <div class="step">Start collaborating with your team!</div>
-              </div>
-              
-              <p><strong>Alternative method:</strong> If the button doesn't work, you can manually enter the code <code style="background-color: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${code}</code> during registration at <a href="${process.env.NEXT_PUBLIC_APP_URL}/register">${process.env.NEXT_PUBLIC_APP_URL}/register</a></p>
-              
-              <p style="color: #64748b; font-size: 14px; margin-top: 30px;">This invitation code will expire and can only be used a limited number of times. Please register soon to secure your access.</p>
-            </div>
+            <p>${message}</p>
             
-            <div class="footer">
-              <p>This invitation was sent by ${senderName} from OH Plus.</p>
-              <p>If you have any questions, please contact your colleague who sent this invitation.</p>
-              <p style="margin-top: 20px;">
-                <a href="${process.env.NEXT_PUBLIC_APP_URL}" style="color: #2563eb;">Visit OH Plus</a>
+            <div class="code-box">
+              <p style="margin: 0 0 10px 0; font-weight: 600;">Your invitation code:</p>
+              <div class="code">${invitationCode}</div>
+              <p style="margin: 10px 0 0 0; font-size: 14px; color: #6c757d;">
+                Copy this code and use it during registration
               </p>
             </div>
+            
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">Assigned Role</span>
+                <span class="info-value">
+                  <span class="role-badge">${role}</span>
+                </span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Valid Until</span>
+                <span class="info-value">${expiresAt}</span>
+              </div>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${registrationUrl}" class="button">
+                Register Your Account
+              </a>
+            </div>
+            
+            <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 6px; margin: 20px 0;">
+              <p style="margin: 0; color: #856404; font-size: 14px;">
+                <strong>📋 Registration Instructions:</strong><br>
+                1. Click the button above or visit: <code>${registrationUrl}</code><br>
+                2. Fill out the registration form<br>
+                3. Your invitation code will be automatically applied<br>
+                4. Complete your profile setup
+              </p>
+            </div>
+            
+            <p>If you have any questions or need assistance, please don't hesitate to reach out.</p>
+            
+            <p>
+              Best regards,<br>
+              <strong>${senderName}</strong>
+            </p>
+          </div>
+          
+          <div class="footer">
+            <p>This invitation was sent by ${senderName} from ${companyName || "OH Plus"}.</p>
+            <p>If you didn't expect this invitation, you can safely ignore this email.</p>
           </div>
         </body>
       </html>
     `
 
+    // Create plain text version
+    const textContent = `
+You're invited to join ${companyName || "our organization"}!
+
+Hello ${recipientName || "there"},
+
+${message}
+
+Your invitation code: ${invitationCode}
+
+Role: ${role}
+Valid until: ${expiresAt}
+
+To register your account, visit: ${registrationUrl}
+
+Registration Instructions:
+1. Visit the registration link above
+2. Fill out the registration form
+3. Your invitation code will be automatically applied
+4. Complete your profile setup
+
+If you have any questions or need assistance, please don't hesitate to reach out.
+
+Best regards,
+${senderName}
+
+---
+This invitation was sent by ${senderName} from ${companyName || "OH Plus"}.
+If you didn't expect this invitation, you can safely ignore this email.
+    `
+
+    // Send email using Resend
     const { data, error } = await resend.emails.send({
-      from: "noreply@resend.dev",
-      to: [email],
-      subject: `${senderName} invited you to join their organization on OH Plus`,
-      html: emailHtml,
+      from: `${senderName} <noreply@${process.env.NEXT_PUBLIC_APP_URL?.replace("https://", "") || "ohplus.com"}>`,
+      to: [recipientEmail],
+      subject: subject,
+      html: htmlContent,
+      text: textContent,
     })
 
     if (error) {
@@ -96,9 +230,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to send email" }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, data })
+    return NextResponse.json({
+      success: true,
+      messageId: data?.id,
+    })
   } catch (error) {
-    console.error("Error sending invitation email:", error)
+    console.error("Email sending error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
