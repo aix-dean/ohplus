@@ -6,24 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Plus, MoreHorizontal, Copy, Eye, Mail, Ban, CheckCircle, XCircle, Clock } from "lucide-react"
-import { toast } from "sonner"
+import { Plus, MoreHorizontal, Eye, Mail, Ban, Calendar, Shield } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
+import { collection, query, where, onSnapshot, orderBy, doc, updateDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 import { GenerateInvitationCodeDialog } from "@/components/generate-invitation-code-dialog"
 import { InvitationCodeDetailsDialog } from "@/components/invitation-code-details-dialog"
 import { SendInvitationEmailDialog } from "@/components/send-invitation-email-dialog"
-import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, serverTimestamp } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { toast } from "sonner"
 
 interface InvitationCode {
   id: string
@@ -37,31 +27,24 @@ interface InvitationCode {
   status: "active" | "inactive" | "expired"
   created_by: string
   company_id: string
-  used_by?: string[]
   description?: string
+  used_by: string[]
 }
 
 export default function InvitationCodesPage() {
   const { userData } = useAuth()
   const [codes, setCodes] = useState<InvitationCode[]>([])
   const [loading, setLoading] = useState(true)
+  const [generateDialogOpen, setGenerateDialogOpen] = useState(false)
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false)
   const [selectedCode, setSelectedCode] = useState<InvitationCode | null>(null)
-  const [showGenerateDialog, setShowGenerateDialog] = useState(false)
-  const [showDetailsDialog, setShowDetailsDialog] = useState(false)
-  const [showEmailDialog, setShowEmailDialog] = useState(false)
-  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false)
-  const [codeToDeactivate, setCodeToDeactivate] = useState<InvitationCode | null>(null)
 
-  // Debug logging
-  useEffect(() => {
-    console.log("User data:", userData)
-    console.log("Company ID:", userData?.company_id)
-  }, [userData])
+  console.log("InvitationCodesPage - userData:", userData)
 
-  // Real-time listener for invitation codes
   useEffect(() => {
     if (!userData?.company_id) {
-      console.log("No company_id found, setting loading to false")
+      console.log("No company_id found in userData")
       setLoading(false)
       return
     }
@@ -78,187 +61,138 @@ export default function InvitationCodesPage() {
       q,
       (snapshot) => {
         console.log("Firestore snapshot received, docs count:", snapshot.docs.length)
-
         const codesData = snapshot.docs.map((doc) => {
           const data = doc.data()
           console.log("Document data:", data)
-
           return {
             id: doc.id,
-            code: data.code,
-            created_at: data.created_at,
-            expires_at: data.expires_at,
-            max_usage: data.max_usage || 0,
-            usage_count: data.usage_count || 0,
-            role: data.role || "user",
-            permissions: data.permissions || [],
-            status: data.status || "active",
-            created_by: data.created_by,
-            company_id: data.company_id,
-            used_by: data.used_by || [],
-            description: data.description,
+            ...data,
           } as InvitationCode
         })
-
-        // Update status based on expiration
-        const updatedCodes = codesData.map((code) => {
-          if (!code.expires_at) return code
-
-          const now = new Date()
-          const expiresAt = code.expires_at.toDate ? code.expires_at.toDate() : new Date(code.expires_at)
-
-          if (code.status === "active" && expiresAt < now) {
-            return { ...code, status: "expired" as const }
-          }
-          return code
-        })
-
-        console.log("Processed codes:", updatedCodes)
-        setCodes(updatedCodes)
+        setCodes(codesData)
         setLoading(false)
       },
       (error) => {
-        console.error("Firestore error:", error)
+        console.error("Error fetching invitation codes:", error)
         setLoading(false)
-        toast.error("Failed to load invitation codes")
       },
     )
 
     return () => unsubscribe()
   }, [userData?.company_id])
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
-    toast.success("Code copied to clipboard")
-  }
-
-  const handleViewDetails = (code: InvitationCode) => {
-    setSelectedCode(code)
-    setShowDetailsDialog(true)
-  }
-
-  const handleSendEmail = (code: InvitationCode) => {
-    setSelectedCode(code)
-    setShowEmailDialog(true)
-  }
-
-  const handleDeactivateClick = (code: InvitationCode) => {
-    setCodeToDeactivate(code)
-    setShowDeactivateDialog(true)
-  }
-
-  const handleDeactivateConfirm = async () => {
-    if (!codeToDeactivate) return
-
-    try {
-      await updateDoc(doc(db, "invitation_codes", codeToDeactivate.id), {
-        status: "inactive",
-        updated_at: serverTimestamp(),
-      })
-      toast.success("Code deactivated successfully")
-    } catch (error) {
-      console.error("Error deactivating code:", error)
-      toast.error("Failed to deactivate code")
-    } finally {
-      setShowDeactivateDialog(false)
-      setCodeToDeactivate(null)
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "active":
-        return <CheckCircle className="h-4 w-4 text-green-500" />
-      case "inactive":
-        return <Ban className="h-4 w-4 text-gray-500" />
-      case "expired":
-        return <XCircle className="h-4 w-4 text-red-500" />
-      default:
-        return <Clock className="h-4 w-4 text-yellow-500" />
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      active: "default",
-      inactive: "secondary",
-      expired: "destructive",
-    } as const
-
-    return (
-      <Badge variant={variants[status as keyof typeof variants] || "secondary"}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    )
-  }
-
   const formatDate = (timestamp: any) => {
-    if (!timestamp) return "N/A"
-
     try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
-      return date.toLocaleDateString()
+      if (!timestamp) return "N/A"
+
+      let date: Date
+      if (timestamp.toDate) {
+        date = timestamp.toDate()
+      } else if (timestamp instanceof Date) {
+        date = timestamp
+      } else if (typeof timestamp === "string") {
+        date = new Date(timestamp)
+      } else {
+        return "Invalid Date"
+      }
+
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
     } catch (error) {
       console.error("Error formatting date:", error)
       return "Invalid Date"
     }
   }
 
-  const isExpiringSoon = (expiresAt: any) => {
-    if (!expiresAt) return false
+  const getStatusBadge = (code: InvitationCode) => {
+    const now = new Date()
+    let expiresAt: Date
 
     try {
-      const now = new Date()
-      const expires = expiresAt.toDate ? expiresAt.toDate() : new Date(expiresAt)
-      const daysUntilExpiry = Math.ceil((expires.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-      return daysUntilExpiry <= 7 && daysUntilExpiry > 0
+      if (code.expires_at?.toDate) {
+        expiresAt = code.expires_at.toDate()
+      } else if (code.expires_at instanceof Date) {
+        expiresAt = code.expires_at
+      } else {
+        expiresAt = new Date(code.expires_at)
+      }
+
+      if (code.status === "inactive") {
+        return <Badge variant="secondary">Inactive</Badge>
+      }
+
+      if (now > expiresAt) {
+        return <Badge variant="destructive">Expired</Badge>
+      }
+
+      if (code.max_usage > 0 && code.usage_count >= code.max_usage) {
+        return <Badge variant="secondary">Used Up</Badge>
+      }
+
+      return <Badge variant="default">Active</Badge>
     } catch (error) {
-      return false
+      return <Badge variant="secondary">Unknown</Badge>
     }
+  }
+
+  const handleDeactivate = async (codeId: string) => {
+    try {
+      await updateDoc(doc(db, "invitation_codes", codeId), {
+        status: "inactive",
+      })
+      toast.success("Invitation code deactivated")
+    } catch (error) {
+      console.error("Error deactivating code:", error)
+      toast.error("Failed to deactivate code")
+    }
+  }
+
+  const handleViewDetails = (code: InvitationCode) => {
+    setSelectedCode(code)
+    setDetailsDialogOpen(true)
+  }
+
+  const handleSendEmail = (code: InvitationCode) => {
+    setSelectedCode(code)
+    setEmailDialogOpen(true)
   }
 
   if (loading) {
     return (
-      <div className="container mx-auto py-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading invitation codes...</p>
+          </div>
         </div>
       </div>
     )
   }
 
-  // Show message if no company_id
   if (!userData?.company_id) {
     return (
-      <div className="container mx-auto py-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="text-center py-8">
-              <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-4">
-                <XCircle className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-medium mb-2">Access Restricted</h3>
-              <p className="text-muted-foreground">
-                You need to be associated with a company to manage invitation codes.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="container mx-auto p-6">
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold mb-4">No Company Associated</h2>
+          <p className="text-muted-foreground">You need to be associated with a company to manage invitation codes.</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Invitation Codes</h1>
-          <p className="text-muted-foreground">Generate and manage invitation codes for user registration</p>
+          <h1 className="text-3xl font-bold">Invitation Codes</h1>
+          <p className="text-muted-foreground">Manage invitation codes for user registration</p>
         </div>
-        <Button onClick={() => setShowGenerateDialog(true)}>
+        <Button onClick={() => setGenerateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Generate Code
         </Button>
@@ -267,25 +201,21 @@ export default function InvitationCodesPage() {
       {/* Codes Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Invitation Codes</CardTitle>
-          <CardDescription>Manage all invitation codes and their usage</CardDescription>
+          <CardTitle>All Invitation Codes</CardTitle>
+          <CardDescription>View and manage all generated invitation codes</CardDescription>
         </CardHeader>
         <CardContent>
           {codes.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <div>
-                <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-4">
-                  <Plus className="h-6 w-6 text-muted-foreground" />
-                </div>
-                <h3 className="text-lg font-medium mb-2">No invitation codes found</h3>
-                <p className="text-muted-foreground mb-4">
-                  Create your first invitation code to start inviting users to your organization.
-                </p>
-                <Button onClick={() => setShowGenerateDialog(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Generate Your First Code
-                </Button>
+            <div className="text-center py-12">
+              <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-4">
+                <Plus className="h-12 w-12 text-muted-foreground" />
               </div>
+              <h3 className="text-lg font-semibold mb-2">No invitation codes yet</h3>
+              <p className="text-muted-foreground mb-4">Generate your first invitation code to get started</p>
+              <Button onClick={() => setGenerateDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Generate Code
+              </Button>
             </div>
           ) : (
             <Table>
@@ -293,59 +223,44 @@ export default function InvitationCodesPage() {
                 <TableRow>
                   <TableHead>Code</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Usage</TableHead>
-                  <TableHead>Expires</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>Usage</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Expires</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {codes.map((code) => (
                   <TableRow key={code.id}>
                     <TableCell>
+                      <div className="font-mono text-sm bg-muted px-2 py-1 rounded">{code.code}</div>
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center space-x-2">
-                        <code className="bg-muted px-2 py-1 rounded text-sm font-mono">{code.code}</code>
-                        <Button variant="ghost" size="sm" onClick={() => copyToClipboard(code.code)}>
-                          <Copy className="h-3 w-3" />
-                        </Button>
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                        <span className="capitalize">{code.role}</span>
                       </div>
                     </TableCell>
+                    <TableCell>{getStatusBadge(code)}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{code.role}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <span>{code.usage_count}</span>
-                        {code.max_usage > 0 && (
-                          <>
-                            <span>/</span>
-                            <span>{code.max_usage}</span>
-                          </>
-                        )}
-                        {code.max_usage === 0 && (
-                          <Badge variant="secondary" className="text-xs">
-                            Unlimited
-                          </Badge>
-                        )}
+                      <div className="text-sm">
+                        {code.usage_count} / {code.max_usage === 0 ? "∞" : code.max_usage}
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
-                        <span>{formatDate(code.expires_at)}</span>
-                        {isExpiringSoon(code.expires_at) && code.status === "active" && (
-                          <Badge variant="destructive" className="text-xs">
-                            Expiring Soon
-                          </Badge>
-                        )}
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">{formatDate(code.created_at)}</span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
-                        {getStatusIcon(code.status)}
-                        {getStatusBadge(code.status)}
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">{formatDate(code.expires_at)}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm">
@@ -362,7 +277,7 @@ export default function InvitationCodesPage() {
                             Send Email
                           </DropdownMenuItem>
                           {code.status === "active" && (
-                            <DropdownMenuItem onClick={() => handleDeactivateClick(code)} className="text-red-600">
+                            <DropdownMenuItem onClick={() => handleDeactivate(code.id)}>
                               <Ban className="h-4 w-4 mr-2" />
                               Deactivate
                             </DropdownMenuItem>
@@ -379,36 +294,18 @@ export default function InvitationCodesPage() {
       </Card>
 
       {/* Dialogs */}
-      <GenerateInvitationCodeDialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog} />
+      <GenerateInvitationCodeDialog open={generateDialogOpen} onOpenChange={setGenerateDialogOpen} />
 
       {selectedCode && (
         <>
           <InvitationCodeDetailsDialog
-            open={showDetailsDialog}
-            onOpenChange={setShowDetailsDialog}
+            open={detailsDialogOpen}
+            onOpenChange={setDetailsDialogOpen}
             code={selectedCode}
           />
-
-          <SendInvitationEmailDialog open={showEmailDialog} onOpenChange={setShowEmailDialog} code={selectedCode} />
+          <SendInvitationEmailDialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen} code={selectedCode} />
         </>
       )}
-
-      {/* Deactivate Confirmation Dialog */}
-      <AlertDialog open={showDeactivateDialog} onOpenChange={setShowDeactivateDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Deactivate Invitation Code</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to deactivate the code "{codeToDeactivate?.code}"? This action cannot be undone and
-              the code will no longer be usable for registration.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeactivateConfirm}>Deactivate</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

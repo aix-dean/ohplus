@@ -52,7 +52,6 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
   const { userData } = useAuth()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    count: 1,
     validityDays: 30,
     maxUsage: 0, // 0 means unlimited
     role: "",
@@ -85,56 +84,47 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
 
       if (!finalRole) {
         toast.error("Please select or enter a role")
-        return
-      }
-
-      if (formData.count < 1 || formData.count > 100) {
-        toast.error("Number of codes must be between 1 and 100")
+        setLoading(false)
         return
       }
 
       if (formData.validityDays < 1 || formData.validityDays > 365) {
         toast.error("Validity period must be between 1 and 365 days")
+        setLoading(false)
         return
       }
 
       if (formData.maxUsage < 0 || formData.maxUsage > 1000) {
         toast.error("Usage limit must be between 0 and 1000 (0 = unlimited)")
+        setLoading(false)
         return
       }
 
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + formData.validityDays)
 
-      const codes = []
-      for (let i = 0; i < formData.count; i++) {
-        const codeData = {
-          code: generateRandomCode(),
-          created_at: serverTimestamp(),
-          expires_at: expiresAt,
-          max_usage: formData.maxUsage,
-          usage_count: 0,
-          role: finalRole,
-          permissions: formData.permissions,
-          status: "active",
-          created_by: userData.uid,
-          company_id: userData.company_id,
-          description: formData.description || null,
-          used_by: [],
-        }
-        codes.push(codeData)
+      const codeData = {
+        code: generateRandomCode(),
+        created_at: serverTimestamp(),
+        expires_at: expiresAt,
+        max_usage: formData.maxUsage,
+        usage_count: 0,
+        role: finalRole,
+        permissions: formData.permissions,
+        status: "active",
+        created_by: userData.uid,
+        company_id: userData.company_id,
+        description: formData.description || null,
+        used_by: [],
       }
 
-      // Add all codes to Firestore
-      const promises = codes.map((codeData) => addDoc(collection(db, "invitation_codes"), codeData))
+      // Add code to Firestore
+      await addDoc(collection(db, "invitation_codes"), codeData)
 
-      await Promise.all(promises)
-
-      toast.success(`Successfully generated ${formData.count} invitation code${formData.count > 1 ? "s" : ""}`)
+      toast.success("Successfully generated invitation code")
 
       // Reset form
       setFormData({
-        count: 1,
         validityDays: 30,
         maxUsage: 0,
         role: "",
@@ -145,8 +135,8 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
 
       onOpenChange(false)
     } catch (error) {
-      console.error("Error generating codes:", error)
-      toast.error("Failed to generate invitation codes")
+      console.error("Error generating code:", error)
+      toast.error("Failed to generate invitation code")
     } finally {
       setLoading(false)
     }
@@ -165,9 +155,9 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Generate Invitation Codes</DialogTitle>
+          <DialogTitle>Generate Invitation Code</DialogTitle>
           <DialogDescription>
-            Create invitation codes for user registration with specific roles and permissions
+            Create an invitation code for user registration with specific role and permissions
           </DialogDescription>
         </DialogHeader>
 
@@ -179,19 +169,6 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="count">Number of Codes</Label>
-                  <Input
-                    id="count"
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={formData.count}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, count: Number.parseInt(e.target.value) || 1 }))}
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">Generate 1-100 codes at once</p>
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="validity">Validity (Days)</Label>
                   <Input
@@ -205,24 +182,25 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
                     }
                     required
                   />
-                  <p className="text-xs text-muted-foreground">How long codes remain valid</p>
+                  <p className="text-xs text-muted-foreground">How long the code remains valid</p>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="maxUsage">Usage Limit</Label>
-                <Input
-                  id="maxUsage"
-                  type="number"
-                  min="0"
-                  max="1000"
-                  value={formData.maxUsage}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, maxUsage: Number.parseInt(e.target.value) || 0 }))}
-                  placeholder="0 for unlimited"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Maximum number of times each code can be used (0 = unlimited)
-                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="maxUsage">Usage Limit</Label>
+                  <Input
+                    id="maxUsage"
+                    type="number"
+                    min="0"
+                    max="1000"
+                    value={formData.maxUsage}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, maxUsage: Number.parseInt(e.target.value) || 0 }))
+                    }
+                    placeholder="0 for unlimited"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Maximum number of times the code can be used (0 = unlimited)
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -231,7 +209,7 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Role Assignment</CardTitle>
-              <CardDescription>Select the role for users who register with these codes</CardDescription>
+              <CardDescription>Select the role for users who register with this code</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -326,7 +304,7 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
                   id="description"
                   value={formData.description}
                   onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                  placeholder="Add a description for these codes..."
+                  placeholder="Add a description for this code..."
                   rows={3}
                 />
               </div>
@@ -341,12 +319,6 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
             <CardContent className="space-y-3">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="font-medium">Codes to generate:</span>
-                  <Badge variant="secondary" className="ml-2">
-                    {formData.count}
-                  </Badge>
-                </div>
-                <div>
                   <span className="font-medium">Valid for:</span>
                   <Badge variant="secondary" className="ml-2">
                     {formData.validityDays} days
@@ -358,10 +330,10 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
                     {formData.maxUsage === 0 ? "Unlimited" : formData.maxUsage}
                   </Badge>
                 </div>
-                <div>
+                <div className="col-span-2">
                   <span className="font-medium">Role:</span>
                   <Badge variant="outline" className="ml-2">
-                    {formData.role === "custom" ? formData.customRole : formData.role}
+                    {formData.role === "custom" ? formData.customRole || "Custom" : formData.role || "Not selected"}
                   </Badge>
                 </div>
               </div>
@@ -391,7 +363,7 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
           </Button>
           <Button type="submit" onClick={handleSubmit} disabled={loading}>
             {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Generate {formData.count} Code{formData.count > 1 ? "s" : ""}
+            Generate Code
           </Button>
         </DialogFooter>
       </DialogContent>
