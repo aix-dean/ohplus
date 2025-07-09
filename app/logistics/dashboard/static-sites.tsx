@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useCallback } from "react"
 import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import Image from "next/image"
@@ -339,7 +341,7 @@ export default function StaticSitesTab() {
         <div className="bg-red-50 border border-red-200 rounded-md p-4 text-center">
           <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
           <p className="text-red-700">{error}</p>
-          <Button variant="outline" className="mt-4" onClick={() => fetchProducts(1, true)}>
+          <Button variant="outline" className="mt-4 bg-transparent" onClick={() => fetchProducts(1, true)}>
             Try Again
           </Button>
         </div>
@@ -420,7 +422,7 @@ export default function StaticSitesTab() {
               size="sm"
               onClick={goToPreviousPage}
               disabled={currentPage === 1}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 bg-transparent"
             >
               <ChevronLeft size={16} />
             </Button>
@@ -466,6 +468,13 @@ export default function StaticSitesTab() {
 function SiteCard({ site }: { site: any }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
+
+  // Add the handleCreateReport function
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    console.log("Creating report for site:", site.id)
+  }
 
   // Fetch service assignments for this specific product
   useEffect(() => {
@@ -527,6 +536,15 @@ function SiteCard({ site }: { site: any }) {
               {site.status}
             </Badge>
           </div>
+
+          {/* Add Create Report Button */}
+          <Button
+            variant="outline"
+            className="mt-4 w-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200 font-medium"
+            onClick={handleCreateReport}
+          >
+            Create Report
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -537,6 +555,13 @@ function SiteCard({ site }: { site: any }) {
 function IlluminationCard({ site }: { site: any }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
+
+  // Add the handleCreateReport function
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    console.log("Creating report for site:", site.id)
+  }
 
   // Fetch service assignments for this specific product
   useEffect(() => {
@@ -588,6 +613,15 @@ function IlluminationCard({ site }: { site: any }) {
               <div className="w-4 h-4 bg-white rounded-full"></div>
             </div>
           </div>
+
+          {/* Add Create Report Button */}
+          <Button
+            variant="outline"
+            className="mt-4 w-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200 font-medium"
+            onClick={handleCreateReport}
+          >
+            Create Report
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -597,6 +631,13 @@ function IlluminationCard({ site }: { site: any }) {
 function StructureCard({ site }: { site: any }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
+
+  // Add the handleCreateReport function
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    console.log("Creating report for site:", site.id)
+  }
 
   // Fetch service assignments for this specific product
   useEffect(() => {
@@ -656,6 +697,15 @@ function StructureCard({ site }: { site: any }) {
               Good
             </div>
           </div>
+
+          {/* Add Create Report Button */}
+          <Button
+            variant="outline"
+            className="mt-4 w-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200 font-medium"
+            onClick={handleCreateReport}
+          >
+            Create Report
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -665,6 +715,13 @@ function StructureCard({ site }: { site: any }) {
 function ComplianceCard({ site }: { site: any }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
+
+  // Add the handleCreateReport function
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    console.log("Creating report for site:", site.id)
+  }
 
   // Fetch service assignments for this specific product
   useEffect(() => {
@@ -713,6 +770,15 @@ function ComplianceCard({ site }: { site: any }) {
             <span className="text-green-600 font-bold text-xl mr-1">5/5</span>
             <span className="text-gray-600">Documents</span>
           </div>
+
+          {/* Add Create Report Button */}
+          <Button
+            variant="outline"
+            className="mt-4 w-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200 font-medium"
+            onClick={handleCreateReport}
+          >
+            Create Report
+          </Button>
         </div>
       </CardContent>
     </Card>
