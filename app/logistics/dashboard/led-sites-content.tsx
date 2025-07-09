@@ -1,10 +1,12 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
-import { LayoutGrid, List, AlertCircle, Plus, Search } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { LayoutGrid, List, Play, AlertCircle, Plus, Search } from "lucide-react"
+import Image from "next/image"
+import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import type { Product } from "@/lib/firebase-service"
 import { getServiceAssignmentsByProductId, type ServiceAssignment } from "@/lib/firebase-service"
@@ -12,6 +14,113 @@ import { CreateReportDialog } from "@/components/create-report-dialog"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
+
+const LEDSiteCard = ({ product, onCreateReport }: { product: Product; onCreateReport: (siteId: string) => void }) => {
+  // Get the first media item for the thumbnail
+  const thumbnailUrl = product.media && product.media.length > 0 ? product.media[0].url : "/led-billboard-1.png"
+
+  // Determine location based on product type
+  const location = product.specs_rental?.location || product.light?.location || "Unknown location"
+
+  // State for service assignments
+  const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
+  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
+
+  // Add the handleCreateReport function
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onCreateReport(product.id)
+  }
+
+  const handleCardClick = () => {
+    window.location.href = `/logistics/sites/${product.id}?view=content`
+  }
+
+  // Fetch service assignments for this specific product
+  useEffect(() => {
+    const fetchProductAssignments = async () => {
+      try {
+        setIsLoadingAssignments(true)
+        const assignments = await getServiceAssignmentsByProductId(product.id)
+        setActiveAssignments(assignments)
+      } catch (error) {
+        console.error(`Error fetching assignments for product ${product.id}:`, error)
+      } finally {
+        setIsLoadingAssignments(false)
+      }
+    }
+
+    fetchProductAssignments()
+  }, [product.id])
+
+  return (
+    <Card
+      className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white"
+      onClick={handleCardClick}
+    >
+      <div className="relative h-48 bg-gray-200">
+        <Image
+          src={thumbnailUrl || "/placeholder.svg"}
+          alt={product.name || "LED Site"}
+          fill
+          className="object-cover"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            target.src = "/led-billboard-1.png"
+            target.className = "opacity-50 object-contain"
+          }}
+        />
+
+        {/* Notification badge */}
+        {activeAssignments.length > 0 && (
+          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
+            {activeAssignments.length}
+          </div>
+        )}
+
+        {/* Play/Pause button overlay */}
+        <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+          <Button size="icon" variant="secondary" className="rounded-full">
+            <Play size={20} />
+          </Button>
+        </div>
+      </div>
+
+      <CardContent className="p-4">
+        <div className="flex flex-col gap-2">
+          <h3 className="font-semibold text-lg">{product.name || "Unnamed Site"}</h3>
+          <div className="text-xs text-gray-500">ID: {product.id}</div>
+          <div className="text-sm text-gray-500">{location}</div>
+
+          {/* Content status */}
+          <div className="flex items-center gap-2 mt-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <span className="text-sm text-green-600">Content Playing</span>
+          </div>
+
+          {/* Progress bar */}
+          <div className="mt-3">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm">Campaign Progress</span>
+              <span className="text-sm">75%</span>
+            </div>
+            <Progress value={75} className="h-2" />
+          </div>
+
+          {/* Add Create Report Button */}
+          <Button
+            variant="outline"
+            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+            onClick={handleCreateReport}
+          >
+            Create Report
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function LEDSitesContentTab({ products = [] }: { products?: Product[] }) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -142,42 +251,3 @@ export default function LEDSitesContentTab({ products = [] }: { products?: Produ
     </div>
   )
 }
-
-// Replace the existing LEDSiteCard component with this updated version
-function LEDSiteCard({ product, onCreateReport }: { product: Product; onCreateReport: (siteId: string) => void }) {
-  // Get the first media item for the thumbnail
-  const thumbnailUrl = product.media && product.media.length > 0 ? product.media[0].url : "/led-billboard-1.png"
-
-  // Determine location based on product type
-  const location = product.specs_rental?.location || product.light?.location || "Unknown location"
-
-  // State for service assignments
-  const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
-  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
-
-  // Add the handleCreateReport function
-  const handleCreateReport = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    onCreateReport(product.id)
-  }
-
-  const handleCardClick = () => {
-    window.location.href = `/logistics/sites/${product.id}?view=content`
-  }
-
-  // Fetch service assignments for this specific product
-  useEffect(() => {
-    const fetchProductAssignments = async () => {
-      try {
-        setIsLoadingAssignments(true)
-        const assignments = await getServiceAssignmentsByProductId(product.id)
-        setActiveAssignments(assignments)
-      } catch (error) {
-        console.error(`Error fetching assignments for product ${product.id}:`, error)
-      } finally {
-        setIsLoadingAssignments(false)
-      }
-    }
-
-    fetch
