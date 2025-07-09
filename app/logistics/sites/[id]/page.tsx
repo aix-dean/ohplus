@@ -29,6 +29,7 @@ import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-
 import Link from "next/link"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { AlarmSettingDialog } from "@/components/alarm-setting-dialog"
+import { IndexCardDialog } from "@/components/index-card-dialog"
 
 type Props = {
   params: { id: string }
@@ -63,6 +64,7 @@ export default function SiteDetailsPage({ params }: Props) {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
   const [alarmDialogOpen, setAlarmDialogOpen] = useState(false)
+  const [indexCardDialogOpen, setIndexCardDialogOpen] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const view = searchParams.get("view")
@@ -399,7 +401,12 @@ export default function SiteDetailsPage({ params }: Props) {
                   {/* Status indicators */}
                 </div>
 
-                <Button variant="outline" size="sm" className="mt-4 w-full bg-transparent">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4 w-full bg-transparent"
+                  onClick={() => setIndexCardDialogOpen(true)}
+                >
                   View Index Card
                 </Button>
               </CardContent>
@@ -637,6 +644,14 @@ export default function SiteDetailsPage({ params }: Props) {
         }}
       />
       <AlarmSettingDialog open={alarmDialogOpen} onOpenChange={setAlarmDialogOpen} />
+      <IndexCardDialog
+        open={indexCardDialogOpen}
+        onOpenChange={setIndexCardDialogOpen}
+        onCreateJO={() => {
+          // Navigate to create service assignment with this site pre-selected
+          router.push(`/logistics/assignments/create?projectSite=${params.id}`)
+        }}
+      />
     </div>
   )
 }
