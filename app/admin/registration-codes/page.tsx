@@ -6,11 +6,12 @@ import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Plus } from "lucide-react"
+import { Copy, Plus, Mail } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { collection, query, where, getDocs, doc, setDoc, updateDoc, serverTimestamp, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { ResponsiveTable } from "@/components/responsive-table"
+import { SendInvitationEmailDialog } from "@/components/send-invitation-email-dialog"
 
 interface RegistrationCode {
   id: string
@@ -32,6 +33,8 @@ export default function RegistrationCodesPage() {
   const [loading, setLoading] = useState(true)
   const [codes, setCodes] = useState<RegistrationCode[]>([])
   const [generatingCode, setGeneratingCode] = useState(false)
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false)
+  const [selectedCode, setSelectedCode] = useState<string>("")
 
   useEffect(() => {
     if (!user && !loading) {
@@ -141,6 +144,11 @@ export default function RegistrationCodesPage() {
     })
   }
 
+  const handleSendEmail = (code: string) => {
+    setSelectedCode(code)
+    setEmailDialogOpen(true)
+  }
+
   const handleDeactivateCode = async (codeId: string) => {
     try {
       await updateDoc(doc(db, "organization_codes", codeId), {
@@ -220,15 +228,27 @@ export default function RegistrationCodesPage() {
       header: "Actions",
       accessorKey: "id" as keyof RegistrationCode,
       cell: (row: RegistrationCode) => (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => handleDeactivateCode(row.code)}
-          disabled={!row.active}
-          className="text-blue-600 border-blue-600 hover:bg-blue-50"
-        >
-          Deactivate
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleSendEmail(row.code)}
+            disabled={!row.active}
+            className="text-blue-600 border-blue-600 hover:bg-blue-50"
+          >
+            <Mail className="h-3 w-3 mr-1" />
+            Email
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleDeactivateCode(row.code)}
+            disabled={!row.active}
+            className="text-red-600 border-red-600 hover:bg-red-50"
+          >
+            Deactivate
+          </Button>
+        </div>
       ),
     },
   ]
@@ -285,6 +305,12 @@ export default function RegistrationCodesPage() {
           />
         </CardContent>
       </Card>
+
+      <SendInvitationEmailDialog
+        open={emailDialogOpen}
+        onOpenChange={setEmailDialogOpen}
+        organizationCode={selectedCode}
+      />
     </div>
   )
 }
