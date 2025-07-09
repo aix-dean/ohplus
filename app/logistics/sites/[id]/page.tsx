@@ -28,6 +28,7 @@ import { db } from "@/lib/firebase"
 import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
 import Link from "next/link"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { AlarmSettingDialog } from "@/components/alarm-setting-dialog"
 
 type Props = {
   params: { id: string }
@@ -61,6 +62,7 @@ export default function SiteDetailsPage({ params }: Props) {
   const [error, setError] = useState<Error | null>(null)
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
+  const [alarmDialogOpen, setAlarmDialogOpen] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const view = searchParams.get("view")
@@ -346,7 +348,13 @@ export default function SiteDetailsPage({ params }: Props) {
                       <Edit className="mr-2 h-4 w-4" />
                       Edit
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => console.log("Alarm Settings clicked")}>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setAlarmDialogOpen(true)
+                      }}
+                    >
                       <Bell className="mr-2 h-4 w-4" />
                       Alarm Settings
                     </DropdownMenuItem>
@@ -628,6 +636,7 @@ export default function SiteDetailsPage({ params }: Props) {
           fetchAssignments()
         }}
       />
+      <AlarmSettingDialog open={alarmDialogOpen} onOpenChange={setAlarmDialogOpen} />
     </div>
   )
 }
