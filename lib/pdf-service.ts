@@ -801,15 +801,19 @@ export async function generateReportPDF(
       })
     }
 
-    // Add header images
+    // Add header with proper scaling
     try {
       const headerBase64 = await loadImageAsBase64("/logistics-header.png")
       if (headerBase64) {
-        pdf.addImage(headerBase64, "PNG", 0, 0, pageWidth, 40)
-        yPosition = 45
+        // Scale header to fit properly - use smaller height
+        const headerHeight = 25 // Reduced from 40
+        pdf.addImage(headerBase64, "PNG", 0, 0, pageWidth, headerHeight)
+        yPosition = headerHeight + 5
       }
     } catch (error) {
       console.error("Error adding header image:", error)
+      // Continue without header if it fails
+      yPosition = margin
     }
 
     // Report Title Section
@@ -821,11 +825,14 @@ export async function generateReportPDF(
     pdf.setTextColor(255, 255, 255)
     pdf.text(getReportTypeDisplay(report.reportType), margin + 2, yPosition + 5)
 
-    // Add GTS logo
+    // Add GTS logo with proper scaling
     try {
       const logoBase64 = await loadImageAsBase64("/gts-logo.png")
       if (logoBase64) {
-        pdf.addImage(logoBase64, "PNG", pageWidth - margin - 30, yPosition - 5, 30, 15)
+        // Smaller logo size
+        const logoWidth = 25 // Reduced from 30
+        const logoHeight = 12 // Reduced from 15
+        pdf.addImage(logoBase64, "PNG", pageWidth - margin - logoWidth, yPosition - 2, logoWidth, logoHeight)
       }
     } catch (error) {
       console.error("Error adding logo:", error)
@@ -1034,7 +1041,7 @@ export async function generateReportPDF(
     }
 
     // Footer Section
-    checkNewPage(20)
+    checkNewPage(30) // More space for footer content
     pdf.setLineWidth(0.3)
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 8
@@ -1051,22 +1058,31 @@ export async function generateReportPDF(
     pdf.text("LOGISTICS", margin, yPosition)
     yPosition += 3
     pdf.text(formatDate(createdAt.toISOString().split("T")[0]), margin, yPosition)
+    yPosition += 8
 
     // Add disclaimer
     pdf.setFontSize(8)
     pdf.setFont("helvetica", "italic")
     pdf.setTextColor(100, 100, 100)
     const disclaimer = `"All data are based on the latest available records as of ${formatDate(new Date().toISOString().split("T")[0])}."`
-    pdf.text(disclaimer, pageWidth - margin - 80, yPosition)
+    pdf.text(disclaimer, margin, yPosition)
+    yPosition += 10
 
-    // Add footer image
-    try {
-      const footerBase64 = await loadImageAsBase64("/logistics-footer.png")
-      if (footerBase64) {
-        pdf.addImage(footerBase64, "PNG", 0, pageHeight - 20, pageWidth, 20)
+    // Add footer image with proper scaling - only if there's enough space
+    const remainingSpace = pageHeight - yPosition
+    if (remainingSpace >= 15) {
+      try {
+        const footerBase64 = await loadImageAsBase64("/logistics-footer.png")
+        if (footerBase64) {
+          // Scale footer to fit properly - use smaller height
+          const footerHeight = 12 // Reduced from 20
+          const footerY = pageHeight - footerHeight
+          pdf.addImage(footerBase64, "PNG", 0, footerY, pageWidth, footerHeight)
+        }
+      } catch (error) {
+        console.error("Error adding footer image:", error)
+        // Continue without footer if it fails
       }
-    } catch (error) {
-      console.error("Error adding footer image:", error)
     }
 
     if (returnBase64) {
