@@ -129,43 +129,69 @@ Best regards,
     fileInputRef.current?.click()
   }
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          // Remove the data URL prefix to get just the base64 string
+          const base64 = reader.result.split(",")[1]
+          resolve(base64)
+        } else {
+          reject(new Error("Failed to convert file to base64"))
+        }
+      }
+      reader.onerror = () => reject(new Error("Failed to read file"))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
     if (!files || files.length === 0) return
 
     const newAttachments: EmailAttachment[] = []
 
-    Array.from(files).forEach((file) => {
-      // Check file size (limit to 10MB)
-      if (file.size > 10 * 1024 * 1024) {
+    try {
+      for (const file of Array.from(files)) {
+        // Check file size (limit to 10MB)
+        if (file.size > 10 * 1024 * 1024) {
+          toast({
+            title: "File Too Large",
+            description: `${file.name} is larger than 10MB and cannot be attached.`,
+            variant: "destructive",
+          })
+          continue
+        }
+
+        // Convert file to base64
+        const base64Content = await convertFileToBase64(file)
+
+        const attachment: EmailAttachment = {
+          fileName: file.name,
+          fileUrl: `data:${file.type};base64,${base64Content}`, // Store as data URL for email sending
+          fileSize: file.size,
+          fileType: file.type || "application/octet-stream",
+        }
+
+        newAttachments.push(attachment)
+      }
+
+      if (newAttachments.length > 0) {
+        setAttachments((prev) => [...prev, ...newAttachments])
         toast({
-          title: "File Too Large",
-          description: `${file.name} is larger than 10MB and cannot be attached.`,
-          variant: "destructive",
+          title: "Files Attached",
+          description: `${newAttachments.length} file(s) have been attached to your email.`,
         })
-        return
+        setDebugInfo((prev) => prev + ` | Files attached: ${newAttachments.length}`)
       }
-
-      // Create file URL for preview/download
-      const fileUrl = URL.createObjectURL(file)
-
-      const attachment: EmailAttachment = {
-        fileName: file.name,
-        fileUrl,
-        fileSize: file.size,
-        fileType: file.type || "application/octet-stream",
-      }
-
-      newAttachments.push(attachment)
-    })
-
-    if (newAttachments.length > 0) {
-      setAttachments((prev) => [...prev, ...newAttachments])
+    } catch (error) {
+      console.error("Error processing files:", error)
       toast({
-        title: "Files Attached",
-        description: `${newAttachments.length} file(s) have been attached to your email.`,
+        title: "Error",
+        description: "Failed to process some files. Please try again.",
+        variant: "destructive",
       })
-      setDebugInfo((prev) => prev + ` | Files attached: ${newAttachments.length}`)
     }
 
     // Reset file input
@@ -302,11 +328,6 @@ Best regards,
   }
 
   const removeAttachment = (index: number) => {
-    // Revoke the object URL to free up memory
-    const attachment = attachments[index]
-    if (attachment.fileUrl.startsWith("blob:")) {
-      URL.revokeObjectURL(attachment.fileUrl)
-    }
     setAttachments((prev) => prev.filter((_, i) => i !== index))
   }
 
