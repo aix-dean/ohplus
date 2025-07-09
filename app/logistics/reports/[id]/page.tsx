@@ -84,26 +84,24 @@ export default function ReportPreviewPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Back Button and Content Title */}
-      <div className="relative">
-        <div className="absolute top-4 left-4 z-10 flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleBack}
-            className="bg-white/90 hover:bg-white text-black rounded-full p-2 shadow-sm"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <Badge className="bg-cyan-400 text-white px-3 py-1 rounded-full font-medium">
-            {product?.content_type || "Content"}
-          </Badge>
-        </div>
+      {/* Back Button and Content Title Section */}
+      <div className="bg-white px-4 py-3 flex items-center gap-3 shadow-sm">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleBack}
+          className="text-black rounded-full p-2 hover:bg-gray-100"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <Badge className="bg-cyan-400 text-white px-3 py-1 rounded-full font-medium">
+          {product?.content_type || "Content"}
+        </Badge>
+      </div>
 
-        {/* Header */}
-        <div className="w-full">
-          <img src="/logistics-header.png" alt="Logistics Header" className="w-full h-auto object-cover" />
-        </div>
+      {/* Header */}
+      <div className="w-full">
+        <img src="/logistics-header.png" alt="Logistics Header" className="w-full h-auto object-cover" />
       </div>
 
       <div className="max-w-6xl mx-auto p-6 space-y-6">
