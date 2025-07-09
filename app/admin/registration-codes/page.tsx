@@ -279,11 +279,7 @@ export default function RegistrationCodesPage() {
             isLoading={loading}
             emptyState={
               <div className="text-center py-8">
-                <p className="text-gray-500 mb-4">No registration codes found.</p>
-                <Button onClick={handleGenerateCode} className="flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  Generate Your First Code
-                </Button>
+                <p className="text-gray-500">No registration codes found.</p>
               </div>
             }
           />
