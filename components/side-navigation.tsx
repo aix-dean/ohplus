@@ -34,4 +34,4 @@ const SideNavigation = () => {
   )
 }
 
-export default SideNavigation
+export { SideNavigation }

@@ -1,386 +1,436 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
-import { useAuth } from "@/contexts/auth-context"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FirebaseError } from "firebase/app"
-import { validateAndUseInvitationCode } from "@/lib/invitation-service"
-import { Building2, UserPlus } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Separator } from "@/components/ui/separator"
+import { Building2, Users, Eye, EyeOff, AlertCircle, CheckCircle } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
+import { validateInvitationCode } from "@/lib/invitation-service"
+import { toast } from "@/components/ui/use-toast"
 
 export default function RegisterPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [middleName, setMiddleName] = useState("")
-  const [phoneNumber, setPhoneNumber] = useState("")
-  const [companyName, setCompanyName] = useState("")
-  const [companyLocation, setCompanyLocation] = useState("")
-  const [invitationCode, setInvitationCode] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [registrationType, setRegistrationType] = useState<"new" | "join">("new")
-
-  const { register, joinOrganization } = useAuth()
   const router = useRouter()
+  const { register, joinOrganization } = useAuth()
+  const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [error, setError] = useState("")
+  const [validatingCode, setValidatingCode] = useState(false)
+  const [codeValidation, setCodeValidation] = useState<{
+    valid: boolean
+    error?: string
+    companyId?: string
+  } | null>(null)
 
-  const getFriendlyErrorMessage = (error: unknown): string => {
-    console.error("Raw error during registration:", error)
-    if (error instanceof FirebaseError) {
-      switch (error.code) {
-        case "auth/email-already-in-use":
-          return "This email address is already in use. Please use a different email or log in."
-        case "auth/invalid-email":
-          return "The email address is not valid. Please check the format."
-        case "auth/weak-password":
-          return "The password is too weak. Please choose a stronger password (at least 6 characters)."
-        case "auth/operation-not-allowed":
-          return "Email/password accounts are not enabled. Please contact support."
-        case "auth/network-request-failed":
-          return "Network error. Please check your internet connection and try again."
-        default:
-          return "An unexpected error occurred during registration. Please try again."
-      }
+  // Form state for new organization
+  const [newOrgForm, setNewOrgForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    companyName: "",
+    licenseKey: "",
+  })
+
+  // Form state for joining organization
+  const [joinOrgForm, setJoinOrgForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    invitationCode: "",
+  })
+
+  const validateInviteCode = async (code: string) => {
+    if (!code.trim()) {
+      setCodeValidation(null)
+      return
     }
-    return "An unknown error occurred. Please try again."
+
+    setValidatingCode(true)
+    try {
+      const result = await validateInvitationCode(code)
+      setCodeValidation(result)
+    } catch (error) {
+      setCodeValidation({ valid: false, error: "Failed to validate code" })
+    } finally {
+      setValidatingCode(false)
+    }
   }
 
-  const handleRegister = async () => {
-    setErrorMessage(null)
+  const handleNewOrgSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
 
-    if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
-      setErrorMessage("Please fill in all required fields.")
+    // Validation
+    if (newOrgForm.password !== newOrgForm.confirmPassword) {
+      setError("Passwords do not match")
       return
     }
 
-    if (password !== confirmPassword) {
-      setErrorMessage("Passwords do not match.")
+    if (newOrgForm.password.length < 6) {
+      setError("Password must be at least 6 characters")
       return
     }
 
-    if (registrationType === "new" && (!companyName || !companyLocation)) {
-      setErrorMessage("Please fill in company information.")
-      return
-    }
-
-    if (registrationType === "join" && !invitationCode) {
-      setErrorMessage("Please enter an invitation code.")
+    if (
+      !newOrgForm.firstName ||
+      !newOrgForm.lastName ||
+      !newOrgForm.email ||
+      !newOrgForm.companyName ||
+      !newOrgForm.licenseKey
+    ) {
+      setError("Please fill in all required fields")
       return
     }
 
     setLoading(true)
     try {
-      if (registrationType === "join") {
-        // Validate invitation code first
-        const validation = await validateAndUseInvitationCode(invitationCode)
-        if (!validation.isValid) {
-          setErrorMessage(validation.error || "Invalid invitation code.")
-          setLoading(false)
-          return
-        }
+      await register({
+        email: newOrgForm.email,
+        password: newOrgForm.password,
+        firstName: newOrgForm.firstName,
+        lastName: newOrgForm.lastName,
+        companyName: newOrgForm.companyName,
+        licenseKey: newOrgForm.licenseKey,
+      })
 
-        // Join existing organization
-        await joinOrganization(
-          {
-            email,
-            first_name: firstName,
-            last_name: lastName,
-            middle_name: middleName,
-            phone_number: phoneNumber,
-            gender: "",
-          },
-          password,
-          validation.licenseKey!,
-        )
-      } else {
-        // Create new organization
-        await register(
-          {
-            email,
-            first_name: firstName,
-            last_name: lastName,
-            middle_name: middleName,
-            phone_number: phoneNumber,
-            gender: "",
-          },
-          {
-            company_name: companyName,
-            company_location: companyLocation,
-          },
-          password,
-        )
-      }
+      toast({
+        title: "Registration Successful",
+        description: "Welcome to your new organization!",
+      })
 
-      setErrorMessage(null)
-      router.push("/admin/dashboard?registered=true")
-    } catch (error: unknown) {
-      setErrorMessage(getFriendlyErrorMessage(error))
+      router.push("/onboarding")
+    } catch (error: any) {
+      setError(error.message || "Registration failed")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleJoinOrgSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+
+    // Validation
+    if (joinOrgForm.password !== joinOrgForm.confirmPassword) {
+      setError("Passwords do not match")
+      return
+    }
+
+    if (joinOrgForm.password.length < 6) {
+      setError("Password must be at least 6 characters")
+      return
+    }
+
+    if (!joinOrgForm.firstName || !joinOrgForm.lastName || !joinOrgForm.email || !joinOrgForm.invitationCode) {
+      setError("Please fill in all required fields")
+      return
+    }
+
+    if (!codeValidation?.valid) {
+      setError("Please enter a valid invitation code")
+      return
+    }
+
+    setLoading(true)
+    try {
+      await joinOrganization({
+        email: joinOrgForm.email,
+        password: joinOrgForm.password,
+        firstName: joinOrgForm.firstName,
+        lastName: joinOrgForm.lastName,
+        invitationCode: joinOrgForm.invitationCode,
+      })
+
+      toast({
+        title: "Successfully Joined Organization",
+        description: "Welcome to the team!",
+      })
+
+      router.push("/dashboard")
+    } catch (error: any) {
+      setError(error.message || "Failed to join organization")
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen">
-      {/* Left Panel - Image */}
-      <div className="relative hidden w-[40%] items-center justify-center bg-gray-900 lg:flex">
-        <Image
-          src="/registration-background.png"
-          alt="Background"
-          layout="fill"
-          objectFit="cover"
-          className="absolute inset-0 z-0 opacity-50"
-        />
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-bold text-center">Create Account</CardTitle>
+          <CardDescription className="text-center">Choose how you'd like to get started</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="new-org" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="new-org" className="flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                New Organization
+              </TabsTrigger>
+              <TabsTrigger value="join-org" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Join Organization
+              </TabsTrigger>
+            </TabsList>
 
-      {/* Right Panel - Form */}
-      <div className="flex w-full items-center justify-center bg-white p-8 dark:bg-gray-950 lg:w-[60%]">
-        <Card className="w-full max-w-md border-none shadow-none">
-          <CardHeader className="space-y-1 text-left">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-3xl font-bold">Create an Account</CardTitle>
-            </div>
-            <CardDescription className="text-gray-600 dark:text-gray-400">It's free to create one!</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Registration Type Selection */}
-              <Tabs value={registrationType} onValueChange={(value) => setRegistrationType(value as "new" | "join")}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="new" className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4" />
-                    New Organization
-                  </TabsTrigger>
-                  <TabsTrigger value="join" className="flex items-center gap-2">
-                    <UserPlus className="h-4 w-4" />
-                    Join Organization
-                  </TabsTrigger>
-                </TabsList>
+            <TabsContent value="new-org" className="space-y-4">
+              <form onSubmit={handleNewOrgSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input
+                      id="firstName"
+                      type="text"
+                      value={newOrgForm.firstName}
+                      onChange={(e) => setNewOrgForm((prev) => ({ ...prev, firstName: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      type="text"
+                      value={newOrgForm.lastName}
+                      onChange={(e) => setNewOrgForm((prev) => ({ ...prev, lastName: e.target.value }))}
+                      required
+                    />
+                  </div>
+                </div>
 
-                <TabsContent value="new" className="space-y-4 mt-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input
-                        id="firstName"
-                        placeholder="John"
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input
-                        id="lastName"
-                        placeholder="Doe"
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="middleName">Middle Name (Optional)</Label>
-                    <Input
-                      id="middleName"
-                      placeholder=""
-                      value={middleName}
-                      onChange={(e) => setMiddleName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phoneNumber">Cellphone number</Label>
-                    <Input
-                      id="phoneNumber"
-                      placeholder="+63 9XX XXX XXXX"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="m@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName">Company Name</Label>
-                    <Input
-                      id="companyName"
-                      placeholder="Your Company Name"
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="companyLocation">Company Location</Label>
-                    <Input
-                      id="companyLocation"
-                      placeholder="City, Country"
-                      value={companyLocation}
-                      onChange={(e) => setCompanyLocation(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={newOrgForm.email}
+                    onChange={(e) => setNewOrgForm((prev) => ({ ...prev, email: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="companyName">Company Name</Label>
+                  <Input
+                    id="companyName"
+                    type="text"
+                    value={newOrgForm.companyName}
+                    onChange={(e) => setNewOrgForm((prev) => ({ ...prev, companyName: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="licenseKey">License Key</Label>
+                  <Input
+                    id="licenseKey"
+                    type="text"
+                    value={newOrgForm.licenseKey}
+                    onChange={(e) => setNewOrgForm((prev) => ({ ...prev, licenseKey: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
                     <Input
                       id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      type={showPassword ? "text" : "password"}
+                      value={newOrgForm.password}
+                      onChange={(e) => setNewOrgForm((prev) => ({ ...prev, password: e.target.value }))}
                       required
                     />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm password</Label>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <div className="relative">
                     <Input
                       id="confirmPassword"
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={newOrgForm.confirmPassword}
+                      onChange={(e) => setNewOrgForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
                       required
                     />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
                   </div>
-                </TabsContent>
+                </div>
 
-                <TabsContent value="join" className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="invitationCode">Invitation Code</Label>
-                    <Input
-                      id="invitationCode"
-                      placeholder="Enter 8-character code"
-                      value={invitationCode}
-                      onChange={(e) => setInvitationCode(e.target.value.toUpperCase())}
-                      maxLength={8}
-                      className="font-mono text-center text-lg tracking-widest"
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground">Ask your organization admin for an invitation code</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input
-                        id="firstName"
-                        placeholder="John"
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input
-                        id="lastName"
-                        placeholder="Doe"
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="middleName">Middle Name (Optional)</Label>
-                    <Input
-                      id="middleName"
-                      placeholder=""
-                      value={middleName}
-                      onChange={(e) => setMiddleName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phoneNumber">Cellphone number</Label>
-                    <Input
-                      id="phoneNumber"
-                      placeholder="+63 9XX XXX XXXX"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="m@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm password</Label>
-                    <Input
-                      id="confirmPassword"
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-                </TabsContent>
-              </Tabs>
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
 
-              <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
-                <a href="#" className="text-blue-600 hover:underline">
-                  Terms and Conditions
-                </a>
-                ,{" "}
-                <a href="#" className="text-blue-600 hover:underline">
-                  Privacy Policy
-                </a>
-                , and all platform{" "}
-                <a href="#" className="text-blue-600 hover:underline">
-                  rules and regulations
-                </a>{" "}
-                set by OH!Plus.
-              </p>
-              <Button
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                type="submit"
-                onClick={handleRegister}
-                disabled={loading}
-              >
-                {loading ? "Signing Up..." : registrationType === "new" ? "Create Organization" : "Join Organization"}
-              </Button>
-            </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Creating Account..." : "Create Organization"}
+                </Button>
+              </form>
+            </TabsContent>
 
-            {errorMessage && (
-              <div className="text-red-500 text-sm mt-4 text-center" role="alert">
-                {errorMessage}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            <TabsContent value="join-org" className="space-y-4">
+              <form onSubmit={handleJoinOrgSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="joinFirstName">First Name</Label>
+                    <Input
+                      id="joinFirstName"
+                      type="text"
+                      value={joinOrgForm.firstName}
+                      onChange={(e) => setJoinOrgForm((prev) => ({ ...prev, firstName: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="joinLastName">Last Name</Label>
+                    <Input
+                      id="joinLastName"
+                      type="text"
+                      value={joinOrgForm.lastName}
+                      onChange={(e) => setJoinOrgForm((prev) => ({ ...prev, lastName: e.target.value }))}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="joinEmail">Email</Label>
+                  <Input
+                    id="joinEmail"
+                    type="email"
+                    value={joinOrgForm.email}
+                    onChange={(e) => setJoinOrgForm((prev) => ({ ...prev, email: e.target.value }))}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="invitationCode">Invitation Code</Label>
+                  <Input
+                    id="invitationCode"
+                    type="text"
+                    placeholder="Enter 8-character code"
+                    value={joinOrgForm.invitationCode}
+                    onChange={(e) => {
+                      const code = e.target.value.toUpperCase()
+                      setJoinOrgForm((prev) => ({ ...prev, invitationCode: code }))
+                      validateInviteCode(code)
+                    }}
+                    required
+                  />
+                  {validatingCode && <p className="text-sm text-muted-foreground">Validating code...</p>}
+                  {codeValidation && (
+                    <Alert variant={codeValidation.valid ? "default" : "destructive"}>
+                      {codeValidation.valid ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                      <AlertDescription>
+                        {codeValidation.valid ? "Valid invitation code!" : codeValidation.error}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="joinPassword">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="joinPassword"
+                      type={showPassword ? "text" : "password"}
+                      value={joinOrgForm.password}
+                      onChange={(e) => setJoinOrgForm((prev) => ({ ...prev, password: e.target.value }))}
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="joinConfirmPassword">Confirm Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="joinConfirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={joinOrgForm.confirmPassword}
+                      onChange={(e) => setJoinOrgForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <Button type="submit" className="w-full" disabled={loading || !codeValidation?.valid}>
+                  {loading ? "Joining Organization..." : "Join Organization"}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+
+          <Separator className="my-6" />
+
+          <div className="text-center text-sm">
+            Already have an account?{" "}
+            <Link href="/login" className="text-primary hover:underline">
+              Sign in
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

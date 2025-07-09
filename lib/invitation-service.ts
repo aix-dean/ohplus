@@ -1,19 +1,38 @@
+import {
+  collection,
+  addDoc,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  deleteDoc,
+  doc,
+  updateDoc,
+  increment,
+  Timestamp,
+} from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { collection, doc, getDocs, query, where, addDoc, deleteDoc, updateDoc } from "firebase/firestore"
 
-export type InvitationCode = {
+export interface InvitationCode {
   id: string
   code: string
-  licenseKey: string
+  companyId: string
   description: string
   maxUses: number
   usedCount: number
-  expiresAt: number
-  createdAt: number
+  createdAt: Date
+  expiresAt?: Date
   createdBy: string
 }
 
-// Generate a random invitation code
+export interface CreateInvitationCodeData {
+  companyId: string
+  description: string
+  maxUses: number
+  expiresAt?: Date
+}
+
+// Generate a random 8-character alphanumeric code
 function generateInvitationCode(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
   let result = ""
@@ -23,138 +42,118 @@ function generateInvitationCode(): string {
   return result
 }
 
-// Create a new invitation code
-export async function createInvitationCode(params: {
-  licenseKey: string
-  description: string
-  maxUses: number
-  expiresInDays: number
-  createdBy?: string
-}): Promise<InvitationCode> {
-  try {
-    const code = generateInvitationCode()
-    const now = Date.now()
-    const expiresAt = now + params.expiresInDays * 24 * 60 * 60 * 1000
+export async function createInvitationCode(data: CreateInvitationCodeData): Promise<string> {
+  const code = generateInvitationCode()
 
-    const invitationData = {
-      code,
-      licenseKey: params.licenseKey,
-      description: params.description,
-      maxUses: params.maxUses,
-      usedCount: 0,
-      expiresAt,
-      createdAt: now,
-      createdBy: params.createdBy || "system",
-    }
-
-    const docRef = await addDoc(collection(db, "invitation_codes"), invitationData)
-
-    return {
-      id: docRef.id,
-      ...invitationData,
-    }
-  } catch (error) {
-    console.error("Error creating invitation code:", error)
-    throw new Error("Failed to create invitation code")
+  const invitationData = {
+    code,
+    companyId: data.companyId,
+    description: data.description,
+    maxUses: data.maxUses,
+    usedCount: 0,
+    createdAt: Timestamp.now(),
+    expiresAt: data.expiresAt ? Timestamp.fromDate(data.expiresAt) : null,
+    createdBy: "current-user", // You might want to pass this as a parameter
   }
+
+  const docRef = await addDoc(collection(db, "invitationCodes"), invitationData)
+  return docRef.id
 }
 
-// Get all invitation codes for a license key
-export async function getInvitationCodes(licenseKey: string): Promise<InvitationCode[]> {
-  try {
-    const q = query(collection(db, "invitation_codes"), where("licenseKey", "==", licenseKey))
+export async function getInvitationCodes(companyId: string): Promise<InvitationCode[]> {
+  const q = query(collection(db, "invitationCodes"), where("companyId", "==", companyId), orderBy("createdAt", "desc"))
 
-    const querySnapshot = await getDocs(q)
-    const codes: InvitationCode[] = []
-
-    querySnapshot.forEach((doc) => {
-      codes.push({
-        id: doc.id,
-        ...doc.data(),
-      } as InvitationCode)
-    })
-
-    // Sort by creation date (newest first)
-    return codes.sort((a, b) => b.createdAt - a.createdAt)
-  } catch (error) {
-    console.error("Error getting invitation codes:", error)
-    throw new Error("Failed to get invitation codes")
-  }
-}
-
-// Validate and use an invitation code
-export async function validateAndUseInvitationCode(code: string): Promise<{
-  isValid: boolean
-  licenseKey?: string
-  error?: string
-}> {
-  try {
-    const q = query(collection(db, "invitation_codes"), where("code", "==", code.toUpperCase()))
-
-    const querySnapshot = await getDocs(q)
-
-    if (querySnapshot.empty) {
-      return { isValid: false, error: "Invalid invitation code" }
-    }
-
-    const inviteDoc = querySnapshot.docs[0]
-    const inviteData = inviteDoc.data() as InvitationCode
-
-    const now = Date.now()
-
-    // Check if expired
-    if (now > inviteData.expiresAt) {
-      return { isValid: false, error: "Invitation code has expired" }
-    }
-
-    // Check if max uses reached
-    if (inviteData.usedCount >= inviteData.maxUses) {
-      return { isValid: false, error: "Invitation code has reached maximum uses" }
-    }
-
-    // Increment usage count
-    await updateDoc(doc(db, "invitation_codes", inviteDoc.id), {
-      usedCount: inviteData.usedCount + 1,
-    })
-
-    return {
-      isValid: true,
-      licenseKey: inviteData.licenseKey,
-    }
-  } catch (error) {
-    console.error("Error validating invitation code:", error)
-    return { isValid: false, error: "Failed to validate invitation code" }
-  }
-}
-
-// Delete an invitation code
-export async function deleteInvitationCode(codeId: string): Promise<void> {
-  try {
-    await deleteDoc(doc(db, "invitation_codes", codeId))
-  } catch (error) {
-    console.error("Error deleting invitation code:", error)
-    throw new Error("Failed to delete invitation code")
-  }
-}
-
-// Get invitation code by code string
-export async function getInvitationCodeByCode(code: string): Promise<InvitationCode | null> {
-  try {
-    const q = query(collection(db, "invitation_codes"), where("code", "==", code.toUpperCase()))
-
-    const querySnapshot = await getDocs(q)
-
-    if (querySnapshot.empty) {
-      return null
-    }
-
-    const doc = querySnapshot.docs[0]
+  const querySnapshot = await getDocs(q)
+  return querySnapshot.docs.map((doc) => {
+    const data = doc.data()
     return {
       id: doc.id,
-      ...doc.data(),
-    } as InvitationCode
-  } catch (error) {
-    console.error("Error getting invitation code:", error)
+      code: data.code,
+      companyId: data.companyId,
+      description: data.description,
+      maxUses: data.maxUses,
+      usedCount: data.usedCount,
+      createdAt: data.createdAt.toDate(),
+      expiresAt: data.expiresAt ? data.expiresAt.toDate() : undefined,
+      createdBy: data.createdBy,
+    }
+  })
+}
+
+export async function validateInvitationCode(code: string): Promise<{
+  valid: boolean
+  companyId?: string
+  error?: string
+}> {
+  const q = query(collection(db, "invitationCodes"), where("code", "==", code.toUpperCase()))
+
+  const querySnapshot = await getDocs(q)
+
+  if (querySnapshot.empty) {
+    return { valid: false, error: "Invalid invitation code" }
+  }
+
+  const doc = querySnapshot.docs[0]
+  const data = doc.data()
+
+  // Check if expired
+  if (data.expiresAt && data.expiresAt.toDate() < new Date()) {
+    return { valid: false, error: "Invitation code has expired" }
+  }
+
+  // Check if max uses reached
+  if (data.usedCount >= data.maxUses) {
+    return { valid: false, error: "Invitation code has reached maximum uses" }
+  }
+
+  return { valid: true, companyId: data.companyId }
+}
+
+export async function useInvitationCode(code: string): Promise<string> {
+  const validation = await validateInvitationCode(code)
+
+  if (!validation.valid) {
+    throw new Error(validation.error)
+  }
+
+  const q = query(collection(db, "invitationCodes"), where("code", "==", code.toUpperCase()))
+
+  const querySnapshot = await getDocs(q)
+  const docRef = querySnapshot.docs[0].ref
+
+  // Increment the used count
+  await updateDoc(docRef, {
+    usedCount: increment(1),
+  })
+
+  return validation.companyId!
+}
+
+export async function deleteInvitationCode(codeId: string): Promise<void> {
+  await deleteDoc(doc(db, "invitationCodes", codeId))
+}
+
+export async function getInvitationCodeByCode(code: string): Promise<InvitationCode | null> {
+  const q = query(collection(db, "invitationCodes"), where("code", "==", code.toUpperCase()))
+
+  const querySnapshot = await getDocs(q)
+
+  if (querySnapshot.empty) {
     return null
+  }
+
+  const docData = querySnapshot.docs[0]
+  const data = docData.data()
+
+  return {
+    id: docData.id,
+    code: data.code,
+    companyId: data.companyId,
+    description: data.description,
+    maxUses: data.maxUses,
+    usedCount: data.usedCount,
+    createdAt: data.createdAt.toDate(),
+    expiresAt: data.expiresAt ? data.expiresAt.toDate() : undefined,
+    createdBy: data.createdBy,
   }
 }
