@@ -8,6 +8,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import LoopTimeline from "@/components/loop-timeline"
+import { getProductById, getServiceAssignmentsByProductId } from "@/lib/firebase-service"
 import {
   ArrowLeft,
   Edit,
@@ -36,147 +37,176 @@ interface Props {
   }
 }
 
-// This would typically come from your database or API
-async function getProductData(id: string) {
-  // Simulate API call - replace with actual data fetching
-  return {
-    id: "CtLuWKfCkOOJmYGNlrp",
-    name: "LED Billboard - EDSA Guadalupe",
-    description: "Premium LED billboard located at EDSA Guadalupe with high visibility and traffic",
-    status: "PENDING",
-    type: "RENTAL",
-    image: "/placeholder.svg?height=200&width=200",
-    dimensions: "H: 12 × W: 12",
-    created: "July 9, 2025",
-    updated: "July 9, 2025",
-    cms: {
-      end_time: "18:44",
-      loops_per_day: 20,
-      spot_duration: 15,
-      start_time: "16:44",
-    },
-    programList: [
-      {
-        id: "SPOT001",
-        name: "Morning Slot",
-        duration: "15 seconds",
-        timeSlot: "06:00 AM - 12:00 PM",
-        advertiser: "Coca Cola",
-        price: "PHP 1,200",
-        status: "Active",
+// Enhanced product data interface for CMS details
+interface CMSProductData {
+  id: string
+  name: string
+  description: string
+  status: string
+  type: string
+  image?: string
+  dimensions?: string
+  created: string
+  updated: string
+  cms: {
+    end_time: string
+    loops_per_day: number
+    spot_duration: number
+    start_time: string
+  }
+  programList: Array<{
+    id: string
+    name: string
+    duration: string
+    timeSlot: string
+    advertiser: string
+    price: string
+    status: string
+  }>
+  serviceAssignments: Array<{
+    id: string
+    title: string
+    assignedTo: string
+    date: string
+    status: string
+    notes: string
+  }>
+  ledStatus: {
+    powerStatus: string
+    temperature: string
+    connection: string
+    videoSource: string
+    activeContent: string
+    lastReboot: string
+    lastTimeSync: string
+    warnings: string[]
+  }
+  livePreview: Array<{
+    id: string
+    health: string
+    image: string
+  }>
+}
+
+// Fetch product data from Firebase
+async function getProductData(id: string): Promise<CMSProductData | null> {
+  try {
+    // Get product from Firebase
+    const product = await getProductById(id)
+
+    if (!product) {
+      return null
+    }
+
+    // Get service assignments for this product
+    const serviceAssignments = await getServiceAssignmentsByProductId(id)
+
+    // Convert Firebase product to CMS product data format
+    const cmsProductData: CMSProductData = {
+      id: product.id || id,
+      name: product.name || "Unknown Product",
+      description: product.description || "No description available",
+      status: product.status || "PENDING",
+      type: product.type || "RENTAL",
+      image: product.imageUrl || "/placeholder.svg?height=200&width=200",
+      dimensions: `H: ${product.specs_rental?.height || 12} × W: ${product.specs_rental?.width || 12}`,
+      created: product.created ? new Date(product.created.seconds * 1000).toLocaleDateString() : "Unknown",
+      updated: product.updated ? new Date(product.updated.seconds * 1000).toLocaleDateString() : "Unknown",
+      cms: {
+        end_time: product.cms?.end_time || "18:00",
+        loops_per_day: product.cms?.loops_per_day || 20,
+        spot_duration: product.cms?.spot_duration || 15,
+        start_time: product.cms?.start_time || "06:00",
       },
-      {
-        id: "SPOT002",
-        name: "Afternoon Slot",
-        duration: "30 seconds",
-        timeSlot: "12:00 PM - 06:00 PM",
-        advertiser: "Samsung",
-        price: "PHP 1,800",
-        status: "Active",
+      // Mock program list - in a real app, this would come from a separate collection
+      programList: [
+        {
+          id: "SPOT001",
+          name: "Morning Slot",
+          duration: "15 seconds",
+          timeSlot: "06:00 AM - 12:00 PM",
+          advertiser: "Coca Cola",
+          price: "PHP 1,200",
+          status: "Active",
+        },
+        {
+          id: "SPOT002",
+          name: "Afternoon Slot",
+          duration: "30 seconds",
+          timeSlot: "12:00 PM - 06:00 PM",
+          advertiser: "Samsung",
+          price: "PHP 1,800",
+          status: "Active",
+        },
+        {
+          id: "SPOT003",
+          name: "Evening Slot",
+          duration: "15 seconds",
+          timeSlot: "06:00 PM - 12:00 AM",
+          advertiser: "Nike",
+          price: "PHP 2,100",
+          status: "Pending",
+        },
+        {
+          id: "SPOT004",
+          name: "Late Night Slot",
+          duration: "30 seconds",
+          timeSlot: "12:00 AM - 06:00 AM",
+          advertiser: "-",
+          price: "PHP 900",
+          status: "Available",
+        },
+      ],
+      // Convert service assignments from Firebase
+      serviceAssignments: serviceAssignments.map((assignment) => ({
+        id: assignment.id,
+        title: assignment.jobDescription || "Service Assignment",
+        assignedTo: assignment.assignedTo || "Unassigned",
+        date: assignment.coveredDateStart ? new Date(assignment.coveredDateStart).toLocaleDateString() : "TBD",
+        status: assignment.status || "Pending",
+        notes: assignment.message || "No notes available",
+      })),
+      // Mock LED status - in a real app, this would come from IoT devices or separate collection
+      ledStatus: {
+        powerStatus: "On",
+        temperature: "32°C",
+        connection: "Online",
+        videoSource: "HDMI 1",
+        activeContent: "Current Campaign",
+        lastReboot: new Date().toLocaleDateString() + " 09:15 AM",
+        lastTimeSync: new Date().toLocaleDateString() + " 08:00 AM",
+        warnings:
+          product.specs_rental?.elevation && product.specs_rental.elevation > 100 ? ["High elevation detected"] : [],
       },
-      {
-        id: "SPOT003",
-        name: "Evening Slot",
-        duration: "15 seconds",
-        timeSlot: "06:00 PM - 12:00 AM",
-        advertiser: "Nike",
-        price: "PHP 2,100",
-        status: "Pending",
-      },
-      {
-        id: "SPOT004",
-        name: "Late Night Slot",
-        duration: "30 seconds",
-        timeSlot: "12:00 AM - 06:00 AM",
-        advertiser: "-",
-        price: "PHP 900",
-        status: "Available",
-      },
-      {
-        id: "SPOT005",
-        name: "Weekend Special",
-        duration: "45 seconds",
-        timeSlot: "10:00 AM - 08:00 PM",
-        advertiser: "Apple",
-        price: "PHP 2,500",
-        status: "Active",
-      },
-      {
-        id: "SPOT006",
-        name: "Prime Time",
-        duration: "20 seconds",
-        timeSlot: "07:00 PM - 09:00 PM",
-        advertiser: "McDonald's",
-        price: "PHP 2,200",
-        status: "Pending",
-      },
-    ],
-    serviceAssignments: [
-      {
-        id: "SA001",
-        title: "Routine Maintenance",
-        assignedTo: "John Doe",
-        date: "2023-05-15",
-        status: "Completed",
-        notes: "Cleaned display, checked connections, updated firmware...",
-      },
-      {
-        id: "SA002",
-        title: "Panel Replacement",
-        assignedTo: "Sarah Johnson",
-        date: "2023-06-02",
-        status: "In Progress",
-        notes: "Replacing damaged LED panels on the right side",
-      },
-      {
-        id: "SA003",
-        title: "Network Troubleshooting",
-        assignedTo: "Mike Chen",
-        date: "2023-06-10",
-        status: "Scheduled",
-        notes: "Investigating intermittent connectivity issues",
-      },
-      {
-        id: "SA004",
-        title: "Emergency Repair",
-        assignedTo: "Lisa Wong",
-        date: "2023-04-28",
-        status: "Completed",
-        notes: "Fixed power supply issue after storm damage",
-      },
-    ],
-    ledStatus: {
-      powerStatus: "On",
-      temperature: "32°C",
-      connection: "Online",
-      videoSource: "HDMI 1",
-      activeContent: "Summer Campaign 2023",
-      lastReboot: "2023-05-30 09:15 AM",
-      lastTimeSync: "2023-05-30 08:00 AM",
-      warnings: ["High temperature detected"],
-    },
-    livePreview: [
-      {
-        id: "C-5 LED 3.2",
-        health: "100% Healthy",
-        image: "/placeholder.svg?height=100&width=150",
-      },
-      {
-        id: "D-AVE LED 1.0",
-        health: "100% Healthy",
-        image: "/placeholder.svg?height=100&width=150",
-      },
-      {
-        id: "MORATA LED 1.0",
-        health: "100% Healthy",
-        image: "/placeholder.svg?height=100&width=150",
-      },
-      {
-        id: "SLEX LED 2.1",
-        health: "90% Healthy",
-        image: "/placeholder.svg?height=100&width=150",
-      },
-    ],
+      // Mock live preview - in a real app, this would come from live camera feeds
+      livePreview: [
+        {
+          id: `${product.name?.substring(0, 10) || "LED"} 3.2`,
+          health: "100% Healthy",
+          image: "/placeholder.svg?height=100&width=150",
+        },
+        {
+          id: `${product.specs_rental?.location?.substring(0, 10) || "SITE"} 1.0`,
+          health: "100% Healthy",
+          image: "/placeholder.svg?height=100&width=150",
+        },
+        {
+          id: "BACKUP LED 1.0",
+          health: "100% Healthy",
+          image: "/placeholder.svg?height=100&width=150",
+        },
+        {
+          id: "MAIN LED 2.1",
+          health: product.active ? "100% Healthy" : "90% Healthy",
+          image: "/placeholder.svg?height=100&width=150",
+        },
+      ],
+    }
+
+    return cmsProductData
+  } catch (error) {
+    console.error("Error fetching product data:", error)
+    return null
   }
 }
 
@@ -220,6 +250,7 @@ export default async function Page({ params }: Props) {
       case "completed":
         return "bg-green-100 text-green-800"
       case "in progress":
+      case "ongoing":
         return "bg-blue-100 text-blue-800"
       case "scheduled":
         return "bg-yellow-100 text-yellow-800"
@@ -287,6 +318,10 @@ export default async function Page({ params }: Props) {
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
                 <span>Loops per day: {product.cms.loops_per_day}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                <span>Spots per loop: {spotsPerLoop}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
@@ -426,18 +461,26 @@ export default async function Page({ params }: Props) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {product.serviceAssignments.map((assignment) => (
-                    <TableRow key={assignment.id}>
-                      <TableCell className="font-mono text-sm">{assignment.id}</TableCell>
-                      <TableCell className="font-medium">{assignment.title}</TableCell>
-                      <TableCell>{assignment.assignedTo}</TableCell>
-                      <TableCell>{assignment.date}</TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(assignment.status)}>{assignment.status}</Badge>
+                  {product.serviceAssignments.length > 0 ? (
+                    product.serviceAssignments.map((assignment) => (
+                      <TableRow key={assignment.id}>
+                        <TableCell className="font-mono text-sm">{assignment.id}</TableCell>
+                        <TableCell className="font-medium">{assignment.title}</TableCell>
+                        <TableCell>{assignment.assignedTo}</TableCell>
+                        <TableCell>{assignment.date}</TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(assignment.status)}>{assignment.status}</Badge>
+                        </TableCell>
+                        <TableCell className="max-w-xs truncate">{assignment.notes}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                        No service assignments found for this product.
                       </TableCell>
-                      <TableCell className="max-w-xs truncate">{assignment.notes}</TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -611,7 +654,9 @@ export default async function Page({ params }: Props) {
                   </Badge>
                   <span>Structure</span>
                 </div>
-                <span>May 5, 2025, 1:20 PM</span>
+                <span>
+                  {new Date().toLocaleDateString()}, {new Date().toLocaleTimeString()}
+                </span>
                 <Button size="sm" variant="outline">
                   Live
                 </Button>
