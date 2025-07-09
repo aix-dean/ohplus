@@ -85,16 +85,16 @@ export default function ReportPreviewPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Back Button and Content Title Section */}
-      <div className="bg-white px-4 py-3 flex items-center gap-3 shadow-sm">
+      <div className="bg-white px-6 py-4 flex items-center gap-4 shadow-sm">
         <Button
           variant="ghost"
-          size="sm"
+          size="lg"
           onClick={handleBack}
-          className="text-black rounded-full p-2 hover:bg-gray-100"
+          className="text-black rounded-full p-3 hover:bg-gray-100"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-6 w-6" />
         </Button>
-        <Badge className="bg-cyan-400 text-white px-3 py-1 rounded-full font-medium">
+        <Badge className="bg-cyan-400 text-white px-4 py-2 rounded-full font-medium text-lg">
           {product?.content_type || "Content"}
         </Badge>
       </div>
