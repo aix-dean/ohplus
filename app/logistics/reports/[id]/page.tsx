@@ -62,7 +62,7 @@ export default function ReportPreviewPage() {
       .join(" ")
   }
 
-  const handleBackClick = () => {
+  const handleBack = () => {
     router.back()
   }
 
@@ -84,18 +84,25 @@ export default function ReportPreviewPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="relative w-full">
-        <img src="/logistics-header.png" alt="Logistics Header" className="w-full h-auto object-cover" />
-        {/* Back Button Overlay */}
-        <div className="absolute top-4 left-4">
+      {/* Back Button and Content Title */}
+      <div className="relative">
+        <div className="absolute top-4 left-4 z-10 flex items-center gap-3">
           <Button
-            onClick={handleBackClick}
-            className="flex items-center gap-2 bg-cyan-400 hover:bg-cyan-500 text-white px-4 py-2 rounded-full"
+            variant="ghost"
+            size="sm"
+            onClick={handleBack}
+            className="bg-white/90 hover:bg-white text-black rounded-full p-2 shadow-sm"
           >
-            <ArrowLeft className="h-4 w-4" />
-            {product?.content_type || "Back"}
+            <ArrowLeft className="h-5 w-5" />
           </Button>
+          <Badge className="bg-cyan-400 text-white px-3 py-1 rounded-full font-medium">
+            {product?.content_type || "Content"}
+          </Badge>
+        </div>
+
+        {/* Header */}
+        <div className="w-full">
+          <img src="/logistics-header.png" alt="Logistics Header" className="w-full h-auto object-cover" />
         </div>
       </div>
 
