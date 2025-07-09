@@ -7,6 +7,7 @@ import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRig
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
   getProductsByContentTypeAndCompany,
@@ -272,17 +273,33 @@ export default function AllSitesTab() {
           : // 50-80 for warning
             Math.floor(Math.random() * 40) + 10) // 10-50 for error
 
+    // Extract address information from different possible locations
+    const address =
+      product.specs_rental?.location ||
+      product.light?.location ||
+      product.location ||
+      product.address ||
+      "Address not specified"
+
     return {
       id: product.id,
-      name: product.name,
-      status: product.status,
+      name: product.name || `Site ${product.id.substring(0, 8)}`,
+      status: product.status || "UNKNOWN",
       statusColor,
       image,
       notifications,
-      location: product.specs_rental?.location || product.light?.location || "Unknown location",
+      address,
       contentType: product.content_type || "static",
       healthPercentage,
       siteCode: product.site_code || product.id.substring(0, 8),
+      operationalStatus:
+        product.status === "ACTIVE" || product.status === "OCCUPIED"
+          ? "Operational"
+          : product.status === "MAINTENANCE" || product.status === "REPAIR"
+            ? "Under Maintenance"
+            : product.status === "PENDING" || product.status === "INSTALLATION"
+              ? "Pending Setup"
+              : "Inactive",
     }
   }
 
@@ -495,51 +512,81 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             {site.notifications}
           </div>
         )}
+
+        {/* Content Type Badge */}
+        <div className="absolute top-2 left-2">
+          <Badge
+            variant="outline"
+            className={`
+              ${site.contentType === "dynamic" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-amber-50 text-amber-700 border-amber-200"}
+            `}
+          >
+            {site.contentType === "dynamic" ? "Digital" : "Static"}
+          </Badge>
+        </div>
+
+        {/* Operational Status Badge */}
+        <div className="absolute bottom-2 left-2">
+          <Badge
+            variant="outline"
+            className={`
+              ${site.operationalStatus === "Operational" ? "bg-green-50 text-green-700 border-green-200" : ""}
+              ${site.operationalStatus === "Under Maintenance" ? "bg-red-50 text-red-700 border-red-200" : ""}
+              ${site.operationalStatus === "Pending Setup" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
+              ${site.operationalStatus === "Inactive" ? "bg-gray-50 text-gray-700 border-gray-200" : ""}
+            `}
+          >
+            {site.operationalStatus}
+          </Badge>
+        </div>
       </div>
 
       <CardContent className="p-4">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           {/* Site Name */}
-          <h3 className="font-semibold text-lg">{site.name}</h3>
-
-          {/* Site ID */}
-          <div className="text-sm text-gray-600">
-            <span className="font-medium">ID:</span> {site.siteCode}
+          <div>
+            <h3 className="font-semibold text-lg text-gray-900 leading-tight">{site.name}</h3>
+            <div className="text-sm text-gray-500 mt-1">ID: {site.siteCode}</div>
           </div>
 
-          {/* Site Details Section - Added between ID and Current status */}
-          <div className="bg-gray-50 border border-gray-200 rounded-md p-3 space-y-2">
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="flex flex-col">
-                <span className="text-gray-500 font-medium">Operation</span>
-                <span
-                  className={`font-semibold ${
-                    site.status === "ACTIVE" || site.status === "OCCUPIED"
-                      ? "text-green-600"
-                      : site.status === "MAINTENANCE" || site.status === "REPAIR"
-                        ? "text-red-600"
-                        : "text-orange-600"
-                  }`}
-                >
-                  {site.status === "ACTIVE" || site.status === "OCCUPIED"
-                    ? "Active"
-                    : site.status === "MAINTENANCE" || site.status === "REPAIR"
-                      ? "Maintenance"
-                      : "Pending"}
-                </span>
-              </div>
+          {/* Site Information Section */}
+          <div className="space-y-2 py-2 border-t border-gray-100">
+            {/* Address */}
+            <div className="flex flex-col">
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Address</span>
+              <span className="text-sm text-gray-700 mt-1 leading-relaxed">{site.address}</span>
+            </div>
 
+            {/* Operational Status */}
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</span>
+              <span
+                className={`text-sm font-semibold ${
+                  site.operationalStatus === "Operational"
+                    ? "text-green-600"
+                    : site.operationalStatus === "Under Maintenance"
+                      ? "text-red-600"
+                      : site.operationalStatus === "Pending Setup"
+                        ? "text-orange-600"
+                        : "text-gray-600"
+                }`}
+              >
+                {site.operationalStatus}
+              </span>
+            </div>
+
+            {/* Content Type and Health */}
+            <div className="grid grid-cols-2 gap-4">
               <div className="flex flex-col">
-                <span className="text-gray-500 font-medium">Content Type</span>
-                <span className="font-semibold text-blue-600">
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Type</span>
+                <span className="text-sm font-medium text-blue-600 mt-1">
                   {site.contentType === "dynamic" ? "Digital" : "Static"}
                 </span>
               </div>
-
               <div className="flex flex-col">
-                <span className="text-gray-500 font-medium">Display Health</span>
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Health</span>
                 <span
-                  className={`font-semibold ${
+                  className={`text-sm font-semibold mt-1 ${
                     site.healthPercentage > 80
                       ? "text-green-600"
                       : site.healthPercentage > 60
@@ -550,32 +597,14 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
                   {site.healthPercentage}%
                 </span>
               </div>
-
-              <div className="flex flex-col">
-                <span className="text-gray-500 font-medium">Illumination</span>
-                <span
-                  className={`font-semibold ${
-                    site.status === "ACTIVE" || site.status === "OCCUPIED" ? "text-green-600" : "text-gray-500"
-                  }`}
-                >
-                  {site.status === "ACTIVE" || site.status === "OCCUPIED" ? "ON" : "OFF"}
-                </span>
-              </div>
-
-              <div className="flex flex-col col-span-2">
-                <span className="text-gray-500 font-medium">Compliance Status</span>
-                <span className={`font-semibold ${site.healthPercentage > 80 ? "text-green-600" : "text-orange-600"}`}>
-                  {site.healthPercentage > 80 ? "Complete" : "Incomplete"}
-                </span>
-              </div>
             </div>
           </div>
 
-          {/* Current Status */}
-          <div className="text-sm">
-            <span className="text-gray-600 font-medium">Current:</span>{" "}
+          {/* Current Status Line */}
+          <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+            <span className="text-sm font-medium text-gray-600">Current:</span>
             <span
-              className={`font-semibold ${
+              className={`text-sm font-semibold ${
                 site.status === "ACTIVE" || site.status === "OCCUPIED"
                   ? "text-blue-600"
                   : site.status === "VACANT" || site.status === "AVAILABLE"
@@ -592,7 +621,7 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
           {/* Create Report Button */}
           <Button
             variant="outline"
-            className="mt-4 w-full bg-gray-50 hover:bg-gray-100 border-gray-300"
+            className="mt-3 w-full bg-gray-50 hover:bg-gray-100 border-gray-300 text-gray-700 hover:text-gray-900"
             onClick={handleCreateReport}
           >
             Create Report
