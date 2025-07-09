@@ -7,7 +7,6 @@ import { AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { getPaginatedUserProducts, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
@@ -431,7 +430,7 @@ function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (sit
 
   return (
     <Card
-      className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white"
+      className="overflow-hidden cursor-pointer border border-gray-200 shadow-sm rounded-lg transition-all hover:shadow-lg bg-white"
       onClick={handleCardClick}
     >
       <div className="relative h-48 bg-gray-200">
@@ -451,50 +450,46 @@ function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (sit
         <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
           {mockAssignmentCount}
         </div>
-
-        {/* Status Badge - Bottom Left */}
-        <div className="absolute bottom-2 left-2">
-          <Badge
-            className={`
-              text-xs font-medium px-2 py-1 rounded
-              ${site.statusColor === "green" ? "bg-green-500 text-white" : ""}
-              ${site.statusColor === "blue" ? "bg-blue-500 text-white" : ""}
-              ${site.statusColor === "red" ? "bg-red-500 text-white" : ""}
-              ${site.statusColor === "orange" ? "bg-orange-500 text-white" : ""}
-            `}
-          >
-            {site.status}
-          </Badge>
-        </div>
       </div>
 
       <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          {/* Site ID */}
-          <div className="text-sm text-gray-500 font-medium">{site.id}</div>
+        <div className="flex flex-col gap-3">
+          {/* Site Code */}
+          <div className="text-sm text-blue-600 font-medium">Site Code: {site.id}</div>
 
           {/* Site Name */}
-          <h3 className="font-semibold text-lg">{site.name}</h3>
+          <h3 className="font-bold text-xl text-gray-900">{site.name}</h3>
 
-          {/* Site Details */}
-          <div className="mt-2 space-y-1">
-            <div className="text-sm">
-              <span className="font-medium">Content:</span> <span className="text-gray-600">{mockContent}</span>
+          {/* Site Information Grid */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="flex flex-col">
+              <span className="text-gray-500">Operation</span>
+              <span className={`font-semibold ${site.status === "ACTIVE" ? "text-green-600" : "text-gray-800"}`}>
+                {site.status === "ACTIVE" ? "Active" : site.status}
+              </span>
             </div>
-            <div className="text-sm">
-              <span className="font-medium">Illumination:</span>{" "}
-              <span className="text-green-600 font-medium">{mockIllumination}</span>
+            <div className="flex flex-col">
+              <span className="text-gray-500">Display Health</span>
+              <span className="font-semibold text-green-600">95%</span>
             </div>
-            <div className="text-sm">
-              <span className="font-medium">Compliance:</span>{" "}
-              <span className="text-green-600 font-medium">{mockCompliance}</span>
+            <div className="flex flex-col">
+              <span className="text-gray-500">Content</span>
+              <span className="font-semibold text-blue-600">{mockContent}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500">Illumination</span>
+              <span className="font-semibold text-green-600">{mockIllumination}</span>
+            </div>
+            <div className="flex flex-col col-span-2">
+              <span className="text-gray-500">Compliance</span>
+              <span className="font-semibold text-green-600">{mockCompliance}</span>
             </div>
           </div>
 
           {/* Create Report Button */}
           <Button
             variant="outline"
-            className="mt-4 w-full rounded-md bg-gray-50 text-gray-800 hover:bg-gray-100 border-gray-200"
+            className="mt-3 w-full rounded-md bg-gray-50 text-gray-800 hover:bg-gray-100 border-gray-200"
             onClick={handleCreateReport}
           >
             Create Report

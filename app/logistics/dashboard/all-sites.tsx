@@ -7,9 +7,8 @@ import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRig
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { type Product, getPaginatedUserProducts } from "@/lib/firebase-service"
+import { getPaginatedUserProducts, getUserProductsCount, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { CreateReportDialog } from "@/components/create-report-dialog"
@@ -43,8 +42,7 @@ export default function AllSitesTab() {
   const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
   const { toast } = useToast()
-  const { user } = useAuth()
-  const { userData } = useAuth()
+  const { user, projectData } = useAuth()
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -77,17 +75,14 @@ export default function AllSitesTab() {
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
-    if (!user?.uid || !userData?.company_id) return
+    if (!user?.uid) return
 
     setLoadingCount(true)
     try {
-      // Get all user products and filter by company_id
-      const allProducts = await getPaginatedUserProducts(user.uid, 1000, null, {
+      const count = await getUserProductsCount(user.uid, {
+        active: true,
         searchTerm: debouncedSearchTerm,
       })
-
-      const companyProducts = allProducts.items.filter((product) => product.company_id === userData?.company_id)
-      const count = companyProducts.length
 
       setTotalItems(count)
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
@@ -96,12 +91,12 @@ export default function AllSitesTab() {
     } finally {
       setLoadingCount(false)
     }
-  }, [user?.uid, userData?.company_id, debouncedSearchTerm])
+  }, [user?.uid, debouncedSearchTerm])
 
   // Fetch products for the current page
   const fetchProducts = useCallback(
     async (page: number, forceRefresh = false) => {
-      if (!user?.uid || !userData?.company_id) return
+      if (!user?.uid) return
 
       // Check if we have this page in cache and not forcing refresh
       if (!forceRefresh && pageCache.has(page)) {
@@ -120,26 +115,20 @@ export default function AllSitesTab() {
         // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
-        // Get products filtered by company_id only
-        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE * 2, startDoc, {
+        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, {
+          active: true,
           searchTerm: debouncedSearchTerm,
         })
 
-        // Filter products to only show those with matching company_id
-        const filteredItems = result.items.filter((product) => product.company_id === userData?.company_id)
-
-        // Take only the first ITEMS_PER_PAGE items
-        const paginatedItems = filteredItems.slice(0, ITEMS_PER_PAGE)
-
-        setProducts(paginatedItems)
+        setProducts(result.items)
         setLastDoc(result.lastDoc)
-        setHasMore(filteredItems.length > ITEMS_PER_PAGE)
+        setHasMore(result.hasMore)
 
         // Cache this page
         setPageCache((prev) => {
           const newCache = new Map(prev)
           newCache.set(page, {
-            items: paginatedItems,
+            items: result.items,
             lastDoc: result.lastDoc,
           })
           return newCache
@@ -152,21 +141,23 @@ export default function AllSitesTab() {
         setLoadingMore(false)
       }
     },
-    [user?.uid, userData?.company_id, lastDoc, pageCache, debouncedSearchTerm],
+    [user?.uid, lastDoc, pageCache, debouncedSearchTerm],
   )
 
   // Load initial data and count
   useEffect(() => {
-    fetchProducts(1)
-    fetchTotalCount()
-  }, [])
+    if (user?.uid) {
+      fetchProducts(1)
+      fetchTotalCount()
+    }
+  }, [user?.uid, fetchProducts, fetchTotalCount])
 
   // Load data when page changes
   useEffect(() => {
-    if (currentPage > 0) {
+    if (currentPage > 0 && user?.uid) {
       fetchProducts(currentPage)
     }
-  }, [currentPage, fetchProducts])
+  }, [currentPage, fetchProducts, user?.uid])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -290,6 +281,16 @@ export default function AllSitesTab() {
               ? "Pending Setup"
               : "Inactive",
     }
+  }
+
+  // Show loading if no user
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <p className="text-gray-500">Loading user data...</p>
+      </div>
+    )
   }
 
   return (
@@ -479,34 +480,9 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
     window.location.href = `/logistics/sites/${site.id}`
   }
 
-  // Generate mock data for demonstration - replace with real data from your backend
-  const getDisplayHealth = () => {
-    if (site.healthPercentage > 90) return "100%"
-    if (site.healthPercentage > 80) return "90%"
-    if (site.healthPercentage > 60) return "75%"
-    return "50%"
-  }
-
-  const getIlluminationStatus = () => {
-    return site.operationalStatus === "Operational" ? "ON" : "OFF"
-  }
-
-  const getComplianceStatus = () => {
-    return site.operationalStatus === "Operational" ? "Complete" : "Incomplete"
-  }
-
-  const getContentInfo = () => {
-    // Mock content based on site type
-    if (site.contentType === "dynamic") {
-      const contents = ["Leon", "Lilo and Stitch", "Marvel Heroes", "Nike Campaign"]
-      return contents[Math.floor(Math.random() * contents.length)]
-    }
-    return "Static Billboard"
-  }
-
   return (
     <Card
-      className="erp-card overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg"
       onClick={handleCardClick}
     >
       <div className="relative h-48 bg-gray-200">
@@ -526,46 +502,22 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             {site.notifications}
           </div>
         )}
-
-        {/* Status Badge */}
-        <div className="absolute top-2 left-2">
-          <Badge
-            variant="outline"
-            className={`
-              ${site.operationalStatus === "Operational" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
-              ${site.operationalStatus === "Under Maintenance" ? "bg-red-50 text-red-700 border-red-200" : ""}
-              ${site.operationalStatus === "Pending Setup" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
-              ${site.operationalStatus === "Inactive" ? "bg-gray-50 text-gray-700 border-gray-200" : ""}
-            `}
-          >
-            {site.operationalStatus === "Operational"
-              ? "OPEN"
-              : site.operationalStatus === "Under Maintenance"
-                ? "OCCUPIED"
-                : site.operationalStatus === "Pending Setup"
-                  ? "OCCUPIED"
-                  : "CLOSED"}
-          </Badge>
-        </div>
       </div>
 
       <CardContent className="p-4">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
+          {/* Site Code */}
+          <div className="text-sm text-blue-600 font-medium">Site Code: {site.siteCode}</div>
+
           {/* Site Name */}
-          <h3 className="font-semibold text-lg text-gray-900">{site.name}</h3>
+          <h3 className="font-bold text-xl text-gray-900">{site.name}</h3>
 
-          {/* Site ID */}
-          <div className="text-sm text-gray-600 mb-2">
-            <span className="font-medium">ID:</span> {site.siteCode}
-          </div>
-
-          {/* Site Information Section */}
-          <div className="space-y-2 py-2">
-            {/* Operation Status */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-700">Operation:</span>
+          {/* Site Information Grid */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="flex flex-col">
+              <span className="text-gray-500">Operation</span>
               <span
-                className={`text-sm font-semibold ${
+                className={`font-semibold ${
                   site.operationalStatus === "Operational"
                     ? "text-green-600"
                     : site.operationalStatus === "Under Maintenance"
@@ -585,11 +537,10 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
               </span>
             </div>
 
-            {/* Display Health */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-700">Display Health:</span>
+            <div className="flex flex-col">
+              <span className="text-gray-500">Display Health</span>
               <span
-                className={`text-sm font-semibold ${
+                className={`font-semibold ${
                   site.healthPercentage > 80
                     ? "text-green-600"
                     : site.healthPercentage > 60
@@ -607,21 +558,19 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
               </span>
             </div>
 
-            {/* Content */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-700">Content:</span>
-              <span className="text-sm font-semibold text-blue-600">
+            <div className="flex flex-col">
+              <span className="text-gray-500">Content</span>
+              <span className="font-semibold text-blue-600">
                 {site.contentType === "dynamic"
                   ? ["Leon", "Lilo and Stitch", "Marvel Heroes", "Nike Campaign"][Math.floor(Math.random() * 4)]
                   : "Static Billboard"}
               </span>
             </div>
 
-            {/* Illumination */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-700">Illumination:</span>
+            <div className="flex flex-col">
+              <span className="text-gray-500">Illumination</span>
               <span
-                className={`text-sm font-semibold ${
+                className={`font-semibold ${
                   site.operationalStatus === "Operational" ? "text-green-600" : "text-red-600"
                 }`}
               >
@@ -629,11 +578,10 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
               </span>
             </div>
 
-            {/* Compliance */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-700">Compliance:</span>
+            <div className="flex flex-col col-span-2">
+              <span className="text-gray-500">Compliance</span>
               <span
-                className={`text-sm font-semibold ${
+                className={`font-semibold ${
                   site.operationalStatus === "Operational" ? "text-green-600" : "text-red-600"
                 }`}
               >
@@ -646,8 +594,8 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
           </div>
 
           {/* Current Status */}
-          <div className="text-sm mt-3 pt-3 border-t border-gray-200">
-            <span className="text-gray-600 font-medium">Current:</span>{" "}
+          <div className="text-sm pt-2 border-t border-gray-100">
+            <span className="text-gray-500">Status:</span>{" "}
             <span
               className={`font-semibold ${
                 site.status === "ACTIVE" || site.status === "OCCUPIED"
@@ -666,7 +614,7 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
           {/* Create Report Button */}
           <Button
             variant="outline"
-            className="mt-4 w-full bg-gray-50 hover:bg-gray-100 border-gray-300 text-gray-700 hover:text-gray-900"
+            className="mt-3 w-full bg-gray-50 hover:bg-gray-100 border-gray-300 text-gray-700 hover:text-gray-900 rounded-md"
             onClick={handleCreateReport}
           >
             Create Report

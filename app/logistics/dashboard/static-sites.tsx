@@ -17,7 +17,6 @@ import { useAuth } from "@/contexts/auth-context"
 import { CreateReportDialog } from "@/components/create-report-dialog"
 import Image from "next/image"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
@@ -478,75 +477,69 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
 
   return (
     <Card
-      className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white"
+      className="overflow-hidden cursor-pointer border border-gray-200 shadow-sm rounded-lg transition-all hover:shadow-lg bg-white"
       onClick={handleCardClick}
     >
-      <CardContent className="p-0">
-        <div className="relative h-48 bg-gray-200">
-          <Image
-            src={site.image || "/placeholder.svg"}
-            alt={site.name}
-            fill
-            className="object-cover"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement
-              target.src = "/roadside-billboard.png"
-              target.className = "opacity-50 object-contain"
-            }}
-          />
-          {activeAssignments.length > 0 && (
-            <div className="absolute top-2 right-2 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
-              {activeAssignments.length}
-            </div>
-          )}
-          <div className="absolute bottom-2 left-2">
-            <Badge
-              className={`
-          text-xs font-bold px-2 py-1
-          ${site.statusColor === "green" ? "bg-green-500 text-white" : ""}
-          ${site.statusColor === "blue" ? "bg-blue-500 text-white" : ""}
-          ${site.statusColor === "red" ? "bg-red-500 text-white" : ""}
-          ${site.statusColor === "orange" ? "bg-orange-500 text-white" : ""}
-        `}
-            >
-              {site.status === "ACTIVE" ? "OPEN" : site.status}
-            </Badge>
+      <div className="relative h-48 bg-gray-200">
+        <Image
+          src={site.image || "/placeholder.svg"}
+          alt={site.name}
+          fill
+          className="object-cover"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            target.src = "/roadside-billboard.png"
+            target.className = "opacity-50 object-contain"
+          }}
+        />
+        {activeAssignments.length > 0 && (
+          <div className="absolute top-2 right-2 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
+            {activeAssignments.length}
           </div>
-        </div>
+        )}
+      </div>
 
-        <div className="p-4">
-          <div className="flex flex-col gap-1">
-            <div className="text-sm font-bold text-gray-800">{site.id}</div>
-            <h3 className="font-semibold text-gray-900">{site.name}</h3>
+      <CardContent className="p-4">
+        <div className="flex flex-col gap-3">
+          {/* Site Code */}
+          <div className="text-sm text-blue-600 font-medium">Site Code: {site.id}</div>
 
-            <div className="mt-3 space-y-1">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Operation:</span>
-                <span className={`font-medium ${site.status === "ACTIVE" ? "text-green-600" : "text-gray-800"}`}>
-                  {site.status === "ACTIVE" ? "Active" : site.status}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Display Health:</span>
-                <span className="font-medium text-green-600">90%</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Compliance:</span>
-                <span className="font-medium text-red-600">Incomplete (2)</span>
-              </div>
+          {/* Site Name */}
+          <h3 className="font-bold text-xl text-gray-900">{site.name}</h3>
+
+          {/* Site Information Grid */}
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="flex flex-col">
+              <span className="text-gray-500">Operation</span>
+              <span className={`font-semibold ${site.status === "ACTIVE" ? "text-green-600" : "text-gray-800"}`}>
+                {site.status === "ACTIVE" ? "Active" : site.status}
+              </span>
             </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500">Display Health</span>
+              <span className="font-semibold text-green-600">90%</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500">Content</span>
+              <span className="font-semibold text-blue-600">Static Billboard</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500">Compliance</span>
+              <span className="font-semibold text-red-600">Incomplete (2)</span>
+            </div>
+          </div>
 
-            <div className="mt-4 relative">
-              <Button
-                variant="outline"
-                className="w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200 font-medium"
-                onClick={handleCreateReport}
-              >
-                Create Report
-              </Button>
-              <div className="absolute -top-1 -right-1 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
-                20
-              </div>
+          {/* Create Report Button */}
+          <div className="mt-3 relative">
+            <Button
+              variant="outline"
+              className="w-full rounded-md bg-gray-50 text-gray-800 hover:bg-gray-100 border-gray-200 font-medium"
+              onClick={handleCreateReport}
+            >
+              Create Report
+            </Button>
+            <div className="absolute -top-1 -right-1 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
+              20
             </div>
           </div>
         </div>
