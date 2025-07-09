@@ -809,18 +809,26 @@ export async function generateReportPDF(
       try {
         const headerBase64 = await loadImageAsBase64("/logistics-header-new.png")
         if (headerBase64) {
-          // Use the full width and appropriate height for the header
-          const headerHeight = 25
-          const headerWidth = pageWidth
+          // Get the actual dimensions of the header image
+          const headerDimensions = await getImageDimensions(headerBase64)
+
+          // Calculate proper aspect ratio
+          const aspectRatio = headerDimensions.width / headerDimensions.height
+
+          // Set desired height and calculate width to maintain aspect ratio
+          const headerHeight = 20 // Reduced from 25 to prevent warping
+          const headerWidth = pageWidth // Full page width
+
+          // Add the header image with proper dimensions
           pdf.addImage(headerBase64, "PNG", 0, yPosition, headerWidth, headerHeight)
           yPosition += headerHeight + 5
         } else {
           // Fallback if image fails to load
-          yPosition += 30
+          yPosition += 25
         }
       } catch (error) {
         console.error("Error adding header image:", error)
-        yPosition += 30 // Skip header space if failed
+        yPosition += 25 // Skip header space if failed
       }
     }
 
