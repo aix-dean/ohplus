@@ -423,6 +423,12 @@ function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (sit
     window.location.href = `/logistics/sites/${site.id}`
   }
 
+  // Mock data for demonstration - in real app, this would come from the product data
+  const mockAssignmentCount = Math.floor(Math.random() * 10) + 1
+  const mockContent = "Lilo and Stitch"
+  const mockIllumination = "ON"
+  const mockCompliance = "Complete"
+
   return (
     <Card
       className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white"
@@ -440,32 +446,55 @@ function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (sit
             target.className = "opacity-50 object-contain"
           }}
         />
+
+        {/* Assignment Count Badge - Top Right */}
+        <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+          {mockAssignmentCount}
+        </div>
+
+        {/* Status Badge - Bottom Left */}
+        <div className="absolute bottom-2 left-2">
+          <Badge
+            className={`
+              text-xs font-medium px-2 py-1 rounded
+              ${site.statusColor === "green" ? "bg-green-500 text-white" : ""}
+              ${site.statusColor === "blue" ? "bg-blue-500 text-white" : ""}
+              ${site.statusColor === "red" ? "bg-red-500 text-white" : ""}
+              ${site.statusColor === "orange" ? "bg-orange-500 text-white" : ""}
+            `}
+          >
+            {site.status}
+          </Badge>
+        </div>
       </div>
 
       <CardContent className="p-4">
         <div className="flex flex-col gap-1">
-          <h3 className="font-semibold">{site.name}</h3>
-          <div className="text-xs text-gray-500">ID: {site.id}</div>
+          {/* Site ID */}
+          <div className="text-sm text-gray-500 font-medium">{site.id}</div>
 
-          <div className="mt-2 flex items-center gap-2">
-            <div className="text-sm font-medium">Current:</div>
-            <Badge
-              variant="outline"
-              className={`
-                ${site.statusColor === "green" ? "bg-green-50 text-green-700 border-green-200" : ""}
-                ${site.statusColor === "blue" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
-                ${site.statusColor === "red" ? "bg-red-50 text-red-700 border-red-200" : ""}
-                ${site.statusColor === "orange" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
-              `}
-            >
-              {site.status}
-            </Badge>
+          {/* Site Name */}
+          <h3 className="font-semibold text-lg">{site.name}</h3>
+
+          {/* Site Details */}
+          <div className="mt-2 space-y-1">
+            <div className="text-sm">
+              <span className="font-medium">Content:</span> <span className="text-gray-600">{mockContent}</span>
+            </div>
+            <div className="text-sm">
+              <span className="font-medium">Illumination:</span>{" "}
+              <span className="text-green-600 font-medium">{mockIllumination}</span>
+            </div>
+            <div className="text-sm">
+              <span className="font-medium">Compliance:</span>{" "}
+              <span className="text-green-600 font-medium">{mockCompliance}</span>
+            </div>
           </div>
 
-          {/* Add Create Report Button */}
+          {/* Create Report Button */}
           <Button
             variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+            className="mt-4 w-full rounded-md bg-gray-50 text-gray-800 hover:bg-gray-100 border-gray-200"
             onClick={handleCreateReport}
           >
             Create Report
