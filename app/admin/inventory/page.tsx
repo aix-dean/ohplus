@@ -289,7 +289,31 @@ export default function AdminInventoryPage() {
   const handleCompanyRegistrationSuccess = async () => {
     await refreshUserData()
     setShowCompanyDialog(false)
-    // After successful company registration, proceed to add site
+
+    // Check subscription after company registration
+    if (!userData?.license_key) {
+      setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
+      setShowSubscriptionLimitDialog(true)
+      return
+    }
+
+    if (!subscriptionData || subscriptionData.status !== "active") {
+      setSubscriptionLimitMessage(
+        "Your current subscription is not active. Please activate or upgrade your plan to add more sites.",
+      )
+      setShowSubscriptionLimitDialog(true)
+      return
+    }
+
+    if (totalItems >= subscriptionData.maxProducts) {
+      setSubscriptionLimitMessage(
+        `You have reached the maximum number of sites allowed by your current plan (${subscriptionData.maxProducts}). Please upgrade your subscription to add more sites.`,
+      )
+      setShowSubscriptionLimitDialog(true)
+      return
+    }
+
+    // Only redirect if all subscription checks pass
     router.push("/admin/products/create")
   }
 
