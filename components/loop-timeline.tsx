@@ -165,12 +165,7 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
               <span className="font-medium text-gray-500">Total Loop Duration:</span>
               <div className="text-lg font-semibold">{formatDuration(totalLoopDuration)}</div>
             </div>
-            <div>
-              <span className="font-medium text-gray-500">Calculated from DB:</span>
-              <div className="text-sm text-blue-600">
-                ({endTimeStr} - {startTimeStr}) ÷ {spotDuration}s = {spotsPerLoop} spots
-              </div>
-            </div>
+
           </div>
         </CardContent>
       </Card>
@@ -180,7 +175,7 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Play size={18} />
-            First Loop Timeline ({spotsPerLoop} Spots)
+            First Loop Timeline ({loopsPerDay} Spots)
           </CardTitle>
           <div className="text-sm text-gray-500">
             Loop runs from {convertTo12Hour(startTimeStr)} to {convertTo12Hour(endTimeStr)} (
@@ -194,11 +189,6 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
               <div className="flex items-center gap-2">
                 <Clock size={16} className="text-gray-500" />
                 <span className="font-medium">Start: {convertTo12Hour(startTimeStr)}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-medium">
-                  {spotsPerLoop} spots × {spotDuration}s each = {formatDuration(totalLoopDuration)}
-                </span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock size={16} className="text-gray-500" />
