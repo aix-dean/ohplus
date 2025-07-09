@@ -1,69 +1,72 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Separator } from "@/components/ui/separator"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Mail, Lock, Eye, EyeOff } from "lucide-react"
+import { FirebaseError } from "firebase/app"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showJoinOrgDialog, setShowJoinOrgDialog] = useState(false)
   const [orgCode, setOrgCode] = useState("")
 
-  const { login, user } = useAuth()
+  const { login } = useAuth()
   const router = useRouter()
 
-  // Redirect if already logged in
-  useEffect(() => {
-    if (user) {
-      router.push("/admin/dashboard") // Changed redirect to /admin/dashboard
+  const getFriendlyErrorMessage = (error: unknown): string => {
+    console.error("Raw error during login:", error)
+    if (error instanceof FirebaseError) {
+      switch (error.code) {
+        case "auth/user-not-found":
+          return "No account found with this email address."
+        case "auth/wrong-password":
+          return "Incorrect password. Please try again."
+        case "auth/invalid-email":
+          return "The email address is not valid."
+        case "auth/user-disabled":
+          return "This account has been disabled. Please contact support."
+        case "auth/too-many-requests":
+          return "Too many failed login attempts. Please try again later."
+        case "auth/network-request-failed":
+          return "Network error. Please check your internet connection."
+        default:
+          return "An unexpected error occurred. Please try again."
+      }
     }
-  }, [user, router])
+    return "An unknown error occurred. Please try again."
+  }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    setIsLoading(true)
+  const handleLogin = async () => {
+    setErrorMessage(null)
 
+    if (!email || !password) {
+      setErrorMessage("Please fill in all fields.")
+      return
+    }
+
+    setLoading(true)
     try {
       await login(email, password)
-      router.push("/admin/dashboard") // Changed redirect to /admin/dashboard
-    } catch (error: any) {
-      console.error("Login error:", error)
-
-      // Provide more user-friendly error messages
-      if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
-        setError("Invalid email or password. Please check your credentials.")
-      } else if (error.code === "auth/too-many-requests") {
-        setError("Too many unsuccessful login attempts. Please try again later.")
-      } else if (error.code === "auth/tenant-id-mismatch") {
-        setError("Authentication error: Tenant ID mismatch. Please contact support.")
-      } else {
-        setError(error.message || "Failed to login. Please check your credentials.")
-      }
+      router.push("/admin/dashboard")
+    } catch (error: unknown) {
+      setErrorMessage(getFriendlyErrorMessage(error))
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
   const handleJoinOrganization = () => {
     if (!orgCode.trim()) {
-      setError("Please enter an organization code.")
+      setErrorMessage("Please enter an organization code.")
       return
     }
 
@@ -72,134 +75,97 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white p-4">
-      <div className="flex w-full max-w-4xl bg-white rounded-lg shadow-lg overflow-hidden">
-        {/* Left Section: Logo and Company Name */}
-        <div className="hidden md:flex flex-col items-center justify-center p-8 bg-gray-50 w-1/2">
-          <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={200} height={200} priority />
-          <span className="mt-4 text-2xl font-bold text-gray-800">OH Plus</span>
-        </div>
+    <div className="flex min-h-screen">
+      {/* Left Panel - Image */}
+      <div className="relative hidden w-[40%] items-center justify-center bg-gray-900 lg:flex">
+        <Image
+          src="/registration-background.png"
+          alt="Background"
+          layout="fill"
+          objectFit="cover"
+          className="absolute inset-0 z-0 opacity-50"
+        />
+      </div>
 
-        {/* Right Section: Login Form */}
-        <div className="w-full md:w-1/2 p-8">
-          <Card className="border-none shadow-none">
-            <CardHeader className="text-center md:text-left">
-              <CardTitle className="text-3xl font-bold text-gray-900">Log in to your Account</CardTitle>
-              <CardDescription className="text-gray-600 mt-2">Welcome back! Select method to log in:</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-4 mb-6">
-                <Button
-                  variant="outline"
-                  className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                >
-                  <Image src="/placeholder.svg?height=20&width=20" alt="Google" width={20} height={20} />
-                  Google
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                >
-                  <Image src="/placeholder.svg?height=20&width=20" alt="Facebook" width={20} height={20} />
-                  Facebook
-                </Button>
+      {/* Right Panel - Form */}
+      <div className="flex w-full items-center justify-center bg-white p-8 dark:bg-gray-950 lg:w-[60%]">
+        <Card className="w-full max-w-md border-none shadow-none">
+          <CardHeader className="space-y-1 text-left">
+            <CardTitle className="text-3xl font-bold">Welcome back</CardTitle>
+            <CardDescription className="text-gray-600 dark:text-gray-400">
+              Enter your email and password to sign in to your account
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="m@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
               </div>
-
-              <div className="relative flex items-center justify-center my-6">
-                <Separator className="absolute w-full" />
-                <span className="relative z-10 bg-white px-4 text-sm text-gray-500">or continue with email</span>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
               </div>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="sr-only">
-                    Email
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="pl-10 pr-4 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="sr-only">
-                    Password
-                  </Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      className="pl-10 pr-10 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 text-gray-400 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox id="remember-me" />
-                    <Label htmlFor="remember-me" className="text-gray-700">
-                      Remember me
-                    </Label>
-                  </div>
-                  <Link href="/forgot-password" className="text-blue-600 hover:underline">
-                    Forgot password?
-                  </Link>
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Logging in..." : "Log in"}
-                </Button>
-              </form>
-            </CardContent>
-            <CardFooter className="flex flex-col gap-2 text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{" "}
-                <Link href="/register" className="text-blue-600 hover:underline">
-                  Create an account
-                </Link>
-              </p>
               <Button
-                variant="outline"
-                className="w-full mt-2 bg-transparent"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                type="submit"
+                onClick={handleLogin}
+                disabled={loading}
+              >
+                {loading ? "Signing In..." : "Sign In"}
+              </Button>
+            </div>
+
+            {errorMessage && (
+              <div className="text-red-500 text-sm mt-4 text-center" role="alert">
+                {errorMessage}
+              </div>
+            )}
+          </CardContent>
+          <CardFooter className="flex flex-col space-y-2">
+            <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+              Don't have an account?{" "}
+              <Button
+                variant="link"
+                className="p-0 h-auto font-normal text-blue-600 hover:text-blue-700"
+                onClick={() => router.push("/register")}
+              >
+                Sign up
+              </Button>
+            </div>
+            <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+              <Button
+                variant="link"
+                className="p-0 h-auto font-normal text-blue-600 hover:text-blue-700"
+                onClick={() => router.push("/forgot-password")}
+              >
+                Forgot your password?
+              </Button>
+            </div>
+            <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+              <Button
+                variant="link"
+                className="p-0 h-auto font-normal text-green-600 hover:text-green-700"
                 onClick={() => setShowJoinOrgDialog(true)}
               >
                 Join an organization
               </Button>
-            </CardFooter>
-          </Card>
-        </div>
+            </div>
+          </CardFooter>
+        </Card>
       </div>
 
       <Dialog open={showJoinOrgDialog} onOpenChange={setShowJoinOrgDialog}>
