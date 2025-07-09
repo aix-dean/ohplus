@@ -4,39 +4,57 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { toast } from "sonner"
+import { UserPlus, Settings, Mail, Shield } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { Search, UserPlus, MoreHorizontal, Shield, User, Crown, Settings } from "lucide-react"
-import { collection, query, getDocs, doc, setDoc, where, orderBy } from "firebase/firestore"
+import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { ResponsiveTable } from "@/components/responsive-table"
 import AddUserInvitationDialog from "@/components/add-user-invitation-dialog"
+import Link from "next/link"
+import { toast } from "sonner"
 
-interface UserData {
+interface User {
   id: string
   email: string
-  displayName?: string
+  displayName: string
   role: string
-  companyId?: string
-  companyName?: string
-  photoURL?: string
-  createdAt?: any
-  lastLoginAt?: any
-  isActive: boolean
+  status: string
+  lastLogin: Date | null
+  created: Date
 }
 
 export default function UserManagementPage() {
   const { userData } = useAuth()
-  const [users, setUsers] = useState<UserData[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [showInviteDialog, setShowInviteDialog] = useState(false)
-  const [invitationCode, setInvitationCode] = useState("")
+  const [showAddUserDialog, setShowAddUserDialog] = useState(false)
+  const [currentInvitationCode, setCurrentInvitationCode] = useState("")
 
-  // Generate invitation code
+  useEffect(() => {
+    if (!userData?.company_id) return
+
+    const q = query(collection(db, "iboard_users"), where("company_id", "==", userData.company_id))
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const usersData = snapshot.docs.map((doc) => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          email: data.email || "",
+          displayName: data.display_name || data.displayName || "Unknown User",
+          role: String(data.role || "user"), // Ensure role is always a string
+          status: data.active === false ? "inactive" : "active",
+          lastLogin: data.lastLogin?.toDate() || null,
+          created: data.created?.toDate() || new Date(),
+        }
+      })
+      setUsers(usersData)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [userData?.company_id])
+
   const generateInvitationCode = () => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
     let result = ""
@@ -46,276 +64,179 @@ export default function UserManagementPage() {
     return result
   }
 
-  // Handle add user button click
   const handleAddUser = async () => {
+    if (!userData?.company_id) {
+      toast.error("Company information not found")
+      return
+    }
+
     try {
-      const code = generateInvitationCode()
+      // Generate invitation code
+      const invitationCode = generateInvitationCode()
 
       // Save invitation code to Firestore
-      await setDoc(doc(db, "invitationCodes", code), {
-        code: code,
-        createdBy: userData?.uid,
-        createdAt: new Date(),
-        companyId: userData?.companyId,
-        companyName: userData?.companyName,
+      await addDoc(collection(db, "invitation_codes"), {
+        code: invitationCode,
+        company_id: userData.company_id,
+        created_by: userData.uid,
+        created_at: serverTimestamp(),
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        used: false,
         role: "user",
-        isUsed: false,
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        max_uses: 1,
+        current_uses: 0,
       })
 
-      setInvitationCode(code)
-      setShowInviteDialog(true)
+      setCurrentInvitationCode(invitationCode)
+      setShowAddUserDialog(true)
     } catch (error) {
       console.error("Error generating invitation code:", error)
-      toast.error("Failed to generate invitation code")
+      toast.error("Failed to generate invitation code. Please try again.")
     }
   }
 
-  // Fetch users from Firestore
-  const fetchUsers = async () => {
-    if (!userData?.companyId) return
+  const getStatusBadge = (status: string) => {
+    // Ensure status is a string
+    const statusStr = String(status || "unknown")
 
-    try {
-      setLoading(true)
-      const usersRef = collection(db, "users")
-      const q = query(usersRef, where("companyId", "==", userData.companyId), orderBy("createdAt", "desc"))
-
-      const querySnapshot = await getDocs(q)
-      const usersData: UserData[] = []
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data()
-        usersData.push({
-          id: doc.id,
-          email: data.email,
-          displayName: data.displayName,
-          role: data.role || "user",
-          companyId: data.companyId,
-          companyName: data.companyName,
-          photoURL: data.photoURL,
-          createdAt: data.createdAt,
-          lastLoginAt: data.lastLoginAt,
-          isActive: data.isActive !== false, // Default to true if not specified
-        })
-      })
-
-      setUsers(usersData)
-    } catch (error) {
-      console.error("Error fetching users:", error)
-      toast.error("Failed to load users")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchUsers()
-  }, [userData?.companyId])
-
-  // Filter users based on search term
-  const filteredUsers = users.filter(
-    (user) =>
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.displayName?.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
-
-  // Get role icon
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case "admin":
-        return <Crown className="h-4 w-4" />
-      case "manager":
-        return <Shield className="h-4 w-4" />
+    switch (statusStr) {
+      case "active":
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Active</Badge>
+      case "inactive":
+        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Inactive</Badge>
       default:
-        return <User className="h-4 w-4" />
+        return <Badge variant="secondary">{statusStr}</Badge>
     }
   }
 
-  // Get role color
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case "admin":
-        return "bg-red-100 text-red-800"
-      case "manager":
-        return "bg-blue-100 text-blue-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+  const getRoleBadge = (role: string) => {
+    // Ensure role is a string and provide fallback
+    const roleStr = String(role || "user").toLowerCase()
+
+    const roleColors = {
+      admin: "bg-purple-100 text-purple-800 hover:bg-purple-100",
+      manager: "bg-blue-100 text-blue-800 hover:bg-blue-100",
+      editor: "bg-orange-100 text-orange-800 hover:bg-orange-100",
+      user: "bg-gray-100 text-gray-800 hover:bg-gray-100",
     }
+
+    return (
+      <Badge className={roleColors[roleStr as keyof typeof roleColors] || roleColors.user}>
+        {roleStr.charAt(0).toUpperCase() + roleStr.slice(1)}
+      </Badge>
+    )
+  }
+
+  const columns = [
+    {
+      key: "user",
+      label: "User",
+      render: (user: User) => (
+        <div>
+          <div className="font-medium">{user.displayName}</div>
+          <div className="text-sm text-muted-foreground">{user.email}</div>
+        </div>
+      ),
+    },
+    {
+      key: "role",
+      label: "Role",
+      render: (user: User) => getRoleBadge(user.role),
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (user: User) => getStatusBadge(user.status),
+    },
+    {
+      key: "lastLogin",
+      label: "Last Login",
+      render: (user: User) => (
+        <span className="text-sm">{user.lastLogin ? user.lastLogin.toLocaleDateString() : "Never"}</span>
+      ),
+    },
+    {
+      key: "created",
+      label: "Joined",
+      render: (user: User) => <span className="text-sm">{user.created.toLocaleDateString()}</span>,
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      render: (user: User) => (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ]
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">User Management</h1>
+            <p className="text-muted-foreground">Manage users and their permissions.</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="container mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold">User Management</h1>
-          <p className="text-muted-foreground">Manage users and their permissions</p>
+          <h1 className="text-2xl font-bold">User Management</h1>
+          <p className="text-muted-foreground">Manage users and their permissions.</p>
         </div>
-        <Button onClick={handleAddUser} className="flex items-center gap-2">
-          <UserPlus className="h-4 w-4" />
-          Add User
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link href="/admin/access-management">
+            <Button variant="outline" className="gap-2 bg-transparent">
+              <Shield className="h-4 w-4" />
+              Roles & Permissions
+            </Button>
+          </Link>
+          <Link href="/admin/invitation-codes">
+            <Button variant="outline" className="gap-2 bg-transparent">
+              <Mail className="h-4 w-4" />
+              Invitation Codes
+            </Button>
+          </Link>
+          <Button className="gap-2" onClick={handleAddUser}>
+            <UserPlus className="h-4 w-4" />
+            Add User
+          </Button>
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <User className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{users.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
-            <User className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{users.filter((u) => u.isActive).length}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Admins</CardTitle>
-            <Crown className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{users.filter((u) => u.role === "admin").length}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Managers</CardTitle>
-            <Shield className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{users.filter((u) => u.role === "manager").length}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Filters */}
+      {/* Users Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Users</CardTitle>
-          <CardDescription>Manage your organization's users</CardDescription>
+          <CardTitle>Organization Users ({users.length})</CardTitle>
+          <CardDescription>Manage users within your organization</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center space-x-2 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search users..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8"
-              />
-            </div>
-          </div>
-
-          {/* Users Table */}
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Login</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
-                      Loading users...
-                    </TableCell>
-                  </TableRow>
-                ) : filteredUsers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
-                      No users found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={user.photoURL || "/placeholder.svg"} />
-                            <AvatarFallback>
-                              {user.displayName?.charAt(0) || user.email.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium">{user.displayName || "No name"}</div>
-                            <div className="text-sm text-muted-foreground">{user.email}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className={getRoleColor(user.role)}>
-                          <div className="flex items-center gap-1">
-                            {getRoleIcon(user.role)}
-                            {user.role}
-                          </div>
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={user.isActive ? "default" : "secondary"}>
-                          {user.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {user.lastLoginAt ? new Date(user.lastLoginAt.toDate()).toLocaleDateString() : "Never"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Settings className="mr-2 h-4 w-4" />
-                              Edit User
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Shield className="mr-2 h-4 w-4" />
-                              Change Role
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600">
-                              <User className="mr-2 h-4 w-4" />
-                              {user.isActive ? "Deactivate" : "Activate"}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <ResponsiveTable data={users} columns={columns} keyField="id" />
         </CardContent>
       </Card>
 
-      {/* Add User Invitation Dialog */}
+      {/* Add User Dialog */}
       <AddUserInvitationDialog
-        open={showInviteDialog}
-        onOpenChange={setShowInviteDialog}
-        invitationCode={invitationCode}
+        open={showAddUserDialog}
+        onOpenChange={setShowAddUserDialog}
+        invitationCode={currentInvitationCode}
         onSuccess={() => {
-          // Optionally refresh the users list or show success message
           toast.success("User invitation sent successfully!")
         }}
       />
