@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -22,7 +24,10 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   const [loading, setLoading] = useState(false)
   const [reportType, setReportType] = useState("completion-report")
   const [date, setDate] = useState("")
-  const [attachments, setAttachments] = useState<{ note: string; file?: File }[]>([{ note: "" }, { note: "" }])
+  const [attachments, setAttachments] = useState<{ note: string; file?: File; fileName?: string }[]>([
+    { note: "" },
+    { note: "" },
+  ])
   const { toast } = useToast()
 
   // Fetch product data when dialog opens
@@ -54,10 +59,14 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     setAttachments(newAttachments)
   }
 
-  const handleFileUpload = (index: number, file: File) => {
-    const newAttachments = [...attachments]
-    newAttachments[index].file = file
-    setAttachments(newAttachments)
+  const handleFileUpload = (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      const newAttachments = [...attachments]
+      newAttachments[index].file = file
+      newAttachments[index].fileName = file.name
+      setAttachments(newAttachments)
+    }
   }
 
   const handleGenerateReport = async () => {
@@ -174,22 +183,23 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             <div className="grid grid-cols-2 gap-3">
               {attachments.map((attachment, index) => (
                 <div key={index} className="space-y-2">
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center bg-gray-50">
-                    <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center bg-gray-50 hover:bg-gray-100 transition-colors">
                     <input
                       type="file"
                       className="hidden"
                       id={`file-${index}`}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) handleFileUpload(index, file)
-                      }}
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
+                      onChange={(e) => handleFileUpload(index, e)}
                     />
-                    <label
-                      htmlFor={`file-${index}`}
-                      className="cursor-pointer text-sm text-gray-500 hover:text-gray-700"
-                    >
-                      Upload File
+                    <label htmlFor={`file-${index}`} className="cursor-pointer flex flex-col items-center space-y-2">
+                      <Upload className="h-6 w-6 text-gray-400" />
+                      <span className="text-xs text-gray-500">
+                        {attachment.fileName ? (
+                          <span className="text-blue-600 font-medium">{attachment.fileName}</span>
+                        ) : (
+                          "Click to upload"
+                        )}
+                      </span>
                     </label>
                   </div>
                   <Input
