@@ -535,7 +535,7 @@ function UnifiedSiteCard({ site }: { site: any }) {
           {/* Create Report Button */}
           <Button
             variant="outline"
-            className="mt-4 w-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200 font-medium"
+            className="mt-4 w-full bg-white text-gray-600 hover:bg-gray-50 border-gray-300 font-normal shadow-sm"
             onClick={handleCreateReport}
           >
             Create Report
