@@ -752,104 +752,146 @@ export async function generateCostEstimatePDF(
 }
 
 export async function generateReportPDF(
-  report: ReportData,
+  reportData: ReportData,
   product: Product | null,
   returnBlob = false,
-): Promise<void | Blob> {
-  const doc = new jsPDF()
-
-  // Add header
-  doc.setFontSize(20)
-  doc.text("Report", 20, 30)
-
-  // Add report details
-  doc.setFontSize(12)
-  let yPosition = 50
-
-  doc.text(`Report Type: ${getReportTypeDisplay(report.reportType)}`, 20, yPosition)
-  yPosition += 10
-
-  doc.text(`Site Name: ${report.siteName}`, 20, yPosition)
-  yPosition += 10
-
-  doc.text(`Site ID: ${report.siteId}`, 20, yPosition)
-  yPosition += 10
-
-  doc.text(`Date: ${new Date(report.date).toLocaleDateString()}`, 20, yPosition)
-  yPosition += 10
-
-  if (report.completionPercentage) {
-    doc.text(`Completion: ${report.completionPercentage}%`, 20, yPosition)
-    yPosition += 10
-  }
-
-  // Add product details if available
-  if (product) {
-    yPosition += 10
-    doc.setFontSize(14)
-    doc.text("Product Details:", 20, yPosition)
-    yPosition += 10
-
-    doc.setFontSize(12)
-    doc.text(`Product Name: ${product.name || "N/A"}`, 20, yPosition)
-    yPosition += 10
-
-    if (product.location) {
-      doc.text(`Location: ${product.location}`, 20, yPosition)
-      yPosition += 10
-    }
-
-    if (product.dimensions) {
-      doc.text(`Dimensions: ${product.dimensions}`, 20, yPosition)
-      yPosition += 10
-    }
-  }
-
-  // Add report content
-  if (report.notes) {
-    yPosition += 10
-    doc.setFontSize(14)
-    doc.text("Notes:", 20, yPosition)
-    yPosition += 10
-
-    doc.setFontSize(12)
-    const splitNotes = doc.splitTextToSize(report.notes, 170)
-    doc.text(splitNotes, 20, yPosition)
-    yPosition += splitNotes.length * 5
-  }
-
-  // Add attachments info
-  if (report.attachments && report.attachments.length > 0) {
-    yPosition += 10
-    doc.setFontSize(14)
-    doc.text("Attachments:", 20, yPosition)
-    yPosition += 10
-
-    doc.setFontSize(12)
-    report.attachments.forEach((attachment, index) => {
-      doc.text(`${index + 1}. ${attachment.name || `Attachment ${index + 1}`}`, 20, yPosition)
-      yPosition += 8
+): Promise<Blob | void> {
+  try {
+    // Create a new jsPDF instance
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
     })
+
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 20
+
+    // Helper function to add text with word wrapping
+    const addWrappedText = (text: string, x: number, y: number, maxWidth: number, lineHeight = 6) => {
+      const lines = pdf.splitTextToSize(text, maxWidth)
+      pdf.text(lines, x, y)
+      return y + lines.length * lineHeight
+    }
+
+    // Set up document properties
+    pdf.setProperties({
+      title: `${reportData.reportType} - ${reportData.siteName}`,
+      subject: `Report for ${reportData.siteName}`,
+      author: "OOH Operator",
+      creator: "OOH Operator System",
+    })
+
+    // Add header
+    pdf.setFontSize(20)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("LOGISTICS REPORT", pageWidth / 2, margin + 10, { align: "center" })
+
+    // Add report type
+    pdf.setFontSize(14)
+    pdf.setFont("helvetica", "normal")
+    const reportTypeDisplay = reportData.reportType
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+    pdf.text(reportTypeDisplay, pageWidth / 2, margin + 20, { align: "center" })
+
+    // Add date
+    pdf.setFontSize(10)
+    pdf.text(`as of ${new Date(reportData.date).toLocaleDateString()}`, pageWidth / 2, margin + 28, { align: "center" })
+
+    let currentY = margin + 40
+
+    // Project Information Section
+    pdf.setFontSize(14)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Project Information", margin, currentY)
+    currentY += 10
+
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
+
+    // Left column
+    const leftColumnX = margin
+    const rightColumnX = pageWidth / 2 + 10
+    let leftY = currentY
+    let rightY = currentY
+
+    // Left column data
+    const leftData = [
+      `Site ID: ${reportData.siteId} ${product?.light?.location || product?.specs_rental?.location || ""}`,
+      `Job Order: ${reportData.id?.slice(-4).toUpperCase() || "N/A"}`,
+      `Job Order Date: ${new Date(reportData.created?.toDate?.() || reportData.date).toLocaleDateString()}`,
+      `Site: ${reportData.siteName}`,
+      `Size: ${product?.specs_rental?.size || product?.light?.size || "N/A"}`,
+      `Start Date: ${new Date(reportData.bookingDates.start).toLocaleDateString()}`,
+      `End Date: ${new Date(reportData.bookingDates.end).toLocaleDateString()}`,
+    ]
+
+    // Right column data
+    const rightData = [
+      `Content: ${product?.content_type || "N/A"}`,
+      `Material Specs: ${product?.specs_rental?.material || "N/A"}`,
+      `Crew: Team ${reportData.assignedTo || "A"}`,
+      `Illumination: ${product?.light?.illumination || "N/A"}`,
+      `Gondola: ${product?.specs_rental?.gondola ? "YES" : "NO"}`,
+      `Technology: ${product?.specs_rental?.technology || "N/A"}`,
+      `Sales: ${reportData.sales}`,
+    ]
+
+    // Add left column
+    leftData.forEach((item) => {
+      leftY = addWrappedText(item, leftColumnX, leftY, pageWidth / 2 - margin - 10, 6)
+    })
+
+    // Add right column
+    rightData.forEach((item) => {
+      rightY = addWrappedText(item, rightColumnX, rightY, pageWidth / 2 - margin - 10, 6)
+    })
+
+    currentY = Math.max(leftY, rightY) + 10
+
+    // Project Status Section
+    pdf.setFontSize(14)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Project Status", margin, currentY)
+    currentY += 10
+
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(`Completion: ${reportData.completionPercentage || 100}%`, margin, currentY)
+    currentY += 10
+
+    // Add attachments info if available
+    if (reportData.attachments && reportData.attachments.length > 0) {
+      pdf.text(`Attachments: ${reportData.attachments.length} file(s) attached`, margin, currentY)
+      currentY += 10
+    }
+
+    // Footer
+    const pageCount = pdf.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      pdf.setPage(i)
+      pdf.setFontSize(10)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(
+        `Generated on ${new Date().toLocaleDateString()} - Page ${i} of ${pageCount}`,
+        20,
+        pdf.internal.pageSize.height - 20,
+      )
+    }
+
+    if (returnBlob) {
+      // Return as blob for email attachment
+      return pdf.output("blob")
+    } else {
+      // Download the PDF
+      const fileName = `${reportData.siteId}_${reportData.reportType.replace(/\s+/g, "_")}_${reportData.siteName.replace(/\s+/g, "_")}.pdf`
+      pdf.save(fileName)
+    }
+  } catch (error) {
+    console.error("Error generating PDF:", error)
+    throw error
   }
-
-  // Add footer
-  const pageHeight = doc.internal.pageSize.height
-  doc.setFontSize(10)
-  doc.text("Generated by OOH Operator System", 20, pageHeight - 20)
-  doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, pageHeight - 10)
-
-  if (returnBlob) {
-    return doc.output("blob")
-  } else {
-    // Download the PDF
-    const fileName = `${report.siteId}_${getReportTypeDisplay(report.reportType).replace(/\s+/g, "_")}_${report.siteName.replace(/\s+/g, "_")}.pdf`
-    doc.save(fileName)
-  }
-}
-
-function getReportTypeDisplay(type: string): string {
-  return type
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
 }

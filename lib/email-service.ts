@@ -12,6 +12,10 @@ import {
   type Timestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { Resend } from "resend"
+
+// Initialize Resend
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 // Email Template Interface
 export interface EmailTemplate {
@@ -108,7 +112,7 @@ class EmailService {
     }
   }
 
-  // Compose Emails - using compose_emails collection
+  // Emails - using compose_emails collection
   async createEmail(email: Omit<Email, "id" | "created">): Promise<string> {
     try {
       // Clean the email object to remove undefined values
@@ -195,72 +199,69 @@ class EmailService {
 
   async sendEmail(emailId: string): Promise<void> {
     try {
-      // Get the email document first
-      const emailsQuery = query(collection(db, "compose_emails"), where("__name__", "==", emailId))
-      const emailSnapshot = await getDocs(emailsQuery)
+      // Get email data from database
+      const emails = await this.getEmails("")
+      const emailData = emails.find((e) => e.id === emailId)
 
-      if (emailSnapshot.empty) {
+      if (!emailData) {
         throw new Error("Email not found")
       }
 
-      const emailData = emailSnapshot.docs[0].data() as Email
+      // Convert attachments to Resend format
+      const attachments =
+        emailData.attachments?.map((att) => ({
+          filename: att.fileName,
+          content: att.fileUrl, // In a real app, this would be the actual file content or buffer
+        })) || []
 
-      // Prepare email for sending via Resend API
-      const emailPayload = {
-        from: emailData.from || "noreply@ohplus.aix.ph",
+      // Send email using Resend
+      const emailPayload: any = {
+        from: "OOH Operator <noreply@ohplus.com>",
         to: emailData.to,
-        cc: emailData.cc || [],
         subject: emailData.subject,
-        html: this.formatEmailBody(emailData.body),
-        attachments: emailData.attachments ? await this.prepareAttachments(emailData.attachments) : [],
+        html: emailData.body.replace(/\n/g, "<br>"),
+        text: emailData.body,
       }
 
-      // Send email using Resend API
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        },
-        body: JSON.stringify(emailPayload),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(`Failed to send email: ${errorData.message || response.statusText}`)
+      // Add CC if exists
+      if (emailData.cc && emailData.cc.length > 0) {
+        emailPayload.cc = emailData.cc
       }
 
-      const result = await response.json()
-      console.log("Email sent successfully:", result)
+      // Add BCC if exists
+      if (emailData.bcc && emailData.bcc.length > 0) {
+        emailPayload.bcc = emailData.bcc
+      }
+
+      // Add attachments if exists (commented out for now as we need proper file handling)
+      // if (attachments.length > 0) {
+      //   emailPayload.attachments = attachments
+      // }
+
+      const result = await resend.emails.send(emailPayload)
+
+      if (result.error) {
+        throw new Error(result.error.message)
+      }
 
       // Update email status to sent
       await this.updateEmail(emailId, {
         status: "sent",
         sentAt: serverTimestamp() as any,
       })
+
+      console.log("Email sent successfully:", result.data?.id)
     } catch (error) {
       console.error("Error sending email:", error)
 
       // Update email status to failed with error message
       await this.updateEmail(emailId, {
         status: "failed",
-        errorMessage: error instanceof Error ? error.message : "Unknown error occurred",
+        errorMessage: error instanceof Error ? error.message : "Unknown error",
       })
 
       throw error
     }
-  }
-
-  private formatEmailBody(body: string): string {
-    // Convert plain text to HTML with proper formatting
-    return body.replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>").replace(/^/, "<p>").replace(/$/, "</p>")
-  }
-
-  private async prepareAttachments(attachments: EmailAttachment[]): Promise<any[]> {
-    // In a real implementation, you would convert blob URLs to base64 or upload to a CDN
-    // For now, we'll return empty array since blob URLs won't work in email sending
-    console.log("Attachments would be processed here:", attachments)
-    return []
   }
 
   // Default templates

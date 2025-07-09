@@ -148,6 +148,11 @@ export default function ComposeEmailPage() {
     setBody(template.body)
   }
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
   const handleSendEmail = async () => {
     if (!user?.uid || !to.trim() || !subject.trim() || !body.trim()) {
       toast({
@@ -158,23 +163,44 @@ export default function ComposeEmailPage() {
       return
     }
 
+    // Validate email addresses
+    const toEmails = to
+      .split(",")
+      .map((email) => email.trim())
+      .filter((email) => email)
+
+    const invalidToEmails = toEmails.filter((email) => !validateEmail(email))
+    if (invalidToEmails.length > 0) {
+      toast({
+        title: "Invalid Email",
+        description: `Invalid email addresses: ${invalidToEmails.join(", ")}`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    const ccEmails = cc
+      ? cc
+          .split(",")
+          .map((email) => email.trim())
+          .filter((email) => email)
+      : []
+
+    const invalidCcEmails = ccEmails.filter((email) => !validateEmail(email))
+    if (invalidCcEmails.length > 0) {
+      toast({
+        title: "Invalid CC Email",
+        description: `Invalid CC email addresses: ${invalidCcEmails.join(", ")}`,
+        variant: "destructive",
+      })
+      return
+    }
+
     setSending(true)
     try {
-      // Parse email addresses
-      const toEmails = to
-        .split(",")
-        .map((email) => email.trim())
-        .filter((email) => email)
-      const ccEmails = cc
-        ? cc
-            .split(",")
-            .map((email) => email.trim())
-            .filter((email) => email)
-        : []
-
       // Create email record - only include defined values
       const emailData: Omit<Email, "id" | "created"> = {
-        from: user.email || "noreply@ohplus.aix.ph",
+        from: user.email || "noreply@ohplus.com",
         to: toEmails,
         subject,
         body,
@@ -199,20 +225,8 @@ export default function ComposeEmailPage() {
       // Create email record in compose_emails collection
       const emailId = await emailService.createEmail(emailData)
 
-      // Send email via API route
-      const response = await fetch("/api/emails/send", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ emailId }),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.details || result.error || "Failed to send email")
-      }
+      // Send email using Resend
+      await emailService.sendEmail(emailId)
 
       toast({
         title: "Email Sent!",
