@@ -10,7 +10,8 @@ import {
   orderBy,
   Timestamp,
 } from "firebase/firestore"
-import { db } from "./firebase"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { db, storage } from "./firebase"
 
 export interface ReportData {
   id?: string
@@ -66,13 +67,67 @@ export interface ReportData {
 
 const REPORTS_COLLECTION = "reports"
 
+export async function uploadReportAttachment(file: File, reportId: string, index: number): Promise<string> {
+  try {
+    const fileExtension = file.name.split(".").pop()
+    const fileName = `reports/${reportId}/attachment_${index}.${fileExtension}`
+    const storageRef = ref(storage, fileName)
+
+    await uploadBytes(storageRef, file)
+    const downloadURL = await getDownloadURL(storageRef)
+
+    return downloadURL
+  } catch (error) {
+    console.error("Error uploading attachment:", error)
+    throw error
+  }
+}
+
 export async function createReport(reportData: ReportData): Promise<string> {
   try {
+    // First create the report to get an ID
     const docRef = await addDoc(collection(db, REPORTS_COLLECTION), {
       ...reportData,
+      attachments: [], // Temporarily empty while we upload files
       created: Timestamp.now(),
       updated: Timestamp.now(),
     })
+
+    // Upload attachments and get URLs
+    const uploadedAttachments = await Promise.all(
+      reportData.attachments.map(async (attachment, index) => {
+        if (attachment.file) {
+          try {
+            const fileUrl = await uploadReportAttachment(attachment.file, docRef.id, index)
+            return {
+              note: attachment.note,
+              fileName: attachment.fileName,
+              fileUrl: fileUrl,
+              fileType: attachment.fileType,
+            }
+          } catch (error) {
+            console.error(`Error uploading attachment ${index}:`, error)
+            return {
+              note: attachment.note,
+              fileName: attachment.fileName,
+              fileType: attachment.fileType,
+            }
+          }
+        }
+        return {
+          note: attachment.note,
+          fileName: attachment.fileName,
+          fileType: attachment.fileType,
+        }
+      }),
+    )
+
+    // Update the report with the uploaded attachment URLs
+    await updateDoc(doc(db, REPORTS_COLLECTION, docRef.id), {
+      attachments: uploadedAttachments,
+      updated: Timestamp.now(),
+    })
+
     return docRef.id
   } catch (error) {
     console.error("Error creating report:", error)

@@ -89,6 +89,18 @@ export default function ReportPreviewPage() {
     }
   }
 
+  const isImageFile = (fileName: string) => {
+    if (!fileName) return false
+    const extension = fileName.toLowerCase().split(".").pop()
+    return ["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")
+  }
+
+  const isVideoFile = (fileName: string) => {
+    if (!fileName) return false
+    const extension = fileName.toLowerCase().split(".").pop()
+    return ["mp4", "avi", "mov", "wmv"].includes(extension || "")
+  }
+
   const handleBack = () => {
     router.back()
   }
@@ -223,8 +235,68 @@ export default function ReportPreviewPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {report.attachments.slice(0, 2).map((attachment, index) => (
                 <div key={index} className="space-y-2">
-                  <div className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4">
-                    {attachment.fileName ? (
+                  <div className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden">
+                    {attachment.fileUrl ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center">
+                        {isImageFile(attachment.fileName || "") ? (
+                          <img
+                            src={attachment.fileUrl || "/placeholder.svg"}
+                            alt={attachment.fileName || `Attachment ${index + 1}`}
+                            className="max-w-full max-h-full object-contain rounded"
+                            onError={(e) => {
+                              // Fallback to icon if image fails to load
+                              const target = e.target as HTMLImageElement
+                              target.style.display = "none"
+                              const parent = target.parentElement
+                              if (parent) {
+                                parent.innerHTML = `
+                                  <div class="text-center space-y-2">
+                                    ${getFileIcon(attachment.fileName || "").props.children}
+                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
+                                  </div>
+                                `
+                              }
+                            }}
+                          />
+                        ) : isVideoFile(attachment.fileName || "") ? (
+                          <video
+                            src={attachment.fileUrl}
+                            controls
+                            className="max-w-full max-h-full object-contain rounded"
+                            onError={(e) => {
+                              // Fallback to icon if video fails to load
+                              const target = e.target as HTMLVideoElement
+                              target.style.display = "none"
+                              const parent = target.parentElement
+                              if (parent) {
+                                parent.innerHTML = `
+                                  <div class="text-center space-y-2">
+                                    ${getFileIcon(attachment.fileName || "").props.children}
+                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
+                                  </div>
+                                `
+                              }
+                            }}
+                          />
+                        ) : (
+                          <div className="text-center space-y-2">
+                            {getFileIcon(attachment.fileName || "")}
+                            <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
+                            <a
+                              href={attachment.fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:text-blue-800 underline"
+                            >
+                              Open File
+                            </a>
+                          </div>
+                        )}
+                        {attachment.note && (
+                          <p className="text-xs text-gray-500 italic mt-2 text-center">"{attachment.note}"</p>
+                        )}
+                      </div>
+                    ) : attachment.fileName ? (
                       <div className="text-center space-y-2">
                         {getFileIcon(attachment.fileName)}
                         <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>

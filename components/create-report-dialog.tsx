@@ -104,8 +104,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       newAttachments[index].file = file
       newAttachments[index].fileName = file.name
 
-      // Create preview for images
-      if (file.type.startsWith("image/")) {
+      // Create preview for images and videos
+      if (file.type.startsWith("image/") || file.type.startsWith("video/")) {
         try {
           const preview = await createFilePreview(file)
           newAttachments[index].preview = preview
@@ -163,6 +163,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     }
 
     const isImage = attachment.file.type.startsWith("image/")
+    const isVideo = attachment.file.type.startsWith("video/")
 
     return (
       <div className="relative w-full h-full group">
@@ -175,6 +176,12 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
               src={attachment.preview || "/placeholder.svg"}
               alt={attachment.fileName}
               className="w-full h-full object-cover rounded"
+            />
+          ) : isVideo && attachment.preview ? (
+            <video
+              src={attachment.preview || "/placeholder.svg"}
+              className="w-full h-full object-cover rounded"
+              muted
             />
           ) : (
             <div className="flex items-center justify-center">{getFileIcon(attachment.fileName)}</div>
@@ -234,6 +241,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
           .filter((att) => att.note.trim() !== "" || att.file)
           .map((att) => ({
             note: att.note,
+            file: att.file,
             fileName: att.fileName,
             fileType: att.file?.type,
           })),
