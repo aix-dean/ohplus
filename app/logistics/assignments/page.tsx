@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button"
 import { ServiceAssignmentsTable } from "@/components/service-assignments-table"
 import { Plus, Filter, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
-import { doc, getDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
 import { useRouter } from "next/navigation"
+import { getDoc, doc } from "firebase/firestore"
+import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
+
+import { db } from "@/lib/firebase"
 
 export default function ServiceAssignmentsPage() {
   const router = useRouter()
