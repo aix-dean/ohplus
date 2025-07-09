@@ -1,4 +1,5 @@
 import jsPDF from "jspdf"
+import html2canvas from "html2canvas"
 import type { Proposal } from "@/lib/types/proposal"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import type { ReportData } from "@/lib/report-service"
@@ -757,136 +758,170 @@ export async function generateReportPDF(
   returnBlob = false,
 ): Promise<Blob | void> {
   try {
-    // Create a new jsPDF instance
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
+    // Create a temporary container for the report content
+    const container = document.createElement("div")
+    container.style.position = "absolute"
+    container.style.left = "-9999px"
+    container.style.top = "-9999px"
+    container.style.width = "800px"
+    container.style.backgroundColor = "white"
+    container.style.padding = "40px"
+    container.style.fontFamily = "Arial, sans-serif"
+
+    // Generate report content HTML
+    const reportContent = generateReportHTML(report, product)
+    container.innerHTML = reportContent
+
+    // Append to body temporarily
+    document.body.appendChild(container)
+
+    // Convert to canvas
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#ffffff",
     })
 
-    const pageWidth = pdf.internal.pageSize.getWidth()
-    const pageHeight = pdf.internal.pageSize.getHeight()
-    const margin = 20
+    // Remove temporary container
+    document.body.removeChild(container)
 
-    // Helper function to add text with word wrapping
-    const addWrappedText = (text: string, x: number, y: number, maxWidth: number, lineHeight = 6) => {
-      const lines = pdf.splitTextToSize(text, maxWidth)
-      pdf.text(lines, x, y)
-      return y + lines.length * lineHeight
+    // Create PDF
+    const pdf = new jsPDF("p", "mm", "a4")
+    const imgWidth = 210 // A4 width in mm
+    const pageHeight = 295 // A4 height in mm
+    const imgHeight = (canvas.height * imgWidth) / canvas.width
+    let heightLeft = imgHeight
+
+    let position = 0
+
+    // Add first page
+    pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, position, imgWidth, imgHeight)
+    heightLeft -= pageHeight
+
+    // Add additional pages if needed
+    while (heightLeft >= 0) {
+      position = heightLeft - imgHeight
+      pdf.addPage()
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
     }
-
-    // Add header
-    pdf.setFontSize(20)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("LOGISTICS REPORT", pageWidth / 2, margin + 10, { align: "center" })
-
-    // Add report type
-    pdf.setFontSize(14)
-    pdf.setFont("helvetica", "normal")
-    const reportType = report.reportType
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
-    pdf.text(reportType, pageWidth / 2, margin + 20, { align: "center" })
-
-    // Add date
-    pdf.setFontSize(10)
-    pdf.text(`as of ${new Date(report.date).toLocaleDateString()}`, pageWidth / 2, margin + 28, { align: "center" })
-
-    let currentY = margin + 40
-
-    // Project Information Section
-    pdf.setFontSize(14)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Project Information", margin, currentY)
-    currentY += 10
-
-    pdf.setFontSize(10)
-    pdf.setFont("helvetica", "normal")
-
-    // Left column
-    const leftColumnX = margin
-    const rightColumnX = pageWidth / 2 + 10
-    let leftY = currentY
-    let rightY = currentY
-
-    // Left column data
-    const leftData = [
-      `Site ID: ${report.siteId} ${product?.light?.location || product?.specs_rental?.location || ""}`,
-      `Job Order: ${report.id?.slice(-4).toUpperCase() || "N/A"}`,
-      `Job Order Date: ${new Date(report.created?.toDate?.() || report.date).toLocaleDateString()}`,
-      `Site: ${report.siteName}`,
-      `Size: ${product?.specs_rental?.size || product?.light?.size || "N/A"}`,
-      `Start Date: ${new Date(report.bookingDates.start).toLocaleDateString()}`,
-      `End Date: ${new Date(report.bookingDates.end).toLocaleDateString()}`,
-    ]
-
-    // Right column data
-    const rightData = [
-      `Content: ${product?.content_type || "N/A"}`,
-      `Material Specs: ${product?.specs_rental?.material || "N/A"}`,
-      `Crew: Team ${report.assignedTo || "A"}`,
-      `Illumination: ${product?.light?.illumination || "N/A"}`,
-      `Gondola: ${product?.specs_rental?.gondola ? "YES" : "NO"}`,
-      `Technology: ${product?.specs_rental?.technology || "N/A"}`,
-      `Sales: ${report.sales}`,
-    ]
-
-    // Add left column
-    leftData.forEach((item) => {
-      leftY = addWrappedText(item, leftColumnX, leftY, pageWidth / 2 - margin - 10, 6)
-    })
-
-    // Add right column
-    rightData.forEach((item) => {
-      rightY = addWrappedText(item, rightColumnX, rightY, pageWidth / 2 - margin - 10, 6)
-    })
-
-    currentY = Math.max(leftY, rightY) + 10
-
-    // Project Status Section
-    pdf.setFontSize(14)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Project Status", margin, currentY)
-    currentY += 10
-
-    pdf.setFontSize(10)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(`Completion: ${report.completionPercentage || 100}%`, margin, currentY)
-    currentY += 10
-
-    // Add attachments info if available
-    if (report.attachments && report.attachments.length > 0) {
-      pdf.text(`Attachments: ${report.attachments.length} file(s) attached`, margin, currentY)
-      currentY += 10
-    }
-
-    // Footer
-    currentY = pageHeight - 40
-    pdf.setFontSize(8)
-    pdf.text("Prepared by:", margin, currentY)
-    pdf.text(report.createdByName || "N/A", margin, currentY + 5)
-    pdf.text("LOGISTICS", margin, currentY + 10)
-    pdf.text(new Date(report.created?.toDate?.() || report.date).toLocaleDateString(), margin, currentY + 15)
-
-    // Disclaimer
-    pdf.text(
-      `"All data are based on the latest available records as of ${new Date().toLocaleDateString()}."`,
-      pageWidth - margin,
-      currentY + 15,
-      { align: "right" },
-    )
 
     if (returnBlob) {
       // Return as blob for email attachment
       return pdf.output("blob")
     } else {
       // Download the PDF
-      const fileName = `${report.siteId}_${reportType.replace(/\s+/g, "_")}_${report.siteName.replace(/\s+/g, "_")}.pdf`
+      const fileName = `${report.siteId}_${getReportTypeDisplay(report.reportType).replace(/\s+/g, "_")}_${report.siteName.replace(/\s+/g, "_")}.pdf`
       pdf.save(fileName)
     }
   } catch (error) {
     console.error("Error generating PDF:", error)
     throw error
   }
+}
+
+const generateReportHTML = (report: ReportData, product: Product | null): string => {
+  const getReportTypeDisplay = (type: string) => {
+    return type
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+  }
+
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+      <!-- Header -->
+      <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #e5e7eb; padding-bottom: 20px;">
+        <img src="/logistics-header-new.png" alt="Company Logo" style="max-height: 80px; margin-bottom: 10px;" />
+        <h1 style="color: #1f2937; margin: 10px 0; font-size: 24px;">${getReportTypeDisplay(report.reportType)}</h1>
+        <p style="color: #6b7280; margin: 0; font-size: 14px;">Generated on ${new Date().toLocaleDateString()}</p>
+      </div>
+
+      <!-- Report Details -->
+      <div style="margin-bottom: 30px;">
+        <h2 style="color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">Report Information</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <div>
+            <p style="margin: 8px 0;"><strong>Site Name:</strong> ${report.siteName}</p>
+            <p style="margin: 8px 0;"><strong>Site ID:</strong> ${report.siteId}</p>
+            <p style="margin: 8px 0;"><strong>Report Type:</strong> ${getReportTypeDisplay(report.reportType)}</p>
+            <p style="margin: 8px 0;"><strong>Date:</strong> ${new Date(report.date).toLocaleDateString()}</p>
+          </div>
+          <div>
+            <p style="margin: 8px 0;"><strong>Status:</strong> <span style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${report.completionPercentage || 100}% Complete</span></p>
+            <p style="margin: 8px 0;"><strong>Created By:</strong> ${report.createdBy || "System"}</p>
+            ${product ? `<p style="margin: 8px 0;"><strong>Location:</strong> ${product.location || "N/A"}</p>` : ""}
+          </div>
+        </div>
+      </div>
+
+      <!-- Report Content -->
+      <div style="margin-bottom: 30px;">
+        <h2 style="color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">Report Details</h2>
+        ${report.description ? `<p style="line-height: 1.6; color: #374151; margin-bottom: 20px;">${report.description}</p>` : ""}
+        
+        ${
+          report.findings
+            ? `
+          <div style="margin-bottom: 20px;">
+            <h3 style="color: #1f2937; margin-bottom: 10px;">Findings</h3>
+            <p style="line-height: 1.6; color: #374151;">${report.findings}</p>
+          </div>
+        `
+            : ""
+        }
+
+        ${
+          report.recommendations
+            ? `
+          <div style="margin-bottom: 20px;">
+            <h3 style="color: #1f2937; margin-bottom: 10px;">Recommendations</h3>
+            <p style="line-height: 1.6; color: #374151;">${report.recommendations}</p>
+          </div>
+        `
+            : ""
+        }
+      </div>
+
+      <!-- Attachments -->
+      ${
+        report.attachments && report.attachments.length > 0
+          ? `
+        <div style="margin-bottom: 30px;">
+          <h2 style="color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">Attachments</h2>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+            ${report.attachments
+              .map(
+                (attachment, index) => `
+              <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; text-align: center;">
+                <div style="width: 40px; height: 40px; background: #f3f4f6; border-radius: 8px; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center;">
+                  <span style="font-size: 12px; color: #6b7280;">📎</span>
+                </div>
+                <p style="font-size: 12px; color: #374151; margin: 0; word-break: break-all;">${attachment.name || `Attachment ${index + 1}`}</p>
+              </div>
+            `,
+              )
+              .join("")}
+          </div>
+        </div>
+      `
+          : ""
+      }
+
+      <!-- Footer -->
+      <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #e5e7eb;">
+        <img src="/logistics-footer-new.png" alt="Company Footer" style="max-height: 60px; margin-bottom: 10px;" />
+        <p style="color: #6b7280; font-size: 12px; margin: 5px 0;">This report was generated automatically by the OOH Operator System</p>
+        <p style="color: #6b7280; font-size: 12px; margin: 5px 0;">For questions or concerns, please contact our support team</p>
+      </div>
+    </div>
+  `
+}
+
+const getReportTypeDisplay = (type: string) => {
+  return type
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
 }

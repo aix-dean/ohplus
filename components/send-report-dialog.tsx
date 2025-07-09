@@ -1,181 +1,170 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
 import { Copy, Mail, MessageCircle, Phone, Facebook, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import type { ReportData } from "@/lib/report-service"
 
 interface SendReportDialogProps {
-  isOpen: boolean
-  onClose: () => void
-  report: ReportData
-  onSelectOption: (option: "email" | "whatsapp" | "viber" | "messenger") => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  reportId: string
+  reportFileName: string
+  reportType: string
 }
 
-export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: SendReportDialogProps) {
-  const { toast } = useToast()
+export function SendReportDialog({ open, onOpenChange, reportId, reportFileName, reportType }: SendReportDialogProps) {
   const router = useRouter()
-  const [copied, setCopied] = useState(false)
+  const { toast } = useToast()
+  const [copying, setCopying] = useState(false)
 
-  useEffect(() => {
-    if (copied) {
-      const timer = setTimeout(() => setCopied(false), 2000)
-      return () => clearTimeout(timer)
+  // Generate shareable link
+  const shareableLink = `${process.env.NEXT_PUBLIC_APP_URL || "https://ohplus.aix.ph"}/logistics/reports/${reportId}`
+
+  const handleCopyLink = async () => {
+    setCopying(true)
+    try {
+      await navigator.clipboard.writeText(shareableLink)
+      toast({
+        title: "Link Copied!",
+        description: "The report link has been copied to your clipboard.",
+      })
+    } catch (error) {
+      toast({
+        title: "Copy Failed",
+        description: "Failed to copy link. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setCopying(false)
     }
-  }, [copied])
-
-  // Generate report view URL
-  const reportViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/logistics/reports/${report.id}`
-
-  // Generate report filename
-  const getReportTypeDisplay = (type: string) => {
-    return type
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
   }
 
-  const reportFileName = `${report.siteId}_${getReportTypeDisplay(report.reportType).replace(/\s+/g, "_")}_${report.siteName.replace(/\s+/g, "_")}.pdf`
+  const handleEmailClick = () => {
+    onOpenChange(false)
+    router.push(`/logistics/reports/${reportId}/compose`)
+  }
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(reportViewUrl)
-    setCopied(true)
+  const handleWhatsAppClick = () => {
+    const message = encodeURIComponent(`Check out this report: ${shareableLink}`)
+    window.open(`https://wa.me/?text=${message}`, "_blank")
     toast({
-      title: "Link Copied!",
-      description: "The report link has been copied to your clipboard.",
+      title: "WhatsApp Opened",
+      description: "Share the report via WhatsApp.",
     })
   }
 
-  const handleEmailOption = () => {
-    onClose()
-    // Navigate to compose email page
-    router.push(`/logistics/reports/${report.id}/compose`)
+  const handleViberClick = () => {
+    const message = encodeURIComponent(`Check out this report: ${shareableLink}`)
+    window.open(`viber://forward?text=${message}`, "_blank")
+    toast({
+      title: "Viber Opened",
+      description: "Share the report via Viber.",
+    })
   }
 
-  const handleSocialShare = (platform: string) => {
+  const handleMessengerClick = () => {
+    const message = encodeURIComponent(`Check out this report: ${shareableLink}`)
+    window.open(`https://m.me/?text=${message}`, "_blank")
     toast({
-      title: "Not Implemented",
-      description: `Sharing via ${platform} is not yet implemented.`,
-      variant: "destructive",
+      title: "Messenger Opened",
+      description: "Share the report via Messenger.",
     })
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto p-0">
-        {/* Header */}
-        <DialogHeader className="p-6 pb-4">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px] p-0">
+        <DialogHeader className="px-8 pt-6 pb-4">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-xl font-semibold">Send Report</DialogTitle>
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-6 w-6 rounded-full">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              className="h-6 w-6 p-0 rounded-full hover:bg-gray-100"
+            >
               <X className="h-4 w-4" />
             </Button>
           </div>
         </DialogHeader>
 
-        <div className="px-8 pb-6">
+        <div className="px-8 pb-8 space-y-6">
           {/* Report Preview */}
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative w-16 h-20 flex-shrink-0 bg-blue-50 rounded border">
-              {/* Report thumbnail placeholder */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-8 h-8 bg-blue-500 rounded mb-1 mx-auto flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">PDF</span>
-                  </div>
-                  <div className="text-xs text-blue-600 font-medium">Report</div>
-                </div>
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+            <div className="flex-shrink-0">
+              <div className="w-12 h-12 bg-blue-500 rounded flex items-center justify-center">
+                <span className="text-white font-bold text-xs">PDF</span>
               </div>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 truncate">{reportFileName}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {getReportTypeDisplay(report.reportType)} • {new Date(report.date).toLocaleDateString()}
+              <p className="text-xs text-gray-500">
+                {reportType} • {new Date().toLocaleDateString()}
               </p>
             </div>
           </div>
 
-          {/* Link Section */}
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2">
-              <Input value={reportViewUrl} readOnly className="flex-1 text-sm" placeholder="Report link" />
+          {/* Shareable Link */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Input value={shareableLink} readOnly className="flex-1 bg-gray-50 text-sm" />
               <Button
-                variant="outline"
-                size="sm"
                 onClick={handleCopyLink}
-                className="flex-shrink-0 text-blue-600 border-blue-200 hover:bg-blue-50 bg-transparent"
+                disabled={copying}
+                variant="outline"
+                className="px-4 py-2 text-blue-600 border-blue-200 hover:bg-blue-50 bg-transparent"
               >
-                <Copy className="mr-1 h-3 w-3" />
-                {copied ? "Copied!" : "COPY LINK"}
+                <Copy className="h-4 w-4 mr-1" />
+                {copying ? "COPYING..." : "COPY LINK"}
               </Button>
             </div>
+          </div>
 
-            <Separator className="my-4" />
-
-            {/* Sharing Options */}
-            <div className="grid grid-cols-4 gap-6 text-center">
-              {/* Email */}
-              <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={handleEmailOption}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-12 w-12 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200"
-                >
-                  <Mail className="h-6 w-6" />
-                </Button>
-                <span className="text-xs text-gray-700">Email</span>
+          {/* Sharing Options */}
+          <div className="grid grid-cols-4 gap-6">
+            <button
+              onClick={handleEmailClick}
+              className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <Mail className="h-6 w-6 text-blue-600" />
               </div>
+              <span className="text-sm font-medium text-gray-700">Email</span>
+            </button>
 
-              {/* WhatsApp */}
-              <div
-                className="flex flex-col items-center gap-2 cursor-pointer"
-                onClick={() => handleSocialShare("WhatsApp")}
-              >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-12 w-12 rounded-full bg-green-100 text-green-600 hover:bg-green-200"
-                >
-                  <MessageCircle className="h-6 w-6" />
-                </Button>
-                <span className="text-xs text-gray-700">Whatsapp</span>
+            <button
+              onClick={handleWhatsAppClick}
+              className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <MessageCircle className="h-6 w-6 text-green-600" />
               </div>
+              <span className="text-sm font-medium text-gray-700">WhatsApp</span>
+            </button>
 
-              {/* Viber */}
-              <div
-                className="flex flex-col items-center gap-2 cursor-pointer"
-                onClick={() => handleSocialShare("Viber")}
-              >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-12 w-12 rounded-full bg-purple-100 text-purple-600 hover:bg-purple-200"
-                >
-                  <Phone className="h-6 w-6" />
-                </Button>
-                <span className="text-xs text-gray-700">Viber</span>
+            <button
+              onClick={handleViberClick}
+              className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                <Phone className="h-6 w-6 text-purple-600" />
               </div>
+              <span className="text-sm font-medium text-gray-700">Viber</span>
+            </button>
 
-              {/* Messenger */}
-              <div
-                className="flex flex-col items-center gap-2 cursor-pointer"
-                onClick={() => handleSocialShare("Messenger")}
-              >
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-12 w-12 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200"
-                >
-                  <Facebook className="h-6 w-6" />
-                </Button>
-                <span className="text-xs text-gray-700">Messenger</span>
+            <button
+              onClick={handleMessengerClick}
+              className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <Facebook className="h-6 w-6 text-blue-600" />
               </div>
-            </div>
+              <span className="text-sm font-medium text-gray-700">Messenger</span>
+            </button>
           </div>
         </div>
       </DialogContent>

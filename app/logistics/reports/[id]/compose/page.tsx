@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, Paperclip, Send, Plus, Smile, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
-import { emailService, type EmailTemplate, type Email, type EmailAttachment } from "@/lib/email-service"
+import { emailService, type EmailTemplate, type EmailAttachment } from "@/lib/email-service"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
@@ -82,7 +82,9 @@ export default function ComposeEmailPage() {
       }
 
       // Auto-generate and attach PDF
-      await generateAndAttachPDF(foundReport)
+      if (foundReport) {
+        await generateAndAttachPDF(foundReport)
+      }
     } catch (error) {
       console.error("Error fetching data:", error)
       toast({
@@ -96,7 +98,7 @@ export default function ComposeEmailPage() {
   }
 
   const generateAndAttachPDF = async (reportData: ReportData) => {
-    if (!reportData || !product) return
+    if (!reportData) return
 
     setGeneratingPDF(true)
     try {
@@ -166,18 +168,28 @@ export default function ComposeEmailPage() {
             .filter((email) => email)
         : []
 
-      // Create email record
-      const emailData: Omit<Email, "id" | "created"> = {
+      // Create email data object and only include defined values
+      const emailData: any = {
         from: user.email || "",
         to: toEmails,
-        cc: ccEmails,
         subject,
         body,
-        attachments,
-        templateId: selectedTemplate || undefined,
-        reportId,
-        status: "draft",
+        status: "draft" as const,
         userId: user.uid,
+        reportId,
+      }
+
+      // Only add optional fields if they have values
+      if (ccEmails.length > 0) {
+        emailData.cc = ccEmails
+      }
+
+      if (attachments.length > 0) {
+        emailData.attachments = attachments
+      }
+
+      if (selectedTemplate) {
+        emailData.templateId = selectedTemplate
       }
 
       const emailId = await emailService.createEmail(emailData)
