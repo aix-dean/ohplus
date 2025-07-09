@@ -289,7 +289,7 @@ export default function CMSContentCreatePage() {
       .filter(Boolean)
   }
 
-  // Validation function for dynamic content
+  // Enhanced validation function for dynamic content with detailed calculations
   const validateDynamicContent = () => {
     if (formData.content_type !== "Dynamic") {
       return true
@@ -319,22 +319,56 @@ export default function CMSContentCreatePage() {
       const durationMinutes = endTotalMinutes - startTotalMinutes
       const durationSeconds = durationMinutes * 60
 
-      // Calculate total spot time needed
+      // Calculate total spot time needed per loop
       const spotDurationNum = Number.parseInt(spot_duration)
-      const loopsPerDayNum = Number.parseInt(loops_per_day)
-      const totalSpotTime = spotDurationNum * loopsPerDayNum
+      const spotsPerLoopNum = Number.parseInt(loops_per_day)
+      const totalSpotTimePerLoop = spotDurationNum * spotsPerLoopNum
 
-      // Check if the division results in a whole number
-      const result = durationSeconds / totalSpotTime
+      // Calculate how many complete loops can fit in the time duration
+      const loopsResult = durationSeconds / totalSpotTimePerLoop
 
-      if (!Number.isInteger(result)) {
+      // Check if the division results in a whole number (integer)
+      if (!Number.isInteger(loopsResult)) {
+        // Calculate suggested values for correction
+        const floorResult = Math.floor(loopsResult)
+        const ceilResult = Math.ceil(loopsResult)
+
+        // Calculate suggested spot durations for current spots per loop
+        const suggestedSpotDurationFloor = Math.floor(durationSeconds / spotsPerLoopNum / floorResult)
+        const suggestedSpotDurationCeil = Math.floor(durationSeconds / spotsPerLoopNum / ceilResult)
+
+        // Calculate suggested spots per loop for current spot duration
+        const suggestedSpotsPerLoopFloor = Math.floor(durationSeconds / spotDurationNum / floorResult)
+        const suggestedSpotsPerLoopCeil = Math.floor(durationSeconds / spotDurationNum / ceilResult)
+
+        // Format duration for display
+        const durationHours = Math.floor(durationMinutes / 60)
+        const remainingMinutes = durationMinutes % 60
+        const durationDisplay = durationHours > 0 ? `${durationHours}h ${remainingMinutes}m` : `${remainingMinutes}m`
+
         setValidationError(
-          "Invalid spot duration and loops per day. The time slots must divide evenly into the available time period.",
+          `Invalid Input: The current configuration results in ${loopsResult.toFixed(2)} loops, which is not a whole number. ` +
+            `\n\nTime Duration: ${durationDisplay} (${durationSeconds} seconds)` +
+            `\nCurrent Configuration: ${spotDurationNum}s × ${spotsPerLoopNum} spots = ${totalSpotTimePerLoop}s per loop` +
+            `\nResult: ${durationSeconds}s ÷ ${totalSpotTimePerLoop}s = ${loopsResult.toFixed(2)} loops` +
+            `\n\nSuggested corrections:` +
+            `\n• Option 1: Change spot duration to ${suggestedSpotDurationFloor}s (for ${floorResult} complete loops)` +
+            `\n• Option 2: Change spot duration to ${suggestedSpotDurationCeil}s (for ${ceilResult} complete loops)` +
+            `\n• Option 3: Change spots per loop to ${suggestedSpotsPerLoopFloor} (for ${floorResult} complete loops)` +
+            `\n• Option 4: Change spots per loop to ${suggestedSpotsPerLoopCeil} (for ${ceilResult} complete loops)`,
         )
         return false
       }
 
-      setValidationError(null)
+      // Success case - show calculation details
+      const durationHours = Math.floor(durationMinutes / 60)
+      const remainingMinutes = durationMinutes % 60
+      const durationDisplay = durationHours > 0 ? `${durationHours}h ${remainingMinutes}m` : `${remainingMinutes}m`
+
+      setValidationError(
+        `✓ Valid Configuration: ${Math.floor(loopsResult)} complete loops will fit in the ${durationDisplay} time period. ` +
+          `Each loop uses ${totalSpotTimePerLoop}s (${spotDurationNum}s × ${spotsPerLoopNum} spots).`,
+      )
       return true
     } catch (error) {
       setValidationError("Invalid time format or values.")
@@ -502,7 +536,11 @@ export default function CMSContentCreatePage() {
                           name="cms.start_time"
                           type="time"
                           value={formData.cms.start_time}
-                          onChange={handleInputChange}
+                          onChange={(e) => {
+                            handleInputChange(e)
+                            // Trigger validation when time changes
+                            setTimeout(() => validateDynamicContent(), 100)
+                          }}
                           required={formData.content_type === "Dynamic"}
                         />
                       </div>
@@ -514,7 +552,11 @@ export default function CMSContentCreatePage() {
                           name="cms.end_time"
                           type="time"
                           value={formData.cms.end_time}
-                          onChange={handleInputChange}
+                          onChange={(e) => {
+                            handleInputChange(e)
+                            // Trigger validation when time changes
+                            setTimeout(() => validateDynamicContent(), 100)
+                          }}
                           required={formData.content_type === "Dynamic"}
                         />
                       </div>
@@ -526,7 +568,11 @@ export default function CMSContentCreatePage() {
                           name="cms.spot_duration"
                           type="number"
                           value={formData.cms.spot_duration}
-                          onChange={handleInputChange}
+                          onChange={(e) => {
+                            handleInputChange(e)
+                            // Trigger validation when duration changes
+                            setTimeout(() => validateDynamicContent(), 100)
+                          }}
                           placeholder="Enter duration in seconds"
                           min="1"
                           required={formData.content_type === "Dynamic"}
@@ -534,19 +580,39 @@ export default function CMSContentCreatePage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="spot_per_loop">Spot Per Loop</Label>
+                        <Label htmlFor="spot_per_loop">Spots Per Loop</Label>
                         <Input
                           id="spot_per_loop"
                           name="cms.loops_per_day"
                           type="number"
                           value={formData.cms.loops_per_day}
-                          onChange={handleInputChange}
+                          onChange={(e) => {
+                            handleInputChange(e)
+                            // Trigger validation when spots per loop changes
+                            setTimeout(() => validateDynamicContent(), 100)
+                          }}
                           placeholder="Enter spots per loop"
                           min="1"
                           required={formData.content_type === "Dynamic"}
                         />
                       </div>
                     </div>
+
+                    {/* Validation feedback display */}
+                    {validationError && (
+                      <div
+                        className={`p-4 rounded-lg border ${
+                          validationError.startsWith("✓")
+                            ? "bg-green-50 border-green-200 text-green-800"
+                            : "bg-red-50 border-red-200 text-red-800"
+                        }`}
+                      >
+                        <div className="text-sm font-medium mb-2">
+                          {validationError.startsWith("✓") ? "Configuration Valid" : "Configuration Error"}
+                        </div>
+                        <pre className="text-xs whitespace-pre-wrap font-mono">{validationError}</pre>
+                      </div>
+                    )}
                   </div>
                 )}
 
