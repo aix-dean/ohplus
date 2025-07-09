@@ -211,11 +211,7 @@ export default function InvitationCodesPage() {
                 <Plus className="h-12 w-12 text-muted-foreground" />
               </div>
               <h3 className="text-lg font-semibold mb-2">No invitation codes yet</h3>
-              <p className="text-muted-foreground mb-4">Generate your first invitation code to get started</p>
-              <Button onClick={() => setGenerateDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Generate Code
-              </Button>
+              <p className="text-muted-foreground">Generate your first invitation code to get started</p>
             </div>
           ) : (
             <Table>

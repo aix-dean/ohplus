@@ -12,130 +12,108 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { toast } from "sonner"
+import { Shield, Users, Clock, AlertCircle } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { Loader2, Info } from "lucide-react"
+import { toast } from "sonner"
 
 interface GenerateInvitationCodeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-const PREDEFINED_ROLES = [
-  { value: "user", label: "User", description: "Basic access to the platform" },
-  { value: "editor", label: "Editor", description: "Can create and edit content" },
-  { value: "manager", label: "Manager", description: "Can manage teams and projects" },
-  { value: "admin", label: "Admin", description: "Full administrative access" },
+const ROLES = [
+  { value: "admin", label: "Admin", description: "Full system access" },
+  { value: "manager", label: "Manager", description: "Team management access" },
+  { value: "user", label: "User", description: "Standard user access" },
+  { value: "viewer", label: "Viewer", description: "Read-only access" },
 ]
 
-const AVAILABLE_PERMISSIONS = [
-  { id: "read_proposals", label: "Read Proposals", description: "View proposal documents" },
-  { id: "write_proposals", label: "Write Proposals", description: "Create and edit proposals" },
-  { id: "read_clients", label: "Read Clients", description: "View client information" },
-  { id: "write_clients", label: "Write Clients", description: "Create and edit client data" },
-  { id: "read_inventory", label: "Read Inventory", description: "View inventory items" },
-  { id: "write_inventory", label: "Write Inventory", description: "Manage inventory items" },
-  { id: "read_analytics", label: "Read Analytics", description: "View reports and analytics" },
-  { id: "admin_access", label: "Admin Access", description: "Administrative functions" },
+const PERMISSIONS = [
+  { id: "read", label: "Read", description: "View data and content" },
+  { id: "write", label: "Write", description: "Create and edit content" },
+  { id: "delete", label: "Delete", description: "Remove content" },
+  { id: "manage_users", label: "Manage Users", description: "Add/remove users" },
+  { id: "manage_settings", label: "Manage Settings", description: "System configuration" },
 ]
 
 export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInvitationCodeDialogProps) {
   const { userData } = useAuth()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    validityDays: 30,
-    maxUsage: 0, // 0 means unlimited
     role: "",
-    customRole: "",
-    permissions: [] as string[],
+    maxUsage: "1",
+    validityDays: "7",
     description: "",
+    permissions: [] as string[],
   })
 
   const generateRandomCode = () => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
     let result = ""
     for (let i = 0; i < 8; i++) {
-      if (i === 4) result += "-"
       result += chars.charAt(Math.floor(Math.random() * chars.length))
     }
-    return result
+    return result.slice(0, 4) + "-" + result.slice(4)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!userData?.company_id) {
-      toast.error("Company information not found")
-      return
-    }
-
     setLoading(true)
 
     try {
-      const finalRole = formData.role === "custom" ? formData.customRole : formData.role
-
-      if (!finalRole) {
-        toast.error("Please select or enter a role")
+      if (!userData?.company_id) {
+        toast.error("No company associated with your account")
         setLoading(false)
         return
       }
 
-      if (formData.validityDays < 1 || formData.validityDays > 365) {
-        toast.error("Validity period must be between 1 and 365 days")
-        setLoading(false)
-        return
-      }
-
-      if (formData.maxUsage < 0 || formData.maxUsage > 1000) {
-        toast.error("Usage limit must be between 0 and 1000 (0 = unlimited)")
+      if (!formData.role) {
+        toast.error("Please select a role")
         setLoading(false)
         return
       }
 
       const expiresAt = new Date()
-      expiresAt.setDate(expiresAt.getDate() + formData.validityDays)
+      expiresAt.setDate(expiresAt.getDate() + Number.parseInt(formData.validityDays))
 
       const codeData = {
         code: generateRandomCode(),
-        created_at: serverTimestamp(),
-        expires_at: expiresAt,
-        max_usage: formData.maxUsage,
-        usage_count: 0,
-        role: finalRole,
-        permissions: formData.permissions,
-        status: "active",
-        created_by: userData.uid,
         company_id: userData.company_id,
-        description: formData.description || null,
+        role: formData.role,
+        max_usage: Number.parseInt(formData.maxUsage) || 0,
+        usage_count: 0,
+        expires_at: expiresAt,
+        status: "active",
+        permissions: formData.permissions,
+        description: formData.description,
+        created_at: serverTimestamp(),
+        created_by: userData.uid,
         used_by: [],
       }
 
-      // Add code to Firestore
       await addDoc(collection(db, "invitation_codes"), codeData)
 
-      toast.success("Successfully generated invitation code")
+      toast.success("Invitation code generated successfully!")
+      onOpenChange(false)
 
       // Reset form
       setFormData({
-        validityDays: 30,
-        maxUsage: 0,
         role: "",
-        customRole: "",
-        permissions: [],
+        maxUsage: "1",
+        validityDays: "7",
         description: "",
+        permissions: [],
       })
-
-      onOpenChange(false)
     } catch (error) {
-      console.error("Error generating code:", error)
+      console.error("Error generating invitation code:", error)
       toast.error("Failed to generate invitation code")
     } finally {
       setLoading(false)
@@ -149,223 +127,184 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
     }))
   }
 
-  const selectedRoleData = PREDEFINED_ROLES.find((r) => r.value === formData.role)
+  const selectedRole = ROLES.find((role) => role.value === formData.role)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Generate Invitation Code</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Generate Invitation Code
+          </DialogTitle>
           <DialogDescription>
-            Create an invitation code for user registration with specific role and permissions
+            Create a new invitation code for user registration with specific role and permissions.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Basic Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="validity">Validity (Days)</Label>
-                  <Input
-                    id="validity"
-                    type="number"
-                    min="1"
-                    max="365"
-                    value={formData.validityDays}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, validityDays: Number.parseInt(e.target.value) || 30 }))
-                    }
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">How long the code remains valid</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="maxUsage">Usage Limit</Label>
-                  <Input
-                    id="maxUsage"
-                    type="number"
-                    min="0"
-                    max="1000"
-                    value={formData.maxUsage}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, maxUsage: Number.parseInt(e.target.value) || 0 }))
-                    }
-                    placeholder="0 for unlimited"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Maximum number of times the code can be used (0 = unlimited)
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Role Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Role Assignment</CardTitle>
-              <CardDescription>Select the role for users who register with this code</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(value) => setFormData((prev) => ({ ...prev, role: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PREDEFINED_ROLES.map((role) => (
-                      <SelectItem key={role.value} value={role.value}>
-                        <div>
-                          <div className="font-medium">{role.label}</div>
-                          <div className="text-xs text-muted-foreground">{role.description}</div>
-                        </div>
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="custom">
-                      <div>
-                        <div className="font-medium">Custom Role</div>
-                        <div className="text-xs text-muted-foreground">Define a custom role</div>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formData.role === "custom" && (
-                <div className="space-y-2">
-                  <Label htmlFor="customRole">Custom Role Name</Label>
-                  <Input
-                    id="customRole"
-                    value={formData.customRole}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, customRole: e.target.value }))}
-                    placeholder="Enter custom role name"
-                    required
-                  />
-                </div>
-              )}
-
-              {selectedRoleData && (
-                <div className="p-3 bg-muted rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Selected Role: {selectedRoleData.label}</span>
+          <div className="space-y-2">
+            <Label htmlFor="role" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Role *
+            </Label>
+            <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a role" />
+              </SelectTrigger>
+              <SelectContent>
+                {ROLES.map((role) => (
+                  <SelectItem key={role.value} value={role.value}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{role.label}</span>
+                      <span className="text-xs text-muted-foreground">{role.description}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedRole && (
+              <Card className="mt-2">
+                <CardContent className="pt-4">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{selectedRole.label}</Badge>
+                    <span className="text-sm text-muted-foreground">{selectedRole.description}</span>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">{selectedRoleData.description}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Usage Limit */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="maxUsage">Usage Limit</Label>
+              <Select
+                value={formData.maxUsage}
+                onValueChange={(value) => setFormData({ ...formData, maxUsage: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 use</SelectItem>
+                  <SelectItem value="5">5 uses</SelectItem>
+                  <SelectItem value="10">10 uses</SelectItem>
+                  <SelectItem value="0">Unlimited</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="validityDays" className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Valid for (days)
+              </Label>
+              <Select
+                value={formData.validityDays}
+                onValueChange={(value) => setFormData({ ...formData, validityDays: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 day</SelectItem>
+                  <SelectItem value="7">7 days</SelectItem>
+                  <SelectItem value="30">30 days</SelectItem>
+                  <SelectItem value="90">90 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
           {/* Permissions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Permissions</CardTitle>
-              <CardDescription>Select specific permissions for this role</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {AVAILABLE_PERMISSIONS.map((permission) => (
-                  <div key={permission.id} className="flex items-start space-x-3">
-                    <Checkbox
-                      id={permission.id}
-                      checked={formData.permissions.includes(permission.id)}
-                      onCheckedChange={(checked) => handlePermissionChange(permission.id, checked as boolean)}
-                    />
-                    <div className="space-y-1">
-                      <Label htmlFor={permission.id} className="text-sm font-medium cursor-pointer">
-                        {permission.label}
-                      </Label>
-                      <p className="text-xs text-muted-foreground">{permission.description}</p>
-                    </div>
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Permissions</Label>
+            <div className="grid grid-cols-1 gap-3">
+              {PERMISSIONS.map((permission) => (
+                <div key={permission.id} className="flex items-start space-x-3">
+                  <Checkbox
+                    id={permission.id}
+                    checked={formData.permissions.includes(permission.id)}
+                    onCheckedChange={(checked) => handlePermissionChange(permission.id, checked as boolean)}
+                  />
+                  <div className="grid gap-1.5 leading-none">
+                    <Label
+                      htmlFor={permission.id}
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      {permission.label}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">{permission.description}</p>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+              ))}
+            </div>
+          </div>
 
           {/* Description */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Additional Information</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label htmlFor="description">Description (Optional)</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                  placeholder="Add a description for this code..."
-                  rows={3}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-2">
+            <Label htmlFor="description">Description (Optional)</Label>
+            <Textarea
+              id="description"
+              placeholder="Add a note about this invitation code..."
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              rows={3}
+            />
+          </div>
 
-          {/* Summary */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">Valid for:</span>
-                  <Badge variant="secondary" className="ml-2">
-                    {formData.validityDays} days
-                  </Badge>
+          {/* Preview */}
+          {formData.role && (
+            <Card className="bg-muted/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Code Preview
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Role:</span>
+                  <Badge variant="outline">{formData.role}</Badge>
                 </div>
-                <div>
-                  <span className="font-medium">Usage limit:</span>
-                  <Badge variant="secondary" className="ml-2">
-                    {formData.maxUsage === 0 ? "Unlimited" : formData.maxUsage}
-                  </Badge>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Usage:</span>
+                  <span>{formData.maxUsage === "0" ? "Unlimited" : `${formData.maxUsage} use(s)`}</span>
                 </div>
-                <div className="col-span-2">
-                  <span className="font-medium">Role:</span>
-                  <Badge variant="outline" className="ml-2">
-                    {formData.role === "custom" ? formData.customRole || "Custom" : formData.role || "Not selected"}
-                  </Badge>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Valid for:</span>
+                  <span>{formData.validityDays} day(s)</span>
                 </div>
-              </div>
-
-              {formData.permissions.length > 0 && (
-                <div>
-                  <span className="font-medium text-sm">Permissions:</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {formData.permissions.map((permId) => {
-                      const perm = AVAILABLE_PERMISSIONS.find((p) => p.id === permId)
-                      return (
-                        <Badge key={permId} variant="outline" className="text-xs">
-                          {perm?.label}
-                        </Badge>
-                      )
-                    })}
+                {formData.permissions.length > 0 && (
+                  <div className="flex items-start gap-2 text-sm">
+                    <span className="text-muted-foreground">Permissions:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {formData.permissions.map((permId) => {
+                        const perm = PERMISSIONS.find((p) => p.id === permId)
+                        return (
+                          <Badge key={permId} variant="secondary" className="text-xs">
+                            {perm?.label}
+                          </Badge>
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </form>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="submit" onClick={handleSubmit} disabled={loading}>
-            {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Generate Code
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading || !formData.role}>
+              {loading ? "Generating..." : "Generate Code"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )
