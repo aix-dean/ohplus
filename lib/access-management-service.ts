@@ -18,6 +18,7 @@ export type Role = {
   description: string
   isAdmin?: boolean
   permissions?: string[] // Array of permission IDs
+  allowedRoutes?: string[] // Array of allowed route patterns
   createdAt?: number
   updatedAt?: number
 }
@@ -123,6 +124,7 @@ export async function createRole(role: Omit<Role, "id" | "createdAt" | "updatedA
     const roleWithTimestamp = {
       ...role,
       permissions: role.permissions || [],
+      allowedRoutes: role.allowedRoutes || [],
       createdAt: timestamp,
       updatedAt: timestamp,
     }
@@ -267,19 +269,22 @@ export async function getUserRoles(userId: string): Promise<string[]> {
 
 export async function assignRoleToUser(userId: string, roleId: string): Promise<void> {
   try {
-    // Check if the user already has this role
+    // First, remove all existing roles for this user
     const userRolesCollection = collection(db, "user_roles")
-    const userRolesQuery = query(userRolesCollection, where("userId", "==", userId), where("roleId", "==", roleId))
-    const userRolesSnapshot = await getDocs(userRolesQuery)
+    const existingRolesQuery = query(userRolesCollection, where("userId", "==", userId))
+    const existingRolesSnapshot = await getDocs(existingRolesQuery)
 
-    if (userRolesSnapshot.empty) {
-      // User doesn't have this role yet, so assign it
-      await addDoc(userRolesCollection, {
-        userId,
-        roleId,
-        assignedAt: Date.now(),
-      })
+    // Delete all existing role assignments
+    for (const docSnapshot of existingRolesSnapshot.docs) {
+      await deleteDoc(doc(userRolesCollection, docSnapshot.id))
     }
+
+    // Then assign the new role
+    await addDoc(userRolesCollection, {
+      userId,
+      roleId,
+      assignedAt: Date.now(),
+    })
   } catch (error) {
     console.error("Error assigning role to user:", error)
     throw new Error("Failed to assign role to user")
@@ -298,6 +303,123 @@ export async function removeRoleFromUser(userId: string, roleId: string): Promis
   } catch (error) {
     console.error("Error removing role from user:", error)
     throw new Error("Failed to remove role from user")
+  }
+}
+
+// Get user's allowed routes based on their roles
+export async function getUserAllowedRoutes(userId: string): Promise<string[]> {
+  try {
+    const userRoles = await getUserRoles(userId)
+    const allowedRoutes: Set<string> = new Set()
+
+    for (const roleId of userRoles) {
+      const roleDoc = await getDoc(doc(db, "roles", roleId))
+      if (roleDoc.exists()) {
+        const role = roleDoc.data() as Role
+        if (role.allowedRoutes) {
+          role.allowedRoutes.forEach((route) => allowedRoutes.add(route))
+        }
+      }
+    }
+
+    return Array.from(allowedRoutes)
+  } catch (error) {
+    console.error("Error getting user allowed routes:", error)
+    return []
+  }
+}
+
+// Check if user can access a specific route
+export async function canUserAccessRoute(userId: string, route: string): Promise<boolean> {
+  try {
+    const allowedRoutes = await getUserAllowedRoutes(userId)
+
+    // Check if user has admin access (can access all routes)
+    if (allowedRoutes.includes("/admin/*")) {
+      return true
+    }
+
+    // Check exact match
+    if (allowedRoutes.includes(route)) {
+      return true
+    }
+
+    // Check pattern match (e.g., /sales/* matches /sales/dashboard)
+    return allowedRoutes.some((allowedRoute) => {
+      if (allowedRoute.endsWith("/*")) {
+        const baseRoute = allowedRoute.slice(0, -2)
+        return route.startsWith(baseRoute)
+      }
+      return false
+    })
+  } catch (error) {
+    console.error("Error checking route access:", error)
+    return false
+  }
+}
+
+// Initialize predefined roles with route access
+export async function initializePredefinedRoles(): Promise<void> {
+  try {
+    // Check if roles already exist
+    const existingRoles = await getRoles()
+    if (existingRoles.length > 0) {
+      console.log("Roles already initialized, skipping...")
+      return
+    }
+
+    // Define predefined roles with route access
+    const predefinedRoles = [
+      {
+        name: "Admin",
+        description: "Full system access with all administrative privileges",
+        isAdmin: true,
+        allowedRoutes: [
+          "/admin/*",
+          "/sales/*",
+          "/logistics/*",
+          "/cms/*",
+          "/dashboard",
+          "/account",
+          "/settings",
+          "/help",
+        ],
+      },
+      {
+        name: "Sales",
+        description: "Access to sales module and related features",
+        isAdmin: false,
+        allowedRoutes: ["/sales/*", "/dashboard", "/account", "/settings", "/help"],
+      },
+      {
+        name: "Logistics",
+        description: "Access to logistics module and related features",
+        isAdmin: false,
+        allowedRoutes: ["/logistics/*", "/dashboard", "/account", "/settings", "/help"],
+      },
+      {
+        name: "CMS",
+        description: "Access to content management system and related features",
+        isAdmin: false,
+        allowedRoutes: ["/cms/*", "/dashboard", "/account", "/settings", "/help"],
+      },
+      {
+        name: "User",
+        description: "Basic user access with limited permissions",
+        isAdmin: false,
+        allowedRoutes: ["/dashboard", "/account", "/settings", "/help"],
+      },
+    ]
+
+    // Create all predefined roles
+    for (const role of predefinedRoles) {
+      await createRole(role)
+    }
+
+    console.log("Predefined roles initialized successfully")
+  } catch (error) {
+    console.error("Error initializing predefined roles:", error)
+    throw new Error("Failed to initialize predefined roles")
   }
 }
 
@@ -640,78 +762,17 @@ export async function initializeDefaultPermissions(): Promise<void> {
   }
 }
 
-// Initialize departmental roles
+// Initialize departmental roles (legacy - replaced by initializePredefinedRoles)
 export async function initializeDepartmentalRoles(): Promise<void> {
-  try {
-    // Check if roles already exist
-    const existingRoles = await getRoles()
-    if (existingRoles.length > 0) {
-      console.log("Roles already initialized, skipping...")
-      return
-    }
-
-    // Define departmental roles
-    const departmentalRoles = [
-      {
-        name: "Administrator",
-        description: "Full system access with all administrative privileges",
-        isAdmin: true,
-      },
-      {
-        name: "Sales Manager",
-        description: "Full access to sales module with management capabilities",
-        isAdmin: false,
-      },
-      {
-        name: "Sales Representative",
-        description: "Standard sales access for day-to-day operations",
-        isAdmin: false,
-      },
-      {
-        name: "Logistics Manager",
-        description: "Full access to logistics module with management capabilities",
-        isAdmin: false,
-      },
-      {
-        name: "Logistics Coordinator",
-        description: "Standard logistics access for operational tasks",
-        isAdmin: false,
-      },
-      {
-        name: "CMS Manager",
-        description: "Full access to content management with editing privileges",
-        isAdmin: false,
-      },
-      {
-        name: "CMS Editor",
-        description: "Content creation and editing access",
-        isAdmin: false,
-      },
-      {
-        name: "Viewer",
-        description: "Read-only access across all modules",
-        isAdmin: false,
-      },
-    ]
-
-    // Create all roles
-    for (const role of departmentalRoles) {
-      await createRole(role)
-    }
-
-    console.log("Departmental roles initialized successfully")
-  } catch (error) {
-    console.error("Error initializing departmental roles:", error)
-    throw new Error("Failed to initialize departmental roles")
-  }
+  return initializePredefinedRoles()
 }
 
-// Initialize admin role (legacy function - now part of departmental roles)
+// Initialize admin role (legacy function - now part of predefined roles)
 export async function initializeAdminRole(): Promise<string> {
   try {
     // Check if admin role already exists
     const existingRoles = await getRoles()
-    const adminRole = existingRoles.find((role) => role.name === "Administrator")
+    const adminRole = existingRoles.find((role) => role.name === "Admin")
 
     if (adminRole) {
       console.log("Admin role already exists, skipping...")
@@ -720,9 +781,10 @@ export async function initializeAdminRole(): Promise<string> {
 
     // Create admin role
     const adminRoleId = await createRole({
-      name: "Administrator",
+      name: "Admin",
       description: "Full access to all system features",
       isAdmin: true,
+      allowedRoutes: ["/admin/*", "/sales/*", "/logistics/*", "/cms/*", "/dashboard", "/account", "/settings", "/help"],
     })
 
     // Get all permissions and assign them to the admin role
