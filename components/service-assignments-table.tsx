@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { collection, query, orderBy, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -32,6 +33,7 @@ interface ServiceAssignmentsTableProps {
 }
 
 export function ServiceAssignmentsTable({ onSelectAssignment }: ServiceAssignmentsTableProps) {
+  const router = useRouter()
   const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -65,6 +67,14 @@ export function ServiceAssignmentsTable({ onSelectAssignment }: ServiceAssignmen
         return "bg-red-100 text-red-800"
       default:
         return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const handleViewAssignment = (id: string) => {
+    if (onSelectAssignment) {
+      onSelectAssignment(id)
+    } else {
+      router.push(`/logistics/assignments/${id}`)
     }
   }
 
@@ -123,11 +133,7 @@ export function ServiceAssignmentsTable({ onSelectAssignment }: ServiceAssignmen
                   {assignment.created ? format(new Date(assignment.created.toDate()), "MMM d, yyyy") : "Unknown"}
                 </TableCell>
                 <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onSelectAssignment && onSelectAssignment(assignment.id)}
-                  >
+                  <Button variant="ghost" size="sm" onClick={() => handleViewAssignment(assignment.id)}>
                     View
                   </Button>
                 </TableCell>

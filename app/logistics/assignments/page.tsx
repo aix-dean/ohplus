@@ -1,76 +1,107 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { ServiceAssignmentsTable } from "@/components/service-assignments-table"
-import { Plus, Filter, Search } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
-import { doc, getDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { type ColumnDef, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 
-export default function ServiceAssignmentsPage() {
+interface Assignment {
+  id: string
+  title: string
+  description: string
+  status: string
+  dueDate: string
+}
+
+const columns: ColumnDef<Assignment>[] = [
+  {
+    accessorKey: "title",
+    header: "Title",
+  },
+  {
+    accessorKey: "description",
+    header: "Description",
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+  },
+  {
+    accessorKey: "dueDate",
+    header: "Due Date",
+  },
+]
+
+const ServiceAssignmentsTable = () => {
+  const [data, setData] = useState<Assignment[]>([])
   const router = useRouter()
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
-  const [selectedAssignment, setSelectedAssignment] = useState(null)
-  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
 
-  const handleSelectAssignment = async (id) => {
-    try {
-      const assignmentDoc = await getDoc(doc(db, "service_assignments", id))
-      if (assignmentDoc.exists()) {
-        setSelectedAssignment({
-          id: assignmentDoc.id,
-          ...assignmentDoc.data(),
-        })
-        setSelectedAssignmentId(id)
-        setDetailsDialogOpen(true)
-      }
-    } catch (err) {
-      console.error("Error fetching assignment:", err)
-    }
-  }
+  useEffect(() => {
+    // Replace with your actual data fetching logic
+    const mockData: Assignment[] = [
+      {
+        id: "1",
+        title: "Install New Software",
+        description: "Install the latest version of the accounting software on all workstations.",
+        status: "In Progress",
+        dueDate: "2024-03-15",
+      },
+      {
+        id: "2",
+        title: "Network Troubleshooting",
+        description: "Diagnose and resolve network connectivity issues in the main office.",
+        status: "Pending",
+        dueDate: "2024-03-20",
+      },
+      {
+        id: "3",
+        title: "Hardware Upgrade",
+        description: "Upgrade the RAM on the server to improve performance.",
+        status: "Completed",
+        dueDate: "2024-03-01",
+      },
+    ]
+    setData(mockData)
+  }, [])
 
-  const handleCreateAssignment = () => {
-    router.push("/logistics/assignments/create")
-  }
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  })
 
   return (
-    <div className="flex-1 overflow-auto">
-      <header className="flex justify-between items-center p-4 border-b border-gray-200">
-        <div>
-          <h1 className="text-xl font-bold">Service Assignments</h1>
-          <p className="text-sm text-gray-500">Manage service assignments</p>
-        </div>
-        <Button onClick={handleCreateAssignment} className="bg-blue-600 hover:bg-blue-700">
-          <Plus className="mr-2 h-4 w-4" /> Create Assignment
-        </Button>
-      </header>
-
-      <main className="p-4">
-        <div className="mb-6 flex items-center justify-between">
-          <div className="relative w-64">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-            <Input placeholder="Search assignments..." className="pl-8" />
-          </div>
-          <Button variant="outline" size="sm">
-            <Filter className="mr-2 h-4 w-4" /> Filter
-          </Button>
-        </div>
-
-        <ServiceAssignmentsTable onSelectAssignment={handleSelectAssignment} />
-
-        <ServiceAssignmentDetailsDialog
-          open={detailsDialogOpen}
-          onOpenChange={setDetailsDialogOpen}
-          assignmentId={selectedAssignmentId}
-          assignment={selectedAssignment}
-          onStatusChange={() => {
-            // You could add a refresh function here
-          }}
-        />
-      </main>
+    <div className="container mx-auto py-10">
+      <Table>
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id}>
+              {headerGroup.headers.map((header) => {
+                return (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                )
+              })}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.map((row) => (
+            <TableRow
+              key={row.id}
+              className="cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={() => router.push(`/logistics/assignments/${row.original.id}`)}
+            >
+              {row.getVisibleCells().map((cell) => (
+                <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   )
 }
+
+export default ServiceAssignmentsTable
