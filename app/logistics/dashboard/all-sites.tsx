@@ -44,6 +44,7 @@ export default function AllSitesTab() {
 
   const { toast } = useToast()
   const { user } = useAuthContext()
+  const { userData } = useAuthContext()
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -76,16 +77,16 @@ export default function AllSitesTab() {
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
-    if (!user?.id || !user?.companyId) return
+    if (!user?.uid || !userData?.company_id) return
 
     setLoadingCount(true)
     try {
       // Get all user products and filter by company_id
-      const allProducts = await getPaginatedUserProducts(user.id, 1000, null, {
+      const allProducts = await getPaginatedUserProducts(user.uid, 1000, null, {
         searchTerm: debouncedSearchTerm,
       })
 
-      const companyProducts = allProducts.items.filter((product) => product.company_id === user.companyId)
+      const companyProducts = allProducts.items.filter((product) => product.company_id === userData?.company_id)
       const count = companyProducts.length
 
       setTotalItems(count)
@@ -95,12 +96,12 @@ export default function AllSitesTab() {
     } finally {
       setLoadingCount(false)
     }
-  }, [user?.id, user?.companyId, debouncedSearchTerm])
+  }, [user?.uid, userData?.company_id, debouncedSearchTerm])
 
   // Fetch products for the current page
   const fetchProducts = useCallback(
     async (page: number, forceRefresh = false) => {
-      if (!user?.id || !user?.companyId) return
+      if (!user?.uid || !userData?.company_id) return
 
       // Check if we have this page in cache and not forcing refresh
       if (!forceRefresh && pageCache.has(page)) {
@@ -120,12 +121,12 @@ export default function AllSitesTab() {
         const startDoc = isFirstPage ? null : lastDoc
 
         // Get products filtered by company_id only
-        const result = await getPaginatedUserProducts(user.id, ITEMS_PER_PAGE * 2, startDoc, {
+        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE * 2, startDoc, {
           searchTerm: debouncedSearchTerm,
         })
 
         // Filter products to only show those with matching company_id
-        const filteredItems = result.items.filter((product) => product.company_id === user.companyId)
+        const filteredItems = result.items.filter((product) => product.company_id === userData?.company_id)
 
         // Take only the first ITEMS_PER_PAGE items
         const paginatedItems = filteredItems.slice(0, ITEMS_PER_PAGE)
@@ -151,7 +152,7 @@ export default function AllSitesTab() {
         setLoadingMore(false)
       }
     },
-    [user?.id, user?.companyId, lastDoc, pageCache, debouncedSearchTerm],
+    [user?.uid, userData?.company_id, lastDoc, pageCache, debouncedSearchTerm],
   )
 
   // Load initial data and count
