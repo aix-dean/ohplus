@@ -15,6 +15,7 @@ import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-success-dialog"
 
 // Service types as provided
 const SERVICE_TYPES = ["Roll up", "Roll down", "Change Material", "Repair", "Maintenance", "Monitoring", "Spot Booking"]
@@ -29,6 +30,8 @@ export default function CreateServiceAssignmentPage() {
   const [fetchingProducts, setFetchingProducts] = useState(false)
   const [products, setProducts] = useState<Product[]>([])
   const [saNumber, setSaNumber] = useState("")
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [createdSaNumber, setCreatedSaNumber] = useState("")
 
   // Form data state
   const [formData, setFormData] = useState({
@@ -186,8 +189,9 @@ export default function CreateServiceAssignmentPage() {
         company_id: userData?.company_id || null, // Add company_id from userData
       })
 
-      // Navigate back to assignments page
-      router.push("/logistics/assignments")
+      // Show success dialog
+      setCreatedSaNumber(saNumber)
+      setShowSuccessDialog(true)
     } catch (error) {
       console.error("Error creating service assignment:", error)
     } finally {
@@ -285,6 +289,52 @@ export default function CreateServiceAssignmentPage() {
       console.error("Error formatting date:", error)
       return "Invalid date"
     }
+  }
+
+  // Handle success dialog actions
+  const handleViewAssignments = () => {
+    router.push("/logistics/assignments")
+  }
+
+  const handleCreateAnother = () => {
+    // Reset form
+    setFormData({
+      projectSite: "",
+      serviceType: "",
+      assignedTo: "",
+      serviceDuration: "",
+      priority: "",
+      equipmentRequired: "",
+      materialSpecs: "",
+      crew: "",
+      illuminationNits: "",
+      gondola: "",
+      technology: "",
+      sales: "",
+      remarks: "",
+      message: "",
+      startDate: null,
+      endDate: null,
+      alarmDate: null,
+      alarmTime: "",
+      attachments: [],
+      serviceCost: {
+        crewFee: "",
+        overtimeFee: "",
+        transpo: "",
+        tollFee: "",
+        mealAllowance: "",
+        otherFees: [],
+        total: 0,
+      },
+    })
+    setStartDateInput("")
+    setEndDateInput("")
+    setAlarmDateInput("")
+
+    // Generate new SA number
+    const randomNum = Math.floor(100000 + Math.random() * 900000)
+    setSaNumber(randomNum.toString())
   }
 
   if (fetchingProducts) {
@@ -842,6 +892,15 @@ export default function CreateServiceAssignmentPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Success Dialog */}
+      <ServiceAssignmentSuccessDialog
+        open={showSuccessDialog}
+        onOpenChange={setShowSuccessDialog}
+        saNumber={createdSaNumber}
+        onViewAssignments={handleViewAssignments}
+        onCreateAnother={handleCreateAnother}
+      />
     </div>
   )
 }
