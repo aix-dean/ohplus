@@ -78,18 +78,8 @@ export default function ReportPreviewPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-900 via-blue-700 to-cyan-400 text-white p-6">
-        <div className="flex justify-between items-center max-w-6xl mx-auto">
-          <h1 className="text-3xl font-bold">Logistics</h1>
-          <div className="relative">
-            <div className="w-32 h-16 bg-gradient-to-b from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center border-4 border-yellow-300 shadow-lg">
-              <div className="text-center">
-                <div className="text-black font-bold text-xl leading-tight">GTS</div>
-                <div className="text-black text-xs font-semibold">INCORPORATED</div>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="w-full">
+        <img src="/logistics-header.png" alt="Logistics Header" className="w-full h-auto object-cover" />
       </div>
 
       <div className="max-w-6xl mx-auto p-6 space-y-6">
