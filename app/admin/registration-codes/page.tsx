@@ -34,7 +34,7 @@ export default function RegistrationCodesPage() {
   const [codes, setCodes] = useState<RegistrationCode[]>([])
   const [generatingCode, setGeneratingCode] = useState(false)
   const [emailDialogOpen, setEmailDialogOpen] = useState(false)
-  const [selectedCode, setSelectedCode] = useState<string>("")
+  const [selectedCode, setSelectedCode] = useState("")
 
   useEffect(() => {
     if (!user && !loading) {
@@ -234,7 +234,7 @@ export default function RegistrationCodesPage() {
             variant="outline"
             onClick={() => handleSendEmail(row.code)}
             disabled={!row.active}
-            className="text-blue-600 border-blue-600 hover:bg-blue-50"
+            className="text-green-600 border-green-600 hover:bg-green-50"
           >
             <Mail className="h-3 w-3 mr-1" />
             Email
@@ -244,7 +244,7 @@ export default function RegistrationCodesPage() {
             variant="outline"
             onClick={() => handleDeactivateCode(row.code)}
             disabled={!row.active}
-            className="text-red-600 border-red-600 hover:bg-red-50"
+            className="text-blue-600 border-blue-600 hover:bg-blue-50"
           >
             Deactivate
           </Button>
@@ -306,11 +306,7 @@ export default function RegistrationCodesPage() {
         </CardContent>
       </Card>
 
-      <SendInvitationEmailDialog
-        open={emailDialogOpen}
-        onOpenChange={setEmailDialogOpen}
-        organizationCode={selectedCode}
-      />
+      <SendInvitationEmailDialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen} code={selectedCode} />
     </div>
   )
 }
