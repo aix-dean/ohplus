@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
@@ -17,7 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Plus, Search, MoreHorizontal, Copy, Eye, Mail, Ban, CheckCircle, XCircle, Clock, Activity } from "lucide-react"
+import { Plus, MoreHorizontal, Copy, Eye, Mail, Ban, CheckCircle, XCircle, Clock } from "lucide-react"
 import { toast } from "sonner"
 import { GenerateInvitationCodeDialog } from "@/components/generate-invitation-code-dialog"
 import { InvitationCodeDetailsDialog } from "@/components/invitation-code-details-dialog"
@@ -46,7 +45,6 @@ export default function InvitationCodesPage() {
   const { userData } = useAuth()
   const [codes, setCodes] = useState<InvitationCode[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
   const [selectedCode, setSelectedCode] = useState<InvitationCode | null>(null)
   const [showGenerateDialog, setShowGenerateDialog] = useState(false)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
@@ -128,21 +126,6 @@ export default function InvitationCodesPage() {
 
     return () => unsubscribe()
   }, [userData?.company_id])
-
-  // Filter codes based on search term
-  const filteredCodes = codes.filter(
-    (code) =>
-      code.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      code.role.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
-
-  // Get status counts
-  const statusCounts = {
-    active: codes.filter((code) => code.status === "active").length,
-    inactive: codes.filter((code) => code.status === "inactive").length,
-    expired: codes.filter((code) => code.status === "expired").length,
-    total: codes.length,
-  }
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -281,61 +264,6 @@ export default function InvitationCodesPage() {
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Codes</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{statusCounts.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{statusCounts.active}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inactive</CardTitle>
-            <Ban className="h-4 w-4 text-gray-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-600">{statusCounts.inactive}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Expired</CardTitle>
-            <XCircle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{statusCounts.expired}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Filters */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center space-x-2">
-            <Search className="h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search codes or roles..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="max-w-sm"
-            />
-          </div>
-        </CardHeader>
-      </Card>
-
       {/* Codes Table */}
       <Card>
         <CardHeader>
@@ -343,25 +271,21 @@ export default function InvitationCodesPage() {
           <CardDescription>Manage all invitation codes and their usage</CardDescription>
         </CardHeader>
         <CardContent>
-          {filteredCodes.length === 0 ? (
+          {codes.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              {codes.length === 0 ? (
-                <div>
-                  <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-4">
-                    <Plus className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <h3 className="text-lg font-medium mb-2">No invitation codes found</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Create your first invitation code to start inviting users to your organization.
-                  </p>
-                  <Button onClick={() => setShowGenerateDialog(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Generate Your First Code
-                  </Button>
+              <div>
+                <div className="mx-auto w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-4">
+                  <Plus className="h-6 w-6 text-muted-foreground" />
                 </div>
-              ) : (
-                "No codes found matching your search."
-              )}
+                <h3 className="text-lg font-medium mb-2">No invitation codes found</h3>
+                <p className="text-muted-foreground mb-4">
+                  Create your first invitation code to start inviting users to your organization.
+                </p>
+                <Button onClick={() => setShowGenerateDialog(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Generate Your First Code
+                </Button>
+              </div>
             </div>
           ) : (
             <Table>
@@ -376,7 +300,7 @@ export default function InvitationCodesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCodes.map((code) => (
+                {codes.map((code) => (
                   <TableRow key={code.id}>
                     <TableCell>
                       <div className="flex items-center space-x-2">
