@@ -2,31 +2,25 @@ import {
   collection,
   addDoc,
   getDocs,
+  doc,
   getDoc,
+  updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
-  serverTimestamp,
-  doc,
-  updateDoc,
-  deleteDoc,
-  type Timestamp,
+  Timestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
-// Email Template Interface
-export interface EmailTemplate {
-  id?: string
-  name: string
-  subject: string
-  body: string
-  userId: string
-  isDefault: boolean
-  created: Timestamp | string
-  updated?: Timestamp | string
+// Email types
+export interface EmailAttachment {
+  fileName: string
+  fileUrl: string
+  fileSize: number
+  fileType: string
 }
 
-// Email Interface
 export interface Email {
   id?: string
   from: string
@@ -38,242 +32,197 @@ export interface Email {
   attachments?: EmailAttachment[]
   templateId?: string
   reportId?: string
-  status: "draft" | "sent" | "failed"
-  sentAt?: Timestamp | string
+  status: "draft" | "sending" | "sent" | "failed"
   userId: string
-  created: Timestamp | string
-  updated?: Timestamp | string
-  errorMessage?: string
-  resendId?: string
+  created?: Timestamp
+  sent?: Timestamp
+  error?: string
 }
 
-// Email Attachment Interface
-export interface EmailAttachment {
-  fileName: string
-  fileUrl: string
-  fileSize: number
-  fileType: string
-  content?: string | Buffer
+export interface EmailTemplate {
+  id?: string
+  name: string
+  subject: string
+  body: string
+  userId: string
+  created?: Timestamp
 }
 
-// Email Service Class
 class EmailService {
-  // Email Templates
-  async createEmailTemplate(template: Omit<EmailTemplate, "id" | "created">): Promise<string> {
+  private emailsCollection = "compose_emails"
+  private templatesCollection = "email_templates"
+
+  // Email CRUD operations
+  async createEmail(emailData: Omit<Email, "id" | "created">): Promise<string> {
     try {
-      const docRef = await addDoc(collection(db, "email_templates"), {
-        ...template,
-        created: serverTimestamp(),
+      // Clean undefined values
+      const cleanEmailData = Object.fromEntries(Object.entries(emailData).filter(([_, value]) => value !== undefined))
+
+      const docRef = await addDoc(collection(db, this.emailsCollection), {
+        ...cleanEmailData,
+        created: Timestamp.now(),
       })
-      return docRef.id
-    } catch (error) {
-      console.error("Error creating email template:", error)
-      throw error
-    }
-  }
-
-  async getEmailTemplates(userId: string): Promise<EmailTemplate[]> {
-    try {
-      const q = query(collection(db, "email_templates"), where("userId", "==", userId), orderBy("created", "desc"))
-      const querySnapshot = await getDocs(q)
-
-      const templates: EmailTemplate[] = []
-      querySnapshot.forEach((doc) => {
-        templates.push({ id: doc.id, ...doc.data() } as EmailTemplate)
-      })
-
-      return templates
-    } catch (error) {
-      console.error("Error fetching email templates:", error)
-      return []
-    }
-  }
-
-  async updateEmailTemplate(templateId: string, updates: Partial<EmailTemplate>): Promise<void> {
-    try {
-      const templateRef = doc(db, "email_templates", templateId)
-      await updateDoc(templateRef, {
-        ...updates,
-        updated: serverTimestamp(),
-      })
-    } catch (error) {
-      console.error("Error updating email template:", error)
-      throw error
-    }
-  }
-
-  async deleteEmailTemplate(templateId: string): Promise<void> {
-    try {
-      await deleteDoc(doc(db, "email_templates", templateId))
-    } catch (error) {
-      console.error("Error deleting email template:", error)
-      throw error
-    }
-  }
-
-  // Emails - using compose_emails collection
-  async createEmail(email: Omit<Email, "id" | "created">): Promise<string> {
-    try {
-      // Clean the email object to remove undefined values
-      const cleanEmail: any = {
-        from: email.from,
-        to: email.to,
-        subject: email.subject,
-        body: email.body,
-        status: email.status,
-        userId: email.userId,
-        created: serverTimestamp(),
-      }
-
-      // Only add optional fields if they have values
-      if (email.cc && email.cc.length > 0) {
-        cleanEmail.cc = email.cc
-      }
-      if (email.bcc && email.bcc.length > 0) {
-        cleanEmail.bcc = email.bcc
-      }
-      if (email.attachments && email.attachments.length > 0) {
-        cleanEmail.attachments = email.attachments
-      }
-      if (email.templateId) {
-        cleanEmail.templateId = email.templateId
-      }
-      if (email.reportId) {
-        cleanEmail.reportId = email.reportId
-      }
-      if (email.sentAt) {
-        cleanEmail.sentAt = email.sentAt
-      }
-      if (email.errorMessage) {
-        cleanEmail.errorMessage = email.errorMessage
-      }
-      if (email.resendId) {
-        cleanEmail.resendId = email.resendId
-      }
-
-      const docRef = await addDoc(collection(db, "compose_emails"), cleanEmail)
       return docRef.id
     } catch (error) {
       console.error("Error creating email:", error)
-      throw error
-    }
-  }
-
-  async getEmails(userId: string): Promise<Email[]> {
-    try {
-      const q = query(collection(db, "compose_emails"), where("userId", "==", userId), orderBy("created", "desc"))
-      const querySnapshot = await getDocs(q)
-
-      const emails: Email[] = []
-      querySnapshot.forEach((doc) => {
-        emails.push({ id: doc.id, ...doc.data() } as Email)
-      })
-
-      return emails
-    } catch (error) {
-      console.error("Error fetching emails:", error)
-      return []
+      throw new Error("Failed to create email")
     }
   }
 
   async getEmailById(emailId: string): Promise<Email | null> {
     try {
-      const emailRef = doc(db, "compose_emails", emailId)
-      const emailDoc = await getDoc(emailRef)
-
+      const emailDoc = await getDoc(doc(db, this.emailsCollection, emailId))
       if (emailDoc.exists()) {
         return { id: emailDoc.id, ...emailDoc.data() } as Email
       }
-
       return null
     } catch (error) {
-      console.error("Error fetching email by ID:", error)
-      return null
+      console.error("Error getting email:", error)
+      throw new Error("Failed to get email")
+    }
+  }
+
+  async getEmails(userId?: string): Promise<Email[]> {
+    try {
+      let q = query(collection(db, this.emailsCollection), orderBy("created", "desc"))
+
+      if (userId) {
+        q = query(collection(db, this.emailsCollection), where("userId", "==", userId), orderBy("created", "desc"))
+      }
+
+      const querySnapshot = await getDocs(q)
+      return querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Email[]
+    } catch (error) {
+      console.error("Error getting emails:", error)
+      throw new Error("Failed to get emails")
     }
   }
 
   async updateEmail(emailId: string, updates: Partial<Email>): Promise<void> {
     try {
-      const emailRef = doc(db, "compose_emails", emailId)
+      // Clean undefined values
+      const cleanUpdates = Object.fromEntries(Object.entries(updates).filter(([_, value]) => value !== undefined))
 
-      // Clean updates to remove undefined values
-      const cleanUpdates: any = {
-        updated: serverTimestamp(),
-      }
-
-      Object.keys(updates).forEach((key) => {
-        const value = (updates as any)[key]
-        if (value !== undefined) {
-          cleanUpdates[key] = value
-        }
-      })
-
-      await updateDoc(emailRef, cleanUpdates)
+      await updateDoc(doc(db, this.emailsCollection, emailId), cleanUpdates)
     } catch (error) {
       console.error("Error updating email:", error)
-      throw error
+      throw new Error("Failed to update email")
+    }
+  }
+
+  async deleteEmail(emailId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, this.emailsCollection, emailId))
+    } catch (error) {
+      console.error("Error deleting email:", error)
+      throw new Error("Failed to delete email")
     }
   }
 
   async sendEmail(emailId: string): Promise<void> {
     try {
-      // Get email data from database
-      const emailData = await this.getEmailById(emailId)
-
-      if (!emailData) {
-        throw new Error(`Email with ID ${emailId} not found in database`)
+      // Get email from database
+      const email = await this.getEmailById(emailId)
+      if (!email) {
+        throw new Error("Email not found")
       }
 
-      console.log("Sending email:", {
-        id: emailId,
-        to: emailData.to,
-        subject: emailData.subject,
-        attachments: emailData.attachments?.length || 0,
-      })
+      // Update status to sending
+      await this.updateEmail(emailId, { status: "sending" })
 
-      // Send email using fetch to our API route
+      // Send email via API route
       const response = await fetch("/api/send-email", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          to: emailData.to,
-          cc: emailData.cc,
-          subject: emailData.subject,
-          body: emailData.body,
-          attachments: emailData.attachments,
+          emailId,
+          from: email.from,
+          to: email.to,
+          cc: email.cc,
+          subject: email.subject,
+          body: email.body,
+          attachments: email.attachments,
         }),
       })
 
-      const result = await response.json()
-
       if (!response.ok) {
-        throw new Error(result.error || "Failed to send email")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to send email")
       }
 
-      // Update email status to sent
+      // Update status to sent
       await this.updateEmail(emailId, {
         status: "sent",
-        sentAt: serverTimestamp() as any,
-        resendId: result.id,
+        sent: Timestamp.now(),
       })
-
-      console.log("Email sent successfully:", result.id)
     } catch (error) {
       console.error("Error sending email:", error)
 
-      // Update email status to failed with error message
+      // Update status to failed with error message
       await this.updateEmail(emailId, {
         status: "failed",
-        errorMessage: error instanceof Error ? error.message : "Unknown error",
+        error: error instanceof Error ? error.message : "Unknown error",
       })
 
       throw error
     }
   }
 
-  // Default templates
+  // Template CRUD operations
+  async createEmailTemplate(templateData: Omit<EmailTemplate, "id" | "created">): Promise<string> {
+    try {
+      const docRef = await addDoc(collection(db, this.templatesCollection), {
+        ...templateData,
+        created: Timestamp.now(),
+      })
+      return docRef.id
+    } catch (error) {
+      console.error("Error creating email template:", error)
+      throw new Error("Failed to create email template")
+    }
+  }
+
+  async getEmailTemplates(userId: string): Promise<EmailTemplate[]> {
+    try {
+      const q = query(
+        collection(db, this.templatesCollection),
+        where("userId", "==", userId),
+        orderBy("created", "desc"),
+      )
+      const querySnapshot = await getDocs(q)
+      return querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as EmailTemplate[]
+    } catch (error) {
+      console.error("Error getting email templates:", error)
+      throw new Error("Failed to get email templates")
+    }
+  }
+
+  async updateEmailTemplate(templateId: string, updates: Partial<EmailTemplate>): Promise<void> {
+    try {
+      await updateDoc(doc(db, this.templatesCollection, templateId), updates)
+    } catch (error) {
+      console.error("Error updating email template:", error)
+      throw new Error("Failed to update email template")
+    }
+  }
+
+  async deleteEmailTemplate(templateId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, this.templatesCollection, templateId))
+    } catch (error) {
+      console.error("Error deleting email template:", error)
+      throw new Error("Failed to delete email template")
+    }
+  }
+
   async createDefaultTemplates(userId: string): Promise<void> {
     const defaultTemplates = [
       {
@@ -295,50 +244,59 @@ Best regards,
 [Company Name]
 [Contact Info]`,
         userId,
-        isDefault: true,
       },
       {
         name: "Project Update",
         subject: "Project Status Update",
-        body: `Hi [Customer's Name],
+        body: `Dear [Customer's Name],
 
-I wanted to provide you with an update on your project.
+I wanted to provide you with an update on your project progress.
 
-Attached is the latest progress report showing current status, completed milestones, and upcoming activities. Everything is progressing according to schedule.
+Current Status: [Project Status]
+Completion: [Percentage]%
+Next Steps: [Next Steps]
+
+Attached you'll find the detailed progress report with all relevant information and documentation.
 
 If you have any questions or concerns, please don't hesitate to reach out.
 
 Best regards,
 [Your Full Name]
 [Your Position]
-[Company Name]
-[Contact Info]`,
+[Company Name]`,
         userId,
-        isDefault: true,
       },
       {
         name: "Completion Report",
         subject: "Project Completion Report",
-        body: `Hi [Customer's Name],
+        body: `Dear [Customer's Name],
 
-I'm pleased to inform you that your project has been completed successfully.
+I'm pleased to inform you that your project has been completed successfully!
 
-Attached is the final completion report with all details, photos, and documentation. The project was delivered on time and meets all specified requirements.
+Project Details:
+- Start Date: [Start Date]
+- Completion Date: [Completion Date]
+- Final Status: Completed
 
-Thank you for choosing our services. We look forward to working with you again.
+Please find the final completion report attached for your records. This document contains all the details about the work performed and final deliverables.
+
+Thank you for choosing our services. We look forward to working with you again in the future.
 
 Best regards,
 [Your Full Name]
 [Your Position]
-[Company Name]
-[Contact Info]`,
+[Company Name]`,
         userId,
-        isDefault: true,
       },
     ]
 
-    for (const template of defaultTemplates) {
-      await this.createEmailTemplate(template)
+    try {
+      for (const template of defaultTemplates) {
+        await this.createEmailTemplate(template)
+      }
+    } catch (error) {
+      console.error("Error creating default templates:", error)
+      throw new Error("Failed to create default templates")
     }
   }
 }

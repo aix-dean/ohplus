@@ -2,7 +2,14 @@ import jsPDF from "jspdf"
 import type { Proposal } from "@/lib/types/proposal"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import type { ReportData } from "@/lib/report-service"
-import type { PDFGenerationOptions } from "@/lib/pdf-service"
+import type { Product } from "@/lib/firebase-service"
+
+// Types for PDF generation
+export interface PDFGenerationOptions {
+  reportData: ReportData
+  includeImages?: boolean
+  includeNotes?: boolean
+}
 
 // Helper function to load image and convert to base64
 export async function loadImageAsBase64(url: string): Promise<string | null> {
@@ -60,6 +67,13 @@ function safeToDate(dateValue: any): Date {
     return dateValue.toDate()
   }
   return new Date() // fallback to current date
+}
+
+function getReportTypeDisplay(type: string): string {
+  return type
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
 }
 
 async function logProposalPDFGenerated(proposalId: string, userId: string, userName: string): Promise<void> {
@@ -751,6 +765,107 @@ export async function generateCostEstimatePDF(
   }
 }
 
+// Main function for generating report PDFs
+export async function generateReportPDF(
+  report: ReportData,
+  product: Product | null,
+  returnBlob = false,
+): Promise<void | Blob> {
+  try {
+    const doc = new jsPDF()
+
+    // Set up document properties
+    doc.setProperties({
+      title: `${report.reportType} - ${report.siteName}`,
+      subject: "Site Report",
+      author: "OOH Operator",
+      creator: "OOH Operator System",
+    })
+
+    // Header
+    doc.setFontSize(20)
+    doc.setFont("helvetica", "bold")
+    doc.text("SITE REPORT", 105, 20, { align: "center" })
+
+    // Report type and site info
+    doc.setFontSize(16)
+    doc.setFont("helvetica", "normal")
+    doc.text(`Report Type: ${getReportTypeDisplay(report.reportType)}`, 20, 40)
+    doc.text(`Site Name: ${report.siteName}`, 20, 50)
+    doc.text(`Site ID: ${report.siteId}`, 20, 60)
+    doc.text(`Date: ${new Date(report.date).toLocaleDateString()}`, 20, 70)
+
+    // Status
+    doc.setFontSize(14)
+    doc.setFont("helvetica", "bold")
+    doc.text("Status:", 20, 90)
+    doc.setFont("helvetica", "normal")
+    doc.text(`${report.completionPercentage || 100}% Complete`, 50, 90)
+
+    // Description
+    if (report.description) {
+      doc.setFont("helvetica", "bold")
+      doc.text("Description:", 20, 110)
+      doc.setFont("helvetica", "normal")
+
+      // Split long text into multiple lines
+      const splitDescription = doc.splitTextToSize(report.description, 170)
+      doc.text(splitDescription, 20, 120)
+    }
+
+    // Product information
+    if (product) {
+      let yPos = 150
+      doc.setFont("helvetica", "bold")
+      doc.text("Product Information:", 20, yPos)
+
+      doc.setFont("helvetica", "normal")
+      yPos += 10
+      doc.text(`Product Name: ${product.name || "N/A"}`, 20, yPos)
+      yPos += 10
+      doc.text(`Location: ${product.location || "N/A"}`, 20, yPos)
+      yPos += 10
+      doc.text(`Type: ${product.type || "N/A"}`, 20, yPos)
+    }
+
+    // Attachments info
+    if (report.attachments && report.attachments.length > 0) {
+      let yPos = 200
+      doc.setFont("helvetica", "bold")
+      doc.text("Attachments:", 20, yPos)
+      yPos += 10
+
+      doc.setFont("helvetica", "normal")
+      report.attachments.forEach((attachment, index) => {
+        doc.text(`${index + 1}. ${attachment.name || "Attachment"}`, 25, yPos)
+        yPos += 8
+      })
+    }
+
+    // Footer
+    const pageHeight = doc.internal.pageSize.height
+    doc.setFontSize(10)
+    doc.setFont("helvetica", "italic")
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 105, pageHeight - 20, { align: "center" })
+    doc.text("OOH Operator - Report System", 105, pageHeight - 10, { align: "center" })
+
+    if (returnBlob) {
+      // Return as blob for email attachment
+      const pdfBlob = doc.output("blob")
+      return pdfBlob
+    } else {
+      // Download the PDF
+      doc.save(
+        `${report.siteId}_${getReportTypeDisplay(report.reportType).replace(/\s+/g, "_")}_${report.siteName.replace(/\s+/g, "_")}.pdf`,
+      )
+    }
+  } catch (error) {
+    console.error("Error generating PDF:", error)
+    throw error
+  }
+}
+
+// PDF Service class for additional functionality
 export class PDFService {
   static async generateReportPDF(options: PDFGenerationOptions): Promise<Blob> {
     try {
@@ -759,8 +874,8 @@ export class PDFService {
 
       // Set up document properties
       doc.setProperties({
-        title: `${reportData.reportType} Report - ${reportData.productName}`,
-        subject: `Report for ${reportData.productName}`,
+        title: `${reportData.reportType} Report - ${reportData.siteName}`,
+        subject: `Report for ${reportData.siteName}`,
         author: "OOH Operator",
         creator: "OOH Operator System",
       })
@@ -783,46 +898,23 @@ export class PDFService {
       doc.setFont("helvetica", "normal")
       doc.text(`Report Type: ${reportData.reportType || "N/A"}`, 20, yPosition)
       yPosition += 8
-      doc.text(`Product: ${reportData.productName || "N/A"}`, 20, yPosition)
+      doc.text(`Site Name: ${reportData.siteName || "N/A"}`, 20, yPosition)
       yPosition += 8
-      doc.text(`Location: ${reportData.location || "N/A"}`, 20, yPosition)
+      doc.text(`Site ID: ${reportData.siteId || "N/A"}`, 20, yPosition)
       yPosition += 8
       doc.text(`Date: ${reportData.date ? new Date(reportData.date).toLocaleDateString() : "N/A"}`, 20, yPosition)
       yPosition += 8
-      doc.text(`Status: ${reportData.status || "N/A"}`, 20, yPosition)
+      doc.text(`Status: ${reportData.completionPercentage || 100}% Complete`, 20, yPosition)
       yPosition += 15
 
-      // Product details
-      if (reportData.productDetails) {
-        doc.setFont("helvetica", "bold")
-        doc.text("Product Details:", 20, yPosition)
-        yPosition += 10
-
-        doc.setFont("helvetica", "normal")
-        const details = reportData.productDetails
-        if (details.dimensions) {
-          doc.text(`Dimensions: ${details.dimensions}`, 20, yPosition)
-          yPosition += 8
-        }
-        if (details.material) {
-          doc.text(`Material: ${details.material}`, 20, yPosition)
-          yPosition += 8
-        }
-        if (details.specifications) {
-          doc.text(`Specifications: ${details.specifications}`, 20, yPosition)
-          yPosition += 8
-        }
-        yPosition += 10
-      }
-
       // Notes section
-      if (includeNotes && reportData.notes) {
+      if (includeNotes && reportData.description) {
         doc.setFont("helvetica", "bold")
-        doc.text("Notes:", 20, yPosition)
+        doc.text("Description:", 20, yPosition)
         yPosition += 10
 
         doc.setFont("helvetica", "normal")
-        const notes = reportData.notes
+        const notes = reportData.description
         const splitNotes = doc.splitTextToSize(notes, 170)
         doc.text(splitNotes, 20, yPosition)
         yPosition += splitNotes.length * 6 + 10
@@ -850,19 +942,23 @@ export class PDFService {
       // For now, we'll create a sample report
       const sampleReportData: ReportData = {
         id: reportId,
-        reportType: "Completion Report",
-        productName: "LED Billboard Installation",
-        location: "Manila, Philippines",
+        reportType: "completion-report",
+        siteName: "LED Billboard Installation",
+        siteId: reportId,
         date: new Date().toISOString(),
-        status: "Completed",
-        productDetails: {
-          dimensions: "10m x 5m",
-          material: "LED Display Panel",
-          specifications: "P10 Outdoor LED Display, IP65 Rating",
+        completionPercentage: 100,
+        description:
+          "Installation completed successfully. All systems tested and operational. Client training provided.",
+        assignedTo: "Team A",
+        sales: "John Doe",
+        location: "Manila, Philippines",
+        bookingDates: {
+          start: new Date().toISOString(),
+          end: new Date().toISOString(),
         },
-        notes: "Installation completed successfully. All systems tested and operational. Client training provided.",
-        userId: "sample-user",
-        created: new Date().toISOString(),
+        attachments: [],
+        created: new Date(),
+        createdByName: "System User",
       }
 
       return await this.generateReportPDF({
