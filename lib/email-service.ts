@@ -2,22 +2,24 @@ import {
   collection,
   addDoc,
   getDocs,
-  getDoc,
   doc,
+  getDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
-  serverTimestamp,
   type Timestamp,
+  serverTimestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
+// Email types
 export interface EmailAttachment {
   fileName: string
-  fileUrl: string
+  content: string | Buffer
+  contentType: string
   fileSize: number
-  fileType: string
 }
 
 export interface Email {
@@ -25,17 +27,18 @@ export interface Email {
   from: string
   to: string[]
   cc?: string[]
+  bcc?: string[]
   subject: string
   body: string
   attachments?: EmailAttachment[]
-  reportId?: string
   templateId?: string
+  reportId?: string
   status: "draft" | "sending" | "sent" | "failed"
   userId: string
   created?: Timestamp
-  updated?: Timestamp
-  messageId?: string
+  sent?: Timestamp
   error?: string
+  messageId?: string
 }
 
 export interface EmailTemplate {
@@ -45,142 +48,200 @@ export interface EmailTemplate {
   body: string
   userId: string
   created?: Timestamp
-  updated?: Timestamp
 }
 
 class EmailService {
-  private checkFirestore() {
-    if (!db) {
-      throw new Error("Firestore is not initialized. This function can only be called on the client side.")
-    }
-  }
+  private emailsCollection = "compose_emails"
+  private templatesCollection = "email_templates"
 
   // Email CRUD operations
   async createEmail(emailData: Omit<Email, "id" | "created">): Promise<string> {
-    this.checkFirestore()
-
     try {
-      const newEmail = {
-        ...emailData,
-        created: serverTimestamp(),
-        updated: serverTimestamp(),
-      }
+      // Clean undefined values
+      const cleanEmailData = Object.fromEntries(Object.entries(emailData).filter(([_, value]) => value !== undefined))
 
-      const docRef = await addDoc(collection(db!, "compose_emails"), newEmail)
+      const docRef = await addDoc(collection(db, this.emailsCollection), {
+        ...cleanEmailData,
+        created: serverTimestamp(),
+      })
+
       console.log("Email record created with ID:", docRef.id)
       return docRef.id
     } catch (error) {
       console.error("Error creating email:", error)
-      throw new Error(`Failed to create email record: ${error instanceof Error ? error.message : "Unknown error"}`)
+      throw new Error("Failed to create email record")
     }
   }
 
   async getEmailById(emailId: string): Promise<Email | null> {
-    this.checkFirestore()
-
     try {
-      const emailDoc = await getDoc(doc(db!, "compose_emails", emailId))
-
+      const emailDoc = await getDoc(doc(db, this.emailsCollection, emailId))
       if (emailDoc.exists()) {
-        return { id: emailDoc.id, ...emailDoc.data() } as Email
+        const data = emailDoc.data()
+        return {
+          id: emailDoc.id,
+          ...data,
+          created: data.created,
+          sent: data.sent,
+        } as Email
       }
-
       return null
     } catch (error) {
-      console.error("Error fetching email:", error)
-      throw new Error(`Failed to fetch email: ${error instanceof Error ? error.message : "Unknown error"}`)
+      console.error("Error getting email:", error)
+      throw new Error("Failed to get email")
     }
   }
 
-  async updateEmailStatus(emailId: string, status: Email["status"], messageId?: string, error?: string): Promise<void> {
-    this.checkFirestore()
-
+  async getEmails(userId?: string): Promise<Email[]> {
     try {
-      const updateData: any = {
-        status,
-        updated: serverTimestamp(),
+      let q = query(collection(db, this.emailsCollection), orderBy("created", "desc"))
+
+      if (userId) {
+        q = query(collection(db, this.emailsCollection), where("userId", "==", userId), orderBy("created", "desc"))
       }
 
-      if (messageId) {
-        updateData.messageId = messageId
-      }
-
-      if (error) {
-        updateData.error = error
-      }
-
-      await updateDoc(doc(db!, "compose_emails", emailId), updateData)
-      console.log("Email status updated:", { emailId, status, messageId })
-    } catch (error) {
-      console.error("Error updating email status:", error)
-      throw new Error(`Failed to update email status: ${error instanceof Error ? error.message : "Unknown error"}`)
-    }
-  }
-
-  async getUserEmails(userId: string): Promise<Email[]> {
-    this.checkFirestore()
-
-    try {
-      const emailsRef = collection(db!, "compose_emails")
-      const q = query(emailsRef, where("userId", "==", userId), orderBy("created", "desc"))
       const querySnapshot = await getDocs(q)
+      return querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Email[]
+    } catch (error) {
+      console.error("Error getting emails:", error)
+      return []
+    }
+  }
 
-      const emails: Email[] = []
-      querySnapshot.forEach((doc) => {
-        emails.push({ id: doc.id, ...doc.data() } as Email)
+  async updateEmail(emailId: string, updates: Partial<Email>): Promise<void> {
+    try {
+      const cleanUpdates = Object.fromEntries(Object.entries(updates).filter(([_, value]) => value !== undefined))
+      await updateDoc(doc(db, this.emailsCollection, emailId), cleanUpdates)
+      console.log("Email updated:", emailId, cleanUpdates)
+    } catch (error) {
+      console.error("Error updating email:", error)
+      throw new Error("Failed to update email")
+    }
+  }
+
+  async deleteEmail(emailId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, this.emailsCollection, emailId))
+    } catch (error) {
+      console.error("Error deleting email:", error)
+      throw new Error("Failed to delete email")
+    }
+  }
+
+  async sendEmail(emailId: string): Promise<void> {
+    try {
+      console.log("Starting email send process for ID:", emailId)
+
+      const email = await this.getEmailById(emailId)
+      if (!email) {
+        throw new Error("Email not found in database")
+      }
+
+      console.log("Email found, updating status to sending...")
+      await this.updateEmail(emailId, { status: "sending" })
+
+      const emailPayload = {
+        emailId,
+        from: email.from,
+        to: email.to,
+        cc: email.cc,
+        subject: email.subject,
+        body: email.body,
+        attachments: email.attachments,
+      }
+
+      console.log("Sending email via API...")
+
+      const response = await fetch("/api/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(emailPayload),
       })
 
-      return emails
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send email via API")
+      }
+
+      console.log("Email API response:", result)
+
+      await this.updateEmail(emailId, {
+        status: "sent",
+        sent: serverTimestamp() as any,
+        messageId: result.messageId,
+      })
+
+      console.log("Email sent successfully with message ID:", result.messageId)
     } catch (error) {
-      console.error("Error fetching user emails:", error)
-      throw new Error(`Failed to fetch emails: ${error instanceof Error ? error.message : "Unknown error"}`)
+      console.error("Error sending email:", error)
+
+      await this.updateEmail(emailId, {
+        status: "failed",
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
+
+      throw error
     }
   }
 
-  // Template CRUD operations
+  // Template operations
   async createEmailTemplate(templateData: Omit<EmailTemplate, "id" | "created">): Promise<string> {
-    this.checkFirestore()
-
     try {
-      const newTemplate = {
+      const docRef = await addDoc(collection(db, this.templatesCollection), {
         ...templateData,
         created: serverTimestamp(),
-        updated: serverTimestamp(),
-      }
-
-      const docRef = await addDoc(collection(db!, "email_templates"), newTemplate)
-      console.log("Email template created with ID:", docRef.id)
+      })
       return docRef.id
     } catch (error) {
       console.error("Error creating email template:", error)
-      throw new Error(`Failed to create email template: ${error instanceof Error ? error.message : "Unknown error"}`)
+      throw new Error("Failed to create email template")
     }
   }
 
   async getEmailTemplates(userId: string): Promise<EmailTemplate[]> {
-    this.checkFirestore()
-
     try {
-      const templatesRef = collection(db!, "email_templates")
-      const q = query(templatesRef, where("userId", "==", userId), orderBy("name", "asc"))
+      const q = query(
+        collection(db, this.templatesCollection),
+        where("userId", "==", userId),
+        orderBy("created", "desc"),
+      )
       const querySnapshot = await getDocs(q)
-
-      const templates: EmailTemplate[] = []
-      querySnapshot.forEach((doc) => {
-        templates.push({ id: doc.id, ...doc.data() } as EmailTemplate)
-      })
-
-      return templates
+      return querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as EmailTemplate[]
     } catch (error) {
-      console.error("Error fetching email templates:", error)
-      throw new Error(`Failed to fetch email templates: ${error instanceof Error ? error.message : "Unknown error"}`)
+      console.error("Error getting email templates:", error)
+      return []
+    }
+  }
+
+  async updateEmailTemplate(templateId: string, updates: Partial<EmailTemplate>): Promise<void> {
+    try {
+      await updateDoc(doc(db, this.templatesCollection, templateId), updates)
+    } catch (error) {
+      console.error("Error updating email template:", error)
+      throw new Error("Failed to update email template")
+    }
+  }
+
+  async deleteEmailTemplate(templateId: string): Promise<void> {
+    try {
+      await deleteDoc(doc(db, this.templatesCollection, templateId))
+    } catch (error) {
+      console.error("Error deleting email template:", error)
+      throw new Error("Failed to delete email template")
     }
   }
 
   async createDefaultTemplates(userId: string): Promise<void> {
-    this.checkFirestore()
-
-    const defaultTemplates: Omit<EmailTemplate, "id" | "created">[] = [
+    const defaultTemplates = [
       {
         name: "Report Delivery",
         subject: "Report Ready for Review",
@@ -202,31 +263,46 @@ Best regards,
         userId,
       },
       {
-        name: "Follow-up",
-        subject: "Following up on your report",
-        body: `Hi [Customer's Name],
+        name: "Project Update",
+        subject: "Project Status Update",
+        body: `Dear [Customer's Name],
 
-I wanted to follow up on the report I sent earlier. Have you had a chance to review it?
+I wanted to provide you with an update on your project progress.
 
-If you have any questions or need clarification on any part of the report, please don't hesitate to reach out. I'm here to help.
+Current Status: [Project Status]
+Completion: [Percentage]%
+Next Steps: [Next Steps]
+
+Attached you'll find the detailed progress report with all relevant information and documentation.
+
+If you have any questions or concerns, please don't hesitate to reach out.
 
 Best regards,
-[Your Full Name]`,
+[Your Full Name]
+[Your Position]
+[Company Name]`,
         userId,
       },
       {
-        name: "Urgent Report",
-        subject: "URGENT: Report requires immediate attention",
-        body: `Hi [Customer's Name],
+        name: "Completion Report",
+        subject: "Project Completion Report",
+        body: `Dear [Customer's Name],
 
-This is an urgent report that requires your immediate attention.
+I'm pleased to inform you that your project has been completed successfully!
 
-Please review the attached document as soon as possible and let me know if you need any clarification.
+Project Details:
+- Start Date: [Start Date]
+- Completion Date: [Completion Date]
+- Final Status: Completed
 
-Thank you for your prompt attention to this matter.
+Please find the final completion report attached for your records. This document contains all the details about the work performed and final deliverables.
+
+Thank you for choosing our services. We look forward to working with you again in the future.
 
 Best regards,
-[Your Full Name]`,
+[Your Full Name]
+[Your Position]
+[Company Name]`,
         userId,
       },
     ]
@@ -238,61 +314,7 @@ Best regards,
       console.log("Default email templates created successfully")
     } catch (error) {
       console.error("Error creating default templates:", error)
-      throw new Error(`Failed to create default templates: ${error instanceof Error ? error.message : "Unknown error"}`)
-    }
-  }
-
-  // Send email function
-  async sendEmail(emailId: string): Promise<void> {
-    try {
-      // Update status to sending
-      await this.updateEmailStatus(emailId, "sending")
-
-      // Get email data
-      const email = await this.getEmailById(emailId)
-      if (!email) {
-        throw new Error("Email not found")
-      }
-
-      console.log("Sending email via API:", {
-        emailId,
-        to: email.to,
-        subject: email.subject,
-      })
-
-      // Send email via API route
-      const response = await fetch("/api/send-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          emailId,
-          from: email.from,
-          to: email.to,
-          cc: email.cc,
-          subject: email.subject,
-          body: email.body,
-          attachments: email.attachments,
-        }),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to send email")
-      }
-
-      // Update status to sent
-      await this.updateEmailStatus(emailId, "sent", result.messageId)
-      console.log("Email sent successfully:", result)
-    } catch (error) {
-      console.error("Error sending email:", error)
-      const errorMessage = error instanceof Error ? error.message : "Unknown error"
-
-      // Update status to failed
-      await this.updateEmailStatus(emailId, "failed", undefined, errorMessage)
-      throw error
+      throw new Error("Failed to create default templates")
     }
   }
 }

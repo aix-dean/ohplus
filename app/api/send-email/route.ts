@@ -1,6 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server"
 import nodemailer from "nodemailer"
 
+// Email configuration - you'll need to set these environment variables
+const EMAIL_CONFIG = {
+  host: process.env.SMTP_HOST || "smtp.gmail.com",
+  port: Number.parseInt(process.env.SMTP_PORT || "587"),
+  secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
+  auth: {
+    user: process.env.SMTP_USER || process.env.EMAIL_USER,
+    pass: process.env.SMTP_PASS || process.env.EMAIL_PASS,
+  },
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -13,97 +24,98 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields: to, subject, body" }, { status: 400 })
     }
 
-    // Check if email credentials are configured
-    const emailUser = process.env.EMAIL_USER
-    const emailPass = process.env.EMAIL_PASS
+    // Check if SMTP is configured
+    if (!EMAIL_CONFIG.auth.user || !EMAIL_CONFIG.auth.pass) {
+      console.log("SMTP not configured, running in demo mode")
 
-    if (!emailUser || !emailPass) {
-      console.log("Email credentials not configured, simulating email send...")
-
-      // Simulate email sending for demo purposes
-      const simulatedResult = {
-        messageId: `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        accepted: Array.isArray(to) ? to : [to],
-        rejected: [],
-      }
-
-      console.log("=== EMAIL SIMULATION ===")
-      console.log("From:", from)
+      // Demo mode - log email details
+      console.log("=== EMAIL DEMO MODE ===")
+      console.log("From:", from || EMAIL_CONFIG.auth.user)
       console.log("To:", Array.isArray(to) ? to.join(", ") : to)
       if (cc && cc.length > 0) console.log("CC:", Array.isArray(cc) ? cc.join(", ") : cc)
       console.log("Subject:", subject)
       console.log("Body Length:", emailBody.length, "characters")
       console.log("Attachments:", attachments?.length || 0)
-      console.log("========================")
+      console.log("======================")
+
+      await new Promise((resolve) => setTimeout(resolve, 1000))
 
       return NextResponse.json({
         success: true,
-        messageId: simulatedResult.messageId,
-        emailId,
-        message: "Email simulated successfully (configure EMAIL_USER and EMAIL_PASS for real sending)",
-        details: {
-          to: simulatedResult.accepted,
-          cc: cc,
-          subject: subject,
-          attachmentCount: attachments?.length || 0,
-          accepted: simulatedResult.accepted,
-          rejected: simulatedResult.rejected,
-          simulated: true,
-        },
+        messageId: `demo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        mode: "demo",
+        message:
+          "Email logged in demo mode. Configure SMTP_USER and SMTP_PASS environment variables to send real emails.",
       })
     }
 
-    // Create transporter using Gmail SMTP
-    const transporter = nodemailer.createTransporter({
-      service: "gmail",
-      auth: {
-        user: emailUser,
-        pass: emailPass,
+    // Create transporter
+    console.log("Creating nodemailer transporter...")
+    const transporter = nodemailer.createTransport({
+      host: EMAIL_CONFIG.host,
+      port: EMAIL_CONFIG.port,
+      secure: EMAIL_CONFIG.secure,
+      auth: EMAIL_CONFIG.auth,
+      tls: {
+        rejectUnauthorized: false, // Allow self-signed certificates
       },
     })
 
+    // Verify connection
+    console.log("Verifying SMTP connection...")
+    try {
+      await transporter.verify()
+      console.log("SMTP connection verified successfully")
+    } catch (verifyError) {
+      console.error("SMTP verification failed:", verifyError)
+      return NextResponse.json(
+        {
+          error: "SMTP configuration error",
+          details: verifyError instanceof Error ? verifyError.message : "Unknown SMTP error",
+        },
+        { status: 500 },
+      )
+    }
+
     // Prepare email data
-    const emailData: any = {
-      from: emailUser, // Use configured email as sender
+    const mailOptions: any = {
+      from: from || EMAIL_CONFIG.auth.user,
       to: Array.isArray(to) ? to.join(", ") : to,
       subject: subject,
       html: `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto;">
-          <div style="background: #2563eb; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
-            <h2 style="margin: 0; font-size: 24px;">OOH Operator</h2>
-            <p style="margin: 5px 0 0 0; opacity: 0.9;">Professional Out-of-Home Advertising Platform</p>
+          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h2 style="color: #2563eb; margin: 0 0 10px 0;">OOH Operator</h2>
+            <p style="margin: 0; color: #6b7280; font-size: 14px;">Professional Report Delivery</p>
           </div>
           
-          <div style="background: white; padding: 30px; border: 1px solid #e5e7eb; border-top: none;">
-            <div style="white-space: pre-wrap; line-height: 1.6;">
-${emailBody}
-            </div>
+          <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #e5e7eb;">
+            ${emailBody.replace(/\n/g, "<br>")}
           </div>
           
           ${
             attachments && attachments.length > 0
               ? `
-          <div style="background: #f8f9fa; padding: 20px; border: 1px solid #e5e7eb; border-top: none;">
-            <h3 style="margin: 0 0 15px 0; color: #374151; font-size: 16px;">📎 Attachments:</h3>
-            ${attachments
-              .map(
-                (att: any) => `
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 8px; background: white; border-radius: 4px;">
-              <span style="color: #2563eb;">📄</span>
-              <span style="color: #374151; font-weight: 500;">${att.fileName}</span>
-              <span style="color: #6b7280; font-size: 12px;">(${Math.round(att.fileSize / 1024)}KB)</span>
+            <div style="margin-top: 20px; padding: 15px; background: #f3f4f6; border-radius: 8px;">
+              <h3 style="margin: 0 0 10px 0; color: #374151; font-size: 16px;">📎 Attachments</h3>
+              ${attachments
+                .map(
+                  (att: any) => `
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                  <span style="color: #2563eb;">${att.fileName}</span>
+                  <span style="color: #9ca3af; font-size: 12px;">(${Math.round(att.fileSize / 1024)}KB)</span>
+                </div>
+              `,
+                )
+                .join("")}
             </div>
-          `,
-              )
-              .join("")}
-          </div>
-        `
+          `
               : ""
           }
           
-          <div style="background: #f3f4f6; padding: 15px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px; text-align: center;">
-            <p style="margin: 0; color: #6b7280; font-size: 12px;">
-              This email was sent from OOH Operator Platform
+          <div style="margin-top: 20px; padding: 15px; background: #f8fafc; border-radius: 8px; border-left: 4px solid #2563eb;">
+            <p style="margin: 0; color: #475569; font-size: 14px;">
+              This email was sent from the OOH Operator platform.
             </p>
           </div>
         </div>
@@ -113,71 +125,55 @@ ${emailBody}
 
     // Add CC if provided
     if (cc && cc.length > 0) {
-      emailData.cc = Array.isArray(cc) ? cc.join(", ") : cc
+      mailOptions.cc = Array.isArray(cc) ? cc.join(", ") : cc
     }
 
     // Add attachments if provided
     if (attachments && attachments.length > 0) {
-      emailData.attachments = attachments.map((attachment: any) => {
-        // Handle base64 data
-        if (attachment.fileUrl && attachment.fileUrl.startsWith("data:")) {
-          const base64Data = attachment.fileUrl.split(",")[1]
-          return {
-            filename: attachment.fileName,
-            content: Buffer.from(base64Data, "base64"),
-            contentType: attachment.fileType,
-          }
-        }
-
-        // Handle other content types
-        return {
-          filename: attachment.fileName,
-          content: attachment.fileUrl,
-          contentType: attachment.fileType,
-        }
-      })
+      mailOptions.attachments = attachments.map((attachment: any) => ({
+        filename: attachment.fileName,
+        content: attachment.content,
+        contentType: attachment.contentType,
+      }))
     }
 
-    console.log("Sending email with nodemailer:", {
-      from: emailData.from,
-      to: emailData.to,
-      cc: emailData.cc,
-      subject: emailData.subject,
-      attachmentCount: emailData.attachments?.length || 0,
+    console.log("Sending email via nodemailer...")
+    console.log("Mail options:", {
+      from: mailOptions.from,
+      to: mailOptions.to,
+      cc: mailOptions.cc,
+      subject: mailOptions.subject,
+      attachmentCount: mailOptions.attachments?.length || 0,
     })
 
     // Send email
-    const result = await transporter.sendMail(emailData)
+    const info = await transporter.sendMail(mailOptions)
 
-    console.log("Email sent successfully:", {
-      messageId: result.messageId,
-      accepted: result.accepted,
-      rejected: result.rejected,
-    })
+    console.log("Email sent successfully:", info.messageId)
+    console.log("Response:", info.response)
 
     return NextResponse.json({
       success: true,
-      messageId: result.messageId,
+      messageId: info.messageId,
       emailId,
-      message: "Email sent successfully",
+      mode: "smtp",
+      message: "Email sent successfully via SMTP",
       details: {
-        to: emailData.to,
-        cc: emailData.cc,
-        subject: emailData.subject,
-        attachmentCount: emailData.attachments?.length || 0,
-        accepted: result.accepted,
-        rejected: result.rejected,
+        accepted: info.accepted,
+        rejected: info.rejected,
+        response: info.response,
       },
     })
   } catch (error) {
-    console.error("Error sending email:", error)
+    console.error("Error in send-email API:", error)
 
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
+    const errorDetails = error instanceof Error ? error.stack : undefined
 
     return NextResponse.json(
       {
         error: `Failed to send email: ${errorMessage}`,
-        details: error instanceof Error ? error.stack : undefined,
+        details: errorDetails,
       },
       { status: 500 },
     )

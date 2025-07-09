@@ -1,98 +1,44 @@
-import { Skeleton } from "@/components/ui/skeleton"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Loader2 } from "lucide-react"
-
-export default function ComposeEmailLoading() {
+export default function Loading() {
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <Skeleton className="h-9 w-20" />
-        <div>
-          <Skeleton className="h-8 w-48 mb-2" />
-          <Skeleton className="h-4 w-32" />
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-white px-6 py-4 flex items-center justify-between shadow-sm border-b">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-gray-200 rounded-full animate-pulse" />
+          <div className="h-6 w-32 bg-gray-200 rounded animate-pulse" />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Email Form */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Template Selection */}
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-32 mb-2" />
-              <Skeleton className="h-4 w-64" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-10 w-full" />
-            </CardContent>
-          </Card>
-
-          {/* Email Form */}
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-6 w-24" />
-            </CardHeader>
-            <CardContent className="space-y-4">
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            <div className="bg-white rounded-lg border p-6 space-y-4">
               <div className="space-y-2">
-                <Skeleton className="h-4 w-8" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-3 w-48" />
+                <div className="h-4 w-8 bg-gray-200 rounded animate-pulse" />
+                <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
               </div>
               <div className="space-y-2">
-                <Skeleton className="h-4 w-8" />
-                <Skeleton className="h-10 w-full" />
+                <div className="h-4 w-8 bg-gray-200 rounded animate-pulse" />
+                <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
               </div>
               <div className="space-y-2">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-10 w-full" />
+                <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
+                <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
               </div>
               <div className="space-y-2">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-32 w-full" />
+                <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
+                <div className="h-64 w-full bg-gray-200 rounded animate-pulse" />
               </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-end">
-            <Skeleton className="h-11 w-32" />
+            </div>
           </div>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-5 w-32" />
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-px w-full" />
+          <div className="space-y-4">
+            <div className="bg-white rounded-lg border p-4">
+              <div className="h-6 w-24 bg-gray-200 rounded animate-pulse mb-4" />
               <div className="space-y-2">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-full" />
+                <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
+                <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
+                <div className="h-10 w-full bg-gray-200 rounded animate-pulse" />
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <Skeleton className="h-5 w-32" />
-            </CardHeader>
-            <CardContent>
-              <Skeleton className="h-4 w-full mb-2" />
-              <Skeleton className="h-3 w-48" />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Loader */}
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p className="text-muted-foreground">Loading compose email...</p>
+            </div>
           </div>
         </div>
       </div>
