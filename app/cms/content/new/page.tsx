@@ -396,6 +396,7 @@ export default function CMSContentCreatePage() {
     e.preventDefault()
 
     // Check if user and project data are available
+    console.log(!user || !projectData)
     if (!user || !projectData) {
       toast({
         title: "Authentication Error",
