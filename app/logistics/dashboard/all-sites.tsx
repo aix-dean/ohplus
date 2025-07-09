@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Progress } from "@/components/ui/progress"
 import type { Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
@@ -514,41 +513,69 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
         <div className="flex flex-col gap-1">
           <h3 className="font-semibold">{site.name}</h3>
 
-          <div className="text-sm text-gray-500 mt-1">{site.location}</div>
-
-          {/* Status Badge */}
-          <div className="mt-2 flex items-center gap-2">
-            <div className="text-sm font-medium">Status:</div>
-            <Badge
-              variant="outline"
-              className={`
-                ${site.statusColor === "green" ? "bg-green-50 text-green-700 border-green-200" : ""}
-                ${site.statusColor === "blue" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
-                ${site.statusColor === "red" ? "bg-red-50 text-red-700 border-red-200" : ""}
-                ${site.statusColor === "orange" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
-              `}
-            >
-              {site.status}
-            </Badge>
-          </div>
-
-          {/* Health Percentage */}
-          <div className="mt-3">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-sm font-medium">Health:</span>
-              <span className="text-sm">{site.healthPercentage}%</span>
+          {/* Site Details Section */}
+          <div className="mt-2 space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Operation:</span>
+              <span
+                className={`font-medium ${
+                  site.status === "ACTIVE" || site.status === "OCCUPIED"
+                    ? "text-green-600"
+                    : site.status === "MAINTENANCE"
+                      ? "text-red-600"
+                      : "text-orange-600"
+                }`}
+              >
+                {site.status === "ACTIVE" || site.status === "OCCUPIED"
+                  ? "Active"
+                  : site.status === "MAINTENANCE"
+                    ? "Maintenance"
+                    : "Pending"}
+              </span>
             </div>
-            <Progress
-              value={site.healthPercentage}
-              className="h-2"
-              indicatorClassName={`
-                ${site.healthPercentage > 80 ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
-                ${site.healthPercentage > 60 && site.healthPercentage <= 80 ? "bg-gradient-to-r from-yellow-500 to-green-300" : ""}
-                ${site.healthPercentage > 40 && site.healthPercentage <= 60 ? "bg-gradient-to-r from-orange-500 to-yellow-300" : ""}
-                ${site.healthPercentage <= 40 ? "bg-gradient-to-r from-red-500 to-orange-300" : ""}
-              `}
-            />
+
+            <div className="flex justify-between">
+              <span className="text-gray-600">Content:</span>
+              <span className="font-medium text-blue-600">
+                {site.contentType === "dynamic" ? "Digital Display" : "Static Billboard"}
+              </span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-gray-600">Display Health:</span>
+              <span
+                className={`font-medium ${
+                  site.healthPercentage > 80
+                    ? "text-green-600"
+                    : site.healthPercentage > 60
+                      ? "text-yellow-600"
+                      : "text-red-600"
+                }`}
+              >
+                {site.healthPercentage}%
+              </span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-gray-600">Illumination:</span>
+              <span
+                className={`font-medium ${
+                  site.status === "ACTIVE" || site.status === "OCCUPIED" ? "text-green-600" : "text-gray-500"
+                }`}
+              >
+                {site.status === "ACTIVE" || site.status === "OCCUPIED" ? "ON" : "OFF"}
+              </span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-gray-600">Compliance:</span>
+              <span className={`font-medium ${site.healthPercentage > 80 ? "text-green-600" : "text-orange-600"}`}>
+                {site.healthPercentage > 80 ? "Complete" : "Incomplete"}
+              </span>
+            </div>
           </div>
+
+          <div className="text-sm text-gray-500 mt-3">{site.location}</div>
 
           {/* Additional Information */}
           <div className="mt-3 pt-3 border-t border-gray-100">
