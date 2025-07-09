@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -18,6 +19,7 @@ interface SendReportDialogProps {
 
 export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: SendReportDialogProps) {
   const { toast } = useToast()
+  const router = useRouter()
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
@@ -47,6 +49,12 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
       title: "Link Copied!",
       description: "The report link has been copied to your clipboard.",
     })
+  }
+
+  const handleEmailOption = () => {
+    onClose()
+    // Navigate to compose email page
+    router.push(`/logistics/reports/${report.id}/compose`)
   }
 
   const handleSocialShare = (platform: string) => {
@@ -112,7 +120,7 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
             {/* Sharing Options */}
             <div className="grid grid-cols-4 gap-6 text-center">
               {/* Email */}
-              <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={() => onSelectOption("email")}>
+              <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={handleEmailOption}>
                 <Button
                   variant="ghost"
                   size="icon"
