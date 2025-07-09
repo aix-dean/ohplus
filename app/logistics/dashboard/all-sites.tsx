@@ -490,6 +490,31 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
     window.location.href = `/logistics/sites/${site.id}`
   }
 
+  // Generate mock data for demonstration - replace with real data from your backend
+  const getDisplayHealth = () => {
+    if (site.healthPercentage > 90) return "100%"
+    if (site.healthPercentage > 80) return "90%"
+    if (site.healthPercentage > 60) return "75%"
+    return "50%"
+  }
+
+  const getIlluminationStatus = () => {
+    return site.operationalStatus === "Operational" ? "ON" : "OFF"
+  }
+
+  const getComplianceStatus = () => {
+    return site.operationalStatus === "Operational" ? "Complete" : "Incomplete"
+  }
+
+  const getContentInfo = () => {
+    // Mock content based on site type
+    if (site.contentType === "dynamic") {
+      const contents = ["Leon", "Lilo and Stitch", "Marvel Heroes", "Nike Campaign"]
+      return contents[Math.floor(Math.random() * contents.length)]
+    }
+    return "Static Billboard"
+  }
+
   return (
     <Card
       className="erp-card overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
@@ -513,30 +538,24 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
           </div>
         )}
 
-        {/* Content Type Badge */}
+        {/* Status Badge */}
         <div className="absolute top-2 left-2">
           <Badge
             variant="outline"
             className={`
-              ${site.contentType === "dynamic" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-amber-50 text-amber-700 border-amber-200"}
-            `}
-          >
-            {site.contentType === "dynamic" ? "Digital" : "Static"}
-          </Badge>
-        </div>
-
-        {/* Operational Status Badge */}
-        <div className="absolute bottom-2 left-2">
-          <Badge
-            variant="outline"
-            className={`
-              ${site.operationalStatus === "Operational" ? "bg-green-50 text-green-700 border-green-200" : ""}
+              ${site.operationalStatus === "Operational" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
               ${site.operationalStatus === "Under Maintenance" ? "bg-red-50 text-red-700 border-red-200" : ""}
               ${site.operationalStatus === "Pending Setup" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
               ${site.operationalStatus === "Inactive" ? "bg-gray-50 text-gray-700 border-gray-200" : ""}
             `}
           >
-            {site.operationalStatus}
+            {site.operationalStatus === "Operational"
+              ? "OPEN"
+              : site.operationalStatus === "Under Maintenance"
+                ? "OCCUPIED"
+                : site.operationalStatus === "Pending Setup"
+                  ? "OCCUPIED"
+                  : "CLOSED"}
           </Badge>
         </div>
       </div>
@@ -552,7 +571,7 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
           </div>
 
           {/* Site Details Section */}
-          <div className="space-y-2 my-3">
+          <div className="space-y-2 mt-3">
             {/* Operation Status */}
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-700">Operation:</span>
@@ -567,7 +586,13 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
                         : "text-gray-600"
                 }`}
               >
-                {site.operationalStatus === "Operational" ? "Active" : site.operationalStatus}
+                {site.operationalStatus === "Operational"
+                  ? "Active"
+                  : site.operationalStatus === "Under Maintenance"
+                    ? "Maintenance"
+                    : site.operationalStatus === "Pending Setup"
+                      ? "Pending"
+                      : "Inactive"}
               </span>
             </div>
 
@@ -583,43 +608,46 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
                       : "text-red-600"
                 }`}
               >
-                {site.healthPercentage}%
+                {getDisplayHealth()}
               </span>
             </div>
 
-            {/* Content Type */}
+            {/* Content */}
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-700">Content:</span>
-              <span className="text-sm font-semibold text-blue-600">
-                {site.contentType === "dynamic" ? "Digital Display" : "Static Billboard"}
-              </span>
+              <span className="text-sm font-semibold text-blue-600">{getContentInfo()}</span>
             </div>
 
-            {/* Illumination Status */}
+            {/* Illumination */}
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-700">Illumination:</span>
               <span
                 className={`text-sm font-semibold ${
-                  site.operationalStatus === "Operational" ? "text-green-600" : "text-gray-600"
+                  getIlluminationStatus() === "ON" ? "text-green-600" : "text-red-600"
                 }`}
               >
-                {site.operationalStatus === "Operational" ? "ON" : "OFF"}
+                {getIlluminationStatus()}
               </span>
             </div>
 
-            {/* Compliance Status */}
+            {/* Compliance */}
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-700">Compliance:</span>
               <span
-                className={`text-sm font-semibold ${site.healthPercentage > 80 ? "text-green-600" : "text-red-600"}`}
+                className={`text-sm font-semibold ${
+                  getComplianceStatus() === "Complete" ? "text-green-600" : "text-red-600"
+                }`}
               >
-                {site.healthPercentage > 80 ? "Complete" : "Incomplete"}
+                {getComplianceStatus()}
+                {getComplianceStatus() === "Incomplete" && (
+                  <span className="ml-1 text-xs bg-red-100 text-red-800 px-1 rounded">(2)</span>
+                )}
               </span>
             </div>
           </div>
 
           {/* Current Status */}
-          <div className="text-sm border-t pt-2">
+          <div className="text-sm mt-3 pt-3 border-t border-gray-200">
             <span className="text-gray-600 font-medium">Current:</span>{" "}
             <span
               className={`font-semibold ${
