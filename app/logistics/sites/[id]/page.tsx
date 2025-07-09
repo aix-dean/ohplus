@@ -18,6 +18,7 @@ import {
   MoreVertical,
   Edit,
   Bell,
+  Sun,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,8 @@ import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-
 import Link from "next/link"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { AlarmSettingDialog } from "@/components/alarm-setting-dialog"
+import { IlluminationIndexCardDialog } from "@/components/illumination-index-card-dialog"
+import { DisplayIndexCardDialog } from "@/components/display-index-card-dialog"
 
 type Props = {
   params: { id: string }
@@ -63,6 +66,8 @@ export default function SiteDetailsPage({ params }: Props) {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
   const [alarmDialogOpen, setAlarmDialogOpen] = useState(false)
+  const [illuminationIndexCardDialogOpen, setIlluminationIndexCardDialogOpen] = useState(false)
+  const [displayIndexCardDialogOpen, setDisplayIndexCardDialogOpen] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const view = searchParams.get("view")
@@ -328,7 +333,7 @@ export default function SiteDetailsPage({ params }: Props) {
             </CardContent>
           </Card>
 
-          {/* Site Data Grid - Exact 2x2 layout */}
+          {/* Site Data Grid - Updated to include Display card */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Illumination - Top Left */}
             <Card>
@@ -395,11 +400,67 @@ export default function SiteDetailsPage({ params }: Props) {
                       <span className="font-medium">Side (Right):</span> N/A
                     </div>
                   </div>
-
-                  {/* Status indicators */}
                 </div>
 
-                <Button variant="outline" size="sm" className="mt-4 w-full bg-transparent">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4 w-full bg-transparent"
+                  onClick={() => setIlluminationIndexCardDialogOpen(true)}
+                >
+                  View Index Card
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Display - Top Middle */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base flex items-center">
+                  <Sun className="h-4 w-4 mr-2" />
+                  Display
+                </CardTitle>
+                <AlertTriangle className="h-4 w-4 text-yellow-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="text-sm">
+                    <div className="font-medium">July 1, 2025 (Tue), 2:00 pm</div>
+                    <div className="text-gray-600 text-xs">
+                      <span className="font-medium">Operating Time:</span> 6:00 pm to 11:00 pm
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 text-sm">
+                    <div>
+                      <span className="font-medium">Brightness:</span>
+                      <div className="text-xs text-gray-600 ml-2">
+                        7:00 am-3:00 pm (20%)
+                        <br />
+                        3:00 pm-11:00 pm (100%)
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Spots in a loop:</span> 10 spots
+                    </div>
+                    <div>
+                      <span className="font-medium">Service Life:</span> 3 years, 8 months, and 10 days
+                    </div>
+                    <div>
+                      <span className="font-medium">Power Consumption:</span> 150 kWh/month
+                    </div>
+                    <div>
+                      <span className="font-medium">Average Power Consumption:</span> 160 kWh over last 3 months
+                    </div>
+                  </div>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4 w-full bg-transparent"
+                  onClick={() => setDisplayIndexCardDialogOpen(true)}
+                >
                   View Index Card
                 </Button>
               </CardContent>
@@ -637,6 +698,22 @@ export default function SiteDetailsPage({ params }: Props) {
         }}
       />
       <AlarmSettingDialog open={alarmDialogOpen} onOpenChange={setAlarmDialogOpen} />
+      <IlluminationIndexCardDialog
+        open={illuminationIndexCardDialogOpen}
+        onOpenChange={setIlluminationIndexCardDialogOpen}
+        onCreateJO={() => {
+          // Navigate to create service assignment with this site pre-selected
+          router.push(`/logistics/assignments/create?projectSite=${params.id}`)
+        }}
+      />
+      <DisplayIndexCardDialog
+        open={displayIndexCardDialogOpen}
+        onOpenChange={setDisplayIndexCardDialogOpen}
+        onCreateJO={() => {
+          // Navigate to create service assignment with this site pre-selected
+          router.push(`/logistics/assignments/create?projectSite=${params.id}`)
+        }}
+      />
     </div>
   )
 }
