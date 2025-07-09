@@ -45,6 +45,8 @@ export default function RegistrationCodesPage() {
     if (!userData?.license_key) return
 
     try {
+      // Fetch codes based on the user's license_key
+      // This ensures users only see codes from their company
       const codesQuery = query(
         collection(db, "organization_codes"),
         where("license_key", "==", userData.license_key),
@@ -75,11 +77,13 @@ export default function RegistrationCodesPage() {
   }
 
   const handleGenerateCode = async () => {
+    // For existing users: Use their existing company_id and license_key
+    // This ensures new users joining will be part of the same company
     if (!userData?.company_id || !userData?.license_key) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Company information not found. Please register your company first.",
+        description: "Company information not found. Please complete your company setup first.",
       })
       return
     }
@@ -101,11 +105,12 @@ export default function RegistrationCodesPage() {
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + 30)
 
-      // Save the organization code
+      // Save the organization code with the existing user's company information
+      // This is the key: existing users pass their company_id and license_key to new users
       await setDoc(doc(db, "organization_codes", code), {
-        company_id: userData.company_id,
-        license_key: userData.license_key,
-        created_by: user?.uid,
+        company_id: userData.company_id, // Existing user's company ID
+        license_key: userData.license_key, // Existing user's license key
+        created_by: user?.uid, // Who created this code
         created_at: serverTimestamp(),
         expires_at: expiresAt,
         used: false,
