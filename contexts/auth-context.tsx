@@ -31,6 +31,7 @@ interface UserData {
   onboarding: boolean
   department?: string
   company_id?: string
+  previous_companies?: string[] // Track company history
   lastLogin?: any
   created?: any
   updated?: any
@@ -48,6 +49,7 @@ interface AuthContextType {
     lastName: string,
     organizationCode?: string,
   ) => Promise<void>
+  joinOrganization: (organizationCode: string) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   updateUserData: (data: Partial<UserData>) => Promise<void>
@@ -199,6 +201,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const joinOrganization = async (organizationCode: string) => {
+    if (!user || !userData) {
+      throw new Error("User must be logged in to join an organization")
+    }
+
+    try {
+      // Validate the organization code
+      const orgData = await validateOrganizationCode(organizationCode)
+
+      // Check if user is already part of this organization
+      if (userData.company_id === orgData.company_id) {
+        throw new Error("You are already a member of this organization")
+      }
+
+      // Prepare update data
+      const updateData: Partial<UserData> = {
+        updated: serverTimestamp(),
+      }
+
+      // Handle existing company membership
+      if (userData.company_id) {
+        // User is switching companies - store previous company in history
+        const previousCompanies = userData.previous_companies || []
+        if (!previousCompanies.includes(userData.company_id)) {
+          previousCompanies.push(userData.company_id)
+        }
+        updateData.previous_companies = previousCompanies
+      }
+
+      // Assign new company and license
+      updateData.company_id = orgData.company_id
+      updateData.license_key = orgData.license_key
+
+      // Update user document
+      await updateDoc(doc(db, "iboard_users", user.uid), updateData)
+
+      // Update organization code usage count
+      await updateDoc(doc(db, "organization_codes", organizationCode), {
+        usage_count: (orgData.usage_count || 0) + 1,
+        updated: serverTimestamp(),
+      })
+
+      // Refresh user data
+      await fetchUserData(user.uid)
+
+      return {
+        message: userData.company_id ? "Successfully switched to new organization" : "Successfully joined organization",
+        previousCompany: userData.company_id || null,
+        newCompany: orgData.company_id,
+      }
+    } catch (error: any) {
+      throw new Error(error.message)
+    }
+  }
+
   const logout = async () => {
     try {
       await signOut(auth)
@@ -237,6 +294,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading,
     login,
     register,
+    joinOrganization,
     logout,
     resetPassword,
     updateUserData,
