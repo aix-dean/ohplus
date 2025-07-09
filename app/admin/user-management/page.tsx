@@ -4,12 +4,13 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { UserPlus, Settings, Mail, Shield } from "lucide-react"
+import { UserPlus, Settings, Mail, Shield, Edit } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { ResponsiveTable } from "@/components/responsive-table"
 import AddUserInvitationDialog from "@/components/add-user-invitation-dialog"
+import EditUserRoleDialog from "@/components/edit-user-role-dialog"
 import Link from "next/link"
 import { toast } from "sonner"
 
@@ -28,7 +29,9 @@ export default function UserManagementPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddUserDialog, setShowAddUserDialog] = useState(false)
+  const [showEditRoleDialog, setShowEditRoleDialog] = useState(false)
   const [currentInvitationCode, setCurrentInvitationCode] = useState("")
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
 
   useEffect(() => {
     if (!userData?.company_id) return
@@ -102,6 +105,11 @@ export default function UserManagementPage() {
     }
   }
 
+  const handleEditRole = (user: User) => {
+    setSelectedUser(user)
+    setShowEditRoleDialog(true)
+  }
+
   const getStatusBadge = (status: string) => {
     // Ensure status is a string
     const statusStr = String(status || "unknown")
@@ -172,6 +180,9 @@ export default function UserManagementPage() {
       label: "Actions",
       render: (user: User) => (
         <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleEditRole(user)}>
+            <Edit className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
             <Settings className="h-4 w-4" />
           </Button>
@@ -247,6 +258,16 @@ export default function UserManagementPage() {
         invitationCode={currentInvitationCode}
         onSuccess={() => {
           toast.success("User invitation sent successfully!")
+        }}
+      />
+
+      {/* Edit User Role Dialog */}
+      <EditUserRoleDialog
+        open={showEditRoleDialog}
+        onOpenChange={setShowEditRoleDialog}
+        user={selectedUser}
+        onSuccess={() => {
+          toast.success("User role updated successfully!")
         }}
       />
     </div>
