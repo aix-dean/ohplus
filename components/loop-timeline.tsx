@@ -30,7 +30,7 @@ interface TimelineSpot {
 
 export function LoopTimeline({ cmsData }: LoopTimelineProps) {
   // Extract CMS configuration with fallbacks
-  const spotsPerLoop = cmsData?.spots_per_loop || cmsData?.spotsPerLoop || 6
+  const spotsPerLoop = cmsData?.spots_per_loop || cmsData?.spotsPerLoop || 5
   const loopsPerDay = cmsData?.loops_per_day || cmsData?.loopsPerDay || 20
   const spotDuration = cmsData?.spot_duration || cmsData?.spotDuration || 15 // seconds
   const startTimeStr = cmsData?.start_time || cmsData?.startTime || "06:00"
@@ -45,31 +45,31 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
 
   // Parse start time
   const [startHour, startMinute] = startTimeStr.split(":").map(Number)
-  const dayStartTime = new Date()
-  dayStartTime.setHours(startHour, startMinute, 0, 0)
+  const loopStartTime = new Date()
+  loopStartTime.setHours(startHour, startMinute, 0, 0)
 
-  // Calculate total minutes in a day and time per loop
-  const totalMinutesInDay = 24 * 60 // 1440 minutes
-  const minutesPerLoop = totalMinutesInDay / loopsPerDay
+  // Calculate total loop duration: spots_per_loop × spot_duration
+  const totalLoopDuration = spotsPerLoop * spotDuration // in seconds
+  const loopEndTime = new Date(loopStartTime.getTime() + totalLoopDuration * 1000)
 
-  // Generate timeline spots based on loops per day
+  // Generate timeline spots based on spots per loop
   const generateTimelineSpots = (): TimelineSpot[] => {
     const spots: TimelineSpot[] = []
-    let currentTime = new Date(dayStartTime)
+    let currentTime = new Date(loopStartTime)
 
-    for (let i = 0; i < loopsPerDay; i++) {
-      const loopEndTime = new Date(currentTime.getTime() + minutesPerLoop * 60 * 1000)
+    for (let i = 0; i < spotsPerLoop; i++) {
+      const spotEndTime = new Date(currentTime.getTime() + spotDuration * 1000)
 
       spots.push({
-        id: `LOOP${String(i + 1).padStart(3, "0")}`,
-        name: `Loop ${i + 1}`,
+        id: `SPOT${String(i + 1).padStart(3, "0")}`,
+        name: `Spot ${i + 1}`,
         startTime: new Date(currentTime),
-        endTime: new Date(loopEndTime),
-        duration: Math.round(minutesPerLoop * 60), // Convert to seconds
-        status: i < 8 ? "active" : i < 12 ? "pending" : "available",
+        endTime: new Date(spotEndTime),
+        duration: spotDuration,
+        status: i < 2 ? "active" : i < 3 ? "pending" : "available",
       })
 
-      currentTime = new Date(loopEndTime)
+      currentTime = new Date(spotEndTime)
     }
 
     return spots
@@ -77,25 +77,20 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
 
   const timelineSpots = generateTimelineSpots()
 
-  // Calculate total loop duration for the entire day
-  const totalDayDuration = loopsPerDay * minutesPerLoop * 60 // in seconds
-
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString([], {
       hour: "numeric",
       minute: "2-digit",
+      second: "2-digit",
       hour12: true,
     })
   }
 
   const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
+    const minutes = Math.floor(seconds / 60)
     const remainingSeconds = seconds % 60
 
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${remainingSeconds}s`
-    } else if (minutes > 0) {
+    if (minutes > 0) {
       return `${minutes}m ${remainingSeconds}s`
     } else {
       return `${remainingSeconds}s`
@@ -116,7 +111,7 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
   }
 
   const handleAddSpot = (spotId: string) => {
-    console.log(`Add action for loop: ${spotId}`)
+    console.log(`Add action for spot: ${spotId}`)
     // Add your spot action logic here
   }
 
@@ -127,7 +122,7 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock size={18} />
-            Daily Loop Configuration
+            First Loop Configuration
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -137,7 +132,7 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
               <div className="text-lg font-semibold">{spotsPerLoop}</div>
             </div>
             <div>
-              <span className="font-medium text-gray-500">Total Loops per Day:</span>
+              <span className="font-medium text-gray-500">Loops per Day:</span>
               <div className="text-lg font-semibold">{loopsPerDay}</div>
             </div>
             <div>
@@ -149,12 +144,12 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
               <div className="text-lg font-semibold">{convertTo12Hour(startTimeStr)}</div>
             </div>
             <div>
-              <span className="font-medium text-gray-500">Time per Loop:</span>
-              <div className="text-lg font-semibold">{Math.round(minutesPerLoop)} minutes</div>
+              <span className="font-medium text-gray-500">Total Loop Duration:</span>
+              <div className="text-lg font-semibold">{formatDuration(totalLoopDuration)}</div>
             </div>
             <div>
-              <span className="font-medium text-gray-500">Total Daily Spots:</span>
-              <div className="text-lg font-semibold">{loopsPerDay * spotsPerLoop}</div>
+              <span className="font-medium text-gray-500">Loop End Time:</span>
+              <div className="text-lg font-semibold">{formatTime(loopEndTime)}</div>
             </div>
           </div>
         </CardContent>
@@ -165,10 +160,11 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Play size={18} />
-            Daily Loop Timeline ({loopsPerDay} Loops)
+            First Loop Timeline ({spotsPerLoop} Spots)
           </CardTitle>
           <div className="text-sm text-gray-500">
-            Daily schedule from {convertTo12Hour(startTimeStr)} with {loopsPerDay} loops throughout the day
+            Loop runs from {convertTo12Hour(startTimeStr)} to {formatTime(loopEndTime)} (
+            {formatDuration(totalLoopDuration)} total)
           </div>
         </CardHeader>
         <CardContent>
@@ -181,28 +177,28 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-medium">
-                  {loopsPerDay} loops × {Math.round(minutesPerLoop)} min each
+                  {spotsPerLoop} spots × {spotDuration}s each = {formatDuration(totalLoopDuration)}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock size={16} className="text-gray-500" />
-                <span className="font-medium">End: {formatTime(timelineSpots[timelineSpots.length - 1]?.endTime)}</span>
+                <span className="font-medium">End: {formatTime(loopEndTime)}</span>
               </div>
             </div>
 
             {/* Timeline Spots */}
-            <div className="space-y-3 max-h-96 overflow-y-auto">
+            <div className="space-y-3">
               {timelineSpots.map((spot, index) => (
                 <div
                   key={spot.id}
                   className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  {/* Loop Number */}
+                  {/* Spot Number */}
                   <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                     <span className="font-semibold text-blue-700">{index + 1}</span>
                   </div>
 
-                  {/* Loop Details */}
+                  {/* Spot Details */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-medium text-gray-900">{spot.name}</h3>
@@ -214,7 +210,7 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
                       <span className="font-mono">
                         {formatTime(spot.startTime)} - {formatTime(spot.endTime)}
                       </span>
-                      <span className="ml-2">({formatDuration(spot.duration)})</span>
+                      <span className="ml-2">({spot.duration}s duration)</span>
                     </div>
                   </div>
 
@@ -230,13 +226,11 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
                               : "bg-blue-500"
                         }`}
                         style={{
-                          width: `${(spot.duration / (minutesPerLoop * 60)) * 100}%`,
+                          width: `${(spot.duration / totalLoopDuration) * 100}%`,
                         }}
                       />
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-xs font-medium text-white mix-blend-difference">
-                          {Math.round(minutesPerLoop)}m
-                        </span>
+                        <span className="text-xs font-medium text-white mix-blend-difference">{spot.duration}s</span>
                       </div>
                     </div>
                   </div>
@@ -258,27 +252,28 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
             <div className="mt-6 p-4 bg-blue-50 rounded-lg">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="font-medium text-blue-900">Daily Schedule Summary</h4>
+                  <h4 className="font-medium text-blue-900">First Loop Summary</h4>
                   <p className="text-sm text-blue-700">
-                    {loopsPerDay} loops running throughout the day, each containing {spotsPerLoop} advertising spots
+                    This loop contains {spotsPerLoop} advertising spots and will repeat {loopsPerDay} times throughout
+                    the day
                   </p>
                 </div>
                 <div className="text-right">
-                  <div className="text-lg font-semibold text-blue-900">{loopsPerDay * spotsPerLoop}</div>
-                  <div className="text-sm text-blue-700">Total Daily Spots</div>
+                  <div className="text-lg font-semibold text-blue-900">{formatDuration(totalLoopDuration)}</div>
+                  <div className="text-sm text-blue-700">Loop Duration</div>
                 </div>
               </div>
               <div className="mt-3 grid grid-cols-3 gap-4 text-sm">
                 <div>
-                  <span className="text-blue-600 font-medium">Active Loops:</span>
+                  <span className="text-blue-600 font-medium">Active Spots:</span>
                   <span className="ml-1">{timelineSpots.filter((s) => s.status === "active").length}</span>
                 </div>
                 <div>
-                  <span className="text-blue-600 font-medium">Pending Loops:</span>
+                  <span className="text-blue-600 font-medium">Pending Spots:</span>
                   <span className="ml-1">{timelineSpots.filter((s) => s.status === "pending").length}</span>
                 </div>
                 <div>
-                  <span className="text-blue-600 font-medium">Available Loops:</span>
+                  <span className="text-blue-600 font-medium">Available Spots:</span>
                   <span className="ml-1">{timelineSpots.filter((s) => s.status === "available").length}</span>
                 </div>
               </div>
