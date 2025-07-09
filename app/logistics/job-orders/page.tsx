@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useAuth } from "@/contexts/auth-context"
 
 // Mock data for job orders
 const mockJobOrders = [
@@ -94,7 +93,6 @@ function getJobTypeColor(type: string) {
 }
 
 export default function LogisticsJobOrdersPage() {
-  const { user } = useAuth()
   const [searchTerm, setSearchTerm] = useState("")
   const [jobOrders, setJobOrders] = useState(mockJobOrders)
   const [filteredJobOrders, setFilteredJobOrders] = useState(mockJobOrders)
