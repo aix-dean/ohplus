@@ -466,7 +466,8 @@ export default function CMSContentCreatePage() {
 
       router.push("/cms/dashboard")
     } catch (error) {
-      console.error("Error creating content:", error)
+      console.log(error)
+      console.error("Error creating content:")
       const errorMessage = error instanceof Error ? error.message : "Failed to create content. Please try again."
       setError(errorMessage)
       toast({
