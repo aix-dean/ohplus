@@ -407,6 +407,7 @@ export default function CMSContentCreatePage() {
     }
 
     // Validate dynamic content before proceeding
+    console.log(!validateDynamicContent())
     if (!validateDynamicContent()) {
       toast({
         title: "Validation Error",
