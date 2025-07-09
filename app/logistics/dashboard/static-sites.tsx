@@ -1,13 +1,23 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useCallback } from "react"
 import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { getPaginatedUserProducts, type Product } from "@/lib/firebase-service"
+import {
+  getPaginatedUserProducts,
+  getServiceAssignmentsByProductId,
+  type Product,
+  type ServiceAssignment,
+} from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { useAuth } from "@/contexts/auth-context"
 import { CreateReportDialog } from "@/components/create-report-dialog"
+import Image from "next/image"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
@@ -435,4 +445,91 @@ export default function StaticSitesTab() {
 
 // Update the SiteCard component to fetch its own service assignments
 function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
-  const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment
+  const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
+  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
+
+  // Add the handleCreateReport function
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onCreateReport(site.id)
+  }
+
+  const handleCardClick = () => {
+    window.location.href = `/logistics/sites/${site.id}`
+  }
+
+  // Fetch service assignments for this specific product
+  useEffect(() => {
+    const fetchProductAssignments = async () => {
+      try {
+        setIsLoadingAssignments(true)
+        const assignments = await getServiceAssignmentsByProductId(site.id)
+        setActiveAssignments(assignments)
+      } catch (error) {
+        console.error(`Error fetching assignments for product ${site.id}:`, error)
+      } finally {
+        setIsLoadingAssignments(false)
+      }
+    }
+
+    fetchProductAssignments()
+  }, [site.id])
+
+  return (
+    <Card
+      className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white"
+      onClick={handleCardClick}
+    >
+      <div className="relative h-48 bg-gray-200">
+        <Image
+          src={site.image || "/placeholder.svg"}
+          alt={site.name}
+          fill
+          className="object-cover"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            target.src = "/roadside-billboard.png"
+            target.className = "opacity-50 object-contain"
+          }}
+        />
+        {activeAssignments.length > 0 && (
+          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
+            {activeAssignments.length}
+          </div>
+        )}
+      </div>
+
+      <CardContent className="p-4">
+        <div className="flex flex-col gap-1">
+          <h3 className="font-semibold">{site.name}</h3>
+          <div className="text-xs text-gray-500">ID: {site.id}</div>
+
+          <div className="mt-2 flex items-center gap-2">
+            <div className="text-sm font-medium">Current:</div>
+            <Badge
+              variant="outline"
+              className={`
+                ${site.statusColor === "green" ? "bg-green-50 text-green-700 border-green-200" : ""}
+                ${site.statusColor === "blue" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
+                ${site.statusColor === "red" ? "bg-red-50 text-red-700 border-red-200" : ""}
+                ${site.statusColor === "orange" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
+              `}
+            >
+              {site.status}
+            </Badge>
+          </div>
+
+          {/* Add Create Report Button */}
+          <Button
+            variant="outline"
+            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+            onClick={handleCreateReport}
+          >
+            Create Report
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
