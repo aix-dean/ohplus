@@ -1,4 +1,5 @@
 import jsPDF from "jspdf"
+import html2canvas from "html2canvas"
 import type { Proposal } from "@/lib/types/proposal"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import type { ReportData } from "@/lib/report-service"
@@ -765,212 +766,178 @@ export async function generateCostEstimatePDF(
   }
 }
 
-// Main function for generating report PDFs
-export async function generateReportPDF(
-  report: ReportData,
-  product: Product | null,
-  returnBlob = false,
-): Promise<void | Blob> {
-  try {
-    const doc = new jsPDF()
-
-    // Set up document properties
-    doc.setProperties({
-      title: `${report.reportType} - ${report.siteName}`,
-      subject: "Site Report",
-      author: "OOH Operator",
-      creator: "OOH Operator System",
-    })
-
-    // Header
-    doc.setFontSize(20)
-    doc.setFont("helvetica", "bold")
-    doc.text("SITE REPORT", 105, 20, { align: "center" })
-
-    // Report type and site info
-    doc.setFontSize(16)
-    doc.setFont("helvetica", "normal")
-    doc.text(`Report Type: ${getReportTypeDisplay(report.reportType)}`, 20, 40)
-    doc.text(`Site Name: ${report.siteName}`, 20, 50)
-    doc.text(`Site ID: ${report.siteId}`, 20, 60)
-    doc.text(`Date: ${new Date(report.date).toLocaleDateString()}`, 20, 70)
-
-    // Status
-    doc.setFontSize(14)
-    doc.setFont("helvetica", "bold")
-    doc.text("Status:", 20, 90)
-    doc.setFont("helvetica", "normal")
-    doc.text(`${report.completionPercentage || 100}% Complete`, 50, 90)
-
-    // Description
-    if (report.description) {
-      doc.setFont("helvetica", "bold")
-      doc.text("Description:", 20, 110)
-      doc.setFont("helvetica", "normal")
-
-      // Split long text into multiple lines
-      const splitDescription = doc.splitTextToSize(report.description, 170)
-      doc.text(splitDescription, 20, 120)
-    }
-
-    // Product information
-    if (product) {
-      let yPos = 150
-      doc.setFont("helvetica", "bold")
-      doc.text("Product Information:", 20, yPos)
-
-      doc.setFont("helvetica", "normal")
-      yPos += 10
-      doc.text(`Product Name: ${product.name || "N/A"}`, 20, yPos)
-      yPos += 10
-      doc.text(`Location: ${product.location || "N/A"}`, 20, yPos)
-      yPos += 10
-      doc.text(`Type: ${product.type || "N/A"}`, 20, yPos)
-    }
-
-    // Attachments info
-    if (report.attachments && report.attachments.length > 0) {
-      let yPos = 200
-      doc.setFont("helvetica", "bold")
-      doc.text("Attachments:", 20, yPos)
-      yPos += 10
-
-      doc.setFont("helvetica", "normal")
-      report.attachments.forEach((attachment, index) => {
-        doc.text(`${index + 1}. ${attachment.name || "Attachment"}`, 25, yPos)
-        yPos += 8
-      })
-    }
-
-    // Footer
-    const pageHeight = doc.internal.pageSize.height
-    doc.setFontSize(10)
-    doc.setFont("helvetica", "italic")
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, 105, pageHeight - 20, { align: "center" })
-    doc.text("OOH Operator - Report System", 105, pageHeight - 10, { align: "center" })
-
-    if (returnBlob) {
-      // Return as blob for email attachment
-      const pdfBlob = doc.output("blob")
-      return pdfBlob
-    } else {
-      // Download the PDF
-      doc.save(
-        `${report.siteId}_${getReportTypeDisplay(report.reportType).replace(/\s+/g, "_")}_${report.siteName.replace(/\s+/g, "_")}.pdf`,
-      )
-    }
-  } catch (error) {
-    console.error("Error generating PDF:", error)
-    throw error
-  }
-}
-
 // PDF Service class for additional functionality
 export class PDFService {
-  static async generateReportPDF(options: PDFGenerationOptions): Promise<Blob> {
+  async generateReportPDF(
+    reportData: ReportData,
+    productData?: Product | null,
+    returnBlob = false,
+  ): Promise<Blob | string> {
     try {
-      const { reportData, includeImages = true, includeNotes = true } = options
-      const doc = new jsPDF()
+      // Create a temporary div to render the report content
+      const tempDiv = document.createElement("div")
+      tempDiv.style.position = "absolute"
+      tempDiv.style.left = "-9999px"
+      tempDiv.style.top = "-9999px"
+      tempDiv.style.width = "800px"
+      tempDiv.style.backgroundColor = "white"
+      tempDiv.style.padding = "40px"
+      tempDiv.style.fontFamily = "Arial, sans-serif"
 
-      // Set up document properties
-      doc.setProperties({
-        title: `${reportData.reportType} Report - ${reportData.siteName}`,
-        subject: `Report for ${reportData.siteName}`,
-        author: "OOH Operator",
-        creator: "OOH Operator System",
+      // Generate HTML content for the report
+      tempDiv.innerHTML = this.generateReportHTML(reportData, productData)
+
+      // Add to document temporarily
+      document.body.appendChild(tempDiv)
+
+      // Convert to canvas
+      const canvas = await html2canvas(tempDiv, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
       })
 
-      // Header
-      doc.setFontSize(20)
-      doc.setFont("helvetica", "bold")
-      doc.text("OOH OPERATOR REPORT", 20, 30)
+      // Remove temporary div
+      document.body.removeChild(tempDiv)
 
-      // Report details
-      doc.setFontSize(12)
-      doc.setFont("helvetica", "normal")
-      let yPosition = 50
+      // Create PDF
+      const pdf = new jsPDF("p", "mm", "a4")
+      const imgWidth = 210 // A4 width in mm
+      const pageHeight = 295 // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      let heightLeft = imgHeight
 
-      // Report information
-      doc.setFont("helvetica", "bold")
-      doc.text("Report Information:", 20, yPosition)
-      yPosition += 10
+      let position = 0
 
-      doc.setFont("helvetica", "normal")
-      doc.text(`Report Type: ${reportData.reportType || "N/A"}`, 20, yPosition)
-      yPosition += 8
-      doc.text(`Site Name: ${reportData.siteName || "N/A"}`, 20, yPosition)
-      yPosition += 8
-      doc.text(`Site ID: ${reportData.siteId || "N/A"}`, 20, yPosition)
-      yPosition += 8
-      doc.text(`Date: ${reportData.date ? new Date(reportData.date).toLocaleDateString() : "N/A"}`, 20, yPosition)
-      yPosition += 8
-      doc.text(`Status: ${reportData.completionPercentage || 100}% Complete`, 20, yPosition)
-      yPosition += 15
+      // Add first page
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
 
-      // Notes section
-      if (includeNotes && reportData.description) {
-        doc.setFont("helvetica", "bold")
-        doc.text("Description:", 20, yPosition)
-        yPosition += 10
-
-        doc.setFont("helvetica", "normal")
-        const notes = reportData.description
-        const splitNotes = doc.splitTextToSize(notes, 170)
-        doc.text(splitNotes, 20, yPosition)
-        yPosition += splitNotes.length * 6 + 10
+      // Add additional pages if needed
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight
+        pdf.addPage()
+        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
       }
 
-      // Footer
-      const pageHeight = doc.internal.pageSize.height
-      doc.setFontSize(10)
-      doc.setFont("helvetica", "italic")
-      doc.text("Generated by OOH Operator System", 20, pageHeight - 20)
-      doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, pageHeight - 10)
-
-      // Convert to blob
-      const pdfBlob = doc.output("blob")
-      return pdfBlob
+      if (returnBlob) {
+        return pdf.output("blob")
+      } else {
+        return pdf.output("datauristring")
+      }
     } catch (error) {
       console.error("Error generating PDF:", error)
       throw new Error("Failed to generate PDF report")
     }
   }
 
-  static async generateReportPDFFromId(reportId: string): Promise<Blob> {
-    try {
-      // This would typically fetch the report data from your database
-      // For now, we'll create a sample report
-      const sampleReportData: ReportData = {
-        id: reportId,
-        reportType: "completion-report",
-        siteName: "LED Billboard Installation",
-        siteId: reportId,
-        date: new Date().toISOString(),
-        completionPercentage: 100,
-        description:
-          "Installation completed successfully. All systems tested and operational. Client training provided.",
-        assignedTo: "Team A",
-        sales: "John Doe",
-        location: "Manila, Philippines",
-        bookingDates: {
-          start: new Date().toISOString(),
-          end: new Date().toISOString(),
-        },
-        attachments: [],
-        created: new Date(),
-        createdByName: "System User",
-      }
+  async generateReportPDFFromId(reportId: string): Promise<Blob> {
+    // This is a simplified version - you'd need to fetch the report data by ID
+    // For now, we'll create a basic PDF
+    const pdf = new jsPDF("p", "mm", "a4")
 
-      return await this.generateReportPDF({
-        reportData: sampleReportData,
-        includeImages: true,
-        includeNotes: true,
-      })
-    } catch (error) {
-      console.error("Error generating PDF from report ID:", error)
-      throw new Error("Failed to generate PDF report")
-    }
+    pdf.setFontSize(20)
+    pdf.text("Report", 20, 30)
+
+    pdf.setFontSize(12)
+    pdf.text(`Report ID: ${reportId}`, 20, 50)
+    pdf.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 60)
+    pdf.text("This is a sample report generated for email attachment.", 20, 80)
+
+    return pdf.output("blob")
+  }
+
+  private generateReportHTML(reportData: ReportData, productData?: Product | null): string {
+    const reportTypeDisplay = reportData.reportType
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+
+    return `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <!-- Header -->
+        <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #2563eb; padding-bottom: 20px;">
+          <h1 style="color: #2563eb; margin: 0; font-size: 28px;">OOH Operator</h1>
+          <h2 style="color: #666; margin: 10px 0 0 0; font-size: 18px;">${reportTypeDisplay}</h2>
+        </div>
+
+        <!-- Report Info -->
+        <div style="margin-bottom: 30px;">
+          <h3 style="color: #2563eb; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">Report Information</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold; width: 150px;">Site Name:</td>
+              <td style="padding: 8px 0;">${reportData.siteName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold;">Site ID:</td>
+              <td style="padding: 8px 0;">${reportData.siteId}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold;">Report Type:</td>
+              <td style="padding: 8px 0;">${reportTypeDisplay}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold;">Date:</td>
+              <td style="padding: 8px 0;">${new Date(reportData.date).toLocaleDateString()}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold;">Status:</td>
+              <td style="padding: 8px 0;">
+                <span style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
+                  ${reportData.completionPercentage || 100}% Complete
+                </span>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <!-- Product Info -->
+        ${
+          productData
+            ? `
+        <div style="margin-bottom: 30px;">
+          <h3 style="color: #2563eb; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">Product Information</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold; width: 150px;">Product Name:</td>
+              <td style="padding: 8px 0;">${productData.name}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold;">Type:</td>
+              <td style="padding: 8px 0;">${productData.type}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold;">Location:</td>
+              <td style="padding: 8px 0;">${productData.location}</td>
+            </tr>
+          </table>
+        </div>
+        `
+            : ""
+        }
+
+        <!-- Report Details -->
+        <div style="margin-bottom: 30px;">
+          <h3 style="color: #2563eb; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">Report Details</h3>
+          <div style="margin-top: 15px; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+            ${reportData.notes || "No additional notes provided for this report."}
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #666; font-size: 12px;">
+          <p>Generated by OOH Operator on ${new Date().toLocaleDateString()}</p>
+          <p>This is an automated report. For questions, please contact your account manager.</p>
+        </div>
+      </div>
+    `
   }
 }
 
 export const pdfService = new PDFService()
+
+// Export the main function for backward compatibility
+export const generateReportPDF = pdfService.generateReportPDF.bind(pdfService)

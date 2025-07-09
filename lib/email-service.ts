@@ -19,6 +19,7 @@ export interface EmailAttachment {
   fileUrl: string
   fileSize: number
   fileType: string
+  content?: string | Buffer
 }
 
 export interface Email {
@@ -37,6 +38,7 @@ export interface Email {
   created?: Timestamp
   sent?: Timestamp
   error?: string
+  messageId?: string
 }
 
 export interface EmailTemplate {
@@ -133,6 +135,13 @@ class EmailService {
       // Update status to sending
       await this.updateEmail(emailId, { status: "sending" })
 
+      // Prepare attachments for sending
+      const processedAttachments = email.attachments?.map((attachment) => ({
+        ...attachment,
+        // Convert blob URL to note for now - in production you'd convert to base64
+        content: attachment.fileUrl.startsWith("blob:") ? undefined : attachment.content,
+      }))
+
       // Send email via API route
       const response = await fetch("/api/send-email", {
         method: "POST",
@@ -146,20 +155,24 @@ class EmailService {
           cc: email.cc,
           subject: email.subject,
           body: email.body,
-          attachments: email.attachments,
+          attachments: processedAttachments,
         }),
       })
 
+      const result = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to send email")
+        throw new Error(result.error || "Failed to send email")
       }
 
       // Update status to sent
       await this.updateEmail(emailId, {
         status: "sent",
         sent: Timestamp.now(),
+        messageId: result.messageId,
       })
+
+      console.log("Email sent successfully:", result.messageId)
     } catch (error) {
       console.error("Error sending email:", error)
 

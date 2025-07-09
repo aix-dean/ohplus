@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -20,7 +20,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 export default function ComposeEmailPage() {
   const params = useParams()
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { toast } = useToast()
   const { user } = useAuth()
 
@@ -234,7 +233,7 @@ Best regards,
     try {
       // Create email record - only include defined values
       const emailData: Omit<Email, "id" | "created"> = {
-        from: "dean.aisyndicate.ph@gmail.com",
+        from: process.env.NEXT_PUBLIC_GMAIL_USER || "your-email@gmail.com",
         to: toEmails,
         subject,
         body,
@@ -523,12 +522,17 @@ Best regards,
               </Card>
             )}
 
-            {/* Domain Notice */}
-            <Card className="border-yellow-200 bg-yellow-50">
+            {/* Setup Notice */}
+            <Card className="border-blue-200 bg-blue-50">
               <CardContent className="p-4">
-                <div className="text-sm text-yellow-800">
-                  <strong>Note:</strong> Emails are sent from dean.aisyndicate.ph@gmail.com. To send from a custom
-                  domain, verify it at resend.com/domains.
+                <div className="text-sm text-blue-800">
+                  <strong>Setup Required:</strong> Add these environment variables:
+                  <br />
+                  <code className="text-xs bg-white p-1 rounded mt-1 block">
+                    GMAIL_USER=your-email@gmail.com
+                    <br />
+                    GMAIL_APP_PASSWORD=your-app-password
+                  </code>
                 </div>
               </CardContent>
             </Card>
