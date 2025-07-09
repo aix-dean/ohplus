@@ -806,21 +806,22 @@ export async function generateReportPDF(
 
     // Helper function to create the header section exactly like the preview
     const addHeaderToPage = async () => {
-      // Create header background - dark blue to cyan gradient effect
-      pdf.setFillColor(30, 58, 138) // Dark blue
-      pdf.rect(0, yPosition, pageWidth, 25, "F") // Changed from 35 to 25
-
-      // Add cyan accent
-      pdf.setFillColor(52, 211, 235) // Cyan
-      pdf.rect(pageWidth * 0.7, yPosition, pageWidth * 0.3, 25, "F") // Changed from 35 to 25
-
-      // Add "Logistics" text
-      pdf.setTextColor(255, 255, 255)
-      pdf.setFontSize(16) // Reduced from 18 to 16
-      pdf.setFont("helvetica", "bold")
-      pdf.text("Logistics", margin, yPosition + 15) // Adjusted positioning
-
-      yPosition += 30 // Changed from 40 to 30
+      try {
+        const headerBase64 = await loadImageAsBase64("/logistics-header-new.png")
+        if (headerBase64) {
+          // Use the full width and appropriate height for the header
+          const headerHeight = 25
+          const headerWidth = pageWidth
+          pdf.addImage(headerBase64, "PNG", 0, yPosition, headerWidth, headerHeight)
+          yPosition += headerHeight + 5
+        } else {
+          // Fallback if image fails to load
+          yPosition += 30
+        }
+      } catch (error) {
+        console.error("Error adding header image:", error)
+        yPosition += 30 // Skip header space if failed
+      }
     }
 
     // Add header to first page
@@ -833,6 +834,7 @@ export async function generateReportPDF(
     // Create cyan badge for report type
     pdf.setFillColor(52, 211, 235) // cyan-400
     const badgeWidth = 50
+
     const badgeHeight = 8
     pdf.rect(margin, yPosition, badgeWidth, badgeHeight, "F")
     pdf.setTextColor(255, 255, 255)
@@ -1082,43 +1084,46 @@ export async function generateReportPDF(
 
     yPosition += 15
 
-    // Add bottom footer with diagonal gradient background - exactly like preview
+    // Add bottom footer using the new PNG image - exactly like preview
     const footerY = pageHeight - 15
     const footerHeight = 15
 
-    // Create diagonal effect by drawing multiple thin rectangles
-    const steps = 50 // Number of steps for smooth diagonal
-    const diagonalWidth = pageWidth * 0.15 // Width of diagonal transition area
+    try {
+      const footerBase64 = await loadImageAsBase64("/logistics-footer-new.png")
+      if (footerBase64) {
+        // Use the full width footer image
+        pdf.addImage(footerBase64, "PNG", 0, footerY, pageWidth, footerHeight)
+      } else {
+        // Fallback to original gradient if image fails
+        pdf.setFillColor(52, 211, 235) // Cyan
+        pdf.rect(0, footerY, pageWidth * 0.3, footerHeight, "F")
+        pdf.setFillColor(30, 58, 138) // Dark blue
+        pdf.rect(pageWidth * 0.3, footerY, pageWidth * 0.7, footerHeight, "F")
 
-    for (let i = 0; i < steps; i++) {
-      const progress = i / steps
-      const x = pageWidth * 0.25 + diagonalWidth * progress
-      const width = pageWidth / steps
+        // Add footer text
+        pdf.setTextColor(255, 255, 255)
+        pdf.setFontSize(7)
+        pdf.setFont("helvetica", "normal")
+        pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 50, footerY + 8)
+        pdf.setFont("helvetica", "bold")
+        pdf.text("OH!", pageWidth - margin - 10, footerY + 12)
+      }
+    } catch (error) {
+      console.error("Error adding footer image:", error)
+      // Fallback to original gradient if image fails
+      pdf.setFillColor(52, 211, 235) // Cyan
+      pdf.rect(0, footerY, pageWidth * 0.3, footerHeight, "F")
+      pdf.setFillColor(30, 58, 138) // Dark blue
+      pdf.rect(pageWidth * 0.3, footerY, pageWidth * 0.7, footerHeight, "F")
 
-      // Interpolate between cyan and dark blue
-      const r = Math.round(52 + (30 - 52) * progress)
-      const g = Math.round(211 + (58 - 211) * progress)
-      const b = Math.round(235 + (138 - 235) * progress)
-
-      pdf.setFillColor(r, g, b)
-      pdf.rect(x, footerY, width + 1, footerHeight, "F")
+      // Add footer text
+      pdf.setTextColor(255, 255, 255)
+      pdf.setFontSize(7)
+      pdf.setFont("helvetica", "normal")
+      pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 50, footerY + 8)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("OH!", pageWidth - margin - 10, footerY + 12)
     }
-
-    // Fill the left side with cyan
-    pdf.setFillColor(52, 211, 235) // Cyan
-    pdf.rect(0, footerY, pageWidth * 0.25, footerHeight, "F")
-
-    // Fill the right side with dark blue
-    pdf.setFillColor(30, 58, 138) // Dark blue
-    pdf.rect(pageWidth * 0.4, footerY, pageWidth * 0.6, footerHeight, "F")
-
-    // Add footer text
-    pdf.setTextColor(255, 255, 255)
-    pdf.setFontSize(7)
-    pdf.setFont("helvetica", "normal")
-    pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 50, footerY + 8)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("OH!", pageWidth - margin - 10, footerY + 12)
 
     if (returnBase64) {
       return pdf.output("datauristring").split(",")[1]
