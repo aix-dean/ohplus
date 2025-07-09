@@ -9,7 +9,8 @@ import {
   query,
   where,
   orderBy,
-  Timestamp,
+  type Timestamp,
+  serverTimestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
@@ -19,7 +20,6 @@ export interface EmailAttachment {
   fileUrl: string
   fileSize: number
   fileType: string
-  content?: string | Buffer
 }
 
 export interface Email {
@@ -62,12 +62,14 @@ class EmailService {
 
       const docRef = await addDoc(collection(db, this.emailsCollection), {
         ...cleanEmailData,
-        created: Timestamp.now(),
+        created: serverTimestamp(),
       })
+
+      console.log("Email record created with ID:", docRef.id)
       return docRef.id
     } catch (error) {
       console.error("Error creating email:", error)
-      throw new Error("Failed to create email")
+      throw new Error("Failed to create email record")
     }
   }
 
@@ -75,7 +77,14 @@ class EmailService {
     try {
       const emailDoc = await getDoc(doc(db, this.emailsCollection, emailId))
       if (emailDoc.exists()) {
-        return { id: emailDoc.id, ...emailDoc.data() } as Email
+        const data = emailDoc.data()
+        return {
+          id: emailDoc.id,
+          ...data,
+          // Convert Firestore timestamps to proper format
+          created: data.created,
+          sent: data.sent,
+        } as Email
       }
       return null
     } catch (error) {
@@ -99,7 +108,7 @@ class EmailService {
       })) as Email[]
     } catch (error) {
       console.error("Error getting emails:", error)
-      throw new Error("Failed to get emails")
+      return []
     }
   }
 
@@ -109,6 +118,7 @@ class EmailService {
       const cleanUpdates = Object.fromEntries(Object.entries(updates).filter(([_, value]) => value !== undefined))
 
       await updateDoc(doc(db, this.emailsCollection, emailId), cleanUpdates)
+      console.log("Email updated:", emailId, cleanUpdates)
     } catch (error) {
       console.error("Error updating email:", error)
       throw new Error("Failed to update email")
@@ -126,53 +136,62 @@ class EmailService {
 
   async sendEmail(emailId: string): Promise<void> {
     try {
+      console.log("Starting email send process for ID:", emailId)
+
       // Get email from database
       const email = await this.getEmailById(emailId)
       if (!email) {
-        throw new Error("Email not found")
+        throw new Error("Email not found in database")
       }
+
+      console.log("Email found, updating status to sending...")
 
       // Update status to sending
       await this.updateEmail(emailId, { status: "sending" })
 
-      // Prepare attachments for sending
-      const processedAttachments = email.attachments?.map((attachment) => ({
-        ...attachment,
-        // Convert blob URL to note for now - in production you'd convert to base64
-        content: attachment.fileUrl.startsWith("blob:") ? undefined : attachment.content,
-      }))
+      // Prepare email data for API
+      const emailPayload = {
+        emailId,
+        from: email.from,
+        to: email.to,
+        cc: email.cc,
+        subject: email.subject,
+        body: email.body,
+        attachments: email.attachments,
+      }
 
-      // Send email via API route
+      console.log("Sending email via API with payload:", {
+        emailId,
+        to: email.to,
+        subject: email.subject,
+        attachmentCount: email.attachments?.length || 0,
+      })
+
+      // Send email via our API route
       const response = await fetch("/api/send-email", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          emailId,
-          from: email.from,
-          to: email.to,
-          cc: email.cc,
-          subject: email.subject,
-          body: email.body,
-          attachments: processedAttachments,
-        }),
+        body: JSON.stringify(emailPayload),
       })
 
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to send email")
+        throw new Error(result.error || "Failed to send email via API")
       }
+
+      console.log("Email API response:", result)
 
       // Update status to sent
       await this.updateEmail(emailId, {
         status: "sent",
-        sent: Timestamp.now(),
+        sent: serverTimestamp() as any,
         messageId: result.messageId,
       })
 
-      console.log("Email sent successfully:", result.messageId)
+      console.log("Email sent successfully with message ID:", result.messageId)
     } catch (error) {
       console.error("Error sending email:", error)
 
@@ -191,7 +210,7 @@ class EmailService {
     try {
       const docRef = await addDoc(collection(db, this.templatesCollection), {
         ...templateData,
-        created: Timestamp.now(),
+        created: serverTimestamp(),
       })
       return docRef.id
     } catch (error) {
@@ -214,7 +233,7 @@ class EmailService {
       })) as EmailTemplate[]
     } catch (error) {
       console.error("Error getting email templates:", error)
-      throw new Error("Failed to get email templates")
+      return []
     }
   }
 
@@ -307,6 +326,7 @@ Best regards,
       for (const template of defaultTemplates) {
         await this.createEmailTemplate(template)
       }
+      console.log("Default email templates created successfully")
     } catch (error) {
       console.error("Error creating default templates:", error)
       throw new Error("Failed to create default templates")
