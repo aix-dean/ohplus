@@ -59,8 +59,11 @@ export async function POST(request: NextRequest) {
       </div>
     `
 
+    // Fix the from field format - use a proper email format
+    const fromEmail = companyName ? `${companyName} <noreply@yourdomain.com>` : "Organization <noreply@yourdomain.com>"
+
     const { data, error } = await resend.emails.send({
-      from: `${companyName || "Organization"} <no-reply@${process.env.NEXT_PUBLIC_APP_URL?.replace("https://", "").replace("http://", "") || "example.com"}>`,
+      from: fromEmail,
       to: [email],
       subject: `Invitation to join ${companyName || "our organization"}`,
       html: emailContent,

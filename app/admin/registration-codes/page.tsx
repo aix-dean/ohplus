@@ -3,165 +3,133 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Plus, Mail } from "lucide-react"
+import { Copy, Plus, Mail, Shield } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
-import { collection, query, where, getDocs, doc, setDoc, updateDoc, serverTimestamp, orderBy } from "firebase/firestore"
+import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { ResponsiveTable } from "@/components/responsive-table"
-import { SendInvitationEmailDialog } from "@/components/send-invitation-email-dialog"
+import ResponsiveTable from "@/components/ResponsiveTable" // Import ResponsiveTable
+import SendInvitationEmailDialog from "@/components/SendInvitationEmailDialog" // Import SendInvitationEmailDialog
 
 interface RegistrationCode {
   id: string
   code: string
+  usage: number
+  max_usage?: number
+  expires_at: Date
+  is_active: boolean
+  created_at: Date
+  created_by: string
   company_id: string
   license_key: string
-  created_by: string
-  created_at: any
-  expires_at: Date
-  used: boolean
-  usage_count: number
-  max_usage?: number
-  active: boolean
 }
 
 export default function RegistrationCodesPage() {
   const { user, userData } = useAuth()
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
   const [codes, setCodes] = useState<RegistrationCode[]>([])
-  const [generatingCode, setGeneratingCode] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
   const [emailDialogOpen, setEmailDialogOpen] = useState(false)
   const [selectedCode, setSelectedCode] = useState<string>("")
 
   useEffect(() => {
-    if (!user && !loading) {
-      router.push("/login")
-    } else if (user && userData) {
-      fetchRegistrationCodes()
-    }
-  }, [user, userData, router, loading])
+    if (!user || !userData?.company_id) return
 
-  const fetchRegistrationCodes = async () => {
-    if (!userData?.license_key) return
+    const codesRef = collection(db, "organization_codes")
+    const q = query(codesRef, where("company_id", "==", userData.company_id))
 
-    try {
-      const codesQuery = query(
-        collection(db, "organization_codes"),
-        where("license_key", "==", userData.license_key),
-        orderBy("created_at", "desc"),
-      )
-
-      const codesSnapshot = await getDocs(codesQuery)
-      const codesData = codesSnapshot.docs.map((doc) => ({
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const codesData = snapshot.docs.map((doc) => ({
         id: doc.id,
-        code: doc.id,
         ...doc.data(),
-        expires_at: doc.data().expires_at?.toDate() || new Date(),
-        usage_count: doc.data().usage_count || 0,
-        active: doc.data().active !== false && !doc.data().used && doc.data().expires_at?.toDate() > new Date(),
+        expires_at: doc.data().expires_at?.toDate(),
+        created_at: doc.data().created_at?.toDate(),
       })) as RegistrationCode[]
 
+      // Sort by creation date (newest first)
+      codesData.sort((a, b) => b.created_at.getTime() - a.created_at.getTime())
       setCodes(codesData)
-    } catch (error) {
-      console.error("Error fetching registration codes:", error)
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to fetch registration codes.",
-      })
-    } finally {
       setLoading(false)
-    }
-  }
+    })
 
-  const handleGenerateCode = async () => {
-    if (!userData?.company_id || !userData?.license_key) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Company information not found. Please register your company first.",
-      })
-      return
-    }
+    return () => unsubscribe()
+  }, [user, userData?.company_id])
+
+  const generateCode = async () => {
+    if (!user || !userData?.company_id) return
 
     try {
-      setGeneratingCode(true)
+      setGenerating(true)
 
-      // Generate a unique 8-character code in format XXXX-XXXX
-      const generateCodeString = () => {
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-        const part1 = Array.from({ length: 4 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join("")
-        const part2 = Array.from({ length: 4 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join("")
-        return `${part1}-${part2}`
-      }
+      // Generate 8-character code in XXXX-XXXX format
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+      const part1 = Array.from({ length: 4 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join("")
+      const part2 = Array.from({ length: 4 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join("")
+      const code = `${part1}-${part2}`
 
-      const code = generateCodeString()
-
-      // Set expiration to 30 days from now
+      // Create expiration date (30 days from now)
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + 30)
 
-      // Save the organization code
-      await setDoc(doc(db, "organization_codes", code), {
-        company_id: userData.company_id,
-        license_key: userData.license_key,
-        created_by: user?.uid,
-        created_at: serverTimestamp(),
+      // Add to Firestore
+      const codesRef = collection(db, "organization_codes")
+      await codesRef.add({
+        code,
+        usage: 0,
         expires_at: expiresAt,
-        used: false,
-        usage_count: 0,
-        max_usage: null, // Unlimited usage
-        active: true,
+        is_active: true,
+        created_at: new Date(),
+        created_by: user.uid,
+        company_id: userData.company_id,
+        license_key: userData.license_key || "",
       })
 
       toast({
-        title: "Registration Code Generated",
-        description: `Code: ${code} (expires in 30 days)`,
+        title: "Code Generated!",
+        description: `Organization code ${code} has been created successfully.`,
       })
-
-      // Refresh the codes list
-      fetchRegistrationCodes()
     } catch (error) {
-      console.error("Error generating registration code:", error)
+      console.error("Error generating code:", error)
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to generate registration code. Please try again.",
+        description: "Failed to generate organization code. Please try again.",
       })
     } finally {
-      setGeneratingCode(false)
+      setGenerating(false)
     }
   }
 
-  const handleCopyCode = (code: string) => {
-    navigator.clipboard.writeText(code)
-    toast({
-      title: "Copied to clipboard!",
-      description: `Code ${code} has been copied.`,
-    })
-  }
-
-  const handleSendEmail = (code: string) => {
-    setSelectedCode(code)
-    setEmailDialogOpen(true)
-  }
-
-  const handleDeactivateCode = async (codeId: string) => {
+  const copyToClipboard = async (code: string) => {
     try {
-      await updateDoc(doc(db, "organization_codes", codeId), {
-        active: false,
+      await navigator.clipboard.writeText(code)
+      toast({
+        title: "Copied!",
+        description: `Code ${code} copied to clipboard.`,
+      })
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to copy code to clipboard.",
+      })
+    }
+  }
+
+  const deactivateCode = async (codeId: string, code: string) => {
+    try {
+      const codeRef = doc(db, "organization_codes", codeId)
+      await updateDoc(codeRef, {
+        is_active: false,
       })
 
       toast({
         title: "Code Deactivated",
-        description: "The registration code has been deactivated.",
+        description: `Code ${code} has been deactivated.`,
       })
-
-      // Refresh the codes list
-      fetchRegistrationCodes()
     } catch (error) {
       console.error("Error deactivating code:", error)
       toast({
@@ -170,6 +138,11 @@ export default function RegistrationCodesPage() {
         description: "Failed to deactivate code. Please try again.",
       })
     }
+  }
+
+  const handleSendEmail = (code: string) => {
+    setSelectedCode(code)
+    setEmailDialogOpen(true)
   }
 
   const formatDate = (date: Date) => {
@@ -182,127 +155,154 @@ export default function RegistrationCodesPage() {
 
   const getUsageDisplay = (code: RegistrationCode) => {
     if (code.max_usage) {
-      return `${code.usage_count} / ${code.max_usage}`
+      return `${code.usage} / ${code.max_usage}`
     }
-    return code.usage_count.toString()
+    return code.usage.toString()
+  }
+
+  const isExpired = (expiresAt: Date) => {
+    return new Date() > expiresAt
+  }
+
+  const getStatus = (code: RegistrationCode) => {
+    if (!code.is_active) return "Inactive"
+    if (isExpired(code.expires_at)) return "Expired"
+    if (code.max_usage && code.usage >= code.max_usage) return "Used Up"
+    return "Active"
+  }
+
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case "Active":
+        return "default"
+      case "Inactive":
+      case "Expired":
+      case "Used Up":
+        return "destructive"
+      default:
+        return "secondary"
+    }
   }
 
   const columns = [
     {
-      header: "Code",
-      accessorKey: "code" as keyof RegistrationCode,
-      cell: (row: RegistrationCode) => (
+      key: "code",
+      label: "Code",
+      render: (code: RegistrationCode) => (
         <div className="flex items-center gap-2">
-          <span className="font-mono font-medium">{row.code}</span>
-          <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => handleCopyCode(row.code)}>
+          <span className="font-mono font-medium">{code.code}</span>
+          <Button variant="ghost" size="sm" onClick={() => copyToClipboard(code.code)} className="h-6 w-6 p-0">
             <Copy className="h-3 w-3" />
           </Button>
         </div>
       ),
     },
     {
-      header: "Usage",
-      accessorKey: "usage_count" as keyof RegistrationCode,
-      cell: (row: RegistrationCode) => getUsageDisplay(row),
+      key: "usage",
+      label: "Usage",
+      render: (code: RegistrationCode) => <span className="text-sm">{getUsageDisplay(code)}</span>,
     },
     {
-      header: "Expires",
-      accessorKey: "expires_at" as keyof RegistrationCode,
-      cell: (row: RegistrationCode) => formatDate(row.expires_at),
+      key: "expires",
+      label: "Expires",
+      render: (code: RegistrationCode) => <span className="text-sm">{formatDate(code.expires_at)}</span>,
     },
     {
-      header: "Status",
-      accessorKey: "active" as keyof RegistrationCode,
-      cell: (row: RegistrationCode) => (
-        <Badge
-          variant={row.active ? "default" : "secondary"}
-          className={
-            row.active ? "bg-green-100 text-green-800 hover:bg-green-100" : "bg-red-100 text-red-800 hover:bg-red-100"
-          }
-        >
-          {row.active ? "Active" : "Inactive"}
-        </Badge>
-      ),
+      key: "status",
+      label: "Status",
+      render: (code: RegistrationCode) => {
+        const status = getStatus(code)
+        return <Badge variant={getStatusVariant(status)}>{status}</Badge>
+      },
     },
     {
-      header: "Actions",
-      accessorKey: "id" as keyof RegistrationCode,
-      cell: (row: RegistrationCode) => (
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleSendEmail(row.code)}
-            disabled={!row.active}
-            className="text-blue-600 border-blue-600 hover:bg-blue-50"
-          >
-            <Mail className="h-3 w-3 mr-1" />
-            Email
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleDeactivateCode(row.code)}
-            disabled={!row.active}
-            className="text-red-600 border-red-600 hover:bg-red-50"
-          >
-            Deactivate
-          </Button>
-        </div>
-      ),
+      key: "actions",
+      label: "Actions",
+      render: (code: RegistrationCode) => {
+        const status = getStatus(code)
+        const isActive = status === "Active"
+
+        return (
+          <div className="flex items-center gap-2">
+            {isActive && (
+              <Button variant="outline" size="sm" onClick={() => handleSendEmail(code.code)}>
+                <Mail className="h-4 w-4 mr-1" />
+                Email
+              </Button>
+            )}
+            {code.is_active && (
+              <Button variant="outline" size="sm" onClick={() => deactivateCode(code.id, code.code)}>
+                Deactivate
+              </Button>
+            )}
+          </div>
+        )
+      },
     },
   ]
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Loading Registration Codes...</h2>
-          <p className="text-gray-500">Please wait while we fetch your codes.</p>
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Registration Codes</h1>
+            <p className="text-muted-foreground">Manage registration codes for your organization.</p>
+          </div>
         </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-center h-32">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto py-10">
-      <div className="flex justify-between items-center mb-6">
+    <div className="container mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Registration Codes</h1>
-          <p className="text-gray-600 mt-1">Manage registration codes for your organization.</p>
+          <h1 className="text-2xl font-bold">Registration Codes</h1>
+          <p className="text-muted-foreground">Manage registration codes for your organization.</p>
         </div>
-        <Button
-          onClick={handleGenerateCode}
-          disabled={generatingCode}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
-        >
-          {generatingCode ? (
+        <Button onClick={generateCode} disabled={generating}>
+          {generating ? (
             <>
-              <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-              <span>Generating...</span>
+              <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
+              Generating...
             </>
           ) : (
             <>
-              <Plus className="h-4 w-4" />
-              <span>Generate Code</span>
+              <Plus className="h-4 w-4 mr-2" />
+              Generate Code
             </>
           )}
         </Button>
       </div>
 
       <Card>
-        <CardContent className="p-0">
-          <ResponsiveTable
-            data={codes}
-            columns={columns}
-            keyField="id"
-            isLoading={loading}
-            emptyState={
-              <div className="text-center py-8">
-                <p className="text-gray-500">No registration codes found.</p>
-              </div>
-            }
-          />
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Organization Codes
+          </CardTitle>
+          <CardDescription>Generated codes that can be used to invite new users to your organization.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {codes.length === 0 ? (
+            <div className="text-center py-8">
+              <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">No registration codes found.</h3>
+              <p className="text-muted-foreground mb-4">
+                Generate your first code to start inviting users to your organization.
+              </p>
+            </div>
+          ) : (
+            <ResponsiveTable data={codes} columns={columns} emptyMessage="No registration codes found." />
+          )}
         </CardContent>
       </Card>
 
