@@ -387,14 +387,14 @@ export default function ReportPreviewPage() {
 
       {/* Full Screen Preview Dialog */}
       <Dialog open={isFullScreenOpen} onOpenChange={setIsFullScreenOpen}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0 bg-black">
+        <DialogContent className="max-w-[90vw] max-h-[90vh] w-full h-full p-0 bg-black border-2 border-gray-800">
           <div className="relative w-full h-full flex flex-col">
             {/* Header with controls */}
-            <div className="absolute top-0 left-0 right-0 z-10 bg-black bg-opacity-75 p-4 flex justify-between items-center">
-              <DialogTitle className="text-white text-lg font-medium">
+            <div className="absolute top-0 left-0 right-0 z-10 bg-black bg-opacity-90 p-4 flex justify-between items-center border-b border-gray-700">
+              <DialogTitle className="text-white text-lg font-medium truncate pr-4">
                 {fullScreenAttachment?.fileName || "File Preview"}
               </DialogTitle>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 {fullScreenAttachment?.fileUrl && (
                   <Button
                     variant="ghost"
@@ -416,59 +416,65 @@ export default function ReportPreviewPage() {
               </div>
             </div>
 
-            {/* Content */}
-            <div className="flex-1 flex items-center justify-center p-4 pt-16">
-              {fullScreenAttachment?.fileUrl ? (
-                <div className="w-full h-full flex items-center justify-center">
-                  {isImageFile(fullScreenAttachment.fileName || "") ? (
-                    <img
-                      src={fullScreenAttachment.fileUrl || "/placeholder.svg"}
-                      alt={fullScreenAttachment.fileName || "Full screen preview"}
-                      className="max-w-full max-h-full object-contain"
-                    />
-                  ) : isVideoFile(fullScreenAttachment.fileName || "") ? (
-                    <video
-                      src={fullScreenAttachment.fileUrl}
-                      controls
-                      className="max-w-full max-h-full object-contain"
-                      autoPlay
-                    />
-                  ) : isPdfFile(fullScreenAttachment.fileName || "") ? (
-                    <iframe
-                      src={fullScreenAttachment.fileUrl}
-                      className="w-full h-full border-0"
-                      title={fullScreenAttachment.fileName || "PDF Preview"}
-                    />
-                  ) : (
-                    <div className="text-center text-white space-y-4">
-                      {getFileIcon(fullScreenAttachment.fileName || "")}
-                      <div>
-                        <p className="text-lg font-medium">{fullScreenAttachment.fileName}</p>
-                        <p className="text-sm text-gray-300 mt-2">Preview not available for this file type</p>
-                        <Button
-                          variant="outline"
-                          className="mt-4 bg-transparent"
-                          onClick={() =>
-                            downloadFile(fullScreenAttachment.fileUrl, fullScreenAttachment.fileName || "file")
-                          }
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Download File
-                        </Button>
+            {/* Scrollable Content Container */}
+            <div className="flex-1 overflow-auto pt-16 pb-16">
+              <div className="min-h-full flex items-center justify-center p-6">
+                {fullScreenAttachment?.fileUrl ? (
+                  <div className="w-full max-w-full flex items-center justify-center">
+                    {isImageFile(fullScreenAttachment.fileName || "") ? (
+                      <img
+                        src={fullScreenAttachment.fileUrl || "/placeholder.svg"}
+                        alt={fullScreenAttachment.fileName || "Full screen preview"}
+                        className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded shadow-lg"
+                        style={{ maxWidth: "calc(90vw - 3rem)" }}
+                      />
+                    ) : isVideoFile(fullScreenAttachment.fileName || "") ? (
+                      <video
+                        src={fullScreenAttachment.fileUrl}
+                        controls
+                        className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded shadow-lg"
+                        style={{ maxWidth: "calc(90vw - 3rem)" }}
+                        autoPlay
+                      />
+                    ) : isPdfFile(fullScreenAttachment.fileName || "") ? (
+                      <div className="w-full h-[calc(90vh-8rem)] max-w-[calc(90vw-3rem)]">
+                        <iframe
+                          src={fullScreenAttachment.fileUrl}
+                          className="w-full h-full border-0 rounded shadow-lg"
+                          title={fullScreenAttachment.fileName || "PDF Preview"}
+                        />
                       </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center text-white">
-                  <p>File not available</p>
-                </div>
-              )}
+                    ) : (
+                      <div className="text-center text-white space-y-4 p-8">
+                        <div className="flex justify-center">{getFileIcon(fullScreenAttachment.fileName || "")}</div>
+                        <div>
+                          <p className="text-lg font-medium break-all">{fullScreenAttachment.fileName}</p>
+                          <p className="text-sm text-gray-300 mt-2">Preview not available for this file type</p>
+                          <Button
+                            variant="outline"
+                            className="mt-4 bg-transparent border-white text-white hover:bg-white hover:text-black"
+                            onClick={() =>
+                              downloadFile(fullScreenAttachment.fileUrl, fullScreenAttachment.fileName || "file")
+                            }
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download File
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center text-white p-8">
+                    <p>File not available</p>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Footer with file info */}
             {fullScreenAttachment?.note && (
-              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 p-4">
+              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-90 p-4 border-t border-gray-700">
                 <p className="text-white text-sm italic text-center">"{fullScreenAttachment.note}"</p>
               </div>
             )}
