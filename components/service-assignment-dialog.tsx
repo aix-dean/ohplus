@@ -164,6 +164,7 @@ export function ServiceAssignmentDialog({
         created: serverTimestamp(),
         updated: serverTimestamp(),
         project_key: userData?.license_key || "",
+        company_id: userData?.company_id || null, // Add company_id from userData
       })
 
       // Reset form and close dialog
@@ -477,7 +478,7 @@ export function ServiceAssignmentDialog({
 
                   <button
                     type="button"
-                    className="border rounded-md p-2 w-[100px] h-[100px] flex items-center justify-center hover:bg-gray-50"
+                    className="border rounded-md p-2 w-[100px] h-[100px] flex flex-col items-center justify-center hover:bg-gray-50"
                   >
                     <Plus size={24} className="text-gray-400" />
                   </button>

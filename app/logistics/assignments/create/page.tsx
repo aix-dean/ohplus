@@ -178,11 +178,12 @@ export default function CreateServiceAssignmentPage() {
         alarmDate: formData.alarmDate,
         alarmTime: formData.alarmTime,
         attachments: formData.attachments,
-        serviceCost: formData.serviceCost, // Add this line
+        serviceCost: formData.serviceCost,
         status: "Pending",
         created: serverTimestamp(),
         updated: serverTimestamp(),
         project_key: userData?.license_key || "",
+        company_id: userData?.company_id || null, // Add company_id from userData
       })
 
       // Navigate back to assignments page
