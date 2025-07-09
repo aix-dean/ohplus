@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { ChevronDown, X, Check, Loader2 } from "lucide-react"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
@@ -333,12 +333,13 @@ export default function CMSContentCreatePage() {
       // Calculate duration in minutes, then convert to seconds
       const durationMinutes = endTotalMinutes - startTotalMinutes
       const durationSeconds = durationMinutes * 60
-
+      console.log(loops_per_day)
       // Calculate total spot time needed per loop
       const spotDurationNum = Number.parseInt(spot_duration)
       const spotsPerLoopNum = Number.parseInt(loops_per_day)
+      console.log(`spot duration: ${spotDurationNum} loop per day: ${spotsPerLoopNum}`)
       const totalSpotTimePerLoop = spotDurationNum * spotsPerLoopNum
-
+      console.log(`total seconds: ${totalSpotTimePerLoop}`)
       // Calculate how many complete loops can fit in the time duration
       const loopsResult = durationSeconds / totalSpotTimePerLoop
 
@@ -379,13 +380,14 @@ export default function CMSContentCreatePage() {
       const durationHours = Math.floor(durationMinutes / 60)
       const remainingMinutes = durationMinutes % 60
       const durationDisplay = durationHours > 0 ? `${durationHours}h ${remainingMinutes}m` : `${remainingMinutes}m`
-
+      console.log(loopsResult)
       setValidationError(
         `✓ Valid Configuration: ${Math.floor(loopsResult)} complete loops will fit in the ${durationDisplay} time period. ` +
           `Each loop uses ${totalSpotTimePerLoop}s (${spotDurationNum}s × ${spotsPerLoopNum} spots).`,
       )
       return true
     } catch (error) {
+      console.log(error)
       setValidationError("Invalid time format or values.")
       return false
     }
@@ -394,7 +396,7 @@ export default function CMSContentCreatePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Check if user and project data are available
+
     if (!user || !projectData) {
       toast({
         title: "Authentication Error",
@@ -404,21 +406,11 @@ export default function CMSContentCreatePage() {
       return
     }
 
-    // Validate dynamic content before proceeding
-    if (formData.content_type === "Dynamic" && !validateDynamicContent()) {
+
+    if (!validateDynamicContent()) {
       toast({
         title: "Validation Error",
-        description: validationError || "Please fix the dynamic content configuration.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Check if media files are required and present
-    if (mediaFiles.length === 0) {
-      toast({
-        title: "Media Required",
-        description: "Please upload at least one media file.",
+        description: validationError,
         variant: "destructive",
       })
       return
@@ -432,13 +424,15 @@ export default function CMSContentCreatePage() {
         ...formData,
         name: contentTitle,
         description,
-        price: Number.parseFloat(price) || 0,
+        price: Number.parseFloat(price),
         media: mediaData,
         categories: selectedCategories,
         category_names: getCategoryNames(),
         active: true,
         deleted: false,
         company_id: user.company_id || projectData.id,
+        created: serverTimestamp(),
+        updated: serverTimestamp(),
         cms:
           formData.content_type === "Dynamic"
             ? {
@@ -913,7 +907,7 @@ export default function CMSContentCreatePage() {
                 </section>
 
                 <CardFooter className="flex justify-end p-0 pt-4">
-                  <Button type="submit">
+                  <Button type="submit" disabled={loading}>
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...
