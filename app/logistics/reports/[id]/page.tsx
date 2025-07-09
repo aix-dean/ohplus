@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, FileText, ImageIcon, Video, File } from "lucide-react"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
@@ -60,6 +60,33 @@ export default function ReportPreviewPage() {
       .split("-")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ")
+  }
+
+  const getFileIcon = (fileName: string) => {
+    if (!fileName) return <File className="h-12 w-12 text-gray-400" />
+
+    const extension = fileName.toLowerCase().split(".").pop()
+
+    switch (extension) {
+      case "pdf":
+        return <FileText className="h-12 w-12 text-red-500" />
+      case "doc":
+      case "docx":
+        return <FileText className="h-12 w-12 text-blue-500" />
+      case "jpg":
+      case "jpeg":
+      case "png":
+      case "gif":
+      case "webp":
+        return <ImageIcon className="h-12 w-12 text-green-500" />
+      case "mp4":
+      case "avi":
+      case "mov":
+      case "wmv":
+        return <Video className="h-12 w-12 text-purple-500" />
+      default:
+        return <File className="h-12 w-12 text-gray-500" />
+    }
   }
 
   const handleBack = () => {
@@ -196,20 +223,21 @@ export default function ReportPreviewPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {report.attachments.slice(0, 2).map((attachment, index) => (
                 <div key={index} className="space-y-2">
-                  <div className="bg-gray-200 rounded-lg h-64 flex items-center justify-center">
+                  <div className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4">
                     {attachment.fileName ? (
-                      <div className="text-center">
-                        <div className="text-4xl mb-2">📄</div>
-                        <p className="text-sm text-gray-600">{attachment.fileName}</p>
+                      <div className="text-center space-y-2">
+                        {getFileIcon(attachment.fileName)}
+                        <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
+                        {attachment.note && <p className="text-xs text-gray-500 italic">"{attachment.note}"</p>}
                       </div>
                     ) : (
-                      <div className="text-center">
-                        <div className="text-4xl mb-2">📷</div>
+                      <div className="text-center space-y-2">
+                        <ImageIcon className="h-12 w-12 text-gray-400" />
                         <p className="text-sm text-gray-600">Project Photo {index + 1}</p>
                       </div>
                     )}
                   </div>
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-gray-600 space-y-1">
                     <div>
                       <span className="font-semibold">Date:</span> {formatDate(report.date)}
                     </div>
@@ -220,11 +248,6 @@ export default function ReportPreviewPage() {
                     <div>
                       <span className="font-semibold">Location:</span> {report.location || "N/A"}
                     </div>
-                    {attachment.note && (
-                      <div>
-                        <span className="font-semibold">Note:</span> {attachment.note}
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}
