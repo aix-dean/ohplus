@@ -913,7 +913,7 @@ export default function CMSContentCreatePage() {
                 </section>
 
                 <CardFooter className="flex justify-end p-0 pt-4">
-                  <Button type="submit" disabled={loading}>
+                  <Button type="submit">
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...
