@@ -30,7 +30,8 @@ import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-
 import Link from "next/link"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { AlarmSettingDialog } from "@/components/alarm-setting-dialog"
-import { IndexCardDialog } from "@/components/index-card-dialog"
+import { IlluminationIndexCardDialog } from "@/components/illumination-index-card-dialog"
+import { DisplayIndexCardDialog } from "@/components/display-index-card-dialog"
 
 type Props = {
   params: { id: string }
@@ -65,7 +66,8 @@ export default function SiteDetailsPage({ params }: Props) {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
   const [alarmDialogOpen, setAlarmDialogOpen] = useState(false)
-  const [indexCardDialogOpen, setIndexCardDialogOpen] = useState(false)
+  const [illuminationIndexCardDialogOpen, setIlluminationIndexCardDialogOpen] = useState(false)
+  const [displayIndexCardDialogOpen, setDisplayIndexCardDialogOpen] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const view = searchParams.get("view")
@@ -404,7 +406,7 @@ export default function SiteDetailsPage({ params }: Props) {
                   variant="outline"
                   size="sm"
                   className="mt-4 w-full bg-transparent"
-                  onClick={() => setIndexCardDialogOpen(true)}
+                  onClick={() => setIlluminationIndexCardDialogOpen(true)}
                 >
                   View Index Card
                 </Button>
@@ -457,7 +459,7 @@ export default function SiteDetailsPage({ params }: Props) {
                   variant="outline"
                   size="sm"
                   className="mt-4 w-full bg-transparent"
-                  onClick={() => setIndexCardDialogOpen(true)}
+                  onClick={() => setDisplayIndexCardDialogOpen(true)}
                 >
                   View Index Card
                 </Button>
@@ -696,9 +698,17 @@ export default function SiteDetailsPage({ params }: Props) {
         }}
       />
       <AlarmSettingDialog open={alarmDialogOpen} onOpenChange={setAlarmDialogOpen} />
-      <IndexCardDialog
-        open={indexCardDialogOpen}
-        onOpenChange={setIndexCardDialogOpen}
+      <IlluminationIndexCardDialog
+        open={illuminationIndexCardDialogOpen}
+        onOpenChange={setIlluminationIndexCardDialogOpen}
+        onCreateJO={() => {
+          // Navigate to create service assignment with this site pre-selected
+          router.push(`/logistics/assignments/create?projectSite=${params.id}`)
+        }}
+      />
+      <DisplayIndexCardDialog
+        open={displayIndexCardDialogOpen}
+        onOpenChange={setDisplayIndexCardDialogOpen}
         onCreateJO={() => {
           // Navigate to create service assignment with this site pre-selected
           router.push(`/logistics/assignments/create?projectSite=${params.id}`)
