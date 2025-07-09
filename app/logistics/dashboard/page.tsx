@@ -8,7 +8,6 @@ import AllSitesTab from "./all-sites" // Import the new component
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
-import { CardContent } from "@/components/ui/card"
 
 // Update the page title
 export default function LogisticsDashboardPage() {
@@ -62,37 +61,5 @@ export default function LogisticsDashboardPage() {
         }}
       />
     </div>
-  )
-}
-
-const product = {
-  name: "Example Product",
-  price: 19.99,
-}
-
-const siteCode = "S123"
-
-const formattedPrice = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-}).format(product.price)
-
-function ProductCard() {
-  return (
-    <CardContent className="p-4">
-      <div className="flex flex-col">
-        {siteCode && <span className="text-xs text-gray-700 mb-1">Site Code: {siteCode}</span>}
-
-        <h3 className="font-semibold line-clamp-1">{product.name}</h3>
-
-        <div className="mt-2 text-sm font-medium text-green-700">{formattedPrice}</div>
-        <Button
-          variant="outline"
-          className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-        >
-          Create Report
-        </Button>
-      </div>
-    </CardContent>
   )
 }
