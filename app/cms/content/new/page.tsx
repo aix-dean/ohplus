@@ -415,7 +415,7 @@ export default function CMSContentCreatePage() {
       })
       return
     }
-
+    console.log(user.company_id)
     setLoading(true)
     try {
       const mediaData = await uploadMediaFiles()
