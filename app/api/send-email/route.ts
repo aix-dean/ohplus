@@ -5,84 +5,69 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { emailId, from, to, cc, subject, body: emailBody, attachments } = body
+    // Parse FormData
+    const formData = await request.formData()
 
-    console.log("Sending email:", { emailId, from, to, subject })
+    // Extract email data
+    const from = formData.get("from") as string
+    const toJson = formData.get("to") as string
+    const ccJson = formData.get("cc") as string
+    const subject = formData.get("subject") as string
+    const body = formData.get("body") as string
 
-    // Validate required fields
-    if (!from || !to || !subject || !emailBody) {
-      return NextResponse.json({ error: "Missing required fields: from, to, subject, body" }, { status: 400 })
+    // Parse JSON strings
+    const to = JSON.parse(toJson)
+    const cc = ccJson ? JSON.parse(ccJson) : undefined
+
+    // Process file attachments
+    const attachments = []
+    let attachmentIndex = 0
+
+    while (true) {
+      const file = formData.get(`attachment_${attachmentIndex}`) as File
+      if (!file) break
+
+      // Convert file to buffer
+      const bytes = await file.arrayBuffer()
+      const buffer = Buffer.from(bytes)
+
+      attachments.push({
+        filename: file.name,
+        content: buffer,
+      })
+
+      attachmentIndex++
     }
 
-    // Prepare email data
+    // Send email using Resend
     const emailData: any = {
-      from: "noreply@resend.dev", // Use Resend's default domain
-      to: Array.isArray(to) ? to : [to],
+      from,
+      to,
       subject,
-      html: `
-        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-          ${emailBody.replace(/\n/g, "<br>")}
-        </div>
-      `,
-      text: emailBody,
+      html: body.replace(/\n/g, "<br>"),
     }
 
-    // Add CC if provided
     if (cc && cc.length > 0) {
-      emailData.cc = Array.isArray(cc) ? cc : [cc]
+      emailData.cc = cc
     }
 
-    // Add attachments if provided
-    if (attachments && attachments.length > 0) {
-      emailData.attachments = attachments.map((attachment: any) => ({
-        filename: attachment.fileName,
-        content: attachment.fileUrl, // This would need to be base64 content in real implementation
-      }))
+    if (attachments.length > 0) {
+      emailData.attachments = attachments
     }
 
-    console.log("Sending via Resend with data:", {
-      from: emailData.from,
-      to: emailData.to,
-      subject: emailData.subject,
-      attachmentCount: emailData.attachments?.length || 0,
-    })
+    const { data, error } = await resend.emails.send(emailData)
 
-    if (!process.env.RESEND_API_KEY) {
-      return NextResponse.json({ error: "Resend API key not configured" }, { status: 500 })
+    if (error) {
+      console.error("Resend error:", error)
+      return NextResponse.json({ error: error.message }, { status: 400 })
     }
 
-    // Send email via Resend
-    const result = await resend.emails.send(emailData)
-
-    console.log("Resend result:", result)
-
-    if (result.error) {
-      console.error("Resend error:", result.error)
-
-      // Check for domain verification errors
-      if (result.error.message?.includes("domain is not verified")) {
-        return NextResponse.json(
-          {
-            error: "Email domain not verified. Please verify your domain in Resend dashboard.",
-          },
-          { status: 400 },
-        )
-      }
-
-      return NextResponse.json({ error: `Resend error: ${result.error.message}` }, { status: 400 })
-    }
-
-    return NextResponse.json({
-      success: true,
-      messageId: result.data?.id,
-      emailId,
-    })
+    return NextResponse.json({ success: true, data })
   } catch (error) {
-    console.error("Error in send-email API:", error)
-
-    const errorMessage = error instanceof Error ? error.message : "Unknown error"
-
-    return NextResponse.json({ error: `Failed to send email: ${errorMessage}` }, { status: 500 })
+    console.error("Send email error:", error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to send email" },
+      { status: 500 },
+    )
   }
 }

@@ -13,10 +13,17 @@ import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, Paperclip, Send, Plus, Smile, X, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
-import { emailService, type EmailTemplate, type Email, type EmailAttachment } from "@/lib/email-service"
+import { emailService, type EmailTemplate } from "@/lib/email-service"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+
+interface FileAttachment {
+  file: File
+  fileName: string
+  fileSize: number
+  fileType: string
+}
 
 export default function ComposeEmailPage() {
   const params = useParams()
@@ -35,7 +42,7 @@ export default function ComposeEmailPage() {
   const [cc, setCc] = useState("")
   const [subject, setSubject] = useState("")
   const [body, setBody] = useState("")
-  const [attachments, setAttachments] = useState<EmailAttachment[]>([])
+  const [attachments, setAttachments] = useState<FileAttachment[]>([])
 
   // Templates state
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
@@ -129,69 +136,40 @@ Best regards,
     fileInputRef.current?.click()
   }
 
-  const convertFileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => {
-        if (typeof reader.result === "string") {
-          // Remove the data URL prefix to get just the base64 string
-          const base64 = reader.result.split(",")[1]
-          resolve(base64)
-        } else {
-          reject(new Error("Failed to convert file to base64"))
-        }
-      }
-      reader.onerror = () => reject(new Error("Failed to read file"))
-      reader.readAsDataURL(file)
-    })
-  }
-
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
     if (!files || files.length === 0) return
 
-    const newAttachments: EmailAttachment[] = []
+    const newAttachments: FileAttachment[] = []
 
-    try {
-      for (const file of Array.from(files)) {
-        // Check file size (limit to 10MB)
-        if (file.size > 10 * 1024 * 1024) {
-          toast({
-            title: "File Too Large",
-            description: `${file.name} is larger than 10MB and cannot be attached.`,
-            variant: "destructive",
-          })
-          continue
-        }
-
-        // Convert file to base64
-        const base64Content = await convertFileToBase64(file)
-
-        const attachment: EmailAttachment = {
-          fileName: file.name,
-          fileUrl: `data:${file.type};base64,${base64Content}`, // Store as data URL for email sending
-          fileSize: file.size,
-          fileType: file.type || "application/octet-stream",
-        }
-
-        newAttachments.push(attachment)
-      }
-
-      if (newAttachments.length > 0) {
-        setAttachments((prev) => [...prev, ...newAttachments])
+    Array.from(files).forEach((file) => {
+      // Check file size (limit to 10MB)
+      if (file.size > 10 * 1024 * 1024) {
         toast({
-          title: "Files Attached",
-          description: `${newAttachments.length} file(s) have been attached to your email.`,
+          title: "File Too Large",
+          description: `${file.name} is larger than 10MB and cannot be attached.`,
+          variant: "destructive",
         })
-        setDebugInfo((prev) => prev + ` | Files attached: ${newAttachments.length}`)
+        return
       }
-    } catch (error) {
-      console.error("Error processing files:", error)
+
+      const attachment: FileAttachment = {
+        file: file,
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type || "application/octet-stream",
+      }
+
+      newAttachments.push(attachment)
+    })
+
+    if (newAttachments.length > 0) {
+      setAttachments((prev) => [...prev, ...newAttachments])
       toast({
-        title: "Error",
-        description: "Failed to process some files. Please try again.",
-        variant: "destructive",
+        title: "Files Attached",
+        description: `${newAttachments.length} file(s) have been attached to your email.`,
       })
+      setDebugInfo((prev) => prev + ` | Files attached: ${newAttachments.length}`)
     }
 
     // Reset file input
@@ -265,44 +243,44 @@ Best regards,
     setDebugInfo((prev) => prev + " | Creating email record...")
 
     try {
-      // Create email record - only include defined values
-      const emailData: Omit<Email, "id" | "created"> = {
-        from: "noreply@resend.dev",
-        to: toEmails,
-        subject,
-        body,
-        status: "draft",
-        userId: user.uid,
-      }
+      // Create FormData for file upload
+      const formData = new FormData()
 
-      // Add optional fields only if they have values
+      // Add email data
+      formData.append("from", "noreply@resend.dev")
+      formData.append("to", JSON.stringify(toEmails))
+      formData.append("subject", subject)
+      formData.append("body", body)
+      formData.append("userId", user.uid)
+
       if (ccEmails.length > 0) {
-        emailData.cc = ccEmails
-      }
-      if (attachments.length > 0) {
-        emailData.attachments = attachments
+        formData.append("cc", JSON.stringify(ccEmails))
       }
       if (selectedTemplate) {
-        emailData.templateId = selectedTemplate
+        formData.append("templateId", selectedTemplate)
       }
       if (reportId) {
-        emailData.reportId = reportId
+        formData.append("reportId", reportId)
       }
 
-      // Create email record in compose_emails collection
-      const emailId = await emailService.createEmail(emailData)
-      setDebugInfo((prev) => prev + ` | Email created: ${emailId}`)
+      // Add file attachments
+      attachments.forEach((attachment, index) => {
+        formData.append(`attachment_${index}`, attachment.file)
+      })
 
-      // Verify email was created by fetching it back
-      const createdEmail = await emailService.getEmailById(emailId)
-      if (!createdEmail) {
-        throw new Error("Failed to verify email creation")
+      setDebugInfo((prev) => prev + " | Sending email with attachments...")
+
+      // Send email directly via API route with FormData
+      const response = await fetch("/api/send-email", {
+        method: "POST",
+        body: formData, // Send FormData directly (no Content-Type header needed)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to send email")
       }
-      setDebugInfo((prev) => prev + " | Email verified in database")
 
-      // Send email using our service
-      setDebugInfo((prev) => prev + " | Sending email...")
-      await emailService.sendEmail(emailId)
       setDebugInfo((prev) => prev + " | Email sent successfully!")
 
       toast({

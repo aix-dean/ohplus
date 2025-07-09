@@ -13,14 +13,7 @@ import {
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
-// Email types
-export interface EmailAttachment {
-  fileName: string
-  fileUrl: string
-  fileSize: number
-  fileType: string
-}
-
+// Email types (simplified - no attachments stored in Firestore)
 export interface Email {
   id?: string
   from: string
@@ -29,7 +22,6 @@ export interface Email {
   bcc?: string[]
   subject: string
   body: string
-  attachments?: EmailAttachment[]
   templateId?: string
   reportId?: string
   status: "draft" | "sending" | "sent" | "failed"
@@ -55,46 +47,13 @@ class EmailService {
   // Email CRUD operations
   async createEmail(emailData: Omit<Email, "id" | "created">): Promise<string> {
     try {
-      // Convert the email data to a plain object that Firestore can handle
-      const firestoreData: any = {
-        from: emailData.from,
-        to: Array.isArray(emailData.to) ? [...emailData.to] : [],
-        subject: emailData.subject,
-        body: emailData.body,
-        status: emailData.status,
-        userId: emailData.userId,
+      // Clean undefined values
+      const cleanEmailData = Object.fromEntries(Object.entries(emailData).filter(([_, value]) => value !== undefined))
+
+      const docRef = await addDoc(collection(db, this.emailsCollection), {
+        ...cleanEmailData,
         created: Timestamp.now(),
-      }
-
-      // Add optional arrays only if they exist and have content
-      if (emailData.cc && Array.isArray(emailData.cc) && emailData.cc.length > 0) {
-        firestoreData.cc = [...emailData.cc]
-      }
-
-      if (emailData.bcc && Array.isArray(emailData.bcc) && emailData.bcc.length > 0) {
-        firestoreData.bcc = [...emailData.bcc]
-      }
-
-      // Add optional strings only if they exist
-      if (emailData.templateId) {
-        firestoreData.templateId = emailData.templateId
-      }
-
-      if (emailData.reportId) {
-        firestoreData.reportId = emailData.reportId
-      }
-
-      // Handle attachments - convert to plain objects
-      if (emailData.attachments && Array.isArray(emailData.attachments) && emailData.attachments.length > 0) {
-        firestoreData.attachments = emailData.attachments.map((attachment) => ({
-          fileName: String(attachment.fileName || ""),
-          fileUrl: String(attachment.fileUrl || ""),
-          fileSize: Number(attachment.fileSize || 0),
-          fileType: String(attachment.fileType || "application/octet-stream"),
-        }))
-      }
-
-      const docRef = await addDoc(collection(db, this.emailsCollection), firestoreData)
+      })
       return docRef.id
     } catch (error) {
       console.error("Error creating email:", error)
@@ -106,31 +65,7 @@ class EmailService {
     try {
       const emailDoc = await getDoc(doc(db, this.emailsCollection, emailId))
       if (emailDoc.exists()) {
-        const data = emailDoc.data()
-        return {
-          id: emailDoc.id,
-          from: data.from || "",
-          to: Array.isArray(data.to) ? data.to : [],
-          cc: Array.isArray(data.cc) ? data.cc : undefined,
-          bcc: Array.isArray(data.bcc) ? data.bcc : undefined,
-          subject: data.subject || "",
-          body: data.body || "",
-          attachments: Array.isArray(data.attachments)
-            ? data.attachments.map((att: any) => ({
-                fileName: att.fileName || "",
-                fileUrl: att.fileUrl || "",
-                fileSize: att.fileSize || 0,
-                fileType: att.fileType || "application/octet-stream",
-              }))
-            : undefined,
-          templateId: data.templateId,
-          reportId: data.reportId,
-          status: data.status || "draft",
-          userId: data.userId || "",
-          created: data.created,
-          sent: data.sent,
-          error: data.error,
-        } as Email
+        return { id: emailDoc.id, ...emailDoc.data() } as Email
       }
       return null
     } catch (error) {
@@ -148,33 +83,10 @@ class EmailService {
       }
 
       const querySnapshot = await getDocs(q)
-      return querySnapshot.docs.map((doc) => {
-        const data = doc.data()
-        return {
-          id: doc.id,
-          from: data.from || "",
-          to: Array.isArray(data.to) ? data.to : [],
-          cc: Array.isArray(data.cc) ? data.cc : undefined,
-          bcc: Array.isArray(data.bcc) ? data.bcc : undefined,
-          subject: data.subject || "",
-          body: data.body || "",
-          attachments: Array.isArray(data.attachments)
-            ? data.attachments.map((att: any) => ({
-                fileName: att.fileName || "",
-                fileUrl: att.fileUrl || "",
-                fileSize: att.fileSize || 0,
-                fileType: att.fileType || "application/octet-stream",
-              }))
-            : undefined,
-          templateId: data.templateId,
-          reportId: data.reportId,
-          status: data.status || "draft",
-          userId: data.userId || "",
-          created: data.created,
-          sent: data.sent,
-          error: data.error,
-        } as Email
-      })
+      return querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Email[]
     } catch (error) {
       console.error("Error getting emails:", error)
       throw new Error("Failed to get emails")
@@ -183,30 +95,10 @@ class EmailService {
 
   async updateEmail(emailId: string, updates: Partial<Email>): Promise<void> {
     try {
-      // Convert updates to plain objects that Firestore can handle
-      const firestoreUpdates: any = {}
+      // Clean undefined values
+      const cleanUpdates = Object.fromEntries(Object.entries(updates).filter(([_, value]) => value !== undefined))
 
-      Object.keys(updates).forEach((key) => {
-        const value = (updates as any)[key]
-        if (value !== undefined) {
-          if (key === "attachments" && Array.isArray(value)) {
-            firestoreUpdates[key] = value.map((attachment) => ({
-              fileName: String(attachment.fileName || ""),
-              fileUrl: String(attachment.fileUrl || ""),
-              fileSize: Number(attachment.fileSize || 0),
-              fileType: String(attachment.fileType || "application/octet-stream"),
-            }))
-          } else if (key === "to" || key === "cc" || key === "bcc") {
-            if (Array.isArray(value)) {
-              firestoreUpdates[key] = [...value]
-            }
-          } else {
-            firestoreUpdates[key] = value
-          }
-        }
-      })
-
-      await updateDoc(doc(db, this.emailsCollection, emailId), firestoreUpdates)
+      await updateDoc(doc(db, this.emailsCollection, emailId), cleanUpdates)
     } catch (error) {
       console.error("Error updating email:", error)
       throw new Error("Failed to update email")
@@ -219,57 +111,6 @@ class EmailService {
     } catch (error) {
       console.error("Error deleting email:", error)
       throw new Error("Failed to delete email")
-    }
-  }
-
-  async sendEmail(emailId: string): Promise<void> {
-    try {
-      // Get email from database
-      const email = await this.getEmailById(emailId)
-      if (!email) {
-        throw new Error("Email not found")
-      }
-
-      // Update status to sending
-      await this.updateEmail(emailId, { status: "sending" })
-
-      // Send email via API route
-      const response = await fetch("/api/send-email", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          emailId,
-          from: email.from,
-          to: email.to,
-          cc: email.cc,
-          subject: email.subject,
-          body: email.body,
-          attachments: email.attachments,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to send email")
-      }
-
-      // Update status to sent
-      await this.updateEmail(emailId, {
-        status: "sent",
-        sent: Timestamp.now(),
-      })
-    } catch (error) {
-      console.error("Error sending email:", error)
-
-      // Update status to failed with error message
-      await this.updateEmail(emailId, {
-        status: "failed",
-        error: error instanceof Error ? error.message : "Unknown error",
-      })
-
-      throw error
     }
   }
 
