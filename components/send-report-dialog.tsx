@@ -1,21 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
-import { Copy, Mail, MessageCircle, Phone, Facebook, X } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Copy, Mail, MessageCircle, Send, Video } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { ReportData } from "@/lib/report-service"
-
-interface SendReportDialogProps {
-  isOpen: boolean
-  onClose: () => void
-  report: ReportData
-  product: any
-  onSelectOption: (option: "email" | "whatsapp" | "viber" | "messenger") => void
-}
 
 // Helper functions moved to the top
 const getReportTypeDisplay = (type: string) => {
@@ -25,135 +17,164 @@ const getReportTypeDisplay = (type: string) => {
     .join(" ")
 }
 
-const formatDateForFilename = (dateString: string) => {
-  return new Date(dateString)
-    .toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    })
-    .replace(/\s/g, "_")
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })
+}
+
+interface SendReportDialogProps {
+  isOpen: boolean
+  onClose: () => void
+  report: ReportData
+  product?: any
+  onSelectOption: (option: "email" | "whatsapp" | "viber" | "messenger") => void
 }
 
 export function SendReportDialog({ isOpen, onClose, report, product, onSelectOption }: SendReportDialogProps) {
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false)
+  const [reportLink, setReportLink] = useState("")
   const { toast } = useToast()
-  const [copied, setCopied] = useState(false)
 
-  const reportViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/logistics/reports/${report.id}`
-  const reportFileName = `${report.siteId}_${getReportTypeDisplay(report.reportType)}_Report_${formatDateForFilename(report.date)}.pdf`
+  const generateShareableLink = async () => {
+    setIsGeneratingLink(true)
+    try {
+      // Generate a shareable link for the report
+      const baseUrl = window.location.origin
+      const link = `${baseUrl}/logistics/reports/${report.id}`
+      setReportLink(link)
 
-  useEffect(() => {
-    if (copied) {
-      const timer = setTimeout(() => setCopied(false), 2000)
-      return () => clearTimeout(timer)
+      toast({
+        title: "Link Generated",
+        description: "Shareable link has been generated successfully.",
+      })
+    } catch (error) {
+      console.error("Error generating link:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate shareable link.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsGeneratingLink(false)
     }
-  }, [copied])
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(reportViewUrl)
-    setCopied(true)
-    toast({
-      title: "Link Copied!",
-      description: "The report link has been copied to your clipboard.",
-    })
   }
 
-  const handleSocialShare = (platform: string) => {
-    toast({
-      title: "Not Implemented",
-      description: `Sharing via ${platform} is not yet implemented.`,
-      variant: "destructive",
-    })
+  const copyToClipboard = async () => {
+    if (!reportLink) {
+      await generateShareableLink()
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(reportLink)
+      toast({
+        title: "Copied!",
+        description: "Link copied to clipboard.",
+      })
+    } catch (error) {
+      console.error("Error copying to clipboard:", error)
+      toast({
+        title: "Error",
+        description: "Failed to copy link to clipboard.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSendOption = (option: "email" | "whatsapp" | "viber" | "messenger") => {
+    onSelectOption(option)
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto p-0">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 pb-4">
-          <DialogTitle className="text-xl font-semibold">Send Report</DialogTitle>
-          <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0 hover:bg-gray-100 rounded-full">
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-semibold">Send Report</DialogTitle>
+        </DialogHeader>
 
-        <div className="px-6 pb-6 space-y-4">
-          <DialogDescription className="sr-only">Choose how you want to share this report.</DialogDescription>
-
+        <div className="space-y-6">
           {/* Report Preview */}
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative w-16 h-20 flex-shrink-0 bg-blue-100 rounded-md overflow-hidden">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="w-8 h-8 bg-blue-600 rounded-sm mx-auto mb-1 flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">PDF</span>
-                  </div>
-                  <div className="text-xs text-blue-600 font-medium">Report</div>
-                </div>
-              </div>
+          <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+              <span className="text-red-600 text-xs font-bold">PDF</span>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-gray-900 truncate">{reportFileName}</div>
-              <div className="text-xs text-gray-500 mt-1">{getReportTypeDisplay(report.reportType)} Report</div>
+              <p className="text-sm font-medium truncate">
+                {getReportTypeDisplay(report.reportType)} Report - {report.siteName}
+              </p>
+              <p className="text-xs text-gray-500">
+                {formatDate(report.date)} • {report.attachments?.length || 0} attachments
+              </p>
             </div>
           </div>
 
-          {/* Link Section */}
-          <div className="flex items-center space-x-2">
-            <Input value={reportViewUrl} readOnly className="flex-1 text-sm bg-gray-50 border-gray-200" />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyLink}
-              className="flex-shrink-0 bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-            >
-              <Copy className="mr-1 h-3 w-3" />
-              {copied ? "Copied!" : "COPY LINK"}
-            </Button>
+          {/* Copy Link Section */}
+          <div className="space-y-2">
+            <Label htmlFor="report-link" className="text-sm font-medium">
+              Share Link
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="report-link"
+                value={reportLink || "Click generate to create shareable link"}
+                readOnly
+                className="flex-1"
+                placeholder="Generating link..."
+              />
+              <Button
+                onClick={copyToClipboard}
+                disabled={isGeneratingLink}
+                variant="outline"
+                size="sm"
+                className="px-3 bg-transparent"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
-          <Separator className="my-4" />
+          {/* Send Options */}
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Send via</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                onClick={() => handleSendOption("email")}
+                variant="outline"
+                className="flex items-center gap-2 h-12 bg-blue-50 hover:bg-blue-100 border-blue-200"
+              >
+                <Mail className="h-5 w-5 text-blue-600" />
+                <span className="text-blue-700 font-medium">Email</span>
+              </Button>
 
-          {/* Sharing Options */}
-          <div className="grid grid-cols-4 gap-4 text-center">
-            <div
-              className="flex flex-col items-center gap-2 cursor-pointer group"
-              onClick={() => onSelectOption("email")}
-            >
-              <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                <Mail className="h-6 w-6 text-blue-600" />
-              </div>
-              <span className="text-xs text-gray-700 font-medium">Email</span>
-            </div>
+              <Button
+                onClick={() => handleSendOption("whatsapp")}
+                variant="outline"
+                className="flex items-center gap-2 h-12 bg-green-50 hover:bg-green-100 border-green-200"
+              >
+                <MessageCircle className="h-5 w-5 text-green-600" />
+                <span className="text-green-700 font-medium">WhatsApp</span>
+              </Button>
 
-            <div
-              className="flex flex-col items-center gap-2 cursor-pointer group"
-              onClick={() => handleSocialShare("WhatsApp")}
-            >
-              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center group-hover:bg-green-200 transition-colors">
-                <MessageCircle className="h-6 w-6 text-green-600" />
-              </div>
-              <span className="text-xs text-gray-700 font-medium">Whatsapp</span>
-            </div>
+              <Button
+                onClick={() => handleSendOption("viber")}
+                variant="outline"
+                className="flex items-center gap-2 h-12 bg-purple-50 hover:bg-purple-100 border-purple-200"
+              >
+                <Video className="h-5 w-5 text-purple-600" />
+                <span className="text-purple-700 font-medium">Viber</span>
+              </Button>
 
-            <div
-              className="flex flex-col items-center gap-2 cursor-pointer group"
-              onClick={() => handleSocialShare("Viber")}
-            >
-              <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-                <Phone className="h-6 w-6 text-purple-600" />
-              </div>
-              <span className="text-xs text-gray-700 font-medium">Viber</span>
-            </div>
-
-            <div
-              className="flex flex-col items-center gap-2 cursor-pointer group"
-              onClick={() => handleSocialShare("Messenger")}
-            >
-              <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                <Facebook className="h-6 w-6 text-blue-600" />
-              </div>
-              <span className="text-xs text-gray-700 font-medium">Messenger</span>
+              <Button
+                onClick={() => handleSendOption("messenger")}
+                variant="outline"
+                className="flex items-center gap-2 h-12 bg-blue-50 hover:bg-blue-100 border-blue-200"
+              >
+                <Send className="h-5 w-5 text-blue-600" />
+                <span className="text-blue-700 font-medium">Messenger</span>
+              </Button>
             </div>
           </div>
         </div>
