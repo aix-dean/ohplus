@@ -1,42 +1,40 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
 import AllSitesTab from "./all-sites"
 
-export default function LogisticsDashboardPage() {
-  const [dialogOpen, setDialogOpen] = useState(false)
+export default function LogisticsDashboard() {
+  const [serviceAssignmentDialogOpen, setServiceAssignmentDialogOpen] = useState(false)
 
   return (
-    <div className="flex-1 overflow-auto relative">
-      <main className="p-4">
-        <div className="flex flex-col gap-4">
-          {/* Main Content - All Sites */}
-          <AllSitesTab />
+    <div className="flex flex-col gap-6 p-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold">Logistics Dashboard</h1>
+          <p className="text-gray-600">Manage and monitor your sites</p>
         </div>
-      </main>
+      </div>
+
+      {/* Sites Content */}
+      <AllSitesTab />
 
       {/* Floating Action Button */}
-      <div className="fixed bottom-8 right-8 z-10">
+      <div className="fixed bottom-6 right-6">
         <Button
-          onClick={() => setDialogOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg h-14 px-6"
           size="lg"
+          className="rounded-full shadow-lg hover:shadow-xl transition-shadow bg-blue-600 hover:bg-blue-700"
+          onClick={() => setServiceAssignmentDialogOpen(true)}
         >
-          <Plus className="mr-2 h-5 w-5" /> Create Service Assignment
+          <Plus className="mr-2 h-5 w-5" />
+          Create Service Assignment
         </Button>
       </div>
 
       {/* Service Assignment Dialog */}
-      <ServiceAssignmentDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onSuccess={() => {
-          // You could add a success toast notification here
-        }}
-      />
+      <ServiceAssignmentDialog open={serviceAssignmentDialogOpen} onOpenChange={setServiceAssignmentDialogOpen} />
     </div>
   )
 }
