@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect, useCallback } from "react"
 import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import Image from "next/image"
@@ -330,7 +328,7 @@ export default function AllSitesTab() {
         <div className="bg-red-50 border border-red-200 rounded-md p-4 text-center">
           <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
           <p className="text-red-700">{error}</p>
-          <Button variant="outline" className="mt-4 bg-transparent" onClick={() => fetchProducts(1, true)}>
+          <Button variant="outline" className="mt-4" onClick={() => fetchProducts(1, true)}>
             Try Again
           </Button>
         </div>
@@ -399,7 +397,7 @@ export default function AllSitesTab() {
               size="sm"
               onClick={goToPreviousPage}
               disabled={currentPage === 1}
-              className="h-8 w-8 p-0 bg-transparent"
+              className="h-8 w-8 p-0"
             >
               <ChevronLeft size={16} />
             </Button>
@@ -441,16 +439,8 @@ export default function AllSitesTab() {
   )
 }
 
-// Unified Site Card that shows all UI elements with Create Report button
+// Unified Site Card that shows all UI elements without conditions
 function UnifiedSiteCard({ site }: { site: any }) {
-  const handleCreateReport = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    // Add report creation logic here
-    console.log("Creating report for site:", site.id)
-    // You can add toast notification or redirect to report creation page
-  }
-
   return (
     <Card className="erp-card overflow-hidden hover:shadow-md transition-shadow">
       <div className="relative h-48 bg-gray-200">
@@ -531,15 +521,6 @@ function UnifiedSiteCard({ site }: { site: any }) {
               <span className="text-sm text-gray-500">Today</span>
             </div>
           </div>
-
-          {/* Create Report Button */}
-          <Button
-            variant="outline"
-            className="mt-4 w-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200 font-medium"
-            onClick={handleCreateReport}
-          >
-            Create Report
-          </Button>
         </div>
       </CardContent>
     </Card>
