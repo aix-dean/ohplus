@@ -1,6 +1,6 @@
 import jsPDF from "jspdf"
 import type { Proposal } from "@/lib/types/proposal"
-import type { CostEstimate } from "@/lib/types/cost-estimate" // Import CostEstimate type
+import type { CostEstimate } from "@/lib/types/cost-estimate"
 import type { ReportData } from "@/lib/report-service"
 
 // Helper function to load image and convert to base64
@@ -762,7 +762,7 @@ export async function generateReportPDF(
     const pageHeight = pdf.internal.pageSize.getHeight()
     const margin = 15
     const contentWidth = pageWidth - margin * 2
-    let yPosition = margin
+    let yPosition = 0
 
     const createdAt = safeToDate(report.created || report.date)
     const startDate = safeToDate(report.bookingDates.start)
@@ -778,9 +778,10 @@ export async function generateReportPDF(
 
     // Helper function to check if we need a new page
     const checkNewPage = (requiredHeight: number) => {
-      if (yPosition + requiredHeight > pageHeight - margin) {
+      if (yPosition + requiredHeight > pageHeight - 30) {
+        // Leave space for footer
         pdf.addPage()
-        yPosition = margin
+        yPosition = 0
         // Add header to new page
         addHeaderToPage()
       }
@@ -803,37 +804,41 @@ export async function generateReportPDF(
       })
     }
 
-    // Helper function to add properly sized header
+    // Helper function to create the header section exactly like the preview
     const addHeaderToPage = async () => {
-      try {
-        const headerBase64 = await loadImageAsBase64("/logistics-header.png")
-        if (headerBase64) {
-          const headerDimensions = await getImageDimensions(headerBase64)
-          // Calculate proper header height maintaining aspect ratio
-          const headerHeight = 25 // Fixed height for header
-          const headerWidth = pageWidth
-          pdf.addImage(headerBase64, "PNG", 0, yPosition, headerWidth, headerHeight)
-          yPosition += headerHeight + 5
-        }
-      } catch (error) {
-        console.error("Error adding header image:", error)
-        yPosition += 5 // Skip header space if failed
-      }
+      // Create header background - dark blue to cyan gradient effect
+      pdf.setFillColor(30, 58, 138) // Dark blue
+      pdf.rect(0, yPosition, pageWidth, 35, "F")
+
+      // Add cyan accent
+      pdf.setFillColor(52, 211, 235) // Cyan
+      pdf.rect(pageWidth * 0.7, yPosition, pageWidth * 0.3, 35, "F")
+
+      // Add "Logistics" text
+      pdf.setTextColor(255, 255, 255)
+      pdf.setFontSize(18)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Logistics", margin, yPosition + 20)
+
+      yPosition += 40
     }
 
     // Add header to first page
     await addHeaderToPage()
 
-    // Report Title Section
-    checkNewPage(25)
-    pdf.setFontSize(16)
+    // Report Title Section - exactly like the preview
+    pdf.setFontSize(12)
     pdf.setFont("helvetica", "bold")
+
+    // Create cyan badge for report type
     pdf.setFillColor(52, 211, 235) // cyan-400
-    pdf.rect(margin, yPosition, 60, 8, "F")
+    const badgeWidth = 50
+    const badgeHeight = 8
+    pdf.rect(margin, yPosition, badgeWidth, badgeHeight, "F")
     pdf.setTextColor(255, 255, 255)
     pdf.text(getReportTypeDisplay(report.reportType), margin + 2, yPosition + 5)
 
-    // Add GTS logo
+    // Add GTS logo on the right
     try {
       const logoBase64 = await loadImageAsBase64("/gts-logo.png")
       if (logoBase64) {
@@ -844,23 +849,25 @@ export async function generateReportPDF(
       console.error("Error adding logo:", error)
     }
 
-    yPosition += 12
+    yPosition += badgeHeight + 5
     pdf.setTextColor(0, 0, 0)
-    pdf.setFontSize(10)
+    pdf.setFontSize(9)
     pdf.setFont("helvetica", "italic")
     pdf.text(`as of ${formatDate(report.date)}`, margin, yPosition)
-    yPosition += 10
+    yPosition += 15
 
-    // Project Information Section
-    checkNewPage(60)
+    // Project Information Section - exactly like the preview
+    checkNewPage(70)
     pdf.setFontSize(14)
     pdf.setFont("helvetica", "bold")
     pdf.text("Project Information", margin, yPosition)
     yPosition += 8
 
-    // Draw border around project info
-    pdf.setLineWidth(0.5)
-    pdf.rect(margin, yPosition, contentWidth, 50)
+    // Draw border around project info - exactly like preview
+    pdf.setLineWidth(1)
+    pdf.setDrawColor(0, 0, 0)
+    const tableHeight = 55
+    pdf.rect(margin, yPosition, contentWidth, tableHeight)
     yPosition += 5
 
     pdf.setFontSize(9)
@@ -868,132 +875,131 @@ export async function generateReportPDF(
 
     // Left column
     const leftColumn = margin + 3
-    const rightColumn = margin + contentWidth / 2
+    const rightColumn = margin + contentWidth / 2 + 5
 
     let leftY = yPosition
     let rightY = yPosition
 
-    // Left column data
+    // Left column data - exactly matching the preview layout
     pdf.setFont("helvetica", "bold")
     pdf.text("Site ID:", leftColumn, leftY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(
-      `${report.siteId} ${product?.light?.location || product?.specs_rental?.location || ""}`,
-      leftColumn + 20,
-      leftY,
-    )
-    leftY += 4
+    const siteIdText = `${report.siteId} ${product?.light?.location || product?.specs_rental?.location || ""}`
+    pdf.text(siteIdText, leftColumn + 25, leftY)
+    leftY += 5
 
     pdf.setFont("helvetica", "bold")
     pdf.text("Job Order:", leftColumn, leftY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(report.id?.slice(-4).toUpperCase() || "N/A", leftColumn + 20, leftY)
-    leftY += 4
+    pdf.text(report.id?.slice(-4).toUpperCase() || "N/A", leftColumn + 25, leftY)
+    leftY += 5
 
     pdf.setFont("helvetica", "bold")
     pdf.text("Job Order Date:", leftColumn, leftY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(formatDate(createdAt.toISOString().split("T")[0]), leftColumn + 25, leftY)
-    leftY += 4
+    pdf.text(formatDate(createdAt.toISOString().split("T")[0]), leftColumn + 35, leftY)
+    leftY += 5
 
     pdf.setFont("helvetica", "bold")
     pdf.text("Site:", leftColumn, leftY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(report.siteName, leftColumn + 20, leftY)
-    leftY += 4
+    pdf.text(report.siteName, leftColumn + 25, leftY)
+    leftY += 5
 
     pdf.setFont("helvetica", "bold")
     pdf.text("Size:", leftColumn, leftY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(product?.specs_rental?.size || product?.light?.size || "N/A", leftColumn + 20, leftY)
-    leftY += 4
+    pdf.text(product?.specs_rental?.size || product?.light?.size || "N/A", leftColumn + 25, leftY)
+    leftY += 5
 
     pdf.setFont("helvetica", "bold")
     pdf.text("Start Date:", leftColumn, leftY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(formatDate(report.bookingDates.start), leftColumn + 20, leftY)
-    leftY += 4
+    pdf.text(formatDate(report.bookingDates.start), leftColumn + 25, leftY)
+    leftY += 5
 
     pdf.setFont("helvetica", "bold")
     pdf.text("End Date:", leftColumn, leftY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(formatDate(report.bookingDates.end), leftColumn + 20, leftY)
-    leftY += 4
+    pdf.text(formatDate(report.bookingDates.end), leftColumn + 25, leftY)
+    leftY += 5
 
     pdf.setFont("helvetica", "bold")
     pdf.text("Installation Duration:", leftColumn, leftY)
     pdf.setFont("helvetica", "normal")
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-    pdf.text(`${duration} days`, leftColumn + 35, leftY)
+    pdf.text(`${duration} days`, leftColumn + 45, leftY)
 
-    // Right column data
+    // Right column data - exactly matching the preview layout
     pdf.setFont("helvetica", "bold")
     pdf.text("Content:", rightColumn, rightY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(product?.content_type || "N/A", rightColumn + 20, rightY)
-    rightY += 4
+    pdf.text(product?.content_type || "N/A", rightColumn + 25, rightY)
+    rightY += 5
 
     pdf.setFont("helvetica", "bold")
     pdf.text("Material Specs:", rightColumn, rightY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(product?.specs_rental?.material || "N/A", rightColumn + 25, rightY)
-    rightY += 4
+    pdf.text(product?.specs_rental?.material || "N/A", rightColumn + 35, rightY)
+    rightY += 5
 
     pdf.setFont("helvetica", "bold")
     pdf.text("Crew:", rightColumn, rightY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(`Team ${report.assignedTo || "A"}`, rightColumn + 20, rightY)
-    rightY += 4
+    pdf.text(`Team ${report.assignedTo || "A"}`, rightColumn + 25, rightY)
+    rightY += 5
 
     pdf.setFont("helvetica", "bold")
     pdf.text("Illumination:", rightColumn, rightY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(product?.light?.illumination || "N/A", rightColumn + 25, rightY)
-    rightY += 4
+    pdf.text(product?.light?.illumination || "N/A", rightColumn + 35, rightY)
+    rightY += 5
 
     pdf.setFont("helvetica", "bold")
     pdf.text("Gondola:", rightColumn, rightY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(product?.specs_rental?.gondola ? "YES" : "NO", rightColumn + 20, rightY)
-    rightY += 4
+    pdf.text(product?.specs_rental?.gondola ? "YES" : "NO", rightColumn + 25, rightY)
+    rightY += 5
 
     pdf.setFont("helvetica", "bold")
     pdf.text("Technology:", rightColumn, rightY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(product?.specs_rental?.technology || "N/A", rightColumn + 25, rightY)
-    rightY += 4
+    pdf.text(product?.specs_rental?.technology || "N/A", rightColumn + 35, rightY)
+    rightY += 5
 
     pdf.setFont("helvetica", "bold")
     pdf.text("Sales:", rightColumn, rightY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(report.sales, rightColumn + 20, rightY)
+    pdf.text(report.sales, rightColumn + 25, rightY)
 
-    yPosition += 55
+    yPosition += tableHeight + 10
 
-    // Project Status Section
+    // Project Status Section - exactly like the preview
     checkNewPage(30)
     pdf.setFontSize(14)
     pdf.setFont("helvetica", "bold")
     pdf.text("Project Status", margin, yPosition)
 
-    // Status badge
+    // Status badge - green like in preview
     pdf.setFillColor(34, 197, 94) // green-500
-    pdf.rect(margin + 80, yPosition - 4, 20, 6, "F")
+    const statusBadgeWidth = 25
+    const statusBadgeHeight = 6
+    pdf.rect(margin + 90, yPosition - 4, statusBadgeWidth, statusBadgeHeight, "F")
     pdf.setTextColor(255, 255, 255)
     pdf.setFontSize(10)
-    pdf.text(`${report.completionPercentage || 100}%`, margin + 85, yPosition)
+    pdf.text(`${report.completionPercentage || 100}%`, margin + 95, yPosition)
     pdf.setTextColor(0, 0, 0)
 
-    yPosition += 10
+    yPosition += 15
 
-    // Attachments Section
+    // Attachments Section - exactly like the preview
     if (report.attachments && report.attachments.length > 0) {
       checkNewPage(80)
 
       const attachmentsToShow = report.attachments.slice(0, 2)
       let currentX = margin
       const imageWidth = (contentWidth - 10) / 2
-      const imageHeight = 50
+      const imageHeight = 60
 
       for (let i = 0; i < attachmentsToShow.length; i++) {
         const attachment = attachmentsToShow[i]
@@ -1002,8 +1008,9 @@ export async function generateReportPDF(
           currentX = margin + imageWidth + 10
         }
 
-        // Draw placeholder box for attachment
-        pdf.setLineWidth(0.5)
+        // Draw border for attachment box - exactly like preview
+        pdf.setLineWidth(1)
+        pdf.setDrawColor(0, 0, 0)
         pdf.rect(currentX, yPosition, imageWidth, imageHeight)
 
         // Try to add actual image if it's an image file
@@ -1028,8 +1035,8 @@ export async function generateReportPDF(
           }
         }
 
-        // Add attachment info below
-        pdf.setFontSize(7)
+        // Add attachment info below - exactly like preview
+        pdf.setFontSize(8)
         pdf.text(`Date: ${formatDate(report.date)}`, currentX, yPosition + imageHeight + 5)
         pdf.text(
           `Time: ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`,
@@ -1046,9 +1053,9 @@ export async function generateReportPDF(
       yPosition += imageHeight + 25
     }
 
-    // Footer Section
-    checkNewPage(30)
-    pdf.setLineWidth(0.3)
+    // Footer Section - exactly like the preview
+    checkNewPage(40)
+    pdf.setLineWidth(0.5)
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 8
 
@@ -1060,32 +1067,35 @@ export async function generateReportPDF(
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
     pdf.text(report.createdByName, margin, yPosition)
-    yPosition += 3
+    yPosition += 4
     pdf.text("LOGISTICS", margin, yPosition)
-    yPosition += 3
+    yPosition += 4
     pdf.text(formatDate(createdAt.toISOString().split("T")[0]), margin, yPosition)
 
-    // Add disclaimer
+    // Add disclaimer - exactly like preview
     pdf.setFontSize(8)
     pdf.setFont("helvetica", "italic")
     pdf.setTextColor(100, 100, 100)
     const disclaimer = `"All data are based on the latest available records as of ${formatDate(new Date().toISOString().split("T")[0])}."`
-    pdf.text(disclaimer, pageWidth - margin - 80, yPosition)
+    const disclaimerLines = pdf.splitTextToSize(disclaimer, 80)
+    pdf.text(disclaimerLines, pageWidth - margin - 80, yPosition - 8)
 
-    yPosition += 10
+    yPosition += 15
 
-    // Add bottom footer image with proper sizing
-    try {
-      const footerBase64 = await loadImageAsBase64("/logistics-footer.png")
-      if (footerBase64) {
-        const footerHeight = 15 // Fixed height for footer
-        const footerWidth = pageWidth
-        // Position footer at bottom of page
-        pdf.addImage(footerBase64, "PNG", 0, pageHeight - footerHeight, footerWidth, footerHeight)
-      }
-    } catch (error) {
-      console.error("Error adding footer image:", error)
-    }
+    // Add bottom footer with gradient background - exactly like preview
+    const footerY = pageHeight - 20
+    pdf.setFillColor(52, 211, 235) // Cyan
+    pdf.rect(0, footerY, pageWidth * 0.3, 20, "F")
+    pdf.setFillColor(30, 58, 138) // Dark blue
+    pdf.rect(pageWidth * 0.3, footerY, pageWidth * 0.7, 20, "F")
+
+    // Add footer text
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(8)
+    pdf.setFont("helvetica", "normal")
+    pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 50, footerY + 10)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("OH!", pageWidth - margin - 15, footerY + 15)
 
     if (returnBase64) {
       return pdf.output("datauristring").split(",")[1]
