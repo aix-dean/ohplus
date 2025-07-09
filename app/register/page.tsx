@@ -4,140 +4,156 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { toast } from "@/components/ui/use-toast"
-import { Eye, EyeOff, Users, Mail, Lock, User } from "lucide-react"
-import Link from "next/link"
+import { Separator } from "@/components/ui/separator"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { useAuth } from "@/contexts/auth-context"
+import { Eye, EyeOff, Users, Loader2 } from "lucide-react"
 
 export default function RegisterPage() {
-  const { register, user } = useAuth()
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [joinOrgDialogOpen, setJoinOrgDialogOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
 
-  // Form state
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-    confirmPassword: "",
-    displayName: "",
-    organizationCode: "",
-  })
+  // Organization code dialog state
+  const [showOrgDialog, setShowOrgDialog] = useState(false)
+  const [organizationCode, setOrganizationCode] = useState("")
+  const [isJoiningOrg, setIsJoiningOrg] = useState(false)
+  const [orgError, setOrgError] = useState("")
 
-  // Pre-fill organization code from URL if present
+  const { register } = useAuth()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Check for organization code in URL parameters
   useEffect(() => {
     const codeFromUrl = searchParams.get("code")
     if (codeFromUrl) {
-      setFormData((prev) => ({ ...prev, organizationCode: codeFromUrl }))
+      setOrganizationCode(codeFromUrl)
+      setShowOrgDialog(true)
     }
   }, [searchParams])
 
-  // Redirect if already logged in
-  useEffect(() => {
-    if (user) {
-      router.push("/dashboard")
-    }
-  }, [user, router])
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError("")
 
-    if (formData.password !== formData.confirmPassword) {
-      toast({
-        variant: "destructive",
-        title: "Password Mismatch",
-        description: "Passwords do not match. Please try again.",
-      })
+    if (password !== confirmPassword) {
+      setError("Passwords do not match")
       return
     }
 
-    if (formData.password.length < 6) {
-      toast({
-        variant: "destructive",
-        title: "Password Too Short",
-        description: "Password must be at least 6 characters long.",
-      })
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long")
       return
     }
+
+    setIsLoading(true)
 
     try {
-      setLoading(true)
-      await register(formData.email, formData.password, formData.displayName, formData.organizationCode || undefined)
-
-      toast({
-        title: "Registration Successful!",
-        description: "Welcome! Your account has been created.",
-      })
-
-      router.push("/dashboard")
-    } catch (error) {
-      console.error("Registration error:", error)
-      toast({
-        variant: "destructive",
-        title: "Registration Failed",
-        description: error instanceof Error ? error.message : "Failed to create account. Please try again.",
-      })
+      await register(email, password, firstName, lastName)
+      router.push("/onboarding")
+    } catch (error: any) {
+      setError(error.message || "Failed to create account")
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
-  const handleJoinOrganization = () => {
-    setJoinOrgDialogOpen(true)
+  const handleJoinOrganization = async () => {
+    if (!organizationCode.trim()) {
+      setOrgError("Please enter an organization code")
+      return
+    }
+
+    setIsJoiningOrg(true)
+    setOrgError("")
+
+    try {
+      await register(email, password, firstName, lastName, organizationCode.trim())
+      setShowOrgDialog(false)
+      router.push("/onboarding")
+    } catch (error: any) {
+      setOrgError(error.message || "Failed to join organization")
+    } finally {
+      setIsJoiningOrg(false)
+    }
   }
 
-  const handleJoinOrgSubmit = () => {
-    setJoinOrgDialogOpen(false)
-    // Organization code is already in formData, proceed with normal registration
-    document.getElementById("register-form")?.requestSubmit()
+  const handleRegularSignUp = async () => {
+    setError("")
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match")
+      return
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long")
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      await register(email, password, firstName, lastName)
+      setShowOrgDialog(false)
+      router.push("/onboarding")
+    } catch (error: any) {
+      setError(error.message || "Failed to create account")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-          <CardDescription>Sign up to get started with our platform</CardDescription>
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-bold text-center">Create Account</CardTitle>
+          <CardDescription className="text-center">Enter your information to create your account</CardDescription>
         </CardHeader>
-
         <CardContent className="space-y-4">
-          {/* Show organization code info if present */}
-          {formData.organizationCode && (
-            <Alert>
-              <Users className="h-4 w-4" />
-              <AlertDescription>
-                You're joining an organization with code: <strong>{formData.organizationCode}</strong>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <form id="register-form" onSubmit={handleRegister} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="displayName">Full Name</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
                 <Input
-                  id="displayName"
-                  name="displayName"
-                  placeholder="Enter your full name"
-                  value={formData.displayName}
-                  onChange={handleInputChange}
-                  className="pl-10"
+                  id="firstName"
+                  type="text"
+                  placeholder="John"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  type="text"
+                  placeholder="Doe"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
                   required
                 />
               </div>
@@ -145,73 +161,72 @@ export default function RegisterPage() {
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="pl-10"
-                  required
-                />
-              </div>
+              <Input
+                id="email"
+                type="email"
+                placeholder="john@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="password"
-                  name="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Create a password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="pl-10 pr-10"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   required
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+                </Button>
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   id="confirmPassword"
-                  name="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
                   placeholder="Confirm your password"
-                  value={formData.confirmPassword}
-                  onChange={handleInputChange}
-                  className="pl-10 pr-10"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
                 >
                   {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+                </Button>
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
                 <>
-                  <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Creating Account...
                 </>
               ) : (
@@ -220,59 +235,88 @@ export default function RegisterPage() {
             </Button>
           </form>
 
-          <Separator />
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <Separator className="w-full" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">Or</span>
+            </div>
+          </div>
 
-          <Button
-            variant="outline"
-            className="w-full bg-transparent"
-            onClick={handleJoinOrganization}
-            disabled={loading}
-          >
-            <Users className="h-4 w-4 mr-2" />
-            Join an Organization
-          </Button>
+          <Dialog open={showOrgDialog} onOpenChange={setShowOrgDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="w-full bg-transparent">
+                <Users className="mr-2 h-4 w-4" />
+                Join an Organization
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Join an Organization</DialogTitle>
+                <DialogDescription>
+                  Enter the organization code provided by your administrator to join their organization.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="orgCode">Organization Code</Label>
+                  <Input
+                    id="orgCode"
+                    placeholder="XXXX-XXXX"
+                    value={organizationCode}
+                    onChange={(e) => setOrganizationCode(e.target.value.toUpperCase())}
+                    className="font-mono"
+                  />
+                </div>
+                {orgError && (
+                  <Alert variant="destructive">
+                    <AlertDescription>{orgError}</AlertDescription>
+                  </Alert>
+                )}
+              </div>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleRegularSignUp}
+                  disabled={isLoading || isJoiningOrg}
+                  className="w-full sm:w-auto bg-transparent"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    "Sign Up Without Organization"
+                  )}
+                </Button>
+                <Button
+                  onClick={handleJoinOrganization}
+                  disabled={isLoading || isJoiningOrg}
+                  className="w-full sm:w-auto"
+                >
+                  {isJoiningOrg ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Joining Organization...
+                    </>
+                  ) : (
+                    "Join Organization"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
-          <div className="text-center text-sm text-gray-600">
+          <div className="text-center text-sm">
             Already have an account?{" "}
-            <Link href="/login" className="text-blue-600 hover:underline">
+            <Link href="/login" className="text-primary hover:underline">
               Sign in
             </Link>
           </div>
         </CardContent>
       </Card>
-
-      {/* Join Organization Dialog */}
-      <Dialog open={joinOrgDialogOpen} onOpenChange={setJoinOrgDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Join an Organization</DialogTitle>
-            <DialogDescription>Enter the organization code provided by your administrator.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="orgCode">Organization Code</Label>
-              <Input
-                id="orgCode"
-                name="organizationCode"
-                placeholder="Enter organization code (e.g., ABCD-1234)"
-                value={formData.organizationCode}
-                onChange={handleInputChange}
-                className="font-mono"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setJoinOrgDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleJoinOrgSubmit} disabled={!formData.organizationCode}>
-                Continue Registration
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

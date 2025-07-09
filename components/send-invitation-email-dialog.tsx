@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -9,32 +11,32 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { toast } from "@/components/ui/use-toast"
-import { Mail, Send } from "lucide-react"
-import { useAuth } from "@/contexts/auth-context"
+import { Mail, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 interface SendInvitationEmailDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
   organizationCode: string
+  trigger?: React.ReactNode
 }
 
-export function SendInvitationEmailDialog({ open, onOpenChange, organizationCode }: SendInvitationEmailDialogProps) {
-  const { userData } = useAuth()
+export function SendInvitationEmailDialog({ organizationCode, trigger }: SendInvitationEmailDialogProps) {
+  const [open, setOpen] = useState(false)
   const [email, setEmail] = useState("")
-  const [senderName, setSenderName] = useState(userData?.display_name || "")
+  const [senderName, setSenderName] = useState("")
   const [companyName, setCompanyName] = useState("")
-  const [sending, setSending] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const { toast } = useToast()
 
   const handleSendInvitation = async () => {
-    if (!email.trim()) {
+    if (!email) {
       toast({
-        variant: "destructive",
         title: "Error",
-        description: "Please enter an email address.",
+        description: "Please enter an email address",
+        variant: "destructive",
       })
       return
     }
@@ -43,122 +45,121 @@ export function SendInvitationEmailDialog({ open, onOpenChange, organizationCode
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       toast({
-        variant: "destructive",
         title: "Error",
-        description: "Please enter a valid email address.",
+        description: "Please enter a valid email address",
+        variant: "destructive",
       })
       return
     }
 
-    try {
-      setSending(true)
+    setIsLoading(true)
 
+    try {
       const response = await fetch("/api/invitations/send-email", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email: email.trim(),
+          email,
           organizationCode,
-          senderName: senderName.trim(),
-          companyName: companyName.trim(),
+          senderName,
+          companyName,
         }),
       })
 
-      const data = await response.json()
+      const result = await response.json()
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send invitation")
+      if (response.ok && result.success) {
+        toast({
+          title: "Success",
+          description: "Invitation email sent successfully!",
+        })
+        setOpen(false)
+        // Reset form
+        setEmail("")
+        setSenderName("")
+        setCompanyName("")
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to send invitation email",
+          variant: "destructive",
+        })
       }
-
-      toast({
-        title: "Invitation Sent!",
-        description: `Invitation email has been sent to ${email}`,
-      })
-
-      // Reset form and close dialog
-      setEmail("")
-      setSenderName(userData?.display_name || "")
-      setCompanyName("")
-      onOpenChange(false)
     } catch (error) {
       console.error("Error sending invitation:", error)
       toast({
-        variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to send invitation email",
+        description: "Failed to send invitation email. Please try again.",
+        variant: "destructive",
       })
     } finally {
-      setSending(false)
+      setIsLoading(false)
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        {trigger || (
+          <Button variant="outline" size="sm">
+            <Mail className="h-4 w-4 mr-2" />
+            Email
+          </Button>
+        )}
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            Send Invitation Email
-          </DialogTitle>
+          <DialogTitle>Send Invitation Email</DialogTitle>
           <DialogDescription>
-            Send an invitation email with the organization code <strong>{organizationCode}</strong> to invite someone to
-            join your organization.
+            Send an invitation email with the organization code: <strong>{organizationCode}</strong>
           </DialogDescription>
         </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email Address *</Label>
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="email">Recipient Email *</Label>
             <Input
               id="email"
               type="email"
-              placeholder="Enter recipient's email address"
+              placeholder="user@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              disabled={sending}
+              required
             />
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="senderName">Your Name</Label>
+          <div className="grid gap-2">
+            <Label htmlFor="senderName">Your Name (Optional)</Label>
             <Input
               id="senderName"
-              type="text"
-              placeholder="Your name (optional)"
+              placeholder="John Doe"
               value={senderName}
               onChange={(e) => setSenderName(e.target.value)}
-              disabled={sending}
             />
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="companyName">Company/Organization Name</Label>
+          <div className="grid gap-2">
+            <Label htmlFor="companyName">Company Name (Optional)</Label>
             <Input
               id="companyName"
-              type="text"
-              placeholder="Your company name (optional)"
+              placeholder="Acme Corp"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
-              disabled={sending}
             />
           </div>
         </div>
-
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
+          <Button variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
             Cancel
           </Button>
-          <Button onClick={handleSendInvitation} disabled={sending}>
-            {sending ? (
+          <Button onClick={handleSendInvitation} disabled={isLoading}>
+            {isLoading ? (
               <>
-                <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Sending...
               </>
             ) : (
               <>
-                <Send className="h-4 w-4 mr-2" />
+                <Mail className="h-4 w-4 mr-2" />
                 Send Invitation
               </>
             )}
