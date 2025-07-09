@@ -332,7 +332,7 @@ export default function SiteDetailsPage({ params }: Props) {
           </Card>
 
           {/* Site Data Grid - Updated to include Display card */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Illumination - Top Left */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
