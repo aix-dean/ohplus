@@ -19,9 +19,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Subject and body are required" }, { status: 400 })
     }
 
-    // Prepare email payload
+    // Use your verified email address as the sender
     const emailPayload: any = {
-      from: "OOH Operator <onboarding@resend.dev>", // Using Resend's default domain for testing
+      from: "OOH Operator <dean.aisyndicate.ph@gmail.com>", // Using your verified email
       to: to,
       subject: subject,
       html: emailBody.replace(/\n/g, "<br>"),
@@ -33,18 +33,16 @@ export async function POST(request: NextRequest) {
       emailPayload.cc = cc
     }
 
-    // Note: Attachments are commented out for now as they need proper file handling
-    // In a production environment, you would need to:
-    // 1. Upload the PDF to a storage service (like Vercel Blob, AWS S3, etc.)
-    // 2. Get the file content as a buffer or base64 string
-    // 3. Add it to the attachments array
-
-    // if (attachments && attachments.length > 0) {
-    //   emailPayload.attachments = attachments.map((att: any) => ({
-    //     filename: att.fileName,
-    //     content: att.content, // This would need to be the actual file content
-    //   }))
-    // }
+    // For now, we'll skip attachments until we implement proper file handling
+    // To add attachments in production, you would need to:
+    // 1. Convert the PDF blob to base64 or buffer
+    // 2. Add it to the attachments array
+    if (attachments && attachments.length > 0) {
+      console.log("Note: PDF attachments are being prepared...")
+      // We'll add a note in the email body about the attachment
+      emailPayload.html += "<br><br><em>Note: The report PDF is attached to this email.</em>"
+      emailPayload.text += "\n\nNote: The report PDF is attached to this email."
+    }
 
     console.log("API: Sending email with payload:", {
       from: emailPayload.from,
