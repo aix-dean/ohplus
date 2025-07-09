@@ -1,61 +1,22 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+
+import { useState, useEffect, useCallback } from "react"
+import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { MapPin, Calendar, Users, FileText } from "lucide-react"
-import { CreateReportDialog } from "@/components/create-report-dialog"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
+import { Progress } from "@/components/ui/progress"
 import { getProductsByContentType, getProductsCountByContentType, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
-
-const sites = [
-  {
-    id: "1",
-    name: "EDSA Northbound",
-    location: "Quezon City",
-    type: "LED Billboard",
-    status: "Active",
-    lastUpdate: "2 hours ago",
-    occupancy: "85%",
-    revenue: "₱125,000",
-  },
-  {
-    id: "2",
-    name: "Ayala Avenue",
-    location: "Makati City",
-    type: "Static Billboard",
-    status: "Active",
-    lastUpdate: "1 hour ago",
-    occupancy: "92%",
-    revenue: "₱180,000",
-  },
-  {
-    id: "3",
-    name: "BGC Central",
-    location: "Taguig City",
-    type: "LED Display",
-    status: "Maintenance",
-    lastUpdate: "4 hours ago",
-    occupancy: "0%",
-    revenue: "₱0",
-  },
-  {
-    id: "4",
-    name: "Ortigas Center",
-    location: "Pasig City",
-    type: "Digital Screen",
-    status: "Active",
-    lastUpdate: "30 minutes ago",
-    occupancy: "78%",
-    revenue: "₱95,000",
-  },
-]
 
 export default function AllSitesTab() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -113,7 +74,7 @@ export default function AllSitesTab() {
   }, [debouncedSearchTerm])
 
   // Fetch total count of products
-  const fetchTotalCount = async () => {
+  const fetchTotalCount = useCallback(async () => {
     setLoadingCount(true)
     try {
       // For all sites, we'll get both static and dynamic content types and combine them
@@ -128,66 +89,74 @@ export default function AllSitesTab() {
     } finally {
       setLoadingCount(false)
     }
-  }
+  }, [debouncedSearchTerm])
 
   // Fetch products for the current page
-  const fetchProducts = async (page: number, forceRefresh = false) => {
-    // Check if we have this page in cache and not forcing refresh
-    if (!forceRefresh && pageCache.has(page)) {
-      const cachedData = pageCache.get(page)!
-      setProducts(cachedData.items)
-      setLastDoc(cachedData.lastDoc)
-      return
-    }
+  const fetchProducts = useCallback(
+    async (page: number, forceRefresh = false) => {
+      // Check if we have this page in cache and not forcing refresh
+      if (!forceRefresh && pageCache.has(page)) {
+        const cachedData = pageCache.get(page)!
+        setProducts(cachedData.items)
+        setLastDoc(cachedData.lastDoc)
+        return
+      }
 
-    const isFirstPage = page === 1
-    setLoading(isFirstPage)
-    setLoadingMore(!isFirstPage)
+      const isFirstPage = page === 1
+      setLoading(isFirstPage)
+      setLoadingMore(!isFirstPage)
 
-    try {
-      // For the first page, start from the beginning
-      // For subsequent pages, use the last document from the previous page
-      const startDoc = isFirstPage ? null : lastDoc
+      try {
+        // For the first page, start from the beginning
+        // For subsequent pages, use the last document from the previous page
+        const startDoc = isFirstPage ? null : lastDoc
 
-      // Get both static and dynamic products
-      const staticResult = await getProductsByContentType("static", ITEMS_PER_PAGE / 2, startDoc, debouncedSearchTerm)
-      const dynamicResult = await getProductsByContentType("dynamic", ITEMS_PER_PAGE / 2, startDoc, debouncedSearchTerm)
+        // Get both static and dynamic products
+        const staticResult = await getProductsByContentType("static", ITEMS_PER_PAGE / 2, startDoc, debouncedSearchTerm)
+        const dynamicResult = await getProductsByContentType(
+          "dynamic",
+          ITEMS_PER_PAGE / 2,
+          startDoc,
+          debouncedSearchTerm,
+        )
 
-      // Combine the results
-      const combinedItems = [...staticResult.items, ...dynamicResult.items]
+        // Combine the results
+        const combinedItems = [...staticResult.items, ...dynamicResult.items]
 
-      // Sort by name for consistency
-      combinedItems.sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+        // Sort by name for consistency
+        combinedItems.sort((a, b) => (a.name || "").localeCompare(b.name || ""))
 
-      // Take only the first ITEMS_PER_PAGE items
-      const paginatedItems = combinedItems.slice(0, ITEMS_PER_PAGE)
+        // Take only the first ITEMS_PER_PAGE items
+        const paginatedItems = combinedItems.slice(0, ITEMS_PER_PAGE)
 
-      setProducts(paginatedItems)
+        setProducts(paginatedItems)
 
-      // Use the last doc from either result based on which has more items
-      const lastVisible =
-        staticResult.items.length > dynamicResult.items.length ? staticResult.lastDoc : dynamicResult.lastDoc
+        // Use the last doc from either result based on which has more items
+        const lastVisible =
+          staticResult.items.length > dynamicResult.items.length ? staticResult.lastDoc : dynamicResult.lastDoc
 
-      setLastDoc(lastVisible)
-      setHasMore(staticResult.hasMore || dynamicResult.hasMore)
+        setLastDoc(lastVisible)
+        setHasMore(staticResult.hasMore || dynamicResult.hasMore)
 
-      // Cache this page
-      setPageCache((prev) => {
-        const newCache = new Map(prev)
-        newCache.set(page, {
-          items: paginatedItems,
-          lastDoc: lastVisible,
+        // Cache this page
+        setPageCache((prev) => {
+          const newCache = new Map(prev)
+          newCache.set(page, {
+            items: paginatedItems,
+            lastDoc: lastVisible,
+          })
+          return newCache
         })
-        return newCache
-      })
-    } catch (error) {
-      console.error("Error fetching products:", error)
-      setError("Failed to load sites. Please try again.")
-    } finally {
-      setLoading(false)
-      setLoadingMore(false)
-    }
-  }
+      } catch (error) {
+        console.error("Error fetching products:", error)
+        setError("Failed to load sites. Please try again.")
+      } finally {
+        setLoading(false)
+        setLoadingMore(false)
+      }
+    },
+    [lastDoc, pageCache, debouncedSearchTerm],
+  )
 
   // Load initial data and count
   useEffect(() => {
@@ -200,7 +169,7 @@ export default function AllSitesTab() {
     if (currentPage > 0) {
       fetchProducts(currentPage)
     }
-  }, [currentPage])
+  }, [currentPage, fetchProducts])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -309,74 +278,287 @@ export default function AllSitesTab() {
     }
   }
 
-  const handleCreateReport = (siteId: string, event: React.MouseEvent) => {
-    event.stopPropagation()
-    setSelectedSiteId(siteId)
-    setReportDialogOpen(true)
-    console.log("Creating report for site:", siteId)
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Date, Search and View Toggle */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="text-sm text-gray-600 font-medium">
+          {currentDate}, {currentTime}
+        </div>
+
+        <div className="flex flex-1 max-w-md mx-auto md:mx-0">
+          <div className="relative w-full">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+            <Input
+              type="search"
+              placeholder="Search sites..."
+              className="pl-8 w-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <div className="border rounded-md p-1 flex">
+            <Button
+              variant={viewMode === "grid" ? "default" : "ghost"}
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setViewMode("grid")}
+            >
+              <LayoutGrid size={18} />
+            </Button>
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setViewMode("list")}
+            >
+              <List size={18} />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Loading State */}
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+          <p className="text-gray-500">Loading sites...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && !loading && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4 text-center">
+          <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
+          <p className="text-red-700">{error}</p>
+          <Button variant="outline" className="mt-4 bg-transparent" onClick={() => fetchProducts(1, true)}>
+            Try Again
+          </Button>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && !error && products.length === 0 && (
+        <div className="bg-gray-50 border border-gray-200 border-dashed rounded-md p-8 text-center">
+          <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+            <AlertCircle size={24} className="text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium mb-2">No sites found</h3>
+          <p className="text-gray-500 mb-4">
+            {debouncedSearchTerm
+              ? "No sites match your search criteria. Try adjusting your search terms."
+              : "There are no sites in the system yet."}
+          </p>
+          {debouncedSearchTerm && (
+            <Button variant="outline" onClick={() => setSearchTerm("")}>
+              Clear Search
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Site Grid */}
+      {!loading && !error && products.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
+          {products.map((product) => (
+            <UnifiedSiteCard
+              key={product.id}
+              site={productToSite(product)}
+              onCreateReport={(siteId) => {
+                setSelectedSiteId(siteId)
+                setReportDialogOpen(true)
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Loading More Indicator */}
+      {loadingMore && (
+        <div className="flex justify-center my-4">
+          <div className="flex items-center gap-2">
+            <Loader2 size={18} className="animate-spin" />
+            <span>Loading more...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!loading && !error && products.length > 0 && (
+        <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
+          <div className="text-sm text-gray-500 flex items-center">
+            {loadingCount ? (
+              <div className="flex items-center">
+                <Loader2 size={14} className="animate-spin mr-2" />
+                <span>Calculating pages...</span>
+              </div>
+            ) : (
+              <span>
+                Page {currentPage} of {totalPages} ({totalItems} items)
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToPreviousPage}
+              disabled={currentPage === 1}
+              className="h-8 w-8 p-0 bg-transparent"
+            >
+              <ChevronLeft size={16} />
+            </Button>
+
+            {/* Page numbers */}
+            <div className="flex items-center gap-1">
+              {getPageNumbers().map((page, index) =>
+                page === "..." ? (
+                  <span key={`ellipsis-${index}`} className="px-2">
+                    ...
+                  </span>
+                ) : (
+                  <Button
+                    key={`page-${page}`}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => goToPage(page as number)}
+                    className="h-8 w-8 p-0"
+                  >
+                    {page}
+                  </Button>
+                ),
+              )}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={goToNextPage}
+              disabled={currentPage >= totalPages}
+              className="h-8 w-8 p-0"
+            >
+              <ChevronRight size={16} />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
+    </div>
+  )
+}
+
+// Unified Site Card that shows all UI elements with Create Report button
+function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onCreateReport(site.id)
+  }
+
+  const handleCardClick = () => {
+    window.location.href = `/logistics/sites/${site.id}`
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">All Sites</h2>
-        <Badge variant="secondary">{sites.length} Total Sites</Badge>
+    <Card
+      className="erp-card overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+      onClick={handleCardClick}
+    >
+      <div className="relative h-48 bg-gray-200">
+        <Image
+          src={site.image || "/placeholder.svg"}
+          alt={site.name}
+          fill
+          className="object-cover"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
+            target.className = "opacity-50 object-contain"
+          }}
+        />
+        {site.notifications > 0 && (
+          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+            {site.notifications}
+          </div>
+        )}
+
+        {/* Content Type Badge */}
+        <div className="absolute top-2 left-2">
+          <Badge
+            variant="outline"
+            className={`
+              ${site.contentType === "dynamic" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-amber-50 text-amber-700 border-amber-200"}
+            `}
+          >
+            {site.contentType === "dynamic" ? "Digital" : "Static"}
+          </Badge>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {sites.map((site) => (
-          <Card key={site.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{site.name}</CardTitle>
-                <Badge
-                  variant={site.status === "Active" ? "default" : "destructive"}
-                  className={site.status === "Active" ? "bg-green-500" : ""}
-                >
-                  {site.status}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center text-sm text-gray-600">
-                  <MapPin className="h-4 w-4 mr-2" />
-                  {site.location}
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Updated {site.lastUpdate}
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <Users className="h-4 w-4 mr-2" />
-                  {site.occupancy} Occupancy
-                </div>
-              </div>
+      <CardContent className="p-4">
+        <div className="flex flex-col gap-1">
+          <h3 className="font-semibold">{site.name}</h3>
 
-              <div className="pt-2 border-t">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Revenue</span>
-                  <span className="text-lg font-bold text-green-600">{site.revenue}</span>
-                </div>
-              </div>
+          <div className="text-sm text-gray-500 mt-1">{site.location}</div>
 
-              <div className="pt-2">
-                <Button
-                  onClick={(e) => handleCreateReport(site.id, e)}
-                  variant="outline"
-                  size="sm"
-                  className="w-full flex items-center gap-2 hover:bg-blue-50 hover:border-blue-300"
-                >
-                  <FileText className="h-4 w-4" />
-                  Create Report
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+          {/* Status Badge */}
+          <div className="mt-2 flex items-center gap-2">
+            <div className="text-sm font-medium">Status:</div>
+            <Badge
+              variant="outline"
+              className={`
+                ${site.statusColor === "green" ? "bg-green-50 text-green-700 border-green-200" : ""}
+                ${site.statusColor === "blue" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
+                ${site.statusColor === "red" ? "bg-red-50 text-red-700 border-red-200" : ""}
+                ${site.statusColor === "orange" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
+              `}
+            >
+              {site.status}
+            </Badge>
+          </div>
 
-      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
-    </div>
+          {/* Health Percentage */}
+          <div className="mt-3">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm font-medium">Health:</span>
+              <span className="text-sm">{site.healthPercentage}%</span>
+            </div>
+            <Progress
+              value={site.healthPercentage}
+              className="h-2"
+              indicatorClassName={`
+                ${site.healthPercentage > 80 ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
+                ${site.healthPercentage > 60 && site.healthPercentage <= 80 ? "bg-gradient-to-r from-yellow-500 to-green-300" : ""}
+                ${site.healthPercentage > 40 && site.healthPercentage <= 60 ? "bg-gradient-to-r from-orange-500 to-yellow-300" : ""}
+                ${site.healthPercentage <= 40 ? "bg-gradient-to-r from-red-500 to-orange-300" : ""}
+              `}
+            />
+          </div>
+
+          {/* Additional Information */}
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Last Updated:</span>
+              <span className="text-sm text-gray-500">Today</span>
+            </div>
+          </div>
+
+          {/* Create Report Button */}
+          <Button
+            variant="outline"
+            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+            onClick={handleCreateReport}
+          >
+            Create Report
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
