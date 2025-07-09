@@ -52,7 +52,7 @@ export default function AddUserInvitationDialog({
     setLoading(true)
 
     try {
-      const registrationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/register?code=${invitationCode}`
+      const registrationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/register?orgCode=${invitationCode}`
 
       const response = await fetch("/api/invitations/send-email", {
         method: "POST",
