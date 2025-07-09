@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useCallback } from "react"
 import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import Image from "next/image"
@@ -8,10 +10,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
-import { getProductsByContentType, getProductsCountByContentType, type Product } from "@/lib/firebase-service"
+import type { Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { CreateReportDialog } from "@/components/create-report-dialog"
+import { getProductsCountByContentTypeAndCompany, getProductsByContentTypeAndCompany } from "@/lib/firebase-service"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
@@ -76,8 +79,8 @@ export default function AllSitesTab() {
     setLoadingCount(true)
     try {
       // For all sites, we'll get both static and dynamic content types and combine them
-      const staticCount = await getProductsCountByContentType("static", debouncedSearchTerm)
-      const dynamicCount = await getProductsCountByContentType("dynamic", debouncedSearchTerm)
+      const staticCount = await getProductsCountByContentTypeAndCompany("static", debouncedSearchTerm)
+      const dynamicCount = await getProductsCountByContentTypeAndCompany("dynamic", debouncedSearchTerm)
       const totalCount = staticCount + dynamicCount
 
       setTotalItems(totalCount)
@@ -110,8 +113,13 @@ export default function AllSitesTab() {
         const startDoc = isFirstPage ? null : lastDoc
 
         // Get both static and dynamic products
-        const staticResult = await getProductsByContentType("static", ITEMS_PER_PAGE / 2, startDoc, debouncedSearchTerm)
-        const dynamicResult = await getProductsByContentType(
+        const staticResult = await getProductsByContentTypeAndCompany(
+          "static",
+          ITEMS_PER_PAGE / 2,
+          startDoc,
+          debouncedSearchTerm,
+        )
+        const dynamicResult = await getProductsByContentTypeAndCompany(
           "dynamic",
           ITEMS_PER_PAGE / 2,
           startDoc,
@@ -332,7 +340,7 @@ export default function AllSitesTab() {
         <div className="bg-red-50 border border-red-200 rounded-md p-4 text-center">
           <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
           <p className="text-red-700">{error}</p>
-          <Button variant="outline" className="mt-4" onClick={() => fetchProducts(1, true)}>
+          <Button variant="outline" className="mt-4 bg-transparent" onClick={() => fetchProducts(1, true)}>
             Try Again
           </Button>
         </div>
@@ -406,7 +414,7 @@ export default function AllSitesTab() {
               size="sm"
               onClick={goToPreviousPage}
               disabled={currentPage === 1}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 bg-transparent"
             >
               <ChevronLeft size={16} />
             </Button>
@@ -463,9 +471,8 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
     window.location.href = `/logistics/sites/${site.id}`
   }
 
-
-// Unified Site Card that shows all UI elements without conditions
-function UnifiedSiteCard({ site }: { site: any }) {
+  // Unified Site Card that shows all UI elements without conditions
+  // function UnifiedSiteCard({ site }: { site: any }) {
 
   return (
     <Card
