@@ -1082,20 +1082,43 @@ export async function generateReportPDF(
 
     yPosition += 15
 
-    // Add bottom footer with gradient background - exactly like preview
-    const footerY = pageHeight - 15 // Changed from 20 to 15
+    // Add bottom footer with diagonal gradient background - exactly like preview
+    const footerY = pageHeight - 15
+    const footerHeight = 15
+
+    // Create diagonal effect by drawing multiple thin rectangles
+    const steps = 50 // Number of steps for smooth diagonal
+    const diagonalWidth = pageWidth * 0.15 // Width of diagonal transition area
+
+    for (let i = 0; i < steps; i++) {
+      const progress = i / steps
+      const x = pageWidth * 0.25 + diagonalWidth * progress
+      const width = pageWidth / steps
+
+      // Interpolate between cyan and dark blue
+      const r = Math.round(52 + (30 - 52) * progress)
+      const g = Math.round(211 + (58 - 211) * progress)
+      const b = Math.round(235 + (138 - 235) * progress)
+
+      pdf.setFillColor(r, g, b)
+      pdf.rect(x, footerY, width + 1, footerHeight, "F")
+    }
+
+    // Fill the left side with cyan
     pdf.setFillColor(52, 211, 235) // Cyan
-    pdf.rect(0, footerY, pageWidth * 0.3, 15, "F") // Changed from 20 to 15
+    pdf.rect(0, footerY, pageWidth * 0.25, footerHeight, "F")
+
+    // Fill the right side with dark blue
     pdf.setFillColor(30, 58, 138) // Dark blue
-    pdf.rect(pageWidth * 0.3, footerY, pageWidth * 0.7, 15, "F") // Changed from 20 to 15
+    pdf.rect(pageWidth * 0.4, footerY, pageWidth * 0.6, footerHeight, "F")
 
     // Add footer text
     pdf.setTextColor(255, 255, 255)
-    pdf.setFontSize(7) // Reduced from 8 to 7
+    pdf.setFontSize(7)
     pdf.setFont("helvetica", "normal")
-    pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 50, footerY + 8) // Adjusted positioning
+    pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 50, footerY + 8)
     pdf.setFont("helvetica", "bold")
-    pdf.text("OH!", pageWidth - margin - 15, footerY + 12) // Adjusted positioning
+    pdf.text("OH!", pageWidth - margin - 10, footerY + 12)
 
     if (returnBase64) {
       return pdf.output("datauristring").split(",")[1]
