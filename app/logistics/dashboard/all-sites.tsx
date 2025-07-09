@@ -13,7 +13,7 @@ import { type Product, getPaginatedUserProducts } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { CreateReportDialog } from "@/components/create-report-dialog"
-import { useAuthContext } from "@/contexts/auth-context"
+import { useAuth } from "@/contexts/auth-context"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
@@ -43,8 +43,8 @@ export default function AllSitesTab() {
   const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
   const { toast } = useToast()
-  const { user } = useAuthContext()
-  const { userData } = useAuthContext()
+  const { user } = useAuth()
+  const { userData } = useAuth()
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
