@@ -1,25 +1,24 @@
 "use client"
 
-import { useEffect } from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type React from "react"
 import { useRouter } from "next/navigation"
-import { createProduct } from "@/lib/firebase-service"
+import { createProduct, getUserProductsCount } from "@/lib/firebase-service"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { ChevronDown, X, Check, Loader2 } from "lucide-react"
+import { ChevronDown, Upload, Trash2, ImageIcon, Film, X, Check, Loader2 } from "lucide-react"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
-import { collection, query, where, getDocs, serverTimestamp } from "firebase/firestore"
+import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/contexts/auth-context"
-import { Upload, Trash2, ImageIcon, Film } from "lucide-react"
+import { subscriptionService } from "@/lib/subscription-service"
 
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
@@ -42,10 +41,10 @@ interface Category {
   photo_url?: string
 }
 
-export default function CMSContentCreatePage() {
+export default function CMSContentNewPage() {
   const router = useRouter()
-  const { user, projectData } = useAuth()
-  const [contentTitle, setContentTitle] = useState("")
+  const { user, userData, subscriptionData } = useAuth()
+  const [productName, setProductName] = useState("")
   const [description, setDescription] = useState("")
   const [price, setPrice] = useState("")
   const [loading, setLoading] = useState(false)
@@ -69,7 +68,7 @@ export default function CMSContentCreatePage() {
     name: "",
     description: "",
     price: "",
-    content_type: "Static",
+    content_type: "Dynamic", // Default to Dynamic for CMS
     cms: {
       start_time: "",
       end_time: "",
@@ -262,6 +261,10 @@ export default function CMSContentCreatePage() {
   }
 
   const uploadMediaFiles = async () => {
+    if (mediaFiles.length === 0) {
+      return [] // Return empty array if no media files
+    }
+
     const storage = getStorage()
     const mediaData = []
 
@@ -270,14 +273,24 @@ export default function CMSContentCreatePage() {
       const isVideo = file.type.startsWith("video/")
 
       try {
+        // Create a unique filename to avoid conflicts
+        const timestamp = Date.now()
+        const randomString = Math.random().toString(36).substring(2, 15)
+        const fileExtension = file.name.split(".").pop()
+        const uniqueFileName = `${timestamp}_${randomString}.${fileExtension}`
+
         // Create a reference to the file in Firebase Storage
-        const fileRef = ref(storage, `content/${Date.now()}_${file.name}`)
+        const fileRef = ref(storage, `products/${uniqueFileName}`)
+
+        console.log(`Uploading file ${i + 1}/${mediaFiles.length}:`, file.name)
 
         // Upload the file
-        await uploadBytes(fileRef, file)
+        const snapshot = await uploadBytes(fileRef, file)
+        console.log(`File ${i + 1} uploaded successfully`)
 
         // Get the download URL
-        const url = await getDownloadURL(fileRef)
+        const url = await getDownloadURL(snapshot.ref)
+        console.log(`Download URL obtained for file ${i + 1}:`, url)
 
         // Add the media data
         mediaData.push({
@@ -287,11 +300,12 @@ export default function CMSContentCreatePage() {
           isVideo,
         })
       } catch (error) {
-        console.error(`Error uploading file ${i}:`, error)
-        throw new Error(`Failed to upload media file ${i + 1}`)
+        console.error(`Error uploading file ${i + 1}:`, error)
+        throw new Error(`Failed to upload media file "${file.name}". Please try again.`)
       }
     }
 
+    console.log("All media files uploaded successfully:", mediaData)
     return mediaData
   }
 
@@ -307,19 +321,27 @@ export default function CMSContentCreatePage() {
   // Enhanced validation function for dynamic content with detailed calculations
   const validateDynamicContent = () => {
     if (formData.content_type !== "Dynamic") {
+      setValidationError(null)
       return true
     }
 
     const { start_time, end_time, spot_duration, loops_per_day } = formData.cms
 
     if (!start_time || !end_time || !spot_duration || !loops_per_day) {
-      return true // Let required field validation handle this
+      setValidationError("All dynamic content fields are required.")
+      return false
     }
 
     try {
       // Parse start and end times
       const [startHour, startMinute] = start_time.split(":").map(Number)
       const [endHour, endMinute] = end_time.split(":").map(Number)
+
+      // Validate time format
+      if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
+        setValidationError("Invalid time format.")
+        return false
+      }
 
       // Convert to total minutes
       const startTotalMinutes = startHour * 60 + startMinute
@@ -333,13 +355,19 @@ export default function CMSContentCreatePage() {
       // Calculate duration in minutes, then convert to seconds
       const durationMinutes = endTotalMinutes - startTotalMinutes
       const durationSeconds = durationMinutes * 60
-      console.log(loops_per_day)
-      // Calculate total spot time needed per loop
+
+      // Parse numeric values
       const spotDurationNum = Number.parseInt(spot_duration)
       const spotsPerLoopNum = Number.parseInt(loops_per_day)
-      console.log(`spot duration: ${spotDurationNum} loop per day: ${spotsPerLoopNum}`)
+
+      if (isNaN(spotDurationNum) || isNaN(spotsPerLoopNum) || spotDurationNum <= 0 || spotsPerLoopNum <= 0) {
+        setValidationError("Spot duration and spots per loop must be positive numbers.")
+        return false
+      }
+
+      // Calculate total spot time needed per loop
       const totalSpotTimePerLoop = spotDurationNum * spotsPerLoopNum
-      console.log(`total seconds: ${totalSpotTimePerLoop}`)
+
       // Calculate how many complete loops can fit in the time duration
       const loopsResult = durationSeconds / totalSpotTimePerLoop
 
@@ -380,14 +408,14 @@ export default function CMSContentCreatePage() {
       const durationHours = Math.floor(durationMinutes / 60)
       const remainingMinutes = durationMinutes % 60
       const durationDisplay = durationHours > 0 ? `${durationHours}h ${remainingMinutes}m` : `${remainingMinutes}m`
-      console.log(loopsResult)
+
       setValidationError(
         `✓ Valid Configuration: ${Math.floor(loopsResult)} complete loops will fit in the ${durationDisplay} time period. ` +
           `Each loop uses ${totalSpotTimePerLoop}s (${spotDurationNum}s × ${spotsPerLoopNum} spots).`,
       )
       return true
     } catch (error) {
-      console.log(error)
+      console.error("Validation error:", error)
       setValidationError("Invalid time format or values.")
       return false
     }
@@ -396,45 +424,81 @@ export default function CMSContentCreatePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-
-    if (!user || !projectData) {
+    // Check if user is authenticated and has license key
+    if (!user || !userData?.license_key) {
       toast({
         title: "Authentication Error",
-        description: "User authentication required. Please log in again.",
+        description: "User not authenticated or license key not found.",
         variant: "destructive",
       })
       return
     }
 
-
-    if (!validateDynamicContent()) {
+    // Validate dynamic content if applicable
+    if (formData.content_type === "Dynamic" && !validateDynamicContent()) {
       toast({
         title: "Validation Error",
-        description: validationError,
+        description: "Please fix the dynamic content configuration errors.",
         variant: "destructive",
       })
       return
     }
 
     setLoading(true)
-    try {
-      const mediaData = await uploadMediaFiles()
+    setError(null)
 
-      const contentData = {
-        ...formData,
-        name: contentTitle,
+    try {
+      console.log("Starting content creation process...")
+      console.log("User ID:", user.uid)
+      console.log("User license key:", userData.license_key)
+
+      // Check subscription limits before creating content
+      if (!subscriptionData) {
+        console.log("No subscription data found, fetching...")
+        const subscription = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
+        if (!subscription) {
+          throw new Error("No active subscription found for this project.")
+        }
+        console.log("Subscription found:", subscription)
+      }
+
+      // Get the current count of non-deleted products for the user
+      const currentProductsCount = await getUserProductsCount(user.uid, { deleted: false })
+      console.log("Current products count:", currentProductsCount)
+
+      if (subscriptionData?.maxProducts !== null && currentProductsCount >= subscriptionData.maxProducts) {
+        throw new Error(
+          `Product limit reached. Your current plan allows up to ${subscriptionData.maxProducts} products.`,
+        )
+      }
+
+      // Upload media files first
+      console.log("Uploading media files...")
+      const mediaData = await uploadMediaFiles()
+      console.log("Media upload completed:", mediaData)
+
+      const contentType = formData.content_type === "Dynamic(LED)" ? "Dynamic" : formData.content_type
+
+      // Get user display name
+      const userName = userData.displayName || user.displayName || user.email || "Unknown User"
+
+      const productData = {
+        name: productName,
         description,
         price: Number.parseFloat(price),
+        content_type: contentType,
         media: mediaData,
         categories: selectedCategories,
         category_names: getCategoryNames(),
         active: true,
         deleted: false,
-        company_id: user.company_id || projectData.id,
-        created: serverTimestamp(),
-        updated: serverTimestamp(),
+        seller_id: user.uid,
+        seller_name: userName,
+        status: formData.status,
+        type: formData.type,
+        position: 0,
         cms:
-          formData.content_type === "Dynamic"
+          contentType === "Dynamic"
             ? {
                 start_time: formData.cms.start_time,
                 end_time: formData.cms.end_time,
@@ -454,20 +518,20 @@ export default function CMSContentCreatePage() {
         },
       }
 
-      // Get user display name
-      const userName = user.displayName || user.email || "Unknown User"
-
-      await createProduct(user.uid, userName, projectData.license_key, contentData)
+      console.log("Creating content with data:", productData)
+      await createProduct(productData)
 
       toast({
         title: "Content created",
         description: "Your content has been created successfully.",
       })
 
+      // Clean up object URLs to prevent memory leaks
+      mediaPreviewUrls.forEach((url) => URL.revokeObjectURL(url))
+
       router.push("/cms/dashboard")
     } catch (error) {
-      console.log(error)
-      console.error("Error creating content:")
+      console.error("Error creating content:", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to create content. Please try again."
       setError(errorMessage)
       toast({
@@ -496,8 +560,6 @@ export default function CMSContentCreatePage() {
     }))
   }
 
-  const isDynamicContent = formData.content_type === "Dynamic"
-
   return (
     <div className="flex min-h-[calc(100vh-theme(spacing.16))] flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8 md:p-10">
       <div className="mx-auto grid w-full max-w-6xl gap-2">
@@ -509,18 +571,18 @@ export default function CMSContentCreatePage() {
           <Card>
             <CardHeader>
               <CardTitle>Content Details</CardTitle>
-              <CardDescription>Enter the title, description, and details of the content.</CardDescription>
+              <CardDescription>Enter the name, description, and price of the content.</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="grid gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="contentTitle">Content Title</Label>
+                  <Label htmlFor="productName">Content Name</Label>
                   <Input
-                    id="contentTitle"
+                    id="productName"
                     type="text"
-                    placeholder="e.g., Summer Sale Campaign"
-                    value={contentTitle}
-                    onChange={(e) => setContentTitle(e.target.value)}
+                    placeholder="e.g., LED Billboard 10x20"
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
                     required
                   />
                 </div>
@@ -546,13 +608,11 @@ export default function CMSContentCreatePage() {
                     required
                   />
                 </div>
-
-                {/* Type Selection */}
                 <div className="grid gap-2">
-                  <Label htmlFor="type">Type</Label>
+                  <Label htmlFor="type">Content Type</Label>
                   <Select value={formData.content_type} onValueChange={handleContentTypeChange}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select type" />
+                      <SelectValue placeholder="Select content type" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Static">Static</SelectItem>
@@ -561,12 +621,12 @@ export default function CMSContentCreatePage() {
                   </Select>
                 </div>
 
-                {/* Dynamic Content Fields - Only show when Dynamic is selected */}
+                {/* Dynamic Content Settings */}
                 {formData.content_type === "Dynamic" && (
-                  <div className="space-y-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
-                    <h3 className="text-lg font-semibold text-gray-800">Dynamic Content Settings</h3>
+                  <section className="space-y-6 p-6 border border-gray-200 rounded-lg bg-white">
+                    <h3 className="text-xl font-semibold text-gray-800 border-b pb-3 mb-3">Dynamic Content Settings</h3>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <Label htmlFor="start_time">Start Time</Label>
                         <Input
@@ -574,10 +634,8 @@ export default function CMSContentCreatePage() {
                           name="cms.start_time"
                           type="time"
                           value={formData.cms.start_time}
-                          onChange={(e) => {
-                            handleInputChange(e)
-                          }}
-                          required={formData.content_type === "Dynamic"}
+                          onChange={handleInputChange}
+                          required
                         />
                       </div>
 
@@ -588,10 +646,8 @@ export default function CMSContentCreatePage() {
                           name="cms.end_time"
                           type="time"
                           value={formData.cms.end_time}
-                          onChange={(e) => {
-                            handleInputChange(e)
-                          }}
-                          required={formData.content_type === "Dynamic"}
+                          onChange={handleInputChange}
+                          required
                         />
                       </div>
 
@@ -602,11 +658,9 @@ export default function CMSContentCreatePage() {
                           name="cms.spot_duration"
                           type="number"
                           value={formData.cms.spot_duration}
-                          onChange={(e) => {
-                            handleInputChange(e)
-                          }}
+                          onChange={handleInputChange}
                           placeholder="Enter duration in seconds"
-                          required={formData.content_type === "Dynamic"}
+                          required
                         />
                       </div>
 
@@ -617,11 +671,9 @@ export default function CMSContentCreatePage() {
                           name="cms.loops_per_day"
                           type="number"
                           value={formData.cms.loops_per_day}
-                          onChange={(e) => {
-                            handleInputChange(e)
-                          }}
+                          onChange={handleInputChange}
                           placeholder="Enter spots per loop"
-                          required={formData.content_type === "Dynamic"}
+                          required
                         />
                       </div>
                     </div>
@@ -641,7 +693,7 @@ export default function CMSContentCreatePage() {
                         <pre className="text-xs whitespace-pre-wrap font-mono">{validationError}</pre>
                       </div>
                     )}
-                  </div>
+                  </section>
                 )}
 
                 <section className="space-y-6 p-6 border border-gray-200 rounded-lg bg-white">
@@ -907,19 +959,25 @@ export default function CMSContentCreatePage() {
                   )}
                 </section>
 
-                <CardFooter className="flex justify-end p-0 pt-4">
-                  <Button type="submit" disabled={loading}>
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...
-                      </>
-                    ) : (
-                      "Create Content"
-                    )}
-                  </Button>
-                </CardFooter>
+                {error && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-red-800 text-sm">{error}</p>
+                  </div>
+                )}
               </form>
             </CardContent>
+            <CardFooter>
+              <Button type="submit" onClick={handleSubmit} disabled={loading} className="w-full">
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating Content...
+                  </>
+                ) : (
+                  "Create Content"
+                )}
+              </Button>
+            </CardFooter>
           </Card>
         </div>
       </div>

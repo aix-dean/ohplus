@@ -58,6 +58,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { LoopTimeline } from "@/components/loop-timeline"
 
 // Mock data for ad spots
 const adSpots = [
@@ -490,7 +491,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
         newDate.setMonth(currentDate.getMonth() - 1)
         break
       case "week":
-        newDate.setDate(currentDate.getDate() - 7)
+        newDate.setDate(currentDate.getDate() - currentDate.getDay())
         break
       case "day":
         newDate.setDate(currentDate.getDate() - 1)
@@ -965,19 +966,19 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
                     {intervalSpots.map((spot, i) => (
                       <div
                         key={`spot-${interval}-${i}`}
-                        className={`flex-1 min-w-[80px] sm:min-w-[150px] p-1 sm:p-2 rounded ${getStatusColor(spot.status)} shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-opacity-80`}
+                        className={`flex-1 min-w-[70px] sm:min-w-[120px] p-1 rounded ${getStatusColor(spot.status)} shadow-sm text-[8px] sm:text-[10px] cursor-pointer hover:bg-opacity-80`}
                       >
                         <div className="font-medium truncate">{spot.name}</div>
                         <div className="flex items-center justify-between mt-0 sm:mt-1">
-                          <Badge variant="outline" className="text-[8px] sm:text-[10px] px-1">
+                          <Badge variant="outline" className="text-[6px] sm:text-[8px] px-1">
                             {spot.status}
                           </Badge>
-                          <span className="text-[8px] sm:text-[10px]">{formatTime(spot.start)}</span>
+                          <span className="text-[6px] sm:text-[8px]">{formatTime(spot.start)}</span>
                         </div>
                       </div>
                     ))}
                     {intervalSpots.length === 0 && (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-[8px] sm:text-xs">
+                      <div className="w-full h-full flex items-center justify-center text-gray-400 text-[8px] sm:text-[10px]">
                         No programs in this time slot
                       </div>
                     )}
@@ -1037,7 +1038,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
                 new Date().getMinutes() === minute &&
                 new Date().getDate() === time.getDate() &&
                 new Date().getMonth() === time.getMonth() &&
-                new Date().getFullYear() === time.getFullYear()
+                new Date().getFullYear() === new Date().getFullYear()
 
               return (
                 <div
@@ -1107,7 +1108,11 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
       <div className="flex flex-col gap-4 sm:gap-6">
         {/* Header with back button and actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full">
-          <Button variant="outline" onClick={handleBack} className="flex items-center gap-2 w-full sm:w-auto">
+          <Button
+            variant="outline"
+            onClick={handleBack}
+            className="flex items-center gap-2 w-full sm:w-auto bg-transparent"
+          >
             <ArrowLeft size={16} />
             Back to Dashboard
           </Button>
@@ -1303,7 +1308,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
           onValueChange={setActiveTab}
           className="w-full"
         >
-          <TabsList className="grid grid-cols-3 mb-6 w-full overflow-x-auto">
+          <TabsList className="grid grid-cols-4 mb-6 w-full overflow-x-auto">
             <TabsTrigger value="adSpots" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4">
               <Calendar size={16} />
               <span className="text-xs sm:text-sm">Program List</span>
@@ -1315,6 +1320,10 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
             <TabsTrigger value="remoteControls" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4">
               <Monitor size={16} />
               <span className="text-xs sm:text-sm">Controls</span>
+            </TabsTrigger>
+            <TabsTrigger value="loopTimeline" className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4">
+              <Clock size={16} />
+              <span className="text-xs sm:text-sm">Loop Timeline</span>
             </TabsTrigger>
           </TabsList>
 
@@ -1422,7 +1431,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
 
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="outline" className="flex items-center gap-2">
+                              <Button variant="outline" className="flex items-center gap-2 bg-transparent">
                                 <Filter size={16} />
                                 <span className="hidden sm:inline">Filter</span>
                               </Button>
@@ -1436,7 +1445,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
                           </DropdownMenu>
                         </div>
 
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
                           <Tabs
                             defaultValue="month"
                             value={calendarView}
@@ -1793,7 +1802,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12"
+                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
                         onClick={handlePowerToggle}
                         disabled={isPerformingAction}
                       >
@@ -1803,7 +1812,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
 
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12"
+                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
                         onClick={handleReboot}
                         disabled={isPerformingAction}
                       >
@@ -1819,7 +1828,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12"
+                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
                         onClick={handlePlayPause}
                         disabled={isPerformingAction}
                       >
@@ -1829,7 +1838,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
 
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12"
+                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
                         onClick={handleVideoSourceSwitch}
                         disabled={isPerformingAction}
                       >
@@ -1845,7 +1854,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12"
+                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
                         onClick={handleTimeSync}
                         disabled={isPerformingAction}
                       >
@@ -1855,7 +1864,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
 
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12"
+                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
                         onClick={handleScreenRefresh}
                         disabled={isPerformingAction}
                       >
@@ -1871,7 +1880,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12"
+                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
                         onClick={handleScreenshot}
                         disabled={isPerformingAction}
                       >
@@ -1881,7 +1890,7 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
 
                       <Button
                         variant="outline"
-                        className="flex items-center justify-center gap-2 h-12"
+                        className="flex items-center justify-center gap-2 h-12 bg-transparent"
                         onClick={handleRefresh}
                         disabled={isPerformingAction}
                       >
@@ -1938,6 +1947,20 @@ export default function ProductDetailsPage({ params }: { params: { id: string } 
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+          {/* Loop Timeline Tab */}
+          <TabsContent value="loopTimeline">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock size={18} />
+                  Loop Timeline
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {product.cms ? <LoopTimeline cmsData={product.cms} /> : <p>No CMS data available for this product.</p>}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
