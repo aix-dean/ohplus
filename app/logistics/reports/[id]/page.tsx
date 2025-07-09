@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, FileText, ImageIcon, Video, File } from "lucide-react"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn } from "lucide-react"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
@@ -17,6 +18,8 @@ export default function ReportPreviewPage() {
   const [report, setReport] = useState<ReportData | null>(null)
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
+  const [fullScreenAttachment, setFullScreenAttachment] = useState<any>(null)
+  const [isFullScreenOpen, setIsFullScreenOpen] = useState(false)
   const { user } = useAuth()
 
   useEffect(() => {
@@ -99,6 +102,31 @@ export default function ReportPreviewPage() {
     if (!fileName) return false
     const extension = fileName.toLowerCase().split(".").pop()
     return ["mp4", "avi", "mov", "wmv"].includes(extension || "")
+  }
+
+  const isPdfFile = (fileName: string) => {
+    if (!fileName) return false
+    const extension = fileName.toLowerCase().split(".").pop()
+    return extension === "pdf"
+  }
+
+  const openFullScreen = (attachment: any) => {
+    setFullScreenAttachment(attachment)
+    setIsFullScreenOpen(true)
+  }
+
+  const closeFullScreen = () => {
+    setIsFullScreenOpen(false)
+    setFullScreenAttachment(null)
+  }
+
+  const downloadFile = (fileUrl: string, fileName: string) => {
+    const link = document.createElement("a")
+    link.href = fileUrl
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   const handleBack = () => {
@@ -235,9 +263,17 @@ export default function ReportPreviewPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {report.attachments.slice(0, 2).map((attachment, index) => (
                 <div key={index} className="space-y-2">
-                  <div className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden">
+                  <div
+                    className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
+                    onClick={() => attachment.fileUrl && openFullScreen(attachment)}
+                  >
                     {attachment.fileUrl ? (
-                      <div className="w-full h-full flex flex-col items-center justify-center">
+                      <div className="w-full h-full flex flex-col items-center justify-center relative">
+                        {/* Zoom overlay */}
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
+                          <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                        </div>
+
                         {isImageFile(attachment.fileName || "") ? (
                           <img
                             src={attachment.fileUrl || "/placeholder.svg"}
@@ -261,7 +297,6 @@ export default function ReportPreviewPage() {
                         ) : isVideoFile(attachment.fileName || "") ? (
                           <video
                             src={attachment.fileUrl}
-                            controls
                             className="max-w-full max-h-full object-contain rounded"
                             onError={(e) => {
                               // Fallback to icon if video fails to load
@@ -287,6 +322,7 @@ export default function ReportPreviewPage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-xs text-blue-600 hover:text-blue-800 underline"
+                              onClick={(e) => e.stopPropagation()}
                             >
                               Open File
                             </a>
@@ -348,6 +384,97 @@ export default function ReportPreviewPage() {
       <div className="w-full mt-8">
         <img src="/logistics-footer.png" alt="Logistics Footer" className="w-full h-auto object-cover" />
       </div>
+
+      {/* Full Screen Preview Dialog */}
+      <Dialog open={isFullScreenOpen} onOpenChange={setIsFullScreenOpen}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0 bg-black">
+          <div className="relative w-full h-full flex flex-col">
+            {/* Header with controls */}
+            <div className="absolute top-0 left-0 right-0 z-10 bg-black bg-opacity-75 p-4 flex justify-between items-center">
+              <DialogTitle className="text-white text-lg font-medium">
+                {fullScreenAttachment?.fileName || "File Preview"}
+              </DialogTitle>
+              <div className="flex items-center gap-2">
+                {fullScreenAttachment?.fileUrl && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => downloadFile(fullScreenAttachment.fileUrl, fullScreenAttachment.fileName || "file")}
+                    className="text-white hover:bg-white hover:bg-opacity-20"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={closeFullScreen}
+                  className="text-white hover:bg-white hover:bg-opacity-20"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 flex items-center justify-center p-4 pt-16">
+              {fullScreenAttachment?.fileUrl ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  {isImageFile(fullScreenAttachment.fileName || "") ? (
+                    <img
+                      src={fullScreenAttachment.fileUrl || "/placeholder.svg"}
+                      alt={fullScreenAttachment.fileName || "Full screen preview"}
+                      className="max-w-full max-h-full object-contain"
+                    />
+                  ) : isVideoFile(fullScreenAttachment.fileName || "") ? (
+                    <video
+                      src={fullScreenAttachment.fileUrl}
+                      controls
+                      className="max-w-full max-h-full object-contain"
+                      autoPlay
+                    />
+                  ) : isPdfFile(fullScreenAttachment.fileName || "") ? (
+                    <iframe
+                      src={fullScreenAttachment.fileUrl}
+                      className="w-full h-full border-0"
+                      title={fullScreenAttachment.fileName || "PDF Preview"}
+                    />
+                  ) : (
+                    <div className="text-center text-white space-y-4">
+                      {getFileIcon(fullScreenAttachment.fileName || "")}
+                      <div>
+                        <p className="text-lg font-medium">{fullScreenAttachment.fileName}</p>
+                        <p className="text-sm text-gray-300 mt-2">Preview not available for this file type</p>
+                        <Button
+                          variant="outline"
+                          className="mt-4 bg-transparent"
+                          onClick={() =>
+                            downloadFile(fullScreenAttachment.fileUrl, fullScreenAttachment.fileName || "file")
+                          }
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Download File
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center text-white">
+                  <p>File not available</p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer with file info */}
+            {fullScreenAttachment?.note && (
+              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-75 p-4">
+                <p className="text-white text-sm italic text-center">"{fullScreenAttachment.note}"</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
