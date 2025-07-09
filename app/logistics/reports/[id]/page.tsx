@@ -78,11 +78,16 @@ export default function ReportPreviewPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-900 to-cyan-400 text-white p-6">
+      <div className="bg-gradient-to-r from-blue-900 via-blue-700 to-cyan-400 text-white p-6">
         <div className="flex justify-between items-center max-w-6xl mx-auto">
-          <h1 className="text-2xl font-bold">Logistics</h1>
-          <div className="w-24 h-12 bg-yellow-400 rounded-full flex items-center justify-center">
-            <span className="text-black font-bold text-sm">GTS</span>
+          <h1 className="text-3xl font-bold">Logistics</h1>
+          <div className="relative">
+            <div className="w-32 h-16 bg-gradient-to-b from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center border-4 border-yellow-300 shadow-lg">
+              <div className="text-center">
+                <div className="text-black font-bold text-xl leading-tight">GTS</div>
+                <div className="text-black text-xs font-semibold">INCORPORATED</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -230,12 +235,18 @@ export default function ReportPreviewPage() {
       </div>
 
       {/* Bottom Branding */}
-      <div className="bg-gradient-to-r from-cyan-400 to-blue-900 text-white p-4 mt-8">
+      <div className="bg-gradient-to-r from-cyan-400 via-blue-600 to-blue-900 text-white p-6 mt-8">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <span className="text-sm">Smart. Seamless. Scalable</span>
-          <div className="flex items-center gap-2">
-            <span className="font-bold">OH!</span>
-            <div className="w-6 h-6 bg-white rounded"></div>
+          <span className="text-lg font-medium">Smart. Seamless. Scalable</span>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <div className="text-2xl font-bold">OH</div>
+              <div className="text-xs font-medium -mt-1">PLUS</div>
+            </div>
+            <div className="w-8 h-8 bg-white rounded-sm flex items-center justify-center">
+              <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-sm"></div>
+            </div>
+            <div className="text-xs font-medium">+</div>
           </div>
         </div>
       </div>
