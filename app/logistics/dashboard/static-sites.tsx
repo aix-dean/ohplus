@@ -16,6 +16,7 @@ import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { getServiceAssignmentsByProductId } from "@/lib/firebase-service"
 import type { ServiceAssignment } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
@@ -28,6 +29,10 @@ export default function StaticSitesTab() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
+
+  // Dialog state
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [selectedSite, setSelectedSite] = useState<any>(null)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -265,6 +270,12 @@ export default function StaticSitesTab() {
     }
   }
 
+  // Handle create report click
+  const handleCreateReport = (site: any) => {
+    setSelectedSite(site)
+    setReportDialogOpen(true)
+  }
+
   // Show loading if no user
   if (!user) {
     return (
@@ -376,13 +387,13 @@ export default function StaticSitesTab() {
             return (
               <Link href={`/logistics/sites/${site.id}${getViewQueryParam(contentTab)}`} key={site.id}>
                 {contentTab === "illumination" ? (
-                  <IlluminationCard site={site} />
+                  <IlluminationCard site={site} onCreateReport={handleCreateReport} />
                 ) : contentTab === "structure" ? (
-                  <StructureCard site={site} />
+                  <StructureCard site={site} onCreateReport={handleCreateReport} />
                 ) : contentTab === "compliance" ? (
-                  <ComplianceCard site={site} />
+                  <ComplianceCard site={site} onCreateReport={handleCreateReport} />
                 ) : (
-                  <SiteCard site={site} />
+                  <SiteCard site={site} onCreateReport={handleCreateReport} />
                 )}
               </Link>
             )
@@ -460,12 +471,15 @@ export default function StaticSitesTab() {
           </div>
         </div>
       )}
+
+      {/* Create Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteData={selectedSite} />
     </div>
   )
 }
 
 // Update the SiteCard component to fetch its own service assignments
-function SiteCard({ site }: { site: any }) {
+function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (site: any) => void }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
 
@@ -473,7 +487,7 @@ function SiteCard({ site }: { site: any }) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    console.log("Creating report for site:", site.id)
+    onCreateReport(site)
   }
 
   // Fetch service assignments for this specific product
@@ -552,7 +566,7 @@ function SiteCard({ site }: { site: any }) {
 }
 
 // Update the IlluminationCard, StructureCard, and ComplianceCard components similarly
-function IlluminationCard({ site }: { site: any }) {
+function IlluminationCard({ site, onCreateReport }: { site: any; onCreateReport: (site: any) => void }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
 
@@ -560,7 +574,7 @@ function IlluminationCard({ site }: { site: any }) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    console.log("Creating report for site:", site.id)
+    onCreateReport(site)
   }
 
   // Fetch service assignments for this specific product
@@ -628,7 +642,7 @@ function IlluminationCard({ site }: { site: any }) {
   )
 }
 
-function StructureCard({ site }: { site: any }) {
+function StructureCard({ site, onCreateReport }: { site: any; onCreateReport: (site: any) => void }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
 
@@ -636,7 +650,7 @@ function StructureCard({ site }: { site: any }) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    console.log("Creating report for site:", site.id)
+    onCreateReport(site)
   }
 
   // Fetch service assignments for this specific product
@@ -712,7 +726,7 @@ function StructureCard({ site }: { site: any }) {
   )
 }
 
-function ComplianceCard({ site }: { site: any }) {
+function ComplianceCard({ site, onCreateReport }: { site: any; onCreateReport: (site: any) => void }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
 
@@ -720,7 +734,7 @@ function ComplianceCard({ site }: { site: any }) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    console.log("Creating report for site:", site.id)
+    onCreateReport(site)
   }
 
   // Fetch service assignments for this specific product

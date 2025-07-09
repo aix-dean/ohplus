@@ -10,9 +10,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import type { Product } from "@/lib/firebase-service"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 
 export default function LEDSitesComplianceTab({ products = [] }: { products?: Product[] }) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+
+  // Dialog state
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [selectedSite, setSelectedSite] = useState<any>(null)
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -32,6 +37,12 @@ export default function LEDSitesComplianceTab({ products = [] }: { products?: Pr
   const nonCompliantCount = products.filter((p) => getComplianceStatus(p) === "Non-Compliant").length
 
   const compliancePercentage = products.length > 0 ? Math.round((compliantCount / products.length) * 100) : 0
+
+  // Handle create report click
+  const handleCreateReport = (site: any) => {
+    setSelectedSite(site)
+    setReportDialogOpen(true)
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -66,7 +77,7 @@ export default function LEDSitesComplianceTab({ products = [] }: { products?: Pr
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
         {products.map((product) => (
           <Link href={`/logistics/sites/${product.id}?view=compliance`} key={product.id}>
-            <ComplianceCard product={product} />
+            <ComplianceCard product={product} onCreateReport={handleCreateReport} />
           </Link>
         ))}
       </div>
@@ -78,11 +89,14 @@ export default function LEDSitesComplianceTab({ products = [] }: { products?: Pr
           Create Service Assignment
         </Button>
       </div>
+
+      {/* Create Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteData={selectedSite} />
     </div>
   )
 }
 
-function ComplianceCard({ product }: { product: Product }) {
+function ComplianceCard({ product, onCreateReport }: { product: Product; onCreateReport: (site: any) => void }) {
   // Get the first media item for the thumbnail
   const thumbnailUrl = product.media && product.media.length > 0 ? product.media[0].url : "/led-billboard-1.png"
 
@@ -90,7 +104,15 @@ function ComplianceCard({ product }: { product: Product }) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    console.log("Creating report for LED site:", product.id)
+    const siteData = {
+      id: product.id,
+      name: product.name || "Unknown Site",
+      client: "Summit Media",
+      bookingDates: "May 20, 2025 to June 20, 2025",
+      breakdate: "May 20, 2025",
+      sales: "Noemi Abellaneda",
+    }
+    onCreateReport(siteData)
   }
 
   // Generate compliance data (for demo purposes)

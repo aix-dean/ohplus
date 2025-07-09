@@ -10,9 +10,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import type { Product } from "@/lib/firebase-service"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 
 export default function LEDSitesDisplayHealthTab({ products = [] }: { products?: Product[] }) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+
+  // Dialog state
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [selectedSite, setSelectedSite] = useState<any>(null)
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -52,6 +57,12 @@ export default function LEDSitesDisplayHealthTab({ products = [] }: { products?:
     else healthyCounts.critical++
   })
 
+  // Handle create report click
+  const handleCreateReport = (site: any) => {
+    setSelectedSite(site)
+    setReportDialogOpen(true)
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {/* Date and View Toggle */}
@@ -85,7 +96,7 @@ export default function LEDSitesDisplayHealthTab({ products = [] }: { products?:
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
         {products.map((product) => (
           <Link href={`/logistics/sites/${product.id}?view=display-health`} key={product.id}>
-            <LEDHealthCard key={product.id} product={product} />
+            <LEDHealthCard key={product.id} product={product} onCreateReport={handleCreateReport} />
           </Link>
         ))}
       </div>
@@ -97,12 +108,15 @@ export default function LEDSitesDisplayHealthTab({ products = [] }: { products?:
           Create Service Assignment
         </Button>
       </div>
+
+      {/* Create Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteData={selectedSite} />
     </div>
   )
 }
 
 // Update the LEDHealthCard to use Product type
-function LEDHealthCard({ product }: { product: Product }) {
+function LEDHealthCard({ product, onCreateReport }: { product: Product; onCreateReport: (site: any) => void }) {
   // Get the first media item for the thumbnail
   const thumbnailUrl = product.media && product.media.length > 0 ? product.media[0].url : "/led-billboard-1.png"
 
@@ -110,7 +124,15 @@ function LEDHealthCard({ product }: { product: Product }) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    console.log("Creating report for LED site:", product.id)
+    const siteData = {
+      id: product.id,
+      name: product.name || "Unknown Site",
+      client: "Summit Media",
+      bookingDates: "May 20, 2025 to June 20, 2025",
+      breakdate: "May 20, 2025",
+      sales: "Noemi Abellaneda",
+    }
+    onCreateReport(siteData)
   }
 
   // Generate a health percentage based on status if not available

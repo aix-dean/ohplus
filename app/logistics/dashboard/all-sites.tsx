@@ -14,6 +14,7 @@ import { Progress } from "@/components/ui/progress"
 import { getProductsByContentType, getProductsCountByContentType, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
@@ -25,6 +26,10 @@ export default function AllSitesTab() {
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
+
+  // Dialog state
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [selectedSite, setSelectedSite] = useState<any>(null)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -274,6 +279,12 @@ export default function AllSitesTab() {
     }
   }
 
+  // Handle create report click
+  const handleCreateReport = (site: any) => {
+    setSelectedSite(site)
+    setReportDialogOpen(true)
+  }
+
   return (
     <div className="flex flex-col gap-5">
       {/* Date, Search and View Toggle */}
@@ -361,7 +372,7 @@ export default function AllSitesTab() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
           {products.map((product) => (
             <Link href={`/logistics/sites/${product.id}`} key={product.id}>
-              <UnifiedSiteCard site={productToSite(product)} />
+              <UnifiedSiteCard site={productToSite(product)} onCreateReport={handleCreateReport} />
             </Link>
           ))}
         </div>
@@ -437,18 +448,19 @@ export default function AllSitesTab() {
           </div>
         </div>
       )}
+
+      {/* Create Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteData={selectedSite} />
     </div>
   )
 }
 
 // Unified Site Card that shows all UI elements with Create Report button
-function UnifiedSiteCard({ site }: { site: any }) {
+function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (site: any) => void }) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    // Add report creation logic here
-    console.log("Creating report for site:", site.id)
-    // You can add toast notification or redirect to report creation page
+    onCreateReport(site)
   }
 
   return (
