@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { createReport, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
+import { useRouter } from "next/navigation"
 
 interface CreateReportDialogProps {
   open: boolean
@@ -32,6 +33,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   const [previewModal, setPreviewModal] = useState<{ open: boolean; file?: File; preview?: string }>({ open: false })
   const { toast } = useToast()
   const { user, userData, projectData } = useAuth()
+  const router = useRouter()
 
   // Fetch product data when dialog opens
   useEffect(() => {
@@ -246,7 +248,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         tags: [reportType, product.content_type || "general"].filter(Boolean),
       }
 
-      await createReport(reportData)
+      const reportId = await createReport(reportData)
 
       toast({
         title: "Success",
@@ -258,6 +260,9 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       setReportType("completion-report")
       setDate("")
       setAttachments([{ note: "" }, { note: "" }])
+
+      // Navigate to the report preview page
+      router.push(`/logistics/reports/${reportId}`)
     } catch (error) {
       console.error("Error creating report:", error)
       toast({
