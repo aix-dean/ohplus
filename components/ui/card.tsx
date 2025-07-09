@@ -3,7 +3,7 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
-import { MoreVertical, Edit, Bell, ChevronLeft } from "lucide-react"
+import { MoreVertical, Edit, Bell } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 
@@ -60,26 +60,9 @@ const CardDescription = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
 )
 CardDescription.displayName = "CardDescription"
 
-const CardContent = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { showProjectHeader?: boolean; projectSiteName?: string }
->(({ className, showProjectHeader = false, projectSiteName = "Project Site Name", ...props }, ref) => (
-  <div ref={ref} className={cn("p-2 pt-0 rounded-md", className)} {...props}>
-    {showProjectHeader && (
-      <div className="flex items-center gap-4 mb-6 p-4">
-        <Button variant="outline" size="sm" onClick={() => window.history.back()} className="flex items-center gap-2">
-          <ChevronLeft className="h-4 w-4" />
-          Back
-        </Button>
-        <div>
-          <h1 className="text-lg font-semibold text-gray-900">{projectSiteName}</h1>
-          <p className="text-sm text-gray-500">Service Assignment Details</p>
-        </div>
-      </div>
-    )}
-    {props.children}
-  </div>
-))
+const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => <div ref={ref} className={cn("p-2 pt-0 rounded-md", className)} {...props} />,
+)
 CardContent.displayName = "CardContent"
 
 const CardContentInner = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(

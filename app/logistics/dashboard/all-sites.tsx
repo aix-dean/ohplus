@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useCallback } from "react"
 import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import Image from "next/image"
@@ -7,8 +9,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Progress } from "@/components/ui/progress"
-import { getProductsByContentType, getProductsCountByContentType, type Product } from "@/lib/firebase-service"
+import {
+  getProductsByContentTypeAndCompany,
+  getProductsCountByContentTypeAndCompany,
+  type Product,
+} from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { CreateReportDialog } from "@/components/create-report-dialog"
@@ -76,8 +81,8 @@ export default function AllSitesTab() {
     setLoadingCount(true)
     try {
       // For all sites, we'll get both static and dynamic content types and combine them
-      const staticCount = await getProductsCountByContentType("static", debouncedSearchTerm)
-      const dynamicCount = await getProductsCountByContentType("dynamic", debouncedSearchTerm)
+      const staticCount = await getProductsCountByContentTypeAndCompany("static", debouncedSearchTerm)
+      const dynamicCount = await getProductsCountByContentTypeAndCompany("dynamic", debouncedSearchTerm)
       const totalCount = staticCount + dynamicCount
 
       setTotalItems(totalCount)
@@ -110,8 +115,13 @@ export default function AllSitesTab() {
         const startDoc = isFirstPage ? null : lastDoc
 
         // Get both static and dynamic products
-        const staticResult = await getProductsByContentType("static", ITEMS_PER_PAGE / 2, startDoc, debouncedSearchTerm)
-        const dynamicResult = await getProductsByContentType(
+        const staticResult = await getProductsByContentTypeAndCompany(
+          "static",
+          ITEMS_PER_PAGE / 2,
+          startDoc,
+          debouncedSearchTerm,
+        )
+        const dynamicResult = await getProductsByContentTypeAndCompany(
           "dynamic",
           ITEMS_PER_PAGE / 2,
           startDoc,
@@ -263,16 +273,33 @@ export default function AllSitesTab() {
           : // 50-80 for warning
             Math.floor(Math.random() * 40) + 10) // 10-50 for error
 
+    // Extract address information from different possible locations
+    const address =
+      product.specs_rental?.location ||
+      product.light?.location ||
+      product.location ||
+      product.address ||
+      "Address not specified"
+
     return {
       id: product.id,
-      name: product.name,
-      status: product.status,
+      name: product.name || `Site ${product.id.substring(0, 8)}`,
+      status: product.status || "UNKNOWN",
       statusColor,
       image,
       notifications,
-      location: product.specs_rental?.location || product.light?.location || "Unknown location",
+      address,
       contentType: product.content_type || "static",
       healthPercentage,
+      siteCode: product.site_code || product.id.substring(0, 8),
+      operationalStatus:
+        product.status === "ACTIVE" || product.status === "OCCUPIED"
+          ? "Operational"
+          : product.status === "MAINTENANCE" || product.status === "REPAIR"
+            ? "Under Maintenance"
+            : product.status === "PENDING" || product.status === "INSTALLATION"
+              ? "Pending Setup"
+              : "Inactive",
     }
   }
 
@@ -332,7 +359,7 @@ export default function AllSitesTab() {
         <div className="bg-red-50 border border-red-200 rounded-md p-4 text-center">
           <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
           <p className="text-red-700">{error}</p>
-          <Button variant="outline" className="mt-4" onClick={() => fetchProducts(1, true)}>
+          <Button variant="outline" className="mt-4 bg-transparent" onClick={() => fetchProducts(1, true)}>
             Try Again
           </Button>
         </div>
@@ -406,7 +433,7 @@ export default function AllSitesTab() {
               size="sm"
               onClick={goToPreviousPage}
               disabled={currentPage === 1}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 bg-transparent"
             >
               <ChevronLeft size={16} />
             </Button>
@@ -463,9 +490,30 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
     window.location.href = `/logistics/sites/${site.id}`
   }
 
+  // Generate mock data for demonstration - replace with real data from your backend
+  const getDisplayHealth = () => {
+    if (site.healthPercentage > 90) return "100%"
+    if (site.healthPercentage > 80) return "90%"
+    if (site.healthPercentage > 60) return "75%"
+    return "50%"
+  }
 
-// Unified Site Card that shows all UI elements without conditions
-function UnifiedSiteCard({ site }: { site: any }) {
+  const getIlluminationStatus = () => {
+    return site.operationalStatus === "Operational" ? "ON" : "OFF"
+  }
+
+  const getComplianceStatus = () => {
+    return site.operationalStatus === "Operational" ? "Complete" : "Incomplete"
+  }
+
+  const getContentInfo = () => {
+    // Mock content based on site type
+    if (site.contentType === "dynamic") {
+      const contents = ["Leon", "Lilo and Stitch", "Marvel Heroes", "Nike Campaign"]
+      return contents[Math.floor(Math.random() * contents.length)]
+    }
+    return "Static Billboard"
+  }
 
   return (
     <Card
@@ -490,71 +538,146 @@ function UnifiedSiteCard({ site }: { site: any }) {
           </div>
         )}
 
-        {/* Content Type Badge */}
+        {/* Status Badge */}
         <div className="absolute top-2 left-2">
           <Badge
             variant="outline"
             className={`
-              ${site.contentType === "dynamic" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-amber-50 text-amber-700 border-amber-200"}
+              ${site.operationalStatus === "Operational" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
+              ${site.operationalStatus === "Under Maintenance" ? "bg-red-50 text-red-700 border-red-200" : ""}
+              ${site.operationalStatus === "Pending Setup" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
+              ${site.operationalStatus === "Inactive" ? "bg-gray-50 text-gray-700 border-gray-200" : ""}
             `}
           >
-            {site.contentType === "dynamic" ? "Digital" : "Static"}
+            {site.operationalStatus === "Operational"
+              ? "OPEN"
+              : site.operationalStatus === "Under Maintenance"
+                ? "OCCUPIED"
+                : site.operationalStatus === "Pending Setup"
+                  ? "OCCUPIED"
+                  : "CLOSED"}
           </Badge>
         </div>
       </div>
 
       <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-semibold">{site.name}</h3>
+        <div className="flex flex-col gap-2">
+          {/* Site Name */}
+          <h3 className="font-semibold text-lg text-gray-900">{site.name}</h3>
 
-          <div className="text-sm text-gray-500 mt-1">{site.location}</div>
+          {/* Site ID */}
+          <div className="text-sm text-gray-600 mb-2">
+            <span className="font-medium">ID:</span> {site.siteCode}
+          </div>
 
-          {/* Status Badge */}
-          <div className="mt-2 flex items-center gap-2">
-            <div className="text-sm font-medium">Status:</div>
-            <Badge
-              variant="outline"
-              className={`
-                ${site.statusColor === "green" ? "bg-green-50 text-green-700 border-green-200" : ""}
-                ${site.statusColor === "blue" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
-                ${site.statusColor === "red" ? "bg-red-50 text-red-700 border-red-200" : ""}
-                ${site.statusColor === "orange" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
-              `}
+          {/* Site Information Section */}
+          <div className="space-y-2 py-2">
+            {/* Operation Status */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-700">Operation:</span>
+              <span
+                className={`text-sm font-semibold ${
+                  site.operationalStatus === "Operational"
+                    ? "text-green-600"
+                    : site.operationalStatus === "Under Maintenance"
+                      ? "text-red-600"
+                      : site.operationalStatus === "Pending Setup"
+                        ? "text-orange-600"
+                        : "text-gray-600"
+                }`}
+              >
+                {site.operationalStatus === "Operational"
+                  ? "Active"
+                  : site.operationalStatus === "Under Maintenance"
+                    ? "Maintenance"
+                    : site.operationalStatus === "Pending Setup"
+                      ? "Pending"
+                      : "Inactive"}
+              </span>
+            </div>
+
+            {/* Display Health */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-700">Display Health:</span>
+              <span
+                className={`text-sm font-semibold ${
+                  site.healthPercentage > 80
+                    ? "text-green-600"
+                    : site.healthPercentage > 60
+                      ? "text-yellow-600"
+                      : "text-red-600"
+                }`}
+              >
+                {site.healthPercentage > 90
+                  ? "100%"
+                  : site.healthPercentage > 80
+                    ? "90%"
+                    : site.healthPercentage > 60
+                      ? "75%"
+                      : "50%"}
+              </span>
+            </div>
+
+            {/* Content */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-700">Content:</span>
+              <span className="text-sm font-semibold text-blue-600">
+                {site.contentType === "dynamic"
+                  ? ["Leon", "Lilo and Stitch", "Marvel Heroes", "Nike Campaign"][Math.floor(Math.random() * 4)]
+                  : "Static Billboard"}
+              </span>
+            </div>
+
+            {/* Illumination */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-700">Illumination:</span>
+              <span
+                className={`text-sm font-semibold ${
+                  site.operationalStatus === "Operational" ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                {site.operationalStatus === "Operational" ? "ON" : "OFF"}
+              </span>
+            </div>
+
+            {/* Compliance */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-700">Compliance:</span>
+              <span
+                className={`text-sm font-semibold ${
+                  site.operationalStatus === "Operational" ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}
+                {site.operationalStatus !== "Operational" && (
+                  <span className="ml-1 text-xs bg-red-100 text-red-800 px-1 rounded">(2)</span>
+                )}
+              </span>
+            </div>
+          </div>
+
+          {/* Current Status */}
+          <div className="text-sm mt-3 pt-3 border-t border-gray-200">
+            <span className="text-gray-600 font-medium">Current:</span>{" "}
+            <span
+              className={`font-semibold ${
+                site.status === "ACTIVE" || site.status === "OCCUPIED"
+                  ? "text-blue-600"
+                  : site.status === "VACANT" || site.status === "AVAILABLE"
+                    ? "text-green-600"
+                    : site.status === "MAINTENANCE" || site.status === "REPAIR"
+                      ? "text-red-600"
+                      : "text-orange-600"
+              }`}
             >
               {site.status}
-            </Badge>
-          </div>
-
-          {/* Health Percentage */}
-          <div className="mt-3">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-sm font-medium">Health:</span>
-              <span className="text-sm">{site.healthPercentage}%</span>
-            </div>
-            <Progress
-              value={site.healthPercentage}
-              className="h-2"
-              indicatorClassName={`
-                ${site.healthPercentage > 80 ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
-                ${site.healthPercentage > 60 && site.healthPercentage <= 80 ? "bg-gradient-to-r from-yellow-500 to-green-300" : ""}
-                ${site.healthPercentage > 40 && site.healthPercentage <= 60 ? "bg-gradient-to-r from-orange-500 to-yellow-300" : ""}
-                ${site.healthPercentage <= 40 ? "bg-gradient-to-r from-red-500 to-orange-300" : ""}
-              `}
-            />
-          </div>
-
-          {/* Additional Information */}
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Last Updated:</span>
-              <span className="text-sm text-gray-500">Today</span>
-            </div>
+            </span>
           </div>
 
           {/* Create Report Button */}
           <Button
             variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+            className="mt-4 w-full bg-gray-50 hover:bg-gray-100 border-gray-300 text-gray-700 hover:text-gray-900"
             onClick={handleCreateReport}
           >
             Create Report

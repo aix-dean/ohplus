@@ -1,25 +1,23 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useCallback } from "react"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import LEDSitesContentTab from "./led-sites-content"
-import LEDSitesDisplayHealthTab from "./led-sites-display-health"
-import LEDSitesStructureTab from "./led-sites-structure"
-import LEDSitesComplianceTab from "./led-sites-compliance"
+import { AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
+import Image from "next/image"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { getPaginatedUserProducts, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
-import { Loader2 } from "lucide-react"
-import { AlertCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/auth-context"
-import { Search, ChevronLeft, ChevronRight } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
 
 export default function LEDSitesTab() {
-  const [contentTab, setContentTab] = useState<"content" | "display-health" | "structure" | "compliance">("content")
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -37,6 +35,10 @@ export default function LEDSitesTab() {
   >(new Map())
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingCount, setLoadingCount] = useState(false)
+
+  // Report dialog state
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
   const { user } = useAuth()
 
@@ -224,6 +226,28 @@ export default function LEDSitesTab() {
     return pageNumbers
   }
 
+  // Convert product to site format for display
+  const productToSite = (product: Product) => {
+    // Determine status color based on product status
+    let statusColor = "blue"
+    if (product.status === "ACTIVE" || product.status === "OCCUPIED") statusColor = "blue"
+    if (product.status === "VACANT" || product.status === "AVAILABLE") statusColor = "green"
+    if (product.status === "MAINTENANCE" || product.status === "REPAIR") statusColor = "red"
+    if (product.status === "PENDING" || product.status === "INSTALLATION") statusColor = "orange"
+
+    // Get image from product media or use placeholder
+    const image = product.media && product.media.length > 0 ? product.media[0].url : "/led-billboard-1.png"
+
+    return {
+      id: product.id,
+      name: product.name,
+      status: product.status,
+      statusColor,
+      image,
+      location: product.specs_rental?.location || product.light?.location || "Unknown location",
+    }
+  }
+
   // Show loading if no user
   if (!user) {
     return (
@@ -236,159 +260,247 @@ export default function LEDSitesTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Content Type Tabs */}
-      <Tabs defaultValue="content" className="w-full" onValueChange={(value) => setContentTab(value as any)}>
-        <TabsList className="grid w-full max-w-[450px] grid-cols-2 md:grid-cols-4">
-          <TabsTrigger value="content">Content</TabsTrigger>
-          <TabsTrigger value="display-health">Display Health</TabsTrigger>
-          <TabsTrigger value="structure">Structure</TabsTrigger>
-          <TabsTrigger value="compliance">Compliance</TabsTrigger>
-        </TabsList>
-
-        {/* Date and Search */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="text-sm text-gray-600 font-medium">
-            {currentDate}, {currentTime}
-          </div>
-
-          <div className="flex flex-1 max-w-md mx-auto md:mx-0">
-            <div className="relative w-full">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-              <Input
-                type="search"
-                placeholder="Search LED sites..."
-                className="pl-8 w-full"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
+      {/* Date and Search */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="text-sm text-gray-600 font-medium">
+          {currentDate}, {currentTime}
         </div>
 
-        {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-2 text-lg">Loading LED sites...</span>
+        <div className="flex flex-1 max-w-md mx-auto md:mx-0">
+          <div className="relative w-full">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+            <Input
+              type="search"
+              placeholder="Search LED sites..."
+              className="pl-8 w-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-        ) : error ? (
-          <div className="text-center py-12 bg-red-50 rounded-lg border border-dashed border-red-200">
-            <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <AlertCircle size={24} className="text-red-500" />
-            </div>
-            <h3 className="text-lg font-medium mb-2 text-red-700">Error Loading LED Sites</h3>
-            <p className="text-red-600 mb-4">{error}</p>
-            <Button variant="outline" onClick={() => fetchProducts(1, true)} className="bg-white">
-              Try Again
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <span className="ml-2 text-lg">Loading LED sites...</span>
+        </div>
+      ) : error ? (
+        <div className="text-center py-12 bg-red-50 rounded-lg border border-dashed border-red-200">
+          <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+            <AlertCircle size={24} className="text-red-500" />
+          </div>
+          <h3 className="text-lg font-medium mb-2 text-red-700">Error Loading LED Sites</h3>
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button variant="outline" onClick={() => fetchProducts(1, true)} className="bg-white">
+            Try Again
+          </Button>
+        </div>
+      ) : products.length === 0 ? (
+        <div className="bg-gray-50 border border-gray-200 border-dashed rounded-md p-8 text-center">
+          <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+            <AlertCircle size={24} className="text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium mb-2">No LED sites found</h3>
+          <p className="text-gray-500 mb-4">
+            {debouncedSearchTerm
+              ? "No LED sites match your search criteria. Try adjusting your search terms."
+              : "You don't have any LED sites yet. Contact an administrator to add LED sites."}
+          </p>
+          {debouncedSearchTerm && (
+            <Button variant="outline" onClick={() => setSearchTerm("")}>
+              Clear Search
             </Button>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* LED Sites Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
+            {products.map((product) => {
+              const site = productToSite(product)
+              return (
+                <LEDSiteCard
+                  key={site.id}
+                  site={site}
+                  onCreateReport={(siteId) => {
+                    setSelectedSiteId(siteId)
+                    setReportDialogOpen(true)
+                  }}
+                />
+              )
+            })}
           </div>
-        ) : products.length === 0 ? (
-          <div className="bg-gray-50 border border-gray-200 border-dashed rounded-md p-8 text-center">
-            <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <AlertCircle size={24} className="text-gray-400" />
-            </div>
-            <h3 className="text-lg font-medium mb-2">No LED sites found</h3>
-            <p className="text-gray-500 mb-4">
-              {debouncedSearchTerm
-                ? "No LED sites match your search criteria. Try adjusting your search terms."
-                : "You don't have any LED sites yet. Contact an administrator to add LED sites."}
-            </p>
-            {debouncedSearchTerm && (
-              <Button variant="outline" onClick={() => setSearchTerm("")}>
-                Clear Search
-              </Button>
-            )}
-          </div>
-        ) : (
-          <>
-            <TabsContent value="content" className="mt-4">
-              <LEDSitesContentTab products={products} />
-            </TabsContent>
 
-            <TabsContent value="display-health" className="mt-4">
-              <LEDSitesDisplayHealthTab products={products} />
-            </TabsContent>
-
-            <TabsContent value="structure" className="mt-4">
-              <LEDSitesStructureTab products={products} />
-            </TabsContent>
-
-            <TabsContent value="compliance" className="mt-4">
-              <LEDSitesComplianceTab products={products} />
-            </TabsContent>
-
-            {/* Loading More Indicator */}
-            {loadingMore && (
-              <div className="flex justify-center my-4">
-                <div className="flex items-center gap-2">
-                  <Loader2 size={18} className="animate-spin" />
-                  <span>Loading more...</span>
-                </div>
+          {/* Loading More Indicator */}
+          {loadingMore && (
+            <div className="flex justify-center my-4">
+              <div className="flex items-center gap-2">
+                <Loader2 size={18} className="animate-spin" />
+                <span>Loading more...</span>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Pagination Controls */}
-            {products.length > 0 && (
-              <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
-                <div className="text-sm text-gray-500 flex items-center">
-                  {loadingCount ? (
-                    <div className="flex items-center">
-                      <Loader2 size={14} className="animate-spin mr-2" />
-                      <span>Calculating pages...</span>
-                    </div>
-                  ) : (
-                    <span>
-                      Page {currentPage} of {totalPages} ({totalItems} items)
-                    </span>
+          {/* Pagination Controls */}
+          {products.length > 0 && (
+            <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
+              <div className="text-sm text-gray-500 flex items-center">
+                {loadingCount ? (
+                  <div className="flex items-center">
+                    <Loader2 size={14} className="animate-spin mr-2" />
+                    <span>Calculating pages...</span>
+                  </div>
+                ) : (
+                  <span>
+                    Page {currentPage} of {totalPages} ({totalItems} items)
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPreviousPage}
+                  disabled={currentPage === 1}
+                  className="h-8 w-8 p-0 bg-transparent"
+                >
+                  <ChevronLeft size={16} />
+                </Button>
+
+                {/* Page numbers */}
+                <div className="flex items-center gap-1">
+                  {getPageNumbers().map((page, index) =>
+                    page === "..." ? (
+                      <span key={`ellipsis-${index}`} className="px-2">
+                        ...
+                      </span>
+                    ) : (
+                      <Button
+                        key={`page-${page}`}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => goToPage(page as number)}
+                        className="h-8 w-8 p-0"
+                      >
+                        {page}
+                      </Button>
+                    ),
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={goToPreviousPage}
-                    disabled={currentPage === 1}
-                    className="h-8 w-8 p-0"
-                  >
-                    <ChevronLeft size={16} />
-                  </Button>
-
-                  {/* Page numbers */}
-                  <div className="flex items-center gap-1">
-                    {getPageNumbers().map((page, index) =>
-                      page === "..." ? (
-                        <span key={`ellipsis-${index}`} className="px-2">
-                          ...
-                        </span>
-                      ) : (
-                        <Button
-                          key={`page-${page}`}
-                          variant={currentPage === page ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => goToPage(page as number)}
-                          className="h-8 w-8 p-0"
-                        >
-                          {page}
-                        </Button>
-                      ),
-                    )}
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={goToNextPage}
-                    disabled={currentPage >= totalPages}
-                    className="h-8 w-8 p-0"
-                  >
-                    <ChevronRight size={16} />
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextPage}
+                  disabled={currentPage >= totalPages}
+                  className="h-8 w-8 p-0"
+                >
+                  <ChevronRight size={16} />
+                </Button>
               </div>
-            )}
-          </>
-        )}
-      </Tabs>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
     </div>
+  )
+}
+
+// LED Site Card component
+function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onCreateReport(site.id)
+  }
+
+  const handleCardClick = () => {
+    window.location.href = `/logistics/sites/${site.id}`
+  }
+
+  // Mock data for demonstration - in real app, this would come from the product data
+  const mockAssignmentCount = Math.floor(Math.random() * 10) + 1
+  const mockContent = "Lilo and Stitch"
+  const mockIllumination = "ON"
+  const mockCompliance = "Complete"
+
+  return (
+    <Card
+      className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white"
+      onClick={handleCardClick}
+    >
+      <div className="relative h-48 bg-gray-200">
+        <Image
+          src={site.image || "/placeholder.svg"}
+          alt={site.name}
+          fill
+          className="object-cover"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            target.src = "/led-billboard-1.png"
+            target.className = "opacity-50 object-contain"
+          }}
+        />
+
+        {/* Assignment Count Badge - Top Right */}
+        <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+          {mockAssignmentCount}
+        </div>
+
+        {/* Status Badge - Bottom Left */}
+        <div className="absolute bottom-2 left-2">
+          <Badge
+            className={`
+              text-xs font-medium px-2 py-1 rounded
+              ${site.statusColor === "green" ? "bg-green-500 text-white" : ""}
+              ${site.statusColor === "blue" ? "bg-blue-500 text-white" : ""}
+              ${site.statusColor === "red" ? "bg-red-500 text-white" : ""}
+              ${site.statusColor === "orange" ? "bg-orange-500 text-white" : ""}
+            `}
+          >
+            {site.status}
+          </Badge>
+        </div>
+      </div>
+
+      <CardContent className="p-4">
+        <div className="flex flex-col gap-1">
+          {/* Site ID */}
+          <div className="text-sm text-gray-500 font-medium">{site.id}</div>
+
+          {/* Site Name */}
+          <h3 className="font-semibold text-lg">{site.name}</h3>
+
+          {/* Site Details */}
+          <div className="mt-2 space-y-1">
+            <div className="text-sm">
+              <span className="font-medium">Content:</span> <span className="text-gray-600">{mockContent}</span>
+            </div>
+            <div className="text-sm">
+              <span className="font-medium">Illumination:</span>{" "}
+              <span className="text-green-600 font-medium">{mockIllumination}</span>
+            </div>
+            <div className="text-sm">
+              <span className="font-medium">Compliance:</span>{" "}
+              <span className="text-green-600 font-medium">{mockCompliance}</span>
+            </div>
+          </div>
+
+          {/* Create Report Button */}
+          <Button
+            variant="outline"
+            className="mt-4 w-full rounded-md bg-gray-50 text-gray-800 hover:bg-gray-100 border-gray-200"
+            onClick={handleCreateReport}
+          >
+            Create Report
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
