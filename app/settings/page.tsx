@@ -1,154 +1,158 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
-import { useAuth } from "@/contexts/auth-context"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Bell, Moon, Sun, User } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import { JoinOrganizationDialog } from "@/components/join-organization-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Building2, History } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useAuth } from "@/contexts/auth-context"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useResponsive } from "@/hooks/use-responsive"
 
 export default function SettingsPage() {
-  const { userData, updateUserData } = useAuth()
-  const [loading, setLoading] = useState(false)
-  const [formData, setFormData] = useState({
-    first_name: userData?.first_name || "",
-    last_name: userData?.last_name || "",
-    phone_number: userData?.phone_number || "",
-    location: userData?.location || "",
-  })
+  const { userData } = useAuth()
+  const [success, setSuccess] = useState("")
+  const { isMobile } = useResponsive()
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    try {
-      await updateUserData(formData)
-    } catch (error) {
-      console.error("Error updating profile:", error)
-    } finally {
-      setLoading(false)
-    }
+  // Notification settings
+  const [emailNotifications, setEmailNotifications] = useState(true)
+  const [pushNotifications, setPushNotifications] = useState(true)
+  const [marketingEmails, setMarketingEmails] = useState(false)
+
+  // Appearance settings
+  const [darkMode, setDarkMode] = useState(false)
+  const [highContrast, setHighContrast] = useState(false)
+  const [reducedMotion, setReducedMotion] = useState(false)
+
+  const handleSaveSettings = () => {
+    setSuccess("Settings saved successfully")
+    setTimeout(() => setSuccess(""), 3000)
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground">Manage your account settings and preferences.</p>
+    <div className="container max-w-4xl py-4 md:py-8 px-4">
+      <div className="flex justify-between items-center mb-4 md:mb-6">
+        <h1 className="text-xl md:text-2xl font-bold">Settings</h1>
       </div>
 
-      <div className="grid gap-6">
-        {/* Profile Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Profile Information</CardTitle>
-            <CardDescription>Update your personal information.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleUpdateProfile} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="first_name">First Name</Label>
-                  <Input
-                    id="first_name"
-                    value={formData.first_name}
-                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="last_name">Last Name</Label>
-                  <Input
-                    id="last_name"
-                    value={formData.last_name}
-                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="phone_number">Phone Number</Label>
-                <Input
-                  id="phone_number"
-                  value={formData.phone_number}
-                  onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="location">Location</Label>
-                <Input
-                  id="location"
-                  value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                />
-              </div>
-              <Button type="submit" disabled={loading}>
-                {loading ? "Updating..." : "Update Profile"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+      {success && (
+        <Alert className="mb-4 bg-green-50 text-green-800 border-green-200">
+          <AlertDescription>{success}</AlertDescription>
+        </Alert>
+      )}
 
-        {/* Organization Settings */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              Organization
-            </CardTitle>
-            <CardDescription>Manage your organization membership.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Current Organization</p>
-                <p className="text-sm text-muted-foreground">
-                  {userData?.company_id ? (
-                    <Badge variant="secondary" className="mt-1">
-                      Company ID: {userData.company_id}
-                    </Badge>
-                  ) : (
-                    "Not a member of any organization"
-                  )}
-                </p>
-              </div>
-              <JoinOrganizationDialog />
-            </div>
+      <Tabs defaultValue="notifications" className="space-y-4 md:space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="appearance">Appearance</TabsTrigger>
+        </TabsList>
 
-            {userData?.license_key && (
-              <>
-                <Separator />
-                <div>
-                  <p className="font-medium">License Key</p>
-                  <p className="text-sm text-muted-foreground font-mono">{userData.license_key}</p>
-                </div>
-              </>
-            )}
-
-            {userData?.previous_companies && userData.previous_companies.length > 0 && (
-              <>
-                <Separator />
-                <div>
-                  <p className="font-medium flex items-center gap-2">
-                    <History className="h-4 w-4" />
-                    Previous Organizations
-                  </p>
-                  <div className="mt-2 space-y-1">
-                    {userData.previous_companies.map((companyId, index) => (
-                      <Badge key={index} variant="outline" className="mr-2">
-                        {companyId}
-                      </Badge>
-                    ))}
+        <TabsContent value="notifications">
+          <Card>
+            <CardHeader className="pb-2 md:pb-4">
+              <CardTitle>Notification Settings</CardTitle>
+              <CardDescription>Configure how you receive notifications</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 md:space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5 pr-4">
+                    <Label className="text-base">Email Notifications</Label>
+                    <p className="text-sm text-gray-500">Receive notifications via email</p>
                   </div>
+                  <Switch checked={emailNotifications} onCheckedChange={setEmailNotifications} />
                 </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5 pr-4">
+                    <Label className="text-base">Push Notifications</Label>
+                    <p className="text-sm text-gray-500">Receive notifications in your browser</p>
+                  </div>
+                  <Switch checked={pushNotifications} onCheckedChange={setPushNotifications} />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5 pr-4">
+                    <Label className="text-base">Marketing Emails</Label>
+                    <p className="text-sm text-gray-500">Receive marketing and promotional emails</p>
+                  </div>
+                  <Switch checked={marketingEmails} onCheckedChange={setMarketingEmails} />
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <button
+                  onClick={handleSaveSettings}
+                  className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                >
+                  Save Notification Settings
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="appearance">
+          <Card>
+            <CardHeader className="pb-2 md:pb-4">
+              <CardTitle>Appearance Settings</CardTitle>
+              <CardDescription>Customize how the application looks</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 md:space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-2 rounded-full bg-gray-100 flex-shrink-0">
+                      {darkMode ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+                    </div>
+                    <div className="space-y-0.5 pr-4">
+                      <Label className="text-base">Dark Mode</Label>
+                      <p className="text-sm text-gray-500">Switch between light and dark themes</p>
+                    </div>
+                  </div>
+                  <Switch checked={darkMode} onCheckedChange={setDarkMode} />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-2 rounded-full bg-gray-100 flex-shrink-0">
+                      <Bell className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-0.5 pr-4">
+                      <Label className="text-base">High Contrast</Label>
+                      <p className="text-sm text-gray-500">Increase contrast for better visibility</p>
+                    </div>
+                  </div>
+                  <Switch checked={highContrast} onCheckedChange={setHighContrast} />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="p-2 rounded-full bg-gray-100 flex-shrink-0">
+                      <User className="h-5 w-5" />
+                    </div>
+                    <div className="space-y-0.5 pr-4">
+                      <Label className="text-base">Reduced Motion</Label>
+                      <p className="text-sm text-gray-500">Minimize animations throughout the interface</p>
+                    </div>
+                  </div>
+                  <Switch checked={reducedMotion} onCheckedChange={setReducedMotion} />
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <button
+                  onClick={handleSaveSettings}
+                  className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+                >
+                  Save Appearance Settings
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

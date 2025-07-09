@@ -1,19 +1,22 @@
 "use client"
 
+import { CardDescription } from "@/components/ui/card"
+
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Shield, Users, Lock, AlertCircle, CheckCircle, QrCode } from "lucide-react"
+import { Shield, Users, Lock, AlertCircle, CheckCircle, Key, QrCode } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { initializeDefaultPermissions, initializeAdminRole, assignRoleToUser } from "@/lib/access-management-service"
 import { toast } from "@/components/ui/use-toast"
 import { UserManagement } from "@/components/access-management/user-management"
 import { RoleManagement } from "@/components/access-management/role-management"
 import { PermissionManagement } from "@/components/access-management/permission-management"
-import Link from "next/link"
+import { doc, setDoc, serverTimestamp } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export default function AccessManagementPage() {
   const { user, userData } = useAuth()
@@ -24,6 +27,8 @@ export default function AccessManagementPage() {
     success: boolean
     message: string
   } | null>(null)
+  const [generatingCode, setGeneratingCode] = useState(false)
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null)
 
   useEffect(() => {
     // Simple check to make sure we're authenticated
@@ -76,6 +81,54 @@ export default function AccessManagementPage() {
     }
   }
 
+  const handleGenerateOrgCode = async () => {
+    if (!userData?.company_id || !userData?.license_key) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Company information not found. Please register your company first.",
+      })
+      return
+    }
+
+    try {
+      setGeneratingCode(true)
+
+      // Generate a unique 8-character code
+      const code = Math.random().toString(36).substring(2, 10).toUpperCase()
+
+      // Set expiration to 7 days from now
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + 7)
+
+      // Save the organization code
+      await setDoc(doc(db, "organization_codes", code), {
+        company_id: userData.company_id,
+        license_key: userData.license_key,
+        created_by: user?.uid,
+        created_at: serverTimestamp(),
+        expires_at: expiresAt,
+        used: false,
+      })
+
+      setGeneratedCode(code)
+
+      toast({
+        title: "Organization Code Generated",
+        description: `Code: ${code} (expires in 7 days)`,
+      })
+    } catch (error) {
+      console.error("Error generating organization code:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to generate organization code. Please try again.",
+      })
+    } finally {
+      setGeneratingCode(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -90,28 +143,14 @@ export default function AccessManagementPage() {
   return (
     <div className="container mx-auto py-10">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Access Management</h1>
-        <div className="flex items-center gap-3">
-          <Link href="/admin/registration-codes">
-            <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-              <QrCode className="h-4 w-4" />
-              <span>Registration Codes</span>
-            </Button>
-          </Link>
-          <Button onClick={handleInitializePermissions} disabled={initializing} className="flex items-center gap-2">
-            {initializing ? (
-              <>
-                <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-                <span>Initializing...</span>
-              </>
-            ) : (
-              <>
-                <Lock className="h-4 w-4" />
-                <span>Initialize Default Permissions</span>
-              </>
-            )}
-          </Button>
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Access Management</h1>
+          <p className="text-muted-foreground">Manage users, roles, and permissions for your organization.</p>
         </div>
+        <Button onClick={() => router.push("/admin/registration-codes")}>
+          <QrCode className="h-4 w-4 mr-2" />
+          Registration Codes
+        </Button>
       </div>
 
       {initializationStatus && (
@@ -122,19 +161,69 @@ export default function AccessManagementPage() {
         </Alert>
       )}
 
-      <Tabs defaultValue="users" className="w-full">
-        <TabsList className="mb-6">
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Organization Invitation
+          </CardTitle>
+          <CardDescription>Generate invitation codes for new users to join your organization.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4">
+            <Button onClick={handleGenerateOrgCode} disabled={generatingCode} className="flex items-center gap-2">
+              {generatingCode ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                  <span>Generating...</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="h-4 w-4" />
+                  <span>Generate Invitation Code</span>
+                </>
+              )}
+            </Button>
+
+            {generatedCode && (
+              <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span className="font-mono text-sm font-semibold">{generatedCode}</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedCode)
+                    toast({ title: "Copied to clipboard!" })
+                  }}
+                >
+                  Copy
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {generatedCode && (
+            <p className="text-sm text-gray-600 mt-2">
+              Share this code with new users so they can join your organization. The code expires in 7 days.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Tabs defaultValue="users" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
-            <span>Users</span>
+            Users
           </TabsTrigger>
           <TabsTrigger value="roles" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
-            <span>Roles</span>
+            Roles
           </TabsTrigger>
           <TabsTrigger value="permissions" className="flex items-center gap-2">
-            <Lock className="h-4 w-4" />
-            <span>Permissions</span>
+            <Key className="h-4 w-4" />
+            Permissions
           </TabsTrigger>
         </TabsList>
 
