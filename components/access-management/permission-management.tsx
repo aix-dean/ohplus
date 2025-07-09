@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getPermissions, createPermission, updatePermission, deletePermission } from "@/lib/access-management-service"
 import type { Permission } from "@/lib/access-management-service"
 import { Search, Plus, Edit, Trash } from "lucide-react"
@@ -69,6 +70,19 @@ export function PermissionManagement() {
       permission.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
       permission.module.toLowerCase().includes(searchTerm.toLowerCase()) ||
       permission.action.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
+
+  // Group permissions by department/module
+  const groupedPermissions = filteredPermissions.reduce(
+    (groups, permission) => {
+      const module = permission.module
+      if (!groups[module]) {
+        groups[module] = []
+      }
+      groups[module].push(permission)
+      return groups
+    },
+    {} as Record<string, Permission[]>,
   )
 
   // Handle form input changes
@@ -229,6 +243,22 @@ export function PermissionManagement() {
     }
   }
 
+  // Get department display name
+  const getDepartmentDisplayName = (module: string) => {
+    switch (module) {
+      case "admin":
+        return "Administration"
+      case "sales":
+        return "Sales"
+      case "logistics":
+        return "Logistics"
+      case "cms":
+        return "Content Management"
+      default:
+        return module.charAt(0).toUpperCase() + module.slice(1)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -264,74 +294,77 @@ export function PermissionManagement() {
           <span className="ml-2">Loading permissions...</span>
         </div>
       ) : (
-        <div className="border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Module</TableHead>
-                <TableHead>Action</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredPermissions.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-6">
-                    No permissions found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredPermissions.map((permission) => (
-                  <TableRow key={permission.id}>
-                    <TableCell className="font-medium">{permission.name}</TableCell>
-                    <TableCell>{permission.description}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="capitalize">
-                        {permission.module}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getActionBadgeVariant(permission.action)} className="capitalize">
-                        {permission.action}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedPermission(permission)
-                            setFormData({
-                              name: permission.name,
-                              description: permission.description,
-                              module: permission.module,
-                              action: permission.action,
-                            })
-                            setIsEditDialogOpen(true)
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedPermission(permission)
-                            setIsDeleteDialogOpen(true)
-                          }}
-                        >
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+        <div className="space-y-6">
+          {Object.keys(groupedPermissions).length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No permissions found</p>
+            </div>
+          ) : (
+            Object.entries(groupedPermissions).map(([module, modulePermissions]) => (
+              <Card key={module}>
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold">{getDepartmentDisplayName(module)} Department</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="border rounded-md">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Action</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {modulePermissions.map((permission) => (
+                          <TableRow key={permission.id}>
+                            <TableCell className="font-medium">{permission.name}</TableCell>
+                            <TableCell>{permission.description}</TableCell>
+                            <TableCell>
+                              <Badge variant={getActionBadgeVariant(permission.action)} className="capitalize">
+                                {permission.action}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedPermission(permission)
+                                    setFormData({
+                                      name: permission.name,
+                                      description: permission.description,
+                                      module: permission.module,
+                                      action: permission.action,
+                                    })
+                                    setIsEditDialogOpen(true)
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedPermission(permission)
+                                    setIsDeleteDialogOpen(true)
+                                  }}
+                                >
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       )}
 
