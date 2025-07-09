@@ -3,318 +3,595 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { toast } from "sonner"
-import { ArrowLeft, Mail, AlertCircle, Loader2 } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { ArrowLeft, Paperclip, Send, Plus, Smile, X, AlertCircle, CheckCircle, Mail, FileText } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/contexts/auth-context"
+import { emailService, type EmailTemplate, type Email, type EmailAttachment } from "@/lib/email-service"
 import { getReports, type ReportData } from "@/lib/report-service"
-import { emailService, type Email, type EmailTemplate } from "@/lib/email-service"
-import { generateReportPDFAsBase64 } from "@/lib/pdf-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
+import { generateReportPDFFromId } from "@/lib/pdf-service"
 
 export default function ComposeEmailPage() {
   const params = useParams()
   const router = useRouter()
-  const reportId = params.id as string
+  const { toast } = useToast()
+  const { user } = useAuth()
 
-  // State
+  const reportId = params.id as string
   const [report, setReport] = useState<ReportData | null>(null)
   const [product, setProduct] = useState<Product | null>(null)
+
+  // Email form state
+  const [to, setTo] = useState("")
+  const [cc, setCc] = useState("")
+  const [subject, setSubject] = useState("")
+  const [body, setBody] = useState("")
+  const [attachments, setAttachments] = useState<EmailAttachment[]>([])
+
+  // Templates state
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
-  const [selectedTemplate, setSelectedTemplate] = useState<string>("")
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
+
+  // UI state
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [pdfGenerating, setPdfGenerating] = useState(false)
-  const [pdfGenerated, setPdfGenerated] = useState(false)
-  const [pdfData, setPdfData] = useState<string>("")
+  const [generatingPDF, setGeneratingPDF] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<string[]>([])
 
-  // Form state
-  const [formData, setFormData] = useState({
-    to: "",
-    cc: "",
-    subject: "",
-    body: "",
-  })
+  const addDebugInfo = (info: string) => {
+    const timestamp = new Date().toLocaleTimeString()
+    setDebugInfo((prev) => [...prev, `${timestamp}: ${info}`])
+    console.log(`[Email Debug] ${timestamp}: ${info}`)
+  }
 
-  // Load report and templates
   useEffect(() => {
-    loadData()
-  }, [reportId])
+    if (reportId && user) {
+      fetchData()
+    }
+  }, [reportId, user])
 
-  const loadData = async () => {
+  const fetchData = async () => {
     try {
-      setLoading(true)
+      addDebugInfo("Loading report data...")
 
-      // Check if we're on the client side
-      if (typeof window === "undefined") {
-        console.log("Running on server side, skipping Firebase operations")
-        return
-      }
-
-      console.log("Loading report data for ID:", reportId)
-
-      // Load report
+      // Fetch report data
       const reports = await getReports()
-      const reportData = reports.find((r) => r.id === reportId)
+      const foundReport = reports.find((r) => r.id === reportId)
 
-      if (!reportData) {
-        toast.error("Report not found")
-        router.push("/logistics/reports")
-        return
-      }
+      if (foundReport) {
+        setReport(foundReport)
+        addDebugInfo(`Report found: ${foundReport.siteName}`)
 
-      console.log("Report found:", reportData)
-      setReport(reportData)
-
-      // Try to load product data if available
-      if (reportData.siteId) {
-        try {
-          const productData = await getProductById(reportData.siteId)
-          if (productData) {
+        // Fetch product data
+        if (foundReport.siteId) {
+          try {
+            const productData = await getProductById(foundReport.siteId)
             setProduct(productData)
-            console.log("Product data loaded:", productData.name)
+            addDebugInfo(`Product found: ${productData?.name || "Unknown"}`)
+          } catch (error) {
+            addDebugInfo("Product not found, continuing without product data")
           }
-        } catch (error) {
-          console.log("Could not load product data:", error)
-          // Continue without product data
         }
-      }
 
-      // Load email templates
-      try {
-        const templatesData = await emailService.getEmailTemplates("current-user-id") // Replace with actual user ID
-        if (templatesData.length === 0) {
-          console.log("No templates found, creating defaults...")
-          await emailService.createDefaultTemplates("current-user-id")
-          const newTemplates = await emailService.getEmailTemplates("current-user-id")
-          setTemplates(newTemplates)
-        } else {
-          setTemplates(templatesData)
-        }
-        console.log("Templates loaded:", templatesData.length)
-      } catch (error) {
-        console.error("Error loading templates:", error)
-        // Continue without templates
-      }
+        // Set default subject
+        setSubject(`${getReportTypeDisplay(foundReport.reportType)} - ${foundReport.siteName}`)
 
-      // Set default form data
-      const reportType = reportData.reportType || "Report"
-      const siteName = reportData.siteName || reportData.title || "Site"
+        // Set default body
+        setBody(`Hi [Customer's Name],
 
-      setFormData({
-        to: "",
-        cc: "",
-        subject: `${reportType} - ${siteName}`,
-        body: `Hi [Client Name],
+I hope you're doing well.
 
-I hope this email finds you well.
+Attached is the ${getReportTypeDisplay(foundReport.reportType).toLowerCase()} for ${foundReport.siteName}. We've prepared a comprehensive analysis based on your requirements and current project status.
 
-Please find attached the ${reportType.toLowerCase()} for ${siteName}. The report has been carefully prepared and contains comprehensive information about the current status.
+Please feel free to review and let me know if you have any questions or would like to explore additional options. I'm happy to assist.
 
-Report Details:
-- Type: ${reportType}
-- Site: ${siteName}
-- Status: ${reportData.status || "Completed"}
-- Date: ${reportData.date ? new Date(reportData.date).toLocaleDateString() : new Date().toLocaleDateString()}
-
-Please review the attached document and let me know if you have any questions or need any clarification.
-
-Thank you for your continued trust in our services.
+Looking forward to your feedback!
 
 Best regards,
-OOH Operator Team`,
-      })
+[Your Full Name]
+[Your Position]
+[Company Name]
+[Contact Info]`)
 
-      // Generate PDF
-      await generatePDF(reportData)
+        // Auto-generate and attach PDF
+        await generateAndAttachPDF(foundReport)
+      } else {
+        addDebugInfo("Report not found!")
+        toast({
+          title: "Error",
+          description: "Report not found.",
+          variant: "destructive",
+        })
+      }
+
+      // Fetch email templates
+      if (user?.uid) {
+        addDebugInfo("Loading email templates...")
+        const userTemplates = await emailService.getEmailTemplates(user.uid)
+        if (userTemplates.length === 0) {
+          addDebugInfo("No templates found, creating defaults...")
+          await emailService.createDefaultTemplates(user.uid)
+          const newTemplates = await emailService.getEmailTemplates(user.uid)
+          setTemplates(newTemplates)
+          addDebugInfo(`Created ${newTemplates.length} default templates`)
+        } else {
+          setTemplates(userTemplates)
+          addDebugInfo(`Loaded ${userTemplates.length} existing templates`)
+        }
+      }
     } catch (error) {
-      console.error("Error loading data:", error)
-      toast.error("Failed to load report data")
+      console.error("Error fetching data:", error)
+      addDebugInfo(`Error: ${error instanceof Error ? error.message : "Unknown error"}`)
+      toast({
+        title: "Error",
+        description: "Failed to load email compose data.",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  const generatePDF = async (reportData: ReportData) => {
+  const generateAndAttachPDF = async (reportData: ReportData) => {
+    if (!reportData) return
+
+    setGeneratingPDF(true)
     try {
-      setPdfGenerating(true)
-      console.log("Generating PDF for report:", reportData.id)
+      addDebugInfo("Generating PDF attachment...")
 
-      const pdfBase64 = await generateReportPDFAsBase64(reportData)
-      setPdfData(pdfBase64)
-      setPdfGenerated(true)
+      // Generate PDF blob
+      const pdfBlob = await generateReportPDFFromId(reportData.id)
 
-      console.log("PDF generated successfully")
-      toast.success("PDF report generated successfully")
+      if (pdfBlob) {
+        // Convert blob to base64 for Resend
+        const arrayBuffer = await pdfBlob.arrayBuffer()
+        const base64 = Buffer.from(arrayBuffer).toString("base64")
+
+        // Create attachment
+        const fileName = `${reportData.siteId}_${getReportTypeDisplay(reportData.reportType).replace(/\s+/g, "_")}_${reportData.siteName.replace(/\s+/g, "_")}.pdf`
+
+        const attachment: EmailAttachment = {
+          fileName,
+          content: base64,
+          contentType: "application/pdf",
+          fileSize: pdfBlob.size,
+        }
+
+        setAttachments([attachment])
+        addDebugInfo(`PDF generated successfully: ${(pdfBlob.size / 1024).toFixed(1)}KB`)
+      }
     } catch (error) {
       console.error("Error generating PDF:", error)
-      toast.error("Failed to generate PDF report")
-      // Continue without PDF
-      setPdfGenerated(false)
+      addDebugInfo(`PDF generation failed: ${error instanceof Error ? error.message : "Unknown error"}`)
+      toast({
+        title: "Warning",
+        description: "Failed to auto-attach PDF. You can continue without it.",
+        variant: "destructive",
+      })
     } finally {
-      setPdfGenerating(false)
+      setGeneratingPDF(false)
     }
   }
 
-  const handleTemplateSelect = (templateId: string) => {
-    const template = templates.find((t) => t.id === templateId)
-    if (template) {
-      setSelectedTemplate(templateId)
-      setFormData((prev) => ({
-        ...prev,
-        subject: template.subject,
-        body: template.body,
-      }))
-      toast.success("Template applied")
-    }
+  const getReportTypeDisplay = (type: string) => {
+    return type
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
   }
 
-  const validateEmail = (email: string): boolean => {
+  const handleTemplateSelect = (template: EmailTemplate) => {
+    setSelectedTemplate(template.id || null)
+    setSubject(template.subject)
+    setBody(template.body)
+    addDebugInfo(`Applied template: ${template.name}`)
+  }
+
+  const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     return emailRegex.test(email)
   }
 
-  const validateForm = (): boolean => {
-    if (!formData.to.trim()) {
-      toast.error("Please enter recipient email address")
-      return false
-    }
-
-    const toEmails = formData.to.split(",").map((email) => email.trim())
-    for (const email of toEmails) {
-      if (!validateEmail(email)) {
-        toast.error(`Invalid email address: ${email}`)
-        return false
-      }
-    }
-
-    if (formData.cc.trim()) {
-      const ccEmails = formData.cc.split(",").map((email) => email.trim())
-      for (const email of ccEmails) {
-        if (!validateEmail(email)) {
-          toast.error(`Invalid CC email address: ${email}`)
-          return false
-        }
-      }
-    }
-
-    if (!formData.subject.trim()) {
-      toast.error("Please enter email subject")
-      return false
-    }
-
-    if (!formData.body.trim()) {
-      toast.error("Please enter email body")
-      return false
-    }
-
-    return true
-  }
-
   const handleSendEmail = async () => {
-    if (!validateForm()) return
+    if (!user?.uid || !to.trim() || !subject.trim() || !body.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields (To, Subject, Body).",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validate email addresses
+    const toEmails = to
+      .split(",")
+      .map((email) => email.trim())
+      .filter((email) => email)
+
+    const invalidToEmails = toEmails.filter((email) => !validateEmail(email))
+    if (invalidToEmails.length > 0) {
+      toast({
+        title: "Invalid Email",
+        description: `Invalid email addresses: ${invalidToEmails.join(", ")}`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    const ccEmails = cc
+      ? cc
+          .split(",")
+          .map((email) => email.trim())
+          .filter((email) => email)
+      : []
+
+    const invalidCcEmails = ccEmails.filter((email) => !validateEmail(email))
+    if (invalidCcEmails.length > 0) {
+      toast({
+        title: "Invalid CC Email",
+        description: `Invalid CC email addresses: ${invalidCcEmails.join(", ")}`,
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSending(true)
+    addDebugInfo("Starting email send process...")
 
     try {
-      setSending(true)
-      console.log("Starting email send process...")
-
-      // Prepare email data
+      // Create email record
       const emailData: Omit<Email, "id" | "created"> = {
-        from: "noreply@oohoperator.com",
-        to: formData.to.split(",").map((email) => email.trim()),
-        cc: formData.cc.trim() ? formData.cc.split(",").map((email) => email.trim()) : undefined,
-        subject: formData.subject,
-        body: formData.body,
-        attachments: pdfGenerated && pdfData
-          ? [
-              {
-                fileName: `report-${report?.title?.replace(/[^a-zA-Z0-9]/g, "-") || "logistics-report"}.pdf`,
-                fileUrl: pdfData,
-                fileSize: Math.round((pdfData.length * 3) / 4), // Approximate size from base64
-                fileType: "application/pdf",
-              },
-            ]
-          : undefined,
-        reportId: reportId,
+        from: "OOH Operator <noreply@yourdomain.com>",
+        to: toEmails,
+        subject,
+        body,
         status: "draft",
-        userId: "current-user-id", // Replace with actual user ID
+        userId: user.uid,
       }
 
-      console.log("Creating email record...")
+      // Add optional fields only if they have values
+      if (ccEmails.length > 0) {
+        emailData.cc = ccEmails
+      }
+      if (attachments.length > 0) {
+        emailData.attachments = attachments
+      }
+      if (selectedTemplate) {
+        emailData.templateId = selectedTemplate
+      }
+      if (reportId) {
+        emailData.reportId = reportId
+      }
 
-      // Create email record
+      addDebugInfo("Creating email record in database...")
       const emailId = await emailService.createEmail(emailData)
-      console.log("Email record created with ID:", emailId)
+      addDebugInfo(`Email record created with ID: ${emailId}`)
 
-      // Send email
-      console.log("Sending email...")
+      // Verify email was created
+      const createdEmail = await emailService.getEmailById(emailId)
+      if (!createdEmail) {
+        throw new Error("Failed to verify email creation")
+      }
+      addDebugInfo("Email record verified in database")
+
+      // Send email using our service
+      addDebugInfo("Sending email via Resend API...")
       await emailService.sendEmail(emailId)
+      addDebugInfo("Email sent successfully!")
 
-      console.log("Email sent successfully!")
-      toast.success("Email sent successfully!")
+      setEmailSent(true)
+      toast({
+        title: "Email Sent!",
+        description: `Your email has been sent successfully to ${toEmails.join(", ")}`,
+      })
 
-      // Redirect back to report
+      // Navigate back after a delay
       setTimeout(() => {
         router.push(`/logistics/reports/${reportId}`)
-      }, 2000)
+      }, 3000)
     } catch (error) {
       console.error("Error sending email:", error)
-      const errorMessage = error instanceof Error ? error.message : "Failed to send email"
-      toast.error(errorMessage)
+      const errorMessage = error instanceof Error ? error.message : "Failed to send email. Please try again."
+      addDebugInfo(`Send error: ${errorMessage}`)
+
+      toast({
+        title: "Send Failed",
+        description: errorMessage,
+        variant: "destructive",
+      })
     } finally {
       setSending(false)
     }
   }
 
-  // Show loading state
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index))
+    addDebugInfo("Attachment removed")
+  }
+
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p className="text-muted-foreground">Loading report data...</p>
-          </div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading compose email...</div>
       </div>
     )
   }
 
-  // Show error if report not found
-  if (!report) {
+  if (emailSent) {
     return (
-      <div className="container mx-auto p-6">
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>Report not found</AlertDescription>
-        </Alert>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-8 text-center">
+            <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-green-700 mb-2">Email Sent!</h2>
+            <p className="text-gray-600 mb-4">Your email has been sent successfully via Resend.</p>
+            <p className="text-sm text-gray-500 mb-6">Redirecting back to report in a few seconds...</p>
+            <Button onClick={() => router.push(`/logistics/reports/${reportId}`)}>Back to Report</Button>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold">Compose Email</h1>
-          <p className="text-muted-foreground">Send report via email</p>
+      <div className="bg-white px-6 py-4 flex items-center justify-between shadow-sm border-b">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="lg"
+            onClick={() => router.back()}
+            className="text-black rounded-full p-3 hover:bg-gray-100"
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold">Compose Email</h1>
+            <p className="text-sm text-gray-500">Send report via Resend</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Mail className="h-5 w-5 text-blue-600" />
+          <span className="text-sm font-medium text-blue-600">Powered by Resend</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Email Form */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Template Selection */}
-          {templates.length > 0 && (
+      <div className="max-w-7xl mx-auto p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Email Compose Form */}
+          <div className="lg:col-span-2 space-y-4">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Mail className="h-5 w-5" />
-                  Email Template
-                </CardTitle>
-                <CardDescription>Choose a template to get\
+              <CardContent className="p-6 space-y-4">
+                {/* To Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    To: <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={to}
+                    onChange={(e) => setTo(e.target.value)}
+                    placeholder="recipient@example.com, another@example.com"
+                    className="w-full"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Separate multiple emails with commas</p>
+                </div>
+
+                {/* CC Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cc:</label>
+                  <Input
+                    value={cc}
+                    onChange={(e) => setCc(e.target.value)}
+                    placeholder="cc@example.com"
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Subject Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Subject: <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    placeholder="Email subject"
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Body Field */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Message: <span className="text-red-500">*</span>
+                  </label>
+                  <Textarea
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    placeholder="Type your message here..."
+                    className="w-full min-h-[300px] resize-none"
+                  />
+                </div>
+
+                {/* Attachments */}
+                {attachments.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Attachments:</label>
+                    <div className="space-y-2">
+                      {attachments.map((attachment, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200"
+                        >
+                          <FileText className="h-5 w-5 text-blue-600" />
+                          <div className="flex-1">
+                            <span className="text-sm font-medium text-blue-900">{attachment.fileName}</span>
+                            <div className="text-xs text-blue-700">
+                              {(attachment.fileSize / 1024 / 1024).toFixed(2)} MB • PDF Document
+                            </div>
+                          </div>
+                          <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                            Ready
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeAttachment(index)}
+                            className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-between pt-4">
+                  <Button variant="outline" className="flex items-center gap-2 bg-transparent" disabled={generatingPDF}>
+                    <Paperclip className="h-4 w-4" />
+                    {generatingPDF ? "Generating PDF..." : "+Add Attachment"}
+                  </Button>
+
+                  <Button
+                    onClick={handleSendEmail}
+                    disabled={sending || !to.trim() || !subject.trim() || !body.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 flex items-center gap-2"
+                  >
+                    <Send className="h-4 w-4" />
+                    {sending ? "Sending..." : "Send Email"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-4">
+            {/* Templates */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold">Email Templates</h3>
+                </div>
+
+                <div className="space-y-2">
+                  {templates.map((template) => (
+                    <div key={template.id} className="flex items-center gap-2">
+                      <Button
+                        variant={selectedTemplate === template.id ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handleTemplateSelect(template)}
+                        className="flex-1 justify-start text-left"
+                      >
+                        {template.name}
+                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 rounded-full bg-yellow-100 text-yellow-600"
+                        >
+                          <Smile className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+
+                  <Separator className="my-3" />
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full flex items-center gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 bg-transparent"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Template
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Report Info */}
+            {report && (
+              <Card>
+                <CardContent className="p-4">
+                  <h3 className="font-semibold mb-2">Report Details</h3>
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="font-medium">Type:</span> {getReportTypeDisplay(report.reportType)}
+                    </div>
+                    <div>
+                      <span className="font-medium">Site:</span> {report.siteName}
+                    </div>
+                    <div>
+                      <span className="font-medium">Date:</span> {new Date(report.date).toLocaleDateString()}
+                    </div>
+                    <div>
+                      <span className="font-medium">Status:</span>{" "}
+                      <Badge className="bg-green-100 text-green-800 text-xs">
+                        {report.completionPercentage || 100}% Complete
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Debug Info */}
+            {debugInfo.length > 0 && (
+              <Card>
+                <CardContent className="p-4">
+                  <h3 className="font-semibold mb-2">Debug Log</h3>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {debugInfo.slice(-10).map((info, index) => (
+                      <div key={index} className="text-xs text-gray-600 font-mono">
+                        {info}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Resend Configuration */}
+            <Card className="border-blue-200 bg-blue-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Mail className="h-4 w-4 text-blue-600" />
+                  <h3 className="font-semibold text-blue-900">Resend Configuration</h3>
+                </div>
+                <div className="text-sm text-blue-800">
+                  {process.env.RESEND_API_KEY ? (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <span>Resend API configured - emails will be sent</span>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <AlertCircle className="h-4 w-4 text-orange-600" />
+                        <span>Demo mode - emails will be logged only</span>
+                      </div>
+                      <p className="text-xs">
+                        Configure <code>RESEND_API_KEY</code> environment variable to send real emails.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

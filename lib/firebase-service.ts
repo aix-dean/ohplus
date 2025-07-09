@@ -20,20 +20,8 @@ import { db } from "@/lib/firebase"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { subscriptionService } from "./subscription-service"
 
-// Initialize Firebase Storage only on client side
-let storage: any = null
-if (typeof window !== "undefined") {
-  try {
-    storage = getStorage()
-  } catch (error) {
-    console.error("Error initializing Firebase Storage:", error)
-  }
-}
-
-// Helper function to check if Firebase is available
-const isFirebaseAvailable = () => {
-  return typeof window !== "undefined" && db !== null
-}
+// Initialize Firebase Storage
+const storage = getStorage()
 
 // Update the Product interface to include new fields
 export interface Product {
@@ -223,11 +211,6 @@ export interface ProjectData {
 
 // Get a single product by ID
 export async function getProductById(productId: string): Promise<Product | null> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return null
-  }
-
   try {
     const productDoc = await getDoc(doc(db, "products", productId))
 
@@ -244,10 +227,6 @@ export async function getProductById(productId: string): Promise<Product | null>
 
 // Update an existing product
 export async function updateProduct(productId: string, productData: Partial<Product>): Promise<void> {
-  if (!isFirebaseAvailable()) {
-    throw new Error("Firebase not available")
-  }
-
   try {
     const productRef = doc(db, "products", productId)
 
@@ -266,11 +245,6 @@ export async function updateProduct(productId: string, productData: Partial<Prod
 
 // Get all products for a user (legacy method)
 export async function getUserProducts(userId: string): Promise<Product[]> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return []
-  }
-
   try {
     const productsRef = collection(db, "products")
     const q = query(productsRef, where("seller_id", "==", userId), orderBy("name", "asc"))
@@ -295,15 +269,6 @@ export async function getPaginatedUserProducts(
   lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
   options: { searchTerm?: string; active?: boolean } = {},
 ): Promise<PaginatedResult<Product>> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return {
-      items: [],
-      lastDoc: null,
-      hasMore: false,
-    }
-  }
-
   try {
     const productsRef = collection(db, "products")
     const { searchTerm = "", active } = options
@@ -372,11 +337,6 @@ export async function getUserProductsCount(
   userId: string,
   options: { searchTerm?: string; active?: boolean; deleted?: boolean } = {},
 ): Promise<number> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return 0
-  }
-
   try {
     const productsRef = collection(db, "products")
     const { searchTerm = "", active, deleted } = options
@@ -433,10 +393,6 @@ export async function createProduct(
   licenseKey: string, // Added licenseKey
   productData: Partial<Product>,
 ): Promise<string> {
-  if (!isFirebaseAvailable()) {
-    throw new Error("Firebase not available")
-  }
-
   try {
     // Check subscription limits before creating a product
     const subscription = await subscriptionService.getSubscriptionByLicenseKey(licenseKey)
@@ -473,10 +429,6 @@ export async function createProduct(
 
 // Soft delete a product (mark as deleted)
 export async function softDeleteProduct(productId: string, licenseKey: string): Promise<void> {
-  if (!isFirebaseAvailable()) {
-    throw new Error("Firebase not available")
-  }
-
   try {
     const productRef = doc(db, "products", productId)
     await updateDoc(productRef, {
@@ -491,11 +443,6 @@ export async function softDeleteProduct(productId: string, licenseKey: string): 
 }
 
 export async function getAllProducts(): Promise<Product[]> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return []
-  }
-
   try {
     const productsRef = collection(db, "products")
     const querySnapshot = await getDocs(productsRef)
@@ -514,11 +461,6 @@ export async function getAllProducts(): Promise<Product[]> {
 
 // Search products by term (for more complex search requirements)
 export async function searchUserProducts(userId: string, searchTerm: string): Promise<Product[]> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return []
-  }
-
   try {
     // For simple searches, we can fetch all user products and filter client-side
     // For production with large datasets, consider using Algolia, Elasticsearch, or Firestore's array-contains
@@ -548,15 +490,6 @@ export async function getProductsByContentType(
   lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
   searchTerm = "",
 ): Promise<PaginatedResult<Product>> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return {
-      items: [],
-      lastDoc: null,
-      hasMore: false,
-    }
-  }
-
   try {
     const productsRef = collection(db, "products")
 
@@ -648,11 +581,6 @@ export async function getProductsByContentType(
 
 // Get count of products by content type
 export async function getProductsCountByContentType(contentType: string, searchTerm = ""): Promise<number> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return 0
-  }
-
   try {
     const productsRef = collection(db, "products")
 
@@ -703,11 +631,6 @@ export async function getProductsCountByContentType(contentType: string, searchT
 
 // Add these functions at the end of the file
 export async function getServiceAssignments(): Promise<ServiceAssignment[]> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return []
-  }
-
   try {
     const assignmentsRef = collection(db, "service_assignments")
     const querySnapshot = await getDocs(assignmentsRef)
@@ -725,11 +648,6 @@ export async function getServiceAssignments(): Promise<ServiceAssignment[]> {
 }
 
 export async function getServiceAssignmentById(assignmentId: string): Promise<ServiceAssignment | null> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return null
-  }
-
   try {
     const assignmentDoc = await getDoc(doc(db, "service_assignments", assignmentId))
 
@@ -748,10 +666,6 @@ export async function updateServiceAssignment(
   assignmentId: string,
   assignmentData: Partial<ServiceAssignment>,
 ): Promise<void> {
-  if (!isFirebaseAvailable()) {
-    throw new Error("Firebase not available")
-  }
-
   try {
     const assignmentRef = doc(db, "service_assignments", assignmentId)
 
@@ -770,11 +684,6 @@ export async function updateServiceAssignment(
 
 // Add this function at the end of the file
 export async function getProductBookings(productId: string): Promise<Booking[]> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return []
-  }
-
   try {
     const bookingsRef = collection(db, "booking")
     const q = query(bookingsRef, where("product_id", "==", productId), orderBy("created", "desc"))
@@ -795,11 +704,6 @@ export async function getProductBookings(productId: string): Promise<Booking[]> 
 
 // Add this function at the end of the file
 export async function getUserById(userId: string): Promise<User | null> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return null
-  }
-
   try {
     const userDoc = await getDoc(doc(db, "users", userId))
 
@@ -816,11 +720,6 @@ export async function getUserById(userId: string): Promise<User | null> {
 
 // Update this function to make status filtering case-insensitive
 export async function getServiceAssignmentsByProductId(productId: string): Promise<ServiceAssignment[]> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return []
-  }
-
   try {
     const assignmentsRef = collection(db, "service_assignments")
 
@@ -852,11 +751,6 @@ export async function getServiceAssignmentsByProductId(productId: string): Promi
 
 // Get all quotation requests
 export async function getQuotationRequests(): Promise<QuotationRequest[]> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return []
-  }
-
   try {
     const quotationRequestsRef = collection(db, "quotation_request")
     const q = query(quotationRequestsRef, where("deleted", "==", false), orderBy("created", "desc"))
@@ -876,11 +770,6 @@ export async function getQuotationRequests(): Promise<QuotationRequest[]> {
 
 // Get quotation requests by seller ID
 export async function getQuotationRequestsBySellerId(sellerId: string): Promise<QuotationRequest[]> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return []
-  }
-
   try {
     const quotationRequestsRef = collection(db, "quotation_request")
     const q = query(
@@ -905,11 +794,6 @@ export async function getQuotationRequestsBySellerId(sellerId: string): Promise<
 
 // Get quotation requests by product ID
 export async function getQuotationRequestsByProductId(productId: string): Promise<QuotationRequest[]> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return []
-  }
-
   try {
     const quotationRequestsRef = collection(db, "quotation_request")
     const q = query(
@@ -942,15 +826,6 @@ export async function getPaginatedQuotationRequests(
     searchTerm?: string
   } = {},
 ): Promise<PaginatedResult<QuotationRequest>> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return {
-      items: [],
-      lastDoc: null,
-      hasMore: false,
-    }
-  }
-
   try {
     const quotationRequestsRef = collection(db, "quotation_request")
     const { sellerId, status, searchTerm = "" } = options
@@ -1022,11 +897,6 @@ export async function getPaginatedQuotationRequests(
 
 // Get a single quotation request by ID
 export async function getQuotationRequestById(quotationRequestId: string): Promise<QuotationRequest | null> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return null
-  }
-
   try {
     const quotationRequestDoc = await getDoc(doc(db, "quotation_request", quotationRequestId))
 
@@ -1046,10 +916,6 @@ export async function updateQuotationRequest(
   quotationRequestId: string,
   quotationRequestData: Partial<QuotationRequest>,
 ): Promise<void> {
-  if (!isFirebaseAvailable()) {
-    throw new Error("Firebase not available")
-  }
-
   try {
     const quotationRequestRef = doc(db, "quotation_request", quotationRequestId)
 
@@ -1068,10 +934,6 @@ export async function updateQuotationRequest(
 
 // Create a new quotation request
 export async function createQuotationRequest(quotationRequestData: Partial<QuotationRequest>): Promise<string> {
-  if (!isFirebaseAvailable()) {
-    throw new Error("Firebase not available")
-  }
-
   try {
     const newQuotationRequest = {
       ...quotationRequestData,
@@ -1090,10 +952,6 @@ export async function createQuotationRequest(quotationRequestData: Partial<Quota
 
 // Soft delete a quotation request
 export async function softDeleteQuotationRequest(quotationRequestId: string): Promise<void> {
-  if (!isFirebaseAvailable()) {
-    throw new Error("Firebase not available")
-  }
-
   try {
     const quotationRequestRef = doc(db, "quotation_request", quotationRequestId)
     await updateDoc(quotationRequestRef, {
@@ -1108,11 +966,6 @@ export async function softDeleteQuotationRequest(quotationRequestId: string): Pr
 
 // Get quotations by quotation request ID
 export async function getQuotationsByRequestId(quotationRequestId: string): Promise<any[]> {
-  if (!isFirebaseAvailable()) {
-    console.error("Firebase not available")
-    return []
-  }
-
   try {
     const quotationsRef = collection(db, "quotations")
     const q = query(quotationsRef, where("quotation_request_id", "==", quotationRequestId), orderBy("created", "desc"))
@@ -1137,10 +990,6 @@ export async function getQuotationsByRequestId(quotationRequestId: string): Prom
  * @returns The download URL of the uploaded file.
  */
 export async function uploadFileToFirebaseStorage(file: File, path: string): Promise<string> {
-  if (!storage) {
-    throw new Error("Firebase Storage not available")
-  }
-
   try {
     const storageRef = ref(storage, `${path}${file.name}`)
     const snapshot = await uploadBytes(storageRef, file)

@@ -9,7 +9,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "@ai-sdk/google": "^0.0.52",
+    "@ai-sdk/openai": "^0.0.66",
     "@algolia/client-search": "^5.12.0",
     "@google/generative-ai": "latest",
     "@hookform/resolvers": "latest",
@@ -33,6 +33,7 @@
     "@radix-ui/react-select": "latest",
     "@radix-ui/react-separator": "latest",
     "@radix-ui/react-sheet": "^1.1.0",
+    "@radix-ui/react-sidebar": "^1.1.0",
     "@radix-ui/react-slider": "latest",
     "@radix-ui/react-slot": "latest",
     "@radix-ui/react-switch": "latest",
@@ -45,7 +46,6 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "ai": "^3.4.32",
-    "algoliasearch": "^5.12.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "latest",
@@ -58,7 +58,6 @@
     "lucide-react": "^0.454.0",
     "next": "15.2.4",
     "next-themes": "latest",
-    "nodemailer": "latest",
     "react": "^19",
     "react-day-picker": "latest",
     "react-dom": "^19",
@@ -73,8 +72,8 @@
     "zod": "latest"
   },
   "devDependencies": {
+    "@types/eslint": "^9",
     "@types/node": "^22",
-    "@types/nodemailer": "^6.4.19",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^8",

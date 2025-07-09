@@ -1,4 +1,4 @@
-import { initializeApp, getApps, getApp } from "firebase/app"
+import { initializeApp, getApps } from "firebase/app"
 import { getAuth } from "firebase/auth"
 import { getFirestore } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
@@ -12,35 +12,26 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 }
 
-// Initialize Firebase app
+// Initialize Firebase only if it hasn't been initialized already
 let app
-if (typeof window !== "undefined") {
-  // Client-side initialization only
-  if (getApps().length === 0) {
-    app = initializeApp(firebaseConfig)
-  } else {
-    app = getApp()
-  }
+const existingApps = getApps()
+if (existingApps.length === 0) {
+  app = initializeApp(firebaseConfig)
 } else {
-  // Server-side - don't initialize Firebase
-  app = null
+  app = existingApps[0]
 }
 
-// Initialize services with proper checks
-let db: any = null
-let auth: any = null
-let storage: any = null
+// Initialize services only on client side
+let db
+let auth
+let storage
 
-if (typeof window !== "undefined" && app) {
-  // Client-side service initialization
-  try {
-    db = getFirestore(app)
-    auth = getAuth(app)
-    auth.tenantId = "ohplus-07hsi"
-    storage = getStorage(app)
-  } catch (error) {
-    console.error("Error initializing Firebase services:", error)
-  }
+if (typeof window !== "undefined") {
+  // Client-side initialization
+  db = getFirestore(app)
+  auth = getAuth(app)
+  auth.tenantId = "ohplus-07hsi"
+  storage = getStorage(app)
 }
 
 export { db, auth, storage }
