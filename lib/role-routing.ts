@@ -1,5 +1,8 @@
-export function getDashboardRouteByRole(role: string | null): string {
-  switch (role?.toLowerCase()) {
+export function getDashboardRouteByRole(role: string | null | undefined): string {
+  // Ensure role is a string and handle null/undefined cases
+  const roleString = typeof role === "string" ? role.toLowerCase() : ""
+
+  switch (roleString) {
     case "admin":
       return "/admin/dashboard"
     case "sales":
@@ -13,7 +16,27 @@ export function getDashboardRouteByRole(role: string | null): string {
   }
 }
 
-export function getDefaultRouteByRole(role: string | null): string {
+export function getDefaultRouteByRole(role: string | null | undefined): string {
   // This can be used for other redirects throughout the app
   return getDashboardRouteByRole(role)
+}
+
+export function canAccessAdminRoutes(role: string | null | undefined): boolean {
+  const roleString = typeof role === "string" ? role.toLowerCase() : ""
+  return roleString === "admin"
+}
+
+export function canAccessSalesRoutes(role: string | null | undefined): boolean {
+  const roleString = typeof role === "string" ? role.toLowerCase() : ""
+  return roleString === "admin" || roleString === "sales"
+}
+
+export function canAccessLogisticsRoutes(role: string | null | undefined): boolean {
+  const roleString = typeof role === "string" ? role.toLowerCase() : ""
+  return roleString === "admin" || roleString === "logistics"
+}
+
+export function canAccessCMSRoutes(role: string | null | undefined): boolean {
+  const roleString = typeof role === "string" ? role.toLowerCase() : ""
+  return roleString === "admin" || roleString === "cms"
 }

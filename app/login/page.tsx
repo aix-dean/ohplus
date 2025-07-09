@@ -47,11 +47,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password)
-      // Wait a moment for userData to be populated
-      setTimeout(() => {
-        const dashboardRoute = getDashboardRouteByRole(userData?.role || null)
-        router.push(dashboardRoute)
-      }, 100)
+      // The useEffect will handle the redirect once userData is available
     } catch (error: any) {
       console.error("Login error:", error)
 
