@@ -778,7 +778,7 @@ export async function generateReportPDF(
 
     // Helper function to check if we need a new page
     const checkNewPage = (requiredHeight: number) => {
-      if (yPosition + requiredHeight > pageHeight - 30) {
+      if (yPosition + requiredHeight > pageHeight - 20) {
         // Leave space for footer
         pdf.addPage()
         yPosition = 0
@@ -808,19 +808,19 @@ export async function generateReportPDF(
     const addHeaderToPage = async () => {
       // Create header background - dark blue to cyan gradient effect
       pdf.setFillColor(30, 58, 138) // Dark blue
-      pdf.rect(0, yPosition, pageWidth, 35, "F")
+      pdf.rect(0, yPosition, pageWidth, 25, "F") // Changed from 35 to 25
 
       // Add cyan accent
       pdf.setFillColor(52, 211, 235) // Cyan
-      pdf.rect(pageWidth * 0.7, yPosition, pageWidth * 0.3, 35, "F")
+      pdf.rect(pageWidth * 0.7, yPosition, pageWidth * 0.3, 25, "F") // Changed from 35 to 25
 
       // Add "Logistics" text
       pdf.setTextColor(255, 255, 255)
-      pdf.setFontSize(18)
+      pdf.setFontSize(16) // Reduced from 18 to 16
       pdf.setFont("helvetica", "bold")
-      pdf.text("Logistics", margin, yPosition + 20)
+      pdf.text("Logistics", margin, yPosition + 15) // Adjusted positioning
 
-      yPosition += 40
+      yPosition += 30 // Changed from 40 to 30
     }
 
     // Add header to first page
@@ -1083,19 +1083,19 @@ export async function generateReportPDF(
     yPosition += 15
 
     // Add bottom footer with gradient background - exactly like preview
-    const footerY = pageHeight - 20
+    const footerY = pageHeight - 15 // Changed from 20 to 15
     pdf.setFillColor(52, 211, 235) // Cyan
-    pdf.rect(0, footerY, pageWidth * 0.3, 20, "F")
+    pdf.rect(0, footerY, pageWidth * 0.3, 15, "F") // Changed from 20 to 15
     pdf.setFillColor(30, 58, 138) // Dark blue
-    pdf.rect(pageWidth * 0.3, footerY, pageWidth * 0.7, 20, "F")
+    pdf.rect(pageWidth * 0.3, footerY, pageWidth * 0.7, 15, "F") // Changed from 20 to 15
 
     // Add footer text
     pdf.setTextColor(255, 255, 255)
-    pdf.setFontSize(8)
+    pdf.setFontSize(7) // Reduced from 8 to 7
     pdf.setFont("helvetica", "normal")
-    pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 50, footerY + 10)
+    pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 50, footerY + 8) // Adjusted positioning
     pdf.setFont("helvetica", "bold")
-    pdf.text("OH!", pageWidth - margin - 15, footerY + 15)
+    pdf.text("OH!", pageWidth - margin - 15, footerY + 12) // Adjusted positioning
 
     if (returnBase64) {
       return pdf.output("datauristring").split(",")[1]
