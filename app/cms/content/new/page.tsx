@@ -393,6 +393,7 @@ export default function CMSContentCreatePage() {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log("create content")
     e.preventDefault()
 
     // Check if user and project data are available
