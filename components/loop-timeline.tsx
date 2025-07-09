@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Clock, Play } from "lucide-react"
+import { useState } from "react"
+import VideoUploadDialog from "./video-upload-dialog"
 
 interface CMSData {
   end_time: string
@@ -13,6 +15,9 @@ interface CMSData {
 
 interface LoopTimelineProps {
   cmsData: CMSData
+  productId?: string
+  companyId?: string
+  sellerId?: string
 }
 
 interface TimelineSpot {
@@ -24,7 +29,10 @@ interface TimelineSpot {
   status: "active" | "pending" | "available"
 }
 
-export function LoopTimeline({ cmsData }: LoopTimelineProps) {
+export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTimelineProps) {
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
+  const [selectedSpotNumber, setSelectedSpotNumber] = useState<number | null>(null)
+
   // Extract CMS configuration from database structure
   const startTimeStr = cmsData.start_time // "16:44"
   const endTimeStr = cmsData.end_time // "18:44"
@@ -126,9 +134,15 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
     }
   }
 
-  const handleAddSpot = (spotId: string) => {
-    console.log(`Add action for spot: ${spotId}`)
-    // Add your spot action logic here
+  const handleAddSpot = (spotNumber: number) => {
+    setSelectedSpotNumber(spotNumber)
+    setUploadDialogOpen(true)
+  }
+
+  const handleUploadSuccess = () => {
+    setUploadDialogOpen(false)
+    setSelectedSpotNumber(null)
+    // Optionally refresh the timeline or show success message
   }
 
   return (
@@ -161,7 +175,6 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
               <span className="font-medium text-gray-500">Total Loop Duration:</span>
               <div className="text-lg font-semibold">{formatDuration(totalLoopDuration)}</div>
             </div>
-
           </div>
         </CardContent>
       </Card>
@@ -246,7 +259,7 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
                     size="sm"
                     variant="outline"
                     className="flex-shrink-0 bg-transparent"
-                    onClick={() => handleAddSpot(spot.id)}
+                    onClick={() => handleAddSpot(index + 1)}
                   >
                     <Plus size={16} />
                   </Button>
@@ -287,6 +300,17 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Video Upload Dialog */}
+      <VideoUploadDialog
+        open={uploadDialogOpen}
+        onOpenChange={setUploadDialogOpen}
+        onUploadSuccess={handleUploadSuccess}
+        productId={productId}
+        spotNumber={selectedSpotNumber}
+        companyId={companyId}
+        sellerId={sellerId}
+      />
     </div>
   )
 }

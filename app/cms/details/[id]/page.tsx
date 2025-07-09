@@ -48,6 +48,8 @@ interface CMSProductData {
   dimensions?: string
   created: string
   updated: string
+  company_id?: string
+  seller_id?: string
   cms: {
     end_time: string
     loops_per_day: number
@@ -112,6 +114,8 @@ async function getProductData(id: string): Promise<CMSProductData | null> {
       dimensions: `H: ${product.specs_rental?.height || 12} × W: ${product.specs_rental?.width || 12}`,
       created: product.created ? new Date(product.created.seconds * 1000).toLocaleDateString() : "Unknown",
       updated: product.updated ? new Date(product.updated.seconds * 1000).toLocaleDateString() : "Unknown",
+      company_id: product.company_id,
+      seller_id: product.seller_id,
       cms: {
         end_time: product.cms?.end_time || "18:00",
         loops_per_day: product.cms?.loops_per_day || 20,
@@ -731,7 +735,12 @@ export default async function Page({ params }: Props) {
 
         {/* Loop Timeline Tab */}
         <TabsContent value="timeline" className="space-y-6">
-          <LoopTimeline cmsData={product.cms} />
+          <LoopTimeline
+            cmsData={product.cms}
+            productId={product.id}
+            companyId={product.company_id}
+            sellerId={product.seller_id}
+          />
         </TabsContent>
       </Tabs>
     </div>
