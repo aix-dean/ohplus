@@ -1,34 +1,14 @@
 import jsPDF from "jspdf"
 import type { Proposal } from "@/lib/types/proposal"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
-import { getReports } from "@/lib/report-service"
-import { getProductById } from "@/lib/firebase-service"
+import { getReports, type ReportData } from "./report-service"
+import type { Product } from "./firebase-service"
 
 // Types for PDF generation
 export interface PDFGenerationOptions {
   reportData: any
   includeImages?: boolean
   includeNotes?: boolean
-}
-
-export interface ReportData {
-  id: string
-  title: string
-  status: string
-  createdBy: string
-  created: any
-  siteId?: string
-  assignmentId?: string
-  description?: string
-  notes?: string
-  photos?: string[]
-  location?: {
-    address: string
-    coordinates?: {
-      lat: number
-      lng: number
-    }
-  }
 }
 
 // Helper function to load image and convert to base64
@@ -785,277 +765,93 @@ export async function generateCostEstimatePDF(
   }
 }
 
-// Main function for generating report PDFs
 export async function generateReportPDF(
   reportData: ReportData,
-  productData?: any | null,
-  returnBlob = false,
-): Promise<Blob | void> {
+  product?: Product | null,
+  returnAsBlob = false,
+): Promise<string | Blob> {
   try {
-    console.log("Generating PDF for report:", reportData.id)
+    console.log("Generating PDF with options:", { reportId: reportData.id, hasProduct: !!product, returnAsBlob })
 
-    // Create HTML content for the PDF
-    const htmlContent = generateReportHTML(reportData, productData)
+    const pdfContent = createPDFContent(reportData, product)
 
-    // For now, we'll create a simple text-based "PDF" as a blob
-    // In a real implementation, you would use a PDF library like jsPDF or Puppeteer
-    const pdfContent = generateSimplePDFContent(reportData, productData)
-
-    if (returnBlob) {
-      // Create a blob that simulates a PDF
-      const blob = new Blob([pdfContent], { type: "application/pdf" })
-      console.log("PDF blob created, size:", blob.size)
-      return blob
+    if (returnAsBlob) {
+      return new Blob([pdfContent], { type: "application/pdf" })
+    } else {
+      return btoa(pdfContent) // Return as base64
     }
-
-    // For non-blob returns, we could trigger a download
-    console.log("PDF content generated")
   } catch (error) {
     console.error("Error generating PDF:", error)
-    throw new Error("Failed to generate PDF")
+    throw new Error(`Failed to generate PDF: ${error instanceof Error ? error.message : "Unknown error"}`)
   }
 }
 
-export async function generateReportPDFFromId(reportId: string): Promise<Blob> {
-  try {
-    console.log("Generating PDF for report ID:", reportId)
+function createPDFContent(report: ReportData, product?: Product | null): string {
+  const content = `
+OOH OPERATOR - LOGISTICS REPORT
+================================
 
-    // Get report data
-    const reports = await getReports()
-    const report = reports.find((r) => r.id === reportId)
+Report Details:
+---------------
+Title: ${report.title || "Untitled Report"}
+Report ID: ${report.id}
+Status: ${report.status || "N/A"}
+Created: ${report.createdAt?.toDate?.()?.toLocaleDateString() || "N/A"}
+Location: ${report.location || "N/A"}
 
-    if (!report) {
-      throw new Error("Report not found")
-    }
-
-    // Get product data if available
-    let product: any | null = null
-    if (report.siteId) {
-      try {
-        product = await getProductById(report.siteId)
-      } catch (error) {
-        console.log("Product not found, continuing without product data")
-      }
-    }
-
-    // Generate PDF
-    const blob = (await generateReportPDF(report, product, true)) as Blob
-    return blob
-  } catch (error) {
-    console.error("Error generating PDF from ID:", error)
-    throw error
-  }
+${
+  product
+    ? `
+Site Information:
+-----------------
+Site Name: ${product.name || "N/A"}
+Site Code: ${product.site_code || "N/A"}
+Location: ${product.light?.location || product.specs_rental?.location || "N/A"}
+Type: ${product.type || "N/A"}
+Status: ${product.status || "N/A"}
+`
+    : ""
 }
 
-function generateReportHTML(reportData: ReportData, productData?: any | null): string {
-  const reportTypeDisplay = reportData.reportType
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
+Report Summary:
+---------------
+${report.description || "No description available."}
 
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>${reportTypeDisplay} - ${reportData.siteName}</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
-        .section { margin-bottom: 20px; }
-        .label { font-weight: bold; color: #333; }
-        .value { margin-left: 10px; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .status { padding: 5px 10px; border-radius: 5px; background: #e8f5e8; color: #2d5a2d; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>${reportTypeDisplay}</h1>
-        <h2>${reportData.siteName}</h2>
-        <p>Generated on ${new Date().toLocaleDateString()}</p>
-      </div>
-      
-      <div class="grid">
-        <div class="section">
-          <h3>Report Information</h3>
-          <p><span class="label">Report ID:</span><span class="value">${reportData.id}</span></p>
-          <p><span class="label">Type:</span><span class="value">${reportTypeDisplay}</span></p>
-          <p><span class="label">Date:</span><span class="value">${new Date(reportData.created).toLocaleDateString()}</span></p>
-          <p><span class="label">Status:</span><span class="value status">${reportData.status || "Active"}</span></p>
-          <p><span class="label">Created By:</span><span class="value">${reportData.createdBy || "Unknown"}</span></p>
-        </div>
-        
-        <div class="section">
-          <h3>Site Information</h3>
-          <p><span class="label">Site Name:</span><span class="value">${reportData.siteName}</span></p>
-          <p><span class="label">Site ID:</span><span class="value">${reportData.siteId || "N/A"}</span></p>
-          ${
-            productData
-              ? `
-            <p><span class="label">Product:</span><span class="value">${productData.name}</span></p>
-            <p><span class="label">Location:</span><span class="value">${productData.location || "N/A"}</span></p>
-          `
-              : ""
-          }
-        </div>
-      </div>
-      
-      <div class="section">
-        <h3>Report Details</h3>
-        <p>This ${reportTypeDisplay.toLowerCase()} contains comprehensive information about the site status, maintenance activities, and operational metrics.</p>
-        
-        ${
-          reportData.description
-            ? `
-          <h4>Description:</h4>
-          <p>${reportData.description}</p>
-        `
-            : ""
-        }
-        
-        ${
-          reportData.notes
-            ? `
-          <h4>Notes:</h4>
-          <p>${reportData.notes}</p>
-        `
-            : ""
-        }
-        
-        <h4>Photos:</h4>
-        <p>${reportData.photos?.length || 0} attached</p>
-        
-        <h4>Generated By:</h4>
-        <p>OOH Operator Platform - Logistics Management System</p>
-        <p>Report generated automatically on ${new Date().toLocaleString()}</p>
-      </div>
-    </body>
-    </html>
-  `
+${
+  report.completionPercentage
+    ? `
+Completion Status: ${report.completionPercentage}%
+`
+    : ""
 }
 
-function generateSimplePDFContent(reportData: ReportData, productData?: any | null): string {
-  const reportTypeDisplay = reportData.reportType
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
-
-  // This is a simplified text-based PDF content
-  // In production, you would use a proper PDF library
-  return `%PDF-1.4
-1 0 obj
-<<
-/Type /Catalog
-/Pages 2 0 R
->>
-endobj
-
-2 0 obj
-<<
-/Type /Pages
-/Kids [3 0 R]
-/Count 1
->>
-endobj
-
-3 0 obj
-<<
-/Type /Page
-/Parent 2 0 R
-/MediaBox [0 0 612 792]
-/Contents 4 0 R
-/Resources <<
-/Font <<
-/F1 5 0 R
->>
->>
->>
-endobj
-
-4 0 obj
-<<
-/Length 800
->>
-stream
-BT
-/F1 18 Tf
-50 750 Td
-(OOH OPERATOR - LOGISTICS REPORT) Tj
-0 -30 Td
-/F1 12 Tf
-(Generated: ${new Date().toLocaleDateString()}) Tj
-0 -40 Td
-/F1 14 Tf
-(Report ID: ${reportData.id}) Tj
-0 -20 Td
-(Title: ${reportData.title || "Untitled Report"}) Tj
-0 -20 Td
-(Status: ${reportData.status || "Active"}) Tj
-0 -20 Td
-(Created By: ${reportData.createdBy || "Unknown"}) Tj
-0 -20 Td
-(Created Date: ${new Date(reportData.created).toLocaleDateString()}) Tj
-0 -40 Td
-/F1 12 Tf
-(REPORT DETAILS:) Tj
-0 -20 Td
-(Site ID: ${reportData.siteId || "N/A"}) Tj
-0 -15 Td
-(Assignment ID: ${reportData.assignmentId || "N/A"}) Tj
-0 -15 Td
-(Location: ${reportData.location?.address || "N/A"}) Tj
-0 -30 Td
-(Description:) Tj
-0 -15 Td
-(${reportData.description || "No description provided"}) Tj
-0 -30 Td
-(Notes:) Tj
-0 -15 Td
-(${reportData.notes || "No notes provided"}) Tj
-0 -30 Td
-(Photos: ${reportData.photos?.length || 0} attached) Tj
-0 -50 Td
-(This report was generated by OOH Operator platform.) Tj
-0 -15 Td
-(For questions, contact: support@oohoperator.com) Tj
-ET
-endstream
-endobj
-
-5 0 obj
-<<
-/Type /Font
-/Subtype /Type1
-/BaseFont /Helvetica
->>
-endobj
-
-xref
-0 6
-0000000000 65535 f 
-0000000010 00000 n 
-0000000053 00000 n 
-0000000110 00000 n 
-0000000251 00000 n 
-0000001102 00000 n 
-trailer
-<<
-/Size 6
-/Root 1 0 R
->>
-startxref
-1171
-%%EOF`
+${
+  report.assignedTo
+    ? `
+Assigned To: ${report.assignedTo}
+`
+    : ""
 }
 
-export function generateReportPDFBlob(reportData: ReportData): Blob {
-  const pdfContent = generateReportPDF(reportData)
-  return new Blob([pdfContent], { type: "application/pdf" })
+${
+  report.notes
+    ? `
+Additional Notes:
+-----------------
+${report.notes}
+`
+    : ""
 }
 
-export async function generateReportPDFBase64(reportData: ReportData): Promise<string> {
-  const pdfContent = generateReportPDF(reportData)
-  return btoa(pdfContent)
+Generated by OOH Operator Platform
+Contact: support@oohoperator.com
+Date: ${new Date().toLocaleDateString()}
+
+---
+This is a computer-generated document.
+  `.trim()
+
+  return content
 }
 
 // PDF Service class for additional functionality
@@ -1095,9 +891,9 @@ export class PDFService {
       yPosition += 8
       doc.text(`Site ID: ${reportData.siteId || "N/A"}`, 20, yPosition)
       yPosition += 8
-      doc.text(`Date: ${reportData.created ? new Date(reportData.created).toLocaleDateString() : "N/A"}`, 20, yPosition)
+      doc.text(`Date: ${reportData.date ? new Date(reportData.date).toLocaleDateString() : "N/A"}`, 20, yPosition)
       yPosition += 8
-      doc.text(`Status: ${reportData.status || "Active"}`, 20, yPosition)
+      doc.text(`Status: ${reportData.completionPercentage || 100}% Complete`, 20, yPosition)
       yPosition += 15
 
       // Notes section
@@ -1131,37 +927,27 @@ export class PDFService {
 
   static async generateReportPDFFromId(reportId: string): Promise<Blob> {
     try {
-      // This would typically fetch the report data from your database
-      // For now, we'll create a sample report
-      const sampleReportData: ReportData = {
-        id: reportId,
-        title: "LED Billboard Installation",
-        status: "Active",
-        createdBy: "System User",
-        created: new Date(),
-        siteId: reportId,
-        assignmentId: "A123",
-        description:
-          "Installation completed successfully. All systems tested and operational. Client training provided.",
-        notes: "None",
-        photos: [],
-        location: {
-          address: "Manila, Philippines",
-          coordinates: {
-            lat: 14.5995,
-            lng: 120.9842,
-          },
-        },
+      console.log("Generating PDF for report ID:", reportId)
+
+      // Get report data
+      const reports = await getReports()
+      const report = reports.find((r) => r.id === reportId)
+
+      if (!report) {
+        throw new Error("Report not found")
       }
 
-      return await this.generateReportPDF({
-        reportData: sampleReportData,
-        includeImages: true,
-        includeNotes: true,
-      })
+      // Generate PDF content
+      const pdfContent = createPDFContent(report)
+
+      // Create blob (simulation)
+      const blob = new Blob([pdfContent], { type: "application/pdf" })
+
+      console.log("PDF blob generated:", blob.size, "bytes")
+      return blob
     } catch (error) {
-      console.error("Error generating PDF from report ID:", error)
-      throw new Error("Failed to generate PDF report")
+      console.error("Error generating PDF from ID:", error)
+      throw new Error(`Failed to generate PDF: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
 }

@@ -2,43 +2,45 @@ import {
   collection,
   addDoc,
   getDocs,
-  doc,
   getDoc,
+  doc,
   updateDoc,
-  deleteDoc,
+  serverTimestamp,
   query,
   where,
   orderBy,
   type Timestamp,
-  serverTimestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
-// Email types
+// Helper function to check if Firebase is available
+const isFirebaseAvailable = () => {
+  return typeof window !== "undefined" && db !== null
+}
+
 export interface EmailAttachment {
   fileName: string
-  content: string | Buffer
-  contentType: string
+  fileUrl: string
   fileSize: number
+  fileType: string
 }
 
 export interface Email {
-  id?: string
+  id: string
   from: string
   to: string[]
   cc?: string[]
-  bcc?: string[]
   subject: string
   body: string
   attachments?: EmailAttachment[]
-  templateId?: string
-  reportId?: string
   status: "draft" | "sending" | "sent" | "failed"
   userId: string
-  created?: Timestamp
-  sent?: Timestamp
-  error?: string
-  messageId?: string
+  reportId?: string
+  templateId?: string
+  created: Timestamp
+  updated?: Timestamp
+  sentAt?: Timestamp
+  errorMessage?: string
 }
 
 export interface EmailTemplate {
@@ -46,103 +48,123 @@ export interface EmailTemplate {
   name: string
   subject: string
   body: string
+  category: string
   userId: string
   created?: Timestamp
+  updated?: Timestamp
 }
 
 class EmailService {
-  private emailsCollection = "compose_emails"
-  private templatesCollection = "email_templates"
-
   // Email CRUD operations
   async createEmail(emailData: Omit<Email, "id" | "created">): Promise<string> {
+    if (!isFirebaseAvailable()) {
+      throw new Error("Firebase not available - cannot create email record")
+    }
+
     try {
-      // Clean undefined values
-      const cleanEmailData = Object.fromEntries(Object.entries(emailData).filter(([_, value]) => value !== undefined))
-
-      const docRef = await addDoc(collection(db, this.emailsCollection), {
-        ...cleanEmailData,
+      const emailWithTimestamp = {
+        ...emailData,
         created: serverTimestamp(),
-      })
+        status: "draft" as const,
+      }
 
+      const docRef = await addDoc(collection(db, "compose_emails"), emailWithTimestamp)
       console.log("Email record created with ID:", docRef.id)
       return docRef.id
     } catch (error) {
       console.error("Error creating email:", error)
-      throw new Error("Failed to create email record")
+      throw new Error(`Failed to create email record: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
 
   async getEmailById(emailId: string): Promise<Email | null> {
+    if (!isFirebaseAvailable()) {
+      console.error("Firebase not available - cannot fetch email")
+      return null
+    }
+
     try {
-      const emailDoc = await getDoc(doc(db, this.emailsCollection, emailId))
+      const emailDoc = await getDoc(doc(db, "compose_emails", emailId))
       if (emailDoc.exists()) {
-        const data = emailDoc.data()
-        return {
-          id: emailDoc.id,
-          ...data,
-          created: data.created,
-          sent: data.sent,
-        } as Email
+        return { id: emailDoc.id, ...emailDoc.data() } as Email
       }
       return null
     } catch (error) {
-      console.error("Error getting email:", error)
-      throw new Error("Failed to get email")
+      console.error("Error fetching email:", error)
+      return null
     }
   }
 
-  async getEmails(userId?: string): Promise<Email[]> {
-    try {
-      let q = query(collection(db, this.emailsCollection), orderBy("created", "desc"))
+  async updateEmailStatus(emailId: string, status: Email["status"], errorMessage?: string): Promise<void> {
+    if (!isFirebaseAvailable()) {
+      throw new Error("Firebase not available - cannot update email status")
+    }
 
-      if (userId) {
-        q = query(collection(db, this.emailsCollection), where("userId", "==", userId), orderBy("created", "desc"))
+    try {
+      const updateData: any = {
+        status,
+        updated: serverTimestamp(),
       }
 
-      const querySnapshot = await getDocs(q)
-      return querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Email[]
+      if (status === "sent") {
+        updateData.sentAt = serverTimestamp()
+      }
+
+      if (errorMessage) {
+        updateData.errorMessage = errorMessage
+      }
+
+      await updateDoc(doc(db, "compose_emails", emailId), updateData)
     } catch (error) {
-      console.error("Error getting emails:", error)
+      console.error("Error updating email status:", error)
+      throw error
+    }
+  }
+
+  async getUserEmails(userId: string): Promise<Email[]> {
+    if (!isFirebaseAvailable()) {
+      console.error("Firebase not available - cannot fetch user emails")
+      return []
+    }
+
+    try {
+      const q = query(collection(db, "compose_emails"), where("userId", "==", userId), orderBy("created", "desc"))
+      const querySnapshot = await getDocs(q)
+
+      const emails: Email[] = []
+      querySnapshot.forEach((doc) => {
+        emails.push({ id: doc.id, ...doc.data() } as Email)
+      })
+
+      return emails
+    } catch (error) {
+      console.error("Error fetching user emails:", error)
       return []
     }
   }
 
-  async updateEmail(emailId: string, updates: Partial<Email>): Promise<void> {
-    try {
-      const cleanUpdates = Object.fromEntries(Object.entries(updates).filter(([_, value]) => value !== undefined))
-      await updateDoc(doc(db, this.emailsCollection, emailId), cleanUpdates)
-      console.log("Email updated:", emailId, cleanUpdates)
-    } catch (error) {
-      console.error("Error updating email:", error)
-      throw new Error("Failed to update email")
-    }
-  }
-
-  async deleteEmail(emailId: string): Promise<void> {
-    try {
-      await deleteDoc(doc(db, this.emailsCollection, emailId))
-    } catch (error) {
-      console.error("Error deleting email:", error)
-      throw new Error("Failed to delete email")
-    }
-  }
-
+  // Email sending
   async sendEmail(emailId: string): Promise<void> {
     try {
-      console.log("Starting email send process for ID:", emailId)
+      console.log(`Starting send process for email ID: ${emailId}`)
 
+      // Get email from database
       const email = await this.getEmailById(emailId)
       if (!email) {
         throw new Error("Email not found in database")
       }
 
-      console.log("Email found, updating status to sending...")
-      await this.updateEmail(emailId, { status: "sending" })
+      console.log("Email data retrieved:", {
+        from: email.from,
+        to: email.to,
+        subject: email.subject,
+        attachmentCount: email.attachments?.length || 0,
+      })
 
+      // Update status to sending
+      await this.updateEmailStatus(emailId, "sending")
+
+      // Prepare email data for API
       const emailPayload = {
         emailId,
         from: email.from,
@@ -150,11 +172,12 @@ class EmailService {
         cc: email.cc,
         subject: email.subject,
         body: email.body,
-        attachments: email.attachments,
+        attachments: email.attachments || [],
       }
 
-      console.log("Sending email via API...")
+      console.log("Sending to API endpoint...")
 
+      // Send email via API route
       const response = await fetch("/api/send-email", {
         method: "POST",
         headers: {
@@ -166,143 +189,138 @@ class EmailService {
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to send email via API")
+        console.error("API error response:", result)
+        throw new Error(result.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
-      console.log("Email API response:", result)
+      console.log("Email sent successfully via API:", result)
 
-      await this.updateEmail(emailId, {
-        status: "sent",
-        sent: serverTimestamp() as any,
-        messageId: result.messageId,
-      })
-
-      console.log("Email sent successfully with message ID:", result.messageId)
+      // Update status to sent
+      await this.updateEmailStatus(emailId, "sent")
     } catch (error) {
-      console.error("Error sending email:", error)
+      console.error("Error in sendEmail:", error)
 
-      await this.updateEmail(emailId, {
-        status: "failed",
-        error: error instanceof Error ? error.message : "Unknown error",
-      })
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
 
+      // Update status to failed
+      try {
+        await this.updateEmailStatus(emailId, "failed", errorMessage)
+      } catch (updateError) {
+        console.error("Error updating email status to failed:", updateError)
+      }
+
+      throw new Error(`Failed to send email: ${errorMessage}`)
+    }
+  }
+
+  // Template CRUD operations
+  async createEmailTemplate(templateData: Omit<EmailTemplate, "id" | "created">): Promise<string> {
+    if (!isFirebaseAvailable()) {
+      throw new Error("Firebase not available - cannot create template")
+    }
+
+    try {
+      const templateWithTimestamp = {
+        ...templateData,
+        created: serverTimestamp(),
+      }
+
+      const docRef = await addDoc(collection(db, "email_templates"), templateWithTimestamp)
+      return docRef.id
+    } catch (error) {
+      console.error("Error creating email template:", error)
       throw error
     }
   }
 
-  // Template operations
-  async createEmailTemplate(templateData: Omit<EmailTemplate, "id" | "created">): Promise<string> {
-    try {
-      const docRef = await addDoc(collection(db, this.templatesCollection), {
-        ...templateData,
-        created: serverTimestamp(),
-      })
-      return docRef.id
-    } catch (error) {
-      console.error("Error creating email template:", error)
-      throw new Error("Failed to create email template")
-    }
-  }
-
   async getEmailTemplates(userId: string): Promise<EmailTemplate[]> {
+    if (!isFirebaseAvailable()) {
+      console.error("Firebase not available - cannot fetch templates")
+      return []
+    }
+
     try {
-      const q = query(
-        collection(db, this.templatesCollection),
-        where("userId", "==", userId),
-        orderBy("created", "desc"),
-      )
+      const q = query(collection(db, "email_templates"), where("userId", "==", userId), orderBy("created", "desc"))
       const querySnapshot = await getDocs(q)
-      return querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as EmailTemplate[]
+
+      const templates: EmailTemplate[] = []
+      querySnapshot.forEach((doc) => {
+        templates.push({ id: doc.id, ...doc.data() } as EmailTemplate)
+      })
+
+      return templates
     } catch (error) {
-      console.error("Error getting email templates:", error)
+      console.error("Error fetching email templates:", error)
       return []
     }
   }
 
-  async updateEmailTemplate(templateId: string, updates: Partial<EmailTemplate>): Promise<void> {
-    try {
-      await updateDoc(doc(db, this.templatesCollection, templateId), updates)
-    } catch (error) {
-      console.error("Error updating email template:", error)
-      throw new Error("Failed to update email template")
-    }
-  }
-
-  async deleteEmailTemplate(templateId: string): Promise<void> {
-    try {
-      await deleteDoc(doc(db, this.templatesCollection, templateId))
-    } catch (error) {
-      console.error("Error deleting email template:", error)
-      throw new Error("Failed to delete email template")
-    }
-  }
-
   async createDefaultTemplates(userId: string): Promise<void> {
-    const defaultTemplates = [
+    const defaultTemplates: Omit<EmailTemplate, "id" | "created">[] = [
       {
         name: "Report Delivery",
-        subject: "Report Ready for Review",
-        body: `Hi [Customer's Name],
+        subject: "Your Report is Ready",
+        body: `Hi [Client Name],
+
+I hope this email finds you well.
+
+I'm pleased to inform you that your requested report is now ready for review. The report has been carefully prepared according to your specifications and contains comprehensive analysis of the current status.
+
+Please find the detailed report attached to this email. If you have any questions or need clarification on any aspect of the report, please don't hesitate to reach out.
+
+Thank you for your continued trust in our services.
+
+Best regards,
+[Your Name]
+[Your Position]
+[Company Name]
+[Contact Information]`,
+        category: "delivery",
+        userId,
+      },
+      {
+        name: "Follow-up",
+        subject: "Following Up on Your Report",
+        body: `Dear [Client Name],
+
+I wanted to follow up on the report I sent earlier to ensure you received it and to see if you have any questions.
+
+The report contains important information regarding your project, and I'd be happy to discuss any aspects in more detail if needed.
+
+Please let me know if there's anything specific you'd like to review or if you need any additional information.
+
+Looking forward to hearing from you.
+
+Best regards,
+[Your Name]
+[Company Name]`,
+        category: "follow-up",
+        userId,
+      },
+      {
+        name: "Professional Update",
+        subject: "Project Status Update",
+        body: `Dear [Client Name],
 
 I hope you're doing well.
 
-Attached is the report you requested. We've prepared a comprehensive analysis based on your requirements and current project status.
+As requested, please find attached the latest update on your project. This report includes:
 
-Please feel free to review and let me know if you have any questions or would like to explore additional options. I'm happy to assist.
+• Current progress status
+• Key milestones achieved
+• Upcoming deliverables
+• Any items requiring your attention
 
-Looking forward to your feedback!
+Please review the attached document and let me know if you have any questions or concerns.
+
+I appreciate your continued partnership and look forward to your feedback.
 
 Best regards,
-[Your Full Name]
-[Your Position]
+[Your Name]
+[Your Title]
 [Company Name]
-[Contact Info]`,
-        userId,
-      },
-      {
-        name: "Project Update",
-        subject: "Project Status Update",
-        body: `Dear [Customer's Name],
-
-I wanted to provide you with an update on your project progress.
-
-Current Status: [Project Status]
-Completion: [Percentage]%
-Next Steps: [Next Steps]
-
-Attached you'll find the detailed progress report with all relevant information and documentation.
-
-If you have any questions or concerns, please don't hesitate to reach out.
-
-Best regards,
-[Your Full Name]
-[Your Position]
-[Company Name]`,
-        userId,
-      },
-      {
-        name: "Completion Report",
-        subject: "Project Completion Report",
-        body: `Dear [Customer's Name],
-
-I'm pleased to inform you that your project has been completed successfully!
-
-Project Details:
-- Start Date: [Start Date]
-- Completion Date: [Completion Date]
-- Final Status: Completed
-
-Please find the final completion report attached for your records. This document contains all the details about the work performed and final deliverables.
-
-Thank you for choosing our services. We look forward to working with you again in the future.
-
-Best regards,
-[Your Full Name]
-[Your Position]
-[Company Name]`,
+[Phone] | [Email]`,
+        category: "update",
         userId,
       },
     ]
@@ -314,7 +332,7 @@ Best regards,
       console.log("Default email templates created successfully")
     } catch (error) {
       console.error("Error creating default templates:", error)
-      throw new Error("Failed to create default templates")
+      throw error
     }
   }
 }

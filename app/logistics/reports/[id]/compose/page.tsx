@@ -1,29 +1,32 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Send, FileText, AlertCircle, Loader2, Mail } from "lucide-react"
-import { emailService, type EmailTemplate } from "@/lib/email-service"
-import { generateReportPDFBase64, type ReportData } from "@/lib/pdf-service"
-import { doc, getDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import { toast } from "@/hooks/use-toast"
+import { toast } from "sonner"
+import { ArrowLeft, Mail, AlertCircle, Loader2 } from "lucide-react"
+import { getReports, type ReportData } from "@/lib/report-service"
+import { emailService, type Email, type EmailTemplate } from "@/lib/email-service"
+import { generateReportPDFAsBase64 } from "@/lib/pdf-service"
+import { getProductById, type Product } from "@/lib/firebase-service"
 
-export default function ComposeEmailPage({ params }: { params: { id: string } }) {
+export default function ComposeEmailPage() {
+  const params = useParams()
   const router = useRouter()
-  const [reportData, setReportData] = useState<ReportData | null>(null)
+  const reportId = params.id as string
+
+  // State
+  const [report, setReport] = useState<ReportData | null>(null)
+  const [product, setProduct] = useState<Product | null>(null)
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("")
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [pdfGenerating, setPdfGenerating] = useState(false)
+  const [pdfGenerated, setPdfGenerated] = useState(false)
+  const [pdfData, setPdfData] = useState<string>("")
 
   // Form state
   const [formData, setFormData] = useState({
@@ -31,245 +34,260 @@ export default function ComposeEmailPage({ params }: { params: { id: string } })
     cc: "",
     subject: "",
     body: "",
-    selectedTemplate: "",
   })
 
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [pdfGenerated, setPdfGenerated] = useState(false)
-  const [debugInfo, setDebugInfo] = useState<any[]>([])
-
-  // Load report data and templates
+  // Load report and templates
   useEffect(() => {
-    async function loadData() {
-      try {
-        setDebugInfo((prev) => [...prev, { time: new Date().toLocaleTimeString(), message: "Loading report data..." }])
-
-        // Load report data
-        const reportDoc = await getDoc(doc(db, "reports", params.id))
-        if (reportDoc.exists()) {
-          const data = { id: reportDoc.id, ...reportDoc.data() } as ReportData
-          setReportData(data)
-          setDebugInfo((prev) => [
-            ...prev,
-            { time: new Date().toLocaleTimeString(), message: "Report data loaded successfully" },
-          ])
-
-          // Set default subject
-          setFormData((prev) => ({
-            ...prev,
-            subject: `Report: ${data.title || data.id}`,
-          }))
-        } else {
-          setDebugInfo((prev) => [
-            ...prev,
-            { time: new Date().toLocaleTimeString(), message: "Report not found", error: true },
-          ])
-        }
-
-        // Load email templates (using a dummy user ID for now)
-        const userTemplates = await emailService.getEmailTemplates("demo-user")
-        setTemplates(userTemplates)
-        setDebugInfo((prev) => [
-          ...prev,
-          { time: new Date().toLocaleTimeString(), message: `Loaded ${userTemplates.length} email templates` },
-        ])
-
-        // Create default templates if none exist
-        if (userTemplates.length === 0) {
-          await emailService.createDefaultTemplates("demo-user")
-          const newTemplates = await emailService.getEmailTemplates("demo-user")
-          setTemplates(newTemplates)
-          setDebugInfo((prev) => [
-            ...prev,
-            { time: new Date().toLocaleTimeString(), message: `Created ${newTemplates.length} default templates` },
-          ])
-        }
-      } catch (error) {
-        console.error("Error loading data:", error)
-        setDebugInfo((prev) => [
-          ...prev,
-          {
-            time: new Date().toLocaleTimeString(),
-            message: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-            error: true,
-          },
-        ])
-      } finally {
-        setLoading(false)
-      }
-    }
-
     loadData()
-  }, [params.id])
+  }, [reportId])
 
-  // Generate PDF when report data is loaded
-  useEffect(() => {
-    if (reportData && !pdfGenerated) {
-      try {
-        generateReportPDFBase64(reportData)
-        setPdfGenerated(true)
-        setDebugInfo((prev) => [
-          ...prev,
-          { time: new Date().toLocaleTimeString(), message: "PDF generated successfully" },
-        ])
-      } catch (error) {
-        console.error("PDF generation error:", error)
-        setDebugInfo((prev) => [
-          ...prev,
-          { time: new Date().toLocaleTimeString(), message: `PDF generation failed: ${error}`, error: true },
-        ])
+  const loadData = async () => {
+    try {
+      setLoading(true)
+
+      // Check if we're on the client side
+      if (typeof window === "undefined") {
+        console.log("Running on server side, skipping Firebase operations")
+        return
       }
-    }
-  }, [reportData, pdfGenerated])
 
-  // Form handlers
+      console.log("Loading report data for ID:", reportId)
+
+      // Load report
+      const reports = await getReports()
+      const reportData = reports.find((r) => r.id === reportId)
+
+      if (!reportData) {
+        toast.error("Report not found")
+        router.push("/logistics/reports")
+        return
+      }
+
+      console.log("Report found:", reportData)
+      setReport(reportData)
+
+      // Try to load product data if available
+      if (reportData.siteId) {
+        try {
+          const productData = await getProductById(reportData.siteId)
+          if (productData) {
+            setProduct(productData)
+            console.log("Product data loaded:", productData.name)
+          }
+        } catch (error) {
+          console.log("Could not load product data:", error)
+          // Continue without product data
+        }
+      }
+
+      // Load email templates
+      try {
+        const templatesData = await emailService.getEmailTemplates("current-user-id") // Replace with actual user ID
+        if (templatesData.length === 0) {
+          console.log("No templates found, creating defaults...")
+          await emailService.createDefaultTemplates("current-user-id")
+          const newTemplates = await emailService.getEmailTemplates("current-user-id")
+          setTemplates(newTemplates)
+        } else {
+          setTemplates(templatesData)
+        }
+        console.log("Templates loaded:", templatesData.length)
+      } catch (error) {
+        console.error("Error loading templates:", error)
+        // Continue without templates
+      }
+
+      // Set default form data
+      const reportType = reportData.reportType || "Report"
+      const siteName = reportData.siteName || reportData.title || "Site"
+
+      setFormData({
+        to: "",
+        cc: "",
+        subject: `${reportType} - ${siteName}`,
+        body: `Hi [Client Name],
+
+I hope this email finds you well.
+
+Please find attached the ${reportType.toLowerCase()} for ${siteName}. The report has been carefully prepared and contains comprehensive information about the current status.
+
+Report Details:
+- Type: ${reportType}
+- Site: ${siteName}
+- Status: ${reportData.status || "Completed"}
+- Date: ${reportData.date ? new Date(reportData.date).toLocaleDateString() : new Date().toLocaleDateString()}
+
+Please review the attached document and let me know if you have any questions or need any clarification.
+
+Thank you for your continued trust in our services.
+
+Best regards,
+OOH Operator Team`,
+      })
+
+      // Generate PDF
+      await generatePDF(reportData)
+    } catch (error) {
+      console.error("Error loading data:", error)
+      toast.error("Failed to load report data")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const generatePDF = async (reportData: ReportData) => {
+    try {
+      setPdfGenerating(true)
+      console.log("Generating PDF for report:", reportData.id)
+
+      const pdfBase64 = await generateReportPDFAsBase64(reportData)
+      setPdfData(pdfBase64)
+      setPdfGenerated(true)
+
+      console.log("PDF generated successfully")
+      toast.success("PDF report generated successfully")
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+      toast.error("Failed to generate PDF report")
+      // Continue without PDF
+      setPdfGenerated(false)
+    } finally {
+      setPdfGenerating(false)
+    }
+  }
+
   const handleTemplateSelect = (templateId: string) => {
     const template = templates.find((t) => t.id === templateId)
     if (template) {
+      setSelectedTemplate(templateId)
       setFormData((prev) => ({
         ...prev,
-        selectedTemplate: templateId,
         subject: template.subject,
         body: template.body,
       }))
-      setDebugInfo((prev) => [
-        ...prev,
-        { time: new Date().toLocaleTimeString(), message: `Applied template: ${template.name}` },
-      ])
+      toast.success("Template applied")
     }
   }
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailRegex.test(email.trim())
+    return emailRegex.test(email)
   }
 
   const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {}
-
-    // Validate TO field
     if (!formData.to.trim()) {
-      newErrors.to = "Recipient email is required"
-    } else {
-      const toEmails = formData.to.split(",").map((email) => email.trim())
-      for (const email of toEmails) {
-        if (!validateEmail(email)) {
-          newErrors.to = `Invalid email address: ${email}`
-          break
-        }
+      toast.error("Please enter recipient email address")
+      return false
+    }
+
+    const toEmails = formData.to.split(",").map((email) => email.trim())
+    for (const email of toEmails) {
+      if (!validateEmail(email)) {
+        toast.error(`Invalid email address: ${email}`)
+        return false
       }
     }
 
-    // Validate CC field if provided
     if (formData.cc.trim()) {
       const ccEmails = formData.cc.split(",").map((email) => email.trim())
       for (const email of ccEmails) {
         if (!validateEmail(email)) {
-          newErrors.cc = `Invalid CC email address: ${email}`
-          break
+          toast.error(`Invalid CC email address: ${email}`)
+          return false
         }
       }
     }
 
-    // Validate other fields
     if (!formData.subject.trim()) {
-      newErrors.subject = "Subject is required"
+      toast.error("Please enter email subject")
+      return false
     }
 
     if (!formData.body.trim()) {
-      newErrors.body = "Message body is required"
+      toast.error("Please enter email body")
+      return false
     }
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    return true
   }
 
-  const handleSend = async () => {
-    if (!validateForm() || !reportData) return
-
-    setSending(true)
-    setDebugInfo((prev) => [
-      ...prev,
-      { time: new Date().toLocaleTimeString(), message: "Starting email send process..." },
-    ])
+  const handleSendEmail = async () => {
+    if (!validateForm()) return
 
     try {
-      // Generate PDF attachment
-      const pdfContent = await generateReportPDFBase64(reportData)
-      const pdfAttachment = {
-        fileName: `report_${reportData.id}.pdf`,
-        content: pdfContent,
-        contentType: "application/pdf",
-        fileSize: pdfContent.length,
-      }
-
-      setDebugInfo((prev) => [...prev, { time: new Date().toLocaleTimeString(), message: "PDF attachment prepared" }])
+      setSending(true)
+      console.log("Starting email send process...")
 
       // Prepare email data
-      const emailData = {
+      const emailData: Omit<Email, "id" | "created"> = {
         from: "noreply@oohoperator.com",
         to: formData.to.split(",").map((email) => email.trim()),
-        cc: formData.cc ? formData.cc.split(",").map((email) => email.trim()) : undefined,
+        cc: formData.cc.trim() ? formData.cc.split(",").map((email) => email.trim()) : undefined,
         subject: formData.subject,
         body: formData.body,
-        attachments: [pdfAttachment],
-        reportId: reportData.id,
-        status: "draft" as const,
-        userId: "demo-user",
+        attachments: pdfGenerated && pdfData
+          ? [
+              {
+                fileName: `report-${report?.title?.replace(/[^a-zA-Z0-9]/g, "-") || "logistics-report"}.pdf`,
+                fileUrl: pdfData,
+                fileSize: Math.round((pdfData.length * 3) / 4), // Approximate size from base64
+                fileType: "application/pdf",
+              },
+            ]
+          : undefined,
+        reportId: reportId,
+        status: "draft",
+        userId: "current-user-id", // Replace with actual user ID
       }
 
-      setDebugInfo((prev) => [...prev, { time: new Date().toLocaleTimeString(), message: "Creating email record..." }])
+      console.log("Creating email record...")
 
       // Create email record
       const emailId = await emailService.createEmail(emailData)
-      setDebugInfo((prev) => [
-        ...prev,
-        { time: new Date().toLocaleTimeString(), message: `Email record created: ${emailId}` },
-      ])
+      console.log("Email record created with ID:", emailId)
 
       // Send email
-      setDebugInfo((prev) => [...prev, { time: new Date().toLocaleTimeString(), message: "Sending email..." }])
+      console.log("Sending email...")
       await emailService.sendEmail(emailId)
 
-      setDebugInfo((prev) => [...prev, { time: new Date().toLocaleTimeString(), message: "Email sent successfully!" }])
-
-      toast({
-        title: "Email Sent",
-        description: "Your email has been sent successfully!",
-      })
+      console.log("Email sent successfully!")
+      toast.success("Email sent successfully!")
 
       // Redirect back to report
       setTimeout(() => {
-        router.push(`/logistics/reports/${params.id}`)
+        router.push(`/logistics/reports/${reportId}`)
       }, 2000)
     } catch (error) {
       console.error("Error sending email:", error)
-      setDebugInfo((prev) => [
-        ...prev,
-        {
-          time: new Date().toLocaleTimeString(),
-          message: `Send failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-          error: true,
-        },
-      ])
-
-      toast({
-        title: "Send Failed",
-        description: error instanceof Error ? error.message : "Failed to send email",
-        variant: "destructive",
-      })
+      const errorMessage = error instanceof Error ? error.message : "Failed to send email"
+      toast.error(errorMessage)
     } finally {
       setSending(false)
     }
   }
 
+  // Show loading state
   if (loading) {
     return (
       <div className="container mx-auto p-6">
         <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <span className="ml-2">Loading...</span>
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading report data...</p>
+          </div>
         </div>
+      </div>
+    )
+  }
+
+  // Show error if report not found
+  if (!report) {
+    return (
+      <div className="container mx-auto p-6">
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>Report not found</AlertDescription>
+        </Alert>
       </div>
     )
   }
@@ -279,7 +297,7 @@ export default function ComposeEmailPage({ params }: { params: { id: string } })
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
         <div>
@@ -289,199 +307,14 @@ export default function ComposeEmailPage({ params }: { params: { id: string } })
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Email Form */}
+        {/* Email Form */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Email Template Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Email Template
-              </CardTitle>
-              <CardDescription>Choose a template to get started quickly</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Select value={formData.selectedTemplate} onValueChange={handleTemplateSelect}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select an email template..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {templates.map((template) => (
-                    <SelectItem key={template.id} value={template.id!}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-
-          {/* Email Form */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Email Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* To Field */}
-              <div className="space-y-2">
-                <Label htmlFor="to">To *</Label>
-                <Input
-                  id="to"
-                  type="email"
-                  placeholder="recipient@example.com, another@example.com"
-                  value={formData.to}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, to: e.target.value }))}
-                  className={errors.to ? "border-red-500" : ""}
-                />
-                {errors.to && <p className="text-sm text-red-500">{errors.to}</p>}
-                <p className="text-xs text-muted-foreground">Separate multiple emails with commas</p>
-              </div>
-
-              {/* CC Field */}
-              <div className="space-y-2">
-                <Label htmlFor="cc">CC (Optional)</Label>
-                <Input
-                  id="cc"
-                  type="email"
-                  placeholder="cc@example.com"
-                  value={formData.cc}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, cc: e.target.value }))}
-                  className={errors.cc ? "border-red-500" : ""}
-                />
-                {errors.cc && <p className="text-sm text-red-500">{errors.cc}</p>}
-              </div>
-
-              {/* Subject Field */}
-              <div className="space-y-2">
-                <Label htmlFor="subject">Subject *</Label>
-                <Input
-                  id="subject"
-                  placeholder="Email subject"
-                  value={formData.subject}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, subject: e.target.value }))}
-                  className={errors.subject ? "border-red-500" : ""}
-                />
-                {errors.subject && <p className="text-sm text-red-500">{errors.subject}</p>}
-              </div>
-
-              {/* Message Body */}
-              <div className="space-y-2">
-                <Label htmlFor="body">Message *</Label>
-                <Textarea
-                  id="body"
-                  placeholder="Type your message here..."
-                  rows={8}
-                  value={formData.body}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, body: e.target.value }))}
-                  className={errors.body ? "border-red-500" : ""}
-                />
-                {errors.body && <p className="text-sm text-red-500">{errors.body}</p>}
-              </div>
-
-              {/* Attachments */}
-              <div className="space-y-2">
-                <Label>Attachments</Label>
-                <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                  <FileText className="h-4 w-4" />
-                  <span className="text-sm">report_{reportData?.id}.pdf</span>
-                  <Badge variant={pdfGenerated ? "default" : "secondary"}>
-                    {pdfGenerated ? "Ready" : "Generating..."}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Send Button */}
-              <Separator />
-              <div className="flex justify-end">
-                <Button onClick={handleSend} disabled={sending || !pdfGenerated} size="lg">
-                  {sending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Send Email
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Report Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Report Info</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div>
-                <Label className="text-xs text-muted-foreground">Report ID</Label>
-                <p className="text-sm font-mono">{reportData?.id}</p>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Title</Label>
-                <p className="text-sm">{reportData?.title || "Untitled"}</p>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Status</Label>
-                <Badge variant="outline">{reportData?.status}</Badge>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Created By</Label>
-                <p className="text-sm">{reportData?.createdBy}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* SMTP Configuration */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" />
-                SMTP Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription className="text-sm">
-                  To send real emails, configure these environment variables:
-                  <br />• SMTP_HOST
-                  <br />• SMTP_USER
-                  <br />• SMTP_PASS
-                  <br />
-                  <br />
-                  Currently running in demo mode.
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
-
-          {/* Debug Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Debug Log</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1 max-h-60 overflow-y-auto">
-              {debugInfo.map((info, index) => (
-                <div
-                  key={index}
-                  className={`text-xs p-2 rounded ${info.error ? "bg-red-50 text-red-700" : "bg-gray-50"}`}
-                >
-                  <span className="font-mono text-muted-foreground">{info.time}</span>
-                  <br />
-                  <span>{info.message}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
-  )
-}
+          {/* Template Selection */}
+          {templates.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5" />
+                  Email Template
+                </CardTitle>
+                <CardDescription>Choose a template to get\
