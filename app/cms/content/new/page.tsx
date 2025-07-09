@@ -18,6 +18,7 @@ import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useAuth } from "@/contexts/auth-context"
 
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
@@ -42,6 +43,7 @@ interface Category {
 
 export default function CMSContentCreatePage() {
   const router = useRouter()
+  const { user, projectData } = useAuth()
   const [contentTitle, setContentTitle] = useState("")
   const [description, setDescription] = useState("")
   const [price, setPrice] = useState("")
@@ -393,6 +395,16 @@ export default function CMSContentCreatePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    // Check if user and project data are available
+    if (!user || !projectData) {
+      toast({
+        title: "Authentication Error",
+        description: "User authentication required. Please log in again.",
+        variant: "destructive",
+      })
+      return
+    }
+
     // Validate dynamic content before proceeding
     if (!validateDynamicContent()) {
       toast({
@@ -440,7 +452,10 @@ export default function CMSContentCreatePage() {
         },
       }
 
-      await createProduct(contentData)
+      // Get user display name
+      const userName = user.displayName || user.email || "Unknown User"
+
+      await createProduct(user.uid, userName, projectData.license_key, contentData)
 
       toast({
         title: "Content created",
@@ -451,6 +466,11 @@ export default function CMSContentCreatePage() {
     } catch (error) {
       console.error("Error creating content:", error)
       setError(typeof error === "string" ? error : "Failed to create content. Please try again.")
+      toast({
+        title: "Error",
+        description: typeof error === "string" ? error : "Failed to create content. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
