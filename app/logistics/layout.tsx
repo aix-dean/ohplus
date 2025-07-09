@@ -1,14 +1,23 @@
 "use client"
 
 import type React from "react"
-import { useRouteProtection } from "@/hooks/use-route-protection"
+import { useAuth } from "@/contexts/auth-context"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 
 export default function LogisticsLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { hasAccess, loading } = useRouteProtection("/logistics")
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login")
+    }
+  }, [user, loading, router])
 
   if (loading) {
     return (
@@ -18,7 +27,7 @@ export default function LogisticsLayout({
     )
   }
 
-  if (!hasAccess) {
+  if (!user) {
     return null
   }
 

@@ -14,6 +14,7 @@ import { auth, db } from "@/lib/firebase"
 import { subscriptionService } from "@/lib/subscription-service"
 import type { Subscription } from "@/lib/types/subscription"
 import { generateLicenseKey } from "@/lib/utils" // Assuming this utility exists
+import { getDashboardRouteByRole } from "@/lib/role-routing"
 
 interface UserData {
   uid: string
@@ -55,6 +56,7 @@ interface AuthContextType {
   refreshUserData: () => Promise<void>
   refreshSubscriptionData: () => Promise<void>
   assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
+  getDashboardRoute: () => string
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -357,6 +359,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe()
   }, [fetchUserData])
 
+  const getDashboardRoute = useCallback(() => {
+    return getDashboardRouteByRole(userData?.role || null)
+  }, [userData?.role])
+
   const value = {
     user,
     userData,
@@ -372,6 +378,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUserData,
     refreshSubscriptionData,
     assignLicenseKey,
+    getDashboardRoute,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

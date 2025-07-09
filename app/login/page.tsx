@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { getDashboardRouteByRole } from "@/lib/role-routing"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -28,15 +29,16 @@ export default function LoginPage() {
   const [orgCode, setOrgCode] = useState("")
   const [isValidatingCode, setIsValidatingCode] = useState(false)
 
-  const { login, user } = useAuth()
+  const { login, user, userData } = useAuth()
   const router = useRouter()
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user) {
-      router.push("/admin/dashboard") // Changed redirect to /admin/dashboard
+    if (user && userData) {
+      const dashboardRoute = getDashboardRouteByRole(userData.role)
+      router.push(dashboardRoute)
     }
-  }, [user, router])
+  }, [user, userData, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,7 +47,11 @@ export default function LoginPage() {
 
     try {
       await login(email, password)
-      router.push("/admin/dashboard") // Changed redirect to /admin/dashboard
+      // Wait a moment for userData to be populated
+      setTimeout(() => {
+        const dashboardRoute = getDashboardRouteByRole(userData?.role || null)
+        router.push(dashboardRoute)
+      }, 100)
     } catch (error: any) {
       console.error("Login error:", error)
 
