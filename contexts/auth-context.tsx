@@ -47,6 +47,18 @@ interface AuthContextType {
     },
     password: string,
   ) => Promise<void>
+  joinOrganization: (
+    personalInfo: {
+      email: string
+      first_name: string
+      last_name: string
+      middle_name: string
+      phone_number: string
+      gender: string
+    },
+    password: string,
+    licenseKey: string,
+  ) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   updateUserData: (updates: Partial<UserData>) => Promise<void>
@@ -262,6 +274,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const joinOrganization = async (
+    personalInfo: {
+      email: string
+      first_name: string
+      last_name: string
+      middle_name: string
+      phone_number: string
+      gender: string
+    },
+    password: string,
+    licenseKey: string,
+  ) => {
+    setLoading(true)
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, personalInfo.email, password)
+      const firebaseUser = userCredential.user
+      setUser(firebaseUser)
+
+      // Create user document in "iboard_users" with the provided license key
+      const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
+      await setDoc(userDocRef, {
+        email: firebaseUser.email,
+        uid: firebaseUser.uid,
+        license_key: licenseKey, // Use the provided license key
+        company_id: null, // Will be determined by the license key
+        role: "user", // Default role
+        permissions: [], // Default empty permissions
+        type: "OHPLUS", // Add this field
+        created: serverTimestamp(),
+        updated: serverTimestamp(),
+        first_name: personalInfo.first_name,
+        last_name: personalInfo.last_name,
+        middle_name: personalInfo.middle_name,
+        phone_number: personalInfo.phone_number,
+        gender: personalInfo.gender,
+      })
+
+      await fetchUserData(firebaseUser)
+    } catch (error) {
+      console.error("Error in AuthContext joinOrganization:", error)
+      setLoading(false)
+      throw error
+    }
+  }
+
   const logout = async () => {
     setLoading(true)
     try {
@@ -296,7 +353,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateProjectData = async (updates: Partial<ProjectData>) => {
     if (!user || !userData?.project_id) throw new Error("Project not found or user not authenticated.")
-    const projectDocRef = doc(db, "projects", userData.project_id)
+    const projectDocRef = doc(db, "projects", userData?.project_id)
     const updatedFields = { ...updates, updated: serverTimestamp() }
     await updateDoc(projectDocRef, updatedFields)
     // Optimistically update state
@@ -327,6 +384,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     login,
     register,
+    joinOrganization,
     logout,
     resetPassword,
     updateUserData,
