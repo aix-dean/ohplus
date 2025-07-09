@@ -17,7 +17,6 @@ interface RegistrationCode {
   code: string
   company_id: string
   license_key: string
-  branch?: string
   created_by: string
   created_at: any
   expires_at: Date
@@ -106,7 +105,6 @@ export default function RegistrationCodesPage() {
       await setDoc(doc(db, "organization_codes", code), {
         company_id: userData.company_id,
         license_key: userData.license_key,
-        branch: "Manila", // Default branch, can be made configurable
         created_by: user?.uid,
         created_at: serverTimestamp(),
         expires_at: expiresAt,
@@ -195,11 +193,6 @@ export default function RegistrationCodesPage() {
       ),
     },
     {
-      header: "Branch",
-      accessorKey: "branch" as keyof RegistrationCode,
-      cell: (row: RegistrationCode) => row.branch || "Manila",
-    },
-    {
       header: "Usage",
       accessorKey: "usage_count" as keyof RegistrationCode,
       cell: (row: RegistrationCode) => getUsageDisplay(row),
@@ -256,7 +249,7 @@ export default function RegistrationCodesPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Registration Codes</h1>
-          <p className="text-gray-600 mt-1">Manage branch-specific registration codes.</p>
+          <p className="text-gray-600 mt-1">Manage registration codes for your organization.</p>
         </div>
         <Button
           onClick={handleGenerateCode}
