@@ -593,7 +593,6 @@ export default function CMSContentCreatePage() {
                             setTimeout(() => validateDynamicContent(), 100)
                           }}
                           placeholder="Enter spots per loop"
-                          min="1"
                           required={formData.content_type === "Dynamic"}
                         />
                       </div>
