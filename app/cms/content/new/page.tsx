@@ -318,7 +318,7 @@ export default function CMSContentCreatePage() {
       // Calculate duration in minutes, then convert to seconds
       const durationMinutes = endTotalMinutes - startTotalMinutes
       const durationSeconds = durationMinutes * 60
-  
+      console.log(durationSeconds)
       // Calculate total spot time needed per loop
       const spotDurationNum = Number.parseInt(spot_duration)
       const spotsPerLoopNum = Number.parseInt(loops_per_day)
