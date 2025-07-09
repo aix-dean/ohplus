@@ -145,7 +145,7 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="font-medium text-gray-500">Spots per Loop:</span>
-              <div className="text-lg font-semibold">{spotsPerLoop}</div>
+              <div className="text-lg font-semibold">{loopsPerDay}</div>
             </div>
             <div>
               <span className="font-medium text-gray-500">Loops per Day:</span>
