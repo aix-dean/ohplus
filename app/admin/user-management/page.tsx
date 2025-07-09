@@ -79,7 +79,7 @@ export default function AccessManagementPage() {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Loading User Management...</h2>
+          <h2 className="text-xl font-semibold mb-2">Loading Access Management...</h2>
           <p className="text-gray-500">Please wait while we verify your permissions.</p>
         </div>
       </div>
@@ -89,7 +89,7 @@ export default function AccessManagementPage() {
   return (
     <div className="container mx-auto py-10">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">User Management</h1>
+        <h1 className="text-3xl font-bold">Access Management</h1>
         <Button onClick={handleInitializePermissions} disabled={initializing} className="flex items-center gap-2">
           {initializing ? (
             <>
