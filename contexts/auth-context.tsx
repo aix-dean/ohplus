@@ -1,317 +1,144 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
+import type React from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 import {
-  onAuthStateChanged,
+  type User,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
+  onAuthStateChanged,
   sendPasswordResetEmail,
-  type User as FirebaseUser,
+  updateProfile,
 } from "firebase/auth"
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { doc, setDoc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
-import { subscriptionService } from "@/lib/subscription-service"
-import type { Subscription } from "@/lib/types/subscription"
-import { generateLicenseKey } from "@/lib/utils" // Assuming this utility exists
-
-interface UserData {
-  uid: string
-  email: string | null
-  displayName: string | null
-  license_key: string | null
-  company_id?: string | null
-  role: string | null
-  permissions: string[]
-  // Add other user-specific data here
-}
 
 interface AuthContextType {
-  user: FirebaseUser | null
-  userData: UserData | null
-  subscriptionData: Subscription | null
-  loading: boolean
+  user: User | null
   login: (email: string, password: string) => Promise<void>
-  register: (
-    personalInfo: {
-      email: string
-      first_name: string
-      last_name: string
-      middle_name: string
-      phone_number: string
-      gender: string
-    },
-    companyInfo: {
-      company_name: string
-      company_location: string
-    },
-    password: string,
-    orgCode?: string,
-  ) => Promise<void>
+  register: (email: string, password: string, firstName: string, lastName: string, orgCode?: string) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
-  updateUserData: (updates: Partial<UserData>) => Promise<void>
-  updateProjectData: (updates: Partial<ProjectData>) => Promise<void>
-  refreshUserData: () => Promise<void>
-  refreshSubscriptionData: () => Promise<void>
-  assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
+  loading: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-interface ProjectData {
-  project_id: string
-  company_name?: string
-  company_location?: string
-  company_website?: string
-  project_name?: string
-  social_media?: {
-    facebook?: string
-    instagram?: string
-    youtube?: string
+export function useAuth() {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider")
   }
-  license_key?: string | null
-  created?: Date
-  updated?: Date
+  return context
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<FirebaseUser | null>(null)
-  const [userData, setUserData] = useState<UserData | null>(null)
-  const [projectData, setProjectData] = useState<ProjectData | null>(null)
-  const [subscriptionData, setSubscriptionData] = useState<Subscription | null>(null)
+interface AuthProviderProps {
+  children: React.ReactNode
+}
+
+export function AuthProvider({ children }: AuthProviderProps) {
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
-    try {
-      // Corrected collection name to "iboard_users"
-      const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
-      const userDocSnap = await getDoc(userDocRef)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user)
+      setLoading(false)
+    })
 
-      let fetchedUserData: UserData
-
-      if (userDocSnap.exists()) {
-        const data = userDocSnap.data()
-        fetchedUserData = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          license_key: (data.license_key as string | null) || null, // Explicitly cast to string | null
-          company_id: (data.company_id as string | null) || null, // Add company_id field
-          role: data.role || "user", // Default role
-          permissions: data.permissions || [], // Default empty permissions
-          ...data, // Spread any other fields
-        }
-      } else {
-        // If user document doesn't exist, create a basic one in "iboard_users"
-        fetchedUserData = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          license_key: null, // Will be assigned during registration/onboarding
-          company_id: null, // Will be assigned when user registers company
-          role: "user",
-          permissions: [],
-        }
-        await setDoc(userDocRef, fetchedUserData, { merge: true })
-      }
-      setUserData(fetchedUserData)
-
-      // Fetch project data if project_id exists in user data
-      if (fetchedUserData.project_id) {
-        const projectDocRef = doc(db, "projects", fetchedUserData.project_id)
-        const projectDocSnap = await getDoc(projectDocRef)
-        if (projectDocSnap.exists()) {
-          const projectData = projectDocSnap.data()
-          setProjectData({
-            project_id: projectDocSnap.id,
-            company_name: projectData.company_name,
-            company_location: projectData.company_location,
-            company_website: projectData.company_website,
-            project_name: projectData.project_name,
-            social_media: projectData.social_media,
-            license_key: projectData.license_key, // Fetch license_key for project data
-            created: projectData.created?.toDate(),
-            updated: projectData.updated?.toDate(),
-          })
-        } else {
-          setProjectData(null)
-        }
-      } else {
-        setProjectData(null)
-      }
-
-      // Fetch subscription data if license_key exists
-      if (fetchedUserData.license_key) {
-        const subscription = await subscriptionService.getSubscriptionByLicenseKey(fetchedUserData.license_key)
-        setSubscriptionData(subscription)
-      } else {
-        setSubscriptionData(null)
-      }
-    } catch (error) {
-      console.error("Error fetching user data or subscription:", error)
-      setUserData(null)
-      setProjectData(null)
-      setSubscriptionData(null)
-    }
+    return unsubscribe
   }, [])
 
-  const refreshUserData = useCallback(async () => {
-    if (user) {
-      await fetchUserData(user)
-    }
-  }, [user, fetchUserData])
-
-  const refreshSubscriptionData = useCallback(async () => {
-    if (userData?.license_key) {
-      const subData = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
-      setSubscriptionData(subData)
-    } else {
-      setSubscriptionData(null)
-    }
-  }, [userData])
-
-  const assignLicenseKey = useCallback(
-    async (uid: string, licenseKey: string) => {
-      try {
-        // Corrected collection name to "iboard_users"
-        const userDocRef = doc(db, "iboard_users", uid)
-        await setDoc(userDocRef, { license_key: licenseKey }, { merge: true })
-        // Update local state immediately
-        setUserData((prev) => (prev ? { ...prev, license_key: licenseKey } : null))
-        // Refresh subscription data after assigning license key
-        await refreshSubscriptionData()
-      } catch (error) {
-        console.error("Error assigning license key:", error)
-        throw error
-      }
-    },
-    [refreshSubscriptionData],
-  )
-
   const login = async (email: string, password: string) => {
-    setLoading(true)
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      setUser(userCredential.user)
-      await fetchUserData(userCredential.user)
+      await signInWithEmailAndPassword(auth, email, password)
     } catch (error) {
-      setLoading(false)
+      console.error("Error in AuthContext login:", error)
       throw error
     }
   }
 
-  const register = async (
-    personalInfo: {
-      email: string
-      first_name: string
-      last_name: string
-      middle_name: string
-      phone_number: string
-      gender: string
-    },
-    companyInfo: {
-      company_name: string
-      company_location: string
-    },
-    password: string,
-    orgCode?: string,
-  ) => {
-    setLoading(true)
+  const register = async (email: string, password: string, firstName: string, lastName: string, orgCode?: string) => {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, personalInfo.email, password)
-      const firebaseUser = userCredential.user
-      setUser(firebaseUser)
+      // Create user account
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const user = userCredential.user
 
-      let licenseKey = generateLicenseKey()
+      // Update user profile
+      await updateProfile(user, {
+        displayName: `${firstName} ${lastName}`,
+      })
+
       let companyId = null
 
-      // If joining an organization, validate the code and get company info
+      // Handle organization code if provided
       if (orgCode) {
         try {
           const orgCodeDoc = await getDoc(doc(db, "organization_codes", orgCode))
-          if (!orgCodeDoc.exists()) {
-            throw new Error("Invalid organization code.")
+          if (orgCodeDoc.exists()) {
+            const orgData = orgCodeDoc.data()
+            companyId = orgData.companyId
+            console.log("Organization code validated successfully:", orgCode)
+          } else {
+            console.warn("Organization code not found, continuing with regular registration:", orgCode)
           }
-
-          const orgData = orgCodeDoc.data()
-          if (orgData.expires_at && orgData.expires_at.toDate() < new Date()) {
-            throw new Error("Organization code has expired.")
-          }
-
-          if (orgData.used) {
-            throw new Error("Organization code has already been used.")
-          }
-
-          // Use the organization's license key and company ID
-          licenseKey = orgData.license_key
-          companyId = orgData.company_id
-
-          // Mark the code as used
-          await updateDoc(doc(db, "organization_codes", orgCode), {
-            used: true,
-            used_by: firebaseUser.uid,
-            used_at: serverTimestamp(),
-          })
-        } catch (orgError) {
-          console.error("Organization code validation error:", orgError)
-          // If organization code validation fails, continue with regular registration
-          // but log the error for debugging
-          console.warn("Continuing with regular registration due to org code error:", orgError)
+        } catch (error) {
+          console.warn("Error validating organization code, continuing with regular registration:", error)
         }
       }
 
-      // Create user document in "iboard_users"
-      const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
-      await setDoc(userDocRef, {
-        email: firebaseUser.email,
-        uid: firebaseUser.uid,
-        license_key: licenseKey,
-        company_id: companyId,
+      // Create user document
+      await setDoc(doc(db, "users", user.uid), {
+        email: user.email,
+        firstName,
+        lastName,
+        displayName: `${firstName} ${lastName}`,
+        createdAt: serverTimestamp(),
+        companyId: companyId || null,
         role: "user",
         permissions: [],
-        type: "OHPLUS",
-        created: serverTimestamp(),
-        updated: serverTimestamp(),
-        first_name: personalInfo.first_name,
-        last_name: personalInfo.last_name,
-        middle_name: personalInfo.middle_name,
-        phone_number: personalInfo.phone_number,
-        gender: personalInfo.gender,
-        project_id: orgCode && companyId ? null : firebaseUser.uid, // Only create project if not joining org successfully
       })
 
-      // Only create a project if not joining an organization successfully
-      if (!orgCode || !companyId) {
-        const projectDocRef = doc(db, "projects", firebaseUser.uid)
-        await setDoc(projectDocRef, {
-          company_name: companyInfo.company_name,
-          company_location: companyInfo.company_location,
-          project_name: "My First Project",
-          license_key: licenseKey,
-          created: serverTimestamp(),
-          updated: serverTimestamp(),
-        })
+      // Create a project if user is not joining an organization
+      if (!companyId) {
+        const projectData = {
+          name: `${firstName}'s Project`,
+          description: "Default project",
+          ownerId: user.uid,
+          createdAt: serverTimestamp(),
+          members: [user.uid],
+          settings: {
+            defaultCurrency: "PHP",
+            timezone: "Asia/Manila",
+          },
+        }
+
+        const projectRef = await addDoc(collection(db, "projects"), projectData)
+        console.log("Project created with ID:", projectRef.id)
+
+        // Update user document with project reference
+        await setDoc(
+          doc(db, "users", user.uid),
+          {
+            defaultProjectId: projectRef.id,
+          },
+          { merge: true },
+        )
       }
 
-      await fetchUserData(firebaseUser)
+      console.log("User registration completed successfully")
     } catch (error) {
       console.error("Error in AuthContext register:", error)
-      setLoading(false)
       throw error
     }
   }
 
   const logout = async () => {
-    setLoading(true)
     try {
       await signOut(auth)
-      setUser(null)
-      setUserData(null)
-      setProjectData(null)
-      setSubscriptionData(null)
     } catch (error) {
-      setLoading(false)
+      console.error("Error in AuthContext logout:", error)
       throw error
     }
   }
@@ -320,69 +147,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await sendPasswordResetEmail(auth, email)
     } catch (error) {
+      console.error("Error in AuthContext resetPassword:", error)
       throw error
     }
   }
 
-  const updateUserData = async (updates: Partial<UserData>) => {
-    if (!user) throw new Error("User not authenticated.")
-    // Corrected collection name to "iboard_users"
-    const userDocRef = doc(db, "iboard_users", user.uid)
-    const updatedFields = { ...updates, updated: serverTimestamp() }
-    await updateDoc(userDocRef, updatedFields)
-    // Optimistically update state
-    setUserData((prev) => (prev ? { ...prev, ...updates } : null))
-  }
-
-  const updateProjectData = async (updates: Partial<ProjectData>) => {
-    if (!user || !userData?.project_id) throw new Error("Project not found or user not authenticated.")
-    const projectDocRef = doc(db, "projects", userData.project_id)
-    const updatedFields = { ...updates, updated: serverTimestamp() }
-    await updateDoc(projectDocRef, updatedFields)
-    // Optimistically update state
-    setProjectData((prev) => (prev ? { ...prev, ...updates } : null))
-  }
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser)
-        await fetchUserData(firebaseUser)
-      } else {
-        setUser(null)
-        setUserData(null)
-        setProjectData(null)
-        setSubscriptionData(null)
-      }
-      setLoading(false)
-    })
-    return () => unsubscribe()
-  }, [fetchUserData])
-
   const value = {
     user,
-    userData,
-    projectData,
-    subscriptionData,
-    loading,
     login,
     register,
     logout,
     resetPassword,
-    updateUserData,
-    updateProjectData,
-    refreshUserData,
-    refreshSubscriptionData,
-    assignLicenseKey,
+    loading,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
-  }
-  return context
 }
