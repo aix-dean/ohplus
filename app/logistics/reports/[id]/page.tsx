@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn } from "lucide-react"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
+import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 
 export default function ReportPreviewPage() {
@@ -20,6 +21,7 @@ export default function ReportPreviewPage() {
   const [loading, setLoading] = useState(true)
   const [fullScreenAttachment, setFullScreenAttachment] = useState<any>(null)
   const [isFullScreenOpen, setIsFullScreenOpen] = useState(false)
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const { user } = useAuth()
 
   useEffect(() => {
@@ -129,6 +131,20 @@ export default function ReportPreviewPage() {
     document.body.removeChild(link)
   }
 
+  const handleDownloadPDF = async () => {
+    if (!report || !product) return
+
+    setIsGeneratingPDF(true)
+    try {
+      await generateReportPDF(report, product, false)
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+      alert("Failed to generate PDF. Please try again.")
+    } finally {
+      setIsGeneratingPDF(false)
+    }
+  }
+
   const handleBack = () => {
     router.back()
   }
@@ -152,18 +168,30 @@ export default function ReportPreviewPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Back Button and Content Title Section */}
-      <div className="bg-white px-6 py-4 flex items-center gap-4 shadow-sm">
+      <div className="bg-white px-6 py-4 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="lg"
+            onClick={handleBack}
+            className="text-black rounded-full p-3 hover:bg-gray-100"
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </Button>
+          <Badge className="bg-cyan-400 text-white px-4 py-2 rounded-full font-medium text-lg">
+            {product?.content_type || "Content"}
+          </Badge>
+        </div>
+
+        {/* Download PDF Button */}
         <Button
-          variant="ghost"
-          size="lg"
-          onClick={handleBack}
-          className="text-black rounded-full p-3 hover:bg-gray-100"
+          onClick={handleDownloadPDF}
+          disabled={isGeneratingPDF}
+          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
         >
-          <ArrowLeft className="h-6 w-6" />
+          <Download className="h-4 w-4" />
+          {isGeneratingPDF ? "Generating PDF..." : "Download PDF"}
         </Button>
-        <Badge className="bg-cyan-400 text-white px-4 py-2 rounded-full font-medium text-lg">
-          {product?.content_type || "Content"}
-        </Badge>
       </div>
 
       {/* Header */}

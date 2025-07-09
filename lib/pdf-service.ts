@@ -1,6 +1,7 @@
 import jsPDF from "jspdf"
 import type { Proposal } from "@/lib/types/proposal"
 import type { CostEstimate } from "@/lib/types/cost-estimate" // Import CostEstimate type
+import type { ReportData } from "@/lib/report-service"
 
 // Helper function to load image and convert to base64
 export async function loadImageAsBase64(url: string): Promise<string | null> {
@@ -747,5 +748,337 @@ export async function generateCostEstimatePDF(
   } catch (error) {
     console.error("Error generating Cost Estimate PDF:", error)
     throw new Error("Failed to generate Cost Estimate PDF")
+  }
+}
+
+export async function generateReportPDF(
+  report: ReportData,
+  product: any,
+  returnBase64 = false,
+): Promise<string | void> {
+  try {
+    const pdf = new jsPDF("p", "mm", "a4")
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 15
+    const contentWidth = pageWidth - margin * 2
+    let yPosition = margin
+
+    const createdAt = safeToDate(report.created || report.date)
+    const startDate = safeToDate(report.bookingDates.start)
+    const endDate = safeToDate(report.bookingDates.end)
+
+    // Helper function to add text with word wrapping
+    const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
+      pdf.setFontSize(fontSize)
+      const lines = pdf.splitTextToSize(text, maxWidth)
+      pdf.text(lines, x, y)
+      return y + lines.length * fontSize * 0.3
+    }
+
+    // Helper function to check if we need a new page
+    const checkNewPage = (requiredHeight: number) => {
+      if (yPosition + requiredHeight > pageHeight - margin) {
+        pdf.addPage()
+        yPosition = margin
+      }
+    }
+
+    // Helper function to get report type display
+    const getReportTypeDisplay = (type: string) => {
+      return type
+        .split("-")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ")
+    }
+
+    // Helper function to format date
+    const formatDate = (dateString: string) => {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    }
+
+    // Add header images
+    try {
+      const headerBase64 = await loadImageAsBase64("/logistics-header.png")
+      if (headerBase64) {
+        pdf.addImage(headerBase64, "PNG", 0, 0, pageWidth, 40)
+        yPosition = 45
+      }
+    } catch (error) {
+      console.error("Error adding header image:", error)
+    }
+
+    // Report Title Section
+    checkNewPage(25)
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "bold")
+    pdf.setFillColor(52, 211, 235) // cyan-400
+    pdf.rect(margin, yPosition, 60, 8, "F")
+    pdf.setTextColor(255, 255, 255)
+    pdf.text(getReportTypeDisplay(report.reportType), margin + 2, yPosition + 5)
+
+    // Add GTS logo
+    try {
+      const logoBase64 = await loadImageAsBase64("/gts-logo.png")
+      if (logoBase64) {
+        pdf.addImage(logoBase64, "PNG", pageWidth - margin - 30, yPosition - 5, 30, 15)
+      }
+    } catch (error) {
+      console.error("Error adding logo:", error)
+    }
+
+    yPosition += 12
+    pdf.setTextColor(0, 0, 0)
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "italic")
+    pdf.text(`as of ${formatDate(report.date)}`, margin, yPosition)
+    yPosition += 10
+
+    // Project Information Section
+    checkNewPage(60)
+    pdf.setFontSize(14)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Project Information", margin, yPosition)
+    yPosition += 8
+
+    // Draw border around project info
+    pdf.setLineWidth(0.5)
+    pdf.rect(margin, yPosition, contentWidth, 50)
+    yPosition += 5
+
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+
+    // Left column
+    const leftColumn = margin + 3
+    const rightColumn = margin + contentWidth / 2
+
+    let leftY = yPosition
+    let rightY = yPosition
+
+    // Left column data
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Site ID:", leftColumn, leftY)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(
+      `${report.siteId} ${product?.light?.location || product?.specs_rental?.location || ""}`,
+      leftColumn + 20,
+      leftY,
+    )
+    leftY += 4
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Job Order:", leftColumn, leftY)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(report.id?.slice(-4).toUpperCase() || "N/A", leftColumn + 20, leftY)
+    leftY += 4
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Job Order Date:", leftColumn, leftY)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(formatDate(createdAt.toISOString().split("T")[0]), leftColumn + 25, leftY)
+    leftY += 4
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Site:", leftColumn, leftY)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(report.siteName, leftColumn + 20, leftY)
+    leftY += 4
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Size:", leftColumn, leftY)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(product?.specs_rental?.size || product?.light?.size || "N/A", leftColumn + 20, leftY)
+    leftY += 4
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Start Date:", leftColumn, leftY)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(formatDate(report.bookingDates.start), leftColumn + 20, leftY)
+    leftY += 4
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("End Date:", leftColumn, leftY)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(formatDate(report.bookingDates.end), leftColumn + 20, leftY)
+    leftY += 4
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Installation Duration:", leftColumn, leftY)
+    pdf.setFont("helvetica", "normal")
+    const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+    pdf.text(`${duration} days`, leftColumn + 35, leftY)
+
+    // Right column data
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Content:", rightColumn, rightY)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(product?.content_type || "N/A", rightColumn + 20, rightY)
+    rightY += 4
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Material Specs:", rightColumn, rightY)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(product?.specs_rental?.material || "N/A", rightColumn + 25, rightY)
+    rightY += 4
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Crew:", rightColumn, rightY)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(`Team ${report.assignedTo || "A"}`, rightColumn + 20, rightY)
+    rightY += 4
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Illumination:", rightColumn, rightY)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(product?.light?.illumination || "N/A", rightColumn + 25, rightY)
+    rightY += 4
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Gondola:", rightColumn, rightY)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(product?.specs_rental?.gondola ? "YES" : "NO", rightColumn + 20, rightY)
+    rightY += 4
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Technology:", rightColumn, rightY)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(product?.specs_rental?.technology || "N/A", rightColumn + 25, rightY)
+    rightY += 4
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Sales:", rightColumn, rightY)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(report.sales, rightColumn + 20, rightY)
+
+    yPosition += 55
+
+    // Project Status Section
+    checkNewPage(30)
+    pdf.setFontSize(14)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Project Status", margin, yPosition)
+
+    // Status badge
+    pdf.setFillColor(34, 197, 94) // green-500
+    pdf.rect(margin + 80, yPosition - 4, 20, 6, "F")
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(10)
+    pdf.text(`${report.completionPercentage || 100}%`, margin + 85, yPosition)
+    pdf.setTextColor(0, 0, 0)
+
+    yPosition += 10
+
+    // Attachments Section
+    if (report.attachments && report.attachments.length > 0) {
+      checkNewPage(80)
+
+      const attachmentsToShow = report.attachments.slice(0, 2)
+      let currentX = margin
+      const imageWidth = (contentWidth - 10) / 2
+      const imageHeight = 60
+
+      for (let i = 0; i < attachmentsToShow.length; i++) {
+        const attachment = attachmentsToShow[i]
+
+        if (i === 1) {
+          currentX = margin + imageWidth + 10
+        }
+
+        // Draw placeholder box for attachment
+        pdf.setLineWidth(0.5)
+        pdf.rect(currentX, yPosition, imageWidth, imageHeight)
+
+        // Try to add actual image if it's an image file
+        if (attachment.fileUrl && attachment.fileName) {
+          const extension = attachment.fileName.toLowerCase().split(".").pop()
+          if (["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")) {
+            try {
+              const imageBase64 = await loadImageAsBase64(attachment.fileUrl)
+              if (imageBase64) {
+                pdf.addImage(imageBase64, "JPEG", currentX + 2, yPosition + 2, imageWidth - 4, imageHeight - 4)
+              }
+            } catch (error) {
+              console.error("Error adding attachment image:", error)
+              // Add placeholder text
+              pdf.setFontSize(10)
+              pdf.text(attachment.fileName, currentX + 5, yPosition + imageHeight / 2)
+            }
+          } else {
+            // Add file name for non-image files
+            pdf.setFontSize(10)
+            pdf.text(attachment.fileName, currentX + 5, yPosition + imageHeight / 2)
+          }
+        }
+
+        // Add attachment info below
+        pdf.setFontSize(8)
+        pdf.text(`Date: ${formatDate(report.date)}`, currentX, yPosition + imageHeight + 5)
+        pdf.text(
+          `Time: ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`,
+          currentX,
+          yPosition + imageHeight + 9,
+        )
+        pdf.text(`Location: ${report.location || "N/A"}`, currentX, yPosition + imageHeight + 13)
+
+        if (attachment.note) {
+          pdf.text(`Note: ${attachment.note}`, currentX, yPosition + imageHeight + 17)
+        }
+      }
+
+      yPosition += imageHeight + 25
+    }
+
+    // Footer Section
+    checkNewPage(20)
+    pdf.setLineWidth(0.3)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 8
+
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Prepared by:", margin, yPosition)
+    yPosition += 5
+
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(report.createdByName, margin, yPosition)
+    yPosition += 3
+    pdf.text("LOGISTICS", margin, yPosition)
+    yPosition += 3
+    pdf.text(formatDate(createdAt.toISOString().split("T")[0]), margin, yPosition)
+
+    // Add disclaimer
+    pdf.setFontSize(8)
+    pdf.setFont("helvetica", "italic")
+    pdf.setTextColor(100, 100, 100)
+    const disclaimer = `"All data are based on the latest available records as of ${formatDate(new Date().toISOString().split("T")[0])}."`
+    pdf.text(disclaimer, pageWidth - margin - 80, yPosition)
+
+    // Add footer image
+    try {
+      const footerBase64 = await loadImageAsBase64("/logistics-footer.png")
+      if (footerBase64) {
+        pdf.addImage(footerBase64, "PNG", 0, pageHeight - 20, pageWidth, 20)
+      }
+    } catch (error) {
+      console.error("Error adding footer image:", error)
+    }
+
+    if (returnBase64) {
+      return pdf.output("datauristring").split(",")[1]
+    } else {
+      const fileName = `report-${getReportTypeDisplay(report.reportType)
+        .replace(/[^a-z0-9]/gi, "_")
+        .toLowerCase()}-${Date.now()}.pdf`
+      pdf.save(fileName)
+    }
+  } catch (error) {
+    console.error("Error generating Report PDF:", error)
+    throw new Error("Failed to generate Report PDF")
   }
 }
