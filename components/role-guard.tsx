@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
@@ -31,8 +30,14 @@ export function RoleGuard({ children, allowedRoles, fallbackRoute }: RoleGuardPr
       return
     }
 
-    const userRole = userData.role?.toLowerCase() || ""
-    const hasAccess = allowedRoles.some((role) => role.toLowerCase() === userRole)
+    // Safely handle role checking
+    const userRole = userData.role
+    const roleString = typeof userRole === "string" ? userRole.toLowerCase() : ""
+
+    const hasAccess = allowedRoles.some((role) => {
+      const allowedRole = typeof role === "string" ? role.toLowerCase() : ""
+      return allowedRole === roleString
+    })
 
     if (!hasAccess) {
       const redirectRoute = fallbackRoute || getDashboardRouteByRole(userData.role)
