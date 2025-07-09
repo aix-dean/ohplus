@@ -225,20 +225,8 @@ export default function ReportPreviewPage() {
       </div>
 
       {/* Bottom Branding */}
-      <div className="bg-gradient-to-r from-cyan-400 via-blue-600 to-blue-900 text-white p-6 mt-8">
-        <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <span className="text-lg font-medium">Smart. Seamless. Scalable</span>
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <div className="text-2xl font-bold">OH</div>
-              <div className="text-xs font-medium -mt-1">PLUS</div>
-            </div>
-            <div className="w-8 h-8 bg-white rounded-sm flex items-center justify-center">
-              <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-sm"></div>
-            </div>
-            <div className="text-xs font-medium">+</div>
-          </div>
-        </div>
+      <div className="w-full mt-8">
+        <img src="/logistics-footer.png" alt="Logistics Footer" className="w-full h-auto object-cover" />
       </div>
     </div>
   )
