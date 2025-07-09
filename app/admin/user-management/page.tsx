@@ -65,6 +65,8 @@ export default function UserManagementPage() {
   }
 
   const handleAddUser = async () => {
+    console.log("Add user button clicked") // Debug log
+
     if (!userData?.company_id) {
       toast.error("Company information not found")
       return
@@ -73,6 +75,7 @@ export default function UserManagementPage() {
     try {
       // Generate invitation code
       const invitationCode = generateInvitationCode()
+      console.log("Generated invitation code:", invitationCode) // Debug log
 
       // Save invitation code to Firestore
       await addDoc(collection(db, "invitation_codes"), {
@@ -87,8 +90,12 @@ export default function UserManagementPage() {
         current_uses: 0,
       })
 
+      console.log("Invitation code saved to Firestore") // Debug log
+
       setCurrentInvitationCode(invitationCode)
       setShowAddUserDialog(true)
+
+      console.log("Dialog should be open now:", true) // Debug log
     } catch (error) {
       console.error("Error generating invitation code:", error)
       toast.error("Failed to generate invitation code. Please try again.")
@@ -192,6 +199,8 @@ export default function UserManagementPage() {
       </div>
     )
   }
+
+  console.log("Rendering page with showAddUserDialog:", showAddUserDialog) // Debug log
 
   return (
     <div className="container mx-auto p-6">

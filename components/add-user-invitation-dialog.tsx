@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,32 +14,42 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
+import { useAuth } from "@/contexts/auth-context"
+import { Loader2, Send, User } from "lucide-react"
 
 interface AddUserInvitationDialogProps {
-  isOpen: boolean
-  onClose: () => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
   invitationCode: string
+  onSuccess?: () => void
 }
 
-export default function AddUserInvitationDialog({ isOpen, onClose, invitationCode }: AddUserInvitationDialogProps) {
-  const [email, setEmail] = useState("")
-  const [name, setName] = useState("")
-  const [subject, setSubject] = useState("Invitation to join OH Plus")
-  const [message, setMessage] = useState(
-    "You have been invited to join our team at OH Plus. Please use the invitation code below to register your account.",
-  )
-  const [isLoading, setIsLoading] = useState(false)
+export default function AddUserInvitationDialog({
+  open,
+  onOpenChange,
+  invitationCode,
+  onSuccess,
+}: AddUserInvitationDialogProps) {
+  const { userData } = useAuth()
+  const [loading, setLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    recipientEmail: "",
+    recipientName: "",
+    subject: `Invitation to join ${userData?.companyName || "our organization"}`,
+    message: `You've been invited to join our team! Please use the invitation code below to create your account and get started.`,
+  })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!email) {
-      toast.error("Please enter an email address")
+    if (!formData.recipientEmail) {
+      toast.error("Please enter the recipient's email address")
       return
     }
 
-    setIsLoading(true)
+    setLoading(true)
 
     try {
       const registrationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/register?code=${invitationCode}`
@@ -51,105 +60,129 @@ export default function AddUserInvitationDialog({ isOpen, onClose, invitationCod
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          recipientEmail: email,
-          recipientName: name,
-          subject,
-          message,
-          invitationCode,
+          recipientEmail: formData.recipientEmail,
+          recipientName: formData.recipientName,
+          subject: formData.subject,
+          message: formData.message,
+          invitationCode: invitationCode,
           registrationUrl,
-          senderName: "OH Plus Team",
-          companyName: "OH Plus",
-          role: "User",
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+          senderName: userData?.displayName || userData?.email,
+          companyName: userData?.companyName || "OH Plus",
+          role: "user",
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(), // 30 days from now
         }),
       })
 
-      const result = await response.json()
-
-      if (response.ok) {
-        toast.success("Invitation sent successfully!")
-        onClose()
-        // Reset form
-        setEmail("")
-        setName("")
-        setSubject("Invitation to join OH Plus")
-        setMessage(
-          "You have been invited to join our team at OH Plus. Please use the invitation code below to register your account.",
-        )
-      } else {
-        toast.error(result.error || "Failed to send invitation")
+      if (!response.ok) {
+        throw new Error("Failed to send email")
       }
+
+      toast.success(`Invitation sent successfully to ${formData.recipientEmail}`)
+
+      // Reset form
+      setFormData({
+        recipientEmail: "",
+        recipientName: "",
+        subject: `Invitation to join ${userData?.companyName || "our organization"}`,
+        message: `You've been invited to join our team! Please use the invitation code below to create your account and get started.`,
+      })
+
+      onOpenChange(false)
+      onSuccess?.()
     } catch (error) {
-      console.error("Error sending invitation:", error)
-      toast.error("Failed to send invitation")
+      console.error("Error sending email:", error)
+      toast.error("Failed to send invitation email. Please try again.")
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Send User Invitation</DialogTitle>
-          <DialogDescription>
-            Send an invitation email with the registration link and invitation code.
-          </DialogDescription>
+          <DialogTitle className="flex items-center space-x-2">
+            <User className="h-5 w-5" />
+            <span>Invite New User</span>
+          </DialogTitle>
+          <DialogDescription>Send an invitation email to add a new user to your organization</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="invitation-code">Invitation Code</Label>
-            <Input id="invitation-code" value={invitationCode} readOnly className="bg-gray-50 font-mono" />
-          </div>
+          {/* Invitation Code Display */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm">Generated Invitation Code</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="bg-muted p-3 rounded-md text-center">
+                <code className="text-lg font-mono font-bold">{invitationCode}</code>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                This code will be automatically included in the invitation email
+              </p>
+            </CardContent>
+          </Card>
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email Address *</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="user@example.com"
-              required
-            />
-          </div>
+          {/* Recipient Information */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="recipientEmail">Email Address *</Label>
+              <Input
+                id="recipientEmail"
+                type="email"
+                value={formData.recipientEmail}
+                onChange={(e) => setFormData((prev) => ({ ...prev, recipientEmail: e.target.value }))}
+                placeholder="user@example.com"
+                required
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="name">Recipient Name (Optional)</Label>
-            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="John Doe" />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="recipientName">Full Name (Optional)</Label>
+              <Input
+                id="recipientName"
+                type="text"
+                value={formData.recipientName}
+                onChange={(e) => setFormData((prev) => ({ ...prev, recipientName: e.target.value }))}
+                placeholder="John Doe"
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="subject">Email Subject</Label>
-            <Input
-              id="subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Invitation to join OH Plus"
-            />
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="subject">Email Subject</Label>
+              <Input
+                id="subject"
+                type="text"
+                value={formData.subject}
+                onChange={(e) => setFormData((prev) => ({ ...prev, subject: e.target.value }))}
+                required
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="message">Message</Label>
-            <Textarea
-              id="message"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Enter your invitation message..."
-              rows={3}
-            />
+            <div className="space-y-2">
+              <Label htmlFor="message">Personal Message</Label>
+              <Textarea
+                id="message"
+                value={formData.message}
+                onChange={(e) => setFormData((prev) => ({ ...prev, message: e.target.value }))}
+                placeholder="Add a personal message..."
+                rows={3}
+              />
+            </div>
           </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Sending..." : "Send Invitation"}
-            </Button>
-          </DialogFooter>
         </form>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" onClick={handleSubmit} disabled={loading}>
+            {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            <Send className="h-4 w-4 mr-2" />
+            Send Invitation
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
