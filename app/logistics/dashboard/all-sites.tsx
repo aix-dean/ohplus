@@ -551,19 +551,11 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             <span className="font-medium">ID:</span> {site.siteCode}
           </div>
 
-          {/* Site Details Section - Added here */}
-          <div className="bg-gray-50 border border-gray-200 rounded-md p-3 space-y-2 my-2">
-            <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Site Information</div>
-
-            {/* Address */}
-            <div className="flex flex-col">
-              <span className="text-xs text-gray-500 font-medium">Address:</span>
-              <span className="text-sm text-gray-700">{site.address}</span>
-            </div>
-
+          {/* Site Details Section */}
+          <div className="space-y-2 my-3">
             {/* Operation Status */}
             <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500 font-medium">Operation:</span>
+              <span className="text-sm font-medium text-gray-700">Operation:</span>
               <span
                 className={`text-sm font-semibold ${
                   site.operationalStatus === "Operational"
@@ -575,37 +567,59 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
                         : "text-gray-600"
                 }`}
               >
-                {site.operationalStatus}
+                {site.operationalStatus === "Operational" ? "Active" : site.operationalStatus}
               </span>
             </div>
 
-            {/* Content Type and Health in a row */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="flex flex-col">
-                <span className="text-xs text-gray-500 font-medium">Type:</span>
-                <span className="text-sm font-semibold text-blue-600">
-                  {site.contentType === "dynamic" ? "Digital" : "Static"}
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs text-gray-500 font-medium">Health:</span>
-                <span
-                  className={`text-sm font-semibold ${
-                    site.healthPercentage > 80
-                      ? "text-green-600"
-                      : site.healthPercentage > 60
-                        ? "text-yellow-600"
-                        : "text-red-600"
-                  }`}
-                >
-                  {site.healthPercentage}%
-                </span>
-              </div>
+            {/* Display Health */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-700">Display Health:</span>
+              <span
+                className={`text-sm font-semibold ${
+                  site.healthPercentage > 80
+                    ? "text-green-600"
+                    : site.healthPercentage > 60
+                      ? "text-yellow-600"
+                      : "text-red-600"
+                }`}
+              >
+                {site.healthPercentage}%
+              </span>
+            </div>
+
+            {/* Content Type */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-700">Content:</span>
+              <span className="text-sm font-semibold text-blue-600">
+                {site.contentType === "dynamic" ? "Digital Display" : "Static Billboard"}
+              </span>
+            </div>
+
+            {/* Illumination Status */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-700">Illumination:</span>
+              <span
+                className={`text-sm font-semibold ${
+                  site.operationalStatus === "Operational" ? "text-green-600" : "text-gray-600"
+                }`}
+              >
+                {site.operationalStatus === "Operational" ? "ON" : "OFF"}
+              </span>
+            </div>
+
+            {/* Compliance Status */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-gray-700">Compliance:</span>
+              <span
+                className={`text-sm font-semibold ${site.healthPercentage > 80 ? "text-green-600" : "text-red-600"}`}
+              >
+                {site.healthPercentage > 80 ? "Complete" : "Incomplete"}
+              </span>
             </div>
           </div>
 
           {/* Current Status */}
-          <div className="text-sm">
+          <div className="text-sm border-t pt-2">
             <span className="text-gray-600 font-medium">Current:</span>{" "}
             <span
               className={`font-semibold ${
