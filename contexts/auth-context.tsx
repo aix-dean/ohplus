@@ -232,34 +232,32 @@ export function AuthProvider({ children }: AuthProviderProps) {
       let licenseKey = generateLicenseKey()
       let companyId = null
 
+      // If joining an organization, validate the code and get company info
       if (orgCode) {
-        try {
-          const orgCodeDoc = await getDoc(doc(db, "organization_codes", orgCode))
-          if (orgCodeDoc.exists()) {
-            const orgData = orgCodeDoc.data()
-            if (!orgData.expires_at || orgData.expires_at.toDate() > new Date()) {
-              if (!orgData.used) {
-                licenseKey = orgData.license_key
-                companyId = orgData.company_id
-
-                await updateDoc(doc(db, "organization_codes", orgCode), {
-                  used: true,
-                  used_by: firebaseUser.uid,
-                  used_at: serverTimestamp(),
-                })
-                console.log("Successfully joined organization with code:", orgCode)
-              } else {
-                console.warn("Organization code has already been used:", orgCode)
-              }
-            } else {
-              console.warn("Organization code has expired:", orgCode)
-            }
-          } else {
-            console.warn("Organization code not found:", orgCode)
-          }
-        } catch (orgError) {
-          console.error("Error validating organization code:", orgError)
+        const orgCodeDoc = await getDoc(doc(db, "organization_codes", orgCode))
+        if (!orgCodeDoc.exists()) {
+          throw new Error("Invalid organization code.")
         }
+
+        const orgData = orgCodeDoc.data()
+        if (orgData.expires_at && orgData.expires_at.toDate() < new Date()) {
+          throw new Error("Organization code has expired.")
+        }
+
+        if (orgData.used) {
+          throw new Error("Organization code has already been used.")
+        }
+
+        // Use the organization's license key and company ID
+        licenseKey = orgData.license_key
+        companyId = orgData.company_id
+
+        // Mark the code as used
+        await updateDoc(doc(db, "organization_codes", orgCode), {
+          used: true,
+          used_by: firebaseUser.uid,
+          used_at: serverTimestamp(),
+        })
       }
 
       const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
@@ -278,10 +276,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         middle_name: personalInfo.middle_name,
         phone_number: personalInfo.phone_number,
         gender: personalInfo.gender,
-        project_id: orgCode && companyId ? null : firebaseUser.uid,
+        project_id: orgCode ? null : firebaseUser.uid,
       })
 
-      if (!orgCode || !companyId) {
+      // Only create a project if not joining an organization
+      if (!orgCode) {
         const projectDocRef = doc(db, "projects", firebaseUser.uid)
         await setDoc(projectDocRef, {
           company_name: companyInfo.company_name,
