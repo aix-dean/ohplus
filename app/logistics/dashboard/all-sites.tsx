@@ -523,12 +523,12 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             <span className="font-medium">ID:</span> {site.siteCode}
           </div>
 
-          {/* Site Details Section */}
-          <div className="mt-2 space-y-1.5 text-sm border-t pt-2">
+          {/* Site Details Section - INSERT HERE */}
+          <div className="mt-2 mb-2 space-y-1 text-xs bg-gray-50 p-2 rounded border">
             <div className="flex justify-between items-center">
-              <span className="text-gray-600 font-medium">Operation:</span>
+              <span className="text-gray-600">Operation:</span>
               <span
-                className={`font-semibold ${
+                className={`font-medium ${
                   site.status === "ACTIVE" || site.status === "OCCUPIED"
                     ? "text-green-600"
                     : site.status === "MAINTENANCE" || site.status === "REPAIR"
@@ -545,16 +545,14 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             </div>
 
             <div className="flex justify-between items-center">
-              <span className="text-gray-600 font-medium">Content:</span>
-              <span className="font-semibold text-blue-600">
-                {site.contentType === "dynamic" ? "Digital" : "Static"}
-              </span>
+              <span className="text-gray-600">Content:</span>
+              <span className="font-medium text-blue-600">{site.contentType === "dynamic" ? "Digital" : "Static"}</span>
             </div>
 
             <div className="flex justify-between items-center">
-              <span className="text-gray-600 font-medium">Display Health:</span>
+              <span className="text-gray-600">Display Health:</span>
               <span
-                className={`font-semibold ${
+                className={`font-medium ${
                   site.healthPercentage > 80
                     ? "text-green-600"
                     : site.healthPercentage > 60
@@ -567,9 +565,9 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             </div>
 
             <div className="flex justify-between items-center">
-              <span className="text-gray-600 font-medium">Illumination:</span>
+              <span className="text-gray-600">Illumination:</span>
               <span
-                className={`font-semibold ${
+                className={`font-medium ${
                   site.status === "ACTIVE" || site.status === "OCCUPIED" ? "text-green-600" : "text-gray-500"
                 }`}
               >
@@ -578,15 +576,33 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             </div>
 
             <div className="flex justify-between items-center">
-              <span className="text-gray-600 font-medium">Compliance:</span>
-              <span className={`font-semibold ${site.healthPercentage > 80 ? "text-green-600" : "text-orange-600"}`}>
+              <span className="text-gray-600">Compliance:</span>
+              <span className={`font-medium ${site.healthPercentage > 80 ? "text-green-600" : "text-orange-600"}`}>
                 {site.healthPercentage > 80 ? "Complete" : "Incomplete"}
               </span>
             </div>
           </div>
 
+          {/* Current Status */}
+          <div className="text-sm">
+            <span className="text-gray-600 font-medium">Current:</span>{" "}
+            <span
+              className={`font-semibold ${
+                site.status === "ACTIVE" || site.status === "OCCUPIED"
+                  ? "text-blue-600"
+                  : site.status === "VACANT" || site.status === "AVAILABLE"
+                    ? "text-green-600"
+                    : site.status === "MAINTENANCE" || site.status === "REPAIR"
+                      ? "text-red-600"
+                      : "text-orange-600"
+              }`}
+            >
+              {site.status}
+            </span>
+          </div>
+
           {/* Location */}
-          <div className="text-sm text-gray-500 mt-2 border-t pt-2">
+          <div className="text-sm text-gray-500">
             <span className="font-medium">Location:</span> {site.location}
           </div>
 
