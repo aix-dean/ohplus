@@ -1,6 +1,6 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 
 import { useState } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -9,28 +9,34 @@ import { cn } from "@/lib/utils"
 import { useResponsive } from "@/hooks/use-responsive"
 
 interface Column<T> {
-  header: string
-  accessorKey: keyof T | ((row: T) => any)
+  header?: string
+  accessorKey?: keyof T | ((row: T) => any)
   cell?: (row: T) => React.ReactNode
   className?: string
   hideOnMobile?: boolean
+  // Support for the user management page column structure
+  key?: string
+  label?: string
+  render?: (row: T) => React.ReactNode
 }
 
 interface ResponsiveTableProps<T> {
   data: T[]
   columns: Column<T>[]
   onRowClick?: (row: T) => void
-  keyField: keyof T
+  keyField?: keyof T
   expandableContent?: (row: T) => React.ReactNode
   isLoading?: boolean
   emptyState?: React.ReactNode
+  searchKey?: string
+  searchPlaceholder?: string
 }
 
 export function ResponsiveTable<T>({
   data,
   columns,
   onRowClick,
-  keyField,
+  keyField = "id" as keyof T,
   expandableContent,
   isLoading = false,
   emptyState,
@@ -50,11 +56,27 @@ export function ResponsiveTable<T>({
   }
 
   const getValue = (row: T, column: Column<T>) => {
+    if (column.render) {
+      return column.render(row)
+    }
+
+    if (column.cell) {
+      return column.cell(row)
+    }
+
     if (typeof column.accessorKey === "function") {
       return column.accessorKey(row)
     }
 
-    return row[column.accessorKey]
+    if (column.accessorKey) {
+      return row[column.accessorKey]
+    }
+
+    return null
+  }
+
+  const getColumnHeader = (column: Column<T>) => {
+    return column.header || column.label || ""
   }
 
   if (isLoading) {
@@ -76,21 +98,20 @@ export function ResponsiveTable<T>({
           <TableRow>
             {expandableContent && <TableHead className="w-[40px]"></TableHead>}
             {visibleColumns.map((column, index) => (
-              <TableHead key={index} className={column.className}>
-                {column.header}
+              <TableHead key={column.key || column.header || index} className={column.className}>
+                {getColumnHeader(column)}
               </TableHead>
             ))}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((row) => {
-            const rowId = String(row[keyField])
+          {data.map((row, rowIndex) => {
+            const rowId = row[keyField] ? String(row[keyField]) : String(rowIndex)
             const isExpanded = expandedRows[rowId]
 
             return (
-              <>
+              <React.Fragment key={rowId}>
                 <TableRow
-                  key={rowId}
                   className={cn(onRowClick && "cursor-pointer hover:bg-gray-50", isExpanded && "bg-gray-50")}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                 >
@@ -107,20 +128,20 @@ export function ResponsiveTable<T>({
                       </button>
                     </TableCell>
                   )}
-                  {visibleColumns.map((column, index) => (
-                    <TableCell key={index} className={column.className}>
-                      {column.cell ? column.cell(row) : getValue(row, column)}
+                  {visibleColumns.map((column, columnIndex) => (
+                    <TableCell key={column.key || column.header || columnIndex} className={column.className}>
+                      {getValue(row, column)}
                     </TableCell>
                   ))}
                 </TableRow>
                 {expandableContent && isExpanded && (
-                  <TableRow className="bg-gray-50">
+                  <TableRow key={`${rowId}-expanded`} className="bg-gray-50">
                     <TableCell colSpan={visibleColumns.length + 1} className="p-4">
                       {expandableContent(row)}
                     </TableCell>
                   </TableRow>
                 )}
-              </>
+              </React.Fragment>
             )
           })}
         </TableBody>

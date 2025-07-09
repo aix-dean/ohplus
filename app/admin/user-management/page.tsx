@@ -171,7 +171,7 @@ export default function UserManagementPage() {
           <CardDescription>Manage users within your organization</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveTable data={users} columns={columns} searchKey="displayName" searchPlaceholder="Search users..." />
+          <ResponsiveTable data={users} columns={columns} keyField="id" />
         </CardContent>
       </Card>
     </div>
