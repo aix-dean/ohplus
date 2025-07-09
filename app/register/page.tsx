@@ -1,15 +1,26 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FirebaseError } from "firebase/app"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Eye, EyeOff, Users } from "lucide-react"
+import Link from "next/link"
+import { toast } from "@/components/ui/use-toast"
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
@@ -17,289 +28,240 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
-  const [middleName, setMiddleName] = useState("")
-  const [phoneNumber, setPhoneNumber] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [showJoinOrgDialog, setShowJoinOrgDialog] = useState(false)
+  const [error, setError] = useState("")
   const [orgCode, setOrgCode] = useState("")
+  const [orgDialogOpen, setOrgDialogOpen] = useState(false)
   const [joiningOrg, setJoiningOrg] = useState(false)
 
   const { register } = useAuth()
   const router = useRouter()
 
-  const getFriendlyErrorMessage = (error: unknown): string => {
-    console.error("Raw error during registration:", error)
-    if (error instanceof FirebaseError) {
-      switch (error.code) {
-        case "auth/email-already-in-use":
-          return "This email address is already in use. Please use a different email or log in."
-        case "auth/invalid-email":
-          return "The email address is not valid. Please check the format."
-        case "auth/weak-password":
-          return "The password is too weak. Please choose a stronger password (at least 6 characters)."
-        case "auth/operation-not-allowed":
-          return "Email/password accounts are not enabled. Please contact support."
-        case "auth/network-request-failed":
-          return "Network error. Please check your internet connection and try again."
-        default:
-          return "An unexpected error occurred during registration. Please try again."
-      }
-    }
-    return "An unknown error occurred. Please try again."
-  }
-
-  const handleRegister = async () => {
-    setErrorMessage(null)
-
-    if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
-      setErrorMessage("Please fill in all required fields.")
-      return
-    }
+  const handleSubmit = async (e: React.FormEvent, organizationCode?: string) => {
+    e.preventDefault()
+    setError("")
 
     if (password !== confirmPassword) {
-      setErrorMessage("Passwords do not match.")
+      setError("Passwords do not match")
       return
     }
 
-    setLoading(true)
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long")
+      return
+    }
+
     try {
-      await register(
-        {
-          email,
-          first_name: firstName,
-          last_name: lastName,
-          middle_name: middleName,
-          phone_number: phoneNumber,
-          gender: "",
-        },
-        {
-          company_name: "",
-          company_location: "",
-        },
-        password,
-      )
-      setErrorMessage(null)
-      router.push("/admin/dashboard?registered=true")
-    } catch (error: unknown) {
-      setErrorMessage(getFriendlyErrorMessage(error))
+      setLoading(true)
+      await register(email, password, firstName, lastName, organizationCode)
+
+      if (organizationCode) {
+        toast({
+          title: "Successfully joined organization!",
+          description: "You have been registered and added to the organization.",
+        })
+      }
+
+      router.push("/onboarding")
+    } catch (error: any) {
+      console.error("Registration error:", error)
+      setError(error.message || "Failed to create account")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleJoinOrganization = async () => {
-    setErrorMessage(null)
+  const handleJoinOrganization = async (e: React.FormEvent) => {
+    e.preventDefault()
 
     if (!orgCode.trim()) {
-      setErrorMessage("Please enter an organization code.")
-      return
-    }
-
-    if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
-      setErrorMessage("Please fill in all required fields.")
-      return
-    }
-
-    if (password !== confirmPassword) {
-      setErrorMessage("Passwords do not match.")
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please enter an organization code.",
+      })
       return
     }
 
     setJoiningOrg(true)
-    try {
-      await register(
-        {
-          email,
-          first_name: firstName,
-          last_name: lastName,
-          middle_name: middleName,
-          phone_number: phoneNumber,
-          gender: "",
-        },
-        {
-          company_name: "",
-          company_location: "",
-        },
-        password,
-        orgCode, // Pass the organization code
-      )
-      setErrorMessage(null)
-      router.push("/admin/dashboard?registered=true&joined_org=true")
-    } catch (error: unknown) {
-      setErrorMessage(getFriendlyErrorMessage(error))
-    } finally {
-      setJoiningOrg(false)
-    }
+    await handleSubmit(e, orgCode.trim())
+    setJoiningOrg(false)
+    setOrgDialogOpen(false)
   }
 
   return (
-    <div className="flex min-h-screen">
-      {/* Left Panel - Image */}
-      <div className="relative hidden w-[40%] items-center justify-center bg-gray-900 lg:flex">
-        <Image
-          src="/registration-background.png"
-          alt="Background"
-          layout="fill"
-          objectFit="cover"
-          className="absolute inset-0 z-0 opacity-50"
-        />
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Create your account</h2>
+          <p className="mt-2 text-center text-sm text-gray-600">
+            Or{" "}
+            <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
+              sign in to your existing account
+            </Link>
+          </p>
+        </div>
 
-      {/* Right Panel - Form */}
-      <div className="flex w-full items-center justify-center bg-white p-8 dark:bg-gray-950 lg:w-[60%]">
-        <Card className="w-full max-w-md border-none shadow-none">
-          <CardHeader className="space-y-1 text-left">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-3xl font-bold">Create an Account</CardTitle>
-            </div>
-            <CardDescription className="text-gray-600 dark:text-gray-400">It's free to create one!</CardDescription>
+        <Card>
+          <CardHeader>
+            <CardTitle>Sign Up</CardTitle>
+            <CardDescription>Enter your information to create an account</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <form onSubmit={(e) => handleSubmit(e)} className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+                <div>
                   <Label htmlFor="firstName">First Name</Label>
                   <Input
                     id="firstName"
-                    placeholder="John"
+                    type="text"
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     required
+                    className="mt-1"
                   />
                 </div>
-                <div className="space-y-2">
+                <div>
                   <Label htmlFor="lastName">Last Name</Label>
                   <Input
                     id="lastName"
-                    placeholder="Doe"
+                    type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
                     required
+                    className="mt-1"
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="middleName">Middle Name (Optional)</Label>
-                <Input
-                  id="middleName"
-                  placeholder=""
-                  value={middleName}
-                  onChange={(e) => setMiddleName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Cellphone number</Label>
-                <Input
-                  id="phoneNumber"
-                  placeholder="+63 9XX XXX XXXX"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+
+              <div>
+                <Label htmlFor="email">Email address</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="m@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  className="mt-1"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
-                <a href="#" className="text-blue-600 hover:underline">
-                  Terms and Conditions
-                </a>
-                ,{" "}
-                <a href="#" className="text-blue-600 hover:underline">
-                  Privacy Policy
-                </a>
-                , and all platform{" "}
-                <a href="#" className="text-blue-600 hover:underline">
-                  rules and regulations
-                </a>{" "}
-                set by OH!Plus.
-              </p>
-              <Button
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                type="submit"
-                onClick={handleRegister}
-                disabled={loading}
-              >
-                {loading ? "Signing Up..." : "Sign Up"}
-              </Button>
-              <Button
-                className="w-full bg-green-600 hover:bg-green-700 text-white mt-2"
-                type="button"
-                onClick={() => setShowJoinOrgDialog(true)}
-                disabled={loading}
-              >
-                Join an organization
-              </Button>
-            </div>
 
-            {errorMessage && (
-              <div className="text-red-500 text-sm mt-4 text-center" role="alert">
-                {errorMessage}
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <div className="relative mt-1">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                </div>
               </div>
-            )}
+
+              <div>
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <div className="relative mt-1">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Creating account..." : "Sign Up"}
+              </Button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2 text-muted-foreground">Or</span>
+                </div>
+              </div>
+
+              <Dialog open={orgDialogOpen} onOpenChange={setOrgDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button type="button" variant="outline" className="w-full flex items-center gap-2 bg-transparent">
+                    <Users className="h-4 w-4" />
+                    Join an organization
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Join an Organization</DialogTitle>
+                    <DialogDescription>
+                      Enter the organization code provided by your administrator to join their organization.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleJoinOrganization} className="space-y-4">
+                    <div>
+                      <Label htmlFor="orgCode">Organization Code</Label>
+                      <Input
+                        id="orgCode"
+                        type="text"
+                        placeholder="Enter organization code (e.g., ABCD-1234)"
+                        value={orgCode}
+                        onChange={(e) => setOrgCode(e.target.value.toUpperCase())}
+                        className="mt-1 font-mono"
+                        maxLength={9}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setOrgDialogOpen(false)}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={joiningOrg || !orgCode.trim()} className="flex-1">
+                        {joiningOrg ? "Joining..." : "Join Organization"}
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </form>
           </CardContent>
         </Card>
       </div>
-      <Dialog open={showJoinOrgDialog} onOpenChange={setShowJoinOrgDialog}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Join an Organization</DialogTitle>
-            <DialogDescription>
-              Enter the organization code provided by your administrator to join their organization.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="orgCode">Organization Code</Label>
-              <Input
-                id="orgCode"
-                placeholder="Enter organization code"
-                value={orgCode}
-                onChange={(e) => setOrgCode(e.target.value)}
-                required
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={() => setShowJoinOrgDialog(false)} disabled={joiningOrg}>
-                Cancel
-              </Button>
-              <Button type="button" onClick={handleJoinOrganization} disabled={joiningOrg}>
-                {joiningOrg ? "Joining..." : "Join Organization"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
