@@ -303,7 +303,6 @@ export function SideNavigation() {
                   { title: "Documents", href: "/admin/documents", icon: FileText },
                   { title: "Inventory", href: "/admin/inventory", icon: Package },
                   { title: "User Management", href: "/admin/user-management", icon: Users },
-                  { title: "Invitation Codes", href: "/admin/invitation-codes", icon: FileText },
                   { title: "Subscription", href: "/admin/subscriptions", icon: FileText },
                 ].map((item) => {
                   const Icon = item.icon
