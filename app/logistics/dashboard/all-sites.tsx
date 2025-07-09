@@ -9,11 +9,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import type { Product } from "@/lib/firebase-service"
+import {
+  getProductsByContentTypeAndCompany,
+  getProductsCountByContentTypeAndCompany,
+  type Product,
+} from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { CreateReportDialog } from "@/components/create-report-dialog"
-import { getProductsCountByContentTypeAndCompany, getProductsByContentTypeAndCompany } from "@/lib/firebase-service"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
@@ -280,6 +283,7 @@ export default function AllSitesTab() {
       location: product.specs_rental?.location || product.light?.location || "Unknown location",
       contentType: product.content_type || "static",
       healthPercentage,
+      siteCode: product.site_code || product.id.substring(0, 8),
     }
   }
 
@@ -470,9 +474,6 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
     window.location.href = `/logistics/sites/${site.id}`
   }
 
-  // Unified Site Card that shows all UI elements without conditions
-  // function UnifiedSiteCard({ site }: { site: any }) {
-
   return (
     <Card
       className="erp-card overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
@@ -496,55 +497,64 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
           </div>
         )}
 
-        {/* Content Type Badge */}
-        <div className="absolute top-2 left-2">
+        {/* Status Badge */}
+        <div className="absolute bottom-2 left-2">
           <Badge
             variant="outline"
             className={`
-              ${site.contentType === "dynamic" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-amber-50 text-amber-700 border-amber-200"}
+              ${site.status === "ACTIVE" || site.status === "OCCUPIED" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
+              ${site.status === "VACANT" || site.status === "AVAILABLE" ? "bg-green-50 text-green-700 border-green-200" : ""}
+              ${site.status === "MAINTENANCE" || site.status === "REPAIR" ? "bg-red-50 text-red-700 border-red-200" : ""}
+              ${site.status === "PENDING" || site.status === "INSTALLATION" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
             `}
           >
-            {site.contentType === "dynamic" ? "Digital" : "Static"}
+            {site.status}
           </Badge>
         </div>
       </div>
 
       <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-semibold">{site.name}</h3>
+        <div className="flex flex-col gap-2">
+          {/* Site Name */}
+          <h3 className="font-semibold text-lg">{site.name}</h3>
+
+          {/* Site ID */}
+          <div className="text-sm text-gray-600">
+            <span className="font-medium">ID:</span> {site.siteCode}
+          </div>
 
           {/* Site Details Section */}
-          <div className="mt-2 space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Operation:</span>
+          <div className="mt-2 space-y-1.5 text-sm border-t pt-2">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 font-medium">Operation:</span>
               <span
-                className={`font-medium ${
+                className={`font-semibold ${
                   site.status === "ACTIVE" || site.status === "OCCUPIED"
                     ? "text-green-600"
-                    : site.status === "MAINTENANCE"
+                    : site.status === "MAINTENANCE" || site.status === "REPAIR"
                       ? "text-red-600"
                       : "text-orange-600"
                 }`}
               >
                 {site.status === "ACTIVE" || site.status === "OCCUPIED"
                   ? "Active"
-                  : site.status === "MAINTENANCE"
+                  : site.status === "MAINTENANCE" || site.status === "REPAIR"
                     ? "Maintenance"
                     : "Pending"}
               </span>
             </div>
 
-            <div className="flex justify-between">
-              <span className="text-gray-600">Content:</span>
-              <span className="font-medium text-blue-600">
-                {site.contentType === "dynamic" ? "Digital Display" : "Static Billboard"}
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 font-medium">Content:</span>
+              <span className="font-semibold text-blue-600">
+                {site.contentType === "dynamic" ? "Digital" : "Static"}
               </span>
             </div>
 
-            <div className="flex justify-between">
-              <span className="text-gray-600">Display Health:</span>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 font-medium">Display Health:</span>
               <span
-                className={`font-medium ${
+                className={`font-semibold ${
                   site.healthPercentage > 80
                     ? "text-green-600"
                     : site.healthPercentage > 60
@@ -556,10 +566,10 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
               </span>
             </div>
 
-            <div className="flex justify-between">
-              <span className="text-gray-600">Illumination:</span>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 font-medium">Illumination:</span>
               <span
-                className={`font-medium ${
+                className={`font-semibold ${
                   site.status === "ACTIVE" || site.status === "OCCUPIED" ? "text-green-600" : "text-gray-500"
                 }`}
               >
@@ -567,28 +577,23 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
               </span>
             </div>
 
-            <div className="flex justify-between">
-              <span className="text-gray-600">Compliance:</span>
-              <span className={`font-medium ${site.healthPercentage > 80 ? "text-green-600" : "text-orange-600"}`}>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-600 font-medium">Compliance:</span>
+              <span className={`font-semibold ${site.healthPercentage > 80 ? "text-green-600" : "text-orange-600"}`}>
                 {site.healthPercentage > 80 ? "Complete" : "Incomplete"}
               </span>
             </div>
           </div>
 
-          <div className="text-sm text-gray-500 mt-3">{site.location}</div>
-
-          {/* Additional Information */}
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Last Updated:</span>
-              <span className="text-sm text-gray-500">Today</span>
-            </div>
+          {/* Location */}
+          <div className="text-sm text-gray-500 mt-2 border-t pt-2">
+            <span className="font-medium">Location:</span> {site.location}
           </div>
 
           {/* Create Report Button */}
           <Button
             variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+            className="mt-4 w-full bg-gray-50 hover:bg-gray-100 border-gray-300"
             onClick={handleCreateReport}
           >
             Create Report
