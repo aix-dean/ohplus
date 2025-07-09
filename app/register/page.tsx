@@ -110,9 +110,20 @@ export default function RegisterPage() {
         <Card className="w-full max-w-md border-none shadow-none">
           <CardHeader className="space-y-1 text-left">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-3xl font-bold">Create an Account</CardTitle>
+              <CardTitle className="text-3xl font-bold">
+                {orgCode ? "Join Organization" : "Create an Account"}
+              </CardTitle>
             </div>
-            <CardDescription className="text-gray-600 dark:text-gray-400">It's free to create one!</CardDescription>
+            <CardDescription className="text-gray-600 dark:text-gray-400">
+              {orgCode ? "Complete your registration to join the organization!" : "It's free to create one!"}
+            </CardDescription>
+            {orgCode && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mt-2">
+                <p className="text-sm text-blue-800">
+                  <strong>Organization Code:</strong> {orgCode}
+                </p>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -209,7 +220,13 @@ export default function RegisterPage() {
                 onClick={handleRegister}
                 disabled={loading}
               >
-                {loading ? "Signing Up..." : "Sign Up"}
+                {loading
+                  ? orgCode
+                    ? "Joining Organization..."
+                    : "Signing Up..."
+                  : orgCode
+                    ? "Join Organization"
+                    : "Sign Up"}
               </Button>
             </div>
 

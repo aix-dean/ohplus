@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,19 +28,19 @@ export default function LoginPage() {
     if (error instanceof FirebaseError) {
       switch (error.code) {
         case "auth/user-not-found":
-          return "No account found with this email address."
+          return "No account found with this email address. Please check your email or sign up."
         case "auth/wrong-password":
-          return "Incorrect password. Please try again."
+          return "Incorrect password. Please try again or reset your password."
         case "auth/invalid-email":
-          return "The email address is not valid."
+          return "The email address is not valid. Please check the format."
         case "auth/user-disabled":
           return "This account has been disabled. Please contact support."
         case "auth/too-many-requests":
-          return "Too many failed login attempts. Please try again later."
+          return "Too many failed login attempts. Please try again later or reset your password."
         case "auth/network-request-failed":
-          return "Network error. Please check your internet connection."
+          return "Network error. Please check your internet connection and try again."
         default:
-          return "An unexpected error occurred. Please try again."
+          return "An unexpected error occurred during login. Please try again."
       }
     }
     return "An unknown error occurred. Please try again."
@@ -49,7 +50,7 @@ export default function LoginPage() {
     setErrorMessage(null)
 
     if (!email || !password) {
-      setErrorMessage("Please fill in all fields.")
+      setErrorMessage("Please enter both email and password.")
       return
     }
 
@@ -66,9 +67,11 @@ export default function LoginPage() {
 
   const handleJoinOrganization = () => {
     if (!orgCode.trim()) {
+      setErrorMessage("Please enter an organization code.")
       return
     }
-    setShowJoinOrgDialog(false)
+
+    // Navigate to registration page with organization code
     router.push(`/register?orgCode=${encodeURIComponent(orgCode)}`)
   }
 
@@ -89,15 +92,17 @@ export default function LoginPage() {
       <div className="flex w-full items-center justify-center bg-white p-8 dark:bg-gray-950 lg:w-[60%]">
         <Card className="w-full max-w-md border-none shadow-none">
           <CardHeader className="space-y-1 text-left">
-            <CardTitle className="text-3xl font-bold">Welcome back</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-3xl font-bold">Welcome back</CardTitle>
+            </div>
             <CardDescription className="text-gray-600 dark:text-gray-400">
-              Enter your email and password to sign in to your account
+              Enter your email and password to access your account
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email Address</Label>
                 <Input
                   id="email"
                   type="email"
@@ -108,7 +113,12 @@ export default function LoginPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
+                    Forgot password?
+                  </Link>
+                </div>
                 <Input
                   id="password"
                   type="password"
@@ -136,9 +146,9 @@ export default function LoginPage() {
           <CardFooter className="flex flex-col space-y-2">
             <div className="text-center text-sm text-gray-600 dark:text-gray-400">
               Don't have an account?{" "}
-              <a href="/register" className="text-blue-600 hover:underline">
+              <Link href="/register" className="text-blue-600 hover:underline">
                 Sign up
-              </a>
+              </Link>
             </div>
             <Button variant="outline" className="w-full bg-transparent" onClick={() => setShowJoinOrgDialog(true)}>
               Join an organization
@@ -170,7 +180,7 @@ export default function LoginPage() {
               <Button type="button" variant="outline" onClick={() => setShowJoinOrgDialog(false)}>
                 Cancel
               </Button>
-              <Button type="button" onClick={handleJoinOrganization} disabled={!orgCode.trim()}>
+              <Button type="button" onClick={handleJoinOrganization}>
                 Continue to Registration
               </Button>
             </div>

@@ -1,14 +1,13 @@
 "use client"
 
-import type React from "react"
-import { createContext, useContext, useEffect, useState, useCallback } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
 import {
-  type User as FirebaseUser,
+  onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
-  onAuthStateChanged,
+  type User as FirebaseUser,
 } from "firebase/auth"
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
@@ -25,22 +24,6 @@ interface UserData {
   role: string | null
   permissions: string[]
   // Add other user-specific data here
-}
-
-interface ProjectData {
-  project_id: string
-  company_name?: string
-  company_location?: string
-  company_website?: string
-  project_name?: string
-  social_media?: {
-    facebook?: string
-    instagram?: string
-    youtube?: string
-  }
-  license_key?: string | null
-  created?: Date
-  updated?: Date
 }
 
 interface AuthContextType {
@@ -76,19 +59,23 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider")
+interface ProjectData {
+  project_id: string
+  company_name?: string
+  company_location?: string
+  company_website?: string
+  project_name?: string
+  social_media?: {
+    facebook?: string
+    instagram?: string
+    youtube?: string
   }
-  return context
+  license_key?: string | null
+  created?: Date
+  updated?: Date
 }
 
-interface AuthProviderProps {
-  children: React.ReactNode
-}
-
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
@@ -97,6 +84,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
     try {
+      // Corrected collection name to "iboard_users"
       const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
       const userDocSnap = await getDoc(userDocRef)
 
@@ -108,19 +96,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
-          license_key: (data.license_key as string | null) || null,
-          company_id: (data.company_id as string | null) || null,
-          role: data.role || "user",
-          permissions: data.permissions || [],
-          ...data,
+          license_key: (data.license_key as string | null) || null, // Explicitly cast to string | null
+          company_id: (data.company_id as string | null) || null, // Add company_id field
+          role: data.role || "user", // Default role
+          permissions: data.permissions || [], // Default empty permissions
+          ...data, // Spread any other fields
         }
       } else {
+        // If user document doesn't exist, create a basic one in "iboard_users"
         fetchedUserData = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
-          license_key: null,
-          company_id: null,
+          license_key: null, // Will be assigned during registration/onboarding
+          company_id: null, // Will be assigned when user registers company
           role: "user",
           permissions: [],
         }
@@ -128,6 +117,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       setUserData(fetchedUserData)
 
+      // Fetch project data if project_id exists in user data
       if (fetchedUserData.project_id) {
         const projectDocRef = doc(db, "projects", fetchedUserData.project_id)
         const projectDocSnap = await getDoc(projectDocRef)
@@ -140,7 +130,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             company_website: projectData.company_website,
             project_name: projectData.project_name,
             social_media: projectData.social_media,
-            license_key: projectData.license_key,
+            license_key: projectData.license_key, // Fetch license_key for project data
             created: projectData.created?.toDate(),
             updated: projectData.updated?.toDate(),
           })
@@ -151,9 +141,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setProjectData(null)
       }
 
+      // Fetch subscription data if license_key exists
       if (fetchedUserData.license_key) {
-        const subData = await subscriptionService.getSubscriptionByLicenseKey(fetchedUserData.license_key)
-        setSubscriptionData(subData)
+        const subscription = await subscriptionService.getSubscriptionByLicenseKey(fetchedUserData.license_key)
+        setSubscriptionData(subscription)
       } else {
         setSubscriptionData(null)
       }
@@ -183,9 +174,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const assignLicenseKey = useCallback(
     async (uid: string, licenseKey: string) => {
       try {
+        // Corrected collection name to "iboard_users"
         const userDocRef = doc(db, "iboard_users", uid)
         await setDoc(userDocRef, { license_key: licenseKey }, { merge: true })
+        // Update local state immediately
         setUserData((prev) => (prev ? { ...prev, license_key: licenseKey } : null))
+        // Refresh subscription data after assigning license key
         await refreshSubscriptionData()
       } catch (error) {
         console.error("Error assigning license key:", error)
@@ -234,32 +228,62 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       // If joining an organization, validate the code and get company info
       if (orgCode) {
-        const orgCodeDoc = await getDoc(doc(db, "organization_codes", orgCode))
+        // Try both possible collection names for invitation codes
+        let orgCodeDoc = await getDoc(doc(db, "invitation_codes", orgCode))
+
+        // If not found in invitation_codes, try organization_codes
+        if (!orgCodeDoc.exists()) {
+          orgCodeDoc = await getDoc(doc(db, "organization_codes", orgCode))
+        }
+
         if (!orgCodeDoc.exists()) {
           throw new Error("Invalid organization code.")
         }
 
         const orgData = orgCodeDoc.data()
+
+        // Check if code has expired
         if (orgData.expires_at && orgData.expires_at.toDate() < new Date()) {
           throw new Error("Organization code has expired.")
         }
 
-        if (orgData.used) {
+        // Check if code has already been used (if it's a single-use code)
+        if (orgData.used && orgData.max_uses === 1) {
           throw new Error("Organization code has already been used.")
         }
 
-        // Use the organization's license key and company ID
-        licenseKey = orgData.license_key
-        companyId = orgData.company_id
+        // Check if code has reached maximum uses
+        if (orgData.max_uses && orgData.used_count >= orgData.max_uses) {
+          throw new Error("Organization code has reached its maximum number of uses.")
+        }
 
-        // Mark the code as used
-        await updateDoc(doc(db, "organization_codes", orgCode), {
+        // Use the organization's license key and company ID
+        licenseKey = orgData.license_key || licenseKey
+        companyId = orgData.company_id || null
+
+        // Update the code usage
+        const updateData: any = {
           used: true,
-          used_by: firebaseUser.uid,
-          used_at: serverTimestamp(),
-        })
+          used_count: (orgData.used_count || 0) + 1,
+          last_used_at: serverTimestamp(),
+        }
+
+        // Add user to the used_by array if it exists
+        if (orgData.used_by && Array.isArray(orgData.used_by)) {
+          updateData.used_by = [...orgData.used_by, firebaseUser.uid]
+        } else {
+          updateData.used_by = [firebaseUser.uid]
+        }
+
+        // Update the appropriate collection
+        const collectionName = await getDoc(doc(db, "invitation_codes", orgCode)).then((doc) =>
+          doc.exists() ? "invitation_codes" : "organization_codes",
+        )
+
+        await updateDoc(doc(db, collectionName, orgCode), updateData)
       }
 
+      // Create user document in "iboard_users"
       const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
       await setDoc(userDocRef, {
         email: firebaseUser.email,
@@ -276,7 +300,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         middle_name: personalInfo.middle_name,
         phone_number: personalInfo.phone_number,
         gender: personalInfo.gender,
-        project_id: orgCode ? null : firebaseUser.uid,
+        project_id: orgCode ? null : firebaseUser.uid, // Only create project if not joining org
       })
 
       // Only create a project if not joining an organization
@@ -324,9 +348,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const updateUserData = async (updates: Partial<UserData>) => {
     if (!user) throw new Error("User not authenticated.")
+    // Corrected collection name to "iboard_users"
     const userDocRef = doc(db, "iboard_users", user.uid)
     const updatedFields = { ...updates, updated: serverTimestamp() }
     await updateDoc(userDocRef, updatedFields)
+    // Optimistically update state
     setUserData((prev) => (prev ? { ...prev, ...updates } : null))
   }
 
@@ -335,6 +361,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const projectDocRef = doc(db, "projects", userData.project_id)
     const updatedFields = { ...updates, updated: serverTimestamp() }
     await updateDoc(projectDocRef, updatedFields)
+    // Optimistically update state
     setProjectData((prev) => (prev ? { ...prev, ...updates } : null))
   }
 
@@ -372,4 +399,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider")
+  }
+  return context
 }
