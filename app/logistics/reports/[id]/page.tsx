@@ -1,15 +1,18 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { ArrowLeft } from "lucide-react"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
 
 export default function ReportPreviewPage() {
   const params = useParams()
+  const router = useRouter()
   const reportId = params.id as string
   const [report, setReport] = useState<ReportData | null>(null)
   const [product, setProduct] = useState<Product | null>(null)
@@ -59,6 +62,10 @@ export default function ReportPreviewPage() {
       .join(" ")
   }
 
+  const handleBackClick = () => {
+    router.back()
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -78,8 +85,18 @@ export default function ReportPreviewPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="w-full">
+      <div className="relative w-full">
         <img src="/logistics-header.png" alt="Logistics Header" className="w-full h-auto object-cover" />
+        {/* Back Button Overlay */}
+        <div className="absolute top-4 left-4">
+          <Button
+            onClick={handleBackClick}
+            className="flex items-center gap-2 bg-cyan-400 hover:bg-cyan-500 text-white px-4 py-2 rounded-full"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            {product?.content_type || "Back"}
+          </Button>
+        </div>
       </div>
 
       <div className="max-w-6xl mx-auto p-6 space-y-6">
