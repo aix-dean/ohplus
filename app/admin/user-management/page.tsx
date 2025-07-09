@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { UserPlus, Settings, Mail } from "lucide-react"
+import { UserPlus, Settings, Mail, Shield } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -157,6 +157,12 @@ export default function UserManagementPage() {
           <p className="text-muted-foreground">Manage users and their permissions.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/admin/access-management">
+            <Button variant="outline" className="gap-2 bg-transparent">
+              <Shield className="h-4 w-4" />
+              Roles & Permissions
+            </Button>
+          </Link>
           <Link href="/admin/invitation-codes">
             <Button variant="outline" className="gap-2 bg-transparent">
               <Mail className="h-4 w-4" />
