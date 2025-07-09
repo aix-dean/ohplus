@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -15,6 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "@/components/ui/use-toast"
 import { Mail, Send } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
 
 interface SendInvitationEmailDialogProps {
   open: boolean
@@ -94,17 +94,8 @@ export function SendInvitationEmailDialog({ open, onOpenChange, organizationCode
     }
   }
 
-  const handleClose = () => {
-    if (!sending) {
-      setEmail("")
-      setSenderName(userData?.display_name || "")
-      setCompanyName("")
-      onOpenChange(false)
-    }
-  }
-
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -112,9 +103,8 @@ export function SendInvitationEmailDialog({ open, onOpenChange, organizationCode
             Send Invitation Email
           </DialogTitle>
           <DialogDescription>
-            Send an invitation email with the organization code{" "}
-            <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">{organizationCode}</code> to invite
-            someone to join your organization.
+            Send an invitation email with the organization code <strong>{organizationCode}</strong> to invite someone to
+            join your organization.
           </DialogDescription>
         </DialogHeader>
 
@@ -128,7 +118,6 @@ export function SendInvitationEmailDialog({ open, onOpenChange, organizationCode
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={sending}
-              required
             />
           </div>
 
@@ -158,10 +147,10 @@ export function SendInvitationEmailDialog({ open, onOpenChange, organizationCode
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={sending}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
             Cancel
           </Button>
-          <Button onClick={handleSendInvitation} disabled={sending || !email.trim()}>
+          <Button onClick={handleSendInvitation} disabled={sending}>
             {sending ? (
               <>
                 <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
