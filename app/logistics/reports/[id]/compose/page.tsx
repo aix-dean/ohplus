@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import type React from "react"
+
+import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,7 +16,6 @@ import { useAuth } from "@/contexts/auth-context"
 import { emailService, type EmailTemplate, type Email, type EmailAttachment } from "@/lib/email-service"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
-import { generateReportPDF } from "@/lib/pdf-service"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function ComposeEmailPage() {
@@ -23,6 +24,7 @@ export default function ComposeEmailPage() {
   const searchParams = useSearchParams()
   const { toast } = useToast()
   const { user } = useAuth()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const reportId = params.id as string
   const [report, setReport] = useState<ReportData | null>(null)
@@ -42,7 +44,6 @@ export default function ComposeEmailPage() {
   // UI state
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const [generatingPDF, setGeneratingPDF] = useState(false)
   const [debugInfo, setDebugInfo] = useState<string>("")
 
   useEffect(() => {
@@ -124,57 +125,52 @@ Best regards,
     }
   }
 
-  const handleAddAttachment = async () => {
-    if (!report) return
+  const handleAddAttachment = () => {
+    fileInputRef.current?.click()
+  }
 
-    setGeneratingPDF(true)
-    try {
-      setDebugInfo((prev) => prev + " | Generating PDF...")
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files || files.length === 0) return
 
-      // Generate PDF blob
-      const pdfBase64 = (await generateReportPDF(report, product, true)) as string
+    const newAttachments: EmailAttachment[] = []
 
-      if (pdfBase64) {
-        // Convert base64 to blob
-        const byteCharacters = atob(pdfBase64)
-        const byteNumbers = new Array(byteCharacters.length)
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i)
-        }
-        const byteArray = new Uint8Array(byteNumbers)
-        const pdfBlob = new Blob([byteArray], { type: "application/pdf" })
-
-        // Create attachment
-        const fileName = `${report.siteId}_${getReportTypeDisplay(report.reportType).replace(/\s+/g, "_")}_${report.siteName.replace(/\s+/g, "_")}.pdf`
-
-        // Convert blob to URL for preview
-        const fileUrl = URL.createObjectURL(pdfBlob)
-
-        const attachment: EmailAttachment = {
-          fileName,
-          fileUrl,
-          fileSize: pdfBlob.size,
-          fileType: "application/pdf",
-        }
-
-        setAttachments((prev) => [...prev, attachment])
-        setDebugInfo((prev) => prev + ` | PDF generated: ${(pdfBlob.size / 1024).toFixed(1)}KB`)
-
+    Array.from(files).forEach((file) => {
+      // Check file size (limit to 10MB)
+      if (file.size > 10 * 1024 * 1024) {
         toast({
-          title: "PDF Generated",
-          description: "Report PDF has been attached to your email.",
+          title: "File Too Large",
+          description: `${file.name} is larger than 10MB and cannot be attached.`,
+          variant: "destructive",
         })
+        return
       }
-    } catch (error) {
-      console.error("Error generating PDF:", error)
-      setDebugInfo((prev) => prev + ` | PDF Error: ${error instanceof Error ? error.message : "Unknown"}`)
+
+      // Create file URL for preview/download
+      const fileUrl = URL.createObjectURL(file)
+
+      const attachment: EmailAttachment = {
+        fileName: file.name,
+        fileUrl,
+        fileSize: file.size,
+        fileType: file.type || "application/octet-stream",
+      }
+
+      newAttachments.push(attachment)
+    })
+
+    if (newAttachments.length > 0) {
+      setAttachments((prev) => [...prev, ...newAttachments])
       toast({
-        title: "Error",
-        description: "Failed to generate PDF attachment.",
-        variant: "destructive",
+        title: "Files Attached",
+        description: `${newAttachments.length} file(s) have been attached to your email.`,
       })
-    } finally {
-      setGeneratingPDF(false)
+      setDebugInfo((prev) => prev + ` | Files attached: ${newAttachments.length}`)
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
     }
   }
 
@@ -306,6 +302,11 @@ Best regards,
   }
 
   const removeAttachment = (index: number) => {
+    // Revoke the object URL to free up memory
+    const attachment = attachments[index]
+    if (attachment.fileUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(attachment.fileUrl)
+    }
     setAttachments((prev) => prev.filter((_, i) => i !== index))
   }
 
@@ -319,6 +320,9 @@ Best regards,
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Hidden file input */}
+      <input ref={fileInputRef} type="file" multiple accept="*/*" onChange={handleFileSelect} className="hidden" />
+
       {/* Header */}
       <div className="bg-white px-6 py-4 flex items-center justify-between shadow-sm border-b">
         <div className="flex items-center gap-4">
@@ -429,11 +433,10 @@ Best regards,
                   <Button
                     variant="outline"
                     className="flex items-center gap-2 bg-transparent"
-                    disabled={generatingPDF}
                     onClick={handleAddAttachment}
                   >
                     <Paperclip className="h-4 w-4" />
-                    {generatingPDF ? "Generating PDF..." : "+Add Attachment"}
+                    +Add Attachment
                   </Button>
 
                   <Button
