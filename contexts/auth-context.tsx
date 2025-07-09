@@ -120,7 +120,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error("This organization code has reached its usage limit")
       }
 
-      return codeData
+      // Return the organization data including company_id and license_key
+      return {
+        company_id: codeData.company_id,
+        license_key: codeData.license_key,
+        usage_count: codeData.usage_count || 0,
+        created_by: codeData.created_by,
+      }
     } catch (error) {
       throw error
     }
@@ -150,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       let orgData = null
 
-      // Validate organization code if provided
+      // Validate organization code if provided and get company association
       if (organizationCode) {
         orgData = await validateOrganizationCode(organizationCode)
       }
@@ -174,12 +180,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updated: serverTimestamp(),
       }
 
-      // If joining an organization, inherit organization data
+      // If joining an organization, inherit the company_id and license_key
+      // This is how we ensure users are from the same company
       if (orgData) {
-        userData.license_key = orgData.license_key
-        userData.company_id = orgData.company_id
+        userData.company_id = orgData.company_id // Same company as code generator
+        userData.license_key = orgData.license_key // Same license as code generator
 
-        // Update organization code usage
+        // Update organization code usage count
         await updateDoc(doc(db, "organization_codes", organizationCode!), {
           usage_count: (orgData.usage_count || 0) + 1,
           updated: serverTimestamp(),
