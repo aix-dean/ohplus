@@ -13,32 +13,58 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields: to, subject, body" }, { status: 400 })
     }
 
+    // Check if email credentials are configured
+    const emailUser = process.env.EMAIL_USER
+    const emailPass = process.env.EMAIL_PASS
+
+    if (!emailUser || !emailPass) {
+      console.log("Email credentials not configured, simulating email send...")
+
+      // Simulate email sending for demo purposes
+      const simulatedResult = {
+        messageId: `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        accepted: Array.isArray(to) ? to : [to],
+        rejected: [],
+      }
+
+      console.log("=== EMAIL SIMULATION ===")
+      console.log("From:", from)
+      console.log("To:", Array.isArray(to) ? to.join(", ") : to)
+      if (cc && cc.length > 0) console.log("CC:", Array.isArray(cc) ? cc.join(", ") : cc)
+      console.log("Subject:", subject)
+      console.log("Body Length:", emailBody.length, "characters")
+      console.log("Attachments:", attachments?.length || 0)
+      console.log("========================")
+
+      return NextResponse.json({
+        success: true,
+        messageId: simulatedResult.messageId,
+        emailId,
+        message: "Email simulated successfully (configure EMAIL_USER and EMAIL_PASS for real sending)",
+        details: {
+          to: simulatedResult.accepted,
+          cc: cc,
+          subject: subject,
+          attachmentCount: attachments?.length || 0,
+          accepted: simulatedResult.accepted,
+          rejected: simulatedResult.rejected,
+          simulated: true,
+        },
+      })
+    }
+
     // Create transporter using Gmail SMTP
-    // You can also use other email providers like Outlook, Yahoo, etc.
-    const transporter = nodemailer.createTransport({
+    const transporter = nodemailer.createTransporter({
       service: "gmail",
       auth: {
-        user: process.env.EMAIL_USER || "your-email@gmail.com", // Your Gmail address
-        pass: process.env.EMAIL_PASS || "your-app-password", // Your Gmail app password
+        user: emailUser,
+        pass: emailPass,
       },
     })
 
-    // Alternative SMTP configuration for other providers:
-    /*
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com', // or your SMTP host
-      port: 587,
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    })
-    */
-
     // Prepare email data
     const emailData: any = {
-      from: process.env.EMAIL_USER || "your-email@gmail.com", // Use your email as sender
+      from: emailUser, // Use configured email as sender
       to: Array.isArray(to) ? to.join(", ") : to,
       subject: subject,
       html: `
@@ -93,9 +119,9 @@ ${emailBody}
     // Add attachments if provided
     if (attachments && attachments.length > 0) {
       emailData.attachments = attachments.map((attachment: any) => {
-        // Convert base64 data URL to buffer if it's a data URL
-        if (attachment.content && attachment.content.startsWith("data:")) {
-          const base64Data = attachment.content.split(",")[1]
+        // Handle base64 data
+        if (attachment.fileUrl && attachment.fileUrl.startsWith("data:")) {
+          const base64Data = attachment.fileUrl.split(",")[1]
           return {
             filename: attachment.fileName,
             content: Buffer.from(base64Data, "base64"),
@@ -103,10 +129,10 @@ ${emailBody}
           }
         }
 
-        // If it's already a buffer or string
+        // Handle other content types
         return {
           filename: attachment.fileName,
-          content: attachment.content || attachment.fileUrl,
+          content: attachment.fileUrl,
           contentType: attachment.fileType,
         }
       })

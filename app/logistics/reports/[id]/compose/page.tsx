@@ -13,17 +13,19 @@ import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { toast } from "sonner"
 import { ArrowLeft, Send, FileText, Mail, AlertCircle, CheckCircle, Loader2 } from "lucide-react"
-import { reportService } from "@/lib/report-service"
+import { getReports, type ReportData } from "@/lib/report-service"
 import { emailService, type Email, type EmailTemplate } from "@/lib/email-service"
 import { generateReportPDFAsBase64 } from "@/lib/pdf-service"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function ComposeEmailPage() {
   const params = useParams()
   const router = useRouter()
+  const { user } = useAuth()
   const reportId = params.id as string
 
   // State
-  const [report, setReport] = useState<any>(null)
+  const [report, setReport] = useState<ReportData | null>(null)
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<string>("")
   const [loading, setLoading] = useState(true)
@@ -42,15 +44,19 @@ export default function ComposeEmailPage() {
 
   // Load report and templates
   useEffect(() => {
-    loadData()
-  }, [reportId])
+    if (typeof window !== "undefined" && user) {
+      loadData()
+    }
+  }, [reportId, user])
 
   const loadData = async () => {
     try {
       setLoading(true)
 
       // Load report
-      const reportData = await reportService.getReportById(reportId)
+      const reports = await getReports()
+      const reportData = reports.find((r) => r.id === reportId)
+
       if (!reportData) {
         toast.error("Report not found")
         router.push("/logistics/reports")
@@ -58,24 +64,38 @@ export default function ComposeEmailPage() {
       }
       setReport(reportData)
 
-      // Load email templates
-      const templatesData = await emailService.getEmailTemplates("current-user-id") // Replace with actual user ID
-      setTemplates(templatesData)
+      // Load email templates (only on client side)
+      if (user?.uid) {
+        try {
+          const templatesData = await emailService.getEmailTemplates(user.uid)
+          setTemplates(templatesData)
+
+          // Create default templates if none exist
+          if (templatesData.length === 0) {
+            await emailService.createDefaultTemplates(user.uid)
+            const newTemplates = await emailService.getEmailTemplates(user.uid)
+            setTemplates(newTemplates)
+          }
+        } catch (error) {
+          console.error("Error loading templates:", error)
+          // Continue without templates if there's an error
+        }
+      }
 
       // Set default form data
       setFormData({
         to: "",
         cc: "",
-        subject: `Report: ${reportData.title}`,
+        subject: `Report: ${reportData.siteName}`,
         body: `Hi,
 
 Please find attached the logistics report for your review.
 
 Report Details:
-- Title: ${reportData.title}
-- Status: ${reportData.status}
-- Location: ${reportData.location || "N/A"}
-- Created: ${reportData.createdAt?.toDate?.()?.toLocaleDateString() || "N/A"}
+- Site: ${reportData.siteName}
+- Type: ${reportData.reportType}
+- Date: ${reportData.date ? new Date(reportData.date).toLocaleDateString() : "N/A"}
+- Status: ${reportData.status || "N/A"}
 
 Please let me know if you have any questions.
 
@@ -93,13 +113,13 @@ OOH Operator Team`,
     }
   }
 
-  const generatePDF = async (reportData: any) => {
+  const generatePDF = async (reportData: ReportData) => {
     try {
       setPdfGenerating(true)
-      console.log("Generating PDF for report:", reportData)
+      console.log("Generating PDF for report:", reportData.siteName)
 
       const pdfBase64 = await generateReportPDFAsBase64(reportData)
-      setPdfData(pdfBase64)
+      setPdfData(`data:application/pdf;base64,${pdfBase64}`)
       setPdfGenerated(true)
 
       console.log("PDF generated successfully")
@@ -168,7 +188,7 @@ OOH Operator Team`,
   }
 
   const handleSendEmail = async () => {
-    if (!validateForm()) return
+    if (!validateForm() || !user?.uid) return
 
     try {
       setSending(true)
@@ -181,19 +201,20 @@ OOH Operator Team`,
         cc: formData.cc.trim() ? formData.cc.split(",").map((email) => email.trim()) : undefined,
         subject: formData.subject,
         body: formData.body,
-        attachments: pdfGenerated
-          ? [
-              {
-                fileName: `report-${report.title.replace(/[^a-zA-Z0-9]/g, "-")}.pdf`,
-                fileUrl: pdfData,
-                fileSize: Math.round((pdfData.length * 3) / 4), // Approximate size from base64
-                fileType: "application/pdf",
-              },
-            ]
-          : undefined,
+        attachments:
+          pdfGenerated && report
+            ? [
+                {
+                  fileName: `report-${report.siteName.replace(/[^a-zA-Z0-9]/g, "-")}.pdf`,
+                  fileUrl: pdfData,
+                  fileSize: Math.round((pdfData.length * 3) / 4), // Approximate size from base64
+                  fileType: "application/pdf",
+                },
+              ]
+            : undefined,
         reportId: reportId,
         status: "draft",
-        userId: "current-user-id", // Replace with actual user ID
+        userId: user.uid,
       }
 
       console.log("Creating email record...")
@@ -262,29 +283,31 @@ OOH Operator Team`,
         {/* Email Form */}
         <div className="lg:col-span-2 space-y-6">
           {/* Template Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />
-                Email Template
-              </CardTitle>
-              <CardDescription>Choose a template to get started quickly</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a template..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {templates.map((template) => (
-                    <SelectItem key={template.id} value={template.id!}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
+          {templates.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="h-5 w-5" />
+                  Email Template
+                </CardTitle>
+                <CardDescription>Choose a template to get started quickly</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a template..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id!}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Email Form */}
           <Card>
@@ -369,21 +392,19 @@ OOH Operator Team`,
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <p className="font-medium">{report.title}</p>
+                <p className="font-medium">{report.siteName}</p>
                 <p className="text-sm text-muted-foreground">ID: {report.id}</p>
               </div>
               <Separator />
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-sm">Status:</span>
-                  <Badge variant="secondary">{report.status}</Badge>
+                  <span className="text-sm">Type:</span>
+                  <Badge variant="secondary">{report.reportType}</Badge>
                 </div>
-                {report.location && (
-                  <div className="flex justify-between">
-                    <span className="text-sm">Location:</span>
-                    <span className="text-sm text-muted-foreground">{report.location}</span>
-                  </div>
-                )}
+                <div className="flex justify-between">
+                  <span className="text-sm">Status:</span>
+                  <Badge variant="secondary">{report.status || "N/A"}</Badge>
+                </div>
                 {report.assignedTo && (
                   <div className="flex justify-between">
                     <span className="text-sm">Assigned:</span>
@@ -429,10 +450,8 @@ OOH Operator Team`,
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="text-sm">
-              <strong>Email Setup Required:</strong> To send emails, configure your email credentials in the environment
-              variables:
-              <br />
-              <code className="text-xs">EMAIL_USER</code> and <code className="text-xs">EMAIL_PASS</code>
+              <strong>Email Setup:</strong> Configure EMAIL_USER and EMAIL_PASS environment variables for real email
+              sending. Without these, emails will be simulated.
             </AlertDescription>
           </Alert>
         </div>
