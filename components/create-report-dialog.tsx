@@ -31,7 +31,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   ])
   const [previewModal, setPreviewModal] = useState<{ open: boolean; file?: File; preview?: string }>({ open: false })
   const { toast } = useToast()
-  const { user, projectData } = useAuth()
+  const { user, userData, projectData } = useAuth()
 
   // Fetch product data when dialog opens
   useEffect(() => {
@@ -201,10 +201,10 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       return
     }
 
-    if (!user || !projectData) {
+    if (!user) {
       toast({
         title: "Error",
-        description: "User authentication required",
+        description: "Please log in to create a report",
         variant: "destructive",
       })
       return
@@ -216,8 +216,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         siteId: product.id,
         siteName: product.name || "Unknown Site",
         siteCode: product.site_code,
-        companyId: projectData.id,
-        sellerId: product.seller_id,
+        companyId: projectData?.project_id || userData?.project_id || user.uid,
+        sellerId: product.seller_id || user.uid,
         client: "Summit Media", // This would come from booking data in real implementation
         clientId: "summit-media-id", // This would come from booking data
         bookingDates: {
