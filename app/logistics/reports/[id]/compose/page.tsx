@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { ArrowLeft, Paperclip, Send, Plus, Smile, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
-import { emailService, type EmailTemplate, type EmailAttachment } from "@/lib/email-service"
+import { emailService, type EmailTemplate, type Email, type EmailAttachment } from "@/lib/email-service"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
@@ -60,12 +60,19 @@ export default function ComposeEmailPage() {
 
         // Fetch product data
         if (foundReport.siteId) {
-          const productData = await getProductById(foundReport.siteId)
-          setProduct(productData)
+          try {
+            const productData = await getProductById(foundReport.siteId)
+            setProduct(productData)
+          } catch (error) {
+            console.log("Product not found, continuing without product data")
+          }
         }
 
         // Set default subject
         setSubject(`${getReportTypeDisplay(foundReport.reportType)} - ${foundReport.siteName}`)
+
+        // Auto-generate and attach PDF
+        await generateAndAttachPDF(foundReport)
       }
 
       // Fetch email templates
@@ -79,11 +86,6 @@ export default function ComposeEmailPage() {
         } else {
           setTemplates(userTemplates)
         }
-      }
-
-      // Auto-generate and attach PDF
-      if (foundReport) {
-        await generateAndAttachPDF(foundReport)
       }
     } catch (error) {
       console.error("Error fetching data:", error)
@@ -103,22 +105,24 @@ export default function ComposeEmailPage() {
     setGeneratingPDF(true)
     try {
       // Generate PDF blob
-      const pdfBlob = await generateReportPDF(reportData, product, true) // true to return blob
+      const pdfBlob = (await generateReportPDF(reportData, product, true)) as Blob
 
-      // Create attachment
-      const fileName = `${reportData.siteId}_${getReportTypeDisplay(reportData.reportType).replace(/\s+/g, "_")}_${reportData.siteName.replace(/\s+/g, "_")}.pdf`
+      if (pdfBlob) {
+        // Create attachment
+        const fileName = `${reportData.siteId}_${getReportTypeDisplay(reportData.reportType).replace(/\s+/g, "_")}_${reportData.siteName.replace(/\s+/g, "_")}.pdf`
 
-      // Convert blob to URL for preview (in real implementation, upload to storage)
-      const fileUrl = URL.createObjectURL(pdfBlob)
+        // Convert blob to URL for preview (in real implementation, upload to storage)
+        const fileUrl = URL.createObjectURL(pdfBlob)
 
-      const attachment: EmailAttachment = {
-        fileName,
-        fileUrl,
-        fileSize: pdfBlob.size,
-        fileType: "application/pdf",
+        const attachment: EmailAttachment = {
+          fileName,
+          fileUrl,
+          fileSize: pdfBlob.size,
+          fileType: "application/pdf",
+        }
+
+        setAttachments([attachment])
       }
-
-      setAttachments([attachment])
     } catch (error) {
       console.error("Error generating PDF:", error)
       toast({
@@ -168,28 +172,28 @@ export default function ComposeEmailPage() {
             .filter((email) => email)
         : []
 
-      // Create email data object and only include defined values
-      const emailData: any = {
+      // Create email record - only include defined values
+      const emailData: Omit<Email, "id" | "created"> = {
         from: user.email || "",
         to: toEmails,
         subject,
         body,
-        status: "draft" as const,
+        status: "draft",
         userId: user.uid,
-        reportId,
       }
 
-      // Only add optional fields if they have values
+      // Add optional fields only if they have values
       if (ccEmails.length > 0) {
         emailData.cc = ccEmails
       }
-
       if (attachments.length > 0) {
         emailData.attachments = attachments
       }
-
       if (selectedTemplate) {
         emailData.templateId = selectedTemplate
+      }
+      if (reportId) {
+        emailData.reportId = reportId
       }
 
       const emailId = await emailService.createEmail(emailData)

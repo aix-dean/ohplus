@@ -52,28 +52,15 @@ export interface EmailAttachment {
   fileType: string
 }
 
-// Helper function to remove undefined values
-const removeUndefinedFields = (obj: any): any => {
-  const cleaned: any = {}
-  for (const [key, value] of Object.entries(obj)) {
-    if (value !== undefined) {
-      cleaned[key] = value
-    }
-  }
-  return cleaned
-}
-
 // Email Service Class
 class EmailService {
   // Email Templates
   async createEmailTemplate(template: Omit<EmailTemplate, "id" | "created">): Promise<string> {
     try {
-      const cleanedTemplate = removeUndefinedFields({
+      const docRef = await addDoc(collection(db, "email_templates"), {
         ...template,
         created: serverTimestamp(),
       })
-
-      const docRef = await addDoc(collection(db, "email_templates"), cleanedTemplate)
       return docRef.id
     } catch (error) {
       console.error("Error creating email template:", error)
@@ -101,12 +88,10 @@ class EmailService {
   async updateEmailTemplate(templateId: string, updates: Partial<EmailTemplate>): Promise<void> {
     try {
       const templateRef = doc(db, "email_templates", templateId)
-      const cleanedUpdates = removeUndefinedFields({
+      await updateDoc(templateRef, {
         ...updates,
         updated: serverTimestamp(),
       })
-
-      await updateDoc(templateRef, cleanedUpdates)
     } catch (error) {
       console.error("Error updating email template:", error)
       throw error
@@ -125,12 +110,38 @@ class EmailService {
   // Emails
   async createEmail(email: Omit<Email, "id" | "created">): Promise<string> {
     try {
-      const cleanedEmail = removeUndefinedFields({
-        ...email,
+      // Clean the email object to remove undefined values
+      const cleanEmail: any = {
+        from: email.from,
+        to: email.to,
+        subject: email.subject,
+        body: email.body,
+        status: email.status,
+        userId: email.userId,
         created: serverTimestamp(),
-      })
+      }
 
-      const docRef = await addDoc(collection(db, "emails"), cleanedEmail)
+      // Only add optional fields if they have values
+      if (email.cc && email.cc.length > 0) {
+        cleanEmail.cc = email.cc
+      }
+      if (email.bcc && email.bcc.length > 0) {
+        cleanEmail.bcc = email.bcc
+      }
+      if (email.attachments && email.attachments.length > 0) {
+        cleanEmail.attachments = email.attachments
+      }
+      if (email.templateId) {
+        cleanEmail.templateId = email.templateId
+      }
+      if (email.reportId) {
+        cleanEmail.reportId = email.reportId
+      }
+      if (email.sentAt) {
+        cleanEmail.sentAt = email.sentAt
+      }
+
+      const docRef = await addDoc(collection(db, "emails"), cleanEmail)
       return docRef.id
     } catch (error) {
       console.error("Error creating email:", error)
@@ -158,12 +169,20 @@ class EmailService {
   async updateEmail(emailId: string, updates: Partial<Email>): Promise<void> {
     try {
       const emailRef = doc(db, "emails", emailId)
-      const cleanedUpdates = removeUndefinedFields({
-        ...updates,
+
+      // Clean updates to remove undefined values
+      const cleanUpdates: any = {
         updated: serverTimestamp(),
+      }
+
+      Object.keys(updates).forEach((key) => {
+        const value = (updates as any)[key]
+        if (value !== undefined) {
+          cleanUpdates[key] = value
+        }
       })
 
-      await updateDoc(emailRef, cleanedUpdates)
+      await updateDoc(emailRef, cleanUpdates)
     } catch (error) {
       console.error("Error updating email:", error)
       throw error
@@ -176,7 +195,7 @@ class EmailService {
       // For now, we'll just update the status
       await this.updateEmail(emailId, {
         status: "sent",
-        sentAt: serverTimestamp(),
+        sentAt: serverTimestamp() as any,
       })
 
       console.log("Email sent successfully")
