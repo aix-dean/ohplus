@@ -563,15 +563,15 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
       <CardContent className="p-4">
         <div className="flex flex-col gap-2">
           {/* Site Name */}
-          <h3 className="font-semibold text-lg">{site.name}</h3>
+          <h3 className="font-semibold text-lg text-gray-900">{site.name}</h3>
 
           {/* Site ID */}
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-gray-600 mb-2">
             <span className="font-medium">ID:</span> {site.siteCode}
           </div>
 
-          {/* Site Details Section */}
-          <div className="space-y-2 mt-3">
+          {/* Site Information Section */}
+          <div className="space-y-2 py-2">
             {/* Operation Status */}
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-700">Operation:</span>
@@ -608,14 +608,24 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
                       : "text-red-600"
                 }`}
               >
-                {getDisplayHealth()}
+                {site.healthPercentage > 90
+                  ? "100%"
+                  : site.healthPercentage > 80
+                    ? "90%"
+                    : site.healthPercentage > 60
+                      ? "75%"
+                      : "50%"}
               </span>
             </div>
 
             {/* Content */}
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-700">Content:</span>
-              <span className="text-sm font-semibold text-blue-600">{getContentInfo()}</span>
+              <span className="text-sm font-semibold text-blue-600">
+                {site.contentType === "dynamic"
+                  ? ["Leon", "Lilo and Stitch", "Marvel Heroes", "Nike Campaign"][Math.floor(Math.random() * 4)]
+                  : "Static Billboard"}
+              </span>
             </div>
 
             {/* Illumination */}
@@ -623,10 +633,10 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
               <span className="text-sm font-medium text-gray-700">Illumination:</span>
               <span
                 className={`text-sm font-semibold ${
-                  getIlluminationStatus() === "ON" ? "text-green-600" : "text-red-600"
+                  site.operationalStatus === "Operational" ? "text-green-600" : "text-red-600"
                 }`}
               >
-                {getIlluminationStatus()}
+                {site.operationalStatus === "Operational" ? "ON" : "OFF"}
               </span>
             </div>
 
@@ -635,11 +645,11 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
               <span className="text-sm font-medium text-gray-700">Compliance:</span>
               <span
                 className={`text-sm font-semibold ${
-                  getComplianceStatus() === "Complete" ? "text-green-600" : "text-red-600"
+                  site.operationalStatus === "Operational" ? "text-green-600" : "text-red-600"
                 }`}
               >
-                {getComplianceStatus()}
-                {getComplianceStatus() === "Incomplete" && (
+                {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}
+                {site.operationalStatus !== "Operational" && (
                   <span className="ml-1 text-xs bg-red-100 text-red-800 px-1 rounded">(2)</span>
                 )}
               </span>
@@ -667,7 +677,7 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
           {/* Create Report Button */}
           <Button
             variant="outline"
-            className="mt-4 w-full bg-gray-50 hover:bg-gray-100 border-gray-300"
+            className="mt-4 w-full bg-gray-50 hover:bg-gray-100 border-gray-300 text-gray-700 hover:text-gray-900"
             onClick={handleCreateReport}
           >
             Create Report
