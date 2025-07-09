@@ -542,24 +542,28 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
       </div>
 
       <CardContent className="p-4">
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           {/* Site Name */}
-          <div>
-            <h3 className="font-semibold text-lg text-gray-900 leading-tight">{site.name}</h3>
-            <div className="text-sm text-gray-500 mt-1">ID: {site.siteCode}</div>
+          <h3 className="font-semibold text-lg">{site.name}</h3>
+
+          {/* Site ID */}
+          <div className="text-sm text-gray-600">
+            <span className="font-medium">ID:</span> {site.siteCode}
           </div>
 
-          {/* Site Information Section */}
-          <div className="space-y-2 py-2 border-t border-gray-100">
+          {/* Site Details Section - Added here */}
+          <div className="bg-gray-50 border border-gray-200 rounded-md p-3 space-y-2 my-2">
+            <div className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">Site Information</div>
+
             {/* Address */}
             <div className="flex flex-col">
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Address</span>
-              <span className="text-sm text-gray-700 mt-1 leading-relaxed">{site.address}</span>
+              <span className="text-xs text-gray-500 font-medium">Address:</span>
+              <span className="text-sm text-gray-700">{site.address}</span>
             </div>
 
-            {/* Operational Status */}
+            {/* Operation Status */}
             <div className="flex justify-between items-center">
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</span>
+              <span className="text-xs text-gray-500 font-medium">Operation:</span>
               <span
                 className={`text-sm font-semibold ${
                   site.operationalStatus === "Operational"
@@ -575,18 +579,18 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
               </span>
             </div>
 
-            {/* Content Type and Health */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Content Type and Health in a row */}
+            <div className="grid grid-cols-2 gap-2">
               <div className="flex flex-col">
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Type</span>
-                <span className="text-sm font-medium text-blue-600 mt-1">
+                <span className="text-xs text-gray-500 font-medium">Type:</span>
+                <span className="text-sm font-semibold text-blue-600">
                   {site.contentType === "dynamic" ? "Digital" : "Static"}
                 </span>
               </div>
               <div className="flex flex-col">
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Health</span>
+                <span className="text-xs text-gray-500 font-medium">Health:</span>
                 <span
-                  className={`text-sm font-semibold mt-1 ${
+                  className={`text-sm font-semibold ${
                     site.healthPercentage > 80
                       ? "text-green-600"
                       : site.healthPercentage > 60
@@ -600,11 +604,11 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             </div>
           </div>
 
-          {/* Current Status Line */}
-          <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-            <span className="text-sm font-medium text-gray-600">Current:</span>
+          {/* Current Status */}
+          <div className="text-sm">
+            <span className="text-gray-600 font-medium">Current:</span>{" "}
             <span
-              className={`text-sm font-semibold ${
+              className={`font-semibold ${
                 site.status === "ACTIVE" || site.status === "OCCUPIED"
                   ? "text-blue-600"
                   : site.status === "VACANT" || site.status === "AVAILABLE"
@@ -621,7 +625,7 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
           {/* Create Report Button */}
           <Button
             variant="outline"
-            className="mt-3 w-full bg-gray-50 hover:bg-gray-100 border-gray-300 text-gray-700 hover:text-gray-900"
+            className="mt-4 w-full bg-gray-50 hover:bg-gray-100 border-gray-300"
             onClick={handleCreateReport}
           >
             Create Report
