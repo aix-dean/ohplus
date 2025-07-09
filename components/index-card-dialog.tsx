@@ -1,125 +1,99 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
 
 interface IndexCardDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreateJO: () => void
+  onCreateJO?: () => void
 }
 
 export function IndexCardDialog({ open, onOpenChange, onCreateJO }: IndexCardDialogProps) {
+  const handleCreateJO = () => {
+    if (onCreateJO) {
+      onCreateJO()
+    }
+    onOpenChange(false)
+  }
+
+  // Generate cabinet data (C1 to C30)
+  const cabinets = Array.from({ length: 30 }, (_, i) => {
+    const cabinetNumber = i + 1
+    const isHealthy = cabinetNumber !== 9 // C9 has an issue
+    return {
+      id: `C${cabinetNumber}`,
+      healthy: isHealthy,
+    }
+  })
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader className="flex flex-row items-center justify-between">
-          <DialogTitle>Index Card</DialogTitle>
-          <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onOpenChange(false)}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader className="relative">
+          <DialogTitle className="text-lg font-semibold">Index Card</DialogTitle>
+          <button
+            onClick={() => onOpenChange(false)}
+            className="absolute right-0 top-0 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+          >
             <X className="h-4 w-4" />
-          </Button>
+            <span className="sr-only">Close</span>
+          </button>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Illumination Details */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="font-medium">Upper:</span> 4 metal-halides
+        <div className="py-4">
+          {/* Cabinet Information */}
+          <div className="mb-4 space-y-1">
+            <div className="text-sm">
+              <span className="font-medium">Cabinets:</span> 30 cabinets
             </div>
-            <div>
-              <span className="font-medium">Left:</span> 2 metal-halides
-            </div>
-            <div>
-              <span className="font-medium">Bottom:</span> 4 metal-halides
-            </div>
-            <div>
-              <span className="font-medium">Right:</span> 2 metal-halides
+            <div className="text-sm">
+              <span className="font-medium">Status:</span> 93% Healthy
             </div>
           </div>
 
-          {/* Grid Layout */}
-          <div className="relative bg-gray-100 p-4 rounded-lg">
-            <div className="grid grid-cols-2 gap-2 h-48">
-              {/* Q1 */}
-              <div className="bg-white rounded border flex items-center justify-center text-sm font-medium">Q1</div>
-              {/* Q2 */}
-              <div className="bg-white rounded border flex items-center justify-center text-sm font-medium">Q2</div>
-              {/* Q3 */}
-              <div className="bg-white rounded border flex items-center justify-center text-sm font-medium">Q3</div>
-              {/* Q4 */}
-              <div className="bg-white rounded border flex items-center justify-center text-sm font-medium">Q4</div>
-            </div>
-
-            {/* Light Indicators */}
-            {/* Upper lights */}
-            <div className="absolute -top-2 left-8 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-xs text-white font-bold">
-              U1
-            </div>
-            <div className="absolute -top-2 left-20 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-xs text-white font-bold">
-              U2
-            </div>
-            <div className="absolute -top-2 right-20 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-xs text-white font-bold">
-              U3
-            </div>
-            <div className="absolute -top-2 right-8 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-xs text-white font-bold">
-              U4
-            </div>
-
-            {/* Left lights */}
-            <div className="absolute -left-2 top-8 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-xs text-white font-bold">
-              L1
-            </div>
-            <div className="absolute -left-2 bottom-8 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-xs text-white font-bold">
-              L2
-            </div>
-
-            {/* Right lights */}
-            <div className="absolute -right-2 top-8 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-xs text-white font-bold">
-              R1
-            </div>
-            <div className="absolute -right-2 bottom-8 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-xs text-white font-bold">
-              R3
-            </div>
-
-            {/* Bottom lights */}
-            <div className="absolute -bottom-2 left-8 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-xs text-white font-bold">
-              B1
-            </div>
-            <div className="absolute -bottom-2 left-20 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-xs text-white font-bold">
-              B2
-            </div>
-            <div className="absolute -bottom-2 right-20 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-xs text-white font-bold">
-              B3
-            </div>
-            <div className="absolute -bottom-2 right-8 w-6 h-6 bg-orange-500 rounded-full flex items-center justify-center text-xs text-white font-bold">
-              B4
+          {/* Cabinet Grid */}
+          <div className="bg-gray-100 rounded-lg p-4 mb-4">
+            <div className="grid grid-cols-5 gap-2">
+              {cabinets.map((cabinet) => (
+                <div
+                  key={cabinet.id}
+                  className={`
+                    h-10 rounded border flex items-center justify-center text-xs font-medium
+                    ${
+                      cabinet.healthy
+                        ? "bg-white border-gray-300 text-gray-700"
+                        : "bg-red-200 border-red-300 text-red-700"
+                    }
+                  `}
+                >
+                  {cabinet.id}
+                </div>
+              ))}
             </div>
           </div>
 
           {/* View Latest Photo Link */}
-          <div className="text-center">
-            <button className="text-blue-600 hover:text-blue-800 text-sm underline">
-              View Latest Photo (Jun 5, 2025)
-            </button>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 pt-4">
-            <Button variant="outline" className="flex-1 bg-transparent" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button
-              className="flex-1 bg-blue-600 hover:bg-blue-700"
-              onClick={() => {
-                onCreateJO()
-                onOpenChange(false)
-              }}
+          <div className="text-center mb-4">
+            <a
+              href="#"
+              className="text-blue-600 hover:text-blue-800 underline text-sm"
+              onClick={(e) => e.preventDefault()}
             >
-              Create JO
-            </Button>
+              View Latest Photo (Jun 5, 2025)
+            </a>
           </div>
         </div>
+
+        <DialogFooter className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleCreateJO} className="bg-blue-600 hover:bg-blue-700">
+            Create JO
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
