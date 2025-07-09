@@ -1,6 +1,7 @@
 import type React from "react"
 import { Clock, Plus } from "lucide-react"
-import { Badge, Button } from "@/components/ui"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 
 interface CMSData {
   start_time?: string
