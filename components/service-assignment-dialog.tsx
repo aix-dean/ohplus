@@ -13,6 +13,7 @@ import type { Product } from "@/lib/firebase-service"
 import { addDoc, collection, serverTimestamp, query, where, orderBy, limit, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
+import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-success-dialog"
 
 // Service types as provided
 const SERVICE_TYPES = ["Roll up", "Roll down", "Change Material", "Repair", "Maintenance", "Monitoring", "Spot Booking"]
@@ -35,6 +36,8 @@ export function ServiceAssignmentDialog({
   const [fetchingProducts, setFetchingProducts] = useState(false)
   const [products, setProducts] = useState<Product[]>([])
   const [saNumber, setSaNumber] = useState("")
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [createdSaNumber, setCreatedSaNumber] = useState("")
 
   // Form data state
   const [formData, setFormData] = useState({
@@ -164,27 +167,12 @@ export function ServiceAssignmentDialog({
         created: serverTimestamp(),
         updated: serverTimestamp(),
         project_key: userData?.license_key || "",
+        company_id: userData?.company_id || null, // Add company_id from userData
       })
 
-      // Reset form and close dialog
-      setFormData({
-        projectSite: "",
-        serviceType: "",
-        assignedTo: "",
-        jobDescription: "",
-        message: "",
-        startDate: null,
-        endDate: null,
-        alarmDate: null,
-        alarmTime: "",
-        attachments: [],
-      })
-      setStartDateInput("")
-      setEndDateInput("")
-      setAlarmDateInput("")
-
-      onOpenChange(false)
-      if (onSuccess) onSuccess()
+      // Show success dialog instead of closing immediately
+      setCreatedSaNumber(saNumber)
+      setShowSuccessDialog(true)
     } catch (error) {
       console.error("Error creating service assignment:", error)
     } finally {
@@ -228,281 +216,348 @@ export function ServiceAssignmentDialog({
     }
   }
 
+  // Handle success dialog actions
+  const handleSuccessDialogClose = () => {
+    setShowSuccessDialog(false)
+
+    // Reset form and close main dialog
+    setFormData({
+      projectSite: "",
+      serviceType: "",
+      assignedTo: "",
+      jobDescription: "",
+      message: "",
+      startDate: null,
+      endDate: null,
+      alarmDate: null,
+      alarmTime: "",
+      attachments: [],
+    })
+    setStartDateInput("")
+    setEndDateInput("")
+    setAlarmDateInput("")
+
+    onOpenChange(false)
+    if (onSuccess) onSuccess()
+  }
+
+  const handleCreateAnother = () => {
+    setShowSuccessDialog(false)
+
+    // Reset form but keep main dialog open
+    setFormData({
+      projectSite: "",
+      serviceType: "",
+      assignedTo: "",
+      jobDescription: "",
+      message: "",
+      startDate: null,
+      endDate: null,
+      alarmDate: null,
+      alarmTime: "",
+      attachments: [],
+    })
+    setStartDateInput("")
+    setEndDateInput("")
+    setAlarmDateInput("")
+
+    // Generate new SA number
+    const randomNum = Math.floor(100000 + Math.random() * 900000)
+    setSaNumber(randomNum.toString())
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">Create Service Assignment</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">Create Service Assignment</DialogTitle>
+          </DialogHeader>
 
-        {fetchingProducts ? (
-          <div className="flex justify-center items-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-            <span className="ml-2 text-gray-500">Loading products...</span>
-          </div>
-        ) : (
-          <div className="grid gap-3 py-2">
-            <div className="grid grid-cols-4 items-center gap-3">
-              <Label htmlFor="saNumber" className="text-right text-sm font-medium">
-                SA#:
-              </Label>
-              <div className="col-span-3">
-                <Input id="saNumber" value={saNumber} readOnly className="bg-gray-100" />
-              </div>
+          {fetchingProducts ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <span className="ml-2 text-gray-500">Loading products...</span>
             </div>
-
-            <div className="grid grid-cols-4 items-center gap-3">
-              <Label htmlFor="projectSite" className="text-right text-sm font-medium">
-                Project Site:
-              </Label>
-              <div className="col-span-3">
-                <Select value={formData.projectSite} onValueChange={(value) => handleInputChange("projectSite", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a site" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-[200px]">
-                    {products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.name} - {product.light?.location || product.specs_rental?.location || "No location"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-4 items-center gap-3">
-              <Label htmlFor="serviceType" className="text-right text-sm font-medium">
-                Service Type:
-              </Label>
-              <div className="col-span-3">
-                <Select value={formData.serviceType} onValueChange={(value) => handleInputChange("serviceType", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="-Select-" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SERVICE_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-4 items-center gap-3">
-              <Label htmlFor="assignedTo" className="text-right text-sm font-medium">
-                Assigned To:
-              </Label>
-              <div className="col-span-3">
-                <Select value={formData.assignedTo} onValueChange={(value) => handleInputChange("assignedTo", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="-Select-" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="team1">Operations Team 1</SelectItem>
-                    <SelectItem value="team2">Operations Team 2</SelectItem>
-                    <SelectItem value="team3">Maintenance Team</SelectItem>
-                    <SelectItem value="contractor">External Contractor</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-4 items-center gap-3">
-              <Label htmlFor="jobDescription" className="text-right text-sm font-medium">
-                Job Description:
-              </Label>
-              <div className="col-span-3">
-                <Textarea
-                  id="jobDescription"
-                  value={formData.jobDescription}
-                  onChange={(e) => handleInputChange("jobDescription", e.target.value)}
-                  placeholder="Enter job description"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-4 items-center gap-3">
-              <Label className="text-right text-sm font-medium">Requested By:</Label>
-              <div className="col-span-3 flex items-center gap-2">
-                <span>(LOGISTICS) {user?.displayName || "Current User"}</span>
-                <div className="h-6 w-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs">
-                  {user?.displayName?.[0] || "U"}
+          ) : (
+            <div className="grid gap-3 py-2">
+              <div className="grid grid-cols-4 items-center gap-3">
+                <Label htmlFor="saNumber" className="text-right text-sm font-medium">
+                  SA#:
+                </Label>
+                <div className="col-span-3">
+                  <Input id="saNumber" value={saNumber} readOnly className="bg-gray-100" />
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-4 items-center gap-3">
-              <Label htmlFor="message" className="text-right text-sm font-medium">
-                Message:
-              </Label>
-              <div className="col-span-3">
-                <Textarea
-                  id="message"
-                  value={formData.message}
-                  onChange={(e) => handleInputChange("message", e.target.value)}
-                  placeholder="Enter additional message"
-                />
+              <div className="grid grid-cols-4 items-center gap-3">
+                <Label htmlFor="projectSite" className="text-right text-sm font-medium">
+                  Project Site:
+                </Label>
+                <div className="col-span-3">
+                  <Select
+                    value={formData.projectSite}
+                    onValueChange={(value) => handleInputChange("projectSite", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a site" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[200px]">
+                      {products.map((product) => (
+                        <SelectItem key={product.id} value={product.id}>
+                          {product.name} - {product.light?.location || product.specs_rental?.location || "No location"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
 
-            {/* Covered Date - Start Date */}
-            <div className="grid grid-cols-4 items-center gap-3">
-              <Label htmlFor="startDate" className="text-right text-sm font-medium">
-                Start Date:
-              </Label>
-              <div className="col-span-3">
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={startDateInput}
-                  onChange={(e) => handleDateInputChange("start", e.target.value)}
-                  className="w-full"
-                />
-                {formData.startDate && (
-                  <p className="text-xs text-gray-500 mt-1">Selected: {formatDateForDisplay(formData.startDate)}</p>
-                )}
+              <div className="grid grid-cols-4 items-center gap-3">
+                <Label htmlFor="serviceType" className="text-right text-sm font-medium">
+                  Service Type:
+                </Label>
+                <div className="col-span-3">
+                  <Select
+                    value={formData.serviceType}
+                    onValueChange={(value) => handleInputChange("serviceType", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="-Select-" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SERVICE_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
 
-            {/* Covered Date - End Date */}
-            <div className="grid grid-cols-4 items-center gap-3">
-              <Label htmlFor="endDate" className="text-right text-sm font-medium">
-                End Date:
-              </Label>
-              <div className="col-span-3">
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={endDateInput}
-                  onChange={(e) => handleDateInputChange("end", e.target.value)}
-                  className="w-full"
-                />
-                {formData.endDate && (
-                  <p className="text-xs text-gray-500 mt-1">Selected: {formatDateForDisplay(formData.endDate)}</p>
-                )}
+              <div className="grid grid-cols-4 items-center gap-3">
+                <Label htmlFor="assignedTo" className="text-right text-sm font-medium">
+                  Assigned To:
+                </Label>
+                <div className="col-span-3">
+                  <Select value={formData.assignedTo} onValueChange={(value) => handleInputChange("assignedTo", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="-Select-" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="team1">Operations Team 1</SelectItem>
+                      <SelectItem value="team2">Operations Team 2</SelectItem>
+                      <SelectItem value="team3">Maintenance Team</SelectItem>
+                      <SelectItem value="contractor">External Contractor</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
 
-            {/* Alarm Date */}
-            <div className="grid grid-cols-4 items-center gap-3">
-              <Label htmlFor="alarmDate" className="text-right text-sm font-medium">
-                Alarm Date:
-              </Label>
-              <div className="col-span-3">
-                <Input
-                  id="alarmDate"
-                  type="date"
-                  value={alarmDateInput}
-                  onChange={(e) => handleDateInputChange("alarm", e.target.value)}
-                  className="w-full"
-                />
-                {formData.alarmDate && (
-                  <p className="text-xs text-gray-500 mt-1">Selected: {formatDateForDisplay(formData.alarmDate)}</p>
-                )}
+              <div className="grid grid-cols-4 items-center gap-3">
+                <Label htmlFor="jobDescription" className="text-right text-sm font-medium">
+                  Job Description:
+                </Label>
+                <div className="col-span-3">
+                  <Textarea
+                    id="jobDescription"
+                    value={formData.jobDescription}
+                    onChange={(e) => handleInputChange("jobDescription", e.target.value)}
+                    placeholder="Enter job description"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Alarm Time */}
-            <div className="grid grid-cols-4 items-center gap-3">
-              <Label htmlFor="alarmTime" className="text-right text-sm font-medium">
-                Alarm Time:
-              </Label>
-              <div className="col-span-3">
-                <Select value={formData.alarmTime} onValueChange={(value) => handleInputChange("alarmTime", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Time" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {timeOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
+              <div className="grid grid-cols-4 items-center gap-3">
+                <Label className="text-right text-sm font-medium">Requested By:</Label>
+                <div className="col-span-3 flex items-center gap-2">
+                  <span>(LOGISTICS) {user?.displayName || "Current User"}</span>
+                  <div className="h-6 w-6 rounded-full bg-orange-500 flex items-center justify-center text-white text-xs">
+                    {user?.displayName?.[0] || "U"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 items-center gap-3">
+                <Label htmlFor="message" className="text-right text-sm font-medium">
+                  Message:
+                </Label>
+                <div className="col-span-3">
+                  <Textarea
+                    id="message"
+                    value={formData.message}
+                    onChange={(e) => handleInputChange("message", e.target.value)}
+                    placeholder="Enter additional message"
+                  />
+                </div>
+              </div>
+
+              {/* Covered Date - Start Date */}
+              <div className="grid grid-cols-4 items-center gap-3">
+                <Label htmlFor="startDate" className="text-right text-sm font-medium">
+                  Start Date:
+                </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={startDateInput}
+                    onChange={(e) => handleDateInputChange("start", e.target.value)}
+                    className="w-full"
+                  />
+                  {formData.startDate && (
+                    <p className="text-xs text-gray-500 mt-1">Selected: {formatDateForDisplay(formData.startDate)}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Covered Date - End Date */}
+              <div className="grid grid-cols-4 items-center gap-3">
+                <Label htmlFor="endDate" className="text-right text-sm font-medium">
+                  End Date:
+                </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="endDate"
+                    type="date"
+                    value={endDateInput}
+                    onChange={(e) => handleDateInputChange("end", e.target.value)}
+                    className="w-full"
+                  />
+                  {formData.endDate && (
+                    <p className="text-xs text-gray-500 mt-1">Selected: {formatDateForDisplay(formData.endDate)}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Alarm Date */}
+              <div className="grid grid-cols-4 items-center gap-3">
+                <Label htmlFor="alarmDate" className="text-right text-sm font-medium">
+                  Alarm Date:
+                </Label>
+                <div className="col-span-3">
+                  <Input
+                    id="alarmDate"
+                    type="date"
+                    value={alarmDateInput}
+                    onChange={(e) => handleDateInputChange("alarm", e.target.value)}
+                    className="w-full"
+                  />
+                  {formData.alarmDate && (
+                    <p className="text-xs text-gray-500 mt-1">Selected: {formatDateForDisplay(formData.alarmDate)}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Alarm Time */}
+              <div className="grid grid-cols-4 items-center gap-3">
+                <Label htmlFor="alarmTime" className="text-right text-sm font-medium">
+                  Alarm Time:
+                </Label>
+                <div className="col-span-3">
+                  <Select value={formData.alarmTime} onValueChange={(value) => handleInputChange("alarmTime", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {timeOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 items-start gap-3">
+                <Label className="text-right text-sm font-medium pt-2">Attachments:</Label>
+                <div className="col-span-3">
+                  <div className="flex flex-wrap gap-2">
+                    {formData.attachments.map((attachment, index) => (
+                      <div
+                        key={index}
+                        className="border rounded-md p-2 w-[100px] h-[100px] flex flex-col items-center justify-center"
+                      >
+                        {attachment.type === "pdf" ? (
+                          <>
+                            <div className="w-12 h-12 bg-red-500 text-white flex items-center justify-center rounded-md mb-2">
+                              <FileText size={24} />
+                            </div>
+                            <span className="text-xs text-center truncate w-full">{attachment.name}</span>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-12 h-12 bg-gray-200 flex items-center justify-center rounded-md mb-2">
+                              <Video size={24} className="text-gray-500" />
+                            </div>
+                            <span className="text-xs text-center truncate w-full">{attachment.name}</span>
+                          </>
+                        )}
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-4 items-start gap-3">
-              <Label className="text-right text-sm font-medium pt-2">Attachments:</Label>
-              <div className="col-span-3">
-                <div className="flex flex-wrap gap-2">
-                  {formData.attachments.map((attachment, index) => (
-                    <div
-                      key={index}
-                      className="border rounded-md p-2 w-[100px] h-[100px] flex flex-col items-center justify-center"
+                    <button
+                      type="button"
+                      onClick={() => addAttachment("pdf")}
+                      className="border rounded-md p-2 w-[100px] h-[100px] flex flex-col items-center justify-center hover:bg-gray-50"
                     >
-                      {attachment.type === "pdf" ? (
-                        <>
-                          <div className="w-12 h-12 bg-red-500 text-white flex items-center justify-center rounded-md mb-2">
-                            <FileText size={24} />
-                          </div>
-                          <span className="text-xs text-center truncate w-full">{attachment.name}</span>
-                        </>
-                      ) : (
-                        <>
-                          <div className="w-12 h-12 bg-gray-200 flex items-center justify-center rounded-md mb-2">
-                            <Video size={24} className="text-gray-500" />
-                          </div>
-                          <span className="text-xs text-center truncate w-full">{attachment.name}</span>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                      <div className="w-12 h-12 bg-red-500 text-white flex items-center justify-center rounded-md mb-2">
+                        <FileText size={24} />
+                      </div>
+                      <span className="text-xs">Add PDF</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => addAttachment("pdf")}
-                    className="border rounded-md p-2 w-[100px] h-[100px] flex flex-col items-center justify-center hover:bg-gray-50"
-                  >
-                    <div className="w-12 h-12 bg-red-500 text-white flex items-center justify-center rounded-md mb-2">
-                      <FileText size={24} />
-                    </div>
-                    <span className="text-xs">Add PDF</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => addAttachment("video")}
+                      className="border rounded-md p-2 w-[100px] h-[100px] flex flex-col items-center justify-center hover:bg-gray-50"
+                    >
+                      <div className="w-12 h-12 bg-gray-200 flex items-center justify-center rounded-md mb-2">
+                        <Video size={24} className="text-gray-500" />
+                      </div>
+                      <span className="text-xs">Add Video</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => addAttachment("video")}
-                    className="border rounded-md p-2 w-[100px] h-[100px] flex flex-col items-center justify-center hover:bg-gray-50"
-                  >
-                    <div className="w-12 h-12 bg-gray-200 flex items-center justify-center rounded-md mb-2">
-                      <Video size={24} className="text-gray-500" />
-                    </div>
-                    <span className="text-xs">Add Video</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="border rounded-md p-2 w-[100px] h-[100px] flex items-center justify-center hover:bg-gray-50"
-                  >
-                    <Plus size={24} className="text-gray-400" />
-                  </button>
+                    <button
+                      type="button"
+                      className="border rounded-md p-2 w-[100px] h-[100px] flex flex-col items-center justify-center hover:bg-gray-50"
+                    >
+                      <Plus size={24} className="text-gray-400" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} type="button">
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={loading || fetchingProducts} variant="default" type="button">
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              "Submit"
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)} type="button">
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={loading || fetchingProducts} variant="default" type="button">
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                "Submit"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Dialog */}
+      <ServiceAssignmentSuccessDialog
+        open={showSuccessDialog}
+        onOpenChange={handleSuccessDialogClose}
+        saNumber={createdSaNumber}
+        onViewAssignments={handleSuccessDialogClose}
+        onCreateAnother={handleCreateAnother}
+      />
+    </>
   )
 }

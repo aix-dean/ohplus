@@ -26,6 +26,8 @@ const clientFormSchema = z.object({
   company: z.string().min(1, {
     message: "Company name is required.",
   }),
+  company_id: z.string().optional(),
+  designation: z.string().optional(),
   address: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
@@ -55,6 +57,8 @@ export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
     email: client?.email || "",
     phone: client?.phone || "",
     company: client?.company || "",
+    company_id: client?.company_id || "",
+    designation: client?.designation || "",
     address: client?.address || "",
     city: client?.city || "",
     state: client?.state || "",
@@ -160,6 +164,34 @@ export function ClientForm({ client, onSuccess, onCancel }: ClientFormProps) {
                 <FormLabel>Company</FormLabel>
                 <FormControl>
                   <Input placeholder="Acme Inc." {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="company_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Company ID</FormLabel>
+                <FormControl>
+                  <Input placeholder="COMP-001" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="designation"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Designation</FormLabel>
+                <FormControl>
+                  <Input placeholder="Marketing Manager" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
