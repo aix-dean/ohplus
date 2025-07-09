@@ -31,7 +31,7 @@ const mockJobOrders = [
     deadline: "Jun 25, 2025",
     requestedBy: "AIX",
     assignedTo: "Unassigned",
-    status: "pending",
+    status: "in_progress",
   },
   {
     id: "3",
@@ -42,7 +42,7 @@ const mockJobOrders = [
     deadline: "Jun 26, 2025",
     requestedBy: "AIX",
     assignedTo: "Unassigned",
-    status: "pending",
+    status: "completed",
   },
   {
     id: "4",
@@ -64,7 +64,7 @@ const mockJobOrders = [
     deadline: "Jun 26, 2025",
     requestedBy: "AIX",
     assignedTo: "Unassigned",
-    status: "pending",
+    status: "cancelled",
   },
   {
     id: "6",
@@ -75,7 +75,7 @@ const mockJobOrders = [
     deadline: "Jun 26, 2025",
     requestedBy: "AIX",
     assignedTo: "Unassigned",
-    status: "pending",
+    status: "in_progress",
   },
 ]
 
@@ -92,6 +92,36 @@ function getJobTypeColor(type: string) {
   }
 }
 
+function getStatusColor(status: string) {
+  switch (status.toLowerCase()) {
+    case "pending":
+      return "bg-orange-100 text-orange-800 hover:bg-orange-200"
+    case "in_progress":
+      return "bg-blue-100 text-blue-800 hover:bg-blue-200"
+    case "completed":
+      return "bg-green-100 text-green-800 hover:bg-green-200"
+    case "cancelled":
+      return "bg-red-100 text-red-800 hover:bg-red-200"
+    default:
+      return "bg-gray-100 text-gray-800 hover:bg-gray-200"
+  }
+}
+
+function formatStatus(status: string) {
+  switch (status.toLowerCase()) {
+    case "in_progress":
+      return "In Progress"
+    case "completed":
+      return "Completed"
+    case "cancelled":
+      return "Cancelled"
+    case "pending":
+      return "Pending"
+    default:
+      return status
+  }
+}
+
 export default function LogisticsJobOrdersPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [jobOrders, setJobOrders] = useState(mockJobOrders)
@@ -105,7 +135,8 @@ export default function LogisticsJobOrdersPage() {
           order.site.toLowerCase().includes(searchTerm.toLowerCase()) ||
           order.joType.toLowerCase().includes(searchTerm.toLowerCase()) ||
           order.requestedBy.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          order.assignedTo.toLowerCase().includes(searchTerm.toLowerCase()),
+          order.assignedTo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          order.status.toLowerCase().includes(searchTerm.toLowerCase()),
       )
       setFilteredJobOrders(filtered)
     } else {
@@ -155,6 +186,7 @@ export default function LogisticsJobOrdersPage() {
                 <TableHead>Deadline</TableHead>
                 <TableHead>Requested By</TableHead>
                 <TableHead>Assigned To</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
             </TableHeader>
@@ -171,6 +203,9 @@ export default function LogisticsJobOrdersPage() {
                   <TableCell>{order.requestedBy}</TableCell>
                   <TableCell>
                     <span className="text-blue-600">{order.assignedTo}</span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={getStatusColor(order.status)}>{formatStatus(order.status)}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
