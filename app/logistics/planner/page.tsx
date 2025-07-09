@@ -827,7 +827,7 @@ export default function LogisticsPlannerPage() {
       <div className="flex flex-col gap-6">
         {/* Header with title and actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-2xl font-bold">Logistics Planne</h1>
+          <h1 className="text-2xl font-bold">Logistics Planner</h1>
         </div>
 
         {/* Calendar controls */}
