@@ -8,14 +8,31 @@ import { Separator } from "@/components/ui/separator"
 import { Copy, Mail, MessageCircle, Phone, Facebook, X } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { ReportData } from "@/lib/report-service"
-import type { Product } from "@/lib/firebase-service"
 
 interface SendReportDialogProps {
   isOpen: boolean
   onClose: () => void
   report: ReportData
-  product: Product | null
+  product: any
   onSelectOption: (option: "email" | "whatsapp" | "viber" | "messenger") => void
+}
+
+// Helper functions moved to the top
+const getReportTypeDisplay = (type: string) => {
+  return type
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
+}
+
+const formatDateForFilename = (dateString: string) => {
+  return new Date(dateString)
+    .toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })
+    .replace(/\s/g, "_")
 }
 
 export function SendReportDialog({ isOpen, onClose, report, product, onSelectOption }: SendReportDialogProps) {
@@ -47,23 +64,6 @@ export function SendReportDialog({ isOpen, onClose, report, product, onSelectOpt
       description: `Sharing via ${platform} is not yet implemented.`,
       variant: "destructive",
     })
-  }
-
-  const getReportTypeDisplay = (type: string) => {
-    return type
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
-  }
-
-  const formatDateForFilename = (dateString: string) => {
-    return new Date(dateString)
-      .toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      })
-      .replace(/\s/g, "_")
   }
 
   return (
