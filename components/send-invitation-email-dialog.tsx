@@ -1,60 +1,38 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Mail, Loader2 } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { Mail, Send } from "lucide-react"
+import { toast } from "@/components/ui/use-toast"
 
 interface SendInvitationEmailDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
   organizationCode: string
-  trigger?: React.ReactNode
 }
 
-export function SendInvitationEmailDialog({ organizationCode, trigger }: SendInvitationEmailDialogProps) {
-  const [open, setOpen] = useState(false)
+export function SendInvitationEmailDialog({ open, onOpenChange, organizationCode }: SendInvitationEmailDialogProps) {
   const [email, setEmail] = useState("")
   const [senderName, setSenderName] = useState("")
   const [companyName, setCompanyName] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-  const { toast } = useToast()
+  const [sending, setSending] = useState(false)
 
   const handleSendInvitation = async () => {
-    if (!email) {
+    if (!email || !email.includes("@")) {
       toast({
-        title: "Error",
-        description: "Please enter an email address",
         variant: "destructive",
+        title: "Invalid Email",
+        description: "Please enter a valid email address.",
       })
       return
     }
-
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid email address",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsLoading(true)
 
     try {
+      setSending(true)
+
       const response = await fetch("/api/invitations/send-email", {
         method: "POST",
         headers: {
@@ -62,74 +40,68 @@ export function SendInvitationEmailDialog({ organizationCode, trigger }: SendInv
         },
         body: JSON.stringify({
           email,
-          organizationCode,
           senderName,
           companyName,
+          organizationCode,
         }),
       })
 
       const result = await response.json()
 
-      if (response.ok && result.success) {
-        toast({
-          title: "Success",
-          description: "Invitation email sent successfully!",
-        })
-        setOpen(false)
-        // Reset form
-        setEmail("")
-        setSenderName("")
-        setCompanyName("")
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to send invitation email",
-          variant: "destructive",
-        })
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send invitation")
       }
+
+      toast({
+        title: "Invitation Sent!",
+        description: `Organization invitation has been sent to ${email}`,
+      })
+
+      // Reset form and close dialog
+      setEmail("")
+      setSenderName("")
+      setCompanyName("")
+      onOpenChange(false)
     } catch (error) {
       console.error("Error sending invitation:", error)
       toast({
-        title: "Error",
-        description: "Failed to send invitation email. Please try again.",
         variant: "destructive",
+        title: "Failed to Send",
+        description: error instanceof Error ? error.message : "Failed to send invitation email.",
       })
     } finally {
-      setIsLoading(false)
+      setSending(false)
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button variant="outline" size="sm">
-            <Mail className="h-4 w-4 mr-2" />
-            Email
-          </Button>
-        )}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Send Invitation Email</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Send Invitation Email
+          </DialogTitle>
           <DialogDescription>
             Send an invitation email with the organization code: <strong>{organizationCode}</strong>
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
+
+        <div className="space-y-4">
+          <div className="space-y-2">
             <Label htmlFor="email">Recipient Email *</Label>
             <Input
               id="email"
               type="email"
-              placeholder="user@example.com"
+              placeholder="colleague@company.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="senderName">Your Name (Optional)</Label>
+
+          <div className="space-y-2">
+            <Label htmlFor="senderName">Your Name</Label>
             <Input
               id="senderName"
               placeholder="John Doe"
@@ -137,34 +109,36 @@ export function SendInvitationEmailDialog({ organizationCode, trigger }: SendInv
               onChange={(e) => setSenderName(e.target.value)}
             />
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="companyName">Company Name (Optional)</Label>
+
+          <div className="space-y-2">
+            <Label htmlFor="companyName">Company Name</Label>
             <Input
               id="companyName"
-              placeholder="Acme Corp"
+              placeholder="Acme Corporation"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
             />
           </div>
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendInvitation} disabled={sending || !email}>
+              {sending ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Invitation
+                </>
+              )}
+            </Button>
+          </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
-            Cancel
-          </Button>
-          <Button onClick={handleSendInvitation} disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Sending...
-              </>
-            ) : (
-              <>
-                <Mail className="h-4 w-4 mr-2" />
-                Send Invitation
-              </>
-            )}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
