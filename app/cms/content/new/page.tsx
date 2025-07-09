@@ -364,7 +364,7 @@ export default function CMSContentCreatePage() {
       const durationHours = Math.floor(durationMinutes / 60)
       const remainingMinutes = durationMinutes % 60
       const durationDisplay = durationHours > 0 ? `${durationHours}h ${remainingMinutes}m` : `${remainingMinutes}m`
-      console.log(loopResult)
+      console.log(loopsResult)
       setValidationError(
         `✓ Valid Configuration: ${Math.floor(loopsResult)} complete loops will fit in the ${durationDisplay} time period. ` +
           `Each loop uses ${totalSpotTimePerLoop}s (${spotDurationNum}s × ${spotsPerLoopNum} spots).`,
