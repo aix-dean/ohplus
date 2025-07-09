@@ -174,7 +174,7 @@ export default function ComposeEmailPage() {
 
       // Create email record - only include defined values
       const emailData: Omit<Email, "id" | "created"> = {
-        from: user.email || "",
+        from: user.email || "noreply@ohplus.aix.ph",
         to: toEmails,
         subject,
         body,
@@ -196,10 +196,23 @@ export default function ComposeEmailPage() {
         emailData.reportId = reportId
       }
 
+      // Create email record in compose_emails collection
       const emailId = await emailService.createEmail(emailData)
 
-      // Send email
-      await emailService.sendEmail(emailId)
+      // Send email via API route
+      const response = await fetch("/api/emails/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ emailId }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.details || result.error || "Failed to send email")
+      }
 
       toast({
         title: "Email Sent!",
@@ -212,7 +225,7 @@ export default function ComposeEmailPage() {
       console.error("Error sending email:", error)
       toast({
         title: "Send Failed",
-        description: "Failed to send email. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to send email. Please try again.",
         variant: "destructive",
       })
     } finally {

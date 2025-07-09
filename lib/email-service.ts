@@ -42,6 +42,7 @@ export interface Email {
   userId: string
   created: Timestamp | string
   updated?: Timestamp | string
+  errorMessage?: string
 }
 
 // Email Attachment Interface
@@ -107,7 +108,7 @@ class EmailService {
     }
   }
 
-  // Emails
+  // Compose Emails - using compose_emails collection
   async createEmail(email: Omit<Email, "id" | "created">): Promise<string> {
     try {
       // Clean the email object to remove undefined values
@@ -140,8 +141,11 @@ class EmailService {
       if (email.sentAt) {
         cleanEmail.sentAt = email.sentAt
       }
+      if (email.errorMessage) {
+        cleanEmail.errorMessage = email.errorMessage
+      }
 
-      const docRef = await addDoc(collection(db, "emails"), cleanEmail)
+      const docRef = await addDoc(collection(db, "compose_emails"), cleanEmail)
       return docRef.id
     } catch (error) {
       console.error("Error creating email:", error)
@@ -151,7 +155,7 @@ class EmailService {
 
   async getEmails(userId: string): Promise<Email[]> {
     try {
-      const q = query(collection(db, "emails"), where("userId", "==", userId), orderBy("created", "desc"))
+      const q = query(collection(db, "compose_emails"), where("userId", "==", userId), orderBy("created", "desc"))
       const querySnapshot = await getDocs(q)
 
       const emails: Email[] = []
@@ -168,7 +172,7 @@ class EmailService {
 
   async updateEmail(emailId: string, updates: Partial<Email>): Promise<void> {
     try {
-      const emailRef = doc(db, "emails", emailId)
+      const emailRef = doc(db, "compose_emails", emailId)
 
       // Clean updates to remove undefined values
       const cleanUpdates: any = {
@@ -191,19 +195,72 @@ class EmailService {
 
   async sendEmail(emailId: string): Promise<void> {
     try {
-      // In a real implementation, this would integrate with an email service like SendGrid, Resend, etc.
-      // For now, we'll just update the status
+      // Get the email document first
+      const emailsQuery = query(collection(db, "compose_emails"), where("__name__", "==", emailId))
+      const emailSnapshot = await getDocs(emailsQuery)
+
+      if (emailSnapshot.empty) {
+        throw new Error("Email not found")
+      }
+
+      const emailData = emailSnapshot.docs[0].data() as Email
+
+      // Prepare email for sending via Resend API
+      const emailPayload = {
+        from: emailData.from || "noreply@ohplus.aix.ph",
+        to: emailData.to,
+        cc: emailData.cc || [],
+        subject: emailData.subject,
+        html: this.formatEmailBody(emailData.body),
+        attachments: emailData.attachments ? await this.prepareAttachments(emailData.attachments) : [],
+      }
+
+      // Send email using Resend API
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        },
+        body: JSON.stringify(emailPayload),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(`Failed to send email: ${errorData.message || response.statusText}`)
+      }
+
+      const result = await response.json()
+      console.log("Email sent successfully:", result)
+
+      // Update email status to sent
       await this.updateEmail(emailId, {
         status: "sent",
         sentAt: serverTimestamp() as any,
       })
-
-      console.log("Email sent successfully")
     } catch (error) {
       console.error("Error sending email:", error)
-      await this.updateEmail(emailId, { status: "failed" })
+
+      // Update email status to failed with error message
+      await this.updateEmail(emailId, {
+        status: "failed",
+        errorMessage: error instanceof Error ? error.message : "Unknown error occurred",
+      })
+
       throw error
     }
+  }
+
+  private formatEmailBody(body: string): string {
+    // Convert plain text to HTML with proper formatting
+    return body.replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>").replace(/^/, "<p>").replace(/$/, "</p>")
+  }
+
+  private async prepareAttachments(attachments: EmailAttachment[]): Promise<any[]> {
+    // In a real implementation, you would convert blob URLs to base64 or upload to a CDN
+    // For now, we'll return empty array since blob URLs won't work in email sending
+    console.log("Attachments would be processed here:", attachments)
+    return []
   }
 
   // Default templates
