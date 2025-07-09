@@ -5,6 +5,7 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
 import { Check, ChevronRight, Circle } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { AlarmSettingDialog } from "../alarm-setting-dialog"
 
 const DropdownMenu = DropdownMenuPrimitive.Root
 
@@ -77,17 +78,30 @@ const DropdownMenuItem = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & {
     inset?: boolean
   }
->(({ className, inset, ...props }, ref) => (
-  <DropdownMenuPrimitive.Item
-    ref={ref}
-    className={cn(
-      "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-      inset && "pl-8",
-      className,
-    )}
-    {...props}
-  />
-))
+>(({ className, inset, onClick, ...props }, ref) => {
+  const [showAlarmDialog, setShowAlarmDialog] = React.useState(false)
+
+  const handleClick = (event: React.MouseEvent) => {
+    setShowAlarmDialog(true)
+    onClick?.(event)
+  }
+
+  return (
+    <>
+      <DropdownMenuPrimitive.Item
+        ref={ref}
+        className={cn(
+          "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+          inset && "pl-8",
+          className,
+        )}
+        onClick={handleClick}
+        {...props}
+      />
+      <AlarmSettingDialog open={showAlarmDialog} onOpenChange={setShowAlarmDialog} />
+    </>
+  )
+})
 DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName
 
 const DropdownMenuCheckboxItem = React.forwardRef<
