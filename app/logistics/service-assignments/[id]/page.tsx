@@ -5,7 +5,6 @@ import { ArrowLeft, FileText, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import Image from "next/image"
 
 interface ServiceAssignmentDetailsProps {
@@ -67,94 +66,22 @@ export default function ServiceAssignmentDetails({ params }: ServiceAssignmentDe
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" onClick={() => window.history.back()} className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900">{serviceAssignment.site.name}</h1>
+            <p className="text-sm text-gray-500">Service Assignment Details</p>
+          </div>
+        </div>
+      </div>
 
       <div className="flex">
-        {/* Left Sidebar */}
-        <div className="w-64 bg-white border-r min-h-screen p-4">
-          {/* Notifications */}
-          <Card className="mb-4 bg-blue-50 border-blue-200">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm text-blue-700">Notification</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center gap-2 text-xs">
-                <div className="w-8 h-8 bg-gray-200 rounded"></div>
-                <div className="flex-1">
-                  <div className="h-2 bg-gray-200 rounded mb-1"></div>
-                  <div className="h-2 bg-gray-200 rounded w-3/4"></div>
-                </div>
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              </div>
-              <div className="flex items-center gap-2 text-xs">
-                <div className="w-8 h-8 bg-gray-200 rounded"></div>
-                <div className="flex-1">
-                  <div className="h-2 bg-gray-200 rounded mb-1"></div>
-                  <div className="h-2 bg-gray-200 rounded w-2/3"></div>
-                </div>
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              </div>
-              <Button variant="link" className="text-xs text-blue-600 p-0 h-auto">
-                See All
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Navigation */}
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-2">To Go</h3>
-              <nav className="space-y-1">
-                <Button variant="ghost" className="w-full justify-start text-sm">
-                  Dashboard
-                </Button>
-                <Button variant="ghost" className="w-full justify-start text-sm">
-                  Bulletin Board
-                </Button>
-                <Button variant="ghost" className="w-full justify-start text-sm">
-                  Project Tracker
-                </Button>
-              </nav>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-medium text-gray-500 mb-2">To Do</h3>
-              <nav className="space-y-1">
-                <Button variant="ghost" className="w-full justify-start text-sm bg-blue-50 text-blue-700">
-                  Service Assignments
-                </Button>
-                <Button variant="ghost" className="w-full justify-start text-sm">
-                  JOs
-                </Button>
-                <Button variant="ghost" className="w-full justify-start text-sm">
-                  Reports
-                </Button>
-                <Button variant="ghost" className="w-full justify-start text-sm">
-                  Teams and Personnel
-                </Button>
-                <Button variant="ghost" className="w-full justify-start text-sm">
-                  Settings and Config.
-                </Button>
-              </nav>
-            </div>
-          </div>
-
-          {/* Intelligence Section */}
-          <Card className="mt-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium">Intelligence ✨</h3>
-              </div>
-              <div className="h-16 bg-white/20 rounded mb-2"></div>
-              <Button variant="ghost" className="text-xs text-white p-0 h-auto">
-                See All
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Main Content */}
-        <div className="flex-1 p-6">
+        <div className="p-6 pt-0 w-full">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Service Details */}
             <div className="lg:col-span-2 space-y-6">
