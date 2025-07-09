@@ -15,46 +15,27 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent } from "@/components/ui/card"
-import { Copy, Mail, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
 interface AddUserInvitationDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  isOpen: boolean
+  onClose: () => void
   invitationCode: string
-  onSuccess?: () => void
 }
 
-export default function AddUserInvitationDialog({
-  open,
-  onOpenChange,
-  invitationCode,
-  onSuccess,
-}: AddUserInvitationDialogProps) {
+export default function AddUserInvitationDialog({ isOpen, onClose, invitationCode }: AddUserInvitationDialogProps) {
   const [email, setEmail] = useState("")
   const [name, setName] = useState("")
-  const [subject, setSubject] = useState("You're invited to join our team")
+  const [subject, setSubject] = useState("Invitation to join OH Plus")
   const [message, setMessage] = useState(
-    "You've been invited to join our team. Click the link below to create your account and get started.",
+    "You have been invited to join our team at OH Plus. Please use the invitation code below to register your account.",
   )
   const [isLoading, setIsLoading] = useState(false)
 
-  const registrationLink = `${process.env.NEXT_PUBLIC_APP_URL}/register?code=${invitationCode}`
-
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(invitationCode)
-    toast.success("Invitation code copied to clipboard!")
-  }
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(registrationLink)
-    toast.success("Registration link copied to clipboard!")
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email.trim()) {
+
+    if (!email) {
       toast.error("Please enter an email address")
       return
     }
@@ -62,153 +43,110 @@ export default function AddUserInvitationDialog({
     setIsLoading(true)
 
     try {
+      const registrationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/register?code=${invitationCode}`
+
       const response = await fetch("/api/invitations/send-email", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email: email.trim(),
-          name: name.trim() || "Team Member",
+          recipientEmail: email,
+          recipientName: name,
           subject,
           message,
           invitationCode,
-          registrationLink,
+          registrationUrl,
+          senderName: "OH Plus Team",
+          companyName: "OH Plus",
+          role: "User",
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
         }),
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to send invitation")
+      const result = await response.json()
+
+      if (response.ok) {
+        toast.success("Invitation sent successfully!")
+        onClose()
+        // Reset form
+        setEmail("")
+        setName("")
+        setSubject("Invitation to join OH Plus")
+        setMessage(
+          "You have been invited to join our team at OH Plus. Please use the invitation code below to register your account.",
+        )
+      } else {
+        toast.error(result.error || "Failed to send invitation")
       }
-
-      toast.success("Invitation sent successfully!")
-      onSuccess?.()
-      onOpenChange(false)
-
-      // Reset form
-      setEmail("")
-      setName("")
-      setSubject("You're invited to join our team")
-      setMessage("You've been invited to join our team. Click the link below to create your account and get started.")
     } catch (error) {
       console.error("Error sending invitation:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to send invitation")
+      toast.error("Failed to send invitation")
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            Send User Invitation
-          </DialogTitle>
+          <DialogTitle>Send User Invitation</DialogTitle>
           <DialogDescription>
-            Send an invitation email with the registration link to add a new user to your organization.
+            Send an invitation email with the registration link and invitation code.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Invitation Code Display */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="space-y-3">
-                <div>
-                  <Label className="text-sm font-medium">Generated Invitation Code</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <code className="flex-1 px-3 py-2 bg-muted rounded-md font-mono text-sm">{invitationCode}</code>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCopyCode}
-                      className="shrink-0 bg-transparent"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Registration Link</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <code className="flex-1 px-3 py-2 bg-muted rounded-md text-xs break-all">{registrationLink}</code>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCopyLink}
-                      className="shrink-0 bg-transparent"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="invitation-code">Invitation Code</Label>
+            <Input id="invitation-code" value={invitationCode} readOnly className="bg-gray-50 font-mono" />
+          </div>
 
-          {/* Email Form */}
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="email">Email Address *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="user@example.com"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="name">Recipient Name</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="John Doe" />
-              </div>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email Address *</Label>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="user@example.com"
+              required
+            />
+          </div>
 
-            <div>
-              <Label htmlFor="subject">Email Subject</Label>
-              <Input
-                id="subject"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="You're invited to join our team"
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="name">Recipient Name (Optional)</Label>
+            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="John Doe" />
+          </div>
 
-            <div>
-              <Label htmlFor="message">Custom Message</Label>
-              <Textarea
-                id="message"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Add a personal message..."
-                rows={3}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="subject">Email Subject</Label>
+            <Input
+              id="subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="Invitation to join OH Plus"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="message">Message</Label>
+            <Textarea
+              id="message"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Enter your invitation message..."
+              rows={3}
+            />
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Mail className="h-4 w-4 mr-2" />
-                  Send Invitation
-                </>
-              )}
+              {isLoading ? "Sending..." : "Send Invitation"}
             </Button>
           </DialogFooter>
         </form>
