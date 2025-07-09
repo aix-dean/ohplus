@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { ChevronDown, Upload, Trash2, ImageIcon, Film, X, Check, Loader2 } from "lucide-react"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
-import { collection, query, where, getDocs, serverTimestamp } from "firebase/firestore"
+import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
@@ -393,7 +393,6 @@ export default function CMSContentCreatePage() {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    console.log("create content")
     e.preventDefault()
 
     // Check if user and project data are available
@@ -415,7 +414,7 @@ export default function CMSContentCreatePage() {
       })
       return
     }
-    console.log(user.company_id)
+
     setLoading(true)
     try {
       const mediaData = await uploadMediaFiles()
@@ -430,8 +429,7 @@ export default function CMSContentCreatePage() {
         category_names: getCategoryNames(),
         active: true,
         deleted: false,
-        created: serverTimestamp(),
-        updated: serverTimestamp(),
+        company_id: user.company_id || projectData.id,
         cms:
           formData.content_type === "Dynamic"
             ? {
@@ -456,7 +454,7 @@ export default function CMSContentCreatePage() {
       // Get user display name
       const userName = user.displayName || user.email || "Unknown User"
 
-      await createProduct(user.uid, userName, projectData.license_key, contentData)
+      const productId = await createProduct(user.uid, userName, projectData.license_key, contentData)
 
       toast({
         title: "Content created",
@@ -466,10 +464,11 @@ export default function CMSContentCreatePage() {
       router.push("/cms/dashboard")
     } catch (error) {
       console.error("Error creating content:", error)
-      setError(typeof error === "string" ? error : "Failed to create content. Please try again.")
+      const errorMessage = error instanceof Error ? error.message : "Failed to create content. Please try again."
+      setError(errorMessage)
       toast({
         title: "Error",
-        description: typeof error === "string" ? error : "Failed to create content. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
