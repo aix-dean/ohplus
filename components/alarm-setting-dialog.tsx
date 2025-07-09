@@ -66,7 +66,7 @@ export function AlarmSettingDialog({ open, onOpenChange }: AlarmSettingDialogPro
             className="absolute right-4 top-4 h-6 w-6"
             onClick={() => onOpenChange(false)}
           >
-            <X className="h-4 w-4" />
+            
           </Button>
         </DialogHeader>
 
