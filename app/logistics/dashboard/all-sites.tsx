@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react"
 import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import Image from "next/image"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +11,7 @@ import { Progress } from "@/components/ui/progress"
 import { getProductsByContentType, getProductsCountByContentType, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
@@ -35,6 +35,10 @@ export default function AllSitesTab() {
   >(new Map())
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingCount, setLoadingCount] = useState(false)
+
+  // Report dialog state
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
   const { toast } = useToast()
 
@@ -358,9 +362,14 @@ export default function AllSitesTab() {
       {!loading && !error && products.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
           {products.map((product) => (
-            <Link href={`/logistics/sites/${product.id}`} key={product.id}>
-              <UnifiedSiteCard site={productToSite(product)} />
-            </Link>
+            <UnifiedSiteCard
+              key={product.id}
+              site={productToSite(product)}
+              onCreateReport={(siteId) => {
+                setSelectedSiteId(siteId)
+                setReportDialogOpen(true)
+              }}
+            />
           ))}
         </div>
       )}
@@ -435,14 +444,34 @@ export default function AllSitesTab() {
           </div>
         </div>
       )}
+
+      {/* Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
     </div>
   )
 }
 
+// Unified Site Card that shows all UI elements with Create Report button
+function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onCreateReport(site.id)
+  }
+
+  const handleCardClick = () => {
+    window.location.href = `/logistics/sites/${site.id}`
+  }
+
+
 // Unified Site Card that shows all UI elements without conditions
 function UnifiedSiteCard({ site }: { site: any }) {
+
   return (
-    <Card className="erp-card overflow-hidden hover:shadow-md transition-shadow">
+    <Card
+      className="erp-card overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+      onClick={handleCardClick}
+    >
       <div className="relative h-48 bg-gray-200">
         <Image
           src={site.image || "/placeholder.svg"}
@@ -521,6 +550,15 @@ function UnifiedSiteCard({ site }: { site: any }) {
               <span className="text-sm text-gray-500">Today</span>
             </div>
           </div>
+
+          {/* Create Report Button */}
+          <Button
+            variant="outline"
+            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+            onClick={handleCreateReport}
+          >
+            Create Report
+          </Button>
         </div>
       </CardContent>
     </Card>
