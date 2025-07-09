@@ -20,6 +20,7 @@ interface UserData {
   email: string | null
   displayName: string | null
   license_key: string | null
+  company_id?: string | null
   role: string | null
   permissions: string[]
   // Add other user-specific data here
@@ -31,7 +32,21 @@ interface AuthContextType {
   subscriptionData: Subscription | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string) => Promise<void>
+  register: (
+    personalInfo: {
+      email: string
+      first_name: string
+      last_name: string
+      middle_name: string
+      phone_number: string
+      gender: string
+    },
+    companyInfo: {
+      company_name: string
+      company_location: string
+    },
+    password: string,
+  ) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   updateUserData: (updates: Partial<UserData>) => Promise<void>
@@ -81,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
           license_key: (data.license_key as string | null) || null, // Explicitly cast to string | null
+          company_id: (data.company_id as string | null) || null, // Add company_id field
           role: data.role || "user", // Default role
           permissions: data.permissions || [], // Default empty permissions
           ...data, // Spread any other fields
@@ -92,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
           license_key: null, // Will be assigned during registration/onboarding
+          company_id: null, // Will be assigned when user registers company
           role: "user",
           permissions: [],
         }
@@ -212,6 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: firebaseUser.email,
         uid: firebaseUser.uid,
         license_key: licenseKey, // Assign the generated license key
+        company_id: null, // Will be assigned when user registers company
         role: "user", // Default role
         permissions: [], // Default empty permissions
         type: "OHPLUS", // Add this field

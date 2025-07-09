@@ -18,7 +18,6 @@ import {
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { subscriptionService } from "./subscription-service"
 
 // Initialize Firebase Storage
 const storage = getStorage()
@@ -30,6 +29,7 @@ export interface Product {
   position: number
   seller_id: string
   seller_name: string
+  company_id?: string | null
   specs_rental?: {
     audience_type?: string
     audience_types?: string[]
@@ -387,35 +387,15 @@ export async function getUserProductsCount(
 }
 
 // Create a new product
-export async function createProduct(
-  userId: string,
-  userName: string,
-  licenseKey: string, // Added licenseKey
-  productData: Partial<Product>,
-): Promise<string> {
+export async function createProduct(productData: Partial<Product>): Promise<string> {
   try {
-    // Check subscription limits before creating a product
-    const subscription = await subscriptionService.getSubscriptionByLicenseKey(licenseKey)
-    if (!subscription) {
-      throw new Error("No active subscription found for this project.")
-    }
-
-    // Get the current count of non-deleted products for the user
-    const currentProductsCount = await getUserProductsCount(userId, { deleted: false })
-
-    if (subscription.maxProducts !== null && currentProductsCount >= subscription.maxProducts) {
-      throw new Error(`Product limit reached. Your current plan allows up to ${subscription.maxProducts} products.`)
-    }
-
     const newProduct = {
       ...productData,
-      seller_id: userId,
-      seller_name: userName,
       status: productData.status || "PENDING",
       position: productData.position || 0,
-      deleted: productData.deleted !== undefined ? productData.deleted : false, // Ensure deleted field is set
-      created: serverTimestamp(), // Set created timestamp here
-      updated: serverTimestamp(), // Set updated timestamp here
+      deleted: productData.deleted !== undefined ? productData.deleted : false,
+      created: serverTimestamp(),
+      updated: serverTimestamp(),
     }
 
     const docRef = await addDoc(collection(db, "products"), newProduct)
@@ -428,7 +408,7 @@ export async function createProduct(
 }
 
 // Soft delete a product (mark as deleted)
-export async function softDeleteProduct(productId: string, licenseKey: string): Promise<void> {
+export async function softDeleteProduct(productId: string): Promise<void> {
   try {
     const productRef = doc(db, "products", productId)
     await updateDoc(productRef, {
