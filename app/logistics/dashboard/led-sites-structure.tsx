@@ -14,9 +14,9 @@ import { CreateReportDialog } from "@/components/create-report-dialog"
 export default function LEDSitesStructureTab({ products = [] }: { products?: Product[] }) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
 
-  // Dialog state
+  // Report dialog state
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
-  const [selectedSite, setSelectedSite] = useState<any>(null)
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -29,12 +29,6 @@ export default function LEDSitesStructureTab({ products = [] }: { products?: Pro
     minute: "2-digit",
     hour12: true,
   })
-
-  // Handle create report click
-  const handleCreateReport = (site: any) => {
-    setSelectedSite(site)
-    setReportDialogOpen(true)
-  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -68,9 +62,14 @@ export default function LEDSitesStructureTab({ products = [] }: { products?: Pro
       {/* LED Site Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
         {products.map((product) => (
-          <Link href={`/logistics/sites/${product.id}?view=structure`} key={product.id}>
-            <LEDStructureCard product={product} onCreateReport={handleCreateReport} />
-          </Link>
+          <LEDStructureCard
+            key={product.id}
+            product={product}
+            onCreateReport={(siteId) => {
+              setSelectedSiteId(siteId)
+              setReportDialogOpen(true)
+            }}
+          />
         ))}
       </div>
 
@@ -82,13 +81,13 @@ export default function LEDSitesStructureTab({ products = [] }: { products?: Pro
         </Button>
       </div>
 
-      {/* Create Report Dialog */}
-      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteData={selectedSite} />
+      {/* Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
     </div>
   )
 }
 
-function LEDStructureCard({ product, onCreateReport }: { product: Product; onCreateReport: (site: any) => void }) {
+function LEDStructureCard({ product, onCreateReport }: { product: Product; onCreateReport: (siteId: string) => void }) {
   // Get the first media item for the thumbnail
   const thumbnailUrl = product.media && product.media.length > 0 ? product.media[0].url : "/led-billboard-1.png"
 
@@ -96,15 +95,7 @@ function LEDStructureCard({ product, onCreateReport }: { product: Product; onCre
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    const siteData = {
-      id: product.id,
-      name: product.name || "Unknown Site",
-      client: "Summit Media",
-      bookingDates: "May 20, 2025 to June 20, 2025",
-      breakdate: "May 20, 2025",
-      sales: "Noemi Abellaneda",
-    }
-    onCreateReport(siteData)
+    onCreateReport(product.id)
   }
 
   // Generate random maintenance date (for demo purposes)
@@ -132,80 +123,82 @@ function LEDStructureCard({ product, onCreateReport }: { product: Product; onCre
   }
 
   return (
-    <Card className="erp-card overflow-hidden hover:shadow-md transition-shadow">
-      <div className="relative h-48 bg-gray-200">
-        <Image
-          src={thumbnailUrl || "/placeholder.svg"}
-          alt={product.name || "LED Site"}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/led-billboard-1.png"
-            target.className = "object-cover"
-          }}
-        />
-      </div>
-
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-bold">{product.name}</h3>
-
-          {/* Maintenance Status Indicator */}
-          <div className="mt-1 p-3 rounded-lg bg-white shadow-sm">
-            <div className="text-sm text-gray-700 mb-1">
-              Last Maintained: <span className="font-medium">July 5, 2024</span>
-            </div>
-            <div className="flex items-center gap-2 mb-1">
-              <div
-                className={`w-5 h-5 rounded-full flex items-center justify-center ${conditionColor === "green" ? "bg-green-500" : conditionColor === "orange" ? "bg-orange-500" : "bg-red-500"}`}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 text-white"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  {conditionColor === "green" ? (
-                    <path
-                      fillRule="evenodd"
-                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                      clipRule="evenodd"
-                    />
-                  ) : (
-                    <path
-                      fillRule="evenodd"
-                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                      clipRule="evenodd"
-                    />
-                  )}
-                </svg>
-              </div>
-              <span
-                className={`font-bold ${
-                  conditionColor === "green"
-                    ? "text-green-600"
-                    : conditionColor === "orange"
-                      ? "text-orange-600"
-                      : "text-red-600"
-                }`}
-              >
-                {condition}
-              </span>
-            </div>
-            <div className="h-2 w-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full"></div>
-          </div>
-
-          {/* Create Report Button */}
-          <Button
-            variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-            onClick={handleCreateReport}
-          >
-            Create Report
-          </Button>
+    <Link href={`/logistics/sites/${product.id}?view=structure`}>
+      <Card className="erp-card overflow-hidden hover:shadow-md transition-shadow">
+        <div className="relative h-48 bg-gray-200">
+          <Image
+            src={thumbnailUrl || "/placeholder.svg"}
+            alt={product.name || "LED Site"}
+            fill
+            className="object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = "/led-billboard-1.png"
+              target.className = "object-cover"
+            }}
+          />
         </div>
-      </CardContent>
-    </Card>
+
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-1">
+            <h3 className="font-bold">{product.name}</h3>
+
+            {/* Maintenance Status Indicator */}
+            <div className="mt-1 p-3 rounded-lg bg-white shadow-sm">
+              <div className="text-sm text-gray-700 mb-1">
+                Last Maintained: <span className="font-medium">July 5, 2024</span>
+              </div>
+              <div className="flex items-center gap-2 mb-1">
+                <div
+                  className={`w-5 h-5 rounded-full flex items-center justify-center ${conditionColor === "green" ? "bg-green-500" : conditionColor === "orange" ? "bg-orange-500" : "bg-red-500"}`}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4 text-white"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    {conditionColor === "green" ? (
+                      <path
+                        fillRule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
+                    ) : (
+                      <path
+                        fillRule="evenodd"
+                        d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                        clipRule="evenodd"
+                      />
+                    )}
+                  </svg>
+                </div>
+                <span
+                  className={`font-bold ${
+                    conditionColor === "green"
+                      ? "text-green-600"
+                      : conditionColor === "orange"
+                        ? "text-orange-600"
+                        : "text-red-600"
+                  }`}
+                >
+                  {condition}
+                </span>
+              </div>
+              <div className="h-2 w-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full"></div>
+            </div>
+
+            {/* Create Report Button */}
+            <Button
+              variant="outline"
+              className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+              onClick={handleCreateReport}
+            >
+              Create Report
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }

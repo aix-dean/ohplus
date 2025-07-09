@@ -30,10 +30,6 @@ export default function StaticSitesTab() {
   const [searchTerm, setSearchTerm] = useState("")
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
 
-  // Dialog state
-  const [reportDialogOpen, setReportDialogOpen] = useState(false)
-  const [selectedSite, setSelectedSite] = useState<any>(null)
-
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
@@ -45,6 +41,10 @@ export default function StaticSitesTab() {
   >(new Map())
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingCount, setLoadingCount] = useState(false)
+
+  // Report dialog state
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
   const { user } = useAuth()
 
@@ -270,12 +270,6 @@ export default function StaticSitesTab() {
     }
   }
 
-  // Handle create report click
-  const handleCreateReport = (site: any) => {
-    setSelectedSite(site)
-    setReportDialogOpen(true)
-  }
-
   // Show loading if no user
   if (!user) {
     return (
@@ -385,17 +379,41 @@ export default function StaticSitesTab() {
             const site = productToSite(product)
 
             return (
-              <Link href={`/logistics/sites/${site.id}${getViewQueryParam(contentTab)}`} key={site.id}>
+              <div key={site.id}>
                 {contentTab === "illumination" ? (
-                  <IlluminationCard site={site} onCreateReport={handleCreateReport} />
+                  <IlluminationCard
+                    site={site}
+                    onCreateReport={(siteId) => {
+                      setSelectedSiteId(siteId)
+                      setReportDialogOpen(true)
+                    }}
+                  />
                 ) : contentTab === "structure" ? (
-                  <StructureCard site={site} onCreateReport={handleCreateReport} />
+                  <StructureCard
+                    site={site}
+                    onCreateReport={(siteId) => {
+                      setSelectedSiteId(siteId)
+                      setReportDialogOpen(true)
+                    }}
+                  />
                 ) : contentTab === "compliance" ? (
-                  <ComplianceCard site={site} onCreateReport={handleCreateReport} />
+                  <ComplianceCard
+                    site={site}
+                    onCreateReport={(siteId) => {
+                      setSelectedSiteId(siteId)
+                      setReportDialogOpen(true)
+                    }}
+                  />
                 ) : (
-                  <SiteCard site={site} onCreateReport={handleCreateReport} />
+                  <SiteCard
+                    site={site}
+                    onCreateReport={(siteId) => {
+                      setSelectedSiteId(siteId)
+                      setReportDialogOpen(true)
+                    }}
+                  />
                 )}
-              </Link>
+              </div>
             )
           })}
         </div>
@@ -472,14 +490,14 @@ export default function StaticSitesTab() {
         </div>
       )}
 
-      {/* Create Report Dialog */}
-      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteData={selectedSite} />
+      {/* Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
     </div>
   )
 }
 
 // Update the SiteCard component to fetch its own service assignments
-function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (site: any) => void }) {
+function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
 
@@ -487,7 +505,7 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (site: 
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    onCreateReport(site)
+    onCreateReport(site.id)
   }
 
   // Fetch service assignments for this specific product
@@ -508,65 +526,67 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (site: 
   }, [site.id])
 
   return (
-    <Card
-      className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white"
-      onClick={() => {}} // Add empty onClick for cursor pointer
-    >
-      <div className="relative h-48 bg-gray-200">
-        <Image
-          src={site.image || "/placeholder.svg"}
-          alt={site.name}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/roadside-billboard.png"
-            target.className = "opacity-50 object-contain"
-          }}
-        />
-        {activeAssignments.length > 0 && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
-            {activeAssignments.length}
-          </div>
-        )}
-      </div>
-
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-semibold">{site.name}</h3>
-          <div className="text-xs text-gray-500">ID: {site.id}</div>
-
-          <div className="mt-2 flex items-center gap-2">
-            <div className="text-sm font-medium">Current:</div>
-            <Badge
-              variant="outline"
-              className={`
-                ${site.statusColor === "green" ? "bg-green-50 text-green-700 border-green-200" : ""}
-                ${site.statusColor === "blue" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
-                ${site.statusColor === "red" ? "bg-red-50 text-red-700 border-red-200" : ""}
-                ${site.statusColor === "orange" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
-              `}
-            >
-              {site.status}
-            </Badge>
-          </div>
-
-          {/* Add Create Report Button */}
-          <Button
-            variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-            onClick={handleCreateReport}
-          >
-            Create Report
-          </Button>
+    <Link href={`/logistics/sites/${site.id}?view=content`}>
+      <Card
+        className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white"
+        onClick={() => {}} // Add empty onClick for cursor pointer
+      >
+        <div className="relative h-48 bg-gray-200">
+          <Image
+            src={site.image || "/placeholder.svg"}
+            alt={site.name}
+            fill
+            className="object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = "/roadside-billboard.png"
+              target.className = "opacity-50 object-contain"
+            }}
+          />
+          {activeAssignments.length > 0 && (
+            <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
+              {activeAssignments.length}
+            </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-1">
+            <h3 className="font-semibold">{site.name}</h3>
+            <div className="text-xs text-gray-500">ID: {site.id}</div>
+
+            <div className="mt-2 flex items-center gap-2">
+              <div className="text-sm font-medium">Current:</div>
+              <Badge
+                variant="outline"
+                className={`
+                  ${site.statusColor === "green" ? "bg-green-50 text-green-700 border-green-200" : ""}
+                  ${site.statusColor === "blue" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
+                  ${site.statusColor === "red" ? "bg-red-50 text-red-700 border-red-200" : ""}
+                  ${site.statusColor === "orange" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
+                `}
+              >
+                {site.status}
+              </Badge>
+            </div>
+
+            {/* Add Create Report Button */}
+            <Button
+              variant="outline"
+              className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+              onClick={handleCreateReport}
+            >
+              Create Report
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }
 
 // Update the IlluminationCard, StructureCard, and ComplianceCard components similarly
-function IlluminationCard({ site, onCreateReport }: { site: any; onCreateReport: (site: any) => void }) {
+function IlluminationCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
 
@@ -574,7 +594,7 @@ function IlluminationCard({ site, onCreateReport }: { site: any; onCreateReport:
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    onCreateReport(site)
+    onCreateReport(site.id)
   }
 
   // Fetch service assignments for this specific product
@@ -595,138 +615,56 @@ function IlluminationCard({ site, onCreateReport }: { site: any; onCreateReport:
   }, [site.id])
 
   return (
-    <Card className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white">
-      <div className="relative h-48 bg-gray-200">
-        <Image
-          src={site.image || "/placeholder.svg"}
-          alt={site.name}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/roadside-billboard.png"
-            target.className = "opacity-50 object-contain"
-          }}
-        />
-        {activeAssignments.length > 0 && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
-            {activeAssignments.length}
-          </div>
-        )}
-      </div>
-
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="text-lg font-bold">{site.name}</h3>
-          <div className="text-xs text-gray-500">ID: {site.id}</div>
-          <div className="text-sm text-gray-500">On @ 6:00pm everyday</div>
-
-          <div className="mt-4 flex items-center justify-between">
-            <div className="font-bold">9/10</div>
-            <div className="w-12 h-6 bg-gray-200 rounded-full flex items-center p-1">
-              <div className="w-4 h-4 bg-white rounded-full"></div>
+    <Link href={`/logistics/sites/${site.id}?view=illumination`}>
+      <Card className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white">
+        <div className="relative h-48 bg-gray-200">
+          <Image
+            src={site.image || "/placeholder.svg"}
+            alt={site.name}
+            fill
+            className="object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = "/roadside-billboard.png"
+              target.className = "opacity-50 object-contain"
+            }}
+          />
+          {activeAssignments.length > 0 && (
+            <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
+              {activeAssignments.length}
             </div>
-          </div>
-
-          {/* Add Create Report Button */}
-          <Button
-            variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-            onClick={handleCreateReport}
-          >
-            Create Report
-          </Button>
+          )}
         </div>
-      </CardContent>
-    </Card>
-  )
-}
 
-function StructureCard({ site, onCreateReport }: { site: any; onCreateReport: (site: any) => void }) {
-  const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
-  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-1">
+            <h3 className="text-lg font-bold">{site.name}</h3>
+            <div className="text-xs text-gray-500">ID: {site.id}</div>
+            <div className="text-sm text-gray-500">On @ 6:00pm everyday</div>
 
-  // Add the handleCreateReport function
-  const handleCreateReport = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    onCreateReport(site)
-  }
-
-  // Fetch service assignments for this specific product
-  useEffect(() => {
-    const fetchProductAssignments = async () => {
-      try {
-        setIsLoadingAssignments(true)
-        const assignments = await getServiceAssignmentsByProductId(site.id)
-        setActiveAssignments(assignments)
-      } catch (error) {
-        console.error(`Error fetching assignments for product ${site.id}:`, error)
-      } finally {
-        setIsLoadingAssignments(false)
-      }
-    }
-
-    fetchProductAssignments()
-  }, [site.id])
-
-  return (
-    <Card className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white">
-      <div className="relative h-48 bg-gray-200">
-        <Image
-          src={site.image || "/placeholder.svg"}
-          alt={site.name}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/roadside-billboard.png"
-            target.className = "opacity-50 object-contain"
-          }}
-        />
-        {activeAssignments.length > 0 && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
-            {activeAssignments.length}
-          </div>
-        )}
-      </div>
-
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="text-lg font-bold">{site.name}</h3>
-          <div className="text-xs text-gray-500">ID: {site.id}</div>
-
-          <div className="mt-4">
-            <div className="text-sm text-gray-600">Last Maintained: July 5, 2024</div>
-            <div className="flex items-center mt-1 text-green-600 font-medium">
-              <div className="w-5 h-5 bg-green-600 rounded-sm flex items-center justify-center mr-2">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-4 h-4">
-                  <path
-                    fillRule="evenodd"
-                    d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+            <div className="mt-4 flex items-center justify-between">
+              <div className="font-bold">9/10</div>
+              <div className="w-12 h-6 bg-gray-200 rounded-full flex items-center p-1">
+                <div className="w-4 h-4 bg-white rounded-full"></div>
               </div>
-              Good
             </div>
-          </div>
 
-          {/* Add Create Report Button */}
-          <Button
-            variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-            onClick={handleCreateReport}
-          >
-            Create Report
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+            {/* Add Create Report Button */}
+            <Button
+              variant="outline"
+              className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+              onClick={handleCreateReport}
+            >
+              Create Report
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }
 
-function ComplianceCard({ site, onCreateReport }: { site: any; onCreateReport: (site: any) => void }) {
+function StructureCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
 
@@ -734,7 +672,7 @@ function ComplianceCard({ site, onCreateReport }: { site: any; onCreateReport: (
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    onCreateReport(site)
+    onCreateReport(site.id)
   }
 
   // Fetch service assignments for this specific product
@@ -755,46 +693,134 @@ function ComplianceCard({ site, onCreateReport }: { site: any; onCreateReport: (
   }, [site.id])
 
   return (
-    <Card className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white">
-      <div className="relative h-48 bg-gray-200">
-        <Image
-          src={site.image || "/placeholder.svg"}
-          alt={site.name}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/roadside-billboard.png"
-            target.className = "opacity-50 object-contain"
-          }}
-        />
-        {activeAssignments.length > 0 && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
-            {activeAssignments.length}
-          </div>
-        )}
-      </div>
-
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="text-lg font-bold">{site.name}</h3>
-          <div className="text-xs text-gray-500">ID: {site.id}</div>
-
-          <div className="mt-4 flex items-center">
-            <span className="text-green-600 font-bold text-xl mr-1">5/5</span>
-            <span className="text-gray-600">Documents</span>
-          </div>
-
-          {/* Add Create Report Button */}
-          <Button
-            variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-            onClick={handleCreateReport}
-          >
-            Create Report
-          </Button>
+    <Link href={`/logistics/sites/${site.id}?view=structure`}>
+      <Card className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white">
+        <div className="relative h-48 bg-gray-200">
+          <Image
+            src={site.image || "/placeholder.svg"}
+            alt={site.name}
+            fill
+            className="object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = "/roadside-billboard.png"
+              target.className = "opacity-50 object-contain"
+            }}
+          />
+          {activeAssignments.length > 0 && (
+            <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
+              {activeAssignments.length}
+            </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-1">
+            <h3 className="text-lg font-bold">{site.name}</h3>
+            <div className="text-xs text-gray-500">ID: {site.id}</div>
+
+            <div className="mt-4">
+              <div className="text-sm text-gray-600">Last Maintained: July 5, 2024</div>
+              <div className="flex items-center mt-1 text-green-600 font-medium">
+                <div className="w-5 h-5 bg-green-600 rounded-sm flex items-center justify-center mr-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-4 h-4">
+                    <path
+                      fillRule="evenodd"
+                      d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                Good
+              </div>
+            </div>
+
+            {/* Add Create Report Button */}
+            <Button
+              variant="outline"
+              className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+              onClick={handleCreateReport}
+            >
+              Create Report
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  )
+}
+
+function ComplianceCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
+  const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
+  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
+
+  // Add the handleCreateReport function
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onCreateReport(site.id)
+  }
+
+  // Fetch service assignments for this specific product
+  useEffect(() => {
+    const fetchProductAssignments = async () => {
+      try {
+        setIsLoadingAssignments(true)
+        const assignments = await getServiceAssignmentsByProductId(site.id)
+        setActiveAssignments(assignments)
+      } catch (error) {
+        console.error(`Error fetching assignments for product ${site.id}:`, error)
+      } finally {
+        setIsLoadingAssignments(false)
+      }
+    }
+
+    fetchProductAssignments()
+  }, [site.id])
+
+  return (
+    <Link href={`/logistics/sites/${site.id}?view=compliance`}>
+      <Card className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white">
+        <div className="relative h-48 bg-gray-200">
+          <Image
+            src={site.image || "/placeholder.svg"}
+            alt={site.name}
+            fill
+            className="object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = "/roadside-billboard.png"
+              target.className = "opacity-50 object-contain"
+            }}
+          />
+          {activeAssignments.length > 0 && (
+            <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
+              {activeAssignments.length}
+            </div>
+          )}
+        </div>
+
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-1">
+            <h3 className="text-lg font-bold">{site.name}</h3>
+            <div className="text-xs text-gray-500">ID: {site.id}</div>
+
+            <div className="mt-4 flex items-center">
+              <span className="text-green-600 font-bold text-xl mr-1">5/5</span>
+              <span className="text-gray-600">Documents</span>
+            </div>
+
+            {/* Add Create Report Button */}
+            <Button
+              variant="outline"
+              className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+              onClick={handleCreateReport}
+            >
+              Create Report
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }

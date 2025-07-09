@@ -15,9 +15,9 @@ import { CreateReportDialog } from "@/components/create-report-dialog"
 export default function LEDSitesComplianceTab({ products = [] }: { products?: Product[] }) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
 
-  // Dialog state
+  // Report dialog state
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
-  const [selectedSite, setSelectedSite] = useState<any>(null)
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -37,12 +37,6 @@ export default function LEDSitesComplianceTab({ products = [] }: { products?: Pr
   const nonCompliantCount = products.filter((p) => getComplianceStatus(p) === "Non-Compliant").length
 
   const compliancePercentage = products.length > 0 ? Math.round((compliantCount / products.length) * 100) : 0
-
-  // Handle create report click
-  const handleCreateReport = (site: any) => {
-    setSelectedSite(site)
-    setReportDialogOpen(true)
-  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -76,9 +70,14 @@ export default function LEDSitesComplianceTab({ products = [] }: { products?: Pr
       {/* LED Site Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
         {products.map((product) => (
-          <Link href={`/logistics/sites/${product.id}?view=compliance`} key={product.id}>
-            <ComplianceCard product={product} onCreateReport={handleCreateReport} />
-          </Link>
+          <ComplianceCard
+            key={product.id}
+            product={product}
+            onCreateReport={(siteId) => {
+              setSelectedSiteId(siteId)
+              setReportDialogOpen(true)
+            }}
+          />
         ))}
       </div>
 
@@ -90,13 +89,13 @@ export default function LEDSitesComplianceTab({ products = [] }: { products?: Pr
         </Button>
       </div>
 
-      {/* Create Report Dialog */}
-      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteData={selectedSite} />
+      {/* Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
     </div>
   )
 }
 
-function ComplianceCard({ product, onCreateReport }: { product: Product; onCreateReport: (site: any) => void }) {
+function ComplianceCard({ product, onCreateReport }: { product: Product; onCreateReport: (siteId: string) => void }) {
   // Get the first media item for the thumbnail
   const thumbnailUrl = product.media && product.media.length > 0 ? product.media[0].url : "/led-billboard-1.png"
 
@@ -104,15 +103,7 @@ function ComplianceCard({ product, onCreateReport }: { product: Product; onCreat
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    const siteData = {
-      id: product.id,
-      name: product.name || "Unknown Site",
-      client: "Summit Media",
-      bookingDates: "May 20, 2025 to June 20, 2025",
-      breakdate: "May 20, 2025",
-      sales: "Noemi Abellaneda",
-    }
-    onCreateReport(siteData)
+    onCreateReport(product.id)
   }
 
   // Generate compliance data (for demo purposes)
@@ -124,56 +115,58 @@ function ComplianceCard({ product, onCreateReport }: { product: Product; onCreat
   const documentsComplete = documentCount === totalDocuments
 
   return (
-    <Card className="erp-card overflow-hidden hover:shadow-md transition-shadow">
-      <div className="relative h-48 bg-gray-200">
-        <Image
-          src={thumbnailUrl || "/placeholder.svg"}
-          alt={product.name || "LED Site"}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/led-billboard-1.png"
-            target.className = "object-cover"
-          }}
-        />
-      </div>
-
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-bold">{product.name}</h3>
-
-          {/* Document Compliance Indicator */}
-          <div className="mt-2 p-3 rounded-lg bg-white shadow-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <FileCheck size={16} className={documentsComplete ? "text-green-500" : "text-amber-500"} />
-              <div className="text-lg font-semibold text-gray-700">
-                {documentCount}/{totalDocuments} <span className="text-gray-500 font-normal">Documents</span>
-              </div>
-            </div>
-            <div className="h-2 w-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full"></div>
-          </div>
-
-          {/* Status Badge */}
-          <div className="mt-2">
-            <Badge
-              variant={status === "Compliant" ? "success" : status === "Pending Review" ? "warning" : "destructive"}
-            >
-              {status}
-            </Badge>
-          </div>
-
-          {/* Create Report Button */}
-          <Button
-            variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-            onClick={handleCreateReport}
-          >
-            Create Report
-          </Button>
+    <Link href={`/logistics/sites/${product.id}?view=compliance`}>
+      <Card className="erp-card overflow-hidden hover:shadow-md transition-shadow">
+        <div className="relative h-48 bg-gray-200">
+          <Image
+            src={thumbnailUrl || "/placeholder.svg"}
+            alt={product.name || "LED Site"}
+            fill
+            className="object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = "/led-billboard-1.png"
+              target.className = "object-cover"
+            }}
+          />
         </div>
-      </CardContent>
-    </Card>
+
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-1">
+            <h3 className="font-bold">{product.name}</h3>
+
+            {/* Document Compliance Indicator */}
+            <div className="mt-2 p-3 rounded-lg bg-white shadow-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <FileCheck size={16} className={documentsComplete ? "text-green-500" : "text-amber-500"} />
+                <div className="text-lg font-semibold text-gray-700">
+                  {documentCount}/{totalDocuments} <span className="text-gray-500 font-normal">Documents</span>
+                </div>
+              </div>
+              <div className="h-2 w-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full"></div>
+            </div>
+
+            {/* Status Badge */}
+            <div className="mt-2">
+              <Badge
+                variant={status === "Compliant" ? "success" : status === "Pending Review" ? "warning" : "destructive"}
+              >
+                {status}
+              </Badge>
+            </div>
+
+            {/* Create Report Button */}
+            <Button
+              variant="outline"
+              className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+              onClick={handleCreateReport}
+            >
+              Create Report
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }
 

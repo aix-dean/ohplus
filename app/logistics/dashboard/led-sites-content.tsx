@@ -23,9 +23,9 @@ export default function LEDSitesContentTab({ products = [] }: { products?: Produ
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
   const [filteredProducts, setFilteredProducts] = useState<Product[]>(products)
 
-  // Dialog state
+  // Report dialog state
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
-  const [selectedSite, setSelectedSite] = useState<any>(null)
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -62,12 +62,6 @@ export default function LEDSitesContentTab({ products = [] }: { products?: Produ
     )
     setFilteredProducts(filtered)
   }, [debouncedSearchTerm, products])
-
-  // Handle create report click
-  const handleCreateReport = (site: any) => {
-    setSelectedSite(site)
-    setReportDialogOpen(true)
-  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -127,9 +121,14 @@ export default function LEDSitesContentTab({ products = [] }: { products?: Produ
       {filteredProducts.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
           {filteredProducts.map((product) => (
-            <Link href={`/logistics/sites/${product.id}?view=content`} key={product.id}>
-              <LEDSiteCard product={product} onCreateReport={handleCreateReport} />
-            </Link>
+            <LEDSiteCard
+              key={product.id}
+              product={product}
+              onCreateReport={(siteId) => {
+                setSelectedSiteId(siteId)
+                setReportDialogOpen(true)
+              }}
+            />
           ))}
         </div>
       )}
@@ -142,14 +141,14 @@ export default function LEDSitesContentTab({ products = [] }: { products?: Produ
         </Button>
       </div>
 
-      {/* Create Report Dialog */}
-      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteData={selectedSite} />
+      {/* Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
     </div>
   )
 }
 
 // Replace the existing LEDSiteCard component with this updated version
-function LEDSiteCard({ product, onCreateReport }: { product: Product; onCreateReport: (site: any) => void }) {
+function LEDSiteCard({ product, onCreateReport }: { product: Product; onCreateReport: (siteId: string) => void }) {
   // Get the first media item for the thumbnail
   const thumbnailUrl = product.media && product.media.length > 0 ? product.media[0].url : "/led-billboard-1.png"
 
@@ -164,15 +163,7 @@ function LEDSiteCard({ product, onCreateReport }: { product: Product; onCreateRe
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    const siteData = {
-      id: product.id,
-      name: product.name || "Unknown Site",
-      client: "Summit Media",
-      bookingDates: "May 20, 2025 to June 20, 2025",
-      breakdate: "May 20, 2025",
-      sales: "Noemi Abellaneda",
-    }
-    onCreateReport(siteData)
+    onCreateReport(product.id)
   }
 
   // Fetch service assignments for this specific product
@@ -210,88 +201,90 @@ function LEDSiteCard({ product, onCreateReport }: { product: Product; onCreateRe
           Math.floor(Math.random() * 40) + 10) // 10-50 for error
 
   return (
-    <Card className="erp-card overflow-hidden hover:shadow-md transition-shadow">
-      <div className="relative h-48 bg-gray-200">
-        {/* Service Assignment Badge - only show if there are active assignments */}
-        {hasActiveAssignments && (
-          <div className="absolute top-2 right-2 z-10">
-            <div className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
-              {activeAssignments.length}
+    <Link href={`/logistics/sites/${product.id}?view=content`}>
+      <Card className="erp-card overflow-hidden hover:shadow-md transition-shadow">
+        <div className="relative h-48 bg-gray-200">
+          {/* Service Assignment Badge - only show if there are active assignments */}
+          {hasActiveAssignments && (
+            <div className="absolute top-2 right-2 z-10">
+              <div className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
+                {activeAssignments.length}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <Image
-          src={thumbnailUrl || "/placeholder.svg"}
-          alt={product.name || "LED Site"}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/led-billboard-1.png"
-            target.className = "object-cover"
-          }}
-        />
-      </div>
-
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-bold">{product.name}</h3>
-          <p className="text-xs text-gray-500">ID: {product.id}</p>
-
-          <div className="mt-2 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span
-                className={`
-                  ${statusColor === "green" ? "text-green-600" : ""}
-                  ${statusColor === "red" ? "text-red-600" : ""}
-                  ${statusColor === "orange" ? "text-orange-600" : ""}
-                  font-medium
-                `}
-              >
-                {status}
-              </span>
-            </div>
-            <div>
-              {status === "Operational" ? (
-                <div className="bg-green-100 text-green-600 rounded-full w-8 h-8 flex items-center justify-center">
-                  <Play size={16} fill="currentColor" />
-                </div>
-              ) : status === "Error" ? (
-                <div className="bg-red-100 text-red-600 rounded-full w-8 h-8 flex items-center justify-center">
-                  <Square size={16} fill="currentColor" />
-                </div>
-              ) : (
-                <div className="bg-orange-100 text-orange-600 rounded-full w-8 h-8 flex items-center justify-center">
-                  <AlertCircle size={16} />
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-2">
-            <Progress
-              value={healthPercentage}
-              className="h-2"
-              indicatorClassName={`
-                ${healthPercentage > 80 ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
-                ${healthPercentage > 60 && healthPercentage <= 80 ? "bg-gradient-to-r from-yellow-500 to-green-300" : ""}
-                ${healthPercentage > 40 && healthPercentage <= 60 ? "bg-gradient-to-r from-orange-500 to-yellow-300" : ""}
-                ${healthPercentage <= 40 ? "bg-gradient-to-r from-red-500 to-orange-300" : ""}
-              `}
-            />
-          </div>
-
-          {/* Create Report Button */}
-          <Button
-            variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-            onClick={handleCreateReport}
-          >
-            Create Report
-          </Button>
+          <Image
+            src={thumbnailUrl || "/placeholder.svg"}
+            alt={product.name || "LED Site"}
+            fill
+            className="object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = "/led-billboard-1.png"
+              target.className = "object-cover"
+            }}
+          />
         </div>
-      </CardContent>
-    </Card>
+
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-1">
+            <h3 className="font-bold">{product.name}</h3>
+            <p className="text-xs text-gray-500">ID: {product.id}</p>
+
+            <div className="mt-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`
+                    ${statusColor === "green" ? "text-green-600" : ""}
+                    ${statusColor === "red" ? "text-red-600" : ""}
+                    ${statusColor === "orange" ? "text-orange-600" : ""}
+                    font-medium
+                  `}
+                >
+                  {status}
+                </span>
+              </div>
+              <div>
+                {status === "Operational" ? (
+                  <div className="bg-green-100 text-green-600 rounded-full w-8 h-8 flex items-center justify-center">
+                    <Play size={16} fill="currentColor" />
+                  </div>
+                ) : status === "Error" ? (
+                  <div className="bg-red-100 text-red-600 rounded-full w-8 h-8 flex items-center justify-center">
+                    <Square size={16} fill="currentColor" />
+                  </div>
+                ) : (
+                  <div className="bg-orange-100 text-orange-600 rounded-full w-8 h-8 flex items-center justify-center">
+                    <AlertCircle size={16} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-2">
+              <Progress
+                value={healthPercentage}
+                className="h-2"
+                indicatorClassName={`
+                  ${healthPercentage > 80 ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
+                  ${healthPercentage > 60 && healthPercentage <= 80 ? "bg-gradient-to-r from-yellow-500 to-green-300" : ""}
+                  ${healthPercentage > 40 && healthPercentage <= 60 ? "bg-gradient-to-r from-orange-500 to-yellow-300" : ""}
+                  ${healthPercentage <= 40 ? "bg-gradient-to-r from-red-500 to-orange-300" : ""}
+                `}
+              />
+            </div>
+
+            {/* Create Report Button */}
+            <Button
+              variant="outline"
+              className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+              onClick={handleCreateReport}
+            >
+              Create Report
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }

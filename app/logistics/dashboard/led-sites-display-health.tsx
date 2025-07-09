@@ -15,9 +15,9 @@ import { CreateReportDialog } from "@/components/create-report-dialog"
 export default function LEDSitesDisplayHealthTab({ products = [] }: { products?: Product[] }) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
 
-  // Dialog state
+  // Report dialog state
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
-  const [selectedSite, setSelectedSite] = useState<any>(null)
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -57,12 +57,6 @@ export default function LEDSitesDisplayHealthTab({ products = [] }: { products?:
     else healthyCounts.critical++
   })
 
-  // Handle create report click
-  const handleCreateReport = (site: any) => {
-    setSelectedSite(site)
-    setReportDialogOpen(true)
-  }
-
   return (
     <div className="flex flex-col gap-4">
       {/* Date and View Toggle */}
@@ -95,9 +89,14 @@ export default function LEDSitesDisplayHealthTab({ products = [] }: { products?:
       {/* LED Site Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
         {products.map((product) => (
-          <Link href={`/logistics/sites/${product.id}?view=display-health`} key={product.id}>
-            <LEDHealthCard key={product.id} product={product} onCreateReport={handleCreateReport} />
-          </Link>
+          <LEDHealthCard
+            key={product.id}
+            product={product}
+            onCreateReport={(siteId) => {
+              setSelectedSiteId(siteId)
+              setReportDialogOpen(true)
+            }}
+          />
         ))}
       </div>
 
@@ -109,14 +108,14 @@ export default function LEDSitesDisplayHealthTab({ products = [] }: { products?:
         </Button>
       </div>
 
-      {/* Create Report Dialog */}
-      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteData={selectedSite} />
+      {/* Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
     </div>
   )
 }
 
 // Update the LEDHealthCard to use Product type
-function LEDHealthCard({ product, onCreateReport }: { product: Product; onCreateReport: (site: any) => void }) {
+function LEDHealthCard({ product, onCreateReport }: { product: Product; onCreateReport: (siteId: string) => void }) {
   // Get the first media item for the thumbnail
   const thumbnailUrl = product.media && product.media.length > 0 ? product.media[0].url : "/led-billboard-1.png"
 
@@ -124,15 +123,7 @@ function LEDHealthCard({ product, onCreateReport }: { product: Product; onCreate
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    const siteData = {
-      id: product.id,
-      name: product.name || "Unknown Site",
-      client: "Summit Media",
-      bookingDates: "May 20, 2025 to June 20, 2025",
-      breakdate: "May 20, 2025",
-      sales: "Noemi Abellaneda",
-    }
-    onCreateReport(siteData)
+    onCreateReport(product.id)
   }
 
   // Generate a health percentage based on status if not available
@@ -164,73 +155,75 @@ function LEDHealthCard({ product, onCreateReport }: { product: Product; onCreate
   const healthColor = getHealthColor(healthPercentage)
 
   return (
-    <Card className="erp-card overflow-hidden">
-      <div className="relative h-48 bg-gray-200">
-        <Image
-          src={thumbnailUrl || "/placeholder.svg"}
-          alt={product.name || "LED Site"}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/led-billboard-1.png"
-            target.className = "object-cover"
-          }}
-        />
-      </div>
-
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-bold">{product.name}</h3>
-
-          <div className="mt-2 flex items-center justify-between">
-            <div
-              className={`
-              font-bold text-lg
-              ${healthColor === "green" ? "text-green-600" : ""}
-              ${healthColor === "yellow" ? "text-yellow-600" : ""}
-              ${healthColor === "orange" ? "text-orange-600" : ""}
-              ${healthColor === "red" ? "text-red-600" : ""}
-            `}
-            >
-              {healthPercentage}%
-            </div>
-            <div
-              className={`
-              font-medium
-              ${healthColor === "green" ? "text-green-600" : ""}
-              ${healthColor === "yellow" ? "text-yellow-600" : ""}
-              ${healthColor === "orange" ? "text-orange-600" : ""}
-              ${healthColor === "red" ? "text-red-600" : ""}
-            `}
-            >
-              {healthStatus}
-            </div>
-          </div>
-
-          <div className="mt-2">
-            <Progress
-              value={healthPercentage}
-              className="h-2"
-              indicatorClassName={`
-                ${healthColor === "green" ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
-                ${healthColor === "yellow" ? "bg-gradient-to-r from-yellow-500 to-yellow-300" : ""}
-                ${healthColor === "orange" ? "bg-gradient-to-r from-orange-500 to-orange-300" : ""}
-                ${healthColor === "red" ? "bg-gradient-to-r from-red-500 to-red-300" : ""}
-              `}
-            />
-          </div>
-
-          {/* Create Report Button */}
-          <Button
-            variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-            onClick={handleCreateReport}
-          >
-            Create Report
-          </Button>
+    <Link href={`/logistics/sites/${product.id}?view=display-health`}>
+      <Card className="erp-card overflow-hidden">
+        <div className="relative h-48 bg-gray-200">
+          <Image
+            src={thumbnailUrl || "/placeholder.svg"}
+            alt={product.name || "LED Site"}
+            fill
+            className="object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = "/led-billboard-1.png"
+              target.className = "object-cover"
+            }}
+          />
         </div>
-      </CardContent>
-    </Card>
+
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-1">
+            <h3 className="font-bold">{product.name}</h3>
+
+            <div className="mt-2 flex items-center justify-between">
+              <div
+                className={`
+                font-bold text-lg
+                ${healthColor === "green" ? "text-green-600" : ""}
+                ${healthColor === "yellow" ? "text-yellow-600" : ""}
+                ${healthColor === "orange" ? "text-orange-600" : ""}
+                ${healthColor === "red" ? "text-red-600" : ""}
+              `}
+              >
+                {healthPercentage}%
+              </div>
+              <div
+                className={`
+                font-medium
+                ${healthColor === "green" ? "text-green-600" : ""}
+                ${healthColor === "yellow" ? "text-yellow-600" : ""}
+                ${healthColor === "orange" ? "text-orange-600" : ""}
+                ${healthColor === "red" ? "text-red-600" : ""}
+              `}
+              >
+                {healthStatus}
+              </div>
+            </div>
+
+            <div className="mt-2">
+              <Progress
+                value={healthPercentage}
+                className="h-2"
+                indicatorClassName={`
+                  ${healthColor === "green" ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
+                  ${healthColor === "yellow" ? "bg-gradient-to-r from-yellow-500 to-yellow-300" : ""}
+                  ${healthColor === "orange" ? "bg-gradient-to-r from-orange-500 to-orange-300" : ""}
+                  ${healthColor === "red" ? "bg-gradient-to-r from-red-500 to-red-300" : ""}
+                `}
+              />
+            </div>
+
+            {/* Create Report Button */}
+            <Button
+              variant="outline"
+              className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+              onClick={handleCreateReport}
+            >
+              Create Report
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }

@@ -27,10 +27,6 @@ export default function AllSitesTab() {
   const [searchTerm, setSearchTerm] = useState("")
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
 
-  // Dialog state
-  const [reportDialogOpen, setReportDialogOpen] = useState(false)
-  const [selectedSite, setSelectedSite] = useState<any>(null)
-
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
@@ -42,6 +38,10 @@ export default function AllSitesTab() {
   >(new Map())
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingCount, setLoadingCount] = useState(false)
+
+  // Report dialog state
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
   const { toast } = useToast()
 
@@ -279,12 +279,6 @@ export default function AllSitesTab() {
     }
   }
 
-  // Handle create report click
-  const handleCreateReport = (site: any) => {
-    setSelectedSite(site)
-    setReportDialogOpen(true)
-  }
-
   return (
     <div className="flex flex-col gap-5">
       {/* Date, Search and View Toggle */}
@@ -371,9 +365,14 @@ export default function AllSitesTab() {
       {!loading && !error && products.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
           {products.map((product) => (
-            <Link href={`/logistics/sites/${product.id}`} key={product.id}>
-              <UnifiedSiteCard site={productToSite(product)} onCreateReport={handleCreateReport} />
-            </Link>
+            <UnifiedSiteCard
+              key={product.id}
+              site={productToSite(product)}
+              onCreateReport={(siteId) => {
+                setSelectedSiteId(siteId)
+                setReportDialogOpen(true)
+              }}
+            />
           ))}
         </div>
       )}
@@ -449,111 +448,113 @@ export default function AllSitesTab() {
         </div>
       )}
 
-      {/* Create Report Dialog */}
-      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteData={selectedSite} />
+      {/* Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
     </div>
   )
 }
 
 // Unified Site Card that shows all UI elements with Create Report button
-function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (site: any) => void }) {
+function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    onCreateReport(site)
+    onCreateReport(site.id)
   }
 
   return (
-    <Card className="erp-card overflow-hidden hover:shadow-md transition-shadow">
-      <div className="relative h-48 bg-gray-200">
-        <Image
-          src={site.image || "/placeholder.svg"}
-          alt={site.name}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
-            target.className = "opacity-50 object-contain"
-          }}
-        />
-        {site.notifications > 0 && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-            {site.notifications}
-          </div>
-        )}
+    <Link href={`/logistics/sites/${site.id}`}>
+      <Card className="erp-card overflow-hidden hover:shadow-md transition-shadow">
+        <div className="relative h-48 bg-gray-200">
+          <Image
+            src={site.image || "/placeholder.svg"}
+            alt={site.name}
+            fill
+            className="object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
+              target.className = "opacity-50 object-contain"
+            }}
+          />
+          {site.notifications > 0 && (
+            <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+              {site.notifications}
+            </div>
+          )}
 
-        {/* Content Type Badge */}
-        <div className="absolute top-2 left-2">
-          <Badge
-            variant="outline"
-            className={`
-              ${site.contentType === "dynamic" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-amber-50 text-amber-700 border-amber-200"}
-            `}
-          >
-            {site.contentType === "dynamic" ? "Digital" : "Static"}
-          </Badge>
-        </div>
-      </div>
-
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-semibold">{site.name}</h3>
-
-          <div className="text-sm text-gray-500 mt-1">{site.location}</div>
-
-          {/* Status Badge */}
-          <div className="mt-2 flex items-center gap-2">
-            <div className="text-sm font-medium">Status:</div>
+          {/* Content Type Badge */}
+          <div className="absolute top-2 left-2">
             <Badge
               variant="outline"
               className={`
-                ${site.statusColor === "green" ? "bg-green-50 text-green-700 border-green-200" : ""}
-                ${site.statusColor === "blue" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
-                ${site.statusColor === "red" ? "bg-red-50 text-red-700 border-red-200" : ""}
-                ${site.statusColor === "orange" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
+                ${site.contentType === "dynamic" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-amber-50 text-amber-700 border-amber-200"}
               `}
             >
-              {site.status}
+              {site.contentType === "dynamic" ? "Digital" : "Static"}
             </Badge>
           </div>
-
-          {/* Health Percentage */}
-          <div className="mt-3">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-sm font-medium">Health:</span>
-              <span className="text-sm">{site.healthPercentage}%</span>
-            </div>
-            <Progress
-              value={site.healthPercentage}
-              className="h-2"
-              indicatorClassName={`
-                ${site.healthPercentage > 80 ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
-                ${site.healthPercentage > 60 && site.healthPercentage <= 80 ? "bg-gradient-to-r from-yellow-500 to-green-300" : ""}
-                ${site.healthPercentage > 40 && site.healthPercentage <= 60 ? "bg-gradient-to-r from-orange-500 to-yellow-300" : ""}
-                ${site.healthPercentage <= 40 ? "bg-gradient-to-r from-red-500 to-orange-300" : ""}
-              `}
-            />
-          </div>
-
-          {/* Additional Information */}
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <div className="flex justify-between items-center">
-              <span className="text-sm">Last Updated:</span>
-              <span className="text-sm text-gray-500">Today</span>
-            </div>
-          </div>
-
-          {/* Create Report Button */}
-          <Button
-            variant="outline"
-            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-            onClick={handleCreateReport}
-          >
-            Create Report
-          </Button>
         </div>
-      </CardContent>
-    </Card>
+
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-1">
+            <h3 className="font-semibold">{site.name}</h3>
+
+            <div className="text-sm text-gray-500 mt-1">{site.location}</div>
+
+            {/* Status Badge */}
+            <div className="mt-2 flex items-center gap-2">
+              <div className="text-sm font-medium">Status:</div>
+              <Badge
+                variant="outline"
+                className={`
+                  ${site.statusColor === "green" ? "bg-green-50 text-green-700 border-green-200" : ""}
+                  ${site.statusColor === "blue" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
+                  ${site.statusColor === "red" ? "bg-red-50 text-red-700 border-red-200" : ""}
+                  ${site.statusColor === "orange" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
+                `}
+              >
+                {site.status}
+              </Badge>
+            </div>
+
+            {/* Health Percentage */}
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-sm font-medium">Health:</span>
+                <span className="text-sm">{site.healthPercentage}%</span>
+              </div>
+              <Progress
+                value={site.healthPercentage}
+                className="h-2"
+                indicatorClassName={`
+                  ${site.healthPercentage > 80 ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
+                  ${site.healthPercentage > 60 && site.healthPercentage <= 80 ? "bg-gradient-to-r from-yellow-500 to-green-300" : ""}
+                  ${site.healthPercentage > 40 && site.healthPercentage <= 60 ? "bg-gradient-to-r from-orange-500 to-yellow-300" : ""}
+                  ${site.healthPercentage <= 40 ? "bg-gradient-to-r from-red-500 to-orange-300" : ""}
+                `}
+              />
+            </div>
+
+            {/* Additional Information */}
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <div className="flex justify-between items-center">
+                <span className="text-sm">Last Updated:</span>
+                <span className="text-sm text-gray-500">Today</span>
+              </div>
+            </div>
+
+            {/* Create Report Button */}
+            <Button
+              variant="outline"
+              className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+              onClick={handleCreateReport}
+            >
+              Create Report
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }
