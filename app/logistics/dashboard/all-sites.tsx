@@ -7,7 +7,6 @@ import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRig
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import {
   getProductsByContentTypeAndCompany,
@@ -496,21 +495,6 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             {site.notifications}
           </div>
         )}
-
-        {/* Status Badge */}
-        <div className="absolute bottom-2 left-2">
-          <Badge
-            variant="outline"
-            className={`
-              ${site.status === "ACTIVE" || site.status === "OCCUPIED" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
-              ${site.status === "VACANT" || site.status === "AVAILABLE" ? "bg-green-50 text-green-700 border-green-200" : ""}
-              ${site.status === "MAINTENANCE" || site.status === "REPAIR" ? "bg-red-50 text-red-700 border-red-200" : ""}
-              ${site.status === "PENDING" || site.status === "INSTALLATION" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
-            `}
-          >
-            {site.status}
-          </Badge>
-        </div>
       </div>
 
       <CardContent className="p-4">
@@ -523,63 +507,67 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             <span className="font-medium">ID:</span> {site.siteCode}
           </div>
 
-          {/* Site Details Section - INSERT HERE */}
-          <div className="mt-2 mb-2 space-y-1 text-xs bg-gray-50 p-2 rounded border">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Operation:</span>
-              <span
-                className={`font-medium ${
-                  site.status === "ACTIVE" || site.status === "OCCUPIED"
-                    ? "text-green-600"
+          {/* Site Details Section - Added between ID and Current status */}
+          <div className="bg-gray-50 border border-gray-200 rounded-md p-3 space-y-2">
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="flex flex-col">
+                <span className="text-gray-500 font-medium">Operation</span>
+                <span
+                  className={`font-semibold ${
+                    site.status === "ACTIVE" || site.status === "OCCUPIED"
+                      ? "text-green-600"
+                      : site.status === "MAINTENANCE" || site.status === "REPAIR"
+                        ? "text-red-600"
+                        : "text-orange-600"
+                  }`}
+                >
+                  {site.status === "ACTIVE" || site.status === "OCCUPIED"
+                    ? "Active"
                     : site.status === "MAINTENANCE" || site.status === "REPAIR"
-                      ? "text-red-600"
-                      : "text-orange-600"
-                }`}
-              >
-                {site.status === "ACTIVE" || site.status === "OCCUPIED"
-                  ? "Active"
-                  : site.status === "MAINTENANCE" || site.status === "REPAIR"
-                    ? "Maintenance"
-                    : "Pending"}
-              </span>
-            </div>
+                      ? "Maintenance"
+                      : "Pending"}
+                </span>
+              </div>
 
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Content:</span>
-              <span className="font-medium text-blue-600">{site.contentType === "dynamic" ? "Digital" : "Static"}</span>
-            </div>
+              <div className="flex flex-col">
+                <span className="text-gray-500 font-medium">Content Type</span>
+                <span className="font-semibold text-blue-600">
+                  {site.contentType === "dynamic" ? "Digital" : "Static"}
+                </span>
+              </div>
 
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Display Health:</span>
-              <span
-                className={`font-medium ${
-                  site.healthPercentage > 80
-                    ? "text-green-600"
-                    : site.healthPercentage > 60
-                      ? "text-yellow-600"
-                      : "text-red-600"
-                }`}
-              >
-                {site.healthPercentage}%
-              </span>
-            </div>
+              <div className="flex flex-col">
+                <span className="text-gray-500 font-medium">Display Health</span>
+                <span
+                  className={`font-semibold ${
+                    site.healthPercentage > 80
+                      ? "text-green-600"
+                      : site.healthPercentage > 60
+                        ? "text-yellow-600"
+                        : "text-red-600"
+                  }`}
+                >
+                  {site.healthPercentage}%
+                </span>
+              </div>
 
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Illumination:</span>
-              <span
-                className={`font-medium ${
-                  site.status === "ACTIVE" || site.status === "OCCUPIED" ? "text-green-600" : "text-gray-500"
-                }`}
-              >
-                {site.status === "ACTIVE" || site.status === "OCCUPIED" ? "ON" : "OFF"}
-              </span>
-            </div>
+              <div className="flex flex-col">
+                <span className="text-gray-500 font-medium">Illumination</span>
+                <span
+                  className={`font-semibold ${
+                    site.status === "ACTIVE" || site.status === "OCCUPIED" ? "text-green-600" : "text-gray-500"
+                  }`}
+                >
+                  {site.status === "ACTIVE" || site.status === "OCCUPIED" ? "ON" : "OFF"}
+                </span>
+              </div>
 
-            <div className="flex justify-between items-center">
-              <span className="text-gray-600">Compliance:</span>
-              <span className={`font-medium ${site.healthPercentage > 80 ? "text-green-600" : "text-orange-600"}`}>
-                {site.healthPercentage > 80 ? "Complete" : "Incomplete"}
-              </span>
+              <div className="flex flex-col col-span-2">
+                <span className="text-gray-500 font-medium">Compliance Status</span>
+                <span className={`font-semibold ${site.healthPercentage > 80 ? "text-green-600" : "text-orange-600"}`}>
+                  {site.healthPercentage > 80 ? "Complete" : "Incomplete"}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -599,11 +587,6 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             >
               {site.status}
             </span>
-          </div>
-
-          {/* Location */}
-          <div className="text-sm text-gray-500">
-            <span className="font-medium">Location:</span> {site.location}
           </div>
 
           {/* Create Report Button */}
