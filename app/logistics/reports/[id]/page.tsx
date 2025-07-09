@@ -146,7 +146,9 @@ export default function ReportDetailsPage() {
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Job Order Date</label>
-                <p className="text-sm">{formatDate(report.created || report.date)}</p>
+                <p className="text-sm">
+                  {formatDate(report.created?.toDate?.()?.toISOString?.()?.split?.("T")?.[0] || report.date)}
+                </p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Site</label>
@@ -289,7 +291,9 @@ export default function ReportDetailsPage() {
               <p className="text-sm font-medium">Prepared by:</p>
               <p className="text-sm">{report.createdByName}</p>
               <p className="text-sm text-gray-600">LOGISTICS</p>
-              <p className="text-sm text-gray-600">{formatDate(report.created || report.date)}</p>
+              <p className="text-sm text-gray-600">
+                {formatDate(report.created?.toDate?.()?.toISOString?.()?.split?.("T")?.[0] || report.date)}
+              </p>
             </div>
             <div className="text-right">
               <p className="text-xs text-gray-500 italic max-w-xs">
