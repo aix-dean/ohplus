@@ -21,7 +21,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, addDoc, Timestamp } from "firebase/firestore"
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Loader2, Info } from "lucide-react"
 
@@ -54,7 +54,7 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
   const [formData, setFormData] = useState({
     count: 1,
     validityDays: 30,
-    usageLimit: 0, // 0 means unlimited
+    maxUsage: 0, // 0 means unlimited
     role: "",
     customRole: "",
     permissions: [] as string[],
@@ -73,7 +73,10 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!userData?.companyId) return
+    if (!userData?.company_id) {
+      toast.error("Company information not found")
+      return
+    }
 
     setLoading(true)
 
@@ -95,7 +98,7 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
         return
       }
 
-      if (formData.usageLimit < 0 || formData.usageLimit > 1000) {
+      if (formData.maxUsage < 0 || formData.maxUsage > 1000) {
         toast.error("Usage limit must be between 0 and 1000 (0 = unlimited)")
         return
       }
@@ -107,23 +110,23 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
       for (let i = 0; i < formData.count; i++) {
         const codeData = {
           code: generateRandomCode(),
-          createdAt: Timestamp.now(),
-          expiresAt: Timestamp.fromDate(expiresAt),
-          usageLimit: formData.usageLimit,
-          usageCount: 0,
+          created_at: serverTimestamp(),
+          expires_at: expiresAt,
+          max_usage: formData.maxUsage,
+          usage_count: 0,
           role: finalRole,
           permissions: formData.permissions,
           status: "active",
-          createdBy: userData.uid,
-          companyId: userData.companyId,
+          created_by: userData.uid,
+          company_id: userData.company_id,
           description: formData.description || null,
-          usedBy: [],
+          used_by: [],
         }
         codes.push(codeData)
       }
 
       // Add all codes to Firestore
-      const promises = codes.map((codeData) => addDoc(collection(db, "invitationCodes"), codeData))
+      const promises = codes.map((codeData) => addDoc(collection(db, "invitation_codes"), codeData))
 
       await Promise.all(promises)
 
@@ -133,7 +136,7 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
       setFormData({
         count: 1,
         validityDays: 30,
-        usageLimit: 0,
+        maxUsage: 0,
         role: "",
         customRole: "",
         permissions: [],
@@ -207,16 +210,14 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="usageLimit">Usage Limit</Label>
+                <Label htmlFor="maxUsage">Usage Limit</Label>
                 <Input
-                  id="usageLimit"
+                  id="maxUsage"
                   type="number"
                   min="0"
                   max="1000"
-                  value={formData.usageLimit}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, usageLimit: Number.parseInt(e.target.value) || 0 }))
-                  }
+                  value={formData.maxUsage}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, maxUsage: Number.parseInt(e.target.value) || 0 }))}
                   placeholder="0 for unlimited"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -354,7 +355,7 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
                 <div>
                   <span className="font-medium">Usage limit:</span>
                   <Badge variant="secondary" className="ml-2">
-                    {formData.usageLimit === 0 ? "Unlimited" : formData.usageLimit}
+                    {formData.maxUsage === 0 ? "Unlimited" : formData.maxUsage}
                   </Badge>
                 </div>
                 <div>
