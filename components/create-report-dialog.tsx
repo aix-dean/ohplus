@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { createReport, type ReportData } from "@/lib/report-service"
+import { useAuth } from "@/contexts/auth-context"
 
 interface CreateReportDialogProps {
   open: boolean
@@ -30,6 +31,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   ])
   const [previewModal, setPreviewModal] = useState<{ open: boolean; file?: File; preview?: string }>({ open: false })
   const { toast } = useToast()
+  const { user, projectData } = useAuth()
 
   // Fetch product data when dialog opens
   useEffect(() => {
@@ -199,23 +201,49 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       return
     }
 
+    if (!user || !projectData) {
+      toast({
+        title: "Error",
+        description: "User authentication required",
+        variant: "destructive",
+      })
+      return
+    }
+
     setLoading(true)
     try {
       const reportData: ReportData = {
         siteId: product.id,
         siteName: product.name || "Unknown Site",
+        siteCode: product.site_code,
+        companyId: projectData.id,
+        sellerId: product.seller_id,
         client: "Summit Media", // This would come from booking data in real implementation
+        clientId: "summit-media-id", // This would come from booking data
         bookingDates: {
           start: "2025-05-20", // This would come from booking data
           end: "2025-06-20",
         },
         breakdate: "2025-05-20",
-        sales: "Noemi Abellaneda", // This would come from user data
+        sales: user.displayName || user.email || "Unknown User",
         reportType,
         date,
-        attachments: attachments.filter((att) => att.note.trim() !== ""),
+        attachments: attachments
+          .filter((att) => att.note.trim() !== "" || att.file)
+          .map((att) => ({
+            note: att.note,
+            fileName: att.fileName,
+            fileType: att.file?.type,
+          })),
         status: "draft",
-        createdBy: "current-user-id", // This would come from auth context
+        createdBy: user.uid,
+        createdByName: user.displayName || user.email || "Unknown User",
+        location: product.light?.location || product.specs_rental?.location,
+        category: "logistics",
+        subcategory: product.content_type || "general",
+        priority: "medium",
+        completionPercentage: reportType === "completion-report" ? 100 : 0,
+        tags: [reportType, product.content_type || "general"].filter(Boolean),
       }
 
       await createReport(reportData)
@@ -266,7 +294,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                 <span className="font-medium">Breakdate:</span> May 20, 2025
               </div>
               <div className="text-sm">
-                <span className="font-medium">Sales:</span> Noemi Abellaneda
+                <span className="font-medium">Sales:</span> {user?.displayName || user?.email || "Current User"}
               </div>
             </div>
 

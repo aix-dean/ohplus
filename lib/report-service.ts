@@ -16,71 +16,50 @@ export interface ReportData {
   id?: string
   siteId: string
   siteName: string
+  siteCode?: string
+  companyId: string
+  sellerId: string
   client: string
+  clientId?: string
   bookingDates: {
     start: string
     end: string
   }
   breakdate: string
   sales: string
-  reportType: "completion-report" | "maintenance-report" | "inspection-report" | "incident-report"
+  reportType: string
   date: string
   attachments: Array<{
     note: string
+    file?: File
     fileName?: string
     fileUrl?: string
     fileType?: string
-    fileSize?: number
   }>
   status: "draft" | "submitted" | "approved" | "rejected"
   createdBy: string
+  createdByName?: string
   assignedTo?: string
-  priority?: "low" | "medium" | "high" | "urgent"
+  assignedToName?: string
+  priority?: "low" | "medium" | "high"
   description?: string
-  findings?: string
-  recommendations?: string
-  nextActionRequired?: boolean
-  nextActionDate?: string
-  nextActionDescription?: string
-  approvedBy?: string
-  approvedDate?: Timestamp
-  rejectedBy?: string
-  rejectedDate?: Timestamp
-  rejectionReason?: string
-  submittedDate?: Timestamp
-  completionPercentage?: number
-  workOrderNumber?: string
-  estimatedCost?: number
-  actualCost?: number
-  laborHours?: number
-  materialsUsed?: Array<{
-    item: string
-    quantity: number
-    unit: string
-    cost?: number
-  }>
+  location?: string
   weatherConditions?: string
-  safetyIncidents?: Array<{
-    type: string
-    description: string
-    severity: "minor" | "major" | "critical"
-    actionTaken: string
-  }>
-  qualityCheckPassed?: boolean
-  qualityCheckNotes?: string
-  clientFeedback?: string
-  clientSignature?: string
-  technicianSignature?: string
-  supervisorSignature?: string
-  gpsLocation?: {
-    latitude: number
-    longitude: number
-  }
+  equipmentUsed?: string[]
+  issuesEncountered?: string
+  recommendations?: string
+  completionPercentage?: number
+  nextScheduledDate?: string
+  cost?: number
+  currency?: string
+  approvedBy?: string
+  approvedByName?: string
+  approvedDate?: Timestamp
+  rejectedReason?: string
+  submittedDate?: Timestamp
   tags?: string[]
-  isArchived?: boolean
-  version?: number
-  parentReportId?: string
-  relatedReports?: string[]
+  category?: string
+  subcategory?: string
   created?: Timestamp
   updated?: Timestamp
 }
@@ -93,8 +72,6 @@ export async function createReport(reportData: ReportData): Promise<string> {
       ...reportData,
       created: Timestamp.now(),
       updated: Timestamp.now(),
-      version: 1,
-      isArchived: false,
     })
     return docRef.id
   } catch (error) {
@@ -122,6 +99,34 @@ export async function getReports(siteId?: string): Promise<ReportData[]> {
   }
 }
 
+export async function getReportsByCompany(companyId: string): Promise<ReportData[]> {
+  try {
+    const q = query(collection(db, REPORTS_COLLECTION), where("companyId", "==", companyId), orderBy("created", "desc"))
+    const querySnapshot = await getDocs(q)
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as ReportData[]
+  } catch (error) {
+    console.error("Error fetching reports by company:", error)
+    throw error
+  }
+}
+
+export async function getReportsBySeller(sellerId: string): Promise<ReportData[]> {
+  try {
+    const q = query(collection(db, REPORTS_COLLECTION), where("sellerId", "==", sellerId), orderBy("created", "desc"))
+    const querySnapshot = await getDocs(q)
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as ReportData[]
+  } catch (error) {
+    console.error("Error fetching reports by seller:", error)
+    throw error
+  }
+}
+
 export async function updateReport(reportId: string, updates: Partial<ReportData>): Promise<void> {
   try {
     const reportRef = doc(db, REPORTS_COLLECTION, reportId)
@@ -140,87 +145,6 @@ export async function deleteReport(reportId: string): Promise<void> {
     await deleteDoc(doc(db, REPORTS_COLLECTION, reportId))
   } catch (error) {
     console.error("Error deleting report:", error)
-    throw error
-  }
-}
-
-export async function getReportsByStatus(status: ReportData["status"]): Promise<ReportData[]> {
-  try {
-    const q = query(collection(db, REPORTS_COLLECTION), where("status", "==", status), orderBy("created", "desc"))
-    const querySnapshot = await getDocs(q)
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as ReportData[]
-  } catch (error) {
-    console.error("Error fetching reports by status:", error)
-    throw error
-  }
-}
-
-export async function getReportsByDateRange(startDate: string, endDate: string): Promise<ReportData[]> {
-  try {
-    const q = query(
-      collection(db, REPORTS_COLLECTION),
-      where("date", ">=", startDate),
-      where("date", "<=", endDate),
-      orderBy("date", "desc"),
-    )
-    const querySnapshot = await getDocs(q)
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as ReportData[]
-  } catch (error) {
-    console.error("Error fetching reports by date range:", error)
-    throw error
-  }
-}
-
-export async function archiveReport(reportId: string): Promise<void> {
-  try {
-    await updateReport(reportId, { isArchived: true })
-  } catch (error) {
-    console.error("Error archiving report:", error)
-    throw error
-  }
-}
-
-export async function approveReport(reportId: string, approvedBy: string): Promise<void> {
-  try {
-    await updateReport(reportId, {
-      status: "approved",
-      approvedBy,
-      approvedDate: Timestamp.now(),
-    })
-  } catch (error) {
-    console.error("Error approving report:", error)
-    throw error
-  }
-}
-
-export async function rejectReport(reportId: string, rejectedBy: string, rejectionReason: string): Promise<void> {
-  try {
-    await updateReport(reportId, {
-      status: "rejected",
-      rejectedBy,
-      rejectedDate: Timestamp.now(),
-      rejectionReason,
-    })
-  } catch (error) {
-    console.error("Error rejecting report:", error)
-    throw error
-  }
-}
-
-export async function submitReport(reportId: string): Promise<void> {
-  try {
-    await updateReport(reportId, {
-      status: "submitted",
-      submittedDate: Timestamp.now(),
-    })
-  } catch (error) {
-    console.error("Error submitting report:", error)
     throw error
   }
 }
