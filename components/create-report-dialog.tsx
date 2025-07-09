@@ -137,17 +137,14 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         className="cursor-pointer flex flex-col items-center justify-center h-full space-y-2 p-2"
       >
         {isImage && attachment.preview ? (
-          <div className="relative w-full h-16 flex items-center justify-center">
-            <img
-              src={attachment.preview || "/placeholder.svg"}
-              alt={attachment.fileName}
-              className="max-w-full max-h-full object-contain rounded"
-            />
-          </div>
+          <img
+            src={attachment.preview || "/placeholder.svg"}
+            alt={attachment.fileName}
+            className="w-full h-full object-cover rounded"
+          />
         ) : (
           <div className="flex items-center justify-center">{getFileIcon(attachment.fileName)}</div>
         )}
-        <span className="text-xs text-blue-600 font-medium text-center break-all px-1">{attachment.fileName}</span>
       </label>
     )
   }
