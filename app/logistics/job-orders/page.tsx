@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Plus, MoreHorizontal } from "lucide-react"
+import { Search, MoreHorizontal } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -144,11 +144,6 @@ export default function LogisticsJobOrdersPage() {
     }
   }, [searchTerm, jobOrders])
 
-  const handleCreateJO = () => {
-    // Handle create job order action
-    console.log("Create JO clicked")
-  }
-
   const handleActionClick = (jobOrder: any, action: string) => {
     console.log(`${action} clicked for job order:`, jobOrder)
   }
@@ -235,17 +230,6 @@ export default function LogisticsJobOrdersPage() {
           </Table>
         </CardContent>
       </Card>
-
-      {/* Floating Create Button */}
-      <div className="fixed bottom-6 right-6">
-        <Button
-          onClick={handleCreateJO}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-full px-6 py-3 shadow-lg"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Create JO
-        </Button>
-      </div>
     </div>
   )
 }
