@@ -23,25 +23,15 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showJoinOrgDialog, setShowJoinOrgDialog] = useState(false)
-
-  // Join organization form states
   const [orgCode, setOrgCode] = useState("")
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [middleName, setMiddleName] = useState("")
-  const [phoneNumber, setPhoneNumber] = useState("")
-  const [regEmail, setRegEmail] = useState("")
-  const [regPassword, setRegPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [joiningOrg, setJoiningOrg] = useState(false)
 
-  const { login, register, user } = useAuth()
+  const { login, user } = useAuth()
   const router = useRouter()
 
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      router.push("/admin/dashboard")
+      router.push("/admin/dashboard") // Changed redirect to /admin/dashboard
     }
   }, [user, router])
 
@@ -52,7 +42,7 @@ export default function LoginPage() {
 
     try {
       await login(email, password)
-      router.push("/admin/dashboard")
+      router.push("/admin/dashboard") // Changed redirect to /admin/dashboard
     } catch (error: any) {
       console.error("Login error:", error)
 
@@ -71,70 +61,14 @@ export default function LoginPage() {
     }
   }
 
-  const getFriendlyErrorMessage = (error: unknown): string => {
-    console.error("Raw error during registration:", error)
-    if (error instanceof Error) {
-      switch (error.message) {
-        case "auth/email-already-in-use":
-          return "This email address is already in use. Please use a different email or log in."
-        case "auth/invalid-email":
-          return "The email address is not valid. Please check the format."
-        case "auth/weak-password":
-          return "The password is too weak. Please choose a stronger password (at least 6 characters)."
-        case "auth/operation-not-allowed":
-          return "Email/password accounts are not enabled. Please contact support."
-        case "auth/network-request-failed":
-          return "Network error. Please check your internet connection and try again."
-        default:
-          return error.message || "An unexpected error occurred during registration. Please try again."
-      }
-    }
-    return "An unknown error occurred. Please try again."
-  }
-
-  const handleJoinOrganization = async () => {
-    setError("")
-
+  const handleJoinOrganization = () => {
     if (!orgCode.trim()) {
       setError("Please enter an organization code.")
       return
     }
 
-    if (!firstName || !lastName || !regEmail || !phoneNumber || !regPassword || !confirmPassword) {
-      setError("Please fill in all required fields.")
-      return
-    }
-
-    if (regPassword !== confirmPassword) {
-      setError("Passwords do not match.")
-      return
-    }
-
-    setJoiningOrg(true)
-    try {
-      await register(
-        {
-          email: regEmail,
-          first_name: firstName,
-          last_name: lastName,
-          middle_name: middleName,
-          phone_number: phoneNumber,
-          gender: "",
-        },
-        {
-          company_name: "",
-          company_location: "",
-        },
-        regPassword,
-        orgCode,
-      )
-      setError("")
-      router.push("/admin/dashboard?registered=true&joined_org=true")
-    } catch (error: unknown) {
-      setError(getFriendlyErrorMessage(error))
-    } finally {
-      setJoiningOrg(false)
-    }
+    // Navigate to registration page with organization code
+    router.push(`/register?orgCode=${encodeURIComponent(orgCode)}`)
   }
 
   return (
@@ -247,15 +181,6 @@ export default function LoginPage() {
                 >
                   {isLoading ? "Logging in..." : "Log in"}
                 </Button>
-
-                <Button
-                  type="button"
-                  className="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-md mt-2"
-                  onClick={() => setShowJoinOrgDialog(true)}
-                  disabled={isLoading}
-                >
-                  Join an organization
-                </Button>
               </form>
             </CardContent>
             <CardFooter className="flex flex-col gap-2 text-center">
@@ -265,16 +190,25 @@ export default function LoginPage() {
                   Create an account
                 </Link>
               </p>
+              <Button
+                variant="outline"
+                className="w-full mt-2 bg-transparent"
+                onClick={() => setShowJoinOrgDialog(true)}
+              >
+                Join an organization
+              </Button>
             </CardFooter>
           </Card>
         </div>
       </div>
 
       <Dialog open={showJoinOrgDialog} onOpenChange={setShowJoinOrgDialog}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Join an Organization</DialogTitle>
-            <DialogDescription>Enter the organization code and your details to join an organization.</DialogDescription>
+            <DialogDescription>
+              Enter the organization code provided by your administrator to join their organization.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -287,99 +221,12 @@ export default function LoginPage() {
                 required
               />
             </div>
-
-            <Separator />
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
-                <Input
-                  id="firstName"
-                  placeholder="John"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input
-                  id="lastName"
-                  placeholder="Doe"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="middleName">Middle Name (Optional)</Label>
-              <Input
-                id="middleName"
-                placeholder=""
-                value={middleName}
-                onChange={(e) => setMiddleName(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="phoneNumber">Phone Number</Label>
-              <Input
-                id="phoneNumber"
-                placeholder="+63 9XX XXX XXXX"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="regEmail">Email Address</Label>
-              <Input
-                id="regEmail"
-                type="email"
-                placeholder="m@example.com"
-                value={regEmail}
-                onChange={(e) => setRegEmail(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="regPassword">Password</Label>
-              <Input
-                id="regPassword"
-                type="password"
-                value={regPassword}
-                onChange={(e) => setRegPassword(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-              />
-            </div>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
             <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={() => setShowJoinOrgDialog(false)} disabled={joiningOrg}>
+              <Button type="button" variant="outline" onClick={() => setShowJoinOrgDialog(false)}>
                 Cancel
               </Button>
-              <Button type="button" onClick={handleJoinOrganization} disabled={joiningOrg}>
-                {joiningOrg ? "Joining..." : "Join Organization"}
+              <Button type="button" onClick={handleJoinOrganization}>
+                Continue to Registration
               </Button>
             </div>
           </div>
