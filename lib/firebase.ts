@@ -13,10 +13,10 @@ const firebaseConfig = {
 }
 
 // Initialize Firebase only on client side
-let app
-let db
-let auth
-let storage
+let app: any = null
+let db: any = null
+let auth: any = null
+let storage: any = null
 
 if (typeof window !== "undefined") {
   // Client-side initialization
@@ -30,12 +30,6 @@ if (typeof window !== "undefined") {
   auth = getAuth(app)
   auth.tenantId = "ohplus-07hsi"
   storage = getStorage(app)
-} else {
-  // Server-side - create mock objects to prevent errors
-  app = null
-  db = null
-  auth = null
-  storage = null
 }
 
 export { db, auth, storage }
