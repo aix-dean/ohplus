@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/contexts/auth-context"
+import { Upload, Trash2, ImageIcon, Film } from "lucide-react"
 
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
@@ -808,6 +809,103 @@ export default function CMSContentCreatePage() {
                       />
                     </div>
                   </div>
+                </section>
+
+                <section className="space-y-6 p-6 border border-gray-200 rounded-lg bg-white">
+                  <h3 className="text-xl font-semibold text-gray-800 border-b pb-3 mb-3">
+                    Media <span className="text-red-500">*</span>
+                  </h3>
+
+                  <div
+                    className={`border-2 border-dashed ${
+                      mediaFiles.length === 0 ? "border-red-400 bg-red-50" : "border-gray-300 bg-gray-50"
+                    } rounded-lg p-8 text-center transition-colors duration-200`}
+                  >
+                    <input
+                      type="file"
+                      id="media-upload"
+                      multiple
+                      accept="image/*,video/*"
+                      className="hidden"
+                      onChange={handleFileChange}
+                      required={mediaFiles.length === 0}
+                      disabled={loading}
+                    />
+                    <label htmlFor="media-upload" className="flex flex-col items-center justify-center cursor-pointer">
+                      <Upload
+                        className={`h-12 w-12 ${mediaFiles.length === 0 ? "text-red-500" : "text-gray-500"} mb-3`}
+                      />
+                      <p className="text-base font-medium text-gray-700 mb-1">Click to upload or drag and drop</p>
+                      <p className="text-sm text-gray-500">Images or videos (max 10MB each)</p>
+                      {mediaFiles.length === 0 && (
+                        <p className="text-sm text-red-600 mt-3 font-medium">At least one media file is required</p>
+                      )}
+                    </label>
+                  </div>
+
+                  {mediaPreviewUrls.length > 0 && (
+                    <div className="space-y-4">
+                      <h4 className="text-base font-medium text-gray-700">Uploaded Media</h4>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {mediaPreviewUrls.map((url, index) => {
+                          const isVideo = mediaTypes[index] === "Video"
+                          return (
+                            <Card key={index} className="relative group overflow-hidden">
+                              <CardContent className="p-0">
+                                <div className="aspect-video bg-gray-100 flex items-center justify-center overflow-hidden">
+                                  {isVideo ? (
+                                    <video src={url} controls className="w-full h-full object-contain" />
+                                  ) : (
+                                    <img
+                                      src={url || "/placeholder.svg"}
+                                      alt={`Preview ${index + 1}`}
+                                      className="w-full h-full object-contain"
+                                    />
+                                  )}
+                                </div>
+                                <div className="p-3 space-y-2">
+                                  <div className="flex items-center text-sm font-medium text-gray-700">
+                                    {isVideo ? (
+                                      <Film className="h-4 w-4 mr-2 text-blue-500" />
+                                    ) : (
+                                      <ImageIcon className="h-4 w-4 mr-2 text-green-500" />
+                                    )}
+                                    <span>
+                                      {isVideo ? "Video" : "Image"} {index + 1}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label htmlFor={`media-distance-${index}`} className="text-xs text-gray-600">
+                                      Viewing Distance
+                                    </Label>
+                                    <Input
+                                      id={`media-distance-${index}`}
+                                      value={mediaDistances[index]}
+                                      onChange={(e) => handleMediaDistanceChange(index, e.target.value)}
+                                      placeholder="e.g., 100m"
+                                      className="h-9 text-sm"
+                                      disabled={loading}
+                                    />
+                                  </div>
+                                </div>
+                              </CardContent>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveMedia(index)}
+                                className="absolute top-2 right-2 h-8 w-8 rounded-full bg-white/80 text-red-500 hover:bg-white hover:text-red-600 transition-all opacity-0 group-hover:opacity-100"
+                                aria-label="Remove media"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </Card>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </section>
 
                 <CardFooter className="flex justify-end p-0 pt-4">
