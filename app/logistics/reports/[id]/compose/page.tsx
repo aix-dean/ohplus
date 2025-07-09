@@ -94,9 +94,6 @@ Best regards,
 [Your Position]
 [Company Name]
 [Contact Info]`)
-
-        // Auto-generate and attach PDF
-        await generateAndAttachPDF(foundReport)
       } else {
         setDebugInfo("Report not found!")
       }
@@ -127,39 +124,53 @@ Best regards,
     }
   }
 
-  const generateAndAttachPDF = async (reportData: ReportData) => {
-    if (!reportData) return
+  const handleAddAttachment = async () => {
+    if (!report) return
 
     setGeneratingPDF(true)
     try {
       setDebugInfo((prev) => prev + " | Generating PDF...")
 
-      // Generate PDF base64 string instead of blob
-      const pdfBase64 = (await generateReportPDF(reportData, product, true)) as string
+      // Generate PDF blob
+      const pdfBase64 = (await generateReportPDF(report, product, true)) as string
 
       if (pdfBase64) {
-        // Create attachment with base64 data
-        const fileName = `${reportData.siteId}_${getReportTypeDisplay(reportData.reportType).replace(/\s+/g, "_")}_${reportData.siteName.replace(/\s+/g, "_")}.pdf`
+        // Convert base64 to blob
+        const byteCharacters = atob(pdfBase64)
+        const byteNumbers = new Array(byteCharacters.length)
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i)
+        }
+        const byteArray = new Uint8Array(byteNumbers)
+        const pdfBlob = new Blob([byteArray], { type: "application/pdf" })
 
-        // Calculate file size from base64 string
-        const fileSize = Math.round((pdfBase64.length * 3) / 4)
+        // Create attachment
+        const fileName = `${report.siteId}_${getReportTypeDisplay(report.reportType).replace(/\s+/g, "_")}_${report.siteName.replace(/\s+/g, "_")}.pdf`
+
+        // Convert blob to URL for preview
+        const fileUrl = URL.createObjectURL(pdfBlob)
 
         const attachment: EmailAttachment = {
           fileName,
-          fileUrl: `data:application/pdf;base64,${pdfBase64}`,
-          fileSize: fileSize,
+          fileUrl,
+          fileSize: pdfBlob.size,
           fileType: "application/pdf",
         }
 
-        setAttachments([attachment])
-        setDebugInfo((prev) => prev + ` | PDF generated: ${(fileSize / 1024).toFixed(1)}KB`)
+        setAttachments((prev) => [...prev, attachment])
+        setDebugInfo((prev) => prev + ` | PDF generated: ${(pdfBlob.size / 1024).toFixed(1)}KB`)
+
+        toast({
+          title: "PDF Generated",
+          description: "Report PDF has been attached to your email.",
+        })
       }
     } catch (error) {
       console.error("Error generating PDF:", error)
       setDebugInfo((prev) => prev + ` | PDF Error: ${error instanceof Error ? error.message : "Unknown"}`)
       toast({
-        title: "Warning",
-        description: "Failed to auto-attach PDF. You can add it manually.",
+        title: "Error",
+        description: "Failed to generate PDF attachment.",
         variant: "destructive",
       })
     } finally {
@@ -415,7 +426,12 @@ Best regards,
 
                 {/* Action Buttons */}
                 <div className="flex items-center justify-between pt-4">
-                  <Button variant="outline" className="flex items-center gap-2 bg-transparent" disabled={generatingPDF}>
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2 bg-transparent"
+                    disabled={generatingPDF}
+                    onClick={handleAddAttachment}
+                  >
                     <Paperclip className="h-4 w-4" />
                     {generatingPDF ? "Generating PDF..." : "+Add Attachment"}
                   </Button>
