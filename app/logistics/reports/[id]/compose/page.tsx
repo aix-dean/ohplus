@@ -212,7 +212,7 @@ export default function ComposeEmailPage() {
     }
 
     setSending(true)
-    setDebugInfo((prev) => prev + " | Sending email...")
+    setDebugInfo((prev) => prev + " | Creating email record...")
 
     try {
       // Create email record - only include defined values
@@ -243,7 +243,15 @@ export default function ComposeEmailPage() {
       const emailId = await emailService.createEmail(emailData)
       setDebugInfo((prev) => prev + ` | Email created: ${emailId}`)
 
+      // Verify email was created by fetching it back
+      const createdEmail = await emailService.getEmailById(emailId)
+      if (!createdEmail) {
+        throw new Error("Failed to verify email creation")
+      }
+      setDebugInfo((prev) => prev + " | Email verified in database")
+
       // Send email using our service
+      setDebugInfo((prev) => prev + " | Sending email...")
       await emailService.sendEmail(emailId)
       setDebugInfo((prev) => prev + " | Email sent successfully!")
 

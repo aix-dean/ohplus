@@ -16,23 +16,32 @@ export default function ComposeEmailLoading() {
           <div className="lg:col-span-2 space-y-4">
             <Card>
               <CardContent className="p-6 space-y-4">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-8" />
+                {/* To Field */}
+                <div>
+                  <Skeleton className="h-4 w-8 mb-1" />
                   <Skeleton className="h-10 w-full" />
                 </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-8" />
+
+                {/* CC Field */}
+                <div>
+                  <Skeleton className="h-4 w-8 mb-1" />
                   <Skeleton className="h-10 w-full" />
                 </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-16" />
+
+                {/* Subject Field */}
+                <div>
+                  <Skeleton className="h-4 w-16 mb-1" />
                   <Skeleton className="h-10 w-full" />
                 </div>
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-16" />
-                  <Skeleton className="h-64 w-full" />
+
+                {/* Body Field */}
+                <div>
+                  <Skeleton className="h-4 w-16 mb-1" />
+                  <Skeleton className="h-[300px] w-full" />
                 </div>
-                <div className="flex justify-between pt-4">
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-between pt-4">
                   <Skeleton className="h-10 w-32" />
                   <Skeleton className="h-10 w-24" />
                 </div>
@@ -46,22 +55,28 @@ export default function ComposeEmailLoading() {
               <CardContent className="p-4">
                 <Skeleton className="h-6 w-20 mb-4" />
                 <div className="space-y-2">
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Skeleton className="h-8 flex-1" />
+                      <div className="flex items-center gap-1">
+                        <Skeleton className="h-6 w-6 rounded-full" />
+                        <Skeleton className="h-6 w-6 rounded-full" />
+                        <Skeleton className="h-6 w-6 rounded-full" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
 
+            {/* Report Info */}
             <Card>
               <CardContent className="p-4">
                 <Skeleton className="h-6 w-24 mb-2" />
                 <div className="space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-16" />
+                  {[1, 2, 3, 4].map((i) => (
+                    <Skeleton key={i} className="h-4 w-full" />
+                  ))}
                 </div>
               </CardContent>
             </Card>

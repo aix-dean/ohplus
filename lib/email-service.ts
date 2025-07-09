@@ -2,6 +2,7 @@ import {
   collection,
   addDoc,
   getDocs,
+  getDoc,
   query,
   where,
   orderBy,
@@ -177,8 +178,14 @@ class EmailService {
 
   async getEmailById(emailId: string): Promise<Email | null> {
     try {
-      const emails = await this.getEmails("")
-      return emails.find((e) => e.id === emailId) || null
+      const emailRef = doc(db, "compose_emails", emailId)
+      const emailDoc = await getDoc(emailRef)
+
+      if (emailDoc.exists()) {
+        return { id: emailDoc.id, ...emailDoc.data() } as Email
+      }
+
+      return null
     } catch (error) {
       console.error("Error fetching email by ID:", error)
       return null
@@ -214,10 +221,11 @@ class EmailService {
       const emailData = await this.getEmailById(emailId)
 
       if (!emailData) {
-        throw new Error("Email not found")
+        throw new Error(`Email with ID ${emailId} not found in database`)
       }
 
       console.log("Sending email:", {
+        id: emailId,
         to: emailData.to,
         subject: emailData.subject,
         attachments: emailData.attachments?.length || 0,
