@@ -15,57 +15,58 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Mail } from "lucide-react"
+import { Mail, Send } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
 import { useAuth } from "@/contexts/auth-context"
 
 interface SendInvitationEmailDialogProps {
-  code: string
-  trigger?: React.ReactNode
+  organizationCode: string
+  children: React.ReactNode
 }
 
-export function SendInvitationEmailDialog({ code, trigger }: SendInvitationEmailDialogProps) {
+export function SendInvitationEmailDialog({ organizationCode, children }: SendInvitationEmailDialogProps) {
+  const [open, setOpen] = useState(false)
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [open, setOpen] = useState(false)
-  const { userData } = useAuth()
+  const { user, userData } = useAuth()
 
   const handleSendEmail = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
 
     if (!email.trim()) {
-      setError("Please enter an email address")
+      setError("Email address is required")
       return
     }
 
-    // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       setError("Please enter a valid email address")
       return
     }
 
-    setLoading(true)
     try {
+      setLoading(true)
+
       const response = await fetch("/api/invitations/send-email", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          email: email.trim(),
-          code,
-          senderName: userData?.display_name || `${userData?.first_name} ${userData?.last_name}`,
-          companyName: userData?.company_id || "OH Plus",
+          recipientEmail: email.trim(),
+          organizationCode,
+          senderName:
+            userData?.firstName && userData?.lastName ? `${userData.firstName} ${userData.lastName}` : user?.email,
+          companyName: userData?.company_name || "Our Organization",
         }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to send email")
+        throw new Error(data.error || "Failed to send invitation")
       }
 
       toast({
@@ -73,32 +74,28 @@ export function SendInvitationEmailDialog({ code, trigger }: SendInvitationEmail
         description: `Organization invitation has been sent to ${email}`,
       })
 
-      setOpen(false)
       setEmail("")
+      setOpen(false)
     } catch (error: any) {
-      console.error("Error sending email:", error)
+      console.error("Error sending invitation:", error)
       setError(error.message || "Failed to send invitation email")
     } finally {
       setLoading(false)
     }
   }
 
-  const defaultTrigger = (
-    <Button variant="outline" size="sm" className="flex items-center gap-1 bg-transparent">
-      <Mail className="h-3 w-3" />
-      Email
-    </Button>
-  )
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger || defaultTrigger}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogTrigger asChild>{children}</DialogTrigger>
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Send Invitation Email</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Send Invitation Email
+          </DialogTitle>
           <DialogDescription>
-            Send an invitation email with the organization code{" "}
-            <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">{code}</code>
+            Send an invitation email with organization code{" "}
+            <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono">{organizationCode}</code>
           </DialogDescription>
         </DialogHeader>
 
@@ -109,8 +106,8 @@ export function SendInvitationEmailDialog({ code, trigger }: SendInvitationEmail
             </Alert>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Recipient Email</Label>
+          <div>
+            <Label htmlFor="email">Recipient Email Address</Label>
             <Input
               id="email"
               type="email"
@@ -118,20 +115,15 @@ export function SendInvitationEmailDialog({ code, trigger }: SendInvitationEmail
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               disabled={loading}
+              className="mt-1"
             />
           </div>
 
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              className="flex-1"
-              disabled={loading}
-            >
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !email.trim()} className="flex-1">
+            <Button type="submit" disabled={loading || !email.trim()}>
               {loading ? (
                 <>
                   <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
@@ -139,7 +131,7 @@ export function SendInvitationEmailDialog({ code, trigger }: SendInvitationEmail
                 </>
               ) : (
                 <>
-                  <Mail className="h-4 w-4 mr-2" />
+                  <Send className="h-4 w-4 mr-2" />
                   Send Invitation
                 </>
               )}

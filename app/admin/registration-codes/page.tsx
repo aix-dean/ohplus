@@ -2,25 +2,25 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ResponsiveTable } from "@/components/responsive-table"
 import { SendInvitationEmailDialog } from "@/components/send-invitation-email-dialog"
-import { useAuth } from "@/contexts/auth-context"
-import { Copy, QrCode } from "lucide-react"
+import { Copy, Mail, Plus, Shield } from "lucide-react"
 import { toast } from "@/components/ui/use-toast"
-import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore"
+import { useAuth } from "@/contexts/auth-context"
+import { collection, query, where, onSnapshot, addDoc, updateDoc, doc, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 interface RegistrationCode {
   id: string
   code: string
-  usage_count: number
-  max_usage?: number
-  expires_at: any
-  active: boolean
-  created_at: any
-  created_by: string
+  usage: number
+  maxUsage?: number
+  expires: Date
+  status: "active" | "inactive"
+  createdAt: Date
+  createdBy: string
   company_id: string
   license_key: string
 }
@@ -34,21 +34,19 @@ export default function RegistrationCodesPage() {
   useEffect(() => {
     if (!user || !userData?.company_id) return
 
-    const q = query(collection(db, "organization_codes"), where("company_id", "==", userData.company_id))
+    const q = query(
+      collection(db, "organization_codes"),
+      where("company_id", "==", userData.company_id),
+      orderBy("createdAt", "desc"),
+    )
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const codesData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
+        expires: doc.data().expires?.toDate(),
+        createdAt: doc.data().createdAt?.toDate(),
       })) as RegistrationCode[]
-
-      // Sort by creation date, newest first
-      codesData.sort((a, b) => {
-        if (a.created_at && b.created_at) {
-          return b.created_at.toDate() - a.created_at.toDate()
-        }
-        return 0
-      })
 
       setCodes(codesData)
       setLoading(false)
@@ -57,54 +55,50 @@ export default function RegistrationCodesPage() {
     return () => unsubscribe()
   }, [user, userData])
 
-  const generateCode = () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    let result = ""
-    for (let i = 0; i < 8; i++) {
-      if (i === 4) result += "-"
-      result += chars.charAt(Math.floor(Math.random() * chars.length))
-    }
-    return result
-  }
+  const generateCode = async () => {
+    if (!user || !userData?.company_id) return
 
-  const handleGenerateCode = async () => {
-    if (!user || !userData) return
-
-    setGenerating(true)
     try {
-      const newCode = generateCode()
+      setGenerating(true)
+
+      // Generate 8-character code in XXXX-XXXX format
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+      const part1 = Array.from({ length: 4 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join("")
+      const part2 = Array.from({ length: 4 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join("")
+      const code = `${part1}-${part2}`
+
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + 30) // 30 days from now
 
       await addDoc(collection(db, "organization_codes"), {
-        code: newCode,
+        code,
+        usage: 0,
+        maxUsage: null, // unlimited usage
+        expires: expiresAt,
+        status: "active",
+        createdAt: new Date(),
+        createdBy: user.uid,
         company_id: userData.company_id,
         license_key: userData.license_key,
-        created_by: user.uid,
-        created_at: serverTimestamp(),
-        expires_at: expiresAt,
-        active: true,
-        usage_count: 0,
-        max_usage: null, // Unlimited usage
       })
 
       toast({
         title: "Code Generated!",
-        description: `New registration code ${newCode} has been created.`,
+        description: `Organization code ${code} has been created successfully.`,
       })
     } catch (error) {
       console.error("Error generating code:", error)
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to generate registration code.",
+        description: "Failed to generate organization code.",
       })
     } finally {
       setGenerating(false)
     }
   }
 
-  const handleCopyCode = async (code: string) => {
+  const copyCode = async (code: string) => {
     try {
       await navigator.clipboard.writeText(code)
       toast({
@@ -112,7 +106,6 @@ export default function RegistrationCodesPage() {
         description: `Code ${code} copied to clipboard.`,
       })
     } catch (error) {
-      console.error("Failed to copy:", error)
       toast({
         variant: "destructive",
         title: "Error",
@@ -121,62 +114,49 @@ export default function RegistrationCodesPage() {
     }
   }
 
-  const handleDeactivateCode = async (codeId: string, code: string) => {
+  const deactivateCode = async (codeId: string, code: string) => {
     try {
       await updateDoc(doc(db, "organization_codes", codeId), {
-        active: false,
-        updated: serverTimestamp(),
+        status: "inactive",
       })
 
       toast({
         title: "Code Deactivated",
-        description: `Registration code ${code} has been deactivated.`,
+        description: `Organization code ${code} has been deactivated.`,
       })
     } catch (error) {
       console.error("Error deactivating code:", error)
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to deactivate registration code.",
+        description: "Failed to deactivate code.",
       })
     }
   }
 
-  const formatDate = (timestamp: any) => {
-    if (!timestamp) return "N/A"
-    return timestamp.toDate().toLocaleDateString()
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString("en-US", {
+      month: "numeric",
+      day: "numeric",
+      year: "numeric",
+    })
   }
 
-  const formatUsage = (code: RegistrationCode) => {
-    if (code.max_usage) {
-      return `${code.usage_count} / ${code.max_usage}`
+  const formatUsage = (usage: number, maxUsage?: number) => {
+    if (maxUsage) {
+      return `${usage} / ${maxUsage}`
     }
-    return code.usage_count.toString()
+    return usage.toString()
   }
 
-  const isExpired = (expiresAt: any) => {
-    if (!expiresAt) return false
-    return expiresAt.toDate() < new Date()
+  const isExpired = (expiresDate: Date) => {
+    return new Date() > expiresDate
   }
 
   const getStatus = (code: RegistrationCode) => {
-    if (!code.active) return "Inactive"
-    if (isExpired(code.expires_at)) return "Expired"
-    if (code.max_usage && code.usage_count >= code.max_usage) return "Used Up"
-    return "Active"
-  }
-
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case "Active":
-        return "default"
-      case "Inactive":
-      case "Expired":
-      case "Used Up":
-        return "secondary"
-      default:
-        return "secondary"
-    }
+    if (code.status === "inactive") return "inactive"
+    if (isExpired(code.expires)) return "inactive"
+    return "active"
   }
 
   const columns = [
@@ -185,8 +165,8 @@ export default function RegistrationCodesPage() {
       label: "Code",
       render: (code: RegistrationCode) => (
         <div className="flex items-center gap-2">
-          <span className="font-mono text-sm">{code.code}</span>
-          <Button variant="ghost" size="sm" onClick={() => handleCopyCode(code.code)} className="h-6 w-6 p-0">
+          <span className="font-mono font-medium">{code.code}</span>
+          <Button variant="ghost" size="sm" onClick={() => copyCode(code.code)} className="h-6 w-6 p-0">
             <Copy className="h-3 w-3" />
           </Button>
         </div>
@@ -195,12 +175,12 @@ export default function RegistrationCodesPage() {
     {
       key: "usage",
       label: "Usage",
-      render: (code: RegistrationCode) => <span className="text-sm">{formatUsage(code)}</span>,
+      render: (code: RegistrationCode) => <span className="text-sm">{formatUsage(code.usage, code.maxUsage)}</span>,
     },
     {
       key: "expires",
       label: "Expires",
-      render: (code: RegistrationCode) => <span className="text-sm">{formatDate(code.expires_at)}</span>,
+      render: (code: RegistrationCode) => <span className="text-sm">{formatDate(code.expires)}</span>,
     },
     {
       key: "status",
@@ -208,11 +188,8 @@ export default function RegistrationCodesPage() {
       render: (code: RegistrationCode) => {
         const status = getStatus(code)
         return (
-          <Badge
-            variant={getStatusVariant(status)}
-            className={status === "Active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
-          >
-            {status}
+          <Badge variant={status === "active" ? "default" : "secondary"}>
+            {status === "active" ? "Active" : "Inactive"}
           </Badge>
         )
       },
@@ -222,18 +199,18 @@ export default function RegistrationCodesPage() {
       label: "Actions",
       render: (code: RegistrationCode) => {
         const status = getStatus(code)
-        const isActive = status === "Active"
-
         return (
           <div className="flex items-center gap-2">
-            {isActive && <SendInvitationEmailDialog code={code.code} />}
-            {isActive && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleDeactivateCode(code.id, code.code)}
-                className="text-blue-600 hover:text-blue-700"
-              >
+            {status === "active" && (
+              <SendInvitationEmailDialog organizationCode={code.code}>
+                <Button variant="outline" size="sm">
+                  <Mail className="h-3 w-3 mr-1" />
+                  Email
+                </Button>
+              </SendInvitationEmailDialog>
+            )}
+            {status === "active" && (
+              <Button variant="outline" size="sm" onClick={() => deactivateCode(code.id, code.code)}>
                 Deactivate
               </Button>
             )}
@@ -261,33 +238,44 @@ export default function RegistrationCodesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Registration Codes</h1>
           <p className="text-gray-600">Manage registration codes for your organization.</p>
         </div>
-        <Button onClick={handleGenerateCode} disabled={generating} className="flex items-center gap-2">
-          <QrCode className="h-4 w-4" />
-          {generating ? "Generating..." : "Generate Code"}
+        <Button onClick={generateCode} disabled={generating}>
+          {generating ? (
+            <>
+              <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
+              Generating...
+            </>
+          ) : (
+            <>
+              <Plus className="h-4 w-4 mr-2" />
+              Generate Code
+            </>
+          )}
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Organization Codes</CardTitle>
-          <CardDescription>
-            Generated codes allow new users to join your organization during registration.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {codes.length === 0 ? (
-            <div className="text-center py-8">
-              <QrCode className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No registration codes found</h3>
-              <p className="text-gray-500 mb-4">
-                Generate your first code to start inviting users to your organization.
-              </p>
-            </div>
-          ) : (
+      {codes.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Shield className="h-12 w-12 text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No registration codes found</h3>
+            <p className="text-gray-500 text-center mb-4">
+              Generate your first organization code to start inviting team members.
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Organization Codes</CardTitle>
+            <CardDescription>
+              {codes.length} code{codes.length !== 1 ? "s" : ""} generated
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             <ResponsiveTable data={codes} columns={columns} />
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

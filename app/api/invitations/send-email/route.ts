@@ -5,19 +5,19 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, code, senderName, companyName } = await request.json()
+    const { recipientEmail, organizationCode, senderName, companyName } = await request.json()
 
-    if (!email || !code) {
-      return NextResponse.json({ error: "Email and code are required" }, { status: 400 })
+    if (!recipientEmail || !organizationCode) {
+      return NextResponse.json({ error: "Recipient email and organization code are required" }, { status: 400 })
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(recipientEmail)) {
       return NextResponse.json({ error: "Invalid email format" }, { status: 400 })
     }
 
-    const registrationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/register?code=${code}`
+    const registrationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/register?code=${organizationCode}`
 
     const emailHtml = `
       <!DOCTYPE html>
@@ -26,48 +26,75 @@ export async function POST(request: NextRequest) {
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Organization Invitation</title>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #1e293b 0%, #1e40af 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+            .logo { font-size: 36px; font-weight: bold; margin-bottom: 10px; }
+            .content { background: #ffffff; padding: 30px; border: 1px solid #e5e7eb; }
+            .code-box { background: #f8fafc; border: 2px dashed #cbd5e1; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; }
+            .code { font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; color: #1e40af; letter-spacing: 2px; }
+            .button { display: inline-block; background: #1e40af; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 20px 0; }
+            .footer { background: #f8fafc; padding: 20px; text-align: center; color: #6b7280; font-size: 14px; border-radius: 0 0 8px 8px; }
+            .divider { height: 1px; background: #e5e7eb; margin: 20px 0; }
+          </style>
         </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">You're Invited!</h1>
-            <p style="color: #f0f0f0; margin: 10px 0 0 0; font-size: 16px;">Join our organization</p>
-          </div>
-          
-          <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-            <p style="font-size: 16px; margin-bottom: 20px;">
-              Hello! ${senderName ? `<strong>${senderName}</strong>` : "Someone"} has invited you to join ${companyName ? `<strong>${companyName}</strong>` : "their organization"}.
-            </p>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">OH<span style="color: #60a5fa;">!</span></div>
+              <p style="margin: 0; font-size: 18px;">Out-of-Home Advertising Platform</p>
+            </div>
             
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
-              <p style="margin: 0 0 10px 0; font-size: 14px; color: #666;">Your organization code:</p>
-              <div style="font-family: 'Courier New', monospace; font-size: 24px; font-weight: bold; color: #2563eb; letter-spacing: 2px;">
-                ${code}
+            <div class="content">
+              <h2 style="color: #1e40af; margin-top: 0;">You're Invited to Join Our Organization!</h2>
+              
+              <p>Hello!</p>
+              
+              <p><strong>${senderName || "Someone"}</strong> from <strong>${companyName || "our organization"}</strong> has invited you to join their team on the OH Plus platform.</p>
+              
+              <div class="code-box">
+                <p style="margin: 0 0 10px 0; font-weight: bold;">Your Organization Code:</p>
+                <div class="code">${organizationCode}</div>
               </div>
+              
+              <h3>How to Join:</h3>
+              
+              <p><strong>Option 1: Quick Registration (Recommended)</strong></p>
+              <p>Click the button below to automatically register with your organization code:</p>
+              
+              <div style="text-align: center;">
+                <a href="${registrationUrl}" class="button">Join Organization & Register</a>
+              </div>
+              
+              <div class="divider"></div>
+              
+              <p><strong>Option 2: Manual Registration</strong></p>
+              <ol>
+                <li>Visit our registration page: <a href="${process.env.NEXT_PUBLIC_APP_URL}/register">${process.env.NEXT_PUBLIC_APP_URL}/register</a></li>
+                <li>Fill out the registration form</li>
+                <li>Click "Join an organization"</li>
+                <li>Enter the organization code: <code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${organizationCode}</code></li>
+              </ol>
+              
+              <div class="divider"></div>
+              
+              <p><strong>What happens next?</strong></p>
+              <ul>
+                <li>You'll create your account and automatically join the organization</li>
+                <li>You'll have access to the same features and data as your team</li>
+                <li>You can start collaborating immediately</li>
+              </ul>
+              
+              <p>If you have any questions or need assistance, please don't hesitate to reach out to your team administrator or contact our support team.</p>
+              
+              <p>Welcome to OH Plus!</p>
             </div>
             
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${registrationUrl}" 
-                 style="background: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 16px;">
-                Join Organization
-              </a>
-            </div>
-            
-            <div style="border-top: 1px solid #e0e0e0; padding-top: 20px; margin-top: 30px;">
-              <h3 style="color: #333; font-size: 16px; margin-bottom: 10px;">Alternative Method:</h3>
-              <p style="font-size: 14px; color: #666; margin-bottom: 5px;">
-                1. Visit: <a href="${process.env.NEXT_PUBLIC_APP_URL}/register" style="color: #2563eb;">${process.env.NEXT_PUBLIC_APP_URL}/register</a>
-              </p>
-              <p style="font-size: 14px; color: #666; margin-bottom: 5px;">
-                2. Click "Join an organization"
-              </p>
-              <p style="font-size: 14px; color: #666;">
-                3. Enter the code: <code style="background: #f1f1f1; padding: 2px 6px; border-radius: 3px; font-family: monospace;">${code}</code>
-              </p>
-            </div>
-            
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #888; text-align: center;">
-              <p>This invitation was sent by ${senderName || "an administrator"} from ${companyName || "your organization"}.</p>
-              <p>If you have any questions, please contact your administrator.</p>
+            <div class="footer">
+              <p>This invitation was sent by ${senderName || "a team member"} from ${companyName || "your organization"}.</p>
+              <p>If you didn't expect this invitation, you can safely ignore this email.</p>
+              <p>&copy; 2024 OH Plus. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -76,8 +103,8 @@ export async function POST(request: NextRequest) {
 
     const { data, error } = await resend.emails.send({
       from: "noreply@resend.dev",
-      to: [email],
-      subject: `Invitation to join ${companyName || "organization"}`,
+      to: [recipientEmail],
+      subject: `You're invited to join ${companyName || "our organization"} on OH Plus`,
       html: emailHtml,
     })
 
@@ -86,7 +113,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Failed to send email" }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, data })
+    return NextResponse.json({
+      success: true,
+      message: "Invitation email sent successfully",
+      emailId: data?.id,
+    })
   } catch (error) {
     console.error("Email sending error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
