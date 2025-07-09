@@ -5,7 +5,6 @@ import {
   doc,
   updateDoc,
   deleteDoc,
-  getDoc,
   query,
   where,
   orderBy,
@@ -13,7 +12,6 @@ import {
 } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db, storage } from "./firebase"
-import { getProductById } from "./firebase-service"
 
 export interface ReportData {
   id?: string
@@ -152,41 +150,6 @@ export async function getReports(siteId?: string): Promise<ReportData[]> {
     })) as ReportData[]
   } catch (error) {
     console.error("Error fetching reports:", error)
-    throw error
-  }
-}
-
-export async function getReportById(reportId: string): Promise<{ report: ReportData; product: any }> {
-  try {
-    const docRef = doc(db, REPORTS_COLLECTION, reportId)
-    const docSnap = await getDoc(docRef)
-
-    if (!docSnap.exists()) {
-      throw new Error("Report not found")
-    }
-
-    const reportData = {
-      id: docSnap.id,
-      ...docSnap.data(),
-    } as ReportData
-
-    // Fetch product data if siteId exists
-    let productData = null
-    if (reportData.siteId) {
-      try {
-        productData = await getProductById(reportData.siteId)
-      } catch (error) {
-        console.error("Error fetching product data:", error)
-        // Continue without product data
-      }
-    }
-
-    return {
-      report: reportData,
-      product: productData,
-    }
-  } catch (error) {
-    console.error("Error fetching report by ID:", error)
     throw error
   }
 }
