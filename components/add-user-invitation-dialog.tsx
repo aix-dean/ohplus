@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 import { Loader2, Send, User } from "lucide-react"
@@ -171,34 +171,6 @@ export default function AddUserInvitationDialog({
               />
             </div>
           </div>
-
-          {/* Email Preview */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Email Preview</CardTitle>
-              <CardDescription className="text-xs">Preview of what the recipient will see</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="border rounded-md p-3 bg-muted/30 space-y-2 text-sm">
-                <div className="border-b pb-2 mb-2">
-                  <div className="font-medium">{formData.subject}</div>
-                  <div className="text-xs text-muted-foreground">
-                    To: {formData.recipientEmail || "recipient@example.com"}
-                  </div>
-                </div>
-
-                <p>Hello {formData.recipientName || "there"},</p>
-                <p>{formData.message}</p>
-
-                <div className="bg-white p-2 rounded border">
-                  <p className="font-medium text-xs">Your invitation code:</p>
-                  <code className="font-mono bg-gray-100 px-1 py-0.5 rounded text-sm">{invitationCode}</code>
-                </div>
-
-                <p className="text-xs">Click the registration link in the email to get started!</p>
-              </div>
-            </CardContent>
-          </Card>
         </form>
 
         <DialogFooter>
