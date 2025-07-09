@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FirebaseError } from "firebase/app"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
@@ -21,12 +20,13 @@ export default function RegisterPage() {
   const [phoneNumber, setPhoneNumber] = useState("")
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [showJoinOrgDialog, setShowJoinOrgDialog] = useState(false)
-  const [orgCode, setOrgCode] = useState("")
-  const [joiningOrg, setJoiningOrg] = useState(false)
 
   const { register } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Get organization code from URL parameters
+  const orgCode = searchParams.get("orgCode")
 
   const getFriendlyErrorMessage = (error: unknown): string => {
     console.error("Raw error during registration:", error)
@@ -78,58 +78,17 @@ export default function RegisterPage() {
           company_location: "",
         },
         password,
+        orgCode || undefined, // Pass the organization code if available
       )
       setErrorMessage(null)
-      router.push("/admin/dashboard?registered=true")
+      const redirectUrl = orgCode
+        ? "/admin/dashboard?registered=true&joined_org=true"
+        : "/admin/dashboard?registered=true"
+      router.push(redirectUrl)
     } catch (error: unknown) {
       setErrorMessage(getFriendlyErrorMessage(error))
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleJoinOrganization = async () => {
-    setErrorMessage(null)
-
-    if (!orgCode.trim()) {
-      setErrorMessage("Please enter an organization code.")
-      return
-    }
-
-    if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
-      setErrorMessage("Please fill in all required fields.")
-      return
-    }
-
-    if (password !== confirmPassword) {
-      setErrorMessage("Passwords do not match.")
-      return
-    }
-
-    setJoiningOrg(true)
-    try {
-      await register(
-        {
-          email,
-          first_name: firstName,
-          last_name: lastName,
-          middle_name: middleName,
-          phone_number: phoneNumber,
-          gender: "",
-        },
-        {
-          company_name: "",
-          company_location: "",
-        },
-        password,
-        orgCode, // Pass the organization code
-      )
-      setErrorMessage(null)
-      router.push("/admin/dashboard?registered=true&joined_org=true")
-    } catch (error: unknown) {
-      setErrorMessage(getFriendlyErrorMessage(error))
-    } finally {
-      setJoiningOrg(false)
     }
   }
 
@@ -252,14 +211,6 @@ export default function RegisterPage() {
               >
                 {loading ? "Signing Up..." : "Sign Up"}
               </Button>
-              <Button
-                className="w-full bg-green-600 hover:bg-green-700 text-white mt-2"
-                type="button"
-                onClick={() => setShowJoinOrgDialog(true)}
-                disabled={loading}
-              >
-                Join an organization
-              </Button>
             </div>
 
             {errorMessage && (
@@ -270,36 +221,6 @@ export default function RegisterPage() {
           </CardContent>
         </Card>
       </div>
-      <Dialog open={showJoinOrgDialog} onOpenChange={setShowJoinOrgDialog}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Join an Organization</DialogTitle>
-            <DialogDescription>
-              Enter the organization code provided by your administrator to join their organization.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="orgCode">Organization Code</Label>
-              <Input
-                id="orgCode"
-                placeholder="Enter organization code"
-                value={orgCode}
-                onChange={(e) => setOrgCode(e.target.value)}
-                required
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={() => setShowJoinOrgDialog(false)} disabled={joiningOrg}>
-                Cancel
-              </Button>
-              <Button type="button" onClick={handleJoinOrganization} disabled={joiningOrg}>
-                {joiningOrg ? "Joining..." : "Join Organization"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

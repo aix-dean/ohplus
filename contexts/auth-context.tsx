@@ -152,8 +152,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       if (fetchedUserData.license_key) {
-        const subscription = await subscriptionService.getSubscriptionByLicenseKey(fetchedUserData.license_key)
-        setSubscriptionData(subscription)
+        const subData = await subscriptionService.getSubscriptionByLicenseKey(fetchedUserData.license_key)
+        setSubscriptionData(subData)
       } else {
         setSubscriptionData(null)
       }
@@ -237,25 +237,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
           const orgCodeDoc = await getDoc(doc(db, "organization_codes", orgCode))
           if (orgCodeDoc.exists()) {
             const orgData = orgCodeDoc.data()
-            if (orgData.expires_at && orgData.expires_at.toDate() < new Date()) {
-              console.warn("Organization code has expired, continuing with regular registration")
-            } else if (orgData.used) {
-              console.warn("Organization code has already been used, continuing with regular registration")
-            } else {
-              licenseKey = orgData.license_key
-              companyId = orgData.company_id
+            if (!orgData.expires_at || orgData.expires_at.toDate() > new Date()) {
+              if (!orgData.used) {
+                licenseKey = orgData.license_key
+                companyId = orgData.company_id
 
-              await updateDoc(doc(db, "organization_codes", orgCode), {
-                used: true,
-                used_by: firebaseUser.uid,
-                used_at: serverTimestamp(),
-              })
+                await updateDoc(doc(db, "organization_codes", orgCode), {
+                  used: true,
+                  used_by: firebaseUser.uid,
+                  used_at: serverTimestamp(),
+                })
+                console.log("Successfully joined organization with code:", orgCode)
+              } else {
+                console.warn("Organization code has already been used:", orgCode)
+              }
+            } else {
+              console.warn("Organization code has expired:", orgCode)
             }
           } else {
-            console.warn("Organization code not found, continuing with regular registration")
+            console.warn("Organization code not found:", orgCode)
           }
         } catch (orgError) {
-          console.warn("Error validating organization code, continuing with regular registration:", orgError)
+          console.error("Error validating organization code:", orgError)
         }
       }
 
