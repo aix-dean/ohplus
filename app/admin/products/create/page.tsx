@@ -17,6 +17,7 @@ import { collection, query, where, getDocs, serverTimestamp } from "firebase/fir
 import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
+import { useAuth } from "@/contexts/auth-context"
 
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
@@ -41,6 +42,7 @@ interface Category {
 
 export default function AdminProductCreatePage() {
   const router = useRouter()
+  const { user, userData } = useAuth()
   const [productName, setProductName] = useState("")
   const [description, setDescription] = useState("")
   const [price, setPrice] = useState("")
@@ -302,6 +304,12 @@ export default function AdminProductCreatePage() {
         media: mediaData,
         categories: selectedCategories,
         category_names: getCategoryNames(),
+        company_id: userData?.company_id || null,
+        seller_id: user?.uid || "",
+        seller_name:
+          userData?.first_name && userData?.last_name
+            ? `${userData.first_name} ${userData.last_name}`
+            : user?.email || "",
         active: true,
         deleted: false,
         created: serverTimestamp(),

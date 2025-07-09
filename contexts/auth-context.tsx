@@ -9,7 +9,7 @@ import {
   sendPasswordResetEmail,
   type User as FirebaseUser,
 } from "firebase/auth"
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import { subscriptionService } from "@/lib/subscription-service"
 import type { Subscription } from "@/lib/types/subscription"
@@ -20,6 +20,7 @@ interface UserData {
   email: string | null
   displayName: string | null
   license_key: string | null
+  company_id?: string | null
   role: string | null
   permissions: string[]
   // Add other user-specific data here
@@ -31,7 +32,22 @@ interface AuthContextType {
   subscriptionData: Subscription | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string) => Promise<void>
+  register: (
+    personalInfo: {
+      email: string
+      first_name: string
+      last_name: string
+      middle_name: string
+      phone_number: string
+      gender: string
+    },
+    companyInfo: {
+      company_name: string
+      company_location: string
+    },
+    password: string,
+    orgCode?: string,
+  ) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   updateUserData: (updates: Partial<UserData>) => Promise<void>
@@ -81,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
           license_key: (data.license_key as string | null) || null, // Explicitly cast to string | null
+          company_id: (data.company_id as string | null) || null, // Add company_id field
           role: data.role || "user", // Default role
           permissions: data.permissions || [], // Default empty permissions
           ...data, // Spread any other fields
@@ -92,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
           license_key: null, // Will be assigned during registration/onboarding
+          company_id: null, // Will be assigned when user registers company
           role: "user",
           permissions: [],
         }
@@ -197,6 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       company_location: string
     },
     password: string,
+    orgCode?: string,
   ) => {
     setLoading(true)
     try {
@@ -204,17 +223,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const firebaseUser = userCredential.user
       setUser(firebaseUser)
 
-      const licenseKey = generateLicenseKey() // Generate a new license key
+      let licenseKey = generateLicenseKey()
+      let companyId = null
+
+      // If joining an organization, get the invitation data (validation already done in login page)
+      if (orgCode) {
+        // Query invitation_codes collection by the 'code' field
+        const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
+        const invitationSnapshot = await getDocs(invitationQuery)
+
+        if (!invitationSnapshot.empty) {
+          // Get the first matching document
+          const invitationDoc = invitationSnapshot.docs[0]
+          const invitationData = invitationDoc.data()
+
+          // Use the organization's license key and company ID
+          licenseKey = invitationData.license_key || licenseKey
+          companyId = invitationData.company_id || null
+
+          // Update the code usage
+          const updateData: any = {
+            used: true,
+            used_count: (invitationData.used_count || 0) + 1,
+            last_used_at: serverTimestamp(),
+          }
+
+          // Add user to the used_by array if it exists
+          if (invitationData.used_by && Array.isArray(invitationData.used_by)) {
+            updateData.used_by = [...invitationData.used_by, firebaseUser.uid]
+          } else {
+            updateData.used_by = [firebaseUser.uid]
+          }
+
+          await updateDoc(doc(db, "invitation_codes", invitationDoc.id), updateData)
+        }
+      }
 
       // Create user document in "iboard_users"
       const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
       await setDoc(userDocRef, {
         email: firebaseUser.email,
         uid: firebaseUser.uid,
-        license_key: licenseKey, // Assign the generated license key
-        role: "user", // Default role
-        permissions: [], // Default empty permissions
-        type: "OHPLUS", // Add this field
+        license_key: licenseKey,
+        company_id: companyId,
+        role: "user",
+        permissions: [],
+        type: "OHPLUS",
         created: serverTimestamp(),
         updated: serverTimestamp(),
         first_name: personalInfo.first_name,
@@ -222,23 +276,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         middle_name: personalInfo.middle_name,
         phone_number: personalInfo.phone_number,
         gender: personalInfo.gender,
-        project_id: firebaseUser.uid, // Assign project_id here
+        project_id: orgCode ? null : firebaseUser.uid, // Only create project if not joining org
       })
 
-      // Create a default project for the user
-      const projectDocRef = doc(db, "projects", firebaseUser.uid) // Using UID as project ID for simplicity
-      await setDoc(projectDocRef, {
-        company_name: companyInfo.company_name,
-        company_location: companyInfo.company_location,
-        project_name: "My First Project",
-        license_key: licenseKey, // Now also saving license_key to the project document
-        created: serverTimestamp(),
-        updated: serverTimestamp(),
-      })
+      // Only create a project if not joining an organization
+      if (!orgCode) {
+        const projectDocRef = doc(db, "projects", firebaseUser.uid)
+        await setDoc(projectDocRef, {
+          company_name: companyInfo.company_name,
+          company_location: companyInfo.company_location,
+          project_name: "My First Project",
+          license_key: licenseKey,
+          created: serverTimestamp(),
+          updated: serverTimestamp(),
+        })
+      }
 
       await fetchUserData(firebaseUser)
     } catch (error) {
-      console.error("Error in AuthContext register:", error) // Added logging
+      console.error("Error in AuthContext register:", error)
       setLoading(false)
       throw error
     }

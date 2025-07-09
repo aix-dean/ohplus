@@ -23,19 +23,11 @@ import {
   ClipboardList,
   CloudRain,
   Cog,
-  Bell,
-  BarChart3,
-  Sparkles,
-  FileCheck,
-  BookOpen,
-  MessageCircle,
 } from "lucide-react"
-
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-
 
 // Navigation data structure with icons
 const navigationItems = [
@@ -108,7 +100,6 @@ const navigationItems = [
 function isActive(pathname: string, href: string) {
   return pathname === href
 }
-
 
 export function SideNavigation() {
   const pathname = usePathname()
@@ -311,7 +302,7 @@ export function SideNavigation() {
                 {[
                   { title: "Documents", href: "/admin/documents", icon: FileText },
                   { title: "Inventory", href: "/admin/inventory", icon: Package },
-                  { title: "User Management", href: "/admin/access-management", icon: Users },
+                  { title: "User Management", href: "/admin/user-management", icon: Users },
                   { title: "Subscription", href: "/admin/subscriptions", icon: FileText },
                 ].map((item) => {
                   const Icon = item.icon
@@ -370,7 +361,10 @@ export function SideNavigation() {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center space-x-3">
-                  <Avatar className="h-8 w-8">{/* Placeholder for AvatarImage and AvatarFallback */}</Avatar>
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src="/placeholder.svg?height=32&width=32" />
+                    <AvatarFallback className="bg-white/20 text-white text-xs">JD</AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="h-2 bg-white/30 rounded-full mb-1"></div>
                     <div className="h-2 bg-white/20 rounded-full w-3/4"></div>
@@ -378,7 +372,10 @@ export function SideNavigation() {
                   <button className="w-2 h-2 bg-white rounded-full"></button>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <Avatar className="h-8 w-8">{/* Placeholder for AvatarImage and AvatarFallback */}</Avatar>
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src="/placeholder.svg?height=32&width=32" />
+                    <AvatarFallback className="bg-white/20 text-white text-xs">SM</AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="h-2 bg-white/30 rounded-full mb-1"></div>
                     <div className="h-2 bg-white/20 rounded-full w-2/3"></div>
@@ -500,34 +497,32 @@ export function SideNavigation() {
           </>
         ) : (
           // Default layout for other sections
-          navigationItems
-            .find((item) => item.section === currentSection)
-            ?.items.map((item) => {
-              const Icon = item.icon
-              const active = isActive(pathname, item.href)
+          currentNavItem?.items.map((item) => {
+            const Icon = item.icon
+            const active = isActive(pathname, item.href)
 
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center py-2.5 px-3 text-sm rounded-md mx-2 my-1 transition-all duration-200",
-                    active
-                      ? "bg-gray-200 text-gray-900 font-medium shadow-sm"
-                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
-                  )}
-                >
-                  <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
-                  <span className="flex-1">{item.title}</span>
-                  {item.href === "/sales/chat" && unreadCount > 0 && (
-                    <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </Badge>
-                  )}
-                  {active && <div className="ml-auto w-1 h-5 bg-gray-700 rounded-full"></div>}
-                </Link>
-              )
-            })
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center py-2.5 px-3 text-sm rounded-md mx-2 my-1 transition-all duration-200",
+                  active
+                    ? "bg-gray-200 text-gray-900 font-medium shadow-sm"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
+                )}
+              >
+                <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                <span className="flex-1">{item.title}</span>
+                {item.href === "/sales/chat" && unreadCount > 0 && (
+                  <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Badge>
+                )}
+                {active && <div className="ml-auto w-1 h-5 bg-gray-700 rounded-full"></div>}
+              </Link>
+            )
+          })
         )}
       </nav>
     </div>

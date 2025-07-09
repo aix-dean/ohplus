@@ -24,17 +24,18 @@ export interface Client {
   email: string
   phone: string
   company: string
+  company_id?: string // Make sure this field is included
   designation?: string
-  address: string
+  address?: string // Make this optional to match the form
   city?: string
   state?: string
   zipCode?: string
-  industry: string
+  industry?: string // Make this optional to match the form
   notes?: string
   status: "active" | "inactive" | "lead"
   companyLogoUrl?: string
-  uploadedBy?: string // New field: User ID of who uploaded the client
-  uploadedByName?: string // New field: Name of who uploaded the client
+  uploadedBy?: string
+  uploadedByName?: string
   created: any
   updated: any
 }
@@ -67,7 +68,22 @@ export async function createClient(clientData: Omit<Client, "id" | "created" | "
   try {
     console.log("Creating new client:", clientData)
     const newClient = {
-      ...clientData,
+      name: clientData.name,
+      email: clientData.email,
+      phone: clientData.phone,
+      company: clientData.company,
+      company_id: clientData.company_id || "",
+      designation: clientData.designation || "",
+      address: clientData.address || "",
+      city: clientData.city || "",
+      state: clientData.state || "",
+      zipCode: clientData.zipCode || "",
+      industry: clientData.industry || "",
+      notes: clientData.notes || "",
+      status: clientData.status,
+      companyLogoUrl: clientData.companyLogoUrl || "",
+      uploadedBy: clientData.uploadedBy || "",
+      uploadedByName: clientData.uploadedByName || "",
       created: serverTimestamp(),
       updated: serverTimestamp(),
     }
@@ -91,6 +107,13 @@ export async function updateClient(clientId: string, clientData: Partial<Client>
       ...clientData,
       updated: serverTimestamp(),
     }
+
+    // Remove undefined values to avoid Firestore errors
+    Object.keys(updateData).forEach((key) => {
+      if (updateData[key] === undefined) {
+        delete updateData[key]
+      }
+    })
 
     await updateDoc(clientRef, updateData)
     console.log("Client updated successfully")
