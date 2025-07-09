@@ -73,7 +73,7 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
     const spots: TimelineSpot[] = []
     let currentTime = new Date(loopStartTime)
 
-    for (let i = 0; i < spotsPerLoop; i++) {
+    for (let i = 0; i < loopsPerDay; i++) {
       const spotEndTime = new Date(currentTime.getTime() + spotDuration * 1000)
 
       spots.push({
