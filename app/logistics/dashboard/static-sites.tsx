@@ -505,6 +505,11 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
           <h3 className="font-semibold">{site.name}</h3>
           <div className="text-xs text-gray-500">ID: {site.id}</div>
 
+          {/* Add site details below the ID */}
+          <div className="text-xs text-gray-600 mt-1">
+            <div className="truncate">{site.location}</div>
+          </div>
+
           <div className="mt-2 flex items-center gap-2">
             <div className="text-sm font-medium">Current:</div>
             <Badge
