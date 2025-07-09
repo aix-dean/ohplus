@@ -126,6 +126,18 @@ export default function CMSContentCreatePage() {
     fetchCategories()
   }, [])
 
+  useEffect(() => {
+    if (formData.content_type === "Dynamic") {
+      validateDynamicContent()
+    }
+  }, [
+    formData.cms.start_time,
+    formData.cms.end_time,
+    formData.cms.spot_duration,
+    formData.cms.loops_per_day,
+    formData.content_type,
+  ])
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
 
@@ -540,8 +552,6 @@ export default function CMSContentCreatePage() {
                           value={formData.cms.start_time}
                           onChange={(e) => {
                             handleInputChange(e)
-                            // Trigger validation when time changes
-                            setTimeout(() => validateDynamicContent(), 100)
                           }}
                           required={formData.content_type === "Dynamic"}
                         />
@@ -556,8 +566,6 @@ export default function CMSContentCreatePage() {
                           value={formData.cms.end_time}
                           onChange={(e) => {
                             handleInputChange(e)
-                            // Trigger validation when time changes
-                            setTimeout(() => validateDynamicContent(), 100)
                           }}
                           required={formData.content_type === "Dynamic"}
                         />
@@ -572,8 +580,6 @@ export default function CMSContentCreatePage() {
                           value={formData.cms.spot_duration}
                           onChange={(e) => {
                             handleInputChange(e)
-                            // Trigger validation when duration changes
-                            setTimeout(() => validateDynamicContent(), 100)
                           }}
                           placeholder="Enter duration in seconds"
                           required={formData.content_type === "Dynamic"}
@@ -589,8 +595,6 @@ export default function CMSContentCreatePage() {
                           value={formData.cms.loops_per_day}
                           onChange={(e) => {
                             handleInputChange(e)
-                            // Trigger validation when spots per loop changes
-                            setTimeout(() => validateDynamicContent(), 100)
                           }}
                           placeholder="Enter spots per loop"
                           required={formData.content_type === "Dynamic"}
