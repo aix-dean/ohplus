@@ -52,16 +52,59 @@ class EmailService {
   private emailsCollection = "compose_emails"
   private templatesCollection = "email_templates"
 
+  // Helper function to serialize attachments for Firestore
+  private serializeAttachments(attachments: EmailAttachment[]): any[] {
+    return attachments.map((attachment) => ({
+      fileName: attachment.fileName,
+      fileUrl: attachment.fileUrl,
+      fileSize: attachment.fileSize,
+      fileType: attachment.fileType,
+    }))
+  }
+
+  // Helper function to deserialize attachments from Firestore
+  private deserializeAttachments(attachments: any[]): EmailAttachment[] {
+    if (!attachments || !Array.isArray(attachments)) return []
+    return attachments.map((attachment) => ({
+      fileName: attachment.fileName || "",
+      fileUrl: attachment.fileUrl || "",
+      fileSize: attachment.fileSize || 0,
+      fileType: attachment.fileType || "application/octet-stream",
+    }))
+  }
+
   // Email CRUD operations
   async createEmail(emailData: Omit<Email, "id" | "created">): Promise<string> {
     try {
-      // Clean undefined values
-      const cleanEmailData = Object.fromEntries(Object.entries(emailData).filter(([_, value]) => value !== undefined))
-
-      const docRef = await addDoc(collection(db, this.emailsCollection), {
-        ...cleanEmailData,
+      // Prepare data for Firestore
+      const firestoreData: any = {
+        from: emailData.from,
+        to: emailData.to,
+        subject: emailData.subject,
+        body: emailData.body,
+        status: emailData.status,
+        userId: emailData.userId,
         created: Timestamp.now(),
-      })
+      }
+
+      // Add optional fields only if they exist
+      if (emailData.cc && emailData.cc.length > 0) {
+        firestoreData.cc = emailData.cc
+      }
+      if (emailData.bcc && emailData.bcc.length > 0) {
+        firestoreData.bcc = emailData.bcc
+      }
+      if (emailData.templateId) {
+        firestoreData.templateId = emailData.templateId
+      }
+      if (emailData.reportId) {
+        firestoreData.reportId = emailData.reportId
+      }
+      if (emailData.attachments && emailData.attachments.length > 0) {
+        firestoreData.attachments = this.serializeAttachments(emailData.attachments)
+      }
+
+      const docRef = await addDoc(collection(db, this.emailsCollection), firestoreData)
       return docRef.id
     } catch (error) {
       console.error("Error creating email:", error)
@@ -73,7 +116,24 @@ class EmailService {
     try {
       const emailDoc = await getDoc(doc(db, this.emailsCollection, emailId))
       if (emailDoc.exists()) {
-        return { id: emailDoc.id, ...emailDoc.data() } as Email
+        const data = emailDoc.data()
+        return {
+          id: emailDoc.id,
+          from: data.from,
+          to: data.to,
+          cc: data.cc,
+          bcc: data.bcc,
+          subject: data.subject,
+          body: data.body,
+          attachments: this.deserializeAttachments(data.attachments),
+          templateId: data.templateId,
+          reportId: data.reportId,
+          status: data.status,
+          userId: data.userId,
+          created: data.created,
+          sent: data.sent,
+          error: data.error,
+        } as Email
       }
       return null
     } catch (error) {
@@ -91,10 +151,26 @@ class EmailService {
       }
 
       const querySnapshot = await getDocs(q)
-      return querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Email[]
+      return querySnapshot.docs.map((doc) => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          from: data.from,
+          to: data.to,
+          cc: data.cc,
+          bcc: data.bcc,
+          subject: data.subject,
+          body: data.body,
+          attachments: this.deserializeAttachments(data.attachments),
+          templateId: data.templateId,
+          reportId: data.reportId,
+          status: data.status,
+          userId: data.userId,
+          created: data.created,
+          sent: data.sent,
+          error: data.error,
+        } as Email
+      })
     } catch (error) {
       console.error("Error getting emails:", error)
       throw new Error("Failed to get emails")
@@ -103,10 +179,21 @@ class EmailService {
 
   async updateEmail(emailId: string, updates: Partial<Email>): Promise<void> {
     try {
-      // Clean undefined values
-      const cleanUpdates = Object.fromEntries(Object.entries(updates).filter(([_, value]) => value !== undefined))
+      // Prepare updates for Firestore
+      const firestoreUpdates: any = {}
 
-      await updateDoc(doc(db, this.emailsCollection, emailId), cleanUpdates)
+      Object.keys(updates).forEach((key) => {
+        const value = (updates as any)[key]
+        if (value !== undefined) {
+          if (key === "attachments" && Array.isArray(value)) {
+            firestoreUpdates[key] = this.serializeAttachments(value)
+          } else {
+            firestoreUpdates[key] = value
+          }
+        }
+      })
+
+      await updateDoc(doc(db, this.emailsCollection, emailId), firestoreUpdates)
     } catch (error) {
       console.error("Error updating email:", error)
       throw new Error("Failed to update email")
