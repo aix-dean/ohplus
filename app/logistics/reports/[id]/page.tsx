@@ -6,11 +6,13 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn } from "lucide-react"
+import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send } from "lucide-react"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
+import { SendReportDialog } from "@/components/send-report-dialog"
 import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/hooks/use-toast"
 
 export default function ReportPreviewPage() {
   const params = useParams()
@@ -22,7 +24,9 @@ export default function ReportPreviewPage() {
   const [fullScreenAttachment, setFullScreenAttachment] = useState<any>(null)
   const [isFullScreenOpen, setIsFullScreenOpen] = useState(false)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
+  const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
   const { user } = useAuth()
+  const { toast } = useToast()
 
   useEffect(() => {
     if (reportId) {
@@ -136,12 +140,38 @@ export default function ReportPreviewPage() {
 
     setIsGeneratingPDF(true)
     try {
-      await generateReportPDF(report, product, false)
+      await generateReportPDF(report, product, true)
     } catch (error) {
       console.error("Error generating PDF:", error)
-      alert("Failed to generate PDF. Please try again.")
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsGeneratingPDF(false)
+    }
+  }
+
+  const handleSendReport = () => {
+    setIsSendDialogOpen(true)
+  }
+
+  const handleSendOption = (option: "email" | "whatsapp" | "viber" | "messenger") => {
+    setIsSendDialogOpen(false)
+
+    if (option === "email") {
+      // Handle email sending logic here
+      toast({
+        title: "Email Feature",
+        description: "Email sending functionality will be implemented soon.",
+      })
+    } else {
+      toast({
+        title: "Not Implemented",
+        description: `Sharing via ${option} is not yet implemented.`,
+        variant: "destructive",
+      })
     }
   }
 
@@ -183,15 +213,24 @@ export default function ReportPreviewPage() {
           </Badge>
         </div>
 
-        {/* Download PDF Button */}
-        <Button
-          onClick={handleDownloadPDF}
-          disabled={isGeneratingPDF}
-          className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          {isGeneratingPDF ? "Generating PDF..." : "Download PDF"}
-        </Button>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={handleSendReport}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+          >
+            <Send className="h-4 w-4" />
+            Send
+          </Button>
+          <Button
+            onClick={handleDownloadPDF}
+            disabled={isGeneratingPDF}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            {isGeneratingPDF ? "Generating PDF..." : "Download PDF"}
+          </Button>
+        </div>
       </div>
 
       {/* Header */}
@@ -412,6 +451,17 @@ export default function ReportPreviewPage() {
       <div className="w-full mt-8">
         <img src="/logistics-footer.png" alt="Logistics Footer" className="w-full h-auto object-cover" />
       </div>
+
+      {/* Send Report Dialog */}
+      {report && (
+        <SendReportDialog
+          isOpen={isSendDialogOpen}
+          onClose={() => setIsSendDialogOpen(false)}
+          report={report}
+          product={product}
+          onSelectOption={handleSendOption}
+        />
+      )}
 
       {/* Full Screen Preview Dialog */}
       <Dialog open={isFullScreenOpen} onOpenChange={setIsFullScreenOpen}>
