@@ -15,6 +15,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Mail, Lock, Eye, EyeOff } from "lucide-react"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -24,6 +26,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showJoinOrgDialog, setShowJoinOrgDialog] = useState(false)
   const [orgCode, setOrgCode] = useState("")
+  const [isValidatingCode, setIsValidatingCode] = useState(false)
 
   const { login, user } = useAuth()
   const router = useRouter()
@@ -61,14 +64,54 @@ export default function LoginPage() {
     }
   }
 
-  const handleJoinOrganization = () => {
+  const validateInvitationCode = async (code: string) => {
+    try {
+      // Query invitation_codes collection by the 'code' field
+      const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", code))
+      const invitationSnapshot = await getDocs(invitationQuery)
+
+      if (invitationSnapshot.empty) {
+        throw new Error("Invalid invitation code.")
+      }
+
+      // Get the first matching document
+      const invitationDoc = invitationSnapshot.docs[0]
+      const invitationData = invitationDoc.data()
+
+      // Check if code has expired
+      if (invitationData.expires_at && invitationData.expires_at.toDate() < new Date()) {
+        throw new Error("Invitation code has expired.")
+      }
+
+      // Check if code has reached maximum uses
+      if (invitationData.max_uses && invitationData.used_count >= invitationData.max_uses) {
+        throw new Error("Invitation code has reached its maximum number of uses.")
+      }
+
+      return true
+    } catch (error: any) {
+      throw error
+    }
+  }
+
+  const handleJoinOrganization = async () => {
     if (!orgCode.trim()) {
       setError("Please enter an organization code.")
       return
     }
 
-    // Navigate to registration page with organization code
-    router.push(`/register?orgCode=${encodeURIComponent(orgCode)}`)
+    setIsValidatingCode(true)
+    setError("")
+
+    try {
+      await validateInvitationCode(orgCode)
+      // If validation passes, navigate to registration page with organization code
+      router.push(`/register?orgCode=${encodeURIComponent(orgCode)}`)
+    } catch (error: any) {
+      setError(error.message || "Failed to validate invitation code.")
+    } finally {
+      setIsValidatingCode(false)
+    }
   }
 
   return (
@@ -211,6 +254,11 @@ export default function LoginPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
             <div className="space-y-2">
               <Label htmlFor="orgCode">Organization Code</Label>
               <Input
@@ -225,8 +273,8 @@ export default function LoginPage() {
               <Button type="button" variant="outline" onClick={() => setShowJoinOrgDialog(false)}>
                 Cancel
               </Button>
-              <Button type="button" onClick={handleJoinOrganization}>
-                Continue to Registration
+              <Button type="button" onClick={handleJoinOrganization} disabled={isValidatingCode}>
+                {isValidatingCode ? "Validating..." : "Continue to Registration"}
               </Button>
             </div>
           </div>

@@ -226,49 +226,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let licenseKey = generateLicenseKey()
       let companyId = null
 
-      // If joining an organization, validate the code and get company info
+      // If joining an organization, get the invitation data (validation already done in login page)
       if (orgCode) {
         // Query invitation_codes collection by the 'code' field
         const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
         const invitationSnapshot = await getDocs(invitationQuery)
 
-        if (invitationSnapshot.empty) {
-          throw new Error("Invalid invitation code.")
+        if (!invitationSnapshot.empty) {
+          // Get the first matching document
+          const invitationDoc = invitationSnapshot.docs[0]
+          const invitationData = invitationDoc.data()
+
+          // Use the organization's license key and company ID
+          licenseKey = invitationData.license_key || licenseKey
+          companyId = invitationData.company_id || null
+
+          // Update the code usage
+          const updateData: any = {
+            used: true,
+            used_count: (invitationData.used_count || 0) + 1,
+            last_used_at: serverTimestamp(),
+          }
+
+          // Add user to the used_by array if it exists
+          if (invitationData.used_by && Array.isArray(invitationData.used_by)) {
+            updateData.used_by = [...invitationData.used_by, firebaseUser.uid]
+          } else {
+            updateData.used_by = [firebaseUser.uid]
+          }
+
+          await updateDoc(doc(db, "invitation_codes", invitationDoc.id), updateData)
         }
-
-        // Get the first matching document
-        const invitationDoc = invitationSnapshot.docs[0]
-        const invitationData = invitationDoc.data()
-
-        // Check if code has expired
-        if (invitationData.expires_at && invitationData.expires_at.toDate() < new Date()) {
-          throw new Error("Invitation code has expired.")
-        }
-
-        // Check if code has reached maximum uses
-        if (invitationData.max_uses && invitationData.used_count >= invitationData.max_uses) {
-          throw new Error("Invitation code has reached its maximum number of uses.")
-        }
-
-        // Use the organization's license key and company ID
-        licenseKey = invitationData.license_key || licenseKey
-        companyId = invitationData.company_id || null
-
-        // Update the code usage
-        const updateData: any = {
-          used: true,
-          used_count: (invitationData.used_count || 0) + 1,
-          last_used_at: serverTimestamp(),
-        }
-
-        // Add user to the used_by array if it exists
-        if (invitationData.used_by && Array.isArray(invitationData.used_by)) {
-          updateData.used_by = [...invitationData.used_by, firebaseUser.uid]
-        } else {
-          updateData.used_by = [firebaseUser.uid]
-        }
-
-        await updateDoc(doc(db, "invitation_codes", invitationDoc.id), updateData)
       }
 
       // Create user document in "iboard_users"
