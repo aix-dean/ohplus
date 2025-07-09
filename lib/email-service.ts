@@ -12,10 +12,6 @@ import {
   type Timestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { Resend } from "resend"
-
-// Initialize Resend
-const resend = new Resend(process.env.RESEND_API_KEY)
 
 // Email Template Interface
 export interface EmailTemplate {
@@ -47,6 +43,7 @@ export interface Email {
   created: Timestamp | string
   updated?: Timestamp | string
   errorMessage?: string
+  resendId?: string
 }
 
 // Email Attachment Interface
@@ -55,6 +52,7 @@ export interface EmailAttachment {
   fileUrl: string
   fileSize: number
   fileType: string
+  content?: string | Buffer
 }
 
 // Email Service Class
@@ -148,6 +146,9 @@ class EmailService {
       if (email.errorMessage) {
         cleanEmail.errorMessage = email.errorMessage
       }
+      if (email.resendId) {
+        cleanEmail.resendId = email.resendId
+      }
 
       const docRef = await addDoc(collection(db, "compose_emails"), cleanEmail)
       return docRef.id
@@ -171,6 +172,16 @@ class EmailService {
     } catch (error) {
       console.error("Error fetching emails:", error)
       return []
+    }
+  }
+
+  async getEmailById(emailId: string): Promise<Email | null> {
+    try {
+      const emails = await this.getEmails("")
+      return emails.find((e) => e.id === emailId) || null
+    } catch (error) {
+      console.error("Error fetching email by ID:", error)
+      return null
     }
   }
 
@@ -200,57 +211,47 @@ class EmailService {
   async sendEmail(emailId: string): Promise<void> {
     try {
       // Get email data from database
-      const emails = await this.getEmails("")
-      const emailData = emails.find((e) => e.id === emailId)
+      const emailData = await this.getEmailById(emailId)
 
       if (!emailData) {
         throw new Error("Email not found")
       }
 
-      // Convert attachments to Resend format
-      const attachments =
-        emailData.attachments?.map((att) => ({
-          filename: att.fileName,
-          content: att.fileUrl, // In a real app, this would be the actual file content or buffer
-        })) || []
-
-      // Send email using Resend
-      const emailPayload: any = {
-        from: "OOH Operator <noreply@ohplus.com>",
+      console.log("Sending email:", {
         to: emailData.to,
         subject: emailData.subject,
-        html: emailData.body.replace(/\n/g, "<br>"),
-        text: emailData.body,
-      }
+        attachments: emailData.attachments?.length || 0,
+      })
 
-      // Add CC if exists
-      if (emailData.cc && emailData.cc.length > 0) {
-        emailPayload.cc = emailData.cc
-      }
+      // Send email using fetch to our API route
+      const response = await fetch("/api/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to: emailData.to,
+          cc: emailData.cc,
+          subject: emailData.subject,
+          body: emailData.body,
+          attachments: emailData.attachments,
+        }),
+      })
 
-      // Add BCC if exists
-      if (emailData.bcc && emailData.bcc.length > 0) {
-        emailPayload.bcc = emailData.bcc
-      }
+      const result = await response.json()
 
-      // Add attachments if exists (commented out for now as we need proper file handling)
-      // if (attachments.length > 0) {
-      //   emailPayload.attachments = attachments
-      // }
-
-      const result = await resend.emails.send(emailPayload)
-
-      if (result.error) {
-        throw new Error(result.error.message)
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send email")
       }
 
       // Update email status to sent
       await this.updateEmail(emailId, {
         status: "sent",
         sentAt: serverTimestamp() as any,
+        resendId: result.id,
       })
 
-      console.log("Email sent successfully:", result.data?.id)
+      console.log("Email sent successfully:", result.id)
     } catch (error) {
       console.error("Error sending email:", error)
 

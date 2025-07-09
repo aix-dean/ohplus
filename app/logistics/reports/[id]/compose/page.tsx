@@ -8,13 +8,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Paperclip, Send, Plus, Smile, X } from "lucide-react"
+import { ArrowLeft, Paperclip, Send, Plus, Smile, X, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
 import { emailService, type EmailTemplate, type Email, type EmailAttachment } from "@/lib/email-service"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function ComposeEmailPage() {
   const params = useParams()
@@ -42,6 +43,7 @@ export default function ComposeEmailPage() {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [generatingPDF, setGeneratingPDF] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<string>("")
 
   useEffect(() => {
     if (reportId && user) {
@@ -51,20 +53,25 @@ export default function ComposeEmailPage() {
 
   const fetchData = async () => {
     try {
+      setDebugInfo("Loading report data...")
+
       // Fetch report data
       const reports = await getReports()
       const foundReport = reports.find((r) => r.id === reportId)
 
       if (foundReport) {
         setReport(foundReport)
+        setDebugInfo(`Report found: ${foundReport.siteName}`)
 
         // Fetch product data
         if (foundReport.siteId) {
           try {
             const productData = await getProductById(foundReport.siteId)
             setProduct(productData)
+            setDebugInfo((prev) => prev + ` | Product: ${productData?.name || "Not found"}`)
           } catch (error) {
             console.log("Product not found, continuing without product data")
+            setDebugInfo((prev) => prev + " | Product: Not found")
           }
         }
 
@@ -73,6 +80,8 @@ export default function ComposeEmailPage() {
 
         // Auto-generate and attach PDF
         await generateAndAttachPDF(foundReport)
+      } else {
+        setDebugInfo("Report not found!")
       }
 
       // Fetch email templates
@@ -86,9 +95,11 @@ export default function ComposeEmailPage() {
         } else {
           setTemplates(userTemplates)
         }
+        setDebugInfo((prev) => prev + ` | Templates: ${userTemplates.length}`)
       }
     } catch (error) {
       console.error("Error fetching data:", error)
+      setDebugInfo(`Error: ${error instanceof Error ? error.message : "Unknown error"}`)
       toast({
         title: "Error",
         description: "Failed to load email compose data.",
@@ -104,6 +115,8 @@ export default function ComposeEmailPage() {
 
     setGeneratingPDF(true)
     try {
+      setDebugInfo((prev) => prev + " | Generating PDF...")
+
       // Generate PDF blob
       const pdfBlob = (await generateReportPDF(reportData, product, true)) as Blob
 
@@ -111,7 +124,7 @@ export default function ComposeEmailPage() {
         // Create attachment
         const fileName = `${reportData.siteId}_${getReportTypeDisplay(reportData.reportType).replace(/\s+/g, "_")}_${reportData.siteName.replace(/\s+/g, "_")}.pdf`
 
-        // Convert blob to URL for preview (in real implementation, upload to storage)
+        // Convert blob to URL for preview
         const fileUrl = URL.createObjectURL(pdfBlob)
 
         const attachment: EmailAttachment = {
@@ -122,9 +135,11 @@ export default function ComposeEmailPage() {
         }
 
         setAttachments([attachment])
+        setDebugInfo((prev) => prev + ` | PDF generated: ${(pdfBlob.size / 1024).toFixed(1)}KB`)
       }
     } catch (error) {
       console.error("Error generating PDF:", error)
+      setDebugInfo((prev) => prev + ` | PDF Error: ${error instanceof Error ? error.message : "Unknown"}`)
       toast({
         title: "Warning",
         description: "Failed to auto-attach PDF. You can add it manually.",
@@ -197,6 +212,8 @@ export default function ComposeEmailPage() {
     }
 
     setSending(true)
+    setDebugInfo((prev) => prev + " | Sending email...")
+
     try {
       // Create email record - only include defined values
       const emailData: Omit<Email, "id" | "created"> = {
@@ -224,22 +241,27 @@ export default function ComposeEmailPage() {
 
       // Create email record in compose_emails collection
       const emailId = await emailService.createEmail(emailData)
+      setDebugInfo((prev) => prev + ` | Email created: ${emailId}`)
 
-      // Send email using Resend
+      // Send email using our service
       await emailService.sendEmail(emailId)
+      setDebugInfo((prev) => prev + " | Email sent successfully!")
 
       toast({
         title: "Email Sent!",
-        description: "Your email has been sent successfully.",
+        description: `Your email has been sent successfully to ${toEmails.join(", ")}.`,
       })
 
       // Navigate back to report
       router.push(`/logistics/reports/${reportId}`)
     } catch (error) {
       console.error("Error sending email:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to send email. Please try again."
+      setDebugInfo((prev) => prev + ` | Send Error: ${errorMessage}`)
+
       toast({
         title: "Send Failed",
-        description: error instanceof Error ? error.message : "Failed to send email. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -277,6 +299,14 @@ export default function ComposeEmailPage() {
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
+        {/* Debug Info */}
+        {debugInfo && (
+          <Alert className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-xs font-mono">Debug: {debugInfo}</AlertDescription>
+          </Alert>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Email Compose Form */}
           <div className="lg:col-span-2 space-y-4">

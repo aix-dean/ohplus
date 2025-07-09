@@ -752,146 +752,103 @@ export async function generateCostEstimatePDF(
 }
 
 export async function generateReportPDF(
-  reportData: ReportData,
+  report: ReportData,
   product: Product | null,
   returnBlob = false,
-): Promise<Blob | void> {
+): Promise<void | Blob> {
   try {
-    // Create a new jsPDF instance
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    })
-
-    const pageWidth = pdf.internal.pageSize.getWidth()
-    const pageHeight = pdf.internal.pageSize.getHeight()
-    const margin = 20
-
-    // Helper function to add text with word wrapping
-    const addWrappedText = (text: string, x: number, y: number, maxWidth: number, lineHeight = 6) => {
-      const lines = pdf.splitTextToSize(text, maxWidth)
-      pdf.text(lines, x, y)
-      return y + lines.length * lineHeight
-    }
+    const doc = new jsPDF()
 
     // Set up document properties
-    pdf.setProperties({
-      title: `${reportData.reportType} - ${reportData.siteName}`,
-      subject: `Report for ${reportData.siteName}`,
+    doc.setProperties({
+      title: `${report.reportType} - ${report.siteName}`,
+      subject: "Site Report",
       author: "OOH Operator",
       creator: "OOH Operator System",
     })
 
-    // Add header
-    pdf.setFontSize(20)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("LOGISTICS REPORT", pageWidth / 2, margin + 10, { align: "center" })
+    // Header
+    doc.setFontSize(20)
+    doc.setFont("helvetica", "bold")
+    doc.text("SITE REPORT", 105, 20, { align: "center" })
 
-    // Add report type
-    pdf.setFontSize(14)
-    pdf.setFont("helvetica", "normal")
-    const reportTypeDisplay = reportData.reportType
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
-    pdf.text(reportTypeDisplay, pageWidth / 2, margin + 20, { align: "center" })
+    // Report type and site info
+    doc.setFontSize(16)
+    doc.setFont("helvetica", "normal")
+    doc.text(`Report Type: ${getReportTypeDisplay(report.reportType)}`, 20, 40)
+    doc.text(`Site Name: ${report.siteName}`, 20, 50)
+    doc.text(`Site ID: ${report.siteId}`, 20, 60)
+    doc.text(`Date: ${new Date(report.date).toLocaleDateString()}`, 20, 70)
 
-    // Add date
-    pdf.setFontSize(10)
-    pdf.text(`as of ${new Date(reportData.date).toLocaleDateString()}`, pageWidth / 2, margin + 28, { align: "center" })
+    // Status
+    doc.setFontSize(14)
+    doc.setFont("helvetica", "bold")
+    doc.text("Status:", 20, 90)
+    doc.setFont("helvetica", "normal")
+    doc.text(`${report.completionPercentage || 100}% Complete`, 50, 90)
 
-    let currentY = margin + 40
+    // Description
+    if (report.description) {
+      doc.setFont("helvetica", "bold")
+      doc.text("Description:", 20, 110)
+      doc.setFont("helvetica", "normal")
 
-    // Project Information Section
-    pdf.setFontSize(14)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Project Information", margin, currentY)
-    currentY += 10
+      // Split long text into multiple lines
+      const splitDescription = doc.splitTextToSize(report.description, 170)
+      doc.text(splitDescription, 20, 120)
+    }
 
-    pdf.setFontSize(10)
-    pdf.setFont("helvetica", "normal")
+    // Product information
+    if (product) {
+      let yPos = 150
+      doc.setFont("helvetica", "bold")
+      doc.text("Product Information:", 20, yPos)
 
-    // Left column
-    const leftColumnX = margin
-    const rightColumnX = pageWidth / 2 + 10
-    let leftY = currentY
-    let rightY = currentY
+      doc.setFont("helvetica", "normal")
+      yPos += 10
+      doc.text(`Product Name: ${product.name || "N/A"}`, 20, yPos)
+      yPos += 10
+      doc.text(`Location: ${product.location || "N/A"}`, 20, yPos)
+      yPos += 10
+      doc.text(`Type: ${product.type || "N/A"}`, 20, yPos)
+    }
 
-    // Left column data
-    const leftData = [
-      `Site ID: ${reportData.siteId} ${product?.light?.location || product?.specs_rental?.location || ""}`,
-      `Job Order: ${reportData.id?.slice(-4).toUpperCase() || "N/A"}`,
-      `Job Order Date: ${new Date(reportData.created?.toDate?.() || reportData.date).toLocaleDateString()}`,
-      `Site: ${reportData.siteName}`,
-      `Size: ${product?.specs_rental?.size || product?.light?.size || "N/A"}`,
-      `Start Date: ${new Date(reportData.bookingDates.start).toLocaleDateString()}`,
-      `End Date: ${new Date(reportData.bookingDates.end).toLocaleDateString()}`,
-    ]
+    // Attachments info
+    if (report.attachments && report.attachments.length > 0) {
+      let yPos = 200
+      doc.setFont("helvetica", "bold")
+      doc.text("Attachments:", 20, yPos)
 
-    // Right column data
-    const rightData = [
-      `Content: ${product?.content_type || "N/A"}`,
-      `Material Specs: ${product?.specs_rental?.material || "N/A"}`,
-      `Crew: Team ${reportData.assignedTo || "A"}`,
-      `Illumination: ${product?.light?.illumination || "N/A"}`,
-      `Gondola: ${product?.specs_rental?.gondola ? "YES" : "NO"}`,
-      `Technology: ${product?.specs_rental?.technology || "N/A"}`,
-      `Sales: ${reportData.sales}`,
-    ]
-
-    // Add left column
-    leftData.forEach((item) => {
-      leftY = addWrappedText(item, leftColumnX, leftY, pageWidth / 2 - margin - 10, 6)
-    })
-
-    // Add right column
-    rightData.forEach((item) => {
-      rightY = addWrappedText(item, rightColumnX, rightY, pageWidth / 2 - margin - 10, 6)
-    })
-
-    currentY = Math.max(leftY, rightY) + 10
-
-    // Project Status Section
-    pdf.setFontSize(14)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Project Status", margin, currentY)
-    currentY += 10
-
-    pdf.setFontSize(10)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(`Completion: ${reportData.completionPercentage || 100}%`, margin, currentY)
-    currentY += 10
-
-    // Add attachments info if available
-    if (reportData.attachments && reportData.attachments.length > 0) {
-      pdf.text(`Attachments: ${reportData.attachments.length} file(s) attached`, margin, currentY)
-      currentY += 10
+      doc.setFont("helvetica", "normal")
+      report.attachments.forEach((attachment, index) => {
+        yPos += 10
+        doc.text(`${index + 1}. ${attachment.name || `Attachment ${index + 1}`}`, 25, yPos)
+      })
     }
 
     // Footer
-    const pageCount = pdf.getNumberOfPages()
-    for (let i = 1; i <= pageCount; i++) {
-      pdf.setPage(i)
-      pdf.setFontSize(10)
-      pdf.setFont("helvetica", "normal")
-      pdf.text(
-        `Generated on ${new Date().toLocaleDateString()} - Page ${i} of ${pageCount}`,
-        20,
-        pdf.internal.pageSize.height - 20,
-      )
-    }
+    doc.setFontSize(10)
+    doc.setFont("helvetica", "italic")
+    doc.text("Generated by OOH Operator System", 105, 280, { align: "center" })
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 105, 285, { align: "center" })
 
     if (returnBlob) {
       // Return as blob for email attachment
-      return pdf.output("blob")
+      return doc.output("blob")
     } else {
       // Download the PDF
-      const fileName = `${reportData.siteId}_${reportData.reportType.replace(/\s+/g, "_")}_${reportData.siteName.replace(/\s+/g, "_")}.pdf`
-      pdf.save(fileName)
+      const fileName = `${report.siteId}_${getReportTypeDisplay(report.reportType).replace(/\s+/g, "_")}_${report.siteName.replace(/\s+/g, "_")}.pdf`
+      doc.save(fileName)
     }
   } catch (error) {
     console.error("Error generating PDF:", error)
     throw error
   }
+}
+
+function getReportTypeDisplay(type: string): string {
+  return type
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
 }
