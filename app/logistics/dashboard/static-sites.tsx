@@ -1,25 +1,58 @@
 "use client"
-
-import type React from "react"
-
 import { useState, useEffect, useCallback } from "react"
 import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { getPaginatedUserProducts, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { getServiceAssignmentsByProductId } from "@/lib/firebase-service"
-import type { ServiceAssignment } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
 import { CreateReportDialog } from "@/components/create-report-dialog"
+import { MapPin, Calendar, Users, FileText } from "lucide-react"
+import type { ServiceAssignment } from "@/types/service-assignment" // Import ServiceAssignment type
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
+
+const staticSites = [
+  {
+    id: "static-1",
+    name: "Ayala Avenue Billboard",
+    location: "Makati City",
+    type: "Static Billboard",
+    status: "Active",
+    lastUpdate: "1 hour ago",
+    occupancy: "92%",
+    revenue: "₱180,000",
+    size: "14m x 48m",
+  },
+  {
+    id: "static-2",
+    name: "Commonwealth Roadside",
+    location: "Quezon City",
+    type: "Static Billboard",
+    status: "Active",
+    lastUpdate: "3 hours ago",
+    occupancy: "88%",
+    revenue: "₱150,000",
+    size: "12m x 36m",
+  },
+  {
+    id: "static-3",
+    name: "SLEX Southbound",
+    location: "Muntinlupa City",
+    type: "Static Billboard",
+    status: "Maintenance",
+    lastUpdate: "1 day ago",
+    occupancy: "0%",
+    revenue: "₱0",
+    size: "16m x 48m",
+  },
+]
 
 export default function StaticSitesTab() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
@@ -283,14 +316,10 @@ export default function StaticSitesTab() {
   return (
     <div className="flex flex-col gap-5">
       {/* Content Type Tabs */}
-      <Tabs defaultValue="content" className="w-full" onValueChange={(value) => setContentTab(value as any)}>
-        <TabsList className="grid w-[450px] grid-cols-4">
-          <TabsTrigger value="content">Content</TabsTrigger>
-          <TabsTrigger value="illumination">Illumination</TabsTrigger>
-          <TabsTrigger value="structure">Structure</TabsTrigger>
-          <TabsTrigger value="compliance">Compliance</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Static Sites</h2>
+        <Badge variant="secondary">{staticSites.length} Static Sites</Badge>
+      </div>
 
       {/* Date, Search and View Toggle */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -383,39 +412,93 @@ export default function StaticSitesTab() {
                 {contentTab === "illumination" ? (
                   <IlluminationCard
                     site={site}
-                    onCreateReport={(siteId) => {
-                      setSelectedSiteId(siteId)
-                      setReportDialogOpen(true)
-                    }}
+                    setSelectedSiteId={setSelectedSiteId}
+                    setReportDialogOpen={setReportDialogOpen}
                   />
                 ) : contentTab === "structure" ? (
                   <StructureCard
                     site={site}
-                    onCreateReport={(siteId) => {
-                      setSelectedSiteId(siteId)
-                      setReportDialogOpen(true)
-                    }}
+                    setSelectedSiteId={setSelectedSiteId}
+                    setReportDialogOpen={setReportDialogOpen}
                   />
                 ) : contentTab === "compliance" ? (
                   <ComplianceCard
                     site={site}
-                    onCreateReport={(siteId) => {
-                      setSelectedSiteId(siteId)
-                      setReportDialogOpen(true)
-                    }}
+                    setSelectedSiteId={setSelectedSiteId}
+                    setReportDialogOpen={setReportDialogOpen}
                   />
                 ) : (
                   <SiteCard
                     site={site}
-                    onCreateReport={(siteId) => {
-                      setSelectedSiteId(siteId)
-                      setReportDialogOpen(true)
-                    }}
+                    setSelectedSiteId={setSelectedSiteId}
+                    setReportDialogOpen={setReportDialogOpen}
                   />
                 )}
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Static Sites Grid */}
+      {!loading && !error && products.length === 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {staticSites.map((site) => (
+            <Card key={site.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">{site.name}</CardTitle>
+                  <Badge
+                    variant={site.status === "Active" ? "default" : "destructive"}
+                    className={site.status === "Active" ? "bg-green-500" : ""}
+                  >
+                    {site.status}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center text-sm text-gray-600">
+                    <MapPin className="h-4 w-4 mr-2" />
+                    {site.location}
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Updated {site.lastUpdate}
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Users className="h-4 w-4 mr-2" />
+                    {site.occupancy} Occupancy
+                  </div>
+                  <div className="text-sm text-gray-600">Size: {site.size}</div>
+                </div>
+
+                <div className="pt-2 border-t">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Revenue</span>
+                    <span className="text-lg font-bold text-green-600">{site.revenue}</span>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <Button
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setSelectedSiteId(site.id)
+                      setReportDialogOpen(true)
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full flex items-center gap-2 hover:bg-blue-50 hover:border-blue-300"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Create Report
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 
@@ -497,16 +580,13 @@ export default function StaticSitesTab() {
 }
 
 // Update the SiteCard component to fetch its own service assignments
-function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
+function SiteCard({
+  site,
+  setSelectedSiteId,
+  setReportDialogOpen,
+}: { site: any; setSelectedSiteId: (siteId: string) => void; setReportDialogOpen: (open: boolean) => void }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
-
-  // Add the handleCreateReport function
-  const handleCreateReport = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    onCreateReport(site.id)
-  }
 
   // Fetch service assignments for this specific product
   useEffect(() => {
@@ -574,7 +654,10 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
             <Button
               variant="outline"
               className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-              onClick={handleCreateReport}
+              onClick={() => {
+                setSelectedSiteId(site.id)
+                setReportDialogOpen(true)
+              }}
             >
               Create Report
             </Button>
@@ -586,16 +669,13 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
 }
 
 // Update the IlluminationCard, StructureCard, and ComplianceCard components similarly
-function IlluminationCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
+function IlluminationCard({
+  site,
+  setSelectedSiteId,
+  setReportDialogOpen,
+}: { site: any; setSelectedSiteId: (siteId: string) => void; setReportDialogOpen: (open: boolean) => void }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
-
-  // Add the handleCreateReport function
-  const handleCreateReport = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    onCreateReport(site.id)
-  }
 
   // Fetch service assignments for this specific product
   useEffect(() => {
@@ -653,7 +733,10 @@ function IlluminationCard({ site, onCreateReport }: { site: any; onCreateReport:
             <Button
               variant="outline"
               className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-              onClick={handleCreateReport}
+              onClick={() => {
+                setSelectedSiteId(site.id)
+                setReportDialogOpen(true)
+              }}
             >
               Create Report
             </Button>
@@ -664,16 +747,13 @@ function IlluminationCard({ site, onCreateReport }: { site: any; onCreateReport:
   )
 }
 
-function StructureCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
+function StructureCard({
+  site,
+  setSelectedSiteId,
+  setReportDialogOpen,
+}: { site: any; setSelectedSiteId: (siteId: string) => void; setReportDialogOpen: (open: boolean) => void }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
-
-  // Add the handleCreateReport function
-  const handleCreateReport = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    onCreateReport(site.id)
-  }
 
   // Fetch service assignments for this specific product
   useEffect(() => {
@@ -739,7 +819,10 @@ function StructureCard({ site, onCreateReport }: { site: any; onCreateReport: (s
             <Button
               variant="outline"
               className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-              onClick={handleCreateReport}
+              onClick={() => {
+                setSelectedSiteId(site.id)
+                setReportDialogOpen(true)
+              }}
             >
               Create Report
             </Button>
@@ -750,16 +833,13 @@ function StructureCard({ site, onCreateReport }: { site: any; onCreateReport: (s
   )
 }
 
-function ComplianceCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
+function ComplianceCard({
+  site,
+  setSelectedSiteId,
+  setReportDialogOpen,
+}: { site: any; setSelectedSiteId: (siteId: string) => void; setReportDialogOpen: (open: boolean) => void }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
-
-  // Add the handleCreateReport function
-  const handleCreateReport = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    onCreateReport(site.id)
-  }
 
   // Fetch service assignments for this specific product
   useEffect(() => {
@@ -814,7 +894,10 @@ function ComplianceCard({ site, onCreateReport }: { site: any; onCreateReport: (
             <Button
               variant="outline"
               className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-              onClick={handleCreateReport}
+              onClick={() => {
+                setSelectedSiteId(site.id)
+                setReportDialogOpen(true)
+              }}
             >
               Create Report
             </Button>

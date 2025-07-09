@@ -2,289 +2,132 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
-import { LayoutGrid, List, Play, Square, AlertCircle, Plus, Search } from "lucide-react"
-import Image from "next/image"
-import Link from "next/link"
+import { useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { Input } from "@/components/ui/input"
-import type { Product } from "@/lib/firebase-service"
-import { getServiceAssignmentsByProductId, type ServiceAssignment } from "@/lib/firebase-service"
+import { MapPin, Calendar, Users, FileText, Play, Pause } from "lucide-react"
 import { CreateReportDialog } from "@/components/create-report-dialog"
 
-// Number of items to display per page
-const ITEMS_PER_PAGE = 8
+const ledSites = [
+  {
+    id: "led-content-1",
+    name: "EDSA Northbound LED",
+    location: "Quezon City",
+    type: "LED Billboard",
+    status: "Active",
+    lastUpdate: "2 hours ago",
+    occupancy: "85%",
+    revenue: "₱125,000",
+    contentStatus: "Playing",
+    currentAd: "Coca-Cola Summer Campaign",
+  },
+  {
+    id: "led-content-2",
+    name: "BGC Central Display",
+    location: "Taguig City",
+    type: "LED Display",
+    status: "Active",
+    lastUpdate: "30 minutes ago",
+    occupancy: "78%",
+    revenue: "₱95,000",
+    contentStatus: "Playing",
+    currentAd: "Samsung Galaxy Launch",
+  },
+  {
+    id: "led-content-3",
+    name: "Ortigas LED Screen",
+    location: "Pasig City",
+    type: "Digital Screen",
+    status: "Maintenance",
+    lastUpdate: "4 hours ago",
+    occupancy: "0%",
+    revenue: "₱0",
+    contentStatus: "Paused",
+    currentAd: "No Content",
+  },
+]
 
-export default function LEDSitesContentTab({ products = [] }: { products?: Product[] }) {
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>(products)
-
-  // Report dialog state
+export default function LEDSitesContent() {
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
-  const [selectedSiteId, setSelectedSiteId] = useState<string>("")
+  const [selectedSiteId, setSelectedSiteId] = useState("")
 
-  const currentDate = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })
-
-  const currentTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  })
-
-  // Debounce search term
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm)
-    }, 500)
-
-    return () => clearTimeout(timer)
-  }, [searchTerm])
-
-  // Filter products based on search term
-  useEffect(() => {
-    if (!debouncedSearchTerm) {
-      setFilteredProducts(products)
-      return
-    }
-
-    const filtered = products.filter(
-      (product) =>
-        product.name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-        product.id?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()),
-    )
-    setFilteredProducts(filtered)
-  }, [debouncedSearchTerm, products])
-
-  return (
-    <div className="flex flex-col gap-4">
-      {/* Date, Search and View Toggle */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="text-sm text-gray-600">
-          {currentDate}, {currentTime}
-        </div>
-        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              type="search"
-              placeholder="Search LED sites..."
-              className="pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="border rounded-md p-1 flex">
-            <Button
-              variant={viewMode === "grid" ? "default" : "ghost"}
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setViewMode("grid")}
-            >
-              <LayoutGrid size={18} />
-            </Button>
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setViewMode("list")}
-            >
-              <List size={18} />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Empty state */}
-      {filteredProducts.length === 0 && (
-        <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed">
-          <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <AlertCircle size={24} className="text-gray-400" />
-          </div>
-          <h3 className="text-lg font-medium mb-2">No LED sites found</h3>
-          <p className="text-gray-500 mb-4">
-            {debouncedSearchTerm
-              ? `No LED sites matching "${debouncedSearchTerm}" were found`
-              : "No dynamic content LED sites are currently available"}
-          </p>
-        </div>
-      )}
-
-      {/* LED Site Grid */}
-      {filteredProducts.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-          {filteredProducts.map((product) => (
-            <LEDSiteCard
-              key={product.id}
-              product={product}
-              onCreateReport={(siteId) => {
-                setSelectedSiteId(siteId)
-                setReportDialogOpen(true)
-              }}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Create Service Assignment Button */}
-      <div className="fixed bottom-6 right-6">
-        <Button size="lg" className="rounded-full shadow-lg gap-2">
-          <Plus size={18} />
-          Create Service Assignment
-        </Button>
-      </div>
-
-      {/* Report Dialog */}
-      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
-    </div>
-  )
-}
-
-// Replace the existing LEDSiteCard component with this updated version
-function LEDSiteCard({ product, onCreateReport }: { product: Product; onCreateReport: (siteId: string) => void }) {
-  // Get the first media item for the thumbnail
-  const thumbnailUrl = product.media && product.media.length > 0 ? product.media[0].url : "/led-billboard-1.png"
-
-  // Determine location based on product type
-  const location = product.specs_rental?.location || product.light?.location || "Unknown location"
-
-  // State for service assignments
-  const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
-  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
-
-  // Add the handleCreateReport function
-  const handleCreateReport = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    onCreateReport(product.id)
+  const handleCreateReport = (siteId: string, event: React.MouseEvent) => {
+    event.stopPropagation()
+    setSelectedSiteId(siteId)
+    setReportDialogOpen(true)
+    console.log("Creating report for LED content site:", siteId)
   }
 
-  // Fetch service assignments for this specific product
-  useEffect(() => {
-    const fetchProductAssignments = async () => {
-      try {
-        setIsLoadingAssignments(true)
-        const assignments = await getServiceAssignmentsByProductId(product.id)
-        setActiveAssignments(assignments)
-      } catch (error) {
-        console.error(`Error fetching assignments for product ${product.id}:`, error)
-      } finally {
-        setIsLoadingAssignments(false)
-      }
-    }
-
-    fetchProductAssignments()
-  }, [product.id])
-
-  const hasActiveAssignments = activeAssignments.length > 0
-
-  // Determine status and health percentage
-  const status = product.status === "ACTIVE" ? "Operational" : product.status === "PENDING" ? "Warning" : "Error"
-  const statusColor = status === "Operational" ? "green" : status === "Warning" ? "orange" : "red"
-
-  // Generate a health percentage based on status if not available
-  const healthPercentage =
-    product.health_percentage ||
-    (status === "Operational"
-      ? Math.floor(Math.random() * 20) + 80
-      : // 80-100 for operational
-        status === "Warning"
-        ? Math.floor(Math.random() * 30) + 50
-        : // 50-80 for warning
-          Math.floor(Math.random() * 40) + 10) // 10-50 for error
-
   return (
-    <Link href={`/logistics/sites/${product.id}?view=content`}>
-      <Card className="erp-card overflow-hidden hover:shadow-md transition-shadow">
-        <div className="relative h-48 bg-gray-200">
-          {/* Service Assignment Badge - only show if there are active assignments */}
-          {hasActiveAssignments && (
-            <div className="absolute top-2 right-2 z-10">
-              <div className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
-                {activeAssignments.length}
-              </div>
-            </div>
-          )}
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">LED Sites - Content</h2>
+        <Badge variant="secondary">{ledSites.length} LED Sites</Badge>
+      </div>
 
-          <Image
-            src={thumbnailUrl || "/placeholder.svg"}
-            alt={product.name || "LED Site"}
-            fill
-            className="object-cover"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement
-              target.src = "/led-billboard-1.png"
-              target.className = "object-cover"
-            }}
-          />
-        </div>
-
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-1">
-            <h3 className="font-bold">{product.name}</h3>
-            <p className="text-xs text-gray-500">ID: {product.id}</p>
-
-            <div className="mt-2 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`
-                    ${statusColor === "green" ? "text-green-600" : ""}
-                    ${statusColor === "red" ? "text-red-600" : ""}
-                    ${statusColor === "orange" ? "text-orange-600" : ""}
-                    font-medium
-                  `}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {ledSites.map((site) => (
+          <Card key={site.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">{site.name}</CardTitle>
+                <Badge
+                  variant={site.status === "Active" ? "default" : "destructive"}
+                  className={site.status === "Active" ? "bg-green-500" : ""}
                 >
-                  {status}
-                </span>
+                  {site.status}
+                </Badge>
               </div>
-              <div>
-                {status === "Operational" ? (
-                  <div className="bg-green-100 text-green-600 rounded-full w-8 h-8 flex items-center justify-center">
-                    <Play size={16} fill="currentColor" />
-                  </div>
-                ) : status === "Error" ? (
-                  <div className="bg-red-100 text-red-600 rounded-full w-8 h-8 flex items-center justify-center">
-                    <Square size={16} fill="currentColor" />
-                  </div>
-                ) : (
-                  <div className="bg-orange-100 text-orange-600 rounded-full w-8 h-8 flex items-center justify-center">
-                    <AlertCircle size={16} />
-                  </div>
-                )}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center text-sm text-gray-600">
+                  <MapPin className="h-4 w-4 mr-2" />
+                  {site.location}
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Updated {site.lastUpdate}
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <Users className="h-4 w-4 mr-2" />
+                  {site.occupancy} Occupancy
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  {site.contentStatus === "Playing" ? (
+                    <Play className="h-4 w-4 mr-2 text-green-500" />
+                  ) : (
+                    <Pause className="h-4 w-4 mr-2 text-red-500" />
+                  )}
+                  {site.contentStatus}: {site.currentAd}
+                </div>
               </div>
-            </div>
 
-            <div className="mt-2">
-              <Progress
-                value={healthPercentage}
-                className="h-2"
-                indicatorClassName={`
-                  ${healthPercentage > 80 ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
-                  ${healthPercentage > 60 && healthPercentage <= 80 ? "bg-gradient-to-r from-yellow-500 to-green-300" : ""}
-                  ${healthPercentage > 40 && healthPercentage <= 60 ? "bg-gradient-to-r from-orange-500 to-yellow-300" : ""}
-                  ${healthPercentage <= 40 ? "bg-gradient-to-r from-red-500 to-orange-300" : ""}
-                `}
-              />
-            </div>
+              <div className="pt-2 border-t">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Revenue</span>
+                  <span className="text-lg font-bold text-green-600">{site.revenue}</span>
+                </div>
+              </div>
 
-            {/* Create Report Button */}
-            <Button
-              variant="outline"
-              className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
-              onClick={handleCreateReport}
-            >
-              Create Report
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+              <div className="pt-2">
+                <Button
+                  onClick={(e) => handleCreateReport(site.id, e)}
+                  variant="outline"
+                  size="sm"
+                  className="w-full flex items-center gap-2 hover:bg-blue-50 hover:border-blue-300"
+                >
+                  <FileText className="h-4 w-4" />
+                  Create Report
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
+    </div>
   )
 }

@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Upload } from "lucide-react"
+import { Upload, FileText, ImageIcon, Video, File } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -24,7 +24,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   const [loading, setLoading] = useState(false)
   const [reportType, setReportType] = useState("completion-report")
   const [date, setDate] = useState("")
-  const [attachments, setAttachments] = useState<{ note: string; file?: File; fileName?: string }[]>([
+  const [attachments, setAttachments] = useState<{ note: string; file?: File; fileName?: string; preview?: string }[]>([
     { note: "" },
     { note: "" },
   ])
@@ -59,14 +59,97 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     setAttachments(newAttachments)
   }
 
-  const handleFileUpload = (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+  const getFileIcon = (fileName: string) => {
+    const extension = fileName.toLowerCase().split(".").pop()
+
+    switch (extension) {
+      case "pdf":
+        return <FileText className="h-8 w-8 text-red-500" />
+      case "doc":
+      case "docx":
+        return <FileText className="h-8 w-8 text-blue-500" />
+      case "jpg":
+      case "jpeg":
+      case "png":
+      case "gif":
+      case "webp":
+        return <ImageIcon className="h-8 w-8 text-green-500" />
+      case "mp4":
+      case "avi":
+      case "mov":
+      case "wmv":
+        return <Video className="h-8 w-8 text-purple-500" />
+      default:
+        return <File className="h-8 w-8 text-gray-500" />
+    }
+  }
+
+  const createFilePreview = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = (e) => resolve(e.target?.result as string)
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handleFileUpload = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
       const newAttachments = [...attachments]
       newAttachments[index].file = file
       newAttachments[index].fileName = file.name
+
+      // Create preview for images
+      if (file.type.startsWith("image/")) {
+        try {
+          const preview = await createFilePreview(file)
+          newAttachments[index].preview = preview
+        } catch (error) {
+          console.error("Error creating preview:", error)
+        }
+      }
+
       setAttachments(newAttachments)
     }
+  }
+
+  const renderFilePreview = (
+    attachment: { note: string; file?: File; fileName?: string; preview?: string },
+    index: number,
+  ) => {
+    if (!attachment.file || !attachment.fileName) {
+      return (
+        <label
+          htmlFor={`file-${index}`}
+          className="cursor-pointer flex flex-col items-center justify-center h-full space-y-2"
+        >
+          <Upload className="h-8 w-8 text-gray-400" />
+          <span className="text-xs text-gray-500">Click to upload</span>
+        </label>
+      )
+    }
+
+    const isImage = attachment.file.type.startsWith("image/")
+
+    return (
+      <label
+        htmlFor={`file-${index}`}
+        className="cursor-pointer flex flex-col items-center justify-center h-full space-y-2 p-2"
+      >
+        {isImage && attachment.preview ? (
+          <div className="relative w-full h-16 flex items-center justify-center">
+            <img
+              src={attachment.preview || "/placeholder.svg"}
+              alt={attachment.fileName}
+              className="max-w-full max-h-full object-contain rounded"
+            />
+          </div>
+        ) : (
+          <div className="flex items-center justify-center">{getFileIcon(attachment.fileName)}</div>
+        )}
+        <span className="text-xs text-blue-600 font-medium text-center break-all px-1">{attachment.fileName}</span>
+      </label>
+    )
   }
 
   const handleGenerateReport = async () => {
@@ -183,24 +266,15 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             <div className="grid grid-cols-2 gap-3">
               {attachments.map((attachment, index) => (
                 <div key={index} className="space-y-2">
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center bg-gray-50 hover:bg-gray-100 transition-colors">
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg h-24 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-center">
                     <input
                       type="file"
                       className="hidden"
                       id={`file-${index}`}
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.mp4,.avi,.mov,.wmv,.txt"
                       onChange={(e) => handleFileUpload(index, e)}
                     />
-                    <label htmlFor={`file-${index}`} className="cursor-pointer flex flex-col items-center space-y-2">
-                      <Upload className="h-6 w-6 text-gray-400" />
-                      <span className="text-xs text-gray-500">
-                        {attachment.fileName ? (
-                          <span className="text-blue-600 font-medium">{attachment.fileName}</span>
-                        ) : (
-                          "Click to upload"
-                        )}
-                      </span>
-                    </label>
+                    {renderFilePreview(attachment, index)}
                   </div>
                   <Input
                     placeholder="Add Note..."
