@@ -371,7 +371,8 @@ export default function CMSContentCreatePage() {
       )
       return true
     } catch (error) {
-      setValidationError("Invalid time format or values.", error)
+      console.log(error)
+      setValidationError("Invalid time format or values.")
       return false
     }
   }
