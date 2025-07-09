@@ -9,14 +9,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import {
-  getProductsByContentTypeAndCompany,
-  getProductsCountByContentTypeAndCompany,
-  type Product,
-} from "@/lib/firebase-service"
+import { getPaginatedUserProducts, getUserProductsCount, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { CreateReportDialog } from "@/components/create-report-dialog"
+import { useAuth } from "@/contexts/auth-context"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
@@ -46,6 +43,7 @@ export default function AllSitesTab() {
   const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
   const { toast } = useToast()
+  const { user, projectData } = useAuth()
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -78,25 +76,29 @@ export default function AllSitesTab() {
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
+    if (!user?.uid) return
+
     setLoadingCount(true)
     try {
-      // For all sites, we'll get both static and dynamic content types and combine them
-      const staticCount = await getProductsCountByContentTypeAndCompany("static", debouncedSearchTerm)
-      const dynamicCount = await getProductsCountByContentTypeAndCompany("dynamic", debouncedSearchTerm)
-      const totalCount = staticCount + dynamicCount
+      const count = await getUserProductsCount(user.uid, {
+        active: true,
+        searchTerm: debouncedSearchTerm,
+      })
 
-      setTotalItems(totalCount)
-      setTotalPages(Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE)))
+      setTotalItems(count)
+      setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
       console.error("Error fetching total count:", error)
     } finally {
       setLoadingCount(false)
     }
-  }, [debouncedSearchTerm])
+  }, [user?.uid, debouncedSearchTerm])
 
   // Fetch products for the current page
   const fetchProducts = useCallback(
     async (page: number, forceRefresh = false) => {
+      if (!user?.uid) return
+
       // Check if we have this page in cache and not forcing refresh
       if (!forceRefresh && pageCache.has(page)) {
         const cachedData = pageCache.get(page)!
@@ -114,44 +116,21 @@ export default function AllSitesTab() {
         // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
-        // Get both static and dynamic products
-        const staticResult = await getProductsByContentTypeAndCompany(
-          "static",
-          ITEMS_PER_PAGE / 2,
-          startDoc,
-          debouncedSearchTerm,
-        )
-        const dynamicResult = await getProductsByContentTypeAndCompany(
-          "dynamic",
-          ITEMS_PER_PAGE / 2,
-          startDoc,
-          debouncedSearchTerm,
-        )
+        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, {
+          active: true,
+          searchTerm: debouncedSearchTerm,
+        })
 
-        // Combine the results
-        const combinedItems = [...staticResult.items, ...dynamicResult.items]
-
-        // Sort by name for consistency
-        combinedItems.sort((a, b) => (a.name || "").localeCompare(b.name || ""))
-
-        // Take only the first ITEMS_PER_PAGE items
-        const paginatedItems = combinedItems.slice(0, ITEMS_PER_PAGE)
-
-        setProducts(paginatedItems)
-
-        // Use the last doc from either result based on which has more items
-        const lastVisible =
-          staticResult.items.length > dynamicResult.items.length ? staticResult.lastDoc : dynamicResult.lastDoc
-
-        setLastDoc(lastVisible)
-        setHasMore(staticResult.hasMore || dynamicResult.hasMore)
+        setProducts(result.items)
+        setLastDoc(result.lastDoc)
+        setHasMore(result.hasMore)
 
         // Cache this page
         setPageCache((prev) => {
           const newCache = new Map(prev)
           newCache.set(page, {
-            items: paginatedItems,
-            lastDoc: lastVisible,
+            items: result.items,
+            lastDoc: result.lastDoc,
           })
           return newCache
         })
@@ -163,21 +142,23 @@ export default function AllSitesTab() {
         setLoadingMore(false)
       }
     },
-    [lastDoc, pageCache, debouncedSearchTerm],
+    [user?.uid, lastDoc, pageCache, debouncedSearchTerm],
   )
 
   // Load initial data and count
   useEffect(() => {
-    fetchProducts(1)
-    fetchTotalCount()
-  }, [])
+    if (user?.uid) {
+      fetchProducts(1)
+      fetchTotalCount()
+    }
+  }, [user?.uid, fetchProducts, fetchTotalCount])
 
   // Load data when page changes
   useEffect(() => {
-    if (currentPage > 0) {
+    if (currentPage > 0 && user?.uid) {
       fetchProducts(currentPage)
     }
-  }, [currentPage, fetchProducts])
+  }, [currentPage, fetchProducts, user?.uid])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -301,6 +282,16 @@ export default function AllSitesTab() {
               ? "Pending Setup"
               : "Inactive",
     }
+  }
+
+  // Show loading if no user
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <p className="text-gray-500">Loading user data...</p>
+      </div>
+    )
   }
 
   return (
