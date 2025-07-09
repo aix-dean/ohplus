@@ -1,302 +1,277 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import Image from "next/image"
-import { useAuth } from "@/contexts/auth-context"
+import type React from "react"
+
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { FirebaseError } from "firebase/app"
+import { Eye, EyeOff } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
+import { toast } from "sonner"
+import Link from "next/link"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 export default function RegisterPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
-  const [middleName, setMiddleName] = useState("")
-  const [phoneNumber, setPhoneNumber] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [showJoinOrgDialog, setShowJoinOrgDialog] = useState(false)
-  const [orgCode, setOrgCode] = useState("")
-  const [joiningOrg, setJoiningOrg] = useState(false)
-
-  const { register } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { register } = useAuth()
 
-  const getFriendlyErrorMessage = (error: unknown): string => {
-    console.error("Raw error during registration:", error)
-    if (error instanceof FirebaseError) {
-      switch (error.code) {
-        case "auth/email-already-in-use":
-          return "This email address is already in use. Please use a different email or log in."
-        case "auth/invalid-email":
-          return "The email address is not valid. Please check the format."
-        case "auth/weak-password":
-          return "The password is too weak. Please choose a stronger password (at least 6 characters)."
-        case "auth/operation-not-allowed":
-          return "Email/password accounts are not enabled. Please contact support."
-        case "auth/network-request-failed":
-          return "Network error. Please check your internet connection and try again."
-        default:
-          return "An unexpected error occurred during registration. Please try again."
-      }
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    middleName: "",
+    cellphone: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  })
+
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [showOrgDialog, setShowOrgDialog] = useState(false)
+  const [orgCode, setOrgCode] = useState("")
+
+  // Check for organization code in URL parameters
+  useEffect(() => {
+    const code = searchParams.get("code")
+    if (code) {
+      setOrgCode(code)
+      setShowOrgDialog(true)
     }
-    return "An unknown error occurred. Please try again."
+  }, [searchParams])
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }))
   }
 
-  const handleRegister = async () => {
-    setErrorMessage(null)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
 
-    if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
-      setErrorMessage("Please fill in all required fields.")
+    if (formData.password !== formData.confirmPassword) {
+      toast.error("Passwords do not match")
       return
     }
 
-    if (password !== confirmPassword) {
-      setErrorMessage("Passwords do not match.")
+    if (formData.password.length < 6) {
+      toast.error("Password must be at least 6 characters long")
       return
     }
 
     setLoading(true)
     try {
-      await register(
-        {
-          email,
-          first_name: firstName,
-          last_name: lastName,
-          middle_name: middleName,
-          phone_number: phoneNumber,
-          gender: "",
-        },
-        {
-          company_name: "",
-          company_location: "",
-        },
-        password,
-      )
-      setErrorMessage(null)
-      router.push("/admin/dashboard?registered=true")
-    } catch (error: unknown) {
-      setErrorMessage(getFriendlyErrorMessage(error))
+      await register({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        middleName: formData.middleName || undefined,
+        cellphone: formData.cellphone,
+        email: formData.email,
+        password: formData.password,
+        organizationCode: orgCode || undefined,
+      })
+
+      toast.success("Account created successfully!")
+      router.push("/dashboard")
+    } catch (error: any) {
+      toast.error(error.message || "Failed to create account")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleJoinOrganization = async () => {
-    setErrorMessage(null)
-
-    if (!orgCode.trim()) {
-      setErrorMessage("Please enter an organization code.")
-      return
-    }
-
-    if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
-      setErrorMessage("Please fill in all required fields.")
-      return
-    }
-
-    if (password !== confirmPassword) {
-      setErrorMessage("Passwords do not match.")
-      return
-    }
-
-    setJoiningOrg(true)
-    try {
-      await register(
-        {
-          email,
-          first_name: firstName,
-          last_name: lastName,
-          middle_name: middleName,
-          phone_number: phoneNumber,
-          gender: "",
-        },
-        {
-          company_name: "",
-          company_location: "",
-        },
-        password,
-        orgCode, // Pass the organization code
-      )
-      setErrorMessage(null)
-      router.push("/admin/dashboard?registered=true&joined_org=true")
-    } catch (error: unknown) {
-      setErrorMessage(getFriendlyErrorMessage(error))
-    } finally {
-      setJoiningOrg(false)
-    }
+  const handleJoinOrganization = () => {
+    setShowOrgDialog(false)
+    // The orgCode is already set, so the form submission will use it
   }
 
   return (
-    <div className="flex min-h-screen">
-      {/* Left Panel - Image */}
-      <div className="relative hidden w-[40%] items-center justify-center bg-gray-900 lg:flex">
-        <Image
-          src="/registration-background.png"
-          alt="Background"
-          layout="fill"
-          objectFit="cover"
-          className="absolute inset-0 z-0 opacity-50"
+    <div className="min-h-screen flex">
+      {/* Left side - Background */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 to-blue-800 relative overflow-hidden">
+        <div className="absolute inset-0 bg-black/20" />
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{
+            backgroundImage: "url(/led-billboard-1.png)",
+          }}
         />
+        <div className="relative z-10 flex flex-col justify-center items-center text-white p-12">
+          <div className="text-6xl font-bold mb-4">
+            OH<span className="text-blue-300">!</span>
+          </div>
+          <p className="text-xl text-center opacity-90">Outdoor Advertising Made Simple</p>
+        </div>
       </div>
 
-      {/* Right Panel - Form */}
-      <div className="flex w-full items-center justify-center bg-white p-8 dark:bg-gray-950 lg:w-[60%]">
-        <Card className="w-full max-w-md border-none shadow-none">
-          <CardHeader className="space-y-1 text-left">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-3xl font-bold">Create an Account</CardTitle>
-            </div>
-            <CardDescription className="text-gray-600 dark:text-gray-400">It's free to create one!</CardDescription>
+      {/* Right side - Form */}
+      <div className="flex-1 flex items-center justify-center p-8">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Create an Account</CardTitle>
+            <CardDescription>It's free to create one!</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+                <div>
                   <Label htmlFor="firstName">First Name</Label>
                   <Input
                     id="firstName"
+                    name="firstName"
+                    type="text"
                     placeholder="John"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
+                    value={formData.firstName}
+                    onChange={handleInputChange}
                     required
                   />
                 </div>
-                <div className="space-y-2">
+                <div>
                   <Label htmlFor="lastName">Last Name</Label>
                   <Input
                     id="lastName"
+                    name="lastName"
+                    type="text"
                     placeholder="Doe"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
+                    value={formData.lastName}
+                    onChange={handleInputChange}
                     required
                   />
                 </div>
               </div>
-              <div className="space-y-2">
+
+              <div>
                 <Label htmlFor="middleName">Middle Name (Optional)</Label>
                 <Input
                   id="middleName"
-                  placeholder=""
-                  value={middleName}
-                  onChange={(e) => setMiddleName(e.target.value)}
+                  name="middleName"
+                  type="text"
+                  value={formData.middleName}
+                  onChange={handleInputChange}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Cellphone number</Label>
+
+              <div>
+                <Label htmlFor="cellphone">Cellphone number</Label>
                 <Input
-                  id="phoneNumber"
+                  id="cellphone"
+                  name="cellphone"
+                  type="tel"
                   placeholder="+63 9XX XXX XXXX"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  value={formData.cellphone}
+                  onChange={handleInputChange}
                   required
                 />
               </div>
-              <div className="space-y-2">
+
+              <div>
                 <Label htmlFor="email">Email Address</Label>
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   placeholder="m@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={formData.email}
+                  onChange={handleInputChange}
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
-              </div>
-              <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
-                <a href="#" className="text-blue-600 hover:underline">
-                  Terms and Conditions
-                </a>
-                ,{" "}
-                <a href="#" className="text-blue-600 hover:underline">
-                  Privacy Policy
-                </a>
-                , and all platform{" "}
-                <a href="#" className="text-blue-600 hover:underline">
-                  rules and regulations
-                </a>{" "}
-                set by OH!Plus.
-              </p>
-              <Button
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                type="submit"
-                onClick={handleRegister}
-                disabled={loading}
-              >
-                {loading ? "Signing Up..." : "Sign Up"}
-              </Button>
-              <Button
-                className="w-full bg-green-600 hover:bg-green-700 text-white mt-2"
-                type="button"
-                onClick={() => setShowJoinOrgDialog(true)}
-                disabled={loading}
-              >
-                Join an organization
-              </Button>
-            </div>
 
-            {errorMessage && (
-              <div className="text-red-500 text-sm mt-4 text-center" role="alert">
-                {errorMessage}
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
-            )}
+
+              <div>
+                <Label htmlFor="confirmPassword">Confirm password</Label>
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="text-xs text-muted-foreground text-center">
+                By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
+                <Link href="/terms" className="text-blue-600 hover:underline">
+                  Terms and Conditions
+                </Link>
+                ,{" "}
+                <Link href="/privacy" className="text-blue-600 hover:underline">
+                  Privacy Policy
+                </Link>
+                , and all platform rules and regulations set by OHPlus.
+              </div>
+
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Creating Account..." : "Sign Up"}
+              </Button>
+            </form>
+
+            <div className="mt-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                Already have an account?{" "}
+                <Link href="/login" className="text-blue-600 hover:underline">
+                  Sign in
+                </Link>
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
-      <Dialog open={showJoinOrgDialog} onOpenChange={setShowJoinOrgDialog}>
-        <DialogContent className="sm:max-w-[400px]">
+
+      {/* Organization Code Dialog */}
+      <Dialog open={showOrgDialog} onOpenChange={setShowOrgDialog}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Join an Organization</DialogTitle>
+            <DialogTitle>Join Organization</DialogTitle>
             <DialogDescription>
-              Enter the organization code provided by your administrator to join their organization.
+              You've been invited to join an organization with code: <strong>{orgCode}</strong>
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="orgCode">Organization Code</Label>
-              <Input
-                id="orgCode"
-                placeholder="Enter organization code"
-                value={orgCode}
-                onChange={(e) => setOrgCode(e.target.value)}
-                required
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={() => setShowJoinOrgDialog(false)} disabled={joiningOrg}>
-                Cancel
-              </Button>
-              <Button type="button" onClick={handleJoinOrganization} disabled={joiningOrg}>
-                {joiningOrg ? "Joining..." : "Join Organization"}
-              </Button>
-            </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowOrgDialog(false)}>
+              Continue without joining
+            </Button>
+            <Button onClick={handleJoinOrganization}>Join Organization</Button>
           </div>
         </DialogContent>
       </Dialog>

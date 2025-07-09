@@ -1,36 +1,30 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import type React from "react"
+import { createContext, useContext, useEffect, useState } from "react"
 import {
   type User,
-  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
 } from "firebase/auth"
-import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore"
+import { doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, increment } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 
 interface UserData {
-  id: string
+  uid: string
   email: string
-  first_name?: string
-  middle_name?: string
-  last_name?: string
-  display_name?: string
-  phone_number?: string
-  photo_url?: string
-  license_key?: string
+  firstName: string
+  lastName: string
+  middleName?: string
+  cellphone: string
   company_id?: string
-  location?: string
-  gender?: string
-  type?: string
-  active?: boolean
-  onboarding?: boolean
-  department?: string
-  created?: any
-  updated?: any
+  license_key?: string
+  role?: string
+  created_at: Date
+  updated_at: Date
 }
 
 interface AuthContextType {
@@ -38,10 +32,11 @@ interface AuthContextType {
   userData: UserData | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string, userData: Partial<UserData>, organizationCode?: string) => Promise<void>
+  register: (
+    userData: Omit<UserData, "uid" | "created_at" | "updated_at"> & { password: string; organizationCode?: string },
+  ) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
-  updateUserData: (data: Partial<UserData>) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -54,11 +49,7 @@ export function useAuth() {
   return context
 }
 
-interface AuthProviderProps {
-  children: ReactNode
-}
-
-export function AuthProvider({ children }: AuthProviderProps) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -67,7 +58,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setUser(user)
-        await fetchUserData(user.uid)
+        // Fetch user data from Firestore
+        const userDoc = await getDoc(doc(db, "users", user.uid))
+        if (userDoc.exists()) {
+          const data = userDoc.data()
+          setUserData({
+            ...data,
+            created_at: data.created_at?.toDate(),
+            updated_at: data.updated_at?.toDate(),
+          } as UserData)
+        }
       } else {
         setUser(null)
         setUserData(null)
@@ -78,15 +78,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => unsubscribe()
   }, [])
 
-  const fetchUserData = async (uid: string) => {
-    try {
-      const userDoc = await getDoc(doc(db, "iboard_users", uid))
-      if (userDoc.exists()) {
-        const data = userDoc.data() as UserData
-        setUserData({ ...data, id: uid })
-      }
-    } catch (error) {
-      console.error("Error fetching user data:", error)
+  const validateOrganizationCode = async (code: string) => {
+    const q = query(collection(db, "registration_codes"), where("code", "==", code), where("status", "==", "active"))
+
+    const snapshot = await getDocs(q)
+    if (snapshot.empty) {
+      throw new Error("Invalid organization code")
+    }
+
+    const codeDoc = snapshot.docs[0]
+    const codeData = codeDoc.data()
+
+    // Check if code is expired
+    const expiresAt = codeData.expires?.toDate()
+    if (expiresAt && expiresAt < new Date()) {
+      throw new Error("Organization code has expired")
+    }
+
+    // Check usage limits if applicable
+    if (codeData.maxUsage && codeData.usage >= codeData.maxUsage) {
+      throw new Error("Organization code has reached its usage limit")
+    }
+
+    return {
+      id: codeDoc.id,
+      company_id: codeData.company_id,
+      license_key: codeData.license_key,
+      ...codeData,
     }
   }
 
@@ -98,71 +116,44 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  const register = async (email: string, password: string, userData: Partial<UserData>, organizationCode?: string) => {
+  const register = async (
+    userData: Omit<UserData, "uid" | "created_at" | "updated_at"> & { password: string; organizationCode?: string },
+  ) => {
     try {
-      // Validate organization code if provided
       let orgData = null
-      let orgSnapshot = null // Declare orgSnapshot variable
-      if (organizationCode) {
-        const orgCodesCollection = collection(db, "organization_codes")
-        const orgQuery = query(orgCodesCollection, where("code", "==", organizationCode))
-        orgSnapshot = await getDocs(orgQuery) // Assign orgSnapshot variable
 
-        if (orgSnapshot.empty) {
-          throw new Error("Invalid organization code")
-        }
-
-        const orgDoc = orgSnapshot.docs[0]
-        orgData = orgDoc.data()
-
-        // Check if code is active and not expired
-        if (!orgData.active || new Date(orgData.expiresAt) < new Date()) {
-          throw new Error("Organization code has expired or is inactive")
-        }
-
-        // Check usage limits if applicable
-        if (orgData.maxUsage && orgData.usage >= orgData.maxUsage) {
-          throw new Error("Organization code has reached its usage limit")
-        }
+      // Validate organization code if provided
+      if (userData.organizationCode) {
+        orgData = await validateOrganizationCode(userData.organizationCode)
       }
 
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const userCredential = await createUserWithEmailAndPassword(auth, userData.email, userData.password)
       const user = userCredential.user
 
-      // Prepare user data
       const newUserData: UserData = {
-        id: user.uid,
-        email: user.email!,
-        first_name: userData.first_name || "",
-        middle_name: userData.middle_name || "",
-        last_name: userData.last_name || "",
-        display_name: userData.display_name || `${userData.first_name} ${userData.last_name}`.trim(),
-        phone_number: userData.phone_number || "",
-        photo_url: userData.photo_url || "",
-        location: userData.location || "",
-        gender: userData.gender || "",
-        type: userData.type || "user",
-        active: true,
-        onboarding: false,
-        department: userData.department || "",
-        created: Date.now(),
-        updated: Date.now(),
+        uid: user.uid,
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        middleName: userData.middleName,
+        cellphone: userData.cellphone,
+        role: "user",
+        created_at: new Date(),
+        updated_at: new Date(),
       }
 
-      // If organization code is provided, inherit company data
+      // If organization code was used, assign company info
       if (orgData) {
         newUserData.company_id = orgData.company_id
         newUserData.license_key = orgData.license_key
 
-        // Update organization code usage
-        const orgDocRef = doc(db, "organization_codes", orgSnapshot.docs[0].id)
-        await updateDoc(orgDocRef, {
-          usage: (orgData.usage || 0) + 1,
+        // Increment usage count for the organization code
+        await updateDoc(doc(db, "registration_codes", orgData.id), {
+          usage: increment(1),
         })
       }
 
-      await setDoc(doc(db, "iboard_users", user.uid), newUserData)
-      setUserData(newUserData)
+      await setDoc(doc(db, "users", user.uid), newUserData)
     } catch (error: any) {
       throw new Error(error.message)
     }
@@ -184,22 +175,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }
 
-  const updateUserData = async (data: Partial<UserData>) => {
-    if (!user) return
-
-    try {
-      const updatedData = {
-        ...data,
-        updated: Date.now(),
-      }
-
-      await updateDoc(doc(db, "iboard_users", user.uid), updatedData)
-      setUserData((prev) => (prev ? { ...prev, ...updatedData } : null))
-    } catch (error: any) {
-      throw new Error(error.message)
-    }
-  }
-
   const value = {
     user,
     userData,
@@ -208,7 +183,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     register,
     logout,
     resetPassword,
-    updateUserData,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -2,95 +2,74 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Copy, Plus } from "lucide-react"
 import { toast } from "sonner"
-import { ResponsiveTable } from "@/components/responsive-table"
-import { db } from "@/lib/firebase"
-import { collection, addDoc, getDocs, updateDoc, doc, query, where } from "firebase/firestore"
 import { useAuth } from "@/contexts/auth-context"
+import { ResponsiveTable } from "@/components/responsive-table"
+import { collection, query, where, onSnapshot, addDoc, updateDoc, doc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 interface RegistrationCode {
   id: string
   code: string
   usage: number
   maxUsage?: number
-  expires: string
+  expires: Date
   status: "active" | "inactive"
-  createdAt: number
-  createdBy: string
-  company_id?: string
-  license_key?: string
+  company_id: string
+  license_key: string
+  created_by: string
+  created_at: Date
 }
 
 export default function RegistrationCodesPage() {
+  const { user, userData } = useAuth()
   const [codes, setCodes] = useState<RegistrationCode[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
-  const { user, userData } = useAuth()
 
   useEffect(() => {
-    fetchCodes()
-  }, [userData])
+    if (!user || !userData?.company_id) return
 
-  const fetchCodes = async () => {
-    if (!userData?.company_id) return
+    const q = query(collection(db, "registration_codes"), where("company_id", "==", userData.company_id))
 
-    try {
-      const codesCollection = collection(db, "organization_codes")
-      const codesQuery = query(codesCollection, where("company_id", "==", userData.company_id))
-      const codesSnapshot = await getDocs(codesQuery)
-
-      const fetchedCodes: RegistrationCode[] = codesSnapshot.docs.map((doc) => ({
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const codesData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
-        expires: new Date(doc.data().expiresAt).toLocaleDateString(),
-        status: doc.data().active && new Date(doc.data().expiresAt) > new Date() ? "active" : "inactive",
+        expires: doc.data().expires?.toDate(),
+        created_at: doc.data().created_at?.toDate(),
       })) as RegistrationCode[]
 
-      setCodes(fetchedCodes.sort((a, b) => b.createdAt - a.createdAt))
-    } catch (error) {
-      console.error("Error fetching codes:", error)
-      toast.error("Failed to fetch registration codes")
-    } finally {
+      setCodes(codesData.sort((a, b) => b.created_at.getTime() - a.created_at.getTime()))
       setLoading(false)
-    }
-  }
+    })
+
+    return () => unsubscribe()
+  }, [user, userData])
 
   const generateCode = async () => {
-    if (!user || !userData?.company_id) {
-      toast.error("Unable to generate code. Please try again.")
-      return
-    }
+    if (!user || !userData?.company_id) return
 
     setGenerating(true)
     try {
-      // Generate 8-character code in XXXX-XXXX format
-      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-      const part1 = Array.from({ length: 4 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join("")
-      const part2 = Array.from({ length: 4 }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join("")
-      const newCode = `${part1}-${part2}`
-
-      // Set expiration to 30 days from now
+      const code = generateRandomCode()
       const expiresAt = new Date()
-      expiresAt.setDate(expiresAt.getDate() + 30)
+      expiresAt.setDate(expiresAt.getDate() + 30) // 30 days from now
 
-      const codeData = {
-        code: newCode,
+      await addDoc(collection(db, "registration_codes"), {
+        code,
         usage: 0,
-        active: true,
-        expiresAt: expiresAt.getTime(),
-        createdAt: Date.now(),
-        createdBy: user.uid,
+        expires: expiresAt,
+        status: "active",
         company_id: userData.company_id,
         license_key: userData.license_key,
-      }
-
-      await addDoc(collection(db, "organization_codes"), codeData)
+        created_by: user.uid,
+        created_at: new Date(),
+      })
 
       toast.success("Registration code generated successfully!")
-      fetchCodes() // Refresh the list
     } catch (error) {
       console.error("Error generating code:", error)
       toast.error("Failed to generate registration code")
@@ -99,7 +78,17 @@ export default function RegistrationCodesPage() {
     }
   }
 
-  const copyCode = async (code: string) => {
+  const generateRandomCode = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    let result = ""
+    for (let i = 0; i < 8; i++) {
+      if (i === 4) result += "-"
+      result += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    return result
+  }
+
+  const copyToClipboard = async (code: string) => {
     try {
       await navigator.clipboard.writeText(code)
       toast.success("Code copied to clipboard!")
@@ -110,15 +99,29 @@ export default function RegistrationCodesPage() {
 
   const deactivateCode = async (codeId: string) => {
     try {
-      const codeRef = doc(db, "organization_codes", codeId)
-      await updateDoc(codeRef, { active: false })
-
+      await updateDoc(doc(db, "registration_codes", codeId), {
+        status: "inactive",
+      })
       toast.success("Code deactivated successfully!")
-      fetchCodes() // Refresh the list
     } catch (error) {
       console.error("Error deactivating code:", error)
       toast.error("Failed to deactivate code")
     }
+  }
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString("en-US", {
+      month: "numeric",
+      day: "numeric",
+      year: "numeric",
+    })
+  }
+
+  const formatUsage = (code: RegistrationCode) => {
+    if (code.maxUsage) {
+      return `${code.usage} / ${code.maxUsage}`
+    }
+    return code.usage.toString()
   }
 
   const columns = [
@@ -128,7 +131,7 @@ export default function RegistrationCodesPage() {
       render: (code: RegistrationCode) => (
         <div className="flex items-center gap-2">
           <span className="font-mono">{code.code}</span>
-          <Button variant="ghost" size="sm" onClick={() => copyCode(code.code)} className="h-6 w-6 p-0">
+          <Button variant="ghost" size="sm" onClick={() => copyToClipboard(code.code)} className="h-6 w-6 p-0">
             <Copy className="h-3 w-3" />
           </Button>
         </div>
@@ -137,14 +140,12 @@ export default function RegistrationCodesPage() {
     {
       key: "usage",
       label: "Usage",
-      render: (code: RegistrationCode) => (
-        <span>{code.maxUsage ? `${code.usage} / ${code.maxUsage}` : code.usage}</span>
-      ),
+      render: (code: RegistrationCode) => formatUsage(code),
     },
     {
       key: "expires",
       label: "Expires",
-      render: (code: RegistrationCode) => <span>{code.expires}</span>,
+      render: (code: RegistrationCode) => formatDate(code.expires),
     },
     {
       key: "status",
@@ -174,8 +175,14 @@ export default function RegistrationCodesPage() {
   if (loading) {
     return (
       <div className="container mx-auto p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Registration Codes</h1>
+            <p className="text-muted-foreground">Manage registration codes for your organization.</p>
+          </div>
+        </div>
         <div className="flex justify-center items-center h-64">
-          <div className="text-lg">Loading registration codes...</div>
+          <div className="text-muted-foreground">Loading...</div>
         </div>
       </div>
     )
@@ -183,9 +190,9 @@ export default function RegistrationCodesPage() {
 
   return (
     <div className="container mx-auto p-6">
-      <div className="flex justify-between items-start mb-6">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold mb-2">Registration Codes</h1>
+          <h1 className="text-2xl font-bold">Registration Codes</h1>
           <p className="text-muted-foreground">Manage registration codes for your organization.</p>
         </div>
         <Button onClick={generateCode} disabled={generating}>
@@ -194,17 +201,13 @@ export default function RegistrationCodesPage() {
         </Button>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {codes.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">No registration codes found.</p>
-            </div>
-          ) : (
-            <ResponsiveTable data={codes} columns={columns} className="border-0" />
-          )}
-        </CardContent>
-      </Card>
+      {codes.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground mb-4">No registration codes found.</p>
+        </div>
+      ) : (
+        <ResponsiveTable data={codes} columns={columns} searchable={false} />
+      )}
     </div>
   )
 }
