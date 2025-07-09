@@ -38,7 +38,7 @@ export default function UserManagementPage() {
           id: doc.id,
           email: data.email || "",
           displayName: data.display_name || data.displayName || "Unknown User",
-          role: data.role || "user",
+          role: String(data.role || "user"), // Ensure role is always a string
           status: data.active === false ? "inactive" : "active",
           lastLogin: data.lastLogin?.toDate() || null,
           created: data.created?.toDate() || new Date(),
@@ -52,17 +52,23 @@ export default function UserManagementPage() {
   }, [userData?.company_id])
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    // Ensure status is a string
+    const statusStr = String(status || "unknown")
+
+    switch (statusStr) {
       case "active":
         return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Active</Badge>
       case "inactive":
         return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Inactive</Badge>
       default:
-        return <Badge variant="secondary">{status}</Badge>
+        return <Badge variant="secondary">{statusStr}</Badge>
     }
   }
 
   const getRoleBadge = (role: string) => {
+    // Ensure role is a string and provide fallback
+    const roleStr = String(role || "user").toLowerCase()
+
     const roleColors = {
       admin: "bg-purple-100 text-purple-800 hover:bg-purple-100",
       manager: "bg-blue-100 text-blue-800 hover:bg-blue-100",
@@ -71,8 +77,8 @@ export default function UserManagementPage() {
     }
 
     return (
-      <Badge className={roleColors[role as keyof typeof roleColors] || roleColors.user}>
-        {role.charAt(0).toUpperCase() + role.slice(1)}
+      <Badge className={roleColors[roleStr as keyof typeof roleColors] || roleColors.user}>
+        {roleStr.charAt(0).toUpperCase() + roleStr.slice(1)}
       </Badge>
     )
   }
