@@ -228,59 +228,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // If joining an organization, validate the code and get company info
       if (orgCode) {
-        // Try both possible collection names for invitation codes
-        let orgCodeDoc = await getDoc(doc(db, "invitation_codes", orgCode))
-
-        // If not found in invitation_codes, try organization_codes
-        if (!orgCodeDoc.exists()) {
-          orgCodeDoc = await getDoc(doc(db, "organization_codes", orgCode))
+        const invitationCodeDoc = await getDoc(doc(db, "invitation_codes", orgCode))
+        if (!invitationCodeDoc.exists()) {
+          throw new Error("Invalid invitation code.")
         }
 
-        if (!orgCodeDoc.exists()) {
-          throw new Error("Invalid organization code.")
-        }
-
-        const orgData = orgCodeDoc.data()
+        const invitationData = invitationCodeDoc.data()
 
         // Check if code has expired
-        if (orgData.expires_at && orgData.expires_at.toDate() < new Date()) {
-          throw new Error("Organization code has expired.")
-        }
-
-        // Check if code has already been used (if it's a single-use code)
-        if (orgData.used && orgData.max_uses === 1) {
-          throw new Error("Organization code has already been used.")
+        if (invitationData.expires_at && invitationData.expires_at.toDate() < new Date()) {
+          throw new Error("Invitation code has expired.")
         }
 
         // Check if code has reached maximum uses
-        if (orgData.max_uses && orgData.used_count >= orgData.max_uses) {
-          throw new Error("Organization code has reached its maximum number of uses.")
+        if (invitationData.max_uses && invitationData.used_count >= invitationData.max_uses) {
+          throw new Error("Invitation code has reached its maximum number of uses.")
         }
 
         // Use the organization's license key and company ID
-        licenseKey = orgData.license_key || licenseKey
-        companyId = orgData.company_id || null
+        licenseKey = invitationData.license_key || licenseKey
+        companyId = invitationData.company_id || null
 
         // Update the code usage
         const updateData: any = {
           used: true,
-          used_count: (orgData.used_count || 0) + 1,
+          used_count: (invitationData.used_count || 0) + 1,
           last_used_at: serverTimestamp(),
         }
 
         // Add user to the used_by array if it exists
-        if (orgData.used_by && Array.isArray(orgData.used_by)) {
-          updateData.used_by = [...orgData.used_by, firebaseUser.uid]
+        if (invitationData.used_by && Array.isArray(invitationData.used_by)) {
+          updateData.used_by = [...invitationData.used_by, firebaseUser.uid]
         } else {
           updateData.used_by = [firebaseUser.uid]
         }
 
-        // Update the appropriate collection
-        const collectionName = await getDoc(doc(db, "invitation_codes", orgCode)).then((doc) =>
-          doc.exists() ? "invitation_codes" : "organization_codes",
-        )
-
-        await updateDoc(doc(db, collectionName, orgCode), updateData)
+        await updateDoc(doc(db, "invitation_codes", orgCode), updateData)
       }
 
       // Create user document in "iboard_users"
