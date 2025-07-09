@@ -11,14 +11,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email and organization code are required" }, { status: 400 })
     }
 
-    const registrationUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://ohplus.aix.ph"}/register?code=${organizationCode}`
+    const registrationUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/register?code=${organizationCode}`
 
     const emailContent = `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale: 1.0">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Join Our Organization</title>
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">

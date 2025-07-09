@@ -1,19 +1,19 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "@/components/ui/use-toast"
-import { Eye, EyeOff, Users } from "lucide-react"
+import { Eye, EyeOff } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
+import { RegistrationSuccessDialog } from "@/components/registration-success-dialog"
+import { JoinOrganizationDialog } from "@/components/join-organization-dialog"
+import Image from "next/image"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -31,6 +31,7 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [joinOrgDialogOpen, setJoinOrgDialogOpen] = useState(false)
   const [organizationCode, setOrganizationCode] = useState("")
 
@@ -81,18 +82,20 @@ export default function RegisterPage() {
         formData.lastName,
       )
 
-      toast({
-        title: "Registration Successful!",
-        description: "Your account has been created successfully.",
-      })
-
-      router.push("/onboarding")
+      // Show success dialog first
+      setShowSuccessDialog(true)
     } catch (error: any) {
       console.error("Registration error:", error)
       setError(error.message || "Failed to create account. Please try again.")
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSuccessDialogClose = () => {
+    setShowSuccessDialog(false)
+    // Navigate to onboarding after dialog closes
+    router.push("/onboarding")
   }
 
   const handleJoinOrganization = async () => {
@@ -134,12 +137,8 @@ export default function RegisterPage() {
         organizationCode.trim(),
       )
 
-      toast({
-        title: "Welcome to the Organization!",
-        description: "Your account has been created and you've joined the organization successfully.",
-      })
-
-      router.push("/onboarding")
+      setJoinOrgDialogOpen(false)
+      setShowSuccessDialog(true)
     } catch (error: any) {
       console.error("Registration with organization error:", error)
       setError(error.message || "Failed to join organization. Please check your code and try again.")
@@ -149,14 +148,17 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Create Account</CardTitle>
-          <CardDescription className="text-center">Enter your information to create your account</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="min-h-screen flex">
+      {/* Left side - Registration Form */}
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 bg-white">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center">
+            <Image src="/ohplus-new-logo.png" alt="OH!Plus Logo" width={120} height={40} className="mx-auto mb-6" />
+            <h2 className="text-3xl font-bold text-gray-900">Create your account</h2>
+            <p className="mt-2 text-sm text-gray-600">Join OH!Plus and start managing your OOH operations</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="mt-8 space-y-6">
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
@@ -164,8 +166,10 @@ export default function RegisterPage() {
             )}
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name *</Label>
+              <div>
+                <Label htmlFor="firstName" className="text-sm font-medium text-gray-700">
+                  First Name *
+                </Label>
                 <Input
                   id="firstName"
                   name="firstName"
@@ -174,10 +178,13 @@ export default function RegisterPage() {
                   onChange={handleInputChange}
                   disabled={loading}
                   required
+                  className="mt-1"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name *</Label>
+              <div>
+                <Label htmlFor="lastName" className="text-sm font-medium text-gray-700">
+                  Last Name *
+                </Label>
                 <Input
                   id="lastName"
                   name="lastName"
@@ -186,12 +193,15 @@ export default function RegisterPage() {
                   onChange={handleInputChange}
                   disabled={loading}
                   required
+                  className="mt-1"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address *</Label>
+            <div>
+              <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                Email Address *
+              </Label>
               <Input
                 id="email"
                 name="email"
@@ -200,12 +210,15 @@ export default function RegisterPage() {
                 onChange={handleInputChange}
                 disabled={loading}
                 required
+                className="mt-1"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password *</Label>
-              <div className="relative">
+            <div>
+              <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                Password *
+              </Label>
+              <div className="relative mt-1">
                 <Input
                   id="password"
                   name="password"
@@ -228,9 +241,11 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password *</Label>
-              <div className="relative">
+            <div>
+              <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
+                Confirm Password *
+              </Label>
+              <div className="relative mt-1">
                 <Input
                   id="confirmPassword"
                   name="confirmPassword"
@@ -253,30 +268,31 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <>
-                  <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
-                  Creating Account...
-                </>
-              ) : (
-                "Sign Up"
-              )}
-            </Button>
+            <div className="space-y-3">
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+                {loading ? (
+                  <>
+                    <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Creating Account...
+                  </>
+                ) : (
+                  "Create Account"
+                )}
+              </Button>
 
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full bg-transparent"
-              onClick={() => setJoinOrgDialogOpen(true)}
-              disabled={loading}
-            >
-              <Users className="h-4 w-4 mr-2" />
-              Join an Organization
-            </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full bg-transparent"
+                onClick={() => setJoinOrgDialogOpen(true)}
+                disabled={loading}
+              >
+                Join an Organization
+              </Button>
+            </div>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{" "}
               <Link href="/login" className="font-medium text-blue-600 hover:text-blue-500">
@@ -284,47 +300,53 @@ export default function RegisterPage() {
               </Link>
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Join Organization Dialog */}
-      <Dialog open={joinOrgDialogOpen} onOpenChange={setJoinOrgDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Join an Organization</DialogTitle>
-            <DialogDescription>
-              Enter the organization code provided by your administrator to join their organization.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="orgCode">Organization Code</Label>
-              <Input
-                id="orgCode"
-                placeholder="Enter organization code (e.g., ABCD-1234)"
-                value={organizationCode}
-                onChange={(e) => setOrganizationCode(e.target.value)}
-                disabled={loading}
-              />
+      {/* Right side - Background Image */}
+      <div className="hidden lg:block lg:w-1/2 relative">
+        <Image src="/registration-background.png" alt="Registration Background" fill className="object-cover" />
+        <div className="absolute inset-0 bg-blue-600 bg-opacity-75"></div>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center text-white px-8">
+            <h1 className="text-4xl font-bold mb-4">Welcome to OH!Plus</h1>
+            <p className="text-xl mb-8">The complete ERP solution for Out-of-Home advertising operations</p>
+            <div className="space-y-4">
+              <div className="flex items-center text-lg">
+                <div className="w-2 h-2 bg-white rounded-full mr-3"></div>
+                Streamline your billboard operations
+              </div>
+              <div className="flex items-center text-lg">
+                <div className="w-2 h-2 bg-white rounded-full mr-3"></div>
+                Manage inventory and bookings
+              </div>
+              <div className="flex items-center text-lg">
+                <div className="w-2 h-2 bg-white rounded-full mr-3"></div>
+                Track performance and analytics
+              </div>
             </div>
           </div>
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={() => setJoinOrgDialogOpen(false)} disabled={loading}>
-              Cancel
-            </Button>
-            <Button onClick={handleJoinOrganization} disabled={loading}>
-              {loading ? (
-                <>
-                  <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></div>
-                  Joining...
-                </>
-              ) : (
-                "Join Organization"
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </div>
+
+      {/* Success Dialog */}
+      <RegistrationSuccessDialog
+        isOpen={showSuccessDialog}
+        firstName={formData.firstName}
+        onClose={handleSuccessDialogClose}
+      />
+
+      {/* Join Organization Dialog */}
+      <JoinOrganizationDialog
+        isOpen={joinOrgDialogOpen}
+        onClose={() => setJoinOrgDialogOpen(false)}
+        organizationCode={organizationCode}
+        onOrganizationCodeChange={setOrganizationCode}
+        onJoin={handleJoinOrganization}
+        loading={loading}
+        formData={formData}
+        error={error}
+      />
     </div>
   )
 }
