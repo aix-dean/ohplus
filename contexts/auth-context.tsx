@@ -9,7 +9,7 @@ import {
   sendPasswordResetEmail,
   type User as FirebaseUser,
 } from "firebase/auth"
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import { subscriptionService } from "@/lib/subscription-service"
 import type { Subscription } from "@/lib/types/subscription"
@@ -228,12 +228,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // If joining an organization, validate the code and get company info
       if (orgCode) {
-        const invitationCodeDoc = await getDoc(doc(db, "invitation_codes", orgCode))
-        if (!invitationCodeDoc.exists()) {
+        // Query invitation_codes collection by the 'code' field
+        const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
+        const invitationSnapshot = await getDocs(invitationQuery)
+
+        if (invitationSnapshot.empty) {
           throw new Error("Invalid invitation code.")
         }
 
-        const invitationData = invitationCodeDoc.data()
+        // Get the first matching document
+        const invitationDoc = invitationSnapshot.docs[0]
+        const invitationData = invitationDoc.data()
 
         // Check if code has expired
         if (invitationData.expires_at && invitationData.expires_at.toDate() < new Date()) {
@@ -263,7 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           updateData.used_by = [firebaseUser.uid]
         }
 
-        await updateDoc(doc(db, "invitation_codes", orgCode), updateData)
+        await updateDoc(doc(db, "invitation_codes", invitationDoc.id), updateData)
       }
 
       // Create user document in "iboard_users"
