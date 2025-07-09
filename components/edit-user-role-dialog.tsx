@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { doc, updateDoc } from "firebase/firestore"
+import { doc, updateDoc, collection, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { toast } from "sonner"
 
@@ -26,6 +26,12 @@ interface User {
   created: Date
 }
 
+interface Role {
+  id: string
+  name: string
+  displayName: string
+}
+
 interface EditUserRoleDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -33,22 +39,42 @@ interface EditUserRoleDialogProps {
   onSuccess: () => void
 }
 
-const AVAILABLE_ROLES = [
-  { value: "user", label: "User" },
-  { value: "admin", label: "Admin" },
-  { value: "manager", label: "Manager" },
-  { value: "editor", label: "Editor" },
-]
-
 export default function EditUserRoleDialog({ open, onOpenChange, user, onSuccess }: EditUserRoleDialogProps) {
   const [selectedRole, setSelectedRole] = useState("")
   const [loading, setLoading] = useState(false)
+  const [roles, setRoles] = useState<Role[]>([])
+  const [loadingRoles, setLoadingRoles] = useState(false)
 
   useEffect(() => {
     if (user) {
       setSelectedRole(user.role)
     }
   }, [user])
+
+  useEffect(() => {
+    if (open) {
+      fetchRoles()
+    }
+  }, [open])
+
+  const fetchRoles = async () => {
+    setLoadingRoles(true)
+    try {
+      const rolesCollection = collection(db, "roles")
+      const rolesSnapshot = await getDocs(rolesCollection)
+      const rolesData = rolesSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        name: doc.data().name,
+        displayName: doc.data().displayName || doc.data().name,
+      }))
+      setRoles(rolesData)
+    } catch (error) {
+      console.error("Error fetching roles:", error)
+      toast.error("Failed to load roles")
+    } finally {
+      setLoadingRoles(false)
+    }
+  }
 
   const handleSave = async () => {
     if (!user || !selectedRole) return
@@ -90,14 +116,14 @@ export default function EditUserRoleDialog({ open, onOpenChange, user, onSuccess
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="role">Role</Label>
-            <Select value={selectedRole} onValueChange={setSelectedRole}>
+            <Select value={selectedRole} onValueChange={setSelectedRole} disabled={loadingRoles}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a role" />
+                <SelectValue placeholder={loadingRoles ? "Loading roles..." : "Select a role"} />
               </SelectTrigger>
               <SelectContent>
-                {AVAILABLE_ROLES.map((role) => (
-                  <SelectItem key={role.value} value={role.value}>
-                    {role.label}
+                {roles.map((role) => (
+                  <SelectItem key={role.id} value={role.name}>
+                    {role.displayName}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -109,7 +135,7 @@ export default function EditUserRoleDialog({ open, onOpenChange, user, onSuccess
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={loading || !selectedRole}>
+          <Button onClick={handleSave} disabled={loading || !selectedRole || loadingRoles}>
             {loading ? "Saving..." : "Save Changes"}
           </Button>
         </DialogFooter>
