@@ -1,46 +1,49 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { FirebaseError } from "firebase/app"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 export default function RegisterPage() {
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [middleName, setMiddleName] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("")
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [showJoinOrgDialog, setShowJoinOrgDialog] = useState(false)
+  const [orgCode, setOrgCode] = useState("")
+  const [joiningOrg, setJoiningOrg] = useState(false)
 
   const { register } = useAuth()
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const orgCode = searchParams.get("orgCode")
 
   const getFriendlyErrorMessage = (error: unknown): string => {
     console.error("Raw error during registration:", error)
     if (error instanceof FirebaseError) {
       switch (error.code) {
         case "auth/email-already-in-use":
-          return "An account with this email address already exists."
+          return "This email address is already in use. Please use a different email or log in."
         case "auth/invalid-email":
-          return "The email address is not valid."
+          return "The email address is not valid. Please check the format."
+        case "auth/weak-password":
+          return "The password is too weak. Please choose a stronger password (at least 6 characters)."
         case "auth/operation-not-allowed":
           return "Email/password accounts are not enabled. Please contact support."
-        case "auth/weak-password":
-          return "The password is too weak. Please choose a stronger password."
         case "auth/network-request-failed":
-          return "Network error. Please check your internet connection."
+          return "Network error. Please check your internet connection and try again."
         default:
-          return "An unexpected error occurred. Please try again."
+          return "An unexpected error occurred during registration. Please try again."
       }
     }
     return "An unknown error occurred. Please try again."
@@ -49,8 +52,8 @@ export default function RegisterPage() {
   const handleRegister = async () => {
     setErrorMessage(null)
 
-    if (!firstName || !lastName || !email || !password || !confirmPassword) {
-      setErrorMessage("Please fill in all fields.")
+    if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
+      setErrorMessage("Please fill in all required fields.")
       return
     }
 
@@ -59,19 +62,74 @@ export default function RegisterPage() {
       return
     }
 
-    if (password.length < 6) {
-      setErrorMessage("Password must be at least 6 characters long.")
-      return
-    }
-
     setLoading(true)
     try {
-      await register(email, password, firstName, lastName, orgCode || undefined)
-      router.push("/admin/dashboard")
+      await register(
+        {
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          middle_name: middleName,
+          phone_number: phoneNumber,
+          gender: "",
+        },
+        {
+          company_name: "",
+          company_location: "",
+        },
+        password,
+      )
+      setErrorMessage(null)
+      router.push("/admin/dashboard?registered=true")
     } catch (error: unknown) {
       setErrorMessage(getFriendlyErrorMessage(error))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleJoinOrganization = async () => {
+    setErrorMessage(null)
+
+    if (!orgCode.trim()) {
+      setErrorMessage("Please enter an organization code.")
+      return
+    }
+
+    if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
+      setErrorMessage("Please fill in all required fields.")
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setErrorMessage("Passwords do not match.")
+      return
+    }
+
+    setJoiningOrg(true)
+    try {
+      await register(
+        {
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          middle_name: middleName,
+          phone_number: phoneNumber,
+          gender: "",
+        },
+        {
+          company_name: "",
+          company_location: "",
+        },
+        password,
+        orgCode, // Pass the organization code
+      )
+      setErrorMessage(null)
+      router.push("/admin/dashboard?registered=true&joined_org=true")
+    } catch (error: unknown) {
+      setErrorMessage(getFriendlyErrorMessage(error))
+    } finally {
+      setJoiningOrg(false)
     }
   }
 
@@ -92,26 +150,16 @@ export default function RegisterPage() {
       <div className="flex w-full items-center justify-center bg-white p-8 dark:bg-gray-950 lg:w-[60%]">
         <Card className="w-full max-w-md border-none shadow-none">
           <CardHeader className="space-y-1 text-left">
-            <CardTitle className="text-3xl font-bold">{orgCode ? "Join Organization" : "Create an account"}</CardTitle>
-            <CardDescription className="text-gray-600 dark:text-gray-400">
-              {orgCode
-                ? "Complete your registration to join the organization"
-                : "Enter your information to create your account"}
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-3xl font-bold">Create an Account</CardTitle>
+            </div>
+            <CardDescription className="text-gray-600 dark:text-gray-400">It's free to create one!</CardDescription>
           </CardHeader>
           <CardContent>
-            {orgCode && (
-              <Alert className="mb-4 border-blue-200 bg-blue-50">
-                <AlertDescription className="text-blue-800">
-                  Organization Code: <strong>{orgCode}</strong>
-                </AlertDescription>
-              </Alert>
-            )}
-
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">First name</Label>
+                  <Label htmlFor="firstName">First Name</Label>
                   <Input
                     id="firstName"
                     placeholder="John"
@@ -121,7 +169,7 @@ export default function RegisterPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last name</Label>
+                  <Label htmlFor="lastName">Last Name</Label>
                   <Input
                     id="lastName"
                     placeholder="Doe"
@@ -132,7 +180,26 @@ export default function RegisterPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="middleName">Middle Name (Optional)</Label>
+                <Input
+                  id="middleName"
+                  placeholder=""
+                  value={middleName}
+                  onChange={(e) => setMiddleName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phoneNumber">Cellphone number</Label>
+                <Input
+                  id="phoneNumber"
+                  placeholder="+63 9XX XXX XXXX"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
                 <Input
                   id="email"
                   type="email"
@@ -162,19 +229,36 @@ export default function RegisterPage() {
                   required
                 />
               </div>
+              <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+                By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
+                <a href="#" className="text-blue-600 hover:underline">
+                  Terms and Conditions
+                </a>
+                ,{" "}
+                <a href="#" className="text-blue-600 hover:underline">
+                  Privacy Policy
+                </a>
+                , and all platform{" "}
+                <a href="#" className="text-blue-600 hover:underline">
+                  rules and regulations
+                </a>{" "}
+                set by OH!Plus.
+              </p>
               <Button
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                 type="submit"
                 onClick={handleRegister}
                 disabled={loading}
               >
-                {loading
-                  ? orgCode
-                    ? "Joining Organization..."
-                    : "Creating Account..."
-                  : orgCode
-                    ? "Join Organization"
-                    : "Create Account"}
+                {loading ? "Signing Up..." : "Sign Up"}
+              </Button>
+              <Button
+                className="w-full bg-green-600 hover:bg-green-700 text-white mt-2"
+                type="button"
+                onClick={() => setShowJoinOrgDialog(true)}
+                disabled={loading}
+              >
+                Join an organization
               </Button>
             </div>
 
@@ -186,6 +270,36 @@ export default function RegisterPage() {
           </CardContent>
         </Card>
       </div>
+      <Dialog open={showJoinOrgDialog} onOpenChange={setShowJoinOrgDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Join an Organization</DialogTitle>
+            <DialogDescription>
+              Enter the organization code provided by your administrator to join their organization.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="orgCode">Organization Code</Label>
+              <Input
+                id="orgCode"
+                placeholder="Enter organization code"
+                value={orgCode}
+                onChange={(e) => setOrgCode(e.target.value)}
+                required
+              />
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button type="button" variant="outline" onClick={() => setShowJoinOrgDialog(false)} disabled={joiningOrg}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleJoinOrganization} disabled={joiningOrg}>
+                {joiningOrg ? "Joining..." : "Join Organization"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
