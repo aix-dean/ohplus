@@ -5,14 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, Clock, Play } from "lucide-react"
 
 interface CMSData {
-  spots_per_loop?: number
-  loops_per_day?: number
-  spot_duration?: number
-  start_time?: string
-  spotsPerLoop?: number
-  loopsPerDay?: number
-  spotDuration?: number
-  startTime?: string
+  end_time: string
+  loops_per_day: number
+  spot_duration: number
+  start_time: string
 }
 
 interface LoopTimelineProps {
@@ -29,11 +25,27 @@ interface TimelineSpot {
 }
 
 export function LoopTimeline({ cmsData }: LoopTimelineProps) {
-  // Extract CMS configuration with fallbacks
-  const spotsPerLoop = cmsData?.spots_per_loop || cmsData?.spotsPerLoop || 5
-  const loopsPerDay = cmsData?.loops_per_day || cmsData?.loopsPerDay || 20
-  const spotDuration = cmsData?.spot_duration || cmsData?.spotDuration || 15 // seconds
-  const startTimeStr = cmsData?.start_time || cmsData?.startTime || "06:00"
+  // Extract CMS configuration from database structure
+  const startTimeStr = cmsData.start_time // "16:44"
+  const endTimeStr = cmsData.end_time // "18:44"
+  const spotDuration = cmsData.spot_duration // 15 seconds
+  const loopsPerDay = cmsData.loops_per_day // 20
+
+  // Calculate spots per loop based on time difference
+  const calculateSpotsPerLoop = () => {
+    const [startHour, startMinute] = startTimeStr.split(":").map(Number)
+    const [endHour, endMinute] = endTimeStr.split(":").map(Number)
+
+    const startTotalMinutes = startHour * 60 + startMinute
+    const endTotalMinutes = endHour * 60 + endMinute
+
+    const loopDurationMinutes = endTotalMinutes - startTotalMinutes
+    const loopDurationSeconds = loopDurationMinutes * 60
+
+    return Math.floor(loopDurationSeconds / spotDuration)
+  }
+
+  const spotsPerLoop = calculateSpotsPerLoop()
 
   // Convert military time to 12-hour format
   const convertTo12Hour = (militaryTime: string) => {
@@ -43,16 +55,20 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
     return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`
   }
 
-  // Parse start time
+  // Parse start and end times
   const [startHour, startMinute] = startTimeStr.split(":").map(Number)
+  const [endHour, endMinute] = endTimeStr.split(":").map(Number)
+
   const loopStartTime = new Date()
   loopStartTime.setHours(startHour, startMinute, 0, 0)
 
-  // Calculate total loop duration: spots_per_loop × spot_duration
-  const totalLoopDuration = spotsPerLoop * spotDuration // in seconds
-  const loopEndTime = new Date(loopStartTime.getTime() + totalLoopDuration * 1000)
+  const loopEndTime = new Date()
+  loopEndTime.setHours(endHour, endMinute, 0, 0)
 
-  // Generate timeline spots based on spots per loop
+  // Calculate total loop duration in seconds
+  const totalLoopDuration = spotsPerLoop * spotDuration
+
+  // Generate timeline spots based on calculated spots per loop
   const generateTimelineSpots = (): TimelineSpot[] => {
     const spots: TimelineSpot[] = []
     let currentTime = new Date(loopStartTime)
@@ -140,16 +156,20 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
               <div className="text-lg font-semibold">{spotDuration}s</div>
             </div>
             <div>
-              <span className="font-medium text-gray-500">Start Time:</span>
-              <div className="text-lg font-semibold">{convertTo12Hour(startTimeStr)}</div>
+              <span className="font-medium text-gray-500">Loop Time:</span>
+              <div className="text-lg font-semibold">
+                {convertTo12Hour(startTimeStr)} - {convertTo12Hour(endTimeStr)}
+              </div>
             </div>
             <div>
               <span className="font-medium text-gray-500">Total Loop Duration:</span>
               <div className="text-lg font-semibold">{formatDuration(totalLoopDuration)}</div>
             </div>
             <div>
-              <span className="font-medium text-gray-500">Loop End Time:</span>
-              <div className="text-lg font-semibold">{formatTime(loopEndTime)}</div>
+              <span className="font-medium text-gray-500">Calculated from DB:</span>
+              <div className="text-sm text-blue-600">
+                ({endTimeStr} - {startTimeStr}) ÷ {spotDuration}s = {spotsPerLoop} spots
+              </div>
             </div>
           </div>
         </CardContent>
@@ -163,7 +183,7 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
             First Loop Timeline ({spotsPerLoop} Spots)
           </CardTitle>
           <div className="text-sm text-gray-500">
-            Loop runs from {convertTo12Hour(startTimeStr)} to {formatTime(loopEndTime)} (
+            Loop runs from {convertTo12Hour(startTimeStr)} to {convertTo12Hour(endTimeStr)} (
             {formatDuration(totalLoopDuration)} total)
           </div>
         </CardHeader>
@@ -182,7 +202,7 @@ export function LoopTimeline({ cmsData }: LoopTimelineProps) {
               </div>
               <div className="flex items-center gap-2">
                 <Clock size={16} className="text-gray-500" />
-                <span className="font-medium">End: {formatTime(loopEndTime)}</span>
+                <span className="font-medium">End: {convertTo12Hour(endTimeStr)}</span>
               </div>
             </div>
 

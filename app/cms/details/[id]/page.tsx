@@ -50,10 +50,10 @@ async function getProductData(id: string) {
     created: "July 9, 2025",
     updated: "July 9, 2025",
     cms: {
-      spots_per_loop: 6,
+      end_time: "18:44",
       loops_per_day: 20,
       spot_duration: 15,
-      start_time: "06:00",
+      start_time: "16:44",
     },
     programList: [
       {
@@ -193,6 +193,22 @@ export default async function Page({ params }: Props) {
     notFound()
   }
 
+  // Calculate spots per loop based on time difference and spot duration
+  const calculateSpotsPerLoop = (startTime: string, endTime: string, spotDuration: number) => {
+    const [startHour, startMinute] = startTime.split(":").map(Number)
+    const [endHour, endMinute] = endTime.split(":").map(Number)
+
+    const startTotalMinutes = startHour * 60 + startMinute
+    const endTotalMinutes = endHour * 60 + endMinute
+
+    const loopDurationMinutes = endTotalMinutes - startTotalMinutes
+    const loopDurationSeconds = loopDurationMinutes * 60
+
+    return Math.floor(loopDurationSeconds / spotDuration)
+  }
+
+  const spotsPerLoop = calculateSpotsPerLoop(product.cms.start_time, product.cms.end_time, product.cms.spot_duration)
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "active":
@@ -267,14 +283,24 @@ export default async function Page({ params }: Props) {
 
           <div>
             <h3 className="text-sm font-medium text-gray-500 mb-2">CMS Configuration</h3>
-            <div className="flex items-center gap-8">
+            <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                <span className="text-sm">Spots per loop: {product.cms.spots_per_loop}</span>
+                <span>Spots per loop: {spotsPerLoop}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                <span className="text-sm">Loops per day: {product.cms.loops_per_day}</span>
+                <span>Loops per day: {product.cms.loops_per_day}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                <span>Spot duration: {product.cms.spot_duration}s</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                <span>
+                  Loop time: {product.cms.start_time} - {product.cms.end_time}
+                </span>
               </div>
             </div>
           </div>
