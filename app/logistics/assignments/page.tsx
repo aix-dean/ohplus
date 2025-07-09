@@ -1,36 +1,15 @@
 "use client"
-
-import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ServiceAssignmentsTable } from "@/components/service-assignments-table"
 import { Plus, Filter, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
-import { getDoc, doc } from "firebase/firestore"
-import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
-
-import { db } from "@/lib/firebase"
 
 export default function ServiceAssignmentsPage() {
   const router = useRouter()
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
-  const [selectedAssignment, setSelectedAssignment] = useState(null)
-  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
 
-  const handleSelectAssignment = async (id) => {
-    try {
-      const assignmentDoc = await getDoc(doc(db, "service_assignments", id))
-      if (assignmentDoc.exists()) {
-        setSelectedAssignment({
-          id: assignmentDoc.id,
-          ...assignmentDoc.data(),
-        })
-        setSelectedAssignmentId(id)
-        setDetailsDialogOpen(true)
-      }
-    } catch (err) {
-      console.error("Error fetching assignment:", err)
-    }
+  const handleSelectAssignment = (id: string) => {
+    router.push(`/logistics/assignments/${id}`)
   }
 
   const handleCreateAssignment = () => {
@@ -61,16 +40,6 @@ export default function ServiceAssignmentsPage() {
         </div>
 
         <ServiceAssignmentsTable onSelectAssignment={handleSelectAssignment} />
-
-        <ServiceAssignmentDetailsDialog
-          open={detailsDialogOpen}
-          onOpenChange={setDetailsDialogOpen}
-          assignmentId={selectedAssignmentId}
-          assignment={selectedAssignment}
-          onStatusChange={() => {
-            // You could add a refresh function here
-          }}
-        />
       </main>
     </div>
   )
