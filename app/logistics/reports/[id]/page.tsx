@@ -92,7 +92,7 @@ export default function ReportPreviewPage() {
             <p className="text-gray-600 mt-2 italic">as of {formatDate(report.date)}</p>
           </div>
           <div className="flex-shrink-0">
-            <img src="/gts-logo.png" alt="GTS Incorporated Logo" className="h-16 w-auto" />
+            <img src="/gts-logo.png" alt="GTS Incorporated Logo" className="h-24 w-auto" />
           </div>
         </div>
 
