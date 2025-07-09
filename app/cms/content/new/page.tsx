@@ -322,6 +322,7 @@ export default function CMSContentCreatePage() {
       // Calculate total spot time needed per loop
       const spotDurationNum = Number.parseInt(spot_duration)
       const spotsPerLoopNum = Number.parseInt(loops_per_day)
+      console.log(spotsPerLoopNum)
       const totalSpotTimePerLoop = spotDurationNum * spotsPerLoopNum
 
       // Calculate how many complete loops can fit in the time duration
