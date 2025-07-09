@@ -52,34 +52,13 @@ class EmailService {
   private emailsCollection = "compose_emails"
   private templatesCollection = "email_templates"
 
-  // Helper function to serialize attachments for Firestore
-  private serializeAttachments(attachments: EmailAttachment[]): any[] {
-    return attachments.map((attachment) => ({
-      fileName: attachment.fileName,
-      fileUrl: attachment.fileUrl,
-      fileSize: attachment.fileSize,
-      fileType: attachment.fileType,
-    }))
-  }
-
-  // Helper function to deserialize attachments from Firestore
-  private deserializeAttachments(attachments: any[]): EmailAttachment[] {
-    if (!attachments || !Array.isArray(attachments)) return []
-    return attachments.map((attachment) => ({
-      fileName: attachment.fileName || "",
-      fileUrl: attachment.fileUrl || "",
-      fileSize: attachment.fileSize || 0,
-      fileType: attachment.fileType || "application/octet-stream",
-    }))
-  }
-
   // Email CRUD operations
   async createEmail(emailData: Omit<Email, "id" | "created">): Promise<string> {
     try {
-      // Prepare data for Firestore
+      // Convert the email data to a plain object that Firestore can handle
       const firestoreData: any = {
         from: emailData.from,
-        to: emailData.to,
+        to: Array.isArray(emailData.to) ? [...emailData.to] : [],
         subject: emailData.subject,
         body: emailData.body,
         status: emailData.status,
@@ -87,21 +66,32 @@ class EmailService {
         created: Timestamp.now(),
       }
 
-      // Add optional fields only if they exist
-      if (emailData.cc && emailData.cc.length > 0) {
-        firestoreData.cc = emailData.cc
+      // Add optional arrays only if they exist and have content
+      if (emailData.cc && Array.isArray(emailData.cc) && emailData.cc.length > 0) {
+        firestoreData.cc = [...emailData.cc]
       }
-      if (emailData.bcc && emailData.bcc.length > 0) {
-        firestoreData.bcc = emailData.bcc
+
+      if (emailData.bcc && Array.isArray(emailData.bcc) && emailData.bcc.length > 0) {
+        firestoreData.bcc = [...emailData.bcc]
       }
+
+      // Add optional strings only if they exist
       if (emailData.templateId) {
         firestoreData.templateId = emailData.templateId
       }
+
       if (emailData.reportId) {
         firestoreData.reportId = emailData.reportId
       }
-      if (emailData.attachments && emailData.attachments.length > 0) {
-        firestoreData.attachments = this.serializeAttachments(emailData.attachments)
+
+      // Handle attachments - convert to plain objects
+      if (emailData.attachments && Array.isArray(emailData.attachments) && emailData.attachments.length > 0) {
+        firestoreData.attachments = emailData.attachments.map((attachment) => ({
+          fileName: String(attachment.fileName || ""),
+          fileUrl: String(attachment.fileUrl || ""),
+          fileSize: Number(attachment.fileSize || 0),
+          fileType: String(attachment.fileType || "application/octet-stream"),
+        }))
       }
 
       const docRef = await addDoc(collection(db, this.emailsCollection), firestoreData)
@@ -119,17 +109,24 @@ class EmailService {
         const data = emailDoc.data()
         return {
           id: emailDoc.id,
-          from: data.from,
-          to: data.to,
-          cc: data.cc,
-          bcc: data.bcc,
-          subject: data.subject,
-          body: data.body,
-          attachments: this.deserializeAttachments(data.attachments),
+          from: data.from || "",
+          to: Array.isArray(data.to) ? data.to : [],
+          cc: Array.isArray(data.cc) ? data.cc : undefined,
+          bcc: Array.isArray(data.bcc) ? data.bcc : undefined,
+          subject: data.subject || "",
+          body: data.body || "",
+          attachments: Array.isArray(data.attachments)
+            ? data.attachments.map((att: any) => ({
+                fileName: att.fileName || "",
+                fileUrl: att.fileUrl || "",
+                fileSize: att.fileSize || 0,
+                fileType: att.fileType || "application/octet-stream",
+              }))
+            : undefined,
           templateId: data.templateId,
           reportId: data.reportId,
-          status: data.status,
-          userId: data.userId,
+          status: data.status || "draft",
+          userId: data.userId || "",
           created: data.created,
           sent: data.sent,
           error: data.error,
@@ -155,17 +152,24 @@ class EmailService {
         const data = doc.data()
         return {
           id: doc.id,
-          from: data.from,
-          to: data.to,
-          cc: data.cc,
-          bcc: data.bcc,
-          subject: data.subject,
-          body: data.body,
-          attachments: this.deserializeAttachments(data.attachments),
+          from: data.from || "",
+          to: Array.isArray(data.to) ? data.to : [],
+          cc: Array.isArray(data.cc) ? data.cc : undefined,
+          bcc: Array.isArray(data.bcc) ? data.bcc : undefined,
+          subject: data.subject || "",
+          body: data.body || "",
+          attachments: Array.isArray(data.attachments)
+            ? data.attachments.map((att: any) => ({
+                fileName: att.fileName || "",
+                fileUrl: att.fileUrl || "",
+                fileSize: att.fileSize || 0,
+                fileType: att.fileType || "application/octet-stream",
+              }))
+            : undefined,
           templateId: data.templateId,
           reportId: data.reportId,
-          status: data.status,
-          userId: data.userId,
+          status: data.status || "draft",
+          userId: data.userId || "",
           created: data.created,
           sent: data.sent,
           error: data.error,
@@ -179,14 +183,23 @@ class EmailService {
 
   async updateEmail(emailId: string, updates: Partial<Email>): Promise<void> {
     try {
-      // Prepare updates for Firestore
+      // Convert updates to plain objects that Firestore can handle
       const firestoreUpdates: any = {}
 
       Object.keys(updates).forEach((key) => {
         const value = (updates as any)[key]
         if (value !== undefined) {
           if (key === "attachments" && Array.isArray(value)) {
-            firestoreUpdates[key] = this.serializeAttachments(value)
+            firestoreUpdates[key] = value.map((attachment) => ({
+              fileName: String(attachment.fileName || ""),
+              fileUrl: String(attachment.fileUrl || ""),
+              fileSize: Number(attachment.fileSize || 0),
+              fileType: String(attachment.fileType || "application/octet-stream"),
+            }))
+          } else if (key === "to" || key === "cc" || key === "bcc") {
+            if (Array.isArray(value)) {
+              firestoreUpdates[key] = [...value]
+            }
           } else {
             firestoreUpdates[key] = value
           }
