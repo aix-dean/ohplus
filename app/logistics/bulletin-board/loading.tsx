@@ -40,10 +40,10 @@ export default function BulletinBoardLoading() {
         ))}
       </div>
 
-      {/* Loader */}
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Loading bulletin board...</span>
+      {/* Loader and Message */}
+      <div className="flex flex-col items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <p className="text-gray-500">Loading bulletin board...</p>
       </div>
     </div>
   )
