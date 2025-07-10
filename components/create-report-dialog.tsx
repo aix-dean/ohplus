@@ -320,9 +320,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="completion-report">Completion Report</SelectItem>
-                  <SelectItem value="maintenance-report">Maintenance Report</SelectItem>
-                  <SelectItem value="inspection-report">Inspection Report</SelectItem>
-                  <SelectItem value="incident-report">Incident Report</SelectItem>
+                  <SelectItem value="monitoring-report">Monitoring Report</SelectItem>
+                  <SelectItem value="installation-report">Installation Report</SelectItem>
                 </SelectContent>
               </Select>
             </div>
