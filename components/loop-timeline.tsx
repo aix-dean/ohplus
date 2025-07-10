@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Clock, Play } from "lucide-react"
+import { Plus, Clock, Play, Eye } from "lucide-react"
 import { useState, useEffect } from "react"
 import VideoUploadDialog from "./video-upload-dialog"
 import { collection, query, where, getDocs } from "firebase/firestore"
@@ -29,6 +29,7 @@ interface TimelineSpot {
   endTime: Date
   duration: number
   status: "active" | "pending" | "available"
+  isScheduled: boolean
 }
 
 export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTimelineProps) {
@@ -132,6 +133,7 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
         endTime: new Date(spotEndTime),
         duration: spotDuration,
         status: hasScheduledContent ? "active" : "available",
+        isScheduled: hasScheduledContent,
       })
 
       currentTime = new Date(spotEndTime)
@@ -178,6 +180,16 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
   const handleAddSpot = (spotNumber: number) => {
     setSelectedSpotNumber(spotNumber)
     setUploadDialogOpen(true)
+  }
+
+  const handleViewSpot = (spotNumber: number) => {
+    // Find the scheduled content for this spot
+    const scheduledContent = screenSchedules.find((schedule) => schedule.spot_number === spotNumber && schedule.active)
+
+    if (scheduledContent && scheduledContent.media) {
+      // Open the video in a new tab/window
+      window.open(scheduledContent.media, "_blank")
+    }
   }
 
   const handleUploadSuccess = async () => {
@@ -328,15 +340,26 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
                     </div>
                   </div>
 
-                  {/* Add Button */}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-shrink-0 bg-transparent"
-                    onClick={() => handleAddSpot(index + 1)}
-                  >
-                    <Plus size={16} />
-                  </Button>
+                  {/* Add/View Button */}
+                  {spot.isScheduled ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="flex-shrink-0"
+                      onClick={() => handleViewSpot(index + 1)}
+                    >
+                      <Eye size={16} />
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-shrink-0 bg-transparent"
+                      onClick={() => handleAddSpot(index + 1)}
+                    >
+                      <Plus size={16} />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
