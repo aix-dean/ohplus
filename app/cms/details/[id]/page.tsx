@@ -53,7 +53,7 @@ interface CMSProductData {
   traffic_count?: number
   cms: {
     end_time: string
-    loops_per_day: number
+    spot_per_loop: number
     spot_duration: number
     start_time: string
   }
@@ -120,7 +120,7 @@ async function getProductData(id: string): Promise<CMSProductData | null> {
       traffic_count: product.specs_rental?.traffic_count || 0,
       cms: {
         end_time: product.cms?.end_time || "18:00",
-        loops_per_day: product.cms?.loops_per_day || 20,
+        spot_per_loopy: product.cms?.spot_per_loop || 20,
         spot_duration: product.cms?.spot_duration || 15,
         start_time: product.cms?.start_time || "06:00",
       },
@@ -334,7 +334,7 @@ export default async function Page({ params }: Props) {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                <span>Spots per loop: {product.cms.loops_per_day}</span>
+                <span>Spots per loop: {product.cms.spot_per_loop}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
