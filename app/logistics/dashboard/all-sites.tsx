@@ -1,18 +1,17 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect, useCallback } from "react"
 import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import Image from "next/image"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { getPaginatedUserProducts, getUserProductsCount, type Product } from "@/lib/firebase-service"
+import { Progress } from "@/components/ui/progress"
+import { getProductsByContentType, getProductsCountByContentType, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
-import { CreateReportDialog } from "@/components/create-report-dialog"
-import { useAuth } from "@/contexts/auth-context"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
@@ -37,12 +36,7 @@ export default function AllSitesTab() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingCount, setLoadingCount] = useState(false)
 
-  // Report dialog state
-  const [reportDialogOpen, setReportDialogOpen] = useState(false)
-  const [selectedSiteId, setSelectedSiteId] = useState<string>("")
-
   const { toast } = useToast()
-  const { user, projectData } = useAuth()
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -75,29 +69,25 @@ export default function AllSitesTab() {
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
-    if (!user?.uid) return
-
     setLoadingCount(true)
     try {
-      const count = await getUserProductsCount(user.uid, {
-        active: true,
-        searchTerm: debouncedSearchTerm,
-      })
+      // For all sites, we'll get both static and dynamic content types and combine them
+      const staticCount = await getProductsCountByContentType("static", debouncedSearchTerm)
+      const dynamicCount = await getProductsCountByContentType("dynamic", debouncedSearchTerm)
+      const totalCount = staticCount + dynamicCount
 
-      setTotalItems(count)
-      setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
+      setTotalItems(totalCount)
+      setTotalPages(Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE)))
     } catch (error) {
       console.error("Error fetching total count:", error)
     } finally {
       setLoadingCount(false)
     }
-  }, [user?.uid, debouncedSearchTerm])
+  }, [debouncedSearchTerm])
 
   // Fetch products for the current page
   const fetchProducts = useCallback(
     async (page: number, forceRefresh = false) => {
-      if (!user?.uid) return
-
       // Check if we have this page in cache and not forcing refresh
       if (!forceRefresh && pageCache.has(page)) {
         const cachedData = pageCache.get(page)!
@@ -115,21 +105,39 @@ export default function AllSitesTab() {
         // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
-        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, {
-          active: true,
-          searchTerm: debouncedSearchTerm,
-        })
+        // Get both static and dynamic products
+        const staticResult = await getProductsByContentType("static", ITEMS_PER_PAGE / 2, startDoc, debouncedSearchTerm)
+        const dynamicResult = await getProductsByContentType(
+          "dynamic",
+          ITEMS_PER_PAGE / 2,
+          startDoc,
+          debouncedSearchTerm,
+        )
 
-        setProducts(result.items)
-        setLastDoc(result.lastDoc)
-        setHasMore(result.hasMore)
+        // Combine the results
+        const combinedItems = [...staticResult.items, ...dynamicResult.items]
+
+        // Sort by name for consistency
+        combinedItems.sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+
+        // Take only the first ITEMS_PER_PAGE items
+        const paginatedItems = combinedItems.slice(0, ITEMS_PER_PAGE)
+
+        setProducts(paginatedItems)
+
+        // Use the last doc from either result based on which has more items
+        const lastVisible =
+          staticResult.items.length > dynamicResult.items.length ? staticResult.lastDoc : dynamicResult.lastDoc
+
+        setLastDoc(lastVisible)
+        setHasMore(staticResult.hasMore || dynamicResult.hasMore)
 
         // Cache this page
         setPageCache((prev) => {
           const newCache = new Map(prev)
           newCache.set(page, {
-            items: result.items,
-            lastDoc: result.lastDoc,
+            items: paginatedItems,
+            lastDoc: lastVisible,
           })
           return newCache
         })
@@ -141,23 +149,21 @@ export default function AllSitesTab() {
         setLoadingMore(false)
       }
     },
-    [user?.uid, lastDoc, pageCache, debouncedSearchTerm],
+    [lastDoc, pageCache, debouncedSearchTerm],
   )
 
   // Load initial data and count
   useEffect(() => {
-    if (user?.uid) {
-      fetchProducts(1)
-      fetchTotalCount()
-    }
-  }, [user?.uid, fetchProducts, fetchTotalCount])
+    fetchProducts(1)
+    fetchTotalCount()
+  }, [])
 
   // Load data when page changes
   useEffect(() => {
-    if (currentPage > 0 && user?.uid) {
+    if (currentPage > 0) {
       fetchProducts(currentPage)
     }
-  }, [currentPage, fetchProducts, user?.uid])
+  }, [currentPage, fetchProducts])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -253,44 +259,17 @@ export default function AllSitesTab() {
           : // 50-80 for warning
             Math.floor(Math.random() * 40) + 10) // 10-50 for error
 
-    // Extract address information from different possible locations
-    const address =
-      product.specs_rental?.location ||
-      product.light?.location ||
-      product.location ||
-      product.address ||
-      "Address not specified"
-
     return {
       id: product.id,
-      name: product.name || `Site ${product.id.substring(0, 8)}`,
-      status: product.status || "UNKNOWN",
+      name: product.name,
+      status: product.status,
       statusColor,
       image,
       notifications,
-      address,
+      location: product.specs_rental?.location || product.light?.location || "Unknown location",
       contentType: product.content_type || "static",
       healthPercentage,
-      siteCode: product.site_code || product.id.substring(0, 8),
-      operationalStatus:
-        product.status === "ACTIVE" || product.status === "OCCUPIED"
-          ? "Operational"
-          : product.status === "MAINTENANCE" || product.status === "REPAIR"
-            ? "Under Maintenance"
-            : product.status === "PENDING" || product.status === "INSTALLATION"
-              ? "Pending Setup"
-              : "Inactive",
     }
-  }
-
-  // Show loading if no user
-  if (!user) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-        <p className="text-gray-500">Loading user data...</p>
-      </div>
-    )
   }
 
   return (
@@ -349,7 +328,7 @@ export default function AllSitesTab() {
         <div className="bg-red-50 border border-red-200 rounded-md p-4 text-center">
           <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
           <p className="text-red-700">{error}</p>
-          <Button variant="outline" className="mt-4 bg-transparent" onClick={() => fetchProducts(1, true)}>
+          <Button variant="outline" className="mt-4" onClick={() => fetchProducts(1, true)}>
             Try Again
           </Button>
         </div>
@@ -379,14 +358,9 @@ export default function AllSitesTab() {
       {!loading && !error && products.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
           {products.map((product) => (
-            <UnifiedSiteCard
-              key={product.id}
-              site={productToSite(product)}
-              onCreateReport={(siteId) => {
-                setSelectedSiteId(siteId)
-                setReportDialogOpen(true)
-              }}
-            />
+            <Link href={`/logistics/sites/${product.id}`} key={product.id}>
+              <UnifiedSiteCard site={productToSite(product)} />
+            </Link>
           ))}
         </div>
       )}
@@ -423,7 +397,7 @@ export default function AllSitesTab() {
               size="sm"
               onClick={goToPreviousPage}
               disabled={currentPage === 1}
-              className="h-8 w-8 p-0 bg-transparent"
+              className="h-8 w-8 p-0"
             >
               <ChevronLeft size={16} />
             </Button>
@@ -461,31 +435,15 @@ export default function AllSitesTab() {
           </div>
         </div>
       )}
-
-      {/* Report Dialog */}
-      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
     </div>
   )
 }
 
-// Unified Site Card that matches the exact reference design
-function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
-  const handleCreateReport = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    onCreateReport(site.id)
-  }
-
-  const handleCardClick = () => {
-    window.location.href = `/logistics/sites/${site.id}`
-  }
-
+// Unified Site Card that shows all UI elements without conditions
+function UnifiedSiteCard({ site }: { site: any }) {
   return (
-    <Card
-      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full max-w-[200px]"
-      onClick={handleCardClick}
-    >
-      <div className="relative h-32 bg-gray-200">
+    <Card className="erp-card overflow-hidden hover:shadow-md transition-shadow">
+      <div className="relative h-48 bg-gray-200">
         <Image
           src={site.image || "/placeholder.svg"}
           alt={site.name}
@@ -497,94 +455,72 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             target.className = "opacity-50 object-contain"
           }}
         />
-
-        {/* Status Badge - Bottom Left */}
-        <div className="absolute bottom-2 left-2">
-          <div className="px-2 py-1 rounded text-xs font-bold text-white" style={{ backgroundColor: "#38b6ff" }}>
-            {site.operationalStatus === "Operational"
-              ? "OPEN"
-              : site.operationalStatus === "Under Maintenance"
-                ? "MAINTENANCE"
-                : site.operationalStatus === "Pending Setup"
-                  ? "PENDING"
-                  : "CLOSED"}
+        {site.notifications > 0 && (
+          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+            {site.notifications}
           </div>
+        )}
+
+        {/* Content Type Badge */}
+        <div className="absolute top-2 left-2">
+          <Badge
+            variant="outline"
+            className={`
+              ${site.contentType === "dynamic" ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-amber-50 text-amber-700 border-amber-200"}
+            `}
+          >
+            {site.contentType === "dynamic" ? "Digital" : "Static"}
+          </Badge>
         </div>
       </div>
 
-      <CardContent className="p-3">
-        <div className="flex flex-col gap-2">
-          {/* Site Code */}
-          <div className="text-xs text-gray-500 uppercase tracking-wide">{site.siteCode}</div>
+      <CardContent className="p-4">
+        <div className="flex flex-col gap-1">
+          <h3 className="font-semibold">{site.name}</h3>
 
-          {/* Site Name with Badge */}
-          <div className="flex items-center gap-2">
-            <h3 className="font-bold text-sm text-gray-900 truncate">{site.name}</h3>
-            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0">
-              {site.contentType === "dynamic" ? "M" : "S"}
-            </div>
+          <div className="text-sm text-gray-500 mt-1">{site.location}</div>
+
+          {/* Status Badge */}
+          <div className="mt-2 flex items-center gap-2">
+            <div className="text-sm font-medium">Status:</div>
+            <Badge
+              variant="outline"
+              className={`
+                ${site.statusColor === "green" ? "bg-green-50 text-green-700 border-green-200" : ""}
+                ${site.statusColor === "blue" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
+                ${site.statusColor === "red" ? "bg-red-50 text-red-700 border-red-200" : ""}
+                ${site.statusColor === "orange" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
+              `}
+            >
+              {site.status}
+            </Badge>
           </div>
 
-          {/* Site Information */}
-          <div className="space-y-1 text-xs">
-            <div className="flex flex-col">
-              <span className="text-black">
-                <span className="font-bold">Operation:</span>
-                <span
-                  className={`ml-1 ${
-                    site.operationalStatus === "Operational"
-                      ? "text-black"
-                      : site.operationalStatus === "Under Maintenance"
-                        ? "text-black"
-                        : site.operationalStatus === "Pending Setup"
-                          ? "text-black"
-                          : "text-black"
-                  }`}
-                >
-                  {site.operationalStatus === "Operational"
-                    ? "Active"
-                    : site.operationalStatus === "Under Maintenance"
-                      ? "Maintenance"
-                      : site.operationalStatus === "Pending Setup"
-                        ? "Pending"
-                        : "Inactive"}
-                </span>
-              </span>
+          {/* Health Percentage */}
+          <div className="mt-3">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm font-medium">Health:</span>
+              <span className="text-sm">{site.healthPercentage}%</span>
             </div>
-
-            <div className="flex flex-col">
-              <span className="text-black">
-                <span className="font-bold">Display Health:</span>
-                <span className="ml-1" style={{ color: "#00bf63" }}>
-                  {site.healthPercentage > 90
-                    ? "100%"
-                    : site.healthPercentage > 80
-                      ? "90%"
-                      : site.healthPercentage > 60
-                        ? "75%"
-                        : "50%"}
-                </span>
-              </span>
-            </div>
-
-            <div className="flex flex-col">
-              <span className="text-black">
-                <span className="font-bold">Compliance:</span>
-                <span className="ml-1 text-black">
-                  {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}
-                </span>
-              </span>
-            </div>
+            <Progress
+              value={site.healthPercentage}
+              className="h-2"
+              indicatorClassName={`
+                ${site.healthPercentage > 80 ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
+                ${site.healthPercentage > 60 && site.healthPercentage <= 80 ? "bg-gradient-to-r from-yellow-500 to-green-300" : ""}
+                ${site.healthPercentage > 40 && site.healthPercentage <= 60 ? "bg-gradient-to-r from-orange-500 to-yellow-300" : ""}
+                ${site.healthPercentage <= 40 ? "bg-gradient-to-r from-red-500 to-orange-300" : ""}
+              `}
+            />
           </div>
 
-          {/* Create Report Button */}
-          <Button
-            variant="secondary"
-            className="mt-3 w-full h-8 text-xs bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
-            onClick={handleCreateReport}
-          >
-            Create Report
-          </Button>
+          {/* Additional Information */}
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Last Updated:</span>
+              <span className="text-sm text-gray-500">Today</span>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>

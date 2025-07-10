@@ -19,10 +19,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  Search,
   Clock,
+  Search,
+  Monitor,
   Play,
-  Repeat,
+  AlertCircle,
+  MapPin,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -60,12 +62,6 @@ const mapProductToContent = (product: Product) => {
     approvalStatus: product.approval_status || "Pending",
     campaignName: product.campaign_name || "Unassigned",
     impressions: product.impressions || 0,
-    // CMS specific fields
-    cms: product.cms || null,
-    productId: product.id?.substring(0, 8).toUpperCase() || "UNKNOWN",
-    location: product.specs_rental?.location || "Unknown Location",
-    operation: product.campaignName || "Unassigned Campaign",
-    displayHealth: product.active ? "ON" : "OFF",
   }
 }
 
@@ -362,7 +358,7 @@ export default function CMSDashboardPage() {
   const mockContent = [
     {
       id: "1",
-      title: "Bocaue 11",
+      title: "Summer Sale Billboard",
       type: "Billboard",
       status: "Published",
       author: "John Smith",
@@ -378,21 +374,10 @@ export default function CMSDashboardPage() {
       approvalStatus: "Approved",
       campaignName: "Summer 2023",
       impressions: 45000,
-      productId: "NAN20010",
-      location: "Bocaue 11",
-      operation: "MerryMart",
-      displayHealth: "ON",
-      cms: {
-        start_time: "16:44",
-        end_time: "18:44",
-        spot_duration: 15,
-        loops_per_day: 20,
-        spots_per_loop: 5,
-      },
     },
     {
       id: "2",
-      title: "EDSA Corner Shaw",
+      title: "New Product Launch",
       type: "LED Display",
       status: "Draft",
       author: "Sarah Johnson",
@@ -408,21 +393,10 @@ export default function CMSDashboardPage() {
       approvalStatus: "Pending",
       campaignName: "Q3 Launch",
       impressions: 0,
-      productId: "LED20011",
-      location: "EDSA Corner Shaw",
-      operation: "Jollibee Campaign",
-      displayHealth: "OFF",
-      cms: {
-        start_time: "08:00",
-        end_time: "22:00",
-        spot_duration: 30,
-        loops_per_day: 48,
-        spots_per_loop: 3,
-      },
     },
     {
       id: "3",
-      title: "Ayala Triangle",
+      title: "Holiday Special Promotion",
       type: "LED Display",
       status: "Published",
       author: "Michael Brown",
@@ -438,21 +412,10 @@ export default function CMSDashboardPage() {
       approvalStatus: "Approved",
       campaignName: "Holiday 2023",
       impressions: 28500,
-      productId: "AYA30001",
-      location: "Ayala Triangle",
-      operation: "Samsung Promo",
-      displayHealth: "ON",
-      cms: {
-        start_time: "06:00",
-        end_time: "24:00",
-        spot_duration: 20,
-        loops_per_day: 72,
-        spots_per_loop: 4,
-      },
     },
     {
       id: "4",
-      title: "BGC Central Square",
+      title: "Brand Awareness Campaign",
       type: "Billboard",
       status: "Review",
       author: "Emily Davis",
@@ -468,17 +431,6 @@ export default function CMSDashboardPage() {
       approvalStatus: "In Review",
       campaignName: "Brand Expansion",
       impressions: 0,
-      productId: "BGC40001",
-      location: "BGC Central Square",
-      operation: "Nike Campaign",
-      displayHealth: "ON",
-      cms: {
-        start_time: "07:00",
-        end_time: "23:00",
-        spot_duration: 25,
-        loops_per_day: 32,
-        spots_per_loop: 6,
-      },
     },
   ]
 
@@ -496,6 +448,75 @@ export default function CMSDashboardPage() {
         {/* Screen Analytics Monitoring */}
         {!loading && (
           <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              <Card
+                className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                onClick={handleNavigateToActiveScreens}
+              >
+                <CardContent className="p-3">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Active Screens</p>
+                      <h3 className="text-2xl font-bold">42</h3>
+                    </div>
+                    <div className="bg-green-100 p-1.5 rounded-full">
+                      <Monitor className="h-4 w-4 text-green-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card
+                className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                onClick={handleNavigateToInactiveScreens}
+              >
+                <CardContent className="p-3">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Inactive Screens</p>
+                      <h3 className="text-2xl font-bold">1,284</h3>
+                    </div>
+                    <div className="bg-blue-100 p-1.5 rounded-full">
+                      <Play className="h-4 w-4 text-blue-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card
+                className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                onClick={handleNavigateToWarnings}
+              >
+                <CardContent className="p-3">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Warnings</p>
+                      <h3 className="text-2xl font-bold">3</h3>
+                    </div>
+                    <div className="bg-amber-100 p-1.5 rounded-full">
+                      <AlertCircle className="h-4 w-4 text-amber-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card
+                className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                onClick={handleNavigateToOrders}
+              >
+                <CardContent className="p-3">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Pending Orders</p>
+                      <h3 className="text-2xl font-bold">7</h3>
+                    </div>
+                    <div className="bg-purple-100 p-1.5 rounded-full">
+                      <Clock className="h-4 w-4 text-purple-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
             <Separator className="my-3" />
           </>
         )}
@@ -537,6 +558,10 @@ export default function CMSDashboardPage() {
                   <List size={18} />
                 </Button>
               </div>
+              <Button onClick={handleAddContent} className="flex items-center gap-2">
+                <Plus size={16} />
+                Add Content
+              </Button>
             </div>
           </div>
         )}
@@ -696,7 +721,7 @@ export default function CMSDashboardPage() {
                 size="sm"
                 onClick={goToPreviousPage}
                 disabled={currentPage === 1}
-                className="h-8 w-8 p-0 bg-transparent"
+                className="h-8 w-8 p-0"
               >
                 <ChevronLeft size={16} />
               </Button>
@@ -763,10 +788,10 @@ function ContentCard({
 }) {
   return (
     <Card
-      className="overflow-hidden cursor-pointer transition-all border border-gray-300 shadow-sm hover:shadow-md rounded-lg bg-white"
+      className="overflow-hidden cursor-pointer transition-all border border-gray-200 shadow-sm hover:shadow-md"
       onClick={onView}
     >
-      <div className="h-32 bg-gray-200 relative">
+      <div className="h-48 bg-gray-200 relative">
         <Image
           src={content.thumbnail || "/placeholder.svg"}
           alt={content.title || "Content thumbnail"}
@@ -779,31 +804,27 @@ function ContentCard({
           }}
         />
 
-        {/* Status Badge - positioned at bottom left of image */}
-        <div className="absolute bottom-2 left-2 z-10">
+        {/* Status Badge */}
+        <div className="absolute top-2 left-2 z-10">
           <Badge
+            variant="outline"
             className={`${
               content.status === "Published"
-                ? "bg-blue-500 text-white border-0 font-medium px-3 py-1"
+                ? "bg-green-50 text-green-700 border-green-200"
                 : content.status === "Draft"
-                  ? "bg-orange-500 text-white border-0 font-medium px-3 py-1"
-                  : "bg-gray-500 text-white border-0 font-medium px-3 py-1"
+                  ? "bg-blue-50 text-blue-700 border-blue-200"
+                  : "bg-amber-50 text-amber-700 border-amber-200"
             }`}
           >
-            {content.status === "Published" ? "OCCUPIED" : content.status.toUpperCase()}
+            {content.status}
           </Badge>
         </div>
 
-        {/* Action Menu - top right */}
         <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="secondary"
-                size="icon"
-                className="h-7 w-7 bg-white/90 backdrop-blur-sm border-0 shadow-sm"
-              >
-                <MoreVertical size={14} />
+              <Button variant="secondary" size="icon" className="h-8 w-8 bg-white/80 backdrop-blur-sm">
+                <MoreVertical size={16} />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -824,44 +845,43 @@ function ContentCard({
         </div>
       </div>
 
-      <CardContent className="p-3">
-        <div className="flex flex-col space-y-2">
+      <CardContent className="p-4">
+        <div className="flex flex-col">
+          <h3 className="text-lg font-semibold line-clamp-1 mb-1">{content.title}</h3>
+          <p className="text-sm text-gray-500 mb-2 flex items-center gap-1">
+            <MapPin className="h-3.5 w-3.5" />
+            <span>Edsa corner Aurora Blvd.</span>
+          </p>
 
-          {/* Title/Location */}
-          <h3 className="text-base font-semibold text-gray-900">{content.title}</h3>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 text-sm">
+            <div className="flex items-center gap-1 text-gray-600">
+              <Monitor className="h-3.5 w-3.5" />
+              <span>{content.dimensions}</span>
+            </div>
 
-          {/* Location Info */}
-          <div className="text-sm text-gray-700">
-            <div className="flex items-center gap-1 mb-1 line-clamp-1">
-              <span>{content.location}</span>
+            <div className="flex items-center gap-1 text-gray-600">
+              <Clock className="h-3.5 w-3.5" />
+              <span>{content.duration}</span>
+            </div>
+
+            <div className="flex items-center gap-1 text-gray-600">
+              <FileText className="h-3.5 w-3.5" />
+              <span>{content.format}</span>
+            </div>
+
+            <div className="flex items-center gap-1 text-gray-600">
+              <Badge variant="outline" className="h-5 px-1.5 text-xs">
+                {content.approvalStatus}
+              </Badge>
             </div>
           </div>
 
-          {/* CMS Schedule Info */}
-          {content.cms && (
-            <div className="mt-2 pt-2 border-t border-gray-100">
-              <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
-                <div className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  <span>
-                    {content.cms.start_time} - {content.cms.end_time}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Play className="h-3 w-3" />
-                  <span>{content.cms.spot_duration}s spots</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Repeat className="h-3 w-3" />
-                  <span>{content.cms.loops_per_day} loops/day</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-xs">•</span>
-                  <span>{content.cms.spots_per_loop} spots/loop</span>
-                </div>
-              </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <div className="flex justify-between items-center text-xs text-gray-500">
+              <span>Campaign: {content.campaignName}</span>
+              <span>Modified: {content.dateModified}</span>
             </div>
-          )}
+          </div>
         </div>
       </CardContent>
     </Card>
