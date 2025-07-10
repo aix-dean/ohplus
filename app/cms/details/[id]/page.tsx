@@ -334,11 +334,7 @@ export default async function Page({ params }: Props) {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                <span>Loops per day: {product.cms.loops_per_day}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                <span>Spots per loop: {spotsPerLoop}</span>
+                <span>Spots per loop: {product.cms.loops_per_day}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
