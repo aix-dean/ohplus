@@ -964,6 +964,155 @@ export async function getQuotationsByRequestId(quotationRequestId: string): Prom
   }
 }
 
+// Get products by content type and company with pagination and filtering
+export async function getProductsByContentTypeAndCompany(
+  contentType: string,
+  itemsPerPage = 16,
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
+  searchTerm = "",
+): Promise<PaginatedResult<Product>> {
+  try {
+    const productsRef = collection(db, "products")
+
+    // Create base query - filter out deleted products
+    const baseQuery = query(productsRef, where("deleted", "==", false), orderBy("name", "asc"))
+
+    // If search term is provided, we need to handle it differently
+    if (searchTerm) {
+      // For search, we need to fetch more items and filter client-side
+      // This is because Firestore doesn't support case-insensitive search
+      const searchQuery = lastDoc
+        ? query(baseQuery, startAfter(lastDoc), limit(itemsPerPage * 3)) // Fetch more to account for filtering
+        : query(baseQuery, limit(itemsPerPage * 3))
+
+      const querySnapshot = await getDocs(searchQuery)
+
+      // Filter client-side for content_type, company_id and search term
+      const searchLower = searchTerm.toLowerCase()
+      const contentTypeLower = contentType.toLowerCase()
+
+      const filteredDocs = querySnapshot.docs.filter((doc) => {
+        const product = doc.data() as Product
+        const productContentType = (product.content_type || "").toLowerCase()
+
+        // Check content type match
+        if (productContentType !== contentTypeLower) return false
+
+        // Check if product has company_id (filter out products without company_id)
+        if (!product.company_id) return false
+
+        // Check search term match
+        return (
+          product.name?.toLowerCase().includes(searchLower) ||
+          product.light?.location?.toLowerCase().includes(searchLower) ||
+          product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
+          product.description?.toLowerCase().includes(searchLower)
+        )
+      })
+
+      // Apply pagination to filtered results
+      const paginatedDocs = filteredDocs.slice(0, itemsPerPage)
+      const lastVisible = paginatedDocs.length > 0 ? paginatedDocs[paginatedDocs.length - 1] : null
+
+      // Convert to products
+      const products = paginatedDocs.map((doc) => ({ id: doc.id, ...doc.data() }) as Product)
+
+      return {
+        items: products,
+        lastDoc: lastVisible,
+        hasMore: filteredDocs.length > itemsPerPage,
+      }
+    } else {
+      // If no search term, we can use a more efficient query
+      const paginatedQuery = lastDoc
+        ? query(baseQuery, limit(itemsPerPage * 2), startAfter(lastDoc))
+        : query(baseQuery, limit(itemsPerPage * 2))
+
+      const querySnapshot = await getDocs(paginatedQuery)
+
+      // Filter for content_type and company_id (case insensitive)
+      const contentTypeLower = contentType.toLowerCase()
+      const filteredDocs = querySnapshot.docs.filter((doc) => {
+        const product = doc.data() as Product
+        const productContentType = (product.content_type || "").toLowerCase()
+
+        // Check content type match and has company_id
+        return productContentType === contentTypeLower && product.company_id
+      })
+
+      // Apply pagination to filtered results
+      const paginatedDocs = filteredDocs.slice(0, itemsPerPage)
+      const lastVisible = paginatedDocs.length > 0 ? paginatedDocs[paginatedDocs.length - 1] : null
+
+      // Convert to products
+      const products = paginatedDocs.map((doc) => ({ id: doc.id, ...doc.data() }) as Product)
+
+      return {
+        items: products,
+        lastDoc: lastVisible,
+        hasMore: filteredDocs.length > itemsPerPage,
+      }
+    }
+  } catch (error) {
+    console.error(`Error fetching products by content type and company (${contentType}):`, error)
+    return {
+      items: [],
+      lastDoc: null,
+      hasMore: false,
+    }
+  }
+}
+
+// Get count of products by content type and company
+export async function getProductsCountByContentTypeAndCompany(contentType: string, searchTerm = ""): Promise<number> {
+  try {
+    const productsRef = collection(db, "products")
+
+    // Create base query - filter out deleted products
+    const baseQuery = query(productsRef, where("deleted", "==", false))
+
+    const querySnapshot = await getDocs(baseQuery)
+
+    // Filter for content_type, company_id and search term
+    const contentTypeLower = contentType.toLowerCase()
+    let count = 0
+
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
+
+      querySnapshot.forEach((doc) => {
+        const product = doc.data() as Product
+        const productContentType = (product.content_type || "").toLowerCase()
+
+        if (productContentType === contentTypeLower && product.company_id) {
+          if (
+            product.name?.toLowerCase().includes(searchLower) ||
+            product.light?.location?.toLowerCase().includes(searchLower) ||
+            product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
+            product.description?.toLowerCase().includes(searchLower)
+          ) {
+            count++
+          }
+        }
+      })
+    } else {
+      querySnapshot.forEach((doc) => {
+        const product = doc.data() as Product
+        const productContentType = (product.content_type || "").toLowerCase()
+
+        if (productContentType === contentTypeLower && product.company_id) {
+          count++
+        }
+      })
+    }
+
+    return count
+  } catch (error) {
+    console.error(`Error getting count of products by content type and company (${contentType}):`, error)
+    return 0
+  }
+}
+
 /**
  * Uploads a file to Firebase Storage.
  * @param file The file to upload.
