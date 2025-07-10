@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Calendar, User, Building, Loader2, AlertCircle } from "lucide-react"
+import { ArrowLeft, Calendar, User, Building, Loader2, AlertCircle, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { getProductById, type Product } from "@/lib/firebase-service"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 import Image from "next/image"
 
 interface ProjectMonitoringEntry {
@@ -23,6 +24,7 @@ export default function SiteDetailsPage({ params }: { params: { id: string } }) 
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
 
   const { user } = useAuth()
 
@@ -144,7 +146,7 @@ export default function SiteDetailsPage({ params }: { params: { id: string } }) 
   }
 
   return (
-    <div className="container mx-auto py-6 px-4">
+    <div className="container mx-auto py-6 px-4 relative">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
         <Link href="/logistics/bulletin-board">
@@ -265,6 +267,20 @@ export default function SiteDetailsPage({ params }: { params: { id: string } }) 
           </div>
         </CardContent>
       </Card>
+
+      {/* Floating Report Button - Bottom Left */}
+      <div className="fixed bottom-8 left-8 z-10">
+        <Button
+          onClick={() => setReportDialogOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg h-14 px-6"
+          size="lg"
+        >
+          <Plus className="mr-2 h-5 w-5" /> Create Report
+        </Button>
+      </div>
+
+      {/* Create Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={params.id} />
     </div>
   )
 }
