@@ -515,25 +515,23 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
           {/* Site Information */}
           <div className="space-y-1 text-xs">
             <div className="flex flex-col">
-              <span className="text-gray-600">
+              <span className="text-black">
                 <span className="font-bold">Operation:</span>
-                <span className={`ml-1 font-semibold text-black`}>
-                  {site.status === "ACTIVE" ? "Active" : site.status}
-                </span>
+                <span className="ml-1 text-black">{site.status === "ACTIVE" ? "Active" : site.status}</span>
               </span>
             </div>
             <div className="flex flex-col">
-              <span className="text-gray-600">
+              <span className="text-black">
                 <span className="font-bold">Display Health:</span>
-                <span className="ml-1 font-semibold" style={{ color: "#00bf63" }}>
+                <span className="ml-1" style={{ color: "#00bf63" }}>
                   100%
                 </span>
               </span>
             </div>
             <div className="flex flex-col">
-              <span className="text-gray-600">
+              <span className="text-black">
                 <span className="font-bold">Compliance:</span>
-                <span className="ml-1 font-semibold text-black">Complete</span>
+                <span className="ml-1 text-black">Complete</span>
               </span>
             </div>
           </div>
