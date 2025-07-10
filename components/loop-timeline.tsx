@@ -10,7 +10,7 @@ import { db } from "@/lib/firebase"
 
 interface CMSData {
   end_time: string
-  loops_per_day: number
+  spot_per_loop: number
   spot_duration: number
   start_time: string
 }
@@ -73,7 +73,7 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
   const startTimeStr = cmsData.start_time // "16:44"
   const endTimeStr = cmsData.end_time // "18:44"
   const spotDuration = cmsData.spot_duration // 15 seconds
-  const loopsPerDay = cmsData.loops_per_day // 20
+  const loopsPerDay = cmsData.spot_per_loop // 20
 
   // Calculate spots per loop based on time difference
   const calculateSpotsPerLoop = () => {
