@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { UserPlus, Settings, Mail, Shield, Edit } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
@@ -244,7 +244,6 @@ export default function UserManagementPage() {
       <Card>
         <CardHeader>
           <CardTitle>Organization Users ({users.length})</CardTitle>
-          <CardDescription>Manage users within your organization</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveTable data={users} columns={columns} keyField="id" />
