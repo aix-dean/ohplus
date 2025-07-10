@@ -531,14 +531,14 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
               <span className="text-gray-600">
                 <span className="font-bold">Operation:</span>
                 <span
-                  className={`font-semibold ml-1 ${
+                  className={`ml-1 ${
                     site.operationalStatus === "Operational"
-                      ? "text-green-600"
+                      ? "text-black font-semibold"
                       : site.operationalStatus === "Under Maintenance"
-                        ? "text-red-600"
+                        ? "text-black font-semibold"
                         : site.operationalStatus === "Pending Setup"
-                          ? "text-orange-600"
-                          : "text-gray-600"
+                          ? "text-black font-semibold"
+                          : "text-black font-semibold"
                   }`}
                 >
                   {site.operationalStatus === "Operational"
@@ -555,17 +555,14 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             <div className="flex flex-col">
               <span className="text-gray-600">
                 <span className="font-bold">Display Health:</span>
-                <span className="font-semibold ml-1 text-black">
+                <span className="ml-1 font-semibold" style={{ color: "#00bf63" }}>
                   {site.healthPercentage > 90
-                    ? "100"
+                    ? "100%"
                     : site.healthPercentage > 80
-                      ? "90"
+                      ? "90%"
                       : site.healthPercentage > 60
-                        ? "75"
-                        : "50"}
-                </span>
-                <span className="font-semibold" style={{ color: "#00bf63" }}>
-                  %
+                        ? "75%"
+                        : "50%"}
                 </span>
               </span>
             </div>
@@ -574,8 +571,8 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
               <span className="text-gray-600">
                 <span className="font-bold">Compliance:</span>
                 <span
-                  className={`font-semibold ml-1 ${
-                    site.operationalStatus === "Operational" ? "text-green-600" : "text-red-600"
+                  className={`ml-1 font-semibold ${
+                    site.operationalStatus === "Operational" ? "text-black" : "text-black"
                   }`}
                 >
                   {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}

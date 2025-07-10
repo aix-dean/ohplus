@@ -517,7 +517,7 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
             <div className="flex flex-col">
               <span className="text-gray-600">
                 <span className="font-bold">Operation:</span>
-                <span className={`font-semibold ml-1 ${site.status === "ACTIVE" ? "text-green-600" : "text-gray-800"}`}>
+                <span className={`ml-1 font-semibold text-black`}>
                   {site.status === "ACTIVE" ? "Active" : site.status}
                 </span>
               </span>
@@ -525,16 +525,15 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
             <div className="flex flex-col">
               <span className="text-gray-600">
                 <span className="font-bold">Display Health:</span>
-                <span className="font-semibold ml-1 text-black">100</span>
-                <span className="font-semibold" style={{ color: "#00bf63" }}>
-                  %
+                <span className="ml-1 font-semibold" style={{ color: "#00bf63" }}>
+                  100%
                 </span>
               </span>
             </div>
             <div className="flex flex-col">
               <span className="text-gray-600">
                 <span className="font-bold">Compliance:</span>
-                <span className="font-semibold ml-1 text-green-600">Complete</span>
+                <span className="ml-1 font-semibold text-black">Complete</span>
               </span>
             </div>
           </div>
