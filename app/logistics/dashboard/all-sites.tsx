@@ -468,7 +468,7 @@ export default function AllSitesTab() {
   )
 }
 
-// Unified Site Card that shows all UI elements with Create Report button
+// Unified Site Card that matches the exact reference design
 function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -482,10 +482,10 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
 
   return (
     <Card
-      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg"
+      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full max-w-[200px]"
       onClick={handleCardClick}
     >
-      <div className="relative h-48 bg-gray-200">
+      <div className="relative h-32 bg-gray-200">
         <Image
           src={site.image || "/placeholder.svg"}
           alt={site.name}
@@ -503,7 +503,7 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
           <div
             className={`px-2 py-1 rounded text-xs font-bold text-white ${
               site.operationalStatus === "Operational"
-                ? "bg-green-500"
+                ? "bg-blue-500"
                 : site.operationalStatus === "Under Maintenance"
                   ? "bg-red-500"
                   : site.operationalStatus === "Pending Setup"
@@ -520,13 +520,6 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
                   : "CLOSED"}
           </div>
         </div>
-
-        {/* Notification Badge - Top Right */}
-        {site.notifications > 0 && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-            {site.notifications}
-          </div>
-        )}
       </div>
 
       <CardContent className="p-3">
@@ -536,9 +529,9 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
 
           {/* Site Name with Badge */}
           <div className="flex items-center gap-2">
-            <h3 className="font-bold text-base text-gray-900">{site.name}</h3>
-            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold">
-              {site.contentType === "dynamic" ? "D" : "S"}
+            <h3 className="font-bold text-sm text-gray-900 truncate">{site.name}</h3>
+            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0">
+              {site.contentType === "dynamic" ? "M" : "S"}
             </div>
           </div>
 
@@ -603,7 +596,7 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
           {/* Create Report Button */}
           <Button
             variant="secondary"
-            className="mt-3 w-full h-9 text-sm bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
+            className="mt-3 w-full h-8 text-xs bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
             onClick={handleCreateReport}
           >
             Create Report

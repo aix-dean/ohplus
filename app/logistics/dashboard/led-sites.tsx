@@ -410,7 +410,7 @@ export default function LEDSitesTab() {
   )
 }
 
-// LED Site Card component
+// LED Site Card that matches the exact reference design
 function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -422,16 +422,12 @@ function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (sit
     window.location.href = `/logistics/sites/${site.id}`
   }
 
-  // Mock data for demonstration - in real app, this would come from the product data
-  const mockAssignmentCount = Math.floor(Math.random() * 10) + 1
-  const mockContent = "Lilo and Stitch"
-
   return (
     <Card
-      className="overflow-hidden cursor-pointer border border-gray-200 shadow-sm rounded-lg transition-all hover:shadow-lg bg-white"
+      className="overflow-hidden cursor-pointer border border-gray-200 shadow-sm rounded-lg transition-all hover:shadow-lg bg-white w-full max-w-[200px]"
       onClick={handleCardClick}
     >
-      <div className="relative h-48 bg-gray-200">
+      <div className="relative h-32 bg-gray-200">
         <Image
           src={site.image || "/placeholder.svg"}
           alt={site.name}
@@ -448,16 +444,11 @@ function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (sit
         <div className="absolute top-2 left-2">
           <div
             className={`px-2 py-1 rounded text-xs font-bold text-white ${
-              site.status === "ACTIVE" ? "bg-green-500" : "bg-gray-500"
+              site.status === "ACTIVE" ? "bg-blue-500" : "bg-gray-500"
             }`}
           >
             {site.status === "ACTIVE" ? "OPEN" : site.status}
           </div>
-        </div>
-
-        {/* Assignment Count Badge - Top Right */}
-        <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-          {mockAssignmentCount}
         </div>
       </div>
 
@@ -468,8 +459,8 @@ function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (sit
 
           {/* Site Name with Badge */}
           <div className="flex items-center gap-2">
-            <h3 className="font-bold text-base text-gray-900">{site.name}</h3>
-            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold">D</div>
+            <h3 className="font-bold text-sm text-gray-900 truncate">{site.name}</h3>
+            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0">M</div>
           </div>
 
           {/* Site Information */}
@@ -482,7 +473,7 @@ function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (sit
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Display Health:</span>
-              <span className="font-semibold text-green-600">95%</span>
+              <span className="font-semibold text-green-600">100%</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Compliance:</span>
@@ -493,7 +484,7 @@ function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (sit
           {/* Create Report Button */}
           <Button
             variant="secondary"
-            className="mt-3 w-full h-9 text-sm bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
+            className="mt-3 w-full h-8 text-xs bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
             onClick={handleCreateReport}
           >
             Create Report
