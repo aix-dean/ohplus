@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Calendar, User, Building, Loader2, AlertCircle, FileText } from "lucide-react"
+import { ArrowLeft, Calendar, User, Building, Loader2, AlertCircle, FileText, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { getProductById, type Product } from "@/lib/firebase-service"
@@ -25,6 +26,7 @@ export default function SiteDetailsPage({ params }: { params: { id: string } }) 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false)
 
   const { user } = useAuth()
 
@@ -116,6 +118,10 @@ export default function SiteDetailsPage({ params }: { params: { id: string } }) 
     if (name?.toLowerCase().includes("fairy")) return "bg-pink-500"
     if (name?.toLowerCase().includes("funalo")) return "bg-gray-800"
     return "bg-blue-500"
+  }
+
+  const handleSeeAttachment = () => {
+    setPdfViewerOpen(true)
   }
 
   if (loading) {
@@ -253,7 +259,7 @@ export default function SiteDetailsPage({ params }: { params: { id: string } }) 
                     <td className="px-6 py-4 text-sm text-gray-900">{entry.update}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {entry.hasAttachment ? (
-                        <Button variant="link" className="text-blue-600 p-0 h-auto">
+                        <Button variant="link" className="text-blue-600 p-0 h-auto" onClick={handleSeeAttachment}>
                           See Attachment
                         </Button>
                       ) : (
@@ -281,6 +287,129 @@ export default function SiteDetailsPage({ params }: { params: { id: string } }) 
 
       {/* Create Report Dialog */}
       {product && <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={product.id} />}
+
+      {/* PDF Viewer Dialog */}
+      <Dialog open={pdfViewerOpen} onOpenChange={setPdfViewerOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] w-full h-full p-0">
+          <div className="relative w-full h-full bg-white">
+            {/* Close Button */}
+            <button
+              onClick={() => setPdfViewerOpen(false)}
+              className="absolute top-4 right-4 z-10 bg-gray-100 hover:bg-gray-200 p-2 rounded-full"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            {/* PDF Content */}
+            <div className="p-8 h-full overflow-y-auto">
+              {/* Header */}
+              <div className="text-center mb-8">
+                <h1 className="text-2xl font-bold text-gray-800 mb-2">Completion Report</h1>
+                <p className="text-gray-600">as of July 10, 2025</p>
+              </div>
+
+              {/* Project Information */}
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b-2 border-blue-500 pb-2">
+                  Project Information
+                </h2>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium">Site ID:</span> {product.id}
+                  </div>
+                  <div>
+                    <span className="font-medium">Location:</span> Guadalupe Viejo
+                  </div>
+                  <div>
+                    <span className="font-medium">Job Order:</span> KTHB
+                  </div>
+                  <div>
+                    <span className="font-medium">Job Order Date:</span> July 10, 2025
+                  </div>
+                  <div>
+                    <span className="font-medium">Site:</span> P01
+                  </div>
+                  <div>
+                    <span className="font-medium">Size:</span> N/A
+                  </div>
+                  <div>
+                    <span className="font-medium">Start Date:</span> May 20, 2025
+                  </div>
+                  <div>
+                    <span className="font-medium">End Date:</span> June 20, 2025
+                  </div>
+                  <div>
+                    <span className="font-medium">Installation Duration:</span> 31 days
+                  </div>
+                  <div>
+                    <span className="font-medium">Content:</span> Static
+                  </div>
+                  <div>
+                    <span className="font-medium">Material Specs:</span> N/A
+                  </div>
+                  <div>
+                    <span className="font-medium">Crew:</span> Team A
+                  </div>
+                  <div>
+                    <span className="font-medium">Illumination:</span> N/A
+                  </div>
+                  <div>
+                    <span className="font-medium">Gondola:</span> NO
+                  </div>
+                  <div>
+                    <span className="font-medium">Technology:</span> N/A
+                  </div>
+                  <div>
+                    <span className="font-medium">Sales:</span> aixymbiosis@aix.com
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Project Status:</span>
+                    <div className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-bold">100%</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Report Details */}
+              <div className="mb-8">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h3 className="font-semibold text-gray-800 mb-2">report.pdf</h3>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <div>
+                      <span className="font-medium">Date:</span> July 10, 2025
+                    </div>
+                    <div>
+                      <span className="font-medium">Time:</span> 10:28 AM
+                    </div>
+                    <div>
+                      <span className="font-medium">Location:</span> Guadalupe Viejo
+                    </div>
+                    <div>
+                      <span className="font-medium">Prepared by:</span> aixymbiosis@aix.com
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="border-t pt-6 mt-8">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="bg-blue-500 text-white px-4 py-2 rounded font-bold">LOGISTICS</div>
+                    <div className="text-sm text-gray-600 mt-2">July 10, 2025</div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500 italic max-w-md">
+                      "All data are based on the latest available records as of July 10, 2025."
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
