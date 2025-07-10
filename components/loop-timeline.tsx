@@ -2,10 +2,11 @@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, Clock, Play, Video, FileText } from "lucide-react"
+import { Plus, Clock, Play } from "lucide-react"
 import { useState, useEffect } from "react"
 import VideoUploadDialog from "./video-upload-dialog"
-import { getScreenSchedulesByProductId, type ScreenSchedule } from "@/lib/screen-schedule-service"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 interface CMSData {
   end_time: string
@@ -28,30 +29,34 @@ interface TimelineSpot {
   endTime: Date
   duration: number
   status: "active" | "pending" | "available"
-  spotNumber: number
-  scheduleData?: ScreenSchedule
 }
 
 export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTimelineProps) {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
   const [selectedSpotNumber, setSelectedSpotNumber] = useState<number | null>(null)
-  const [screenSchedules, setScreenSchedules] = useState<ScreenSchedule[]>([])
+  const [screenSchedules, setScreenSchedules] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-
-  // Extract CMS configuration from database structure
-  const startTimeStr = cmsData.start_time // "16:44"
-  const endTimeStr = cmsData.end_time // "18:44"
-  const spotDuration = cmsData.spot_duration // 15 seconds
-  const loopsPerDay = cmsData.loops_per_day // 20
 
   // Fetch screen schedules on component mount
   useEffect(() => {
     const fetchScreenSchedules = async () => {
-      if (!productId) return
+      if (!productId) {
+        setLoading(false)
+        return
+      }
 
       setLoading(true)
       try {
-        const schedules = await getScreenSchedulesByProductId(productId)
+        const q = query(
+          collection(db, "screen_schedule"),
+          where("product_id", "==", productId),
+          where("deleted", "==", false),
+        )
+        const querySnapshot = await getDocs(q)
+        const schedules = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
         setScreenSchedules(schedules)
       } catch (error) {
         console.error("Error fetching screen schedules:", error)
@@ -62,6 +67,12 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
 
     fetchScreenSchedules()
   }, [productId])
+
+  // Extract CMS configuration from database structure
+  const startTimeStr = cmsData.start_time // "16:44"
+  const endTimeStr = cmsData.end_time // "18:44"
+  const spotDuration = cmsData.spot_duration // 15 seconds
+  const loopsPerDay = cmsData.loops_per_day // 20
 
   // Calculate spots per loop based on time difference
   const calculateSpotsPerLoop = () => {
@@ -109,14 +120,10 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
       const spotEndTime = new Date(currentTime.getTime() + spotDuration * 1000)
       const spotNumber = i + 1
 
-      // Find schedule data for this spot
-      const scheduleData = screenSchedules.find((schedule) => schedule.spot_number === spotNumber)
-
-      // Determine status based on schedule data
-      let status: "active" | "pending" | "available" = "available"
-      if (scheduleData) {
-        status = scheduleData.active ? "active" : "pending"
-      }
+      // Check if this spot has scheduled content
+      const hasScheduledContent = screenSchedules.some(
+        (schedule) => schedule.spot_number === spotNumber && schedule.active,
+      )
 
       spots.push({
         id: `SPOT${String(spotNumber).padStart(3, "0")}`,
@@ -124,9 +131,7 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
         startTime: new Date(currentTime),
         endTime: new Date(spotEndTime),
         duration: spotDuration,
-        status,
-        spotNumber,
-        scheduleData,
+        status: hasScheduledContent ? "active" : "available",
       })
 
       currentTime = new Date(spotEndTime)
@@ -182,22 +187,20 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
     // Refresh screen schedules
     if (productId) {
       try {
-        const schedules = await getScreenSchedulesByProductId(productId)
+        const q = query(
+          collection(db, "screen_schedule"),
+          where("product_id", "==", productId),
+          where("deleted", "==", false),
+        )
+        const querySnapshot = await getDocs(q)
+        const schedules = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
         setScreenSchedules(schedules)
       } catch (error) {
         console.error("Error refreshing screen schedules:", error)
       }
-    }
-  }
-
-  const getVideoFileName = (url: string) => {
-    try {
-      const urlParts = url.split("/")
-      const fileName = urlParts[urlParts.length - 1]
-      const decodedFileName = decodeURIComponent(fileName.split("?")[0])
-      return decodedFileName.length > 30 ? decodedFileName.substring(0, 30) + "..." : decodedFileName
-    } catch {
-      return "Video File"
     }
   }
 
@@ -278,14 +281,14 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
 
             {/* Timeline Spots */}
             <div className="space-y-3">
-              {timelineSpots.map((spot) => (
+              {timelineSpots.map((spot, index) => (
                 <div
                   key={spot.id}
                   className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   {/* Spot Number */}
                   <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span className="font-semibold text-blue-700">{spot.spotNumber}</span>
+                    <span className="font-semibold text-blue-700">{index + 1}</span>
                   </div>
 
                   {/* Spot Details */}
@@ -295,12 +298,6 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
                       <Badge variant="outline" className={getStatusColor(spot.status)}>
                         {spot.status}
                       </Badge>
-                      {spot.scheduleData && (
-                        <div className="flex items-center gap-1 text-xs text-green-600">
-                          <Video size={12} />
-                          <span>Scheduled</span>
-                        </div>
-                      )}
                     </div>
                     <div className="text-sm text-gray-500">
                       <span className="font-mono">
@@ -308,12 +305,6 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
                       </span>
                       <span className="ml-2">({spot.duration}s duration)</span>
                     </div>
-                    {spot.scheduleData && (
-                      <div className="text-xs text-gray-600 mt-1 flex items-center gap-1">
-                        <FileText size={12} />
-                        <span>{spot.scheduleData.title || getVideoFileName(spot.scheduleData.media)}</span>
-                      </div>
-                    )}
                   </div>
 
                   {/* Timeline Bar */}
@@ -340,11 +331,11 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
                   {/* Add Button */}
                   <Button
                     size="sm"
-                    variant={spot.scheduleData ? "secondary" : "outline"}
+                    variant="outline"
                     className="flex-shrink-0 bg-transparent"
-                    onClick={() => handleAddSpot(spot.spotNumber)}
+                    onClick={() => handleAddSpot(index + 1)}
                   >
-                    {spot.scheduleData ? <Video size={16} /> : <Plus size={16} />}
+                    <Plus size={16} />
                   </Button>
                 </div>
               ))}
