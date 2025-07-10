@@ -186,65 +186,67 @@ export default function BulletinBoardPage() {
             const site = productToSite(product)
 
             return (
-              <Card key={site.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader className={`${getCardHeaderColor(site.name)} text-white p-4`}>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-bold">{site.name}</CardTitle>
-                    <Badge variant="secondary" className="bg-white/20 text-white">
-                      S
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm opacity-90">
-                    <MapPin className="h-4 w-4" />
-                    {site.location}
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <div className="space-y-3">
-                    <div className="text-sm text-gray-600">
-                      <span className="font-medium">Site ID:</span> {site.id}
+              <Link key={site.id} href={`/logistics/bulletin-board/${site.id}`}>
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                  <CardHeader className={`${getCardHeaderColor(site.name)} text-white p-4`}>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg font-bold">{site.name}</CardTitle>
+                      <Badge variant="secondary" className="bg-white/20 text-white">
+                        S
+                      </Badge>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${site.statusColor}`}></div>
-                      <span className="text-sm font-medium capitalize">{site.status}</span>
+                    <div className="flex items-center gap-2 text-sm opacity-90">
+                      <MapPin className="h-4 w-4" />
+                      {site.location}
                     </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <Activity className="h-4 w-4" />
-                        Last Activity:
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <div className="space-y-3">
+                      <div className="text-sm text-gray-600">
+                        <span className="font-medium">Site ID:</span> {site.id}
                       </div>
-                      <div className="text-sm text-gray-600 pl-6">{site.lastActivity}</div>
-                    </div>
 
-                    {site.activities.length > 1 && (
-                      <div className="space-y-1">
-                        {site.activities.slice(1).map((activity, index) => (
-                          <div key={index} className="text-xs text-gray-500 pl-6">
-                            {activity}
-                          </div>
-                        ))}
+                      <div className="flex items-center gap-2">
+                        <div className={`w-2 h-2 rounded-full ${site.statusColor}`}></div>
+                        <span className="text-sm font-medium capitalize">{site.status}</span>
                       </div>
-                    )}
 
-                    {/* Site Image */}
-                    <div className="relative h-24 bg-gray-200 rounded-md overflow-hidden">
-                      <Image
-                        src={site.image || "/placeholder.svg"}
-                        alt={site.name}
-                        fill
-                        className="object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.src = "/roadside-billboard.png"
-                          target.className = "opacity-50 object-contain"
-                        }}
-                      />
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <Activity className="h-4 w-4" />
+                          Last Activity:
+                        </div>
+                        <div className="text-sm text-gray-600 pl-6">{site.lastActivity}</div>
+                      </div>
+
+                      {site.activities.length > 1 && (
+                        <div className="space-y-1">
+                          {site.activities.slice(1).map((activity, index) => (
+                            <div key={index} className="text-xs text-gray-500 pl-6">
+                              {activity}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Site Image */}
+                      <div className="relative h-24 bg-gray-200 rounded-md overflow-hidden">
+                        <Image
+                          src={site.image || "/placeholder.svg"}
+                          alt={site.name}
+                          fill
+                          className="object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = "/roadside-billboard.png"
+                            target.className = "opacity-50 object-contain"
+                          }}
+                        />
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </Link>
             )
           })}
         </div>
