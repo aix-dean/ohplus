@@ -492,6 +492,19 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
             target.className = "opacity-50 object-contain"
           }}
         />
+
+        {/* Status Badge - Top Left */}
+        <div className="absolute top-2 left-2">
+          <div
+            className={`px-2 py-1 rounded text-xs font-bold text-white ${
+              site.status === "ACTIVE" ? "bg-green-500" : "bg-gray-500"
+            }`}
+          >
+            {site.status === "ACTIVE" ? "OPEN" : site.status}
+          </div>
+        </div>
+
+        {/* Assignment Count Badge - Top Right */}
         {activeAssignments.length > 0 && (
           <div className="absolute top-2 right-2 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
             {activeAssignments.length}
@@ -499,49 +512,43 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
         )}
       </div>
 
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-3">
+      <CardContent className="p-3">
+        <div className="flex flex-col gap-2">
           {/* Site Code */}
-          <div className="text-sm text-blue-600 font-medium">Site Code: {site.id}</div>
+          <div className="text-xs text-gray-500 uppercase tracking-wide">{site.id}</div>
 
-          {/* Site Name */}
-          <h3 className="font-bold text-xl text-gray-900">{site.name}</h3>
+          {/* Site Name with Badge */}
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-base text-gray-900">{site.name}</h3>
+            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold">S</div>
+          </div>
 
-          {/* Site Information Grid */}
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex flex-col">
-              <span className="text-gray-500">Operation</span>
+          {/* Site Information */}
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Operation:</span>
               <span className={`font-semibold ${site.status === "ACTIVE" ? "text-green-600" : "text-gray-800"}`}>
                 {site.status === "ACTIVE" ? "Active" : site.status}
               </span>
             </div>
-            <div className="flex flex-col">
-              <span className="text-gray-500">Display Health</span>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Display Health:</span>
               <span className="font-semibold text-green-600">90%</span>
             </div>
-            <div className="flex flex-col">
-              <span className="text-gray-500">Content</span>
-              <span className="font-semibold text-blue-600">Static Billboard</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-gray-500">Compliance</span>
-              <span className="font-semibold text-red-600">Incomplete (2)</span>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Compliance:</span>
+              <span className="font-semibold text-red-600">Incomplete</span>
             </div>
           </div>
 
           {/* Create Report Button */}
-          <div className="mt-3 relative">
-            <Button
-              variant="outline"
-              className="w-full rounded-md bg-gray-50 text-gray-800 hover:bg-gray-100 border-gray-200 font-medium"
-              onClick={handleCreateReport}
-            >
-              Create Report
-            </Button>
-            <div className="absolute -top-1 -right-1 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
-              20
-            </div>
-          </div>
+          <Button
+            variant="outline"
+            className="mt-3 w-full h-8 text-xs bg-white hover:bg-gray-50 border-gray-300 text-gray-700 hover:text-gray-900 rounded"
+            onClick={handleCreateReport}
+          >
+            Create Report
+          </Button>
         </div>
       </CardContent>
     </Card>

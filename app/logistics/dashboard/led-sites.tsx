@@ -425,8 +425,6 @@ function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (sit
   // Mock data for demonstration - in real app, this would come from the product data
   const mockAssignmentCount = Math.floor(Math.random() * 10) + 1
   const mockContent = "Lilo and Stitch"
-  const mockIllumination = "ON"
-  const mockCompliance = "Complete"
 
   return (
     <Card
@@ -446,50 +444,56 @@ function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (sit
           }}
         />
 
+        {/* Status Badge - Top Left */}
+        <div className="absolute top-2 left-2">
+          <div
+            className={`px-2 py-1 rounded text-xs font-bold text-white ${
+              site.status === "ACTIVE" ? "bg-green-500" : "bg-gray-500"
+            }`}
+          >
+            {site.status === "ACTIVE" ? "OPEN" : site.status}
+          </div>
+        </div>
+
         {/* Assignment Count Badge - Top Right */}
         <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
           {mockAssignmentCount}
         </div>
       </div>
 
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-3">
+      <CardContent className="p-3">
+        <div className="flex flex-col gap-2">
           {/* Site Code */}
-          <div className="text-sm text-blue-600 font-medium">Site Code: {site.id}</div>
+          <div className="text-xs text-gray-500 uppercase tracking-wide">{site.id}</div>
 
-          {/* Site Name */}
-          <h3 className="font-bold text-xl text-gray-900">{site.name}</h3>
+          {/* Site Name with Badge */}
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-base text-gray-900">{site.name}</h3>
+            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold">D</div>
+          </div>
 
-          {/* Site Information Grid */}
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex flex-col">
-              <span className="text-gray-500">Operation</span>
+          {/* Site Information */}
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span className="text-gray-600">Operation:</span>
               <span className={`font-semibold ${site.status === "ACTIVE" ? "text-green-600" : "text-gray-800"}`}>
                 {site.status === "ACTIVE" ? "Active" : site.status}
               </span>
             </div>
-            <div className="flex flex-col">
-              <span className="text-gray-500">Display Health</span>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Display Health:</span>
               <span className="font-semibold text-green-600">95%</span>
             </div>
-            <div className="flex flex-col">
-              <span className="text-gray-500">Content</span>
-              <span className="font-semibold text-blue-600">{mockContent}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-gray-500">Illumination</span>
-              <span className="font-semibold text-green-600">{mockIllumination}</span>
-            </div>
-            <div className="flex flex-col col-span-2">
-              <span className="text-gray-500">Compliance</span>
-              <span className="font-semibold text-green-600">{mockCompliance}</span>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Compliance:</span>
+              <span className="font-semibold text-green-600">Complete</span>
             </div>
           </div>
 
           {/* Create Report Button */}
           <Button
             variant="outline"
-            className="mt-3 w-full rounded-md bg-gray-50 text-gray-800 hover:bg-gray-100 border-gray-200"
+            className="mt-3 w-full h-8 text-xs bg-white hover:bg-gray-50 border-gray-300 text-gray-700 hover:text-gray-900 rounded"
             onClick={handleCreateReport}
           >
             Create Report
