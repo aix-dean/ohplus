@@ -93,7 +93,7 @@ export default function AdminProductCreatePage() {
       start_time: "",
       end_time: "",
       spot_duration: "",
-      spot_per_loop: "",
+      loops_per_day: "", // Fixed: was spot_per_loop, now consistent with validation
     },
     specs_rental: {
       audience_type: "",
@@ -105,8 +105,8 @@ export default function AdminProductCreatePage() {
       height: "",
       width: "",
     },
-    type: "RENTAL", // Default type
-    status: "PENDING", // Default status
+    type: "RENTAL",
+    status: "PENDING",
   })
 
   useEffect(() => {
@@ -156,12 +156,13 @@ export default function AdminProductCreatePage() {
     formData.cms.start_time,
     formData.cms.end_time,
     formData.cms.spot_duration,
-    formData.cms.spot_per_loop,
+    formData.cms.loops_per_day,
     formData.content_type,
   ])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
+    const safeValue = value || "" // Ensure value is never undefined
 
     if (name.includes(".")) {
       const [parent, child] = name.split(".")
@@ -169,13 +170,13 @@ export default function AdminProductCreatePage() {
         ...prev,
         [parent]: {
           ...prev[parent as keyof typeof prev],
-          [child]: value,
+          [child]: safeValue,
         },
       }))
     } else {
       setFormData((prev) => ({
         ...prev,
-        [name]: value,
+        [name]: safeValue,
       }))
     }
   }
@@ -345,9 +346,9 @@ export default function AdminProductCreatePage() {
       return true
     }
 
-    const { start_time, end_time, spot_duration, spot_per_loop } = formData.cms
+    const { start_time, end_time, spot_duration, loops_per_day } = formData.cms
 
-    if (!start_time || !end_time || !spot_duration || !spot_per_loop) {
+    if (!start_time || !end_time || !spot_duration || !loops_per_day) {
       setValidationError("All dynamic content fields are required.")
       return false
     }
@@ -378,7 +379,7 @@ export default function AdminProductCreatePage() {
 
       // Parse numeric values
       const spotDurationNum = Number.parseInt(spot_duration)
-      const spotsPerLoopNum = Number.parseInt(spot_per_loop)
+      const spotsPerLoopNum = Number.parseInt(loops_per_day)
 
       if (isNaN(spotDurationNum) || isNaN(spotsPerLoopNum) || spotDurationNum <= 0 || spotsPerLoopNum <= 0) {
         setValidationError("Spot duration and spots per loop must be positive numbers.")
@@ -727,7 +728,7 @@ export default function AdminProductCreatePage() {
                   id="start_time"
                   name="cms.start_time"
                   type="time"
-                  value={formData.cms.start_time}
+                  value={formData.cms.start_time || ""}
                   onChange={handleInputChange}
                   required
                 />
@@ -739,7 +740,7 @@ export default function AdminProductCreatePage() {
                   id="end_time"
                   name="cms.end_time"
                   type="time"
-                  value={formData.cms.end_time}
+                  value={formData.cms.end_time || ""}
                   onChange={handleInputChange}
                   required
                 />
@@ -751,7 +752,7 @@ export default function AdminProductCreatePage() {
                   id="spot_duration"
                   name="cms.spot_duration"
                   type="number"
-                  value={formData.cms.spot_duration}
+                  value={formData.cms.spot_duration || ""}
                   onChange={handleInputChange}
                   placeholder="Enter duration in seconds"
                   required
@@ -761,10 +762,10 @@ export default function AdminProductCreatePage() {
               <div className="space-y-2">
                 <Label htmlFor="spot_per_loop">Spots Per Loop</Label>
                 <Input
-                  id="spot_per_loop"
+                  id="loops_per_day"
                   name="cms.loops_per_day"
                   type="number"
-                  value={formData.cms.loops_per_day}
+                  value={formData.cms.loops_per_day || ""}
                   onChange={handleInputChange}
                   placeholder="Enter spots per loop"
                   required
@@ -870,7 +871,7 @@ export default function AdminProductCreatePage() {
                   id="specs_rental.traffic_count"
                   name="specs_rental.traffic_count"
                   type="number"
-                  value={formData.specs_rental.traffic_count}
+                  value={formData.specs_rental.traffic_count || ""}
                   onChange={handleInputChange}
                   placeholder="Enter average daily traffic count"
                   min="0"
@@ -884,7 +885,7 @@ export default function AdminProductCreatePage() {
                   id="specs_rental.elevation"
                   name="specs_rental.elevation"
                   type="number"
-                  value={formData.specs_rental.elevation}
+                  value={formData.specs_rental.elevation || ""}
                   onChange={handleInputChange}
                   placeholder="Enter elevation from ground level in feet"
                   min="0"
@@ -901,7 +902,7 @@ export default function AdminProductCreatePage() {
                   id="specs_rental.height"
                   name="specs_rental.height"
                   type="number"
-                  value={formData.specs_rental.height}
+                  value={formData.specs_rental.height || ""}
                   onChange={handleInputChange}
                   placeholder="Enter height in feet"
                   min="0"
@@ -916,7 +917,7 @@ export default function AdminProductCreatePage() {
                   id="specs_rental.width"
                   name="specs_rental.width"
                   type="number"
-                  value={formData.specs_rental.width}
+                  value={formData.specs_rental.width || ""}
                   onChange={handleInputChange}
                   placeholder="Enter width in feet"
                   min="0"
