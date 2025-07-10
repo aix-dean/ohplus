@@ -1,18 +1,34 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect, useCallback } from "react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
 import Image from "next/image"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { getPaginatedUserProducts, getUserProductsCount, type Product } from "@/lib/firebase-service"
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { useAuth } from "@/contexts/auth-context"
+import { CreateReportDialog } from "@/components/create-report-dialog"
+import type { Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
-import { CreateReportDialog } from "@/components/create-report-dialog"
-import { useAuth } from "@/contexts/auth-context"
+import { getUserProductsCount, getPaginatedUserProducts } from "@/lib/firebase-service" // Import missing functions
+
+interface Site {
+  id: string
+  name: string
+  location: string
+  type: "static" | "led"
+  status: "active" | "maintenance" | "offline"
+  operationalStatus: string
+  displayHealth: string
+  compliance: string
+  lastUpdate: string
+  image?: string
+  companyId: string
+}
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
@@ -20,6 +36,7 @@ const ITEMS_PER_PAGE = 8
 export default function AllSitesTab() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [products, setProducts] = useState<Product[]>([])
+  const [sites, setSites] = useState<Site[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -71,6 +88,7 @@ export default function AllSitesTab() {
     setPageCache(new Map())
     fetchTotalCount()
     fetchProducts(1, true)
+    fetchSites()
   }, [debouncedSearchTerm])
 
   // Fetch total count of products
@@ -144,11 +162,36 @@ export default function AllSitesTab() {
     [user?.uid, lastDoc, pageCache, debouncedSearchTerm],
   )
 
+  // Fetch sites for the current user's company
+  const fetchSites = async () => {
+    if (!user?.companyId) return
+
+    try {
+      setLoading(true)
+
+      // Query sites filtered by user's company ID
+      const sitesQuery = query(collection(db, "sites"), where("companyId", "==", user.companyId), orderBy("name"))
+
+      const sitesSnapshot = await getDocs(sitesQuery)
+      const sitesData = sitesSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Site[]
+
+      setSites(sitesData)
+    } catch (error) {
+      console.error("Error fetching sites:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Load initial data and count
   useEffect(() => {
     if (user?.uid) {
       fetchProducts(1)
       fetchTotalCount()
+      fetchSites()
     }
   }, [user?.uid, fetchProducts, fetchTotalCount])
 
@@ -283,6 +326,25 @@ export default function AllSitesTab() {
     }
   }
 
+  // Get status badge for site
+  const getStatusBadge = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "active":
+        return <Badge className="bg-green-500 text-white text-xs px-2 py-1">OPEN</Badge>
+      case "maintenance":
+        return <Badge className="bg-red-500 text-white text-xs px-2 py-1">MAINTENANCE</Badge>
+      case "offline":
+        return <Badge className="bg-gray-500 text-white text-xs px-2 py-1">OFFLINE</Badge>
+      default:
+        return <Badge className="bg-gray-500 text-white text-xs px-2 py-1">{status.toUpperCase()}</Badge>
+    }
+  }
+
+  // Get type icon for site
+  const getTypeIcon = (type: string) => {
+    return type === "static" ? "S" : "D"
+  }
+
   // Show loading if no user
   if (!user) {
     return (
@@ -304,7 +366,7 @@ export default function AllSitesTab() {
         <div className="flex flex-1 max-w-md mx-auto md:mx-0">
           <div className="relative w-full">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
+            <input
               type="search"
               placeholder="Search sites..."
               className="pl-8 w-full"
@@ -338,9 +400,17 @@ export default function AllSitesTab() {
 
       {/* Loading State */}
       {loading && (
-        <div className="flex flex-col items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-          <p className="text-gray-500">Loading sites...</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(8)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <div className="h-32 bg-gray-200 rounded-t-lg"></div>
+              <CardContent className="p-3">
+                <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded mb-1"></div>
+                <div className="h-3 bg-gray-200 rounded"></div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
 
@@ -356,7 +426,7 @@ export default function AllSitesTab() {
       )}
 
       {/* Empty State */}
-      {!loading && !error && products.length === 0 && (
+      {!loading && !error && products.length === 0 && sites.length === 0 && (
         <div className="bg-gray-50 border border-gray-200 border-dashed rounded-md p-8 text-center">
           <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <AlertCircle size={24} className="text-gray-400" />
@@ -387,6 +457,66 @@ export default function AllSitesTab() {
                 setReportDialogOpen(true)
               }}
             />
+          ))}
+        </div>
+      )}
+
+      {/* Site List */}
+      {!loading && !error && sites.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
+          {sites.map((site) => (
+            <Card key={site.id} className="overflow-hidden hover:shadow-md transition-shadow relative">
+              {/* Status Badge */}
+              <div className="absolute top-2 left-2 z-10">{getStatusBadge(site.status)}</div>
+
+              {/* Site Image */}
+              <div className="relative h-32 bg-gray-100">
+                <Image
+                  src={site.image || "/placeholder.svg?height=128&width=256&query=billboard"}
+                  alt={site.name}
+                  fill
+                  className="object-cover"
+                />
+              </div>
+
+              <CardContent className="p-3">
+                {/* Site Code */}
+                <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">{site.id}</div>
+
+                {/* Site Name with Type Badge */}
+                <div className="flex items-center gap-2 mb-2">
+                  <h3 className="font-semibold text-base text-gray-900 truncate flex-1">{site.name}</h3>
+                  <Badge className="bg-purple-500 text-white text-xs px-1.5 py-0.5 min-w-[20px] h-5 flex items-center justify-center">
+                    {getTypeIcon(site.type)}
+                  </Badge>
+                </div>
+
+                {/* Site Details */}
+                <div className="space-y-1 text-xs text-gray-600 mb-3">
+                  <div className="flex items-center justify-between">
+                    <span>Operation:</span>
+                    <span className="font-medium">{site.operationalStatus || "Active"}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Display Health:</span>
+                    <span className="font-medium text-green-600">{site.displayHealth || "100%"}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Compliance:</span>
+                    <span className="font-medium">{site.compliance || "Complete"}</span>
+                  </div>
+                </div>
+
+                {/* Create Report Button */}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full h-9 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium border-0"
+                >
+                  Create Report
+                </Button>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
@@ -481,7 +611,7 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
   }
 
   return (
-    <Card
+    <div
       className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg"
       onClick={handleCardClick}
     >
@@ -529,7 +659,7 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
         )}
       </div>
 
-      <CardContent className="p-3">
+      <div className="p-3">
         <div className="flex flex-col gap-2">
           {/* Site Code */}
           <div className="text-xs text-gray-500 uppercase tracking-wide">{site.siteCode}</div>
@@ -609,7 +739,7 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             Create Report
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
