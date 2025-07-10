@@ -336,7 +336,7 @@ export default function CMSDashboardPage() {
   // Handle edit click
   const handleEditClick = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation()
-    router.push(`/cms/content/edit/${product.id}`)
+    router.push(`/cms/details/${product.id}`)
   }
 
   // Handle view details click
@@ -344,10 +344,7 @@ export default function CMSDashboardPage() {
     router.push(`/cms/details/${productId}`)
   }
 
-  // Handle add new content
-  const handleAddContent = () => {
-    router.push("/cms/content/new")
-  }
+  // Handle add new c
 
   // Use mock data if no products are available from Firebase
   const [useMockData, setUseMockData] = useState(false)
@@ -557,7 +554,7 @@ export default function CMSDashboardPage() {
             </div>
             <h3 className="text-lg font-medium mb-2">No content yet</h3>
             <p className="text-gray-500 mb-4">Add your first content item to get started</p>
-            <Button onClick={handleAddContent}>
+            <Button>
               <Plus size={16} className="mr-2" />
               Add Content
             </Button>
