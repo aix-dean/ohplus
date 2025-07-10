@@ -518,19 +518,25 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
 
           {/* Site Information */}
           <div className="space-y-1 text-xs">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Operation:</span>
-              <span className={`font-semibold ${site.status === "ACTIVE" ? "text-green-600" : "text-gray-800"}`}>
-                {site.status === "ACTIVE" ? "Active" : site.status}
+            <div className="flex flex-col">
+              <span className="text-gray-600">
+                Operation:
+                <span className={`font-semibold ml-1 ${site.status === "ACTIVE" ? "text-green-600" : "text-gray-800"}`}>
+                  {site.status === "ACTIVE" ? "Active" : site.status}
+                </span>
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Display Health:</span>
-              <span className="font-semibold text-green-600">100%</span>
+            <div className="flex flex-col">
+              <span className="text-gray-600">
+                Display Health:
+                <span className="font-semibold ml-1 text-green-600">100%</span>
+              </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Compliance:</span>
-              <span className="font-semibold text-green-600">Complete</span>
+            <div className="flex flex-col">
+              <span className="text-gray-600">
+                Compliance:
+                <span className="font-semibold ml-1 text-green-600">Complete</span>
+              </span>
             </div>
           </div>
 

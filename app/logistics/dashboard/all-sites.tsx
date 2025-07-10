@@ -537,58 +537,64 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
 
           {/* Site Information */}
           <div className="space-y-1 text-xs">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Operation:</span>
-              <span
-                className={`font-semibold ${
-                  site.operationalStatus === "Operational"
-                    ? "text-green-600"
+            <div className="flex flex-col">
+              <span className="text-gray-600">
+                Operation:
+                <span
+                  className={`font-semibold ml-1 ${
+                    site.operationalStatus === "Operational"
+                      ? "text-green-600"
+                      : site.operationalStatus === "Under Maintenance"
+                        ? "text-red-600"
+                        : site.operationalStatus === "Pending Setup"
+                          ? "text-orange-600"
+                          : "text-gray-600"
+                  }`}
+                >
+                  {site.operationalStatus === "Operational"
+                    ? "Active"
                     : site.operationalStatus === "Under Maintenance"
-                      ? "text-red-600"
+                      ? "Maintenance"
                       : site.operationalStatus === "Pending Setup"
-                        ? "text-orange-600"
-                        : "text-gray-600"
-                }`}
-              >
-                {site.operationalStatus === "Operational"
-                  ? "Active"
-                  : site.operationalStatus === "Under Maintenance"
-                    ? "Maintenance"
-                    : site.operationalStatus === "Pending Setup"
-                      ? "Pending"
-                      : "Inactive"}
+                        ? "Pending"
+                        : "Inactive"}
+                </span>
               </span>
             </div>
 
-            <div className="flex justify-between">
-              <span className="text-gray-600">Display Health:</span>
-              <span
-                className={`font-semibold ${
-                  site.healthPercentage > 80
-                    ? "text-green-600"
-                    : site.healthPercentage > 60
-                      ? "text-yellow-600"
-                      : "text-red-600"
-                }`}
-              >
-                {site.healthPercentage > 90
-                  ? "100%"
-                  : site.healthPercentage > 80
-                    ? "90%"
-                    : site.healthPercentage > 60
-                      ? "75%"
-                      : "50%"}
+            <div className="flex flex-col">
+              <span className="text-gray-600">
+                Display Health:
+                <span
+                  className={`font-semibold ml-1 ${
+                    site.healthPercentage > 80
+                      ? "text-green-600"
+                      : site.healthPercentage > 60
+                        ? "text-yellow-600"
+                        : "text-red-600"
+                  }`}
+                >
+                  {site.healthPercentage > 90
+                    ? "100%"
+                    : site.healthPercentage > 80
+                      ? "90%"
+                      : site.healthPercentage > 60
+                        ? "75%"
+                        : "50%"}
+                </span>
               </span>
             </div>
 
-            <div className="flex justify-between">
-              <span className="text-gray-600">Compliance:</span>
-              <span
-                className={`font-semibold ${
-                  site.operationalStatus === "Operational" ? "text-green-600" : "text-red-600"
-                }`}
-              >
-                {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}
+            <div className="flex flex-col">
+              <span className="text-gray-600">
+                Compliance:
+                <span
+                  className={`font-semibold ml-1 ${
+                    site.operationalStatus === "Operational" ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                  {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}
+                </span>
               </span>
             </div>
           </div>
