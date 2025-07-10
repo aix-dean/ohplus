@@ -1,15 +1,18 @@
 "use client"
-import { useState } from "react"
+
 import type React from "react"
 
+import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Upload, CheckCircle, AlertCircle, Video } from "lucide-react"
-import { uploadVideoToFirebase } from "@/lib/video-upload-service"
+import { Upload, Video, CheckCircle, AlertCircle } from "lucide-react"
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage"
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { storage, db } from "@/lib/firebase"
 
 interface VideoUploadDialogProps {
   open: boolean
@@ -35,74 +38,110 @@ export default function VideoUploadDialog({
   const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
-  const [showConfirmation, setShowConfirmation] = useState(false)
+  const [step, setStep] = useState<"select" | "confirm" | "uploading" | "success">("select")
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) {
-      // Validate file type
-      const validTypes = ["video/mp4", "video/mov", "video/avi", "video/webm"]
-      if (!validTypes.includes(file.type)) {
-        setError("Please select a valid video file (MP4, MOV, AVI, WebM)")
-        return
-      }
+    if (!file) return
 
-      // Validate file size (max 100MB)
-      const maxSize = 100 * 1024 * 1024 // 100MB in bytes
-      if (file.size > maxSize) {
-        setError("File size must be less than 100MB")
-        return
-      }
-
-      setSelectedFile(file)
-      setError(null)
-      setShowConfirmation(true)
-    }
-  }
-
-  const handleUpload = async () => {
-    if (!selectedFile || !productId || !spotNumber || !companyId || !sellerId) {
-      setError("Missing required information")
+    // Validate file type
+    const allowedTypes = ["video/mp4", "video/mov", "video/avi", "video/webm"]
+    if (!allowedTypes.includes(file.type)) {
+      setError("Please select a valid video file (MP4, MOV, AVI, WebM)")
       return
     }
 
+    // Validate file size (max 100MB)
+    const maxSize = 100 * 1024 * 1024 // 100MB in bytes
+    if (file.size > maxSize) {
+      setError("File size must be less than 100MB")
+      return
+    }
+
+    setSelectedFile(file)
+    setError(null)
+    setStep("confirm")
+  }
+
+  const handleUpload = async () => {
+    if (!selectedFile || !productId || !spotNumber) return
+
     setUploading(true)
-    setUploadProgress(0)
+    setStep("uploading")
     setError(null)
 
     try {
-      await uploadVideoToFirebase({
-        file: selectedFile,
-        productId,
-        spotNumber,
-        companyId,
-        sellerId,
-        onProgress: (progress) => {
+      // Create a unique filename
+      const timestamp = Date.now()
+      const fileName = `videos/${productId}/spot_${spotNumber}_${timestamp}_${selectedFile.name}`
+      const storageRef = ref(storage, fileName)
+
+      // Upload file with progress tracking
+      const uploadTask = uploadBytesResumable(storageRef, selectedFile)
+
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
           setUploadProgress(progress)
         },
-      })
+        (error) => {
+          console.error("Upload error:", error)
+          setError("Failed to upload video. Please try again.")
+          setUploading(false)
+        },
+        async () => {
+          try {
+            // Get download URL
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
 
-      setSuccess(true)
-      setTimeout(() => {
-        onUploadSuccess()
-        handleClose()
-      }, 2000)
+            // Create screen schedule document
+            await addDoc(collection(db, "screen_schedule"), {
+              active: true,
+              product_id: productId,
+              spot_number: spotNumber,
+              created: serverTimestamp(),
+              deleted: false,
+              company_id: companyId || "",
+              seller_id: sellerId || "",
+              id: `${productId}_spot_${spotNumber}_${timestamp}`,
+              status: "active",
+              media: downloadURL,
+              title: selectedFile.name,
+            })
+
+            setSuccess(true)
+            setStep("success")
+            setUploading(false)
+
+            // Call success callback after a short delay
+            setTimeout(() => {
+              onUploadSuccess()
+              handleClose()
+            }, 2000)
+          } catch (error) {
+            console.error("Error creating schedule document:", error)
+            setError("Failed to save video schedule. Please try again.")
+            setUploading(false)
+          }
+        },
+      )
     } catch (error) {
       console.error("Upload error:", error)
-      setError(error instanceof Error ? error.message : "Upload failed")
-    } finally {
+      setError("Failed to upload video. Please try again.")
       setUploading(false)
     }
   }
 
   const handleClose = () => {
-    setSelectedFile(null)
-    setUploading(false)
-    setUploadProgress(0)
-    setError(null)
-    setSuccess(false)
-    setShowConfirmation(false)
-    onOpenChange(false)
+    if (!uploading) {
+      setSelectedFile(null)
+      setError(null)
+      setSuccess(false)
+      setUploadProgress(0)
+      setStep("select")
+      onOpenChange(false)
+    }
   }
 
   const formatFileSize = (bytes: number) => {
@@ -124,19 +163,21 @@ export default function VideoUploadDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {!showConfirmation ? (
-            // File Selection Step
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="video-upload">Select Video File</Label>
-                <Input
-                  id="video-upload"
-                  type="file"
-                  accept="video/mp4,video/mov,video/avi,video/webm"
-                  onChange={handleFileSelect}
-                  className="mt-1"
-                />
-                <p className="text-xs text-gray-500 mt-1">Supported formats: MP4, MOV, AVI, WebM (Max: 100MB)</p>
+          {step === "select" && (
+            <>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <Label htmlFor="video-upload" className="cursor-pointer">
+                  <span className="text-sm font-medium text-blue-600 hover:text-blue-500">Click to upload a video</span>
+                  <Input
+                    id="video-upload"
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={handleFileSelect}
+                  />
+                </Label>
+                <p className="text-xs text-gray-500 mt-2">MP4, MOV, AVI, WebM up to 100MB</p>
               </div>
 
               {error && (
@@ -145,79 +186,84 @@ export default function VideoUploadDialog({
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-            </div>
-          ) : (
-            // Confirmation Step
-            <div className="space-y-4">
-              {!uploading && !success && (
-                <div className="space-y-3">
-                  <h3 className="font-medium">Confirm Upload</h3>
-                  <div className="bg-gray-50 p-3 rounded-lg space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">File:</span>
-                      <span className="font-medium">{selectedFile?.name}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Size:</span>
-                      <span>{selectedFile ? formatFileSize(selectedFile.size) : ""}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Spot:</span>
-                      <span className="font-medium">Spot {spotNumber}</span>
-                    </div>
+            </>
+          )}
+
+          {step === "confirm" && selectedFile && (
+            <>
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-medium mb-2">Selected Video</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>File:</span>
+                    <span className="font-medium">{selectedFile.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Size:</span>
+                    <span>{formatFileSize(selectedFile.size)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Spot:</span>
+                    <span className="font-medium">Spot {spotNumber}</span>
                   </div>
                 </div>
-              )}
+              </div>
 
-              {uploading && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Upload className="h-4 w-4 animate-pulse" />
-                    <span className="text-sm">Uploading video...</span>
-                  </div>
-                  <Progress value={uploadProgress} className="w-full" />
-                  <p className="text-xs text-gray-500 text-center">{uploadProgress}% complete</p>
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  This video will be scheduled for Spot {spotNumber}. Are you sure you want to continue?
+                </AlertDescription>
+              </Alert>
+            </>
+          )}
+
+          {step === "uploading" && (
+            <>
+              <div className="space-y-4">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                  <p className="text-sm text-gray-600">Uploading video...</p>
                 </div>
-              )}
+                <Progress value={uploadProgress} className="w-full" />
+                <p className="text-xs text-center text-gray-500">{Math.round(uploadProgress)}% complete</p>
+              </div>
+            </>
+          )}
 
-              {success && (
-                <Alert>
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Video uploaded successfully! Spot {spotNumber} has been scheduled.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+          {step === "success" && (
+            <div className="text-center space-y-4">
+              <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
+              <div>
+                <h4 className="font-medium text-green-900">Upload Successful!</h4>
+                <p className="text-sm text-green-700">Video has been scheduled for Spot {spotNumber}</p>
+              </div>
             </div>
           )}
         </div>
 
         <DialogFooter>
-          {!showConfirmation ? (
+          {step === "select" && (
             <Button variant="outline" onClick={handleClose}>
               Cancel
             </Button>
-          ) : (
-            <div className="flex gap-2">
-              {!uploading && !success && (
-                <>
-                  <Button variant="outline" onClick={() => setShowConfirmation(false)}>
-                    Back
-                  </Button>
-                  <Button onClick={handleUpload} disabled={!selectedFile}>
-                    Confirm Upload
-                  </Button>
-                </>
-              )}
-              {(success || error) && <Button onClick={handleClose}>Close</Button>}
-            </div>
+          )}
+
+          {step === "confirm" && (
+            <>
+              <Button variant="outline" onClick={() => setStep("select")}>
+                Back
+              </Button>
+              <Button onClick={handleUpload} className="bg-blue-600 hover:bg-blue-700">
+                Upload Video
+              </Button>
+            </>
+          )}
+
+          {step === "uploading" && (
+            <Button disabled className="bg-blue-600">
+              Uploading...
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>
