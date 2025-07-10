@@ -10,7 +10,7 @@ import { db } from "@/lib/firebase"
 
 interface CMSData {
   end_time: string
-  spot_per_loop: number
+  loops_per_day: number
   spot_duration: number
   start_time: string
 }
@@ -73,7 +73,7 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
   const startTimeStr = cmsData.start_time // "16:44"
   const endTimeStr = cmsData.end_time // "18:44"
   const spotDuration = cmsData.spot_duration // 15 seconds
-  const spot_per_loop = cmsData.spot_per_loop // 20
+  const loopsPerDay = cmsData.loops_per_day // 20
 
   // Calculate spots per loop based on time difference
   const calculateSpotsPerLoop = () => {
@@ -117,7 +117,7 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
     const spots: TimelineSpot[] = []
     let currentTime = new Date(loopStartTime)
 
-    for (let i = 0; i < spot_per_loop; i++) {
+    for (let i = 0; i < loopsPerDay; i++) {
       const spotEndTime = new Date(currentTime.getTime() + spotDuration * 1000)
       const spotNumber = i + 1
 
@@ -245,7 +245,7 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="font-medium text-gray-500">Spots per Loop:</span>
-              <div className="text-lg font-semibold">{spot_per_loop}</div>
+              <div className="text-lg font-semibold">{loopsPerDay}</div>
             </div>
             <div>
               <span className="font-medium text-gray-500">Spot Duration:</span>
@@ -270,7 +270,7 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Play size={18} />
-            First Loop Timeline ({spot_per_loop} Spots)
+            First Loop Timeline ({loopsPerDay} Spots)
           </CardTitle>
           <div className="text-sm text-gray-500">
             Loop runs from {convertTo12Hour(startTimeStr)} to {convertTo12Hour(endTimeStr)} (
@@ -370,7 +370,7 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
                 <div>
                   <h4 className="font-medium text-blue-900">First Loop Summary</h4>
                   <p className="text-sm text-blue-700">
-                    This loop contains {spotsPerLoop} advertising spots and will repeat {spot_per_loop} times throughout
+                    This loop contains {spotsPerLoop} advertising spots and will repeat {loopsPerDay} times throughout
                     the day
                   </p>
                 </div>
