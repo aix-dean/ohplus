@@ -315,7 +315,7 @@ export default function LEDSitesTab() {
       ) : (
         <>
           {/* LED Sites Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 mt-4">
             {products.map((product) => {
               const site = productToSite(product)
               return (
@@ -424,7 +424,7 @@ function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (sit
 
   return (
     <Card
-      className="overflow-hidden cursor-pointer border border-gray-200 shadow-sm rounded-lg transition-all hover:shadow-lg bg-white w-full max-w-[200px]"
+      className="overflow-hidden cursor-pointer border border-gray-200 shadow-sm rounded-lg transition-all hover:shadow-lg bg-white w-full"
       onClick={handleCardClick}
     >
       <div className="relative h-32 bg-gray-200">
