@@ -1,110 +1,126 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Search, ArrowLeft, MapPin, Activity } from "lucide-react"
+import { Search, ArrowLeft, MapPin, Activity, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-
-// Mock data for sites - in a real app, this would come from your database
-const mockSites = [
-  {
-    id: "QU-SU-LS-0014-060525",
-    name: "Lilo & Stitch",
-    location: "Petplans Southbound",
-    lastActivity: "5/6/25: 5:00AM - Arrival of FA to site",
-    activities: [
-      "5/6/25: 5:00AM - Reported Bad Weather as cause",
-      "5/3/25: 1:30PM - Contacted Team C for installation",
-    ],
-    status: "active",
-    type: "LED",
-  },
-  {
-    id: "QU-SU-LS-0014-060525-2",
-    name: "Fairy Skin",
-    location: "Bocaue 1.1",
-    lastActivity: "5/6/25: 5:00AM - Arrival of FA to site",
-    activities: [
-      "5/6/25: 5:00AM - Reported Bad Weather as cause",
-      "5/3/25: 1:30PM - Contacted Team C for installation",
-    ],
-    status: "active",
-    type: "Static",
-  },
-  {
-    id: "QU-SU-LS-0014-060525-3",
-    name: "FUNalo",
-    location: "Bocaue 2.1",
-    lastActivity: "5/6/25: 5:00AM - Arrival of FA to site",
-    activities: [
-      "5/6/25: 5:00AM - Reported Bad Weather as cause",
-      "5/3/25: 1:30PM - Contacted Team C for installation",
-    ],
-    status: "active",
-    type: "LED",
-  },
-  {
-    id: "BUC-001",
-    name: "Building Under Construction",
-    location: "Site A",
-    lastActivity: "Under Development",
-    activities: ["Site preparation in progress"],
-    status: "construction",
-    type: "BUC",
-  },
-  {
-    id: "BUC-002",
-    name: "Building Under Construction",
-    location: "Site B",
-    lastActivity: "Under Development",
-    activities: ["Site preparation in progress"],
-    status: "construction",
-    type: "BUC",
-  },
-  {
-    id: "BUC-003",
-    name: "Building Under Construction",
-    location: "Site C",
-    lastActivity: "Under Development",
-    activities: ["Site preparation in progress"],
-    status: "construction",
-    type: "BUC",
-  },
-]
+import { getAllProducts, type Product } from "@/lib/firebase-service"
 
 export default function BulletinBoardPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedSite, setSelectedSite] = useState("all")
+  const [sites, setSites] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filteredSites = mockSites.filter((site) => {
+  useEffect(() => {
+    const fetchSites = async () => {
+      try {
+        setLoading(true)
+        const products = await getAllProducts()
+        setSites(products)
+      } catch (error) {
+        console.error("Error fetching sites:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSites()
+  }, [])
+
+  const filteredSites = sites.filter((site) => {
     const matchesSearch =
-      site.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      site.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      site.id.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesSite = selectedSite === "all" || site.type.toLowerCase() === selectedSite.toLowerCase()
-    return matchesSearch && matchesSite
+      site.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      site.specs_rental?.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      site.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      site.description?.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const siteType = site.content_type?.toLowerCase() || "other"
+    const matchesSite =
+      selectedSite === "all" ||
+      (selectedSite === "led" && siteType === "led") ||
+      (selectedSite === "static" && siteType === "static") ||
+      (selectedSite === "other" && !["led", "static"].includes(siteType))
+
+    return matchesSearch && matchesSite && !site.deleted
   })
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case "active":
+      case "approved":
         return "bg-green-500"
-      case "construction":
-        return "bg-blue-500"
+      case "pending":
+        return "bg-yellow-500"
+      case "inactive":
+      case "rejected":
+        return "bg-red-500"
       default:
         return "bg-gray-500"
     }
   }
 
-  const getCardHeaderColor = (name: string) => {
-    if (name === "Lilo & Stitch") return "bg-cyan-500"
-    if (name === "Fairy Skin") return "bg-pink-500"
-    if (name === "FUNalo") return "bg-gray-800"
-    return "bg-blue-500"
+  const getCardHeaderColor = (contentType: string) => {
+    switch (contentType?.toLowerCase()) {
+      case "led":
+        return "bg-cyan-500"
+      case "static":
+        return "bg-pink-500"
+      default:
+        return "bg-gray-800"
+    }
+  }
+
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return "No date available"
+
+    try {
+      let date: Date
+      if (timestamp.toDate) {
+        // Firestore Timestamp
+        date = timestamp.toDate()
+      } else if (timestamp instanceof Date) {
+        date = timestamp
+      } else {
+        date = new Date(timestamp)
+      }
+
+      return date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    } catch (error) {
+      return "Invalid date"
+    }
+  }
+
+  const getLastActivity = (site: Product) => {
+    if (site.updated) {
+      return `Updated: ${formatDate(site.updated)}`
+    } else if (site.created) {
+      return `Created: ${formatDate(site.created)}`
+    }
+    return "No recent activity"
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto py-6 px-4">
+        <div className="flex items-center gap-4 mb-6">
+          <Link href="/logistics/dashboard">
+            <Button variant="ghost" size="sm" className="flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Project Bulletins
+            </Button>
+          </Link>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="ml-2">Loading sites...</span>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -138,7 +154,7 @@ export default function BulletinBoardPage() {
             <SelectItem value="all">All Sites</SelectItem>
             <SelectItem value="led">LED Sites</SelectItem>
             <SelectItem value="static">Static Sites</SelectItem>
-            <SelectItem value="buc">Under Construction</SelectItem>
+            <SelectItem value="other">Other Sites</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -147,18 +163,18 @@ export default function BulletinBoardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredSites.map((site) => (
           <Card key={site.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader className={`${getCardHeaderColor(site.name)} text-white p-4`}>
+            <CardHeader className={`${getCardHeaderColor(site.content_type || "")} text-white p-4`}>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-bold">{site.name}</CardTitle>
-                {site.type === "BUC" && (
+                <CardTitle className="text-lg font-bold">{site.name || "Unnamed Site"}</CardTitle>
+                {site.content_type && (
                   <Badge variant="secondary" className="bg-white/20 text-white">
-                    BUC
+                    {site.content_type.toUpperCase()}
                   </Badge>
                 )}
               </div>
               <div className="flex items-center gap-2 text-sm opacity-90">
                 <MapPin className="h-4 w-4" />
-                {site.location}
+                {site.specs_rental?.location || "Location not specified"}
               </div>
             </CardHeader>
             <CardContent className="p-4">
@@ -168,8 +184,8 @@ export default function BulletinBoardPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${getStatusColor(site.status)}`}></div>
-                  <span className="text-sm font-medium capitalize">{site.status}</span>
+                  <div className={`w-2 h-2 rounded-full ${getStatusColor(site.status || "")}`}></div>
+                  <span className="text-sm font-medium capitalize">{site.status || "Unknown"}</span>
                 </div>
 
                 <div className="space-y-2">
@@ -177,31 +193,26 @@ export default function BulletinBoardPage() {
                     <Activity className="h-4 w-4" />
                     Last Activity:
                   </div>
-                  <div className="text-sm text-gray-600 pl-6">{site.lastActivity}</div>
+                  <div className="text-sm text-gray-600 pl-6">{getLastActivity(site)}</div>
                 </div>
 
-                {site.activities.length > 1 && (
-                  <div className="space-y-1">
-                    {site.activities.slice(1).map((activity, index) => (
-                      <div key={index} className="text-xs text-gray-500 pl-6">
-                        {activity}
-                      </div>
-                    ))}
+                {site.description && (
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium">Description:</span>
+                    <div className="mt-1 line-clamp-2">{site.description}</div>
                   </div>
                 )}
 
-                {site.type === "BUC" && (
-                  <div className="flex justify-center pt-4">
-                    <div className="text-center">
-                      <div className="w-16 h-16 bg-purple-100 rounded-lg flex items-center justify-center mb-2">
-                        <div className="text-purple-600">
-                          <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 2L2 7v10c0 5.55 3.84 9.74 9 11 5.16-1.26 9-5.45 9-11V7l-10-5z" />
-                          </svg>
-                        </div>
-                      </div>
-                      <div className="text-sm text-gray-600">We are creating something exciting for you!</div>
-                    </div>
+                {site.price && (
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium">Price:</span> ₱{site.price.toLocaleString()}
+                  </div>
+                )}
+
+                {site.specs_rental?.traffic_count && (
+                  <div className="text-sm text-gray-600">
+                    <span className="font-medium">Traffic Count:</span>{" "}
+                    {site.specs_rental.traffic_count.toLocaleString()}
                   </div>
                 )}
               </div>
@@ -210,7 +221,7 @@ export default function BulletinBoardPage() {
         ))}
       </div>
 
-      {filteredSites.length === 0 && (
+      {filteredSites.length === 0 && !loading && (
         <div className="text-center py-12">
           <div className="text-gray-500 text-lg">No sites found matching your criteria</div>
           <div className="text-gray-400 text-sm mt-2">Try adjusting your search or filter settings</div>

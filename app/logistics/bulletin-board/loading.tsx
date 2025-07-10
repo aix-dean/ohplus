@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Loader2 } from "lucide-react"
 
 export default function BulletinBoardLoading() {
   return (
@@ -37,6 +38,12 @@ export default function BulletinBoardLoading() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Loader */}
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <span className="ml-2">Loading bulletin board...</span>
       </div>
     </div>
   )
