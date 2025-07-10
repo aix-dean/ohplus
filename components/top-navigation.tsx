@@ -8,8 +8,6 @@ import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useIsAdmin } from "@/hooks/use-is-admin"
-import { doc, getDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
 
 export function TopNavigation() {
   const [isOpen, setIsOpen] = useState(false)
@@ -147,9 +145,9 @@ export function TopNavigation() {
   const isAdminSection = pathname.startsWith("/admin")
   const isAccountPage = pathname === "/account" // New check for account page
 
-  const navBgColor = isSalesSection ? "bg-[#ff3333]" : "bg-[#0a1433]"
+  const navBgColor = isSalesSection ? "bg-[#ff3333]" : isAdminSection ? "bg-[#6b46c1]" : "bg-[#0a1433]"
 
-  const diagonalBgColor = isSalesSection ? "bg-[#ffcccc]" : "bg-[#38b6ff]"
+  const diagonalBgColor = isSalesSection ? "bg-[#ffcccc]" : isAdminSection ? "bg-[#c4b5fd]" : "bg-[#38b6ff]"
 
   const handleMobileNavigation = (href: string) => {
     router.push(href)
