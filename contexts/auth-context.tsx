@@ -9,7 +9,7 @@ import {
   sendPasswordResetEmail,
   type User as FirebaseUser,
 } from "firebase/auth"
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import { subscriptionService } from "@/lib/subscription-service"
 import type { Subscription } from "@/lib/types/subscription"
@@ -20,6 +20,7 @@ interface UserData {
   email: string | null
   displayName: string | null
   license_key: string | null
+  company_id?: string | null
   role: string | null
   permissions: string[]
   project_id?: string
@@ -70,6 +71,7 @@ interface AuthContextType {
       company_location: string
     },
     password: string,
+    orgCode?: string,
   ) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
@@ -119,6 +121,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           type: data.type,
           created: data.created?.toDate(),
           updated: data.updated?.toDate(),
+          company_id: data.company_id || null, // Add company_id field
+          ...data, // Spread any other fields
         }
       } else {
         console.log("User document doesn't exist, creating basic one")
@@ -127,7 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
-          license_key: null,
+          license_key: null, // Will be assigned during registration/onboarding
+          company_id: null, // Will be assigned when user registers company
           role: "user",
           permissions: [],
         }
@@ -265,6 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       company_location: string
     },
     password: string,
+    orgCode?: string,
   ) => {
     setLoading(true)
     try {
@@ -274,15 +280,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const firebaseUser = userCredential.user
       setUser(firebaseUser)
 
-      const licenseKey = generateLicenseKey()
-      console.log("Generated license key:", licenseKey)
 
+      let licenseKey = generateLicenseKey()
+      let companyId = null
+
+      // If joining an organization, get the invitation data (validation already done in login page)
+      if (orgCode) {
+        // Query invitation_codes collection by the 'code' field
+        const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
+        const invitationSnapshot = await getDocs(invitationQuery)
+
+        if (!invitationSnapshot.empty) {
+          // Get the first matching document
+          const invitationDoc = invitationSnapshot.docs[0]
+          const invitationData = invitationDoc.data()
+
+          // Use the organization's license key and company ID
+          licenseKey = invitationData.license_key || licenseKey
+          companyId = invitationData.company_id || null
+
+          // Update the code usage
+          const updateData: any = {
+            used: true,
+            used_count: (invitationData.used_count || 0) + 1,
+            last_used_at: serverTimestamp(),
+          }
+
+          // Add user to the used_by array if it exists
+          if (invitationData.used_by && Array.isArray(invitationData.used_by)) {
+            updateData.used_by = [...invitationData.used_by, firebaseUser.uid]
+          } else {
+            updateData.used_by = [firebaseUser.uid]
+          }
+
+          await updateDoc(doc(db, "invitation_codes", invitationDoc.id), updateData)
+        }
+      }
       // Create user document in "iboard_users" with license_key
       const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
       const userData = {
         email: firebaseUser.email,
         uid: firebaseUser.uid,
-        license_key: licenseKey, // Store license_key in user document
+        license_key: licenseKey,
+        company_id: companyId,
         role: "user",
         permissions: [],
         type: "OHPLUS",
@@ -293,25 +333,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         middle_name: personalInfo.middle_name,
         phone_number: personalInfo.phone_number,
         gender: personalInfo.gender,
-        project_id: firebaseUser.uid, // Reference to project
+        project_id: orgCode ? null : firebaseUser.uid, // Only create project if not joining org
+      })
+      // Only create a project if not joining an organization
+      if (!orgCode) {
+        const projectDocRef = doc(db, "projects", firebaseUser.uid)
+        await setDoc(projectDocRef, {
+          company_name: companyInfo.company_name,
+          company_location: companyInfo.company_location,
+          project_name: "My First Project",
+          license_key: licenseKey,
+          created: serverTimestamp(),
+          updated: serverTimestamp(),
+        })
       }
-
-      console.log("Creating user document:", userData)
-      await setDoc(userDocRef, userData)
-
-      // Create a default project for the user (separate from license_key storage)
-      const projectDocRef = doc(db, "projects", firebaseUser.uid)
-      const projectData = {
-        company_name: companyInfo.company_name,
-        company_location: companyInfo.company_location,
-        project_name: "My First Project",
-        license_key: licenseKey, // Also store in project for reference, but primary source is user document
-        created: serverTimestamp(),
-        updated: serverTimestamp(),
-      }
-
-      console.log("Creating project document:", projectData)
-      await setDoc(projectDocRef, projectData)
 
       await fetchUserData(firebaseUser)
       console.log("Registration completed successfully")

@@ -33,9 +33,10 @@ export interface Product {
   deleted: boolean
   created?: any
   updated?: any
-  seller_id?: string
-  seller_name?: string
-  company_id?: string
+  seller_id: string
+  seller_name: string
+  company_id?: string | null
+  position: number
   media?: Array<{
     url: string
     distance: string
@@ -383,11 +384,10 @@ export async function getUserProductsCount(
   }
 }
 
-// Updated createProduct function with proper parameter signature
+
+// Create a new product
 export async function createProduct(productData: Partial<Product>): Promise<string> {
   try {
-    console.log("Creating product with data:", productData)
-
     const newProduct = {
       ...productData,
       status: productData.status || "PENDING",
@@ -411,7 +411,7 @@ export async function createProduct(productData: Partial<Product>): Promise<stri
 }
 
 // Soft delete a product (mark as deleted)
-export async function softDeleteProduct(productId: string, licenseKey: string): Promise<void> {
+export async function softDeleteProduct(productId: string): Promise<void> {
   try {
     const productRef = doc(db, "products", productId)
     await updateDoc(productRef, {

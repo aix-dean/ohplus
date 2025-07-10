@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/auth-context"
 import { subscriptionService } from "@/lib/subscription-service"
 
+
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
   "General Public",
@@ -576,6 +577,12 @@ export default function AdminProductCreatePage() {
         media: mediaData,
         categories: selectedCategories,
         category_names: getCategoryNames(),
+        company_id: userData?.company_id || null,
+        seller_id: user?.uid || "",
+        seller_name:
+          userData?.first_name && userData?.last_name
+            ? `${userData.first_name} ${userData.last_name}`
+            : user?.email || "",
         active: true,
         deleted: false,
         seller_id: user.uid,

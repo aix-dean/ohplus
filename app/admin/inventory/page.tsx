@@ -13,6 +13,7 @@ import { toast } from "@/components/ui/use-toast"
 import { useResponsive } from "@/hooks/use-responsive"
 import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
 import Image from "next/image"
 import {
   Dialog,
@@ -29,12 +30,15 @@ const ITEMS_PER_PAGE = 12
 
 export default function AdminInventoryPage() {
   const router = useRouter()
-  const { user, userData, subscriptionData } = useAuth()
+  const { user, userData, subscriptionData, refreshUserData } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [productToDelete, setProductToDelete] = useState<Product | null>(null)
   const { isMobile, isTablet } = useResponsive()
+
+  // Company registration dialog state
+  const [showCompanyDialog, setShowCompanyDialog] = useState(false)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -251,6 +255,12 @@ export default function AdminInventoryPage() {
   }
 
   const handleAddSiteClick = () => {
+    // Check if user has company_id first
+    if (!userData?.company_id) {
+      setShowCompanyDialog(true)
+      return
+    }
+
     if (!userData?.license_key) {
       setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
       setShowSubscriptionLimitDialog(true)
@@ -276,11 +286,41 @@ export default function AdminInventoryPage() {
     router.push("/admin/products/create")
   }
 
+  const handleCompanyRegistrationSuccess = async () => {
+    await refreshUserData()
+    setShowCompanyDialog(false)
+
+    // Check subscription after company registration
+    if (!userData?.license_key) {
+      setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
+      setShowSubscriptionLimitDialog(true)
+      return
+    }
+
+    if (!subscriptionData || subscriptionData.status !== "active") {
+      setSubscriptionLimitMessage(
+        "Your current subscription is not active. Please activate or upgrade your plan to add more sites.",
+      )
+      setShowSubscriptionLimitDialog(true)
+      return
+    }
+
+    if (totalItems >= subscriptionData.maxProducts) {
+      setSubscriptionLimitMessage(
+        `You have reached the maximum number of sites allowed by your current plan (${subscriptionData.maxProducts}). Please upgrade your subscription to add more sites.`,
+      )
+      setShowSubscriptionLimitDialog(true)
+      return
+    }
+
+    // Only redirect if all subscription checks pass
+    router.push("/admin/products/create")
+  }
+
   return (
     <div className="flex-1 p-4 md:p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
-        {/* The "+ New Product" button was here before. It's now moved into the grid. */}
       </div>
 
       {loading ? (
@@ -425,6 +465,13 @@ export default function AdminInventoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Company Registration Dialog */}
+      <CompanyRegistrationDialog
+        isOpen={showCompanyDialog}
+        onClose={() => setShowCompanyDialog(false)}
+        onSuccess={handleCompanyRegistrationSuccess}
+      />
     </div>
   )
 }
