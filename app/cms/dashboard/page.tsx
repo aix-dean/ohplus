@@ -386,7 +386,7 @@ export default function CMSDashboardPage() {
         start_time: "16:44",
         end_time: "18:44",
         spot_duration: 15,
-        loops_per_day: 20,
+        spot_per_loop: 20,
         spots_per_loop: 5,
       },
     },
@@ -416,7 +416,7 @@ export default function CMSDashboardPage() {
         start_time: "08:00",
         end_time: "22:00",
         spot_duration: 30,
-        loops_per_day: 48,
+        spot_per_loop: 48,
         spots_per_loop: 3,
       },
     },
@@ -446,7 +446,7 @@ export default function CMSDashboardPage() {
         start_time: "06:00",
         end_time: "24:00",
         spot_duration: 20,
-        loops_per_day: 72,
+        spot_per_loop: 72,
         spots_per_loop: 4,
       },
     },
@@ -476,7 +476,7 @@ export default function CMSDashboardPage() {
         start_time: "07:00",
         end_time: "23:00",
         spot_duration: 25,
-        loops_per_day: 32,
+        spot_per_loop: 32,
         spots_per_loop: 6,
       },
     },
@@ -853,7 +853,7 @@ function ContentCard({
                 </div>
                 <div className="flex items-center gap-1">
                   <Repeat className="h-3 w-3" />
-                  <span>{content.cms.loops_per_day} loops/day</span>
+                  <span>{content.cms.spot_per_loop} loops/day</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <span className="text-xs">•</span>
