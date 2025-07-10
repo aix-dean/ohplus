@@ -280,7 +280,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const firebaseUser = userCredential.user
       setUser(firebaseUser)
 
-
       let licenseKey = generateLicenseKey()
       let companyId = null
 
@@ -334,7 +333,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         phone_number: personalInfo.phone_number,
         gender: personalInfo.gender,
         project_id: orgCode ? null : firebaseUser.uid, // Only create project if not joining org
-      })
+      }
       // Only create a project if not joining an organization
       if (!orgCode) {
         const projectDocRef = doc(db, "projects", firebaseUser.uid)
@@ -348,6 +347,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
       }
 
+      await setDoc(userDocRef, userData) // Added semicolon here
       await fetchUserData(firebaseUser)
       console.log("Registration completed successfully")
     } catch (error) {
