@@ -1,16 +1,14 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Search, ArrowLeft, MapPin, Activity, Loader2, AlertCircle } from "lucide-react"
+import { Search, ArrowLeft, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { getPaginatedUserProducts, type Product } from "@/lib/firebase-service"
-import Image from "next/image"
 
 export default function BulletinBoardPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -67,37 +65,12 @@ export default function BulletinBoardPage() {
     return false
   })
 
-  // Convert product to site format for display
-  const productToSite = (product: Product) => {
-    // Determine status color based on product status
-    let statusColor = "bg-blue-500"
-    if (product.status === "ACTIVE" || product.status === "OCCUPIED") statusColor = "bg-green-500"
-    if (product.status === "VACANT" || product.status === "AVAILABLE") statusColor = "bg-green-500"
-    if (product.status === "MAINTENANCE" || product.status === "REPAIR") statusColor = "bg-red-500"
-    if (product.status === "PENDING" || product.status === "INSTALLATION") statusColor = "bg-orange-500"
-
-    // Get image from product media or use placeholder
-    const image = product.media && product.media.length > 0 ? product.media[0].url : "/roadside-billboard.png"
-
-    return {
-      id: product.id,
-      name: product.name,
-      location: product.specs_rental?.location || product.light?.location || "Unknown location",
-      status: product.status || "Unknown",
-      statusColor,
-      image,
-      lastActivity: `Last updated: ${product.updated_at ? new Date(product.updated_at.seconds * 1000).toLocaleDateString() : "Unknown"}`,
-      activities: [
-        `Status: ${product.status || "Unknown"}`,
-        `Type: ${product.content_type || "Unknown"}`,
-        `Created: ${product.created_at ? new Date(product.created_at.seconds * 1000).toLocaleDateString() : "Unknown"}`,
-      ],
-      type: "Static",
-    }
-  }
-
   const getCardHeaderColor = (name: string) => {
     // Generate a consistent color based on the name
+    if (name?.toLowerCase().includes("lilo")) return "bg-cyan-500"
+    if (name?.toLowerCase().includes("fairy")) return "bg-pink-500"
+    if (name?.toLowerCase().includes("funalo")) return "bg-gray-800"
+
     const colors = [
       "bg-cyan-500",
       "bg-pink-500",
@@ -114,6 +87,15 @@ export default function BulletinBoardPage() {
       hash = name.charCodeAt(i) + ((hash << 5) - hash)
     }
     return colors[Math.abs(hash) % colors.length]
+  }
+
+  // Generate mock activity data for each site
+  const generateMockActivities = (productId: string) => {
+    return [
+      "5/6/25: 5:00PM - Arrival of FA to site",
+      "5/6/25: 3:00PM - Reported Bad Weather as cause",
+      "5/3/25: 1:30PM - Contacted Team C for installation",
+    ]
   }
 
   // Show loading if no user
@@ -183,65 +165,40 @@ export default function BulletinBoardPage() {
       {!loading && !error && filteredSites.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredSites.map((product) => {
-            const site = productToSite(product)
+            const activities = generateMockActivities(product.id)
 
             return (
-              <Link key={site.id} href={`/logistics/bulletin-board/${site.id}`}>
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-                  <CardHeader className={`${getCardHeaderColor(site.name)} text-white p-4`}>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg font-bold">{site.name}</CardTitle>
-                      <Badge variant="secondary" className="bg-white/20 text-white">
-                        S
-                      </Badge>
+              <Link key={product.id} href={`/logistics/bulletin-board/${product.id}`}>
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer border border-gray-200 rounded-lg">
+                  <CardContent className="p-0">
+                    {/* Site ID at top */}
+                    <div className="px-4 pt-3 pb-2">
+                      <div className="text-xs text-blue-600 font-medium">{product.id}</div>
                     </div>
-                    <div className="flex items-center gap-2 text-sm opacity-90">
-                      <MapPin className="h-4 w-4" />
-                      {site.location}
+
+                    {/* Site Name Header */}
+                    <div className={`${getCardHeaderColor(product.name)} text-white px-4 py-3 mx-3 rounded-md mb-3`}>
+                      <div className="font-bold text-lg">{product.name}</div>
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    <div className="space-y-3">
-                      <div className="text-sm text-gray-600">
-                        <span className="font-medium">Site ID:</span> {site.id}
+
+                    {/* Location */}
+                    <div className="px-4 pb-2">
+                      <div className="font-medium text-gray-900">
+                        {product.specs_rental?.location || product.light?.location || "Unknown location"}
                       </div>
+                    </div>
 
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${site.statusColor}`}></div>
-                        <span className="text-sm font-medium capitalize">{site.status}</span>
+                    {/* Last Activity */}
+                    <div className="px-4 pb-4">
+                      <div className="text-sm text-gray-600 mb-2">
+                        <span className="font-medium">Last Activity:</span>
                       </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          <Activity className="h-4 w-4" />
-                          Last Activity:
-                        </div>
-                        <div className="text-sm text-gray-600 pl-6">{site.lastActivity}</div>
-                      </div>
-
-                      {site.activities.length > 1 && (
-                        <div className="space-y-1">
-                          {site.activities.slice(1).map((activity, index) => (
-                            <div key={index} className="text-xs text-gray-500 pl-6">
-                              {activity}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Site Image */}
-                      <div className="relative h-24 bg-gray-200 rounded-md overflow-hidden">
-                        <Image
-                          src={site.image || "/placeholder.svg"}
-                          alt={site.name}
-                          fill
-                          className="object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.src = "/roadside-billboard.png"
-                            target.className = "opacity-50 object-contain"
-                          }}
-                        />
+                      <div className="space-y-1">
+                        {activities.map((activity, index) => (
+                          <div key={index} className="text-xs text-gray-500">
+                            {activity}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </CardContent>
