@@ -50,7 +50,7 @@ export interface Product {
     start_time?: string
     end_time?: string
     spot_duration?: number
-    spot_per_loop?: number
+    loops_per_day?: number
     spots_per_loop?: number
   } | null
   specs_rental?: {

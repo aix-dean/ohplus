@@ -78,7 +78,7 @@ const navigationItems = [
     items: [
       { title: "Dashboard", href: "/cms/dashboard", icon: LayoutDashboard },
       { title: "Planner", href: "/cms/planner", icon: Calendar },
-      { title: "JO's", href: "/cms/orders", icon: FileText },
+      { title: "Orders", href: "/cms/orders", icon: FileText },
     ],
   },
   {
@@ -173,7 +173,41 @@ export function SideNavigation() {
                 {[
                   { title: "Dashboard", href: "/cms/dashboard", icon: LayoutDashboard },
                   { title: "Planner", href: "/cms/planner", icon: Calendar },
-                  { title: "JO's", href: "/cms/orders", icon: FileText },
+                ].map((item) => {
+                  const Icon = item.icon
+                  const active = isActive(pathname, item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
+                        active
+                          ? "bg-gray-100 text-gray-900 font-medium"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                      )}
+                    >
+                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      <span className="flex-1">{item.title}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* To Do Section */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <div className="px-3 py-2 border-b border-gray-100">
+                <h3 className="text-sm font-medium text-gray-700">To Do</h3>
+              </div>
+              <div className="p-1">
+                {[
+                  { title: "JOs", href: "/cms/orders", icon: ClipboardList },
+                  { title: "Content Library", href: "/cms/content", icon: FileText },
+                  { title: "Screen Management", href: "/cms/screens", icon: Monitor },
+                  { title: "Campaign Scheduler", href: "/cms/scheduler", icon: Calendar },
+                  { title: "Analytics", href: "/cms/analytics", icon: BarChart3 },
+                  { title: "Settings", href: "/cms/settings", icon: Cog },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
