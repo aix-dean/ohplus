@@ -31,7 +31,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/auth-context"
 import { subscriptionService } from "@/lib/subscription-service"
 
-
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
   "General Public",
@@ -94,7 +93,7 @@ export default function AdminProductCreatePage() {
       start_time: "",
       end_time: "",
       spot_duration: "",
-      loops_per_day: "",
+      spot_per_loop: "",
     },
     specs_rental: {
       audience_type: "",
@@ -157,7 +156,7 @@ export default function AdminProductCreatePage() {
     formData.cms.start_time,
     formData.cms.end_time,
     formData.cms.spot_duration,
-    formData.cms.loops_per_day,
+    formData.cms.spot_per_loop,
     formData.content_type,
   ])
 
@@ -346,9 +345,9 @@ export default function AdminProductCreatePage() {
       return true
     }
 
-    const { start_time, end_time, spot_duration, loops_per_day } = formData.cms
+    const { start_time, end_time, spot_duration, spot_per_loop } = formData.cms
 
-    if (!start_time || !end_time || !spot_duration || !loops_per_day) {
+    if (!start_time || !end_time || !spot_duration || !spot_per_loop) {
       setValidationError("All dynamic content fields are required.")
       return false
     }
@@ -379,7 +378,7 @@ export default function AdminProductCreatePage() {
 
       // Parse numeric values
       const spotDurationNum = Number.parseInt(spot_duration)
-      const spotsPerLoopNum = Number.parseInt(loops_per_day)
+      const spotsPerLoopNum = Number.parseInt(spot_per_loop)
 
       if (isNaN(spotDurationNum) || isNaN(spotsPerLoopNum) || spotDurationNum <= 0 || spotsPerLoopNum <= 0) {
         setValidationError("Spot duration and spots per loop must be positive numbers.")
@@ -596,7 +595,7 @@ export default function AdminProductCreatePage() {
                 start_time: formData.cms.start_time,
                 end_time: formData.cms.end_time,
                 spot_duration: Number.parseInt(formData.cms.spot_duration) || 0,
-                loops_per_day: Number.parseInt(formData.cms.loops_per_day) || 0,
+                spot_per_loop: Number.parseInt(formData.cms.spot_per_loop) || 0,
               }
             : null,
         specs_rental: {
@@ -763,9 +762,9 @@ export default function AdminProductCreatePage() {
                 <Label htmlFor="spot_per_loop">Spots Per Loop</Label>
                 <Input
                   id="spot_per_loop"
-                  name="cms.loops_per_day"
+                  name="cms.spot_per_loop"
                   type="number"
-                  value={formData.cms.loops_per_day}
+                  value={formData.cms.spot_per_loop}
                   onChange={handleInputChange}
                   placeholder="Enter spots per loop"
                   required

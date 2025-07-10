@@ -50,7 +50,7 @@ export interface Product {
     start_time?: string
     end_time?: string
     spot_duration?: number
-    loops_per_day?: number
+    spot_per_loop?: number
     spots_per_loop?: number
   } | null
   specs_rental?: {
@@ -383,7 +383,6 @@ export async function getUserProductsCount(
     return 0
   }
 }
-
 
 // Create a new product
 export async function createProduct(productData: Partial<Product>): Promise<string> {
