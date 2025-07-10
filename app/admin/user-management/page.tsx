@@ -2,17 +2,14 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { UserPlus, Settings, Mail, Shield, Edit } from "lucide-react"
+import { UserPlus, Settings, Mail, Shield } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore"
+import { collection, query, where, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { ResponsiveTable } from "@/components/responsive-table"
-import AddUserInvitationDialog from "@/components/add-user-invitation-dialog"
-import EditUserRoleDialog from "@/components/edit-user-role-dialog"
 import Link from "next/link"
-import { toast } from "sonner"
 
 interface User {
   id: string
@@ -28,10 +25,6 @@ export default function UserManagementPage() {
   const { userData } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
-  const [showAddUserDialog, setShowAddUserDialog] = useState(false)
-  const [showEditRoleDialog, setShowEditRoleDialog] = useState(false)
-  const [currentInvitationCode, setCurrentInvitationCode] = useState("")
-  const [selectedUser, setSelectedUser] = useState<User | null>(null)
 
   useEffect(() => {
     if (!userData?.company_id) return
@@ -57,58 +50,6 @@ export default function UserManagementPage() {
 
     return () => unsubscribe()
   }, [userData?.company_id])
-
-  const generateInvitationCode = () => {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    let result = ""
-    for (let i = 0; i < 8; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length))
-    }
-    return result
-  }
-
-  const handleAddUser = async () => {
-    console.log("Add user button clicked") // Debug log
-
-    if (!userData?.company_id) {
-      toast.error("Company information not found")
-      return
-    }
-
-    try {
-      // Generate invitation code
-      const invitationCode = generateInvitationCode()
-      console.log("Generated invitation code:", invitationCode) // Debug log
-
-      // Save invitation code to Firestore
-      await addDoc(collection(db, "invitation_codes"), {
-        code: invitationCode,
-        company_id: userData.company_id,
-        created_by: userData.uid,
-        created_at: serverTimestamp(),
-        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-        used: false,
-        role: "user",
-        max_uses: 1,
-        current_uses: 0,
-      })
-
-      console.log("Invitation code saved to Firestore") // Debug log
-
-      setCurrentInvitationCode(invitationCode)
-      setShowAddUserDialog(true)
-
-      console.log("Dialog should be open now:", true) // Debug log
-    } catch (error) {
-      console.error("Error generating invitation code:", error)
-      toast.error("Failed to generate invitation code. Please try again.")
-    }
-  }
-
-  const handleEditRole = (user: User) => {
-    setSelectedUser(user)
-    setShowEditRoleDialog(true)
-  }
 
   const getStatusBadge = (status: string) => {
     // Ensure status is a string
@@ -180,9 +121,6 @@ export default function UserManagementPage() {
       label: "Actions",
       render: (user: User) => (
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleEditRole(user)}>
-            <Edit className="h-4 w-4" />
-          </Button>
           <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
             <Settings className="h-4 w-4" />
           </Button>
@@ -211,8 +149,6 @@ export default function UserManagementPage() {
     )
   }
 
-  console.log("Rendering page with showAddUserDialog:", showAddUserDialog) // Debug log
-
   return (
     <div className="container mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
@@ -233,9 +169,9 @@ export default function UserManagementPage() {
               Invitation Codes
             </Button>
           </Link>
-          <Button className="gap-2" onClick={handleAddUser}>
+          <Button className="gap-2">
             <UserPlus className="h-4 w-4" />
-            Invite User
+            Add User
           </Button>
         </div>
       </div>
@@ -244,31 +180,12 @@ export default function UserManagementPage() {
       <Card>
         <CardHeader>
           <CardTitle>Organization Users ({users.length})</CardTitle>
+          <CardDescription>Manage users within your organization</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveTable data={users} columns={columns} keyField="id" />
         </CardContent>
       </Card>
-
-      {/* Add User Dialog */}
-      <AddUserInvitationDialog
-        open={showAddUserDialog}
-        onOpenChange={setShowAddUserDialog}
-        invitationCode={currentInvitationCode}
-        onSuccess={() => {
-          toast.success("User invitation sent successfully!")
-        }}
-      />
-
-      {/* Edit User Role Dialog */}
-      <EditUserRoleDialog
-        open={showEditRoleDialog}
-        onOpenChange={setShowEditRoleDialog}
-        user={selectedUser}
-        onSuccess={() => {
-          toast.success("User role updated successfully!")
-        }}
-      />
     </div>
   )
 }

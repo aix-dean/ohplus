@@ -13,7 +13,7 @@ import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, whe
 import { auth, db } from "@/lib/firebase"
 import { subscriptionService } from "@/lib/subscription-service"
 import type { Subscription } from "@/lib/types/subscription"
-import { generateLicenseKey } from "@/lib/utils" // Assuming this utility exists
+import { generateLicenseKey } from "@/lib/utils"
 
 interface UserData {
   uid: string
@@ -23,12 +23,37 @@ interface UserData {
   company_id?: string | null
   role: string | null
   permissions: string[]
-  // Add other user-specific data here
+  project_id?: string
+  first_name?: string
+  last_name?: string
+  middle_name?: string
+  phone_number?: string
+  gender?: string
+  type?: string
+  created?: Date
+  updated?: Date
+}
+
+interface ProjectData {
+  project_id: string
+  company_name?: string
+  company_location?: string
+  company_website?: string
+  project_name?: string
+  social_media?: {
+    facebook?: string
+    instagram?: string
+    youtube?: string
+  }
+  license_key?: string | null
+  created?: Date
+  updated?: Date
 }
 
 interface AuthContextType {
   user: FirebaseUser | null
   userData: UserData | null
+  projectData: ProjectData | null
   subscriptionData: Subscription | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
@@ -59,22 +84,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-interface ProjectData {
-  project_id: string
-  company_name?: string
-  company_location?: string
-  company_website?: string
-  project_name?: string
-  social_media?: {
-    facebook?: string
-    instagram?: string
-    youtube?: string
-  }
-  license_key?: string | null
-  created?: Date
-  updated?: Date
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
@@ -84,7 +93,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
     try {
-      // Corrected collection name to "iboard_users"
+      console.log("Fetching user data for:", firebaseUser.uid)
+
+      // Fetch user data from iboard_users collection
       const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
       const userDocSnap = await getDoc(userDocRef)
 
@@ -92,18 +103,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (userDocSnap.exists()) {
         const data = userDocSnap.data()
+        console.log("User document data:", data)
+
         fetchedUserData = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
-          license_key: (data.license_key as string | null) || null, // Explicitly cast to string | null
-          company_id: (data.company_id as string | null) || null, // Add company_id field
-          role: data.role || "user", // Default role
-          permissions: data.permissions || [], // Default empty permissions
+          license_key: data.license_key || null,
+          role: data.role || "user",
+          permissions: data.permissions || [],
+          project_id: data.project_id,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          middle_name: data.middle_name,
+          phone_number: data.phone_number,
+          gender: data.gender,
+          type: data.type,
+          created: data.created?.toDate(),
+          updated: data.updated?.toDate(),
+          company_id: data.company_id || null, // Add company_id field
           ...data, // Spread any other fields
         }
       } else {
-        // If user document doesn't exist, create a basic one in "iboard_users"
+        console.log("User document doesn't exist, creating basic one")
+        // If user document doesn't exist, create a basic one
         fetchedUserData = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -115,14 +138,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         await setDoc(userDocRef, fetchedUserData, { merge: true })
       }
+
+      console.log("Fetched user data:", fetchedUserData)
       setUserData(fetchedUserData)
 
       // Fetch project data if project_id exists in user data
       if (fetchedUserData.project_id) {
+        console.log("Fetching project data for project_id:", fetchedUserData.project_id)
+
         const projectDocRef = doc(db, "projects", fetchedUserData.project_id)
         const projectDocSnap = await getDoc(projectDocRef)
+
         if (projectDocSnap.exists()) {
           const projectData = projectDocSnap.data()
+          console.log("Project document data:", projectData)
+
           setProjectData({
             project_id: projectDocSnap.id,
             company_name: projectData.company_name,
@@ -130,22 +160,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             company_website: projectData.company_website,
             project_name: projectData.project_name,
             social_media: projectData.social_media,
-            license_key: projectData.license_key, // Fetch license_key for project data
+            license_key: projectData.license_key,
             created: projectData.created?.toDate(),
             updated: projectData.updated?.toDate(),
           })
         } else {
+          console.log("Project document doesn't exist")
           setProjectData(null)
         }
       } else {
+        console.log("No project_id found in user data")
         setProjectData(null)
       }
 
-      // Fetch subscription data if license_key exists
+      // Fetch subscription data using the license_key from USER data (not project data)
       if (fetchedUserData.license_key) {
-        const subscription = await subscriptionService.getSubscriptionByLicenseKey(fetchedUserData.license_key)
-        setSubscriptionData(subscription)
+        console.log("Fetching subscription data for license_key:", fetchedUserData.license_key)
+
+        try {
+          const subscription = await subscriptionService.getSubscriptionByLicenseKey(fetchedUserData.license_key)
+          console.log("Subscription data:", subscription)
+          setSubscriptionData(subscription)
+        } catch (subscriptionError) {
+          console.error("Error fetching subscription:", subscriptionError)
+          setSubscriptionData(null)
+        }
       } else {
+        console.log("No license_key found in user data")
         setSubscriptionData(null)
       }
     } catch (error) {
@@ -164,9 +205,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshSubscriptionData = useCallback(async () => {
     if (userData?.license_key) {
-      const subData = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
-      setSubscriptionData(subData)
+      console.log("Refreshing subscription data for license_key:", userData.license_key)
+      try {
+        const subData = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
+        setSubscriptionData(subData)
+      } catch (error) {
+        console.error("Error refreshing subscription data:", error)
+        setSubscriptionData(null)
+      }
     } else {
+      console.log("No license_key available for subscription refresh")
       setSubscriptionData(null)
     }
   }, [userData])
@@ -174,13 +222,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const assignLicenseKey = useCallback(
     async (uid: string, licenseKey: string) => {
       try {
-        // Corrected collection name to "iboard_users"
+        console.log("Assigning license key:", licenseKey, "to user:", uid)
+
         const userDocRef = doc(db, "iboard_users", uid)
         await setDoc(userDocRef, { license_key: licenseKey }, { merge: true })
+
         // Update local state immediately
         setUserData((prev) => (prev ? { ...prev, license_key: licenseKey } : null))
+
         // Refresh subscription data after assigning license key
         await refreshSubscriptionData()
+
+        console.log("License key assigned successfully")
       } catch (error) {
         console.error("Error assigning license key:", error)
         throw error
@@ -192,10 +245,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     setLoading(true)
     try {
+      console.log("Logging in user:", email)
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
       setUser(userCredential.user)
       await fetchUserData(userCredential.user)
     } catch (error) {
+      console.error("Login error:", error)
       setLoading(false)
       throw error
     }
@@ -219,9 +274,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ) => {
     setLoading(true)
     try {
+      console.log("Registering new user:", personalInfo.email)
+
       const userCredential = await createUserWithEmailAndPassword(auth, personalInfo.email, password)
       const firebaseUser = userCredential.user
       setUser(firebaseUser)
+
 
       let licenseKey = generateLicenseKey()
       let companyId = null
@@ -258,10 +316,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await updateDoc(doc(db, "invitation_codes", invitationDoc.id), updateData)
         }
       }
-
-      // Create user document in "iboard_users"
+      // Create user document in "iboard_users" with license_key
       const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
-      await setDoc(userDocRef, {
+      const userData = {
         email: firebaseUser.email,
         uid: firebaseUser.uid,
         license_key: licenseKey,
@@ -278,7 +335,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         gender: personalInfo.gender,
         project_id: orgCode ? null : firebaseUser.uid, // Only create project if not joining org
       })
-
       // Only create a project if not joining an organization
       if (!orgCode) {
         const projectDocRef = doc(db, "projects", firebaseUser.uid)
@@ -293,6 +349,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       await fetchUserData(firebaseUser)
+      console.log("Registration completed successfully")
     } catch (error) {
       console.error("Error in AuthContext register:", error)
       setLoading(false)
@@ -303,12 +360,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     setLoading(true)
     try {
+      console.log("Logging out user")
       await signOut(auth)
       setUser(null)
       setUserData(null)
       setProjectData(null)
       setSubscriptionData(null)
     } catch (error) {
+      console.error("Logout error:", error)
       setLoading(false)
       throw error
     }
@@ -316,37 +375,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = async (email: string) => {
     try {
+      console.log("Sending password reset email to:", email)
       await sendPasswordResetEmail(auth, email)
     } catch (error) {
+      console.error("Password reset error:", error)
       throw error
     }
   }
 
   const updateUserData = async (updates: Partial<UserData>) => {
     if (!user) throw new Error("User not authenticated.")
-    // Corrected collection name to "iboard_users"
+
+    console.log("Updating user data:", updates)
     const userDocRef = doc(db, "iboard_users", user.uid)
     const updatedFields = { ...updates, updated: serverTimestamp() }
     await updateDoc(userDocRef, updatedFields)
+
     // Optimistically update state
     setUserData((prev) => (prev ? { ...prev, ...updates } : null))
   }
 
   const updateProjectData = async (updates: Partial<ProjectData>) => {
     if (!user || !userData?.project_id) throw new Error("Project not found or user not authenticated.")
+
+    console.log("Updating project data:", updates)
     const projectDocRef = doc(db, "projects", userData.project_id)
     const updatedFields = { ...updates, updated: serverTimestamp() }
     await updateDoc(projectDocRef, updatedFields)
+
     // Optimistically update state
     setProjectData((prev) => (prev ? { ...prev, ...updates } : null))
   }
 
   useEffect(() => {
+    console.log("Setting up auth state listener")
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        console.log("Auth state changed: user logged in", firebaseUser.uid)
         setUser(firebaseUser)
         await fetchUserData(firebaseUser)
       } else {
+        console.log("Auth state changed: user logged out")
         setUser(null)
         setUserData(null)
         setProjectData(null)
