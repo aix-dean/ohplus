@@ -78,7 +78,7 @@ const navigationItems = [
     items: [
       { title: "Dashboard", href: "/cms/dashboard", icon: LayoutDashboard },
       { title: "Planner", href: "/cms/planner", icon: Calendar },
-      { title: "Orders", href: "/cms/orders", icon: FileText },
+      { title: "JO's", href: "/cms/orders", icon: FileText },
     ],
   },
   {
