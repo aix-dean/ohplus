@@ -442,7 +442,7 @@ export default function StaticSitesTab() {
   )
 }
 
-// Static Site Card that matches the exact reference design
+// Update the SiteCard component to fetch its own service assignments
 function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
@@ -477,10 +477,10 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
 
   return (
     <Card
-      className="overflow-hidden cursor-pointer border border-gray-200 shadow-sm rounded-lg transition-all hover:shadow-lg bg-white w-full max-w-[200px]"
+      className="overflow-hidden cursor-pointer border border-gray-200 shadow-sm rounded-lg transition-all hover:shadow-lg bg-white"
       onClick={handleCardClick}
     >
-      <div className="relative h-32 bg-gray-200">
+      <div className="relative h-48 bg-gray-200">
         <Image
           src={site.image || "/placeholder.svg"}
           alt={site.name}
@@ -493,12 +493,23 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
           }}
         />
 
-        {/* Status Badge - Bottom Left */}
-        <div className="absolute bottom-2 left-2">
-          <div className="px-2 py-1 rounded text-xs font-bold text-white" style={{ backgroundColor: "#38b6ff" }}>
+        {/* Status Badge - Top Left */}
+        <div className="absolute top-2 left-2">
+          <div
+            className={`px-2 py-1 rounded text-xs font-bold text-white ${
+              site.status === "ACTIVE" ? "bg-green-500" : "bg-gray-500"
+            }`}
+          >
             {site.status === "ACTIVE" ? "OPEN" : site.status}
           </div>
         </div>
+
+        {/* Assignment Count Badge - Top Right */}
+        {activeAssignments.length > 0 && (
+          <div className="absolute top-2 right-2 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
+            {activeAssignments.length}
+          </div>
+        )}
       </div>
 
       <CardContent className="p-3">
@@ -508,38 +519,32 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
 
           {/* Site Name with Badge */}
           <div className="flex items-center gap-2">
-            <h3 className="font-bold text-sm text-gray-900 truncate">{site.name}</h3>
-            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0">S</div>
+            <h3 className="font-bold text-base text-gray-900">{site.name}</h3>
+            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold">S</div>
           </div>
 
           {/* Site Information */}
           <div className="space-y-1 text-xs">
-            <div className="flex flex-col">
-              <span className="text-black">
-                <span className="font-bold">Operation:</span>
-                <span className="ml-1 text-black">{site.status === "ACTIVE" ? "Active" : site.status}</span>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Operation:</span>
+              <span className={`font-semibold ${site.status === "ACTIVE" ? "text-green-600" : "text-gray-800"}`}>
+                {site.status === "ACTIVE" ? "Active" : site.status}
               </span>
             </div>
-            <div className="flex flex-col">
-              <span className="text-black">
-                <span className="font-bold">Display Health:</span>
-                <span className="ml-1" style={{ color: "#00bf63" }}>
-                  100%
-                </span>
-              </span>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Display Health:</span>
+              <span className="font-semibold text-green-600">90%</span>
             </div>
-            <div className="flex flex-col">
-              <span className="text-black">
-                <span className="font-bold">Compliance:</span>
-                <span className="ml-1 text-black">Complete</span>
-              </span>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Compliance:</span>
+              <span className="font-semibold text-red-600">Incomplete</span>
             </div>
           </div>
 
           {/* Create Report Button */}
           <Button
             variant="secondary"
-            className="mt-3 w-full h-8 text-xs bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
+            className="mt-3 w-full h-9 text-sm bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
             onClick={handleCreateReport}
           >
             Create Report

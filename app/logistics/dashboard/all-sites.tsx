@@ -468,7 +468,7 @@ export default function AllSitesTab() {
   )
 }
 
-// Unified Site Card that matches the exact reference design
+// Unified Site Card that shows all UI elements with Create Report button
 function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -482,10 +482,10 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
 
   return (
     <Card
-      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full max-w-[200px]"
+      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg"
       onClick={handleCardClick}
     >
-      <div className="relative h-32 bg-gray-200">
+      <div className="relative h-48 bg-gray-200">
         <Image
           src={site.image || "/placeholder.svg"}
           alt={site.name}
@@ -498,9 +498,19 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
           }}
         />
 
-        {/* Status Badge - Bottom Left */}
-        <div className="absolute bottom-2 left-2">
-          <div className="px-2 py-1 rounded text-xs font-bold text-white" style={{ backgroundColor: "#38b6ff" }}>
+        {/* Status Badge - Top Left */}
+        <div className="absolute top-2 left-2">
+          <div
+            className={`px-2 py-1 rounded text-xs font-bold text-white ${
+              site.operationalStatus === "Operational"
+                ? "bg-green-500"
+                : site.operationalStatus === "Under Maintenance"
+                  ? "bg-red-500"
+                  : site.operationalStatus === "Pending Setup"
+                    ? "bg-orange-500"
+                    : "bg-gray-500"
+            }`}
+          >
             {site.operationalStatus === "Operational"
               ? "OPEN"
               : site.operationalStatus === "Under Maintenance"
@@ -510,6 +520,13 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
                   : "CLOSED"}
           </div>
         </div>
+
+        {/* Notification Badge - Top Right */}
+        {site.notifications > 0 && (
+          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+            {site.notifications}
+          </div>
+        )}
       </div>
 
       <CardContent className="p-3">
@@ -519,60 +536,66 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
 
           {/* Site Name with Badge */}
           <div className="flex items-center gap-2">
-            <h3 className="font-bold text-sm text-gray-900 truncate">{site.name}</h3>
-            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0">
-              {site.contentType === "dynamic" ? "M" : "S"}
+            <h3 className="font-bold text-base text-gray-900">{site.name}</h3>
+            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold">
+              {site.contentType === "dynamic" ? "D" : "S"}
             </div>
           </div>
 
           {/* Site Information */}
           <div className="space-y-1 text-xs">
-            <div className="flex flex-col">
-              <span className="text-black">
-                <span className="font-bold">Operation:</span>
-                <span
-                  className={`ml-1 ${
-                    site.operationalStatus === "Operational"
-                      ? "text-black"
-                      : site.operationalStatus === "Under Maintenance"
-                        ? "text-black"
-                        : site.operationalStatus === "Pending Setup"
-                          ? "text-black"
-                          : "text-black"
-                  }`}
-                >
-                  {site.operationalStatus === "Operational"
-                    ? "Active"
+            <div className="flex justify-between">
+              <span className="text-gray-600">Operation:</span>
+              <span
+                className={`font-semibold ${
+                  site.operationalStatus === "Operational"
+                    ? "text-green-600"
                     : site.operationalStatus === "Under Maintenance"
-                      ? "Maintenance"
+                      ? "text-red-600"
                       : site.operationalStatus === "Pending Setup"
-                        ? "Pending"
-                        : "Inactive"}
-                </span>
+                        ? "text-orange-600"
+                        : "text-gray-600"
+                }`}
+              >
+                {site.operationalStatus === "Operational"
+                  ? "Active"
+                  : site.operationalStatus === "Under Maintenance"
+                    ? "Maintenance"
+                    : site.operationalStatus === "Pending Setup"
+                      ? "Pending"
+                      : "Inactive"}
               </span>
             </div>
 
-            <div className="flex flex-col">
-              <span className="text-black">
-                <span className="font-bold">Display Health:</span>
-                <span className="ml-1" style={{ color: "#00bf63" }}>
-                  {site.healthPercentage > 90
-                    ? "100%"
-                    : site.healthPercentage > 80
-                      ? "90%"
-                      : site.healthPercentage > 60
-                        ? "75%"
-                        : "50%"}
-                </span>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Display Health:</span>
+              <span
+                className={`font-semibold ${
+                  site.healthPercentage > 80
+                    ? "text-green-600"
+                    : site.healthPercentage > 60
+                      ? "text-yellow-600"
+                      : "text-red-600"
+                }`}
+              >
+                {site.healthPercentage > 90
+                  ? "100%"
+                  : site.healthPercentage > 80
+                    ? "90%"
+                    : site.healthPercentage > 60
+                      ? "75%"
+                      : "50%"}
               </span>
             </div>
 
-            <div className="flex flex-col">
-              <span className="text-black">
-                <span className="font-bold">Compliance:</span>
-                <span className="ml-1 text-black">
-                  {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}
-                </span>
+            <div className="flex justify-between">
+              <span className="text-gray-600">Compliance:</span>
+              <span
+                className={`font-semibold ${
+                  site.operationalStatus === "Operational" ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}
               </span>
             </div>
           </div>
@@ -580,7 +603,7 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
           {/* Create Report Button */}
           <Button
             variant="secondary"
-            className="mt-3 w-full h-8 text-xs bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
+            className="mt-3 w-full h-9 text-sm bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
             onClick={handleCreateReport}
           >
             Create Report
