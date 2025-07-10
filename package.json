@@ -60,7 +60,6 @@
     "next-themes": "latest",
     "qrcode": "^1.5.4",
     "react": "^19",
-    "react-big-calendar": "latest",
     "react-day-picker": "latest",
     "react-dom": "^19",
     "react-hook-form": "latest",
