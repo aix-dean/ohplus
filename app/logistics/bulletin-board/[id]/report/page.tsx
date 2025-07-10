@@ -8,6 +8,10 @@ import { ArrowLeft, Download, Send } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
+import { generateReportPDF } from "@/lib/pdf-service"
+import { SendReportDialog } from "@/components/send-report-dialog"
+import { useToast } from "@/hooks/use-toast"
+import type { ReportData } from "@/lib/report-service"
 
 export default function ReportViewPage() {
   const params = useParams()
@@ -15,7 +19,10 @@ export default function ReportViewPage() {
   const siteId = params.id as string
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [sendDialogOpen, setSendDialogOpen] = useState(false)
   const { user } = useAuth()
+  const { toast } = useToast()
 
   useEffect(() => {
     if (siteId && user?.uid) {
@@ -48,6 +55,102 @@ export default function ReportViewPage() {
     router.back()
   }
 
+  const handleDownloadPDF = async () => {
+    if (!product) return
+
+    setIsDownloading(true)
+    try {
+      // Create mock report data based on the product
+      const reportData: ReportData = {
+        id: `REPORT-${Date.now()}`,
+        siteId: product.id,
+        siteName: product.name || "P01",
+        reportType: "completion-report",
+        date: new Date().toISOString().split("T")[0],
+        location: product.location || "Guadalupe Viejo",
+        assignedTo: "Team A",
+        sales: "aixymbiosis@aix.com",
+        completionPercentage: 100,
+        bookingDates: {
+          start: "2025-05-20",
+          end: "2025-06-20",
+        },
+        attachments: [
+          {
+            fileName: "report.pdf",
+            fileUrl: "/placeholder.jpg",
+            note: "Completion report attachment",
+          },
+        ],
+        created: new Date().toISOString(),
+        createdBy: user?.uid || "",
+        createdByName: user?.email || "aixymbiosis@aix.com",
+      }
+
+      // Generate and download PDF
+      await generateReportPDF(reportData, product, false)
+
+      toast({
+        title: "PDF Downloaded",
+        description: "The completion report has been downloaded successfully.",
+      })
+    } catch (error) {
+      console.error("Error downloading PDF:", error)
+      toast({
+        title: "Download Failed",
+        description: "Failed to download the PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
+  const handleSendReport = () => {
+    setSendDialogOpen(true)
+  }
+
+  const handleSendOption = (option: "email" | "whatsapp" | "viber" | "messenger") => {
+    if (!product) return
+
+    // Create mock report data for sending
+    const reportData: ReportData = {
+      id: `REPORT-${Date.now()}`,
+      siteId: product.id,
+      siteName: product.name || "P01",
+      reportType: "completion-report",
+      date: new Date().toISOString().split("T")[0],
+      location: product.location || "Guadalupe Viejo",
+      assignedTo: "Team A",
+      sales: "aixymbiosis@aix.com",
+      completionPercentage: 100,
+      bookingDates: {
+        start: "2025-05-20",
+        end: "2025-06-20",
+      },
+      attachments: [
+        {
+          fileName: "report.pdf",
+          fileUrl: "/placeholder.jpg",
+          note: "Completion report attachment",
+        },
+      ],
+      created: new Date().toISOString(),
+      createdBy: user?.uid || "",
+      createdByName: user?.email || "aixymbiosis@aix.com",
+    }
+
+    if (option === "email") {
+      // Navigate to compose email page (similar to logistics dashboard)
+      router.push(`/logistics/reports/${reportData.id}/compose`)
+    } else {
+      toast({
+        title: "Feature Coming Soon",
+        description: `Sharing via ${option} will be available soon.`,
+      })
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -62,6 +165,33 @@ export default function ReportViewPage() {
         <div className="text-lg">Report not found</div>
       </div>
     )
+  }
+
+  // Create report data for the send dialog
+  const reportData: ReportData = {
+    id: `REPORT-${Date.now()}`,
+    siteId: product.id,
+    siteName: product.name || "P01",
+    reportType: "completion-report",
+    date: new Date().toISOString().split("T")[0],
+    location: product.location || "Guadalupe Viejo",
+    assignedTo: "Team A",
+    sales: "aixymbiosis@aix.com",
+    completionPercentage: 100,
+    bookingDates: {
+      start: "2025-05-20",
+      end: "2025-06-20",
+    },
+    attachments: [
+      {
+        fileName: "report.pdf",
+        fileUrl: "/placeholder.jpg",
+        note: "Completion report attachment",
+      },
+    ],
+    created: new Date().toISOString(),
+    createdBy: user?.uid || "",
+    createdByName: user?.email || "aixymbiosis@aix.com",
   }
 
   return (
@@ -83,15 +213,22 @@ export default function ReportViewPage() {
         {/* Action Buttons */}
         <div className="flex items-center gap-3">
           {/* Send Button */}
-          <Button className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-full flex items-center gap-2">
+          <Button
+            onClick={handleSendReport}
+            className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-full flex items-center gap-2"
+          >
             <Send className="h-4 w-4" />
             Send
           </Button>
 
           {/* Download PDF Button */}
-          <Button className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+          <Button
+            onClick={handleDownloadPDF}
+            disabled={isDownloading}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 disabled:opacity-50"
+          >
             <Download className="h-4 w-4" />
-            Download PDF
+            {isDownloading ? "Downloading..." : "Download PDF"}
           </Button>
         </div>
       </div>
@@ -222,6 +359,14 @@ export default function ReportViewPage() {
       <div className="w-full mt-8">
         <img src="/logistics-footer.png" alt="Logistics Footer" className="w-full h-auto object-cover" />
       </div>
+
+      {/* Send Report Dialog */}
+      <SendReportDialog
+        isOpen={sendDialogOpen}
+        onClose={() => setSendDialogOpen(false)}
+        report={reportData}
+        onSelectOption={handleSendOption}
+      />
     </div>
   )
 }
