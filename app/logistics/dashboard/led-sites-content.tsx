@@ -1,15 +1,14 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
-import { LayoutGrid, List, Play, Square, AlertCircle, Plus, Search } from "lucide-react"
-import Image from "next/image"
-import Link from "next/link"
+import { LayoutGrid, List, AlertCircle, Plus, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import type { Product } from "@/lib/firebase-service"
 import { getServiceAssignmentsByProductId, type ServiceAssignment } from "@/lib/firebase-service"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
@@ -19,6 +18,10 @@ export default function LEDSitesContentTab({ products = [] }: { products?: Produ
   const [searchTerm, setSearchTerm] = useState("")
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
   const [filteredProducts, setFilteredProducts] = useState<Product[]>(products)
+
+  // Report dialog state
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -114,9 +117,14 @@ export default function LEDSitesContentTab({ products = [] }: { products?: Produ
       {filteredProducts.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
           {filteredProducts.map((product) => (
-            <Link href={`/logistics/sites/${product.id}?view=content`} key={product.id}>
-              <LEDSiteCard product={product} />
-            </Link>
+            <LEDSiteCard
+              key={product.id}
+              product={product}
+              onCreateReport={(siteId) => {
+                setSelectedSiteId(siteId)
+                setReportDialogOpen(true)
+              }}
+            />
           ))}
         </div>
       )}
@@ -128,12 +136,15 @@ export default function LEDSitesContentTab({ products = [] }: { products?: Produ
           Create Service Assignment
         </Button>
       </div>
+
+      {/* Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
     </div>
   )
 }
 
 // Replace the existing LEDSiteCard component with this updated version
-function LEDSiteCard({ product }: { product: Product }) {
+function LEDSiteCard({ product, onCreateReport }: { product: Product; onCreateReport: (siteId: string) => void }) {
   // Get the first media item for the thumbnail
   const thumbnailUrl = product.media && product.media.length > 0 ? product.media[0].url : "/led-billboard-1.png"
 
@@ -143,6 +154,17 @@ function LEDSiteCard({ product }: { product: Product }) {
   // State for service assignments
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
+
+  // Add the handleCreateReport function
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onCreateReport(product.id)
+  }
+
+  const handleCardClick = () => {
+    window.location.href = `/logistics/sites/${product.id}?view=content`
+  }
 
   // Fetch service assignments for this specific product
   useEffect(() => {
@@ -158,100 +180,4 @@ function LEDSiteCard({ product }: { product: Product }) {
       }
     }
 
-    fetchProductAssignments()
-  }, [product.id])
-
-  const hasActiveAssignments = activeAssignments.length > 0
-
-  // Determine status and health percentage
-  const status = product.status === "ACTIVE" ? "Operational" : product.status === "PENDING" ? "Warning" : "Error"
-  const statusColor = status === "Operational" ? "green" : status === "Warning" ? "orange" : "red"
-
-  // Generate a health percentage based on status if not available
-  const healthPercentage =
-    product.health_percentage ||
-    (status === "Operational"
-      ? Math.floor(Math.random() * 20) + 80
-      : // 80-100 for operational
-        status === "Warning"
-        ? Math.floor(Math.random() * 30) + 50
-        : // 50-80 for warning
-          Math.floor(Math.random() * 40) + 10) // 10-50 for error
-
-  return (
-    <Card className="erp-card overflow-hidden hover:shadow-md transition-shadow">
-      <div className="relative h-48 bg-gray-200">
-        {/* Service Assignment Badge - only show if there are active assignments */}
-        {hasActiveAssignments && (
-          <div className="absolute top-2 right-2 z-10">
-            <div className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg">
-              {activeAssignments.length}
-            </div>
-          </div>
-        )}
-
-        <Image
-          src={thumbnailUrl || "/placeholder.svg"}
-          alt={product.name || "LED Site"}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/led-billboard-1.png"
-            target.className = "object-cover"
-          }}
-        />
-      </div>
-
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-bold">{product.name}</h3>
-          <p className="text-xs text-gray-500">ID: {product.id}</p>
-
-          <div className="mt-2 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span
-                className={`
-                  ${statusColor === "green" ? "text-green-600" : ""}
-                  ${statusColor === "red" ? "text-red-600" : ""}
-                  ${statusColor === "orange" ? "text-orange-600" : ""}
-                  font-medium
-                `}
-              >
-                {status}
-              </span>
-            </div>
-            <div>
-              {status === "Operational" ? (
-                <div className="bg-green-100 text-green-600 rounded-full w-8 h-8 flex items-center justify-center">
-                  <Play size={16} fill="currentColor" />
-                </div>
-              ) : status === "Error" ? (
-                <div className="bg-red-100 text-red-600 rounded-full w-8 h-8 flex items-center justify-center">
-                  <Square size={16} fill="currentColor" />
-                </div>
-              ) : (
-                <div className="bg-orange-100 text-orange-600 rounded-full w-8 h-8 flex items-center justify-center">
-                  <AlertCircle size={16} />
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-2">
-            <Progress
-              value={healthPercentage}
-              className="h-2"
-              indicatorClassName={`
-                ${healthPercentage > 80 ? "bg-gradient-to-r from-green-500 to-green-300" : ""}
-                ${healthPercentage > 60 && healthPercentage <= 80 ? "bg-gradient-to-r from-yellow-500 to-green-300" : ""}
-                ${healthPercentage > 40 && healthPercentage <= 60 ? "bg-gradient-to-r from-orange-500 to-yellow-300" : ""}
-                ${healthPercentage <= 40 ? "bg-gradient-to-r from-red-500 to-orange-300" : ""}
-              `}
-            />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+    fetch

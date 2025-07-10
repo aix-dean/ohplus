@@ -1,26 +1,28 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useCallback } from "react"
 import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
-import Image from "next/image"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { getPaginatedUserProducts, type Product } from "@/lib/firebase-service"
+import {
+  getPaginatedUserProducts,
+  getServiceAssignmentsByProductId,
+  type Product,
+  type ServiceAssignment,
+} from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
-import { getServiceAssignmentsByProductId } from "@/lib/firebase-service"
-import type { ServiceAssignment } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
+import { CreateReportDialog } from "@/components/create-report-dialog"
+import Image from "next/image"
+import { Card, CardContent } from "@/components/ui/card"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
 
 export default function StaticSitesTab() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [contentTab, setContentTab] = useState<"content" | "illumination" | "structure" | "compliance">("content")
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -38,6 +40,10 @@ export default function StaticSitesTab() {
   >(new Map())
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingCount, setLoadingCount] = useState(false)
+
+  // Report dialog state
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
   const { user } = useAuth()
 
@@ -247,22 +253,6 @@ export default function StaticSitesTab() {
     }
   }
 
-  // Helper function to get the view query parameter based on the current tab
-  const getViewQueryParam = (tab: string) => {
-    switch (tab) {
-      case "illumination":
-        return "?view=illumination"
-      case "structure":
-        return "?view=structure"
-      case "compliance":
-        return "?view=compliance"
-      case "content":
-        return "?view=content"
-      default:
-        return ""
-    }
-  }
-
   // Show loading if no user
   if (!user) {
     return (
@@ -275,16 +265,6 @@ export default function StaticSitesTab() {
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Content Type Tabs */}
-      <Tabs defaultValue="content" className="w-full" onValueChange={(value) => setContentTab(value as any)}>
-        <TabsList className="grid w-[450px] grid-cols-4">
-          <TabsTrigger value="content">Content</TabsTrigger>
-          <TabsTrigger value="illumination">Illumination</TabsTrigger>
-          <TabsTrigger value="structure">Structure</TabsTrigger>
-          <TabsTrigger value="compliance">Compliance</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
       {/* Date, Search and View Toggle */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="text-sm text-gray-600 font-medium">
@@ -339,9 +319,29 @@ export default function StaticSitesTab() {
         <div className="bg-red-50 border border-red-200 rounded-md p-4 text-center">
           <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
           <p className="text-red-700">{error}</p>
-          <Button variant="outline" className="mt-4" onClick={() => fetchProducts(1, true)}>
+          <Button variant="outline" className="mt-4 bg-transparent" onClick={() => fetchProducts(1, true)}>
             Try Again
           </Button>
+        </div>
+      )}
+
+      {/* Site Grid */}
+      {!loading && !error && products.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 mt-4">
+          {products.map((product) => {
+            const site = productToSite(product)
+
+            return (
+              <SiteCard
+                key={site.id}
+                site={site}
+                onCreateReport={(siteId) => {
+                  setSelectedSiteId(siteId)
+                  setReportDialogOpen(true)
+                }}
+              />
+            )
+          })}
         </div>
       )}
 
@@ -362,29 +362,6 @@ export default function StaticSitesTab() {
               Clear Search
             </Button>
           )}
-        </div>
-      )}
-
-      {/* Site Grid */}
-      {!loading && !error && products.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
-          {products.map((product) => {
-            const site = productToSite(product)
-
-            return (
-              <Link href={`/logistics/sites/${site.id}${getViewQueryParam(contentTab)}`} key={site.id}>
-                {contentTab === "illumination" ? (
-                  <IlluminationCard site={site} />
-                ) : contentTab === "structure" ? (
-                  <StructureCard site={site} />
-                ) : contentTab === "compliance" ? (
-                  <ComplianceCard site={site} />
-                ) : (
-                  <SiteCard site={site} />
-                )}
-              </Link>
-            )
-          })}
         </div>
       )}
 
@@ -420,7 +397,7 @@ export default function StaticSitesTab() {
               size="sm"
               onClick={goToPreviousPage}
               disabled={currentPage === 1}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 bg-transparent"
             >
               <ChevronLeft size={16} />
             </Button>
@@ -458,14 +435,28 @@ export default function StaticSitesTab() {
           </div>
         </div>
       )}
+
+      {/* Report Dialog */}
+      <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
     </div>
   )
 }
 
-// Update the SiteCard component to fetch its own service assignments
-function SiteCard({ site }: { site: any }) {
+// Static Site Card that matches the exact reference design
+function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
+
+  // Add the handleCreateReport function
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onCreateReport(site.id)
+  }
+
+  const handleCardClick = () => {
+    window.location.href = `/logistics/sites/${site.id}`
+  }
 
   // Fetch service assignments for this specific product
   useEffect(() => {
@@ -486,10 +477,10 @@ function SiteCard({ site }: { site: any }) {
 
   return (
     <Card
-      className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white"
-      onClick={() => {}} // Add empty onClick for cursor pointer
+      className="overflow-hidden cursor-pointer border border-gray-200 shadow-sm rounded-lg transition-all hover:shadow-lg bg-white w-full"
+      onClick={handleCardClick}
     >
-      <div className="relative h-48 bg-gray-200">
+      <div className="relative h-32 bg-gray-200">
         <Image
           src={site.image || "/placeholder.svg"}
           alt={site.name}
@@ -501,218 +492,58 @@ function SiteCard({ site }: { site: any }) {
             target.className = "opacity-50 object-contain"
           }}
         />
-        {activeAssignments.length > 0 && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
-            {activeAssignments.length}
-          </div>
-        )}
-      </div>
 
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="font-semibold">{site.name}</h3>
-          <div className="text-xs text-gray-500">ID: {site.id}</div>
-
-          <div className="mt-2 flex items-center gap-2">
-            <div className="text-sm font-medium">Current:</div>
-            <Badge
-              variant="outline"
-              className={`
-                ${site.statusColor === "green" ? "bg-green-50 text-green-700 border-green-200" : ""}
-                ${site.statusColor === "blue" ? "bg-blue-50 text-blue-700 border-blue-200" : ""}
-                ${site.statusColor === "red" ? "bg-red-50 text-red-700 border-red-200" : ""}
-                ${site.statusColor === "orange" ? "bg-orange-50 text-orange-700 border-orange-200" : ""}
-              `}
-            >
-              {site.status}
-            </Badge>
+        {/* Status Badge - Bottom Left */}
+        <div className="absolute bottom-2 left-2">
+          <div className="px-2 py-1 rounded text-xs font-bold text-white" style={{ backgroundColor: "#38b6ff" }}>
+            {site.status === "ACTIVE" ? "OPEN" : site.status}
           </div>
         </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// Update the IlluminationCard, StructureCard, and ComplianceCard components similarly
-function IlluminationCard({ site }: { site: any }) {
-  const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
-  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
-
-  // Fetch service assignments for this specific product
-  useEffect(() => {
-    const fetchProductAssignments = async () => {
-      try {
-        setIsLoadingAssignments(true)
-        const assignments = await getServiceAssignmentsByProductId(site.id)
-        setActiveAssignments(assignments)
-      } catch (error) {
-        console.error(`Error fetching assignments for product ${site.id}:`, error)
-      } finally {
-        setIsLoadingAssignments(false)
-      }
-    }
-
-    fetchProductAssignments()
-  }, [site.id])
-
-  return (
-    <Card className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white">
-      <div className="relative h-48 bg-gray-200">
-        <Image
-          src={site.image || "/placeholder.svg"}
-          alt={site.name}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/roadside-billboard.png"
-            target.className = "opacity-50 object-contain"
-          }}
-        />
-        {activeAssignments.length > 0 && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
-            {activeAssignments.length}
-          </div>
-        )}
       </div>
 
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="text-lg font-bold">{site.name}</h3>
-          <div className="text-xs text-gray-500">ID: {site.id}</div>
-          <div className="text-sm text-gray-500">On @ 6:00pm everyday</div>
+      <CardContent className="p-3">
+        <div className="flex flex-col gap-2">
+          {/* Site Code */}
+          <div className="text-xs text-gray-500 uppercase tracking-wide">{site.id}</div>
 
-          <div className="mt-4 flex items-center justify-between">
-            <div className="font-bold">9/10</div>
-            <div className="w-12 h-6 bg-gray-200 rounded-full flex items-center p-1">
-              <div className="w-4 h-4 bg-white rounded-full"></div>
+          {/* Site Name with Badge */}
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-sm text-gray-900 truncate">{site.name}</h3>
+            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0">S</div>
+          </div>
+
+          {/* Site Information */}
+          <div className="space-y-1 text-xs">
+            <div className="flex flex-col">
+              <span className="text-black">
+                <span className="font-bold">Operation:</span>
+                <span className="ml-1 text-black">{site.status === "ACTIVE" ? "Active" : site.status}</span>
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-black">
+                <span className="font-bold">Display Health:</span>
+                <span className="ml-1" style={{ color: "#00bf63" }}>
+                  100%
+                </span>
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-black">
+                <span className="font-bold">Compliance:</span>
+                <span className="ml-1 text-black">Complete</span>
+              </span>
             </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
 
-function StructureCard({ site }: { site: any }) {
-  const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
-  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
-
-  // Fetch service assignments for this specific product
-  useEffect(() => {
-    const fetchProductAssignments = async () => {
-      try {
-        setIsLoadingAssignments(true)
-        const assignments = await getServiceAssignmentsByProductId(site.id)
-        setActiveAssignments(assignments)
-      } catch (error) {
-        console.error(`Error fetching assignments for product ${site.id}:`, error)
-      } finally {
-        setIsLoadingAssignments(false)
-      }
-    }
-
-    fetchProductAssignments()
-  }, [site.id])
-
-  return (
-    <Card className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white">
-      <div className="relative h-48 bg-gray-200">
-        <Image
-          src={site.image || "/placeholder.svg"}
-          alt={site.name}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/roadside-billboard.png"
-            target.className = "opacity-50 object-contain"
-          }}
-        />
-        {activeAssignments.length > 0 && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
-            {activeAssignments.length}
-          </div>
-        )}
-      </div>
-
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="text-lg font-bold">{site.name}</h3>
-          <div className="text-xs text-gray-500">ID: {site.id}</div>
-
-          <div className="mt-4">
-            <div className="text-sm text-gray-600">Last Maintained: July 5, 2024</div>
-            <div className="flex items-center mt-1 text-green-600 font-medium">
-              <div className="w-5 h-5 bg-green-600 rounded-sm flex items-center justify-center mr-2">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-4 h-4">
-                  <path
-                    fillRule="evenodd"
-                    d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-              Good
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function ComplianceCard({ site }: { site: any }) {
-  const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
-  const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
-
-  // Fetch service assignments for this specific product
-  useEffect(() => {
-    const fetchProductAssignments = async () => {
-      try {
-        setIsLoadingAssignments(true)
-        const assignments = await getServiceAssignmentsByProductId(site.id)
-        setActiveAssignments(assignments)
-      } catch (error) {
-        console.error(`Error fetching assignments for product ${site.id}:`, error)
-      } finally {
-        setIsLoadingAssignments(false)
-      }
-    }
-
-    fetchProductAssignments()
-  }, [site.id])
-
-  return (
-    <Card className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white">
-      <div className="relative h-48 bg-gray-200">
-        <Image
-          src={site.image || "/placeholder.svg"}
-          alt={site.name}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/roadside-billboard.png"
-            target.className = "opacity-50 object-contain"
-          }}
-        />
-        {activeAssignments.length > 0 && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
-            {activeAssignments.length}
-          </div>
-        )}
-      </div>
-
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          <h3 className="text-lg font-bold">{site.name}</h3>
-          <div className="text-xs text-gray-500">ID: {site.id}</div>
-
-          <div className="mt-4 flex items-center">
-            <span className="text-green-600 font-bold text-xl mr-1">5/5</span>
-            <span className="text-gray-600">Documents</span>
-          </div>
+          {/* Create Report Button */}
+          <Button
+            variant="secondary"
+            className="mt-3 w-full h-8 text-xs bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
+            onClick={handleCreateReport}
+          >
+            Create Report
+          </Button>
         </div>
       </CardContent>
     </Card>
