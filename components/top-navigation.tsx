@@ -145,9 +145,21 @@ export function TopNavigation() {
   const isAdminSection = pathname.startsWith("/admin")
   const isAccountPage = pathname === "/account" // New check for account page
 
-  const navBgColor = isSalesSection ? "bg-[#ff3333]" : isAdminSection ? "bg-[#6b46c1]" : "bg-[#0a1433]"
+  const navBgColor = isSalesSection
+    ? "bg-[#ff3333]"
+    : isAdminSection
+      ? "bg-[#6b46c1]"
+      : isCmsSection
+        ? "bg-[#f97316]"
+        : "bg-[#0a1433]"
 
-  const diagonalBgColor = isSalesSection ? "bg-[#ffcccc]" : isAdminSection ? "bg-[#c4b5fd]" : "bg-[#38b6ff]"
+  const diagonalBgColor = isSalesSection
+    ? "bg-[#ffcccc]"
+    : isAdminSection
+      ? "bg-[#c4b5fd]"
+      : isCmsSection
+        ? "bg-[#fed7aa]"
+        : "bg-[#38b6ff]"
 
   const handleMobileNavigation = (href: string) => {
     router.push(href)
