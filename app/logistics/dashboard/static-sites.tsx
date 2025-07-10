@@ -543,8 +543,8 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
 
           {/* Create Report Button */}
           <Button
-            variant="outline"
-            className="mt-3 w-full h-8 text-xs bg-white hover:bg-gray-50 border-gray-300 text-gray-700 hover:text-gray-900 rounded"
+            variant="secondary"
+            className="mt-3 w-full h-9 text-sm bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
             onClick={handleCreateReport}
           >
             Create Report
