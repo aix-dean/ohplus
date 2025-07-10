@@ -164,6 +164,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-creatives-orange",
       contentBgColor: "bg-card-content-creatives",
       members: ["Eda"],
+      href: "/cms/dashboard", // Add this line
     },
     {
       id: "finance",
