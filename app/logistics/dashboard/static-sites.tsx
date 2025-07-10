@@ -495,11 +495,7 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
 
         {/* Status Badge - Bottom Left */}
         <div className="absolute bottom-2 left-2">
-          <div
-            className={`px-2 py-1 rounded text-xs font-bold text-white ${
-              site.status === "ACTIVE" ? "bg-blue-500" : "bg-gray-500"
-            }`}
-          >
+          <div className="px-2 py-1 rounded text-xs font-bold text-white" style={{ backgroundColor: "#38b6ff" }}>
             {site.status === "ACTIVE" ? "OPEN" : site.status}
           </div>
         </div>

@@ -500,17 +500,7 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
 
         {/* Status Badge - Bottom Left */}
         <div className="absolute bottom-2 left-2">
-          <div
-            className={`px-2 py-1 rounded text-xs font-bold text-white ${
-              site.operationalStatus === "Operational"
-                ? "bg-blue-500"
-                : site.operationalStatus === "Under Maintenance"
-                  ? "bg-red-500"
-                  : site.operationalStatus === "Pending Setup"
-                    ? "bg-orange-500"
-                    : "bg-gray-500"
-            }`}
-          >
+          <div className="px-2 py-1 rounded text-xs font-bold text-white" style={{ backgroundColor: "#38b6ff" }}>
             {site.operationalStatus === "Operational"
               ? "OPEN"
               : site.operationalStatus === "Under Maintenance"
