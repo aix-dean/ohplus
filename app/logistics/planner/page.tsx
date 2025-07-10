@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { collection, getDocs, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
+import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
 
 // Types for our calendar data
@@ -58,6 +59,7 @@ export default function LogisticsPlannerPage() {
   const [searchTerm, setSearchTerm] = useState("")
 
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
   const [serviceAssignmentDialogOpen, setServiceAssignmentDialogOpen] = useState(false)
 
   // Fetch service assignments
@@ -425,7 +427,8 @@ export default function LogisticsPlannerPage() {
                         className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 ${getServiceTypeColor(assignment.serviceType)}`}
                         onClick={(e) => {
                           e.stopPropagation()
-                          router.push(`/logistics/service-assignments/${assignment.id}`)
+                          setSelectedAssignmentId(assignment.id)
+                          setDetailsDialogOpen(true)
                         }}
                       >
                         <div className="flex items-center gap-1">
@@ -510,7 +513,8 @@ export default function LogisticsPlannerPage() {
                     className={`p-1 sm:p-2 mb-1 sm:mb-2 rounded border cursor-pointer hover:bg-gray-50 text-[10px] sm:text-sm ${getServiceTypeColor(assignment.serviceType)}`}
                     onClick={(e) => {
                       e.stopPropagation()
-                      router.push(`/logistics/service-assignments/${assignment.id}`)
+                      setSelectedAssignmentId(assignment.id)
+                      setDetailsDialogOpen(true)
                     }}
                   >
                     <div className="font-medium truncate">SA#{assignment.saNumber}</div>
@@ -600,7 +604,8 @@ export default function LogisticsPlannerPage() {
                       }}
                       onClick={(e) => {
                         e.stopPropagation()
-                        router.push(`/logistics/service-assignments/${assignment.id}`)
+                        setSelectedAssignmentId(assignment.id)
+                        setDetailsDialogOpen(true)
                       }}
                     >
                       <div className="font-medium truncate">SA#{assignment.saNumber}</div>
@@ -689,7 +694,8 @@ export default function LogisticsPlannerPage() {
                         className={`flex-1 min-w-[80px] sm:min-w-[150px] p-1 sm:p-2 rounded border shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50 ${getServiceTypeColor(assignment.serviceType)}`}
                         onClick={(e) => {
                           e.stopPropagation()
-                          router.push(`/logistics/service-assignments/${assignment.id}`)
+                          setSelectedAssignmentId(assignment.id)
+                          setDetailsDialogOpen(true)
                         }}
                       >
                         <div className="font-medium truncate">SA#{assignment.saNumber}</div>
@@ -785,7 +791,8 @@ export default function LogisticsPlannerPage() {
                         className={`flex-1 min-w-[70px] sm:min-w-[120px] p-1 rounded border shadow-sm text-[8px] sm:text-[10px] cursor-pointer hover:bg-gray-50 ${getServiceTypeColor(assignment.serviceType)}`}
                         onClick={(e) => {
                           e.stopPropagation()
-                          router.push(`/logistics/service-assignments/${assignment.id}`)
+                          setSelectedAssignmentId(assignment.id)
+                          setDetailsDialogOpen(true)
                         }}
                       >
                         <div className="font-medium truncate">SA#{assignment.saNumber}</div>
@@ -820,7 +827,7 @@ export default function LogisticsPlannerPage() {
       <div className="flex flex-col gap-6">
         {/* Header with title and actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-2xl font-bold">Logistics Calendar</h1>
+          <h1 className="text-2xl font-bold">Logistics Planner</h1>
         </div>
 
         {/* Calendar controls */}
@@ -857,7 +864,7 @@ export default function LogisticsPlannerPage() {
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                      <Button variant="outline" className="flex items-center gap-2">
                         <Filter size={16} />
                         <span className="hidden sm:inline">Filter</span>
                       </Button>
@@ -969,6 +976,15 @@ export default function LogisticsPlannerPage() {
             <div className="min-w-[640px]">{renderCalendar()}</div>
           )}
         </div>
+        <ServiceAssignmentDetailsDialog
+          open={detailsDialogOpen}
+          onOpenChange={setDetailsDialogOpen}
+          assignmentId={selectedAssignmentId}
+          onStatusChange={() => {
+            // Refresh assignments after status change
+            fetchAssignments()
+          }}
+        />
         <ServiceAssignmentDialog
           open={serviceAssignmentDialogOpen}
           onOpenChange={setServiceAssignmentDialogOpen}

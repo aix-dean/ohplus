@@ -1,20 +1,43 @@
 "use client"
 
 import { useState } from "react"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import StaticSitesTab from "./static-sites"
+import LEDSitesTab from "./led-sites"
+import AllSitesTab from "./all-sites" // Import the new component
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
-import AllSitesTab from "./all-sites"
 
+// Update the page title
 export default function LogisticsDashboardPage() {
+  const [siteType, setSiteType] = useState<"static" | "led" | "all">("static")
   const [dialogOpen, setDialogOpen] = useState(false)
 
   return (
     <div className="flex-1 overflow-auto relative">
       <main className="p-4">
         <div className="flex flex-col gap-4">
-          {/* Main Content - All Sites */}
-          <AllSitesTab />
+          {/* Site Type Tabs */}
+          <Tabs defaultValue="static" className="w-full" onValueChange={(value) => setSiteType(value as any)}>
+            <TabsList className="grid w-[350px] grid-cols-3">
+              <TabsTrigger value="static">Static Sites</TabsTrigger>
+              <TabsTrigger value="led">LED Sites</TabsTrigger>
+              <TabsTrigger value="all">All Sites</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="static" className="mt-4">
+              <StaticSitesTab />
+            </TabsContent>
+
+            <TabsContent value="led" className="mt-4">
+              <LEDSitesTab />
+            </TabsContent>
+
+            <TabsContent value="all" className="mt-4">
+              <AllSitesTab />
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
 
