@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { createReport, type ReportData } from "@/lib/report-service"
@@ -49,8 +48,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   // Installation report specific fields
   const [status, setStatus] = useState("")
   const [timeline, setTimeline] = useState("on-time")
-  const [delayDays, setDelayDays] = useState("")
   const [delayReason, setDelayReason] = useState("")
+  const [delayDays, setDelayDays] = useState("")
 
   const { toast } = useToast()
   const { user, userData, projectData } = useAuth()
@@ -309,13 +308,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         category: "logistics",
         subcategory: product.content_type || "general",
         priority: "medium",
-        completionPercentage: reportType === "completion-report" ? 100 : status ? Number.parseInt(status) : 0,
+        completionPercentage: reportType === "completion-report" ? 100 : 0,
         tags: [reportType, product.content_type || "general"].filter(Boolean),
         // Add installation-specific fields
         installationStatus: reportType === "installation-report" ? status : undefined,
-        timeline: reportType === "installation-report" ? timeline : undefined,
-        delayDays: reportType === "installation-report" && timeline === "delayed" ? delayDays : undefined,
+        installationTimeline: reportType === "installation-report" ? timeline : undefined,
         delayReason: reportType === "installation-report" && timeline === "delayed" ? delayReason : undefined,
+        delayDays: reportType === "installation-report" && timeline === "delayed" ? delayDays : undefined,
       }
 
       const reportId = await createReport(reportData)
@@ -333,8 +332,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       setAttachments([{ note: "" }, { note: "" }])
       setStatus("")
       setTimeline("on-time")
-      setDelayDays("")
       setDelayReason("")
+      setDelayDays("")
 
       // Navigate to the report preview page
       router.push(`/logistics/reports/${reportId}`)
@@ -353,7 +352,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-sm relative sm:max-w-sm fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-sm relative sm:max-w-sm fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
           <button
             onClick={() => onOpenChange(false)}
             className="absolute -top-2 -right-2 z-10 bg-gray-500 hover:bg-gray-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
@@ -492,12 +491,12 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                     <Input
                       id="status"
                       type="number"
-                      min="0"
-                      max="100"
                       value={status}
                       onChange={(e) => setStatus(e.target.value)}
                       placeholder="0"
                       className="h-8 text-sm flex-1"
+                      min="0"
+                      max="100"
                     />
                     <span className="text-xs text-gray-500">% of 100</span>
                   </div>
@@ -523,24 +522,24 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
                   {/* Delay Details */}
                   {timeline === "delayed" && (
-                    <div className="space-y-2 mt-2 pl-4 border-l-2 border-gray-200">
+                    <div className="space-y-1 mt-2">
+                      <Input
+                        placeholder="Reason for delay..."
+                        value={delayReason}
+                        onChange={(e) => setDelayReason(e.target.value)}
+                        className="h-8 text-sm"
+                      />
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
-                          min="0"
                           value={delayDays}
                           onChange={(e) => setDelayDays(e.target.value)}
                           placeholder="0"
-                          className="h-7 text-xs w-16"
+                          className="h-8 text-sm flex-1"
+                          min="0"
                         />
                         <span className="text-xs text-gray-500">Days</span>
                       </div>
-                      <Textarea
-                        value={delayReason}
-                        onChange={(e) => setDelayReason(e.target.value)}
-                        placeholder="Reason for delay..."
-                        className="text-xs h-16 resize-none"
-                      />
                     </div>
                   )}
                 </div>
