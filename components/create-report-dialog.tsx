@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Upload, FileText, ImageIcon, Video, File, Eye, X } from "lucide-react"
+import { Upload, ImageIcon, type File, Eye, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -68,24 +68,14 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     const extension = fileName.toLowerCase().split(".").pop()
 
     switch (extension) {
-      case "pdf":
-        return <FileText className="h-8 w-8 text-red-500" />
-      case "doc":
-      case "docx":
-        return <FileText className="h-8 w-8 text-blue-500" />
       case "jpg":
       case "jpeg":
       case "png":
       case "gif":
       case "webp":
         return <ImageIcon className="h-8 w-8 text-green-500" />
-      case "mp4":
-      case "avi":
-      case "mov":
-      case "wmv":
-        return <Video className="h-8 w-8 text-purple-500" />
       default:
-        return <File className="h-8 w-8 text-gray-500" />
+        return <ImageIcon className="h-8 w-8 text-gray-500" />
     }
   }
 
@@ -104,8 +94,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       newAttachments[index].file = file
       newAttachments[index].fileName = file.name
 
-      // Create preview for images and videos
-      if (file.type.startsWith("image/") || file.type.startsWith("video/")) {
+      // Create preview for images
+      if (file.type.startsWith("image/")) {
         try {
           const preview = await createFilePreview(file)
           newAttachments[index].preview = preview
@@ -127,17 +117,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
     if (!attachment.file) return
 
-    const fileExtension = attachment.fileName?.toLowerCase().split(".").pop()
-
-    // Handle PDF files - open in new tab
-    if (fileExtension === "pdf") {
-      const url = URL.createObjectURL(attachment.file)
-      window.open(url, "_blank")
-      return
-    }
-
-    // Handle images and videos - show in full screen modal
-    if (attachment.file.type.startsWith("image/") || attachment.file.type.startsWith("video/")) {
+    // Handle images - show in full screen modal
+    if (attachment.file.type.startsWith("image/")) {
       setPreviewModal({
         open: true,
         file: attachment.file,
@@ -163,7 +144,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     }
 
     const isImage = attachment.file.type.startsWith("image/")
-    const isVideo = attachment.file.type.startsWith("video/")
 
     return (
       <div className="relative w-full h-full group">
@@ -176,12 +156,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
               src={attachment.preview || "/placeholder.svg"}
               alt={attachment.fileName}
               className="w-full h-full object-cover rounded"
-            />
-          ) : isVideo && attachment.preview ? (
-            <video
-              src={attachment.preview || "/placeholder.svg"}
-              className="w-full h-full object-cover rounded"
-              muted
             />
           ) : (
             <div className="flex items-center justify-center">{getFileIcon(attachment.fileName)}</div>
@@ -356,7 +330,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                         type="file"
                         className="hidden"
                         id={`file-${index}`}
-                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.mp4,.avi,.mov,.wmv,.txt"
+                        accept=".jpg,.jpeg,.png,.gif,.webp"
                         onChange={(e) => handleFileUpload(index, e)}
                       />
                       {renderFilePreview(attachment, index)}
@@ -395,20 +369,12 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
               <X className="h-6 w-6" />
             </button>
 
-            {previewModal.file && (
-              <>
-                {previewModal.file.type.startsWith("image/") && previewModal.preview && (
-                  <img
-                    src={previewModal.preview || "/placeholder.svg"}
-                    alt="Preview"
-                    className="max-w-full max-h-full object-contain"
-                  />
-                )}
-
-                {previewModal.file.type.startsWith("video/") && (
-                  <video src={URL.createObjectURL(previewModal.file)} controls className="max-w-full max-h-full" />
-                )}
-              </>
+            {previewModal.file && previewModal.file.type.startsWith("image/") && previewModal.preview && (
+              <img
+                src={previewModal.preview || "/placeholder.svg"}
+                alt="Preview"
+                className="max-w-full max-h-full object-contain"
+              />
             )}
           </div>
         </DialogContent>
