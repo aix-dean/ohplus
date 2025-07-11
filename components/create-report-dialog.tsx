@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Upload, ImageIcon, Eye, X, Plus } from "lucide-react"
+import { Upload, ImageIcon, Eye, X, Plus, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -335,7 +335,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md relative sm:max-w-md fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+        <DialogContent className="max-w-lg relative sm:max-w-lg fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
           <button
             onClick={() => onOpenChange(false)}
             className="absolute -top-2 -right-2 z-10 bg-gray-500 hover:bg-gray-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
@@ -347,7 +347,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             <DialogTitle className="text-lg font-semibold">Service Report</DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
             {/* Booking Information Section */}
             <div className="bg-gray-100 p-4 rounded-lg space-y-2">
               <div className="text-sm">
@@ -368,10 +368,12 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             </div>
 
             {/* Report Type */}
-            <div className="space-y-2">
-              <Label htmlFor="report-type">Report Type:</Label>
+            <div className="space-y-3">
+              <Label htmlFor="report-type" className="text-base font-medium">
+                Report Type:
+              </Label>
               <Select value={reportType} onValueChange={setReportType}>
-                <SelectTrigger>
+                <SelectTrigger className="h-12 text-base">
                   <SelectValue placeholder="Select report type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -383,29 +385,36 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             </div>
 
             {/* Date */}
-            <div className="space-y-2">
-              <Label htmlFor="date">Date:</Label>
-              <Input
-                id="date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                placeholder="AutoFill"
-              />
+            <div className="space-y-3">
+              <Label htmlFor="date" className="text-base font-medium">
+                Date:
+              </Label>
+              <div className="relative">
+                <Input
+                  id="date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="h-12 text-base pr-10"
+                />
+                <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
 
             {/* Team */}
-            <div className="space-y-2">
-              <Label htmlFor="team">Team:</Label>
+            <div className="space-y-3">
+              <Label htmlFor="team" className="text-base font-medium">
+                Team:
+              </Label>
               {showNewTeamInput ? (
                 <div className="flex gap-2">
                   <Input
                     placeholder="Enter team name"
                     value={newTeamName}
                     onChange={(e) => setNewTeamName(e.target.value)}
-                    className="flex-1"
+                    className="flex-1 h-12 text-base"
                   />
-                  <Button onClick={handleCreateNewTeam} size="sm" className="bg-green-600 hover:bg-green-700">
+                  <Button onClick={handleCreateNewTeam} size="sm" className="bg-green-600 hover:bg-green-700 h-12 px-4">
                     Add
                   </Button>
                   <Button
@@ -415,13 +424,14 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                     }}
                     size="sm"
                     variant="outline"
+                    className="h-12 px-4"
                   >
                     Cancel
                   </Button>
                 </div>
               ) : (
                 <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-12 text-base">
                     <SelectValue placeholder="Select team" />
                   </SelectTrigger>
                   <SelectContent>
@@ -454,8 +464,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             </div>
 
             {/* Attachments */}
-            <div className="space-y-2">
-              <Label>Attachments:</Label>
+            <div className="space-y-3">
+              <Label className="text-base font-medium">Attachments:</Label>
               <div className="grid grid-cols-2 gap-3">
                 {attachments.map((attachment, index) => (
                   <div key={index} className="space-y-2">
@@ -484,7 +494,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             <Button
               onClick={handleGenerateReport}
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+              className="w-full h-12 text-base bg-blue-600 hover:bg-blue-700 text-white"
             >
               {loading ? "Generating..." : "Generate Report"}
             </Button>
