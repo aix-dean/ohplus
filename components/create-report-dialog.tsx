@@ -1,0 +1,612 @@
+"use client"
+
+import type React from "react"
+
+import { useState, useEffect } from "react"
+import { Upload, ImageIcon, Eye, X, Plus } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Textarea } from "@/components/ui/textarea"
+import { useToast } from "@/hooks/use-toast"
+import { getProductById, type Product } from "@/lib/firebase-service"
+import { createReport, type ReportData } from "@/lib/report-service"
+import { useAuth } from "@/contexts/auth-context"
+import { useRouter } from "next/navigation"
+
+interface CreateReportDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  siteId: string
+}
+
+interface Team {
+  id: string
+  name: string
+  members: string[]
+  createdAt: string
+}
+
+export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportDialogProps) {
+  const [product, setProduct] = useState<Product | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [reportType, setReportType] = useState("completion-report")
+  const [date, setDate] = useState("")
+  const [selectedTeam, setSelectedTeam] = useState("")
+  const [teams, setTeams] = useState<Team[]>([])
+  const [loadingTeams, setLoadingTeams] = useState(false)
+  const [showNewTeamInput, setShowNewTeamInput] = useState(false)
+  const [newTeamName, setNewTeamName] = useState("")
+  const [attachments, setAttachments] = useState<{ note: string; file?: File; fileName?: string; preview?: string }[]>([
+    { note: "" },
+    { note: "" },
+  ])
+  const [previewModal, setPreviewModal] = useState<{ open: boolean; file?: File; preview?: string }>({ open: false })
+
+  // Installation report specific fields
+  const [status, setStatus] = useState("")
+  const [timeline, setTimeline] = useState("on-time")
+  const [delayDays, setDelayDays] = useState("")
+  const [delayReason, setDelayReason] = useState("")
+
+  const { toast } = useToast()
+  const { user, userData, projectData } = useAuth()
+  const router = useRouter()
+
+  // Fetch product data when dialog opens
+  useEffect(() => {
+    if (open && siteId) {
+      fetchProductData()
+      fetchTeams()
+      // Auto-fill date with current date
+      setDate(new Date().toISOString().split("T")[0])
+    }
+  }, [open, siteId])
+
+  const fetchProductData = async () => {
+    try {
+      const productData = await getProductById(siteId)
+      setProduct(productData)
+    } catch (error) {
+      console.error("Error fetching product data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load site information",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const fetchTeams = async () => {
+    setLoadingTeams(true)
+    try {
+      // Mock teams data - replace with actual API call
+      const mockTeams: Team[] = [
+        { id: "1", name: "Installation Team A", members: ["John Doe", "Jane Smith"], createdAt: "2024-01-01" },
+        { id: "2", name: "Installation Team B", members: ["Mike Johnson", "Sarah Wilson"], createdAt: "2024-01-02" },
+        { id: "3", name: "Installation Team C", members: ["David Brown", "Lisa Davis"], createdAt: "2024-01-03" },
+        { id: "4", name: "Maintenance Team", members: ["Tom Wilson", "Amy Chen"], createdAt: "2024-01-04" },
+      ]
+      setTeams(mockTeams)
+    } catch (error) {
+      console.error("Error fetching teams:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load teams",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingTeams(false)
+    }
+  }
+
+  const handleCreateNewTeam = async () => {
+    if (!newTeamName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a team name",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      // Mock team creation - replace with actual API call
+      const newTeam: Team = {
+        id: Date.now().toString(),
+        name: newTeamName,
+        members: [],
+        createdAt: new Date().toISOString(),
+      }
+
+      setTeams((prev) => [...prev, newTeam])
+      setSelectedTeam(newTeam.id)
+      setNewTeamName("")
+      setShowNewTeamInput(false)
+
+      toast({
+        title: "Success",
+        description: "Team created successfully",
+      })
+    } catch (error) {
+      console.error("Error creating team:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create team",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleAttachmentNoteChange = (index: number, note: string) => {
+    const newAttachments = [...attachments]
+    newAttachments[index].note = note
+    setAttachments(newAttachments)
+  }
+
+  const getFileIcon = (fileName: string) => {
+    const extension = fileName.toLowerCase().split(".").pop()
+
+    switch (extension) {
+      case "jpg":
+      case "jpeg":
+      case "png":
+      case "gif":
+      case "webp":
+        return <ImageIcon className="h-8 w-8 text-green-500" />
+      default:
+        return <ImageIcon className="h-8 w-8 text-gray-500" />
+    }
+  }
+
+  const createFilePreview = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = (e) => resolve(e.target?.result as string)
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handleFileUpload = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      const newAttachments = [...attachments]
+      newAttachments[index].file = file
+      newAttachments[index].fileName = file.name
+
+      // Create preview for images
+      if (file.type.startsWith("image/")) {
+        try {
+          const preview = await createFilePreview(file)
+          newAttachments[index].preview = preview
+        } catch (error) {
+          console.error("Error creating preview:", error)
+        }
+      }
+
+      setAttachments(newAttachments)
+    }
+  }
+
+  const handlePreviewFile = (
+    attachment: { note: string; file?: File; fileName?: string; preview?: string },
+    e: React.MouseEvent,
+  ) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (!attachment.file) return
+
+    // Handle images - show in full screen modal
+    if (attachment.file.type.startsWith("image/")) {
+      setPreviewModal({
+        open: true,
+        file: attachment.file,
+        preview: attachment.preview,
+      })
+    }
+  }
+
+  const renderFilePreview = (
+    attachment: { note: string; file?: File; fileName?: string; preview?: string },
+    index: number,
+  ) => {
+    if (!attachment.file || !attachment.fileName) {
+      return (
+        <label
+          htmlFor={`file-${index}`}
+          className="cursor-pointer flex flex-col items-center justify-center h-full space-y-1"
+        >
+          <Upload className="h-6 w-6 text-gray-400" />
+          <span className="text-xs text-gray-500">Upload</span>
+        </label>
+      )
+    }
+
+    const isImage = attachment.file.type.startsWith("image/")
+
+    return (
+      <div className="relative w-full h-full group">
+        <label
+          htmlFor={`file-${index}`}
+          className="cursor-pointer flex flex-col items-center justify-center h-full space-y-1 p-1"
+        >
+          {isImage && attachment.preview ? (
+            <img
+              src={attachment.preview || "/placeholder.svg"}
+              alt={attachment.fileName}
+              className="w-full h-full object-cover rounded"
+            />
+          ) : (
+            <div className="flex items-center justify-center">{getFileIcon(attachment.fileName)}</div>
+          )}
+        </label>
+
+        {/* Preview Button */}
+        <button
+          onClick={(e) => handlePreviewFile(attachment, e)}
+          className="absolute top-1 right-1 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+          title="Preview file"
+        >
+          <Eye className="h-3 w-3" />
+        </button>
+      </div>
+    )
+  }
+
+  const handleGenerateReport = async () => {
+    if (!product) {
+      toast({
+        title: "Error",
+        description: "Site information not loaded",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "Please log in to create a report",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setLoading(true)
+    try {
+      const reportData: ReportData = {
+        siteId: product.id,
+        siteName: product.name || "Unknown Site",
+        siteCode: product.site_code,
+        companyId: projectData?.project_id || userData?.project_id || user.uid,
+        sellerId: product.seller_id || user.uid,
+        client: "Summit Media", // This would come from booking data in real implementation
+        clientId: "summit-media-id", // This would come from booking data
+        bookingDates: {
+          start: "2025-05-20", // This would come from booking data
+          end: "2025-06-20",
+        },
+        breakdate: "2025-05-20",
+        sales: user.displayName || user.email || "Unknown User",
+        reportType,
+        date,
+        attachments: attachments
+          .filter((att) => att.note.trim() !== "" || att.file)
+          .map((att) => ({
+            note: att.note,
+            file: att.file,
+            fileName: att.fileName,
+            fileType: att.file?.type,
+          })),
+        status: "draft",
+        createdBy: user.uid,
+        createdByName: user.displayName || user.email || "Unknown User",
+        location: product.light?.location || product.specs_rental?.location,
+        category: "logistics",
+        subcategory: product.content_type || "general",
+        priority: "medium",
+        completionPercentage: reportType === "completion-report" ? 100 : status ? Number.parseInt(status) : 0,
+        tags: [reportType, product.content_type || "general"].filter(Boolean),
+        // Add installation-specific fields
+        installationStatus: reportType === "installation-report" ? status : undefined,
+        timeline: reportType === "installation-report" ? timeline : undefined,
+        delayDays: reportType === "installation-report" && timeline === "delayed" ? delayDays : undefined,
+        delayReason: reportType === "installation-report" && timeline === "delayed" ? delayReason : undefined,
+      }
+
+      const reportId = await createReport(reportData)
+
+      toast({
+        title: "Success",
+        description: "Report created successfully",
+      })
+
+      onOpenChange(false)
+      // Reset form
+      setReportType("completion-report")
+      setDate("")
+      setSelectedTeam("")
+      setAttachments([{ note: "" }, { note: "" }])
+      setStatus("")
+      setTimeline("on-time")
+      setDelayDays("")
+      setDelayReason("")
+
+      // Navigate to the report preview page
+      router.push(`/logistics/reports/${reportId}`)
+    } catch (error) {
+      console.error("Error creating report:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create report",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-sm relative sm:max-w-sm fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto">
+          <button
+            onClick={() => onOpenChange(false)}
+            className="absolute -top-2 -right-2 z-10 bg-gray-500 hover:bg-gray-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close</span>
+          </button>
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-base font-semibold">Service Report</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {/* Booking Information Section */}
+            <div className="bg-gray-100 p-3 rounded-lg space-y-1">
+              <div className="text-xs">
+                <span className="font-medium">Site:</span> {product?.name || "Loading..."}
+              </div>
+              <div className="text-xs">
+                <span className="font-medium">Client:</span> Summit Media
+              </div>
+              <div className="text-xs">
+                <span className="font-medium">Booking:</span> May 20 - June 20, 2025
+              </div>
+              <div className="text-xs">
+                <span className="font-medium">Sales:</span> {user?.displayName || user?.email || "Current User"}
+              </div>
+            </div>
+
+            {/* Report Type */}
+            <div className="space-y-1">
+              <Label htmlFor="report-type" className="text-xs font-medium">
+                Report Type:
+              </Label>
+              <Select value={reportType} onValueChange={setReportType}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Select report type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="completion-report">Completion Report</SelectItem>
+                  <SelectItem value="monitoring-report">Monitoring Report</SelectItem>
+                  <SelectItem value="installation-report">Installation Report</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Date */}
+            <div className="space-y-1">
+              <Label htmlFor="date" className="text-xs font-medium">
+                Date:
+              </Label>
+              <Input
+                id="date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                placeholder="AutoFill"
+                className="h-8 text-sm"
+              />
+            </div>
+
+            {/* Team */}
+            <div className="space-y-1">
+              <Label htmlFor="team" className="text-xs font-medium">
+                Team:
+              </Label>
+              {showNewTeamInput ? (
+                <div className="flex gap-1">
+                  <Input
+                    placeholder="Enter team name"
+                    value={newTeamName}
+                    onChange={(e) => setNewTeamName(e.target.value)}
+                    className="flex-1 h-8 text-sm"
+                  />
+                  <Button
+                    onClick={handleCreateNewTeam}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 h-8 px-2 text-xs"
+                  >
+                    Add
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowNewTeamInput(false)
+                      setNewTeamName("")
+                    }}
+                    size="sm"
+                    variant="outline"
+                    className="h-8 px-2 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Select team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingTeams ? (
+                      <SelectItem value="loading" disabled>
+                        Loading teams...
+                      </SelectItem>
+                    ) : (
+                      <>
+                        {teams.map((team) => (
+                          <SelectItem key={team.id} value={team.id}>
+                            {team.name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem
+                          value="create-new"
+                          onSelect={() => setShowNewTeamInput(true)}
+                          className="text-blue-600 font-medium"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Plus className="h-4 w-4" />
+                            Create New Team
+                          </div>
+                        </SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Installation Report Specific Fields */}
+            {reportType === "installation-report" && (
+              <>
+                {/* Status */}
+                <div className="space-y-1">
+                  <Label htmlFor="status" className="text-xs font-medium">
+                    Status:
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="status"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={status}
+                      onChange={(e) => setStatus(e.target.value)}
+                      placeholder="0"
+                      className="h-8 text-sm flex-1"
+                    />
+                    <span className="text-xs text-gray-500">% of 100</span>
+                  </div>
+                </div>
+
+                {/* Timeline */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Timeline:</Label>
+                  <RadioGroup value={timeline} onValueChange={setTimeline} className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="on-time" id="on-time" className="h-3 w-3" />
+                      <Label htmlFor="on-time" className="text-xs">
+                        On Time
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="delayed" id="delayed" className="h-3 w-3" />
+                      <Label htmlFor="delayed" className="text-xs">
+                        Delayed
+                      </Label>
+                    </div>
+                  </RadioGroup>
+
+                  {/* Delay Details */}
+                  {timeline === "delayed" && (
+                    <div className="space-y-2 mt-2 pl-4 border-l-2 border-gray-200">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          value={delayDays}
+                          onChange={(e) => setDelayDays(e.target.value)}
+                          placeholder="0"
+                          className="h-7 text-xs w-16"
+                        />
+                        <span className="text-xs text-gray-500">Days</span>
+                      </div>
+                      <Textarea
+                        value={delayReason}
+                        onChange={(e) => setDelayReason(e.target.value)}
+                        placeholder="Reason for delay..."
+                        className="text-xs h-16 resize-none"
+                      />
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Attachments */}
+            <div className="space-y-1">
+              <Label className="text-xs font-medium">Attachments:</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {attachments.map((attachment, index) => (
+                  <div key={index} className="space-y-1">
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg h-16 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-center">
+                      <input
+                        type="file"
+                        className="hidden"
+                        id={`file-${index}`}
+                        accept=".jpg,.jpeg,.png,.gif,.webp"
+                        onChange={(e) => handleFileUpload(index, e)}
+                      />
+                      {renderFilePreview(attachment, index)}
+                    </div>
+                    <Input
+                      placeholder="Add Note..."
+                      value={attachment.note}
+                      onChange={(e) => handleAttachmentNoteChange(index, e.target.value)}
+                      className="text-xs h-7"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Generate Report Button */}
+            <Button
+              onClick={handleGenerateReport}
+              disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white h-8 text-sm font-medium"
+            >
+              {loading ? "Generating..." : "Generate Report"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Full Screen Preview Modal */}
+      <Dialog open={previewModal.open} onOpenChange={(open) => setPreviewModal({ open })}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0">
+          <div className="relative w-full h-full flex items-center justify-center bg-black">
+            <button
+              onClick={() => setPreviewModal({ open: false })}
+              className="absolute top-4 right-4 z-10 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full"
+            >
+              <X className="h-6 w-6" />
+            </button>
+
+            {previewModal.file && previewModal.file.type.startsWith("image/") && previewModal.preview && (
+              <img
+                src={previewModal.preview || "/placeholder.svg"}
+                alt="Preview"
+                className="max-w-full max-h-full object-contain"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
