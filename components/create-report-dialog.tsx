@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Upload, ImageIcon, type File, Eye, X } from "lucide-react"
+import { Upload, ImageIcon, Eye, X, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -21,11 +21,23 @@ interface CreateReportDialogProps {
   siteId: string
 }
 
+interface Team {
+  id: string
+  name: string
+  members: string[]
+  createdAt: string
+}
+
 export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportDialogProps) {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(false)
   const [reportType, setReportType] = useState("completion-report")
   const [date, setDate] = useState("")
+  const [selectedTeam, setSelectedTeam] = useState("")
+  const [teams, setTeams] = useState<Team[]>([])
+  const [loadingTeams, setLoadingTeams] = useState(false)
+  const [showNewTeamInput, setShowNewTeamInput] = useState(false)
+  const [newTeamName, setNewTeamName] = useState("")
   const [attachments, setAttachments] = useState<{ note: string; file?: File; fileName?: string; preview?: string }[]>([
     { note: "" },
     { note: "" },
@@ -39,6 +51,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   useEffect(() => {
     if (open && siteId) {
       fetchProductData()
+      fetchTeams()
       // Auto-fill date with current date
       setDate(new Date().toISOString().split("T")[0])
     }
@@ -53,6 +66,67 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       toast({
         title: "Error",
         description: "Failed to load site information",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const fetchTeams = async () => {
+    setLoadingTeams(true)
+    try {
+      // Mock teams data - replace with actual API call
+      const mockTeams: Team[] = [
+        { id: "1", name: "Installation Team A", members: ["John Doe", "Jane Smith"], createdAt: "2024-01-01" },
+        { id: "2", name: "Installation Team B", members: ["Mike Johnson", "Sarah Wilson"], createdAt: "2024-01-02" },
+        { id: "3", name: "Installation Team C", members: ["David Brown", "Lisa Davis"], createdAt: "2024-01-03" },
+        { id: "4", name: "Maintenance Team", members: ["Tom Wilson", "Amy Chen"], createdAt: "2024-01-04" },
+      ]
+      setTeams(mockTeams)
+    } catch (error) {
+      console.error("Error fetching teams:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load teams",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingTeams(false)
+    }
+  }
+
+  const handleCreateNewTeam = async () => {
+    if (!newTeamName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a team name",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      // Mock team creation - replace with actual API call
+      const newTeam: Team = {
+        id: Date.now().toString(),
+        name: newTeamName,
+        members: [],
+        createdAt: new Date().toISOString(),
+      }
+
+      setTeams((prev) => [...prev, newTeam])
+      setSelectedTeam(newTeam.id)
+      setNewTeamName("")
+      setShowNewTeamInput(false)
+
+      toast({
+        title: "Success",
+        description: "Team created successfully",
+      })
+    } catch (error) {
+      console.error("Error creating team:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create team",
         variant: "destructive",
       })
     }
@@ -241,6 +315,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       // Reset form
       setReportType("completion-report")
       setDate("")
+      setSelectedTeam("")
       setAttachments([{ note: "" }, { note: "" }])
 
       // Navigate to the report preview page
@@ -317,6 +392,65 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                 onChange={(e) => setDate(e.target.value)}
                 placeholder="AutoFill"
               />
+            </div>
+
+            {/* Team */}
+            <div className="space-y-2">
+              <Label htmlFor="team">Team:</Label>
+              {showNewTeamInput ? (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter team name"
+                    value={newTeamName}
+                    onChange={(e) => setNewTeamName(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleCreateNewTeam} size="sm" className="bg-green-600 hover:bg-green-700">
+                    Add
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowNewTeamInput(false)
+                      setNewTeamName("")
+                    }}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {loadingTeams ? (
+                      <SelectItem value="loading" disabled>
+                        Loading teams...
+                      </SelectItem>
+                    ) : (
+                      <>
+                        {teams.map((team) => (
+                          <SelectItem key={team.id} value={team.id}>
+                            {team.name}
+                          </SelectItem>
+                        ))}
+                        <SelectItem
+                          value="create-new"
+                          onSelect={() => setShowNewTeamInput(true)}
+                          className="text-blue-600 font-medium"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Plus className="h-4 w-4" />
+                            Create New Team
+                          </div>
+                        </SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {/* Attachments */}
