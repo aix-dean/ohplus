@@ -335,7 +335,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md relative sm:max-w-md fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+        <DialogContent className="max-w-lg relative sm:max-w-lg fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
           <button
             onClick={() => onOpenChange(false)}
             className="absolute -top-2 -right-2 z-10 bg-gray-500 hover:bg-gray-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
@@ -369,7 +369,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
             {/* Report Type */}
             <div className="space-y-3">
-              <Label htmlFor="report-type" className="text-base font-medium text-gray-900">
+              <Label htmlFor="report-type" className="text-sm font-medium text-gray-700">
                 Report Type:
               </Label>
               <Select value={reportType} onValueChange={setReportType}>
@@ -386,7 +386,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
             {/* Date */}
             <div className="space-y-3">
-              <Label htmlFor="date" className="text-base font-medium text-gray-900">
+              <Label htmlFor="date" className="text-sm font-medium text-gray-700">
                 Date:
               </Label>
               <Input
@@ -401,7 +401,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
             {/* Team */}
             <div className="space-y-3">
-              <Label htmlFor="team" className="text-base font-medium text-gray-900">
+              <Label htmlFor="team" className="text-sm font-medium text-gray-700">
                 Team:
               </Label>
               {showNewTeamInput ? (
@@ -412,7 +412,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                     onChange={(e) => setNewTeamName(e.target.value)}
                     className="flex-1 h-12"
                   />
-                  <Button onClick={handleCreateNewTeam} size="sm" className="bg-green-600 hover:bg-green-700">
+                  <Button onClick={handleCreateNewTeam} size="sm" className="bg-green-600 hover:bg-green-700 h-12">
                     Add
                   </Button>
                   <Button
@@ -422,6 +422,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                     }}
                     size="sm"
                     variant="outline"
+                    className="h-12"
                   >
                     Cancel
                   </Button>
@@ -462,7 +463,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
             {/* Attachments */}
             <div className="space-y-3">
-              <Label className="text-base font-medium text-gray-900">Attachments:</Label>
+              <Label className="text-sm font-medium text-gray-700">Attachments:</Label>
               <div className="grid grid-cols-2 gap-3">
                 {attachments.map((attachment, index) => (
                   <div key={index} className="space-y-2">
@@ -491,7 +492,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             <Button
               onClick={handleGenerateReport}
               disabled={loading}
-              className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white text-base"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 text-base font-medium"
             >
               {loading ? "Generating..." : "Generate Report"}
             </Button>
