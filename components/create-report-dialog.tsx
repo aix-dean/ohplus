@@ -288,7 +288,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-md mx-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg font-semibold">Booking Information</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Service Report</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
