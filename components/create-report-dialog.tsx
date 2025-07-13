@@ -352,7 +352,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-sm relative sm:max-w-sm fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-6">
+        <DialogContent className="max-w-md relative sm:max-w-md fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-6">
           <button
             onClick={() => onOpenChange(false)}
             className="absolute -top-2 -right-2 z-10 bg-gray-500 hover:bg-gray-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
