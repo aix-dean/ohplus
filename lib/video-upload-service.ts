@@ -98,6 +98,71 @@ export const uploadVideoToFirebase = async (
   })
 }
 
+export const uploadFile = async (
+  file: File,
+  folder = "uploads",
+  onProgress?: (progress: UploadProgress) => void,
+): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    // Validate file size (100MB max)
+    const maxSize = 100 * 1024 * 1024 // 100MB
+    if (file.size > maxSize) {
+      reject(new Error("File size too large. Maximum size is 100MB."))
+      return
+    }
+
+    // Create unique filename
+    const timestamp = Date.now()
+    const fileName = `${folder}/${timestamp}_${file.name}`
+    const storageRef = ref(storage, fileName)
+
+    // Start upload
+    const uploadTask = uploadBytesResumable(storageRef, file)
+
+    uploadTask.on(
+      "state_changed",
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+        onProgress?.({
+          progress,
+          status: "uploading",
+        })
+      },
+      (error) => {
+        console.error("Upload error:", error)
+        onProgress?.({
+          progress: 0,
+          status: "error",
+          error: error.message,
+        })
+        reject(error)
+      },
+      async () => {
+        try {
+          // Get download URL
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
+
+          onProgress?.({
+            progress: 100,
+            status: "success",
+            downloadURL,
+          })
+
+          resolve(downloadURL)
+        } catch (error) {
+          console.error("Error getting download URL:", error)
+          onProgress?.({
+            progress: 0,
+            status: "error",
+            error: "Failed to get file URL",
+          })
+          reject(error)
+        }
+      },
+    )
+  })
+}
+
 export const validateVideoFile = (file: File): { valid: boolean; error?: string } => {
   const allowedTypes = ["video/mp4", "video/mov", "video/avi", "video/webm"]
   if (!allowedTypes.includes(file.type)) {

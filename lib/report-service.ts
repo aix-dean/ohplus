@@ -2,22 +2,34 @@ import {
   collection,
   addDoc,
   getDocs,
-  query,
-  orderBy,
-  serverTimestamp,
   doc,
+  getDoc,
   updateDoc,
   deleteDoc,
-  getDoc,
+  query,
+  where,
+  orderBy,
+  serverTimestamp,
+  type Timestamp,
 } from "firebase/firestore"
-import { db } from "./firebase"
+import { db } from "@/lib/firebase"
 
 export interface ReportData {
   id?: string
   reportType: string
   siteId: string
   siteName: string
-  assignedTo: string
+  siteCode?: string
+  companyId?: string
+  sellerId?: string
+  client?: string
+  clientId?: string
+  bookingDates: {
+    start: string
+    end: string
+  }
+  breakdate?: string
+  sales?: string
   date: string
   location?: string
   notes?: string
@@ -25,25 +37,29 @@ export interface ReportData {
     fileName?: string
     fileUrl?: string
     note?: string
+    fileType?: string
+    file?: File
   }>
-  created?: any
-  createdBy?: string
-  createdByName?: string
-  sales?: string
-  bookingDates: {
-    start: string
-    end: string
-  }
+  status?: string
+  createdBy: string
+  createdByName: string
+  created?: Timestamp
+  updated?: Timestamp
+  assignedTo?: string
+  category?: string
+  subcategory?: string
+  priority?: string
   completionPercentage?: number
-  siteCode?: string
-  // Installation-specific fields
+  tags?: string[]
+
+  // Installation report specific fields
   installationStatus?: string
   timeline?: string
   delayReason?: string
-  delayDays?: number
+  delayDays?: number | string
 }
 
-// Helper function to clean data before sending to Firestore
+// Clean function to remove undefined values recursively
 const cleanReportData = (data: any): any => {
   if (data === null || data === undefined) {
     return null
@@ -57,14 +73,11 @@ const cleanReportData = (data: any): any => {
     const cleaned: any = {}
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined && value !== null) {
-        if (typeof value === "string" && value.trim() === "") {
-          cleaned[key] = ""
-        } else {
-          const cleanedValue = cleanReportData(value)
-          if (cleanedValue !== null && cleanedValue !== undefined) {
-            cleaned[key] = cleanedValue
-          }
+        if (key === "file" && value instanceof File) {
+          // Skip File objects as they can't be stored in Firestore
+          continue
         }
+        cleaned[key] = cleanReportData(value)
       }
     }
     return cleaned
@@ -75,90 +88,110 @@ const cleanReportData = (data: any): any => {
 
 export const createReport = async (reportData: Omit<ReportData, "id" | "created">): Promise<string> => {
   try {
-    // Ensure all required fields have default values
-    const dataToSave = {
+    // Clean the data and provide defaults for required fields
+    const cleanedData = cleanReportData({
+      ...reportData,
       reportType: reportData.reportType || "",
       siteId: reportData.siteId || "",
       siteName: reportData.siteName || "",
-      assignedTo: reportData.assignedTo || "",
+      siteCode: reportData.siteCode || "",
       date: reportData.date || new Date().toISOString().split("T")[0],
-      location: reportData.location || "",
-      notes: reportData.notes || "",
-      attachments: reportData.attachments || [],
       createdBy: reportData.createdBy || "",
       createdByName: reportData.createdByName || "",
-      sales: reportData.sales || "",
       bookingDates: {
         start: reportData.bookingDates?.start || "",
         end: reportData.bookingDates?.end || "",
       },
-      completionPercentage: reportData.completionPercentage || 100,
-      siteCode: reportData.siteCode || "",
+      location: reportData.location || "",
+      notes: reportData.notes || "",
+      sales: reportData.sales || "",
+      assignedTo: reportData.assignedTo || "",
+      status: reportData.status || "draft",
+      category: reportData.category || "logistics",
+      subcategory: reportData.subcategory || "general",
+      priority: reportData.priority || "medium",
+      completionPercentage: reportData.completionPercentage || 0,
+      tags: reportData.tags || [],
+      attachments: (reportData.attachments || []).map((att) => ({
+        fileName: att.fileName || "",
+        fileUrl: att.fileUrl || "",
+        note: att.note || "",
+        fileType: att.fileType || "",
+      })),
       created: serverTimestamp(),
-    }
+      updated: serverTimestamp(),
+    })
 
     // Only add installation-specific fields if they have values
     if (reportData.installationStatus && reportData.installationStatus.trim() !== "") {
-      dataToSave.installationStatus = reportData.installationStatus
+      cleanedData.installationStatus = reportData.installationStatus
     }
     if (reportData.timeline && reportData.timeline.trim() !== "") {
-      dataToSave.timeline = reportData.timeline
+      cleanedData.timeline = reportData.timeline
     }
     if (reportData.delayReason && reportData.delayReason.trim() !== "") {
-      dataToSave.delayReason = reportData.delayReason
+      cleanedData.delayReason = reportData.delayReason
     }
-    if (reportData.delayDays !== undefined && reportData.delayDays !== null && reportData.delayDays > 0) {
-      dataToSave.delayDays = reportData.delayDays
+    if (
+      reportData.delayDays &&
+      (typeof reportData.delayDays === "number"
+        ? reportData.delayDays > 0
+        : reportData.delayDays.toString().trim() !== "")
+    ) {
+      cleanedData.delayDays =
+        typeof reportData.delayDays === "string" ? Number.parseInt(reportData.delayDays) || 0 : reportData.delayDays
     }
-
-    // Clean the data to remove any undefined values
-    const cleanedData = cleanReportData(dataToSave)
 
     const docRef = await addDoc(collection(db, "reports"), cleanedData)
     return docRef.id
   } catch (error) {
     console.error("Error creating report:", error)
-    throw error
+    throw new Error("Failed to create report")
   }
 }
 
-export const getReports = async (): Promise<ReportData[]> => {
+export const getReports = async (filters?: {
+  companyId?: string
+  createdBy?: string
+  reportType?: string
+  status?: string
+}): Promise<ReportData[]> => {
   try {
-    const q = query(collection(db, "reports"), orderBy("created", "desc"))
-    const querySnapshot = await getDocs(q)
+    let q = query(collection(db, "reports"), orderBy("created", "desc"))
 
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as ReportData[]
+    if (filters?.companyId) {
+      q = query(q, where("companyId", "==", filters.companyId))
+    }
+    if (filters?.createdBy) {
+      q = query(q, where("createdBy", "==", filters.createdBy))
+    }
+    if (filters?.reportType) {
+      q = query(q, where("reportType", "==", filters.reportType))
+    }
+    if (filters?.status) {
+      q = query(q, where("status", "==", filters.status))
+    }
+
+    const querySnapshot = await getDocs(q)
+    const reports: ReportData[] = []
+
+    querySnapshot.forEach((doc) => {
+      reports.push({
+        id: doc.id,
+        ...doc.data(),
+      } as ReportData)
+    })
+
+    return reports
   } catch (error) {
     console.error("Error fetching reports:", error)
-    throw error
+    throw new Error("Failed to fetch reports")
   }
 }
 
-export const updateReport = async (id: string, updates: Partial<ReportData>): Promise<void> => {
+export const getReportById = async (reportId: string): Promise<ReportData | null> => {
   try {
-    const cleanedUpdates = cleanReportData(updates)
-    await updateDoc(doc(db, "reports", id), cleanedUpdates)
-  } catch (error) {
-    console.error("Error updating report:", error)
-    throw error
-  }
-}
-
-export const deleteReport = async (id: string): Promise<void> => {
-  try {
-    await deleteDoc(doc(db, "reports", id))
-  } catch (error) {
-    console.error("Error deleting report:", error)
-    throw error
-  }
-}
-
-export const getReportById = async (id: string): Promise<ReportData | null> => {
-  try {
-    const docRef = doc(db, "reports", id)
+    const docRef = doc(db, "reports", reportId)
     const docSnap = await getDoc(docRef)
 
     if (docSnap.exists()) {
@@ -171,6 +204,71 @@ export const getReportById = async (id: string): Promise<ReportData | null> => {
     }
   } catch (error) {
     console.error("Error fetching report:", error)
-    throw error
+    throw new Error("Failed to fetch report")
+  }
+}
+
+export const updateReport = async (reportId: string, updates: Partial<ReportData>): Promise<void> => {
+  try {
+    const cleanedUpdates = cleanReportData({
+      ...updates,
+      updated: serverTimestamp(),
+    })
+
+    const docRef = doc(db, "reports", reportId)
+    await updateDoc(docRef, cleanedUpdates)
+  } catch (error) {
+    console.error("Error updating report:", error)
+    throw new Error("Failed to update report")
+  }
+}
+
+export const deleteReport = async (reportId: string): Promise<void> => {
+  try {
+    const docRef = doc(db, "reports", reportId)
+    await deleteDoc(docRef)
+  } catch (error) {
+    console.error("Error deleting report:", error)
+    throw new Error("Failed to delete report")
+  }
+}
+
+export const getReportsByDateRange = async (
+  startDate: string,
+  endDate: string,
+  filters?: {
+    companyId?: string
+    reportType?: string
+  },
+): Promise<ReportData[]> => {
+  try {
+    let q = query(
+      collection(db, "reports"),
+      where("date", ">=", startDate),
+      where("date", "<=", endDate),
+      orderBy("date", "desc"),
+    )
+
+    if (filters?.companyId) {
+      q = query(q, where("companyId", "==", filters.companyId))
+    }
+    if (filters?.reportType) {
+      q = query(q, where("reportType", "==", filters.reportType))
+    }
+
+    const querySnapshot = await getDocs(q)
+    const reports: ReportData[] = []
+
+    querySnapshot.forEach((doc) => {
+      reports.push({
+        id: doc.id,
+        ...doc.data(),
+      } as ReportData)
+    })
+
+    return reports
+  } catch (error) {
+    console.error("Error fetching reports by date range:", error)
+    throw new Error("Failed to fetch reports by date range")
   }
 }
