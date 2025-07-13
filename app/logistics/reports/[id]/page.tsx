@@ -220,16 +220,13 @@ export default function ReportPreviewPage() {
       </div>
 
       {/* Blue Angular Header */}
-      <div className="w-full bg-blue-900 px-6 py-4 relative">
-        <div
-          className="absolute inset-0 bg-blue-900"
-          style={{
-            clipPath: "polygon(0 0, calc(100% - 40px) 0, 100% 100%, 0 100%)",
-          }}
-        ></div>
-        <div className="relative z-10 flex items-center justify-between">
+      <div className="w-full bg-blue-900 px-6 py-4 relative overflow-hidden">
+        <div className="flex items-center justify-between relative z-10">
           <div className="text-white text-lg font-semibold">Logistics</div>
         </div>
+        {/* Angular geometric shape */}
+        <div className="absolute top-0 right-0 w-1/3 h-full bg-cyan-400 transform skew-x-12 origin-top-right"></div>
+        <div className="absolute top-0 right-1/4 w-1/4 h-full bg-blue-700 transform skew-x-6 origin-top-right"></div>
       </div>
 
       <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -463,15 +460,18 @@ export default function ReportPreviewPage() {
       </div>
 
       {/* Bottom Branding */}
-      <div className="w-full h-16 bg-gradient-to-r from-cyan-400 to-blue-600 flex items-center justify-between px-8 mt-8">
-        <div className="flex items-center gap-6">
+      <div className="w-full h-16 bg-blue-900 flex items-center justify-between px-8 mt-8 relative overflow-hidden">
+        <div className="flex items-center gap-6 relative z-10">
           <div className="text-white text-lg font-semibold">GTS INCORPORATED</div>
           <div className="text-white text-sm">Logistics & Operations Division</div>
         </div>
-        <div className="text-white text-right">
+        <div className="text-white text-right relative z-10">
           <div className="text-sm">Smart. Seamless. Scalable.</div>
           <div className="text-2xl font-bold">OH!</div>
         </div>
+        {/* Angular geometric shape */}
+        <div className="absolute top-0 right-0 w-1/3 h-full bg-cyan-400 transform skew-x-12 origin-top-right"></div>
+        <div className="absolute top-0 right-1/4 w-1/4 h-full bg-blue-700 transform skew-x-6 origin-top-right"></div>
       </div>
 
       {/* Send Report Dialog */}
