@@ -219,14 +219,15 @@ export default function ReportPreviewPage() {
         </div>
       </div>
 
-      {/* Angular Blue Header pointing left */}
-      <div className="w-full relative">
+      {/* Blue Angular Header */}
+      <div className="w-full bg-blue-900 px-6 py-4 relative">
         <div
-          className="bg-blue-900 px-6 py-4 relative"
+          className="absolute inset-0 bg-blue-900"
           style={{
             clipPath: "polygon(0 0, calc(100% - 40px) 0, 100% 100%, 0 100%)",
           }}
-        >
+        ></div>
+        <div className="relative z-10 flex items-center justify-between">
           <div className="text-white text-lg font-semibold">Logistics</div>
         </div>
       </div>
