@@ -496,7 +496,7 @@ export default function ReportPreviewPage() {
           <div className="relative z-10 h-full flex items-center justify-between px-8">
             <div className="flex items-center gap-6">
               <div className="text-white text-lg font-semibold">{""}</div>
-              <div className="text-white text-sm">Logistics & Operations Division</div>
+              <div className="text-white text-sm">]</div>
             </div>
             <div className="text-white text-right flex items-center gap-2">
               <div className="text-sm font-medium">Smart. Seamless. Scalable</div>
