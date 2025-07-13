@@ -119,13 +119,12 @@ export async function createReport(reportData: ReportData): Promise<string> {
       }),
     )
 
-    // Create a clean copy of the report data, removing undefined values
+    // Create a clean copy of the report data, explicitly removing undefined values
     const cleanData: any = {}
 
-    // Copy all defined values from reportData
-    Object.keys(reportData).forEach((key) => {
-      const value = (reportData as any)[key]
-      if (value !== undefined) {
+    // Copy all defined values from reportData, excluding undefined values
+    Object.entries(reportData).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
         cleanData[key] = value
       }
     })
@@ -137,8 +136,12 @@ export async function createReport(reportData: ReportData): Promise<string> {
       updated: Timestamp.now(),
     }
 
-    // Final clean to ensure no undefined values
-    const cleanedFinalData = cleanReportData(finalReportData)
+    // Remove any remaining undefined values recursively
+    const cleanedFinalData = JSON.parse(
+      JSON.stringify(finalReportData, (key, value) => {
+        return value === undefined ? null : value
+      }),
+    )
 
     const docRef = await addDoc(collection(db, "reports"), cleanedFinalData)
     return docRef.id
