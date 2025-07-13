@@ -310,11 +310,22 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         priority: "medium",
         completionPercentage: reportType === "completion-report" ? 100 : 0,
         tags: [reportType, product.content_type || "general"].filter(Boolean),
-        // Add installation-specific fields
-        installationStatus: reportType === "installation-report" ? status : undefined,
-        installationTimeline: reportType === "installation-report" ? timeline : undefined,
-        delayReason: reportType === "installation-report" && timeline === "delayed" ? delayReason : undefined,
-        delayDays: reportType === "installation-report" && timeline === "delayed" ? delayDays : undefined,
+      }
+
+      // Add installation-specific fields only if they have values
+      if (reportType === "installation-report") {
+        if (status.trim() !== "") {
+          reportData.installationStatus = status
+        }
+        if (timeline) {
+          reportData.installationTimeline = timeline
+        }
+        if (timeline === "delayed" && delayReason.trim() !== "") {
+          reportData.delayReason = delayReason
+        }
+        if (timeline === "delayed" && delayDays.trim() !== "") {
+          reportData.delayDays = delayDays
+        }
       }
 
       const reportId = await createReport(reportData)
