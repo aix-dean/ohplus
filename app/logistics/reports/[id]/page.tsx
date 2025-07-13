@@ -224,21 +224,21 @@ export default function ReportPreviewPage() {
       </div>
 
       {/* Header */}
-      <div className="w-full h-24 bg-gradient-to-r from-cyan-400 to-blue-500 flex items-center justify-between px-8 relative overflow-hidden">
-        {/* Left side content */}
-        <div className="flex items-center gap-6 z-10">
-          <div className="text-white text-3xl font-bold tracking-wide">GTS</div>
-          <div className="text-white text-xl font-medium tracking-wider">LOGISTICS OPERATIONS</div>
+      <div className="relative w-full h-16 bg-white overflow-hidden">
+        {/* Dark navy section */}
+        <div className="absolute left-0 top-0 h-full w-48 bg-[#1e3a8a] flex items-center justify-start px-6 z-10">
+          <div className="text-white text-lg font-semibold tracking-wide">Logistics</div>
         </div>
 
-        {/* Right side content */}
-        <div className="text-white text-right z-10">
-          <div className="text-base font-medium tracking-wide mb-1">Smart. Seamless. Scalable.</div>
-          <div className="text-4xl font-bold tracking-wider">OH!</div>
-        </div>
-
-        {/* Background geometric element */}
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-blue-600 to-transparent opacity-50"></div>
+        {/* Bright blue section with angular cut */}
+        <div
+          className="absolute top-0 h-full bg-[#3b82f6] z-0"
+          style={{
+            left: "120px",
+            right: "0",
+            clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
+          }}
+        />
       </div>
 
       <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -451,18 +451,15 @@ export default function ReportPreviewPage() {
       </div>
 
       {/* Bottom Branding */}
-      <div className="w-full h-20 bg-gradient-to-r from-cyan-400 to-blue-500 flex items-center justify-between px-8 mt-8 relative overflow-hidden">
-        <div className="flex items-center gap-8 z-10">
-          <div className="text-white text-xl font-bold tracking-wide">GTS INCORPORATED</div>
-          <div className="text-white text-base font-medium">Logistics & Operations Division</div>
+      <div className="w-full h-16 bg-gradient-to-r from-cyan-400 to-blue-600 flex items-center justify-between px-8 mt-8">
+        <div className="flex items-center gap-6">
+          <div className="text-white text-lg font-semibold">GTS INCORPORATED</div>
+          <div className="text-white text-sm">Logistics & Operations Division</div>
         </div>
-        <div className="text-white text-right z-10">
-          <div className="text-sm font-medium tracking-wide">Smart. Seamless. Scalable.</div>
-          <div className="text-3xl font-bold tracking-wider">OH!</div>
+        <div className="text-white text-right">
+          <div className="text-sm">Smart. Seamless. Scalable.</div>
+          <div className="text-2xl font-bold">OH!</div>
         </div>
-
-        {/* Background geometric element */}
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-blue-600 to-transparent opacity-50"></div>
       </div>
 
       {/* Send Report Dialog */}
