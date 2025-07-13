@@ -71,9 +71,10 @@ function cleanReportData(data: any): any {
   if (typeof data === "object" && !(data instanceof File) && !(data instanceof Timestamp)) {
     const cleaned: any = {}
     for (const [key, value] of Object.entries(data)) {
-      if (value !== undefined && value !== null) {
+      // Only include values that are not undefined, null, or empty strings
+      if (value !== undefined && value !== null && value !== "") {
         const cleanedValue = cleanReportData(value)
-        if (cleanedValue !== null && cleanedValue !== undefined) {
+        if (cleanedValue !== null && cleanedValue !== undefined && cleanedValue !== "") {
           cleaned[key] = cleanedValue
         }
       }
@@ -86,7 +87,7 @@ function cleanReportData(data: any): any {
 
 export async function createReport(reportData: ReportData): Promise<string> {
   try {
-    // Clean the data to remove undefined values
+    // Clean the data to remove undefined values and empty strings
     const cleanedData = cleanReportData(reportData)
 
     // Upload attachments first
@@ -129,7 +130,14 @@ export async function createReport(reportData: ReportData): Promise<string> {
       updated: Timestamp.now(),
     }
 
-    const docRef = await addDoc(collection(db, "reports"), finalReportData)
+    // Remove any remaining undefined values before sending to Firestore
+    const sanitizedData = JSON.parse(
+      JSON.stringify(finalReportData, (key, value) => {
+        return value === undefined ? null : value
+      }),
+    )
+
+    const docRef = await addDoc(collection(db, "reports"), sanitizedData)
     return docRef.id
   } catch (error) {
     console.error("Error creating report:", error)

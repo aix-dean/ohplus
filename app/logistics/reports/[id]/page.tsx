@@ -2,584 +2,426 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { Card, CardContent } from "@/components/ui/card"
+import { ArrowLeft, Download, Share2, Edit3, MoreVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send } from "lucide-react"
-import { getReports, type ReportData } from "@/lib/report-service"
-import { getProductById, type Product } from "@/lib/firebase-service"
-import { generateReportPDF } from "@/lib/pdf-service"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
+import { getReportById, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
-import { SendReportDialog } from "@/components/send-report-dialog"
 
-export default function ReportPreviewPage() {
+export default function ReportPage() {
   const params = useParams()
   const router = useRouter()
-  const reportId = params.id as string
-  const [report, setReport] = useState<ReportData | null>(null)
-  const [product, setProduct] = useState<Product | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [fullScreenAttachment, setFullScreenAttachment] = useState<any>(null)
-  const [isFullScreenOpen, setIsFullScreenOpen] = useState(false)
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
-  const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
+  const { toast } = useToast()
   const { user } = useAuth()
+  const [report, setReport] = useState<ReportData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const reportId = params.id as string
 
   useEffect(() => {
     if (reportId) {
-      fetchReportData()
+      fetchReport()
     }
   }, [reportId])
 
-  const fetchReportData = async () => {
+  const fetchReport = async () => {
     try {
-      // Get all reports and find the one with matching ID
-      const reports = await getReports()
-      const foundReport = reports.find((r) => r.id === reportId)
-
-      if (foundReport) {
-        setReport(foundReport)
-
-        // Fetch product data for additional details
-        if (foundReport.siteId) {
-          const productData = await getProductById(foundReport.siteId)
-          setProduct(productData)
-        }
-      }
+      setLoading(true)
+      const reportData = await getReportById(reportId)
+      setReport(reportData)
     } catch (error) {
-      console.error("Error fetching report data:", error)
+      console.error("Error fetching report:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load report",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+  const handleDownload = () => {
+    toast({
+      title: "Download",
+      description: "Report download will be implemented soon",
     })
   }
 
-  const getReportTypeDisplay = (type: string) => {
-    return type
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
+  const handleShare = () => {
+    toast({
+      title: "Share",
+      description: "Report sharing will be implemented soon",
+    })
   }
 
-  const getFileIcon = (fileName: string) => {
-    if (!fileName) return <File className="h-12 w-12 text-gray-400" />
-
-    const extension = fileName.toLowerCase().split(".").pop()
-
-    switch (extension) {
-      case "pdf":
-        return <FileText className="h-12 w-12 text-red-500" />
-      case "doc":
-      case "docx":
-        return <FileText className="h-12 w-12 text-blue-500" />
-      case "jpg":
-      case "jpeg":
-      case "png":
-      case "gif":
-      case "webp":
-        return <ImageIcon className="h-12 w-12 text-green-500" />
-      case "mp4":
-      case "avi":
-      case "mov":
-      case "wmv":
-        return <Video className="h-12 w-12 text-purple-500" />
-      default:
-        return <File className="h-12 w-12 text-gray-500" />
-    }
-  }
-
-  const isImageFile = (fileName: string) => {
-    if (!fileName) return false
-    const extension = fileName.toLowerCase().split(".").pop()
-    return ["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")
-  }
-
-  const isVideoFile = (fileName: string) => {
-    if (!fileName) return false
-    const extension = fileName.toLowerCase().split(".").pop()
-    return ["mp4", "avi", "mov", "wmv"].includes(extension || "")
-  }
-
-  const isPdfFile = (fileName: string) => {
-    if (!fileName) return false
-    const extension = fileName.toLowerCase().split(".").pop()
-    return extension === "pdf"
-  }
-
-  const openFullScreen = (attachment: any) => {
-    setFullScreenAttachment(attachment)
-    setIsFullScreenOpen(true)
-  }
-
-  const closeFullScreen = () => {
-    setIsFullScreenOpen(false)
-    setFullScreenAttachment(null)
-  }
-
-  const downloadFile = (fileUrl: string, fileName: string) => {
-    const link = document.createElement("a")
-    link.href = fileUrl
-    link.download = fileName
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
-  const handleDownloadPDF = async () => {
-    if (!report || !product) return
-
-    setIsGeneratingPDF(true)
-    try {
-      await generateReportPDF(report, product, false)
-    } catch (error) {
-      console.error("Error generating PDF:", error)
-      alert("Failed to generate PDF. Please try again.")
-    } finally {
-      setIsGeneratingPDF(false)
-    }
-  }
-
-  const handleSendReport = () => {
-    setIsSendDialogOpen(true)
-  }
-
-  const handleSendOption = (option: "email" | "whatsapp" | "viber" | "messenger") => {
-    setIsSendDialogOpen(false)
-
-    if (option === "email") {
-      // Handle email sending logic here
-      console.log("Send via email")
-    } else {
-      console.log(`Send via ${option}`)
-    }
-  }
-
-  const handleBack = () => {
-    router.back()
+  const handleEdit = () => {
+    toast({
+      title: "Edit",
+      description: "Report editing will be implemented soon",
+    })
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading report...</div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading report...</p>
+        </div>
       </div>
     )
   }
 
   if (!report) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Report not found</div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Report Not Found</h2>
+          <p className="text-gray-600 mb-4">The report you're looking for doesn't exist.</p>
+          <Button onClick={() => router.back()} variant="outline">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Go Back
+          </Button>
+        </div>
       </div>
     )
   }
 
+  const getReportTypeLabel = (type: string) => {
+    switch (type) {
+      case "installation-report":
+        return "Installation Report"
+      case "completion-report":
+        return "Completion Report"
+      case "monitoring-report":
+        return "Monitoring Report"
+      default:
+        return "Report"
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "completed":
+        return "bg-green-100 text-green-800"
+      case "in-progress":
+        return "bg-blue-100 text-blue-800"
+      case "draft":
+        return "bg-gray-100 text-gray-800"
+      case "delayed":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top Navigation Bar */}
-      <div className="bg-white px-4 py-3 flex items-center shadow-sm border-b">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleBack}
-            className="text-gray-600 hover:text-gray-800 hover:bg-gray-100 p-2"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="bg-cyan-400 text-white px-3 py-1 rounded text-sm font-medium">
-            {product?.content_type || "Lilo & Stitch"}
+      {/* Top Navigation */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-2">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <Badge variant="secondary" className="bg-blue-100 text-blue-800 font-medium">
+              {report.subcategory || "General"}
+            </Badge>
           </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="ml-auto flex items-center gap-2">
-          <Button
-            onClick={handleSendReport}
-            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm flex items-center gap-2"
-          >
-            <Send className="h-4 w-4" />
-            Send
-          </Button>
-          <Button
-            onClick={handleDownloadPDF}
-            disabled={isGeneratingPDF}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            {isGeneratingPDF ? "Generating..." : "Download"}
-          </Button>
-        </div>
-      </div>
-
-      {/* Blue Angular Header */}
-      <div className="w-full bg-blue-900 px-6 py-4 relative overflow-hidden">
-        <div className="flex items-center justify-between relative z-10">
-          <div className="text-white text-lg font-semibold">Logistics</div>
-        </div>
-        {/* Angular geometric shape */}
-        <div className="absolute top-0 right-0 w-1/3 h-full bg-cyan-400 transform skew-x-12 origin-top-right"></div>
-        <div className="absolute top-0 right-1/4 w-1/4 h-full bg-blue-700 transform skew-x-6 origin-top-right"></div>
-      </div>
-
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
-        {/* Report Header with Badge and Logo */}
-        <div className="flex justify-between items-start">
-          <div>
-            <div className="bg-cyan-400 text-white px-4 py-2 rounded text-sm font-medium inline-block">
-              Installation Report
-            </div>
-            <p className="text-gray-600 text-sm mt-1">as of {formatDate(report.date)}</p>
-          </div>
-          <div className="flex-shrink-0">
-            <div className="bg-yellow-400 rounded-full p-3">
-              <div className="text-black font-bold text-xl">GTS</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Project Information */}
-        <Card className="shadow-sm">
-          <CardContent className="p-6">
-            <h2 className="text-xl font-bold mb-4 text-gray-900">Project Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
-              <div className="space-y-2">
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Site ID:</span>
-                  <span className="text-gray-900">
-                    {report.siteId} {product?.light?.location || product?.specs_rental?.location || ""}
-                  </span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Job Order:</span>
-                  <span className="text-gray-900">{report.id?.slice(-4).toUpperCase() || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Job Order Date:</span>
-                  <span className="text-gray-900">
-                    {formatDate(report.created?.toDate().toISOString().split("T")[0] || report.date)}
-                  </span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Site:</span>
-                  <span className="text-gray-900">{report.siteName}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Size:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.size || product?.light?.size || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Start Date:</span>
-                  <span className="text-gray-900">{formatDate(report.bookingDates.start)}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">End Date:</span>
-                  <span className="text-gray-900">{formatDate(report.bookingDates.end)}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Installation Duration:</span>
-                  <span className="text-gray-900">
-                    {Math.ceil(
-                      (new Date(report.bookingDates.end).getTime() - new Date(report.bookingDates.start).getTime()) /
-                        (1000 * 60 * 60 * 24),
-                    )}{" "}
-                    days
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Content:</span>
-                  <span className="text-gray-900">{product?.content_type || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Material Specs:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.material || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Crew:</span>
-                  <span className="text-gray-900">Team {report.assignedTo || "A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Illumination:</span>
-                  <span className="text-gray-900">{product?.light?.illumination || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Gondola:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.gondola ? "YES" : "NO"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Technology:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.technology || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Sales:</span>
-                  <span className="text-gray-900">{report.sales}</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Project Status */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-bold text-gray-900">Project Status</h2>
-            <div className="bg-green-500 text-white px-3 py-1 rounded text-sm font-medium">
-              {report.completionPercentage || 100}%
-            </div>
-          </div>
-
-          {/* Attachments/Photos */}
-          {report.attachments && report.attachments.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {report.attachments.slice(0, 2).map((attachment, index) => (
-                <div key={index} className="space-y-2">
-                  <div
-                    className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
-                    onClick={() => attachment.fileUrl && openFullScreen(attachment)}
-                  >
-                    {attachment.fileUrl ? (
-                      <div className="w-full h-full flex flex-col items-center justify-center relative">
-                        {/* Zoom overlay */}
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-                          <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                        </div>
-
-                        {isImageFile(attachment.fileName || "") ? (
-                          <img
-                            src={attachment.fileUrl || "/placeholder.svg"}
-                            alt={attachment.fileName || `Attachment ${index + 1}`}
-                            className="max-w-full max-h-full object-contain rounded"
-                            onError={(e) => {
-                              // Fallback to icon if image fails to load
-                              const target = e.target as HTMLImageElement
-                              target.style.display = "none"
-                              const parent = target.parentElement
-                              if (parent) {
-                                parent.innerHTML = `
-                                  <div class="text-center space-y-2">
-                                    ${getFileIcon(attachment.fileName || "").props.children}
-                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
-                                  </div>
-                                `
-                              }
-                            }}
-                          />
-                        ) : isVideoFile(attachment.fileName || "") ? (
-                          <video
-                            src={attachment.fileUrl}
-                            className="max-w-full max-h-full object-contain rounded"
-                            onError={(e) => {
-                              // Fallback to icon if video fails to load
-                              const target = e.target as HTMLVideoElement
-                              target.style.display = "none"
-                              const parent = target.parentElement
-                              if (parent) {
-                                parent.innerHTML = `
-                                  <div class="text-center space-y-2">
-                                    ${getFileIcon(attachment.fileName || "").props.children}
-                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
-                                  </div>
-                                `
-                              }
-                            }}
-                          />
-                        ) : (
-                          <div className="text-center space-y-2">
-                            {getFileIcon(attachment.fileName || "")}
-                            <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
-                            <a
-                              href={attachment.fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-blue-600 hover:text-blue-800 underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              Open File
-                            </a>
-                          </div>
-                        )}
-                        {attachment.note && (
-                          <p className="text-xs text-gray-500 italic mt-2 text-center">"{attachment.note}"</p>
-                        )}
-                      </div>
-                    ) : attachment.fileName ? (
-                      <div className="text-center space-y-2">
-                        {getFileIcon(attachment.fileName)}
-                        <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
-                        {attachment.note && <p className="text-xs text-gray-500 italic">"{attachment.note}"</p>}
-                      </div>
-                    ) : (
-                      <div className="text-center space-y-2">
-                        <ImageIcon className="h-12 w-12 text-gray-400" />
-                        <p className="text-sm text-gray-600">Project Photo {index + 1}</p>
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <div>
-                      <span className="font-semibold">Date:</span> {formatDate(report.date)}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Time:</span>{" "}
-                      {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Location:</span> {report.location || "N/A"}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex justify-between items-end pt-8 border-t">
-          <div>
-            <h3 className="font-semibold mb-2">Prepared by:</h3>
-            <div className="text-sm text-gray-600">
-              <div>{report.createdByName}</div>
-              <div>LOGISTICS</div>
-              <div>{formatDate(report.created?.toDate().toISOString().split("T")[0] || report.date)}</div>
-            </div>
-          </div>
-          <div className="text-right text-sm text-gray-500 italic">
-            "All data are based on the latest available records as of{" "}
-            {formatDate(new Date().toISOString().split("T")[0])}."
-          </div>
-        </div>
-      </div>
-
-      {/* Bottom Branding */}
-      <div className="w-full h-16 bg-blue-900 flex items-center justify-between px-8 mt-8 relative overflow-hidden">
-        <div className="flex items-center gap-6 relative z-10">
-          <div className="text-white text-lg font-semibold">GTS INCORPORATED</div>
-          <div className="text-white text-sm">Logistics & Operations Division</div>
-        </div>
-        <div className="text-white text-right relative z-10">
-          <div className="text-sm">Smart. Seamless. Scalable.</div>
-          <div className="text-2xl font-bold">OH!</div>
-        </div>
-        {/* Angular geometric shape */}
-        <div className="absolute top-0 right-0 w-1/3 h-full bg-cyan-400 transform skew-x-12 origin-top-right"></div>
-        <div className="absolute top-0 right-1/4 w-1/4 h-full bg-blue-700 transform skew-x-6 origin-top-right"></div>
-      </div>
-
-      {/* Send Report Dialog */}
-      {report && (
-        <SendReportDialog
-          isOpen={isSendDialogOpen}
-          onClose={() => setIsSendDialogOpen(false)}
-          report={report}
-          onSelectOption={handleSendOption}
-        />
-      )}
-
-      {/* Full Screen Preview Dialog */}
-      <Dialog open={isFullScreenOpen} onOpenChange={setIsFullScreenOpen}>
-        <DialogContent className="max-w-[90vw] max-h-[90vh] w-full h-full p-0 bg-black border-2 border-gray-800">
-          <div className="relative w-full h-full flex flex-col">
-            {/* Header with controls */}
-            <div className="absolute top-0 left-0 right-0 z-10 bg-black bg-opacity-90 p-4 flex justify-between items-center border-b border-gray-700">
-              <DialogTitle className="text-white text-lg font-medium truncate pr-4">
-                {fullScreenAttachment?.fileName || "File Preview"}
-              </DialogTitle>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {fullScreenAttachment?.fileUrl && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => downloadFile(fullScreenAttachment.fileUrl, fullScreenAttachment.fileName || "file")}
-                    className="text-white hover:bg-white hover:bg-opacity-20"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={closeFullScreen}
-                  className="text-white hover:bg-white hover:bg-opacity-20"
-                >
-                  <X className="h-4 w-4" />
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleDownload}>
+              <Download className="h-4 w-4 mr-2" />
+              Download
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <MoreVertical className="h-4 w-4" />
                 </Button>
-              </div>
-            </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleShare}>
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleEdit}>
+                  <Edit3 className="h-4 w-4 mr-2" />
+                  Edit
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </div>
 
-            {/* Scrollable Content Container */}
-            <div className="flex-1 overflow-auto pt-16 pb-16">
-              <div className="min-h-full flex items-center justify-center p-6">
-                {fullScreenAttachment?.fileUrl ? (
-                  <div className="w-full max-w-full flex items-center justify-center">
-                    {isImageFile(fullScreenAttachment.fileName || "") ? (
-                      <img
-                        src={fullScreenAttachment.fileUrl || "/placeholder.svg"}
-                        alt={fullScreenAttachment.fileName || "Full screen preview"}
-                        className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded shadow-lg"
-                        style={{ maxWidth: "calc(90vw - 3rem)" }}
+      {/* Angular Header Section */}
+      <div className="relative overflow-hidden">
+        {/* Base blue section */}
+        <div className="bg-blue-900 h-24 relative">
+          {/* Angular cyan accent */}
+          <div className="absolute top-0 right-0 w-1/3 h-full bg-cyan-400 transform skew-x-12 origin-top-right"></div>
+          {/* Content overlay */}
+          <div className="relative z-10 px-4 py-6 max-w-7xl mx-auto">
+            <h1 className="text-white text-2xl font-bold">Logistics</h1>
+          </div>
+        </div>
+      </div>
+
+      {/* Report Header */}
+      <div className="bg-white border-b border-gray-200 px-4 py-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <Badge className="bg-blue-500 text-white px-3 py-1 text-sm font-medium">
+                {getReportTypeLabel(report.reportType)}
+              </Badge>
+              <span className="text-sm text-gray-600">
+                as of{" "}
+                {new Date(report.date).toLocaleDateString("en-US", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </span>
+            </div>
+            <div className="w-16 h-16 bg-yellow-400 rounded-full flex items-center justify-center">
+              <span className="text-yellow-900 font-bold text-lg">GTS</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Report Content */}
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Project Information */}
+          <Card>
+            <CardContent className="p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-6">Project Information</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-700">Site ID:</span>
+                    <div className="text-gray-900">{report.siteCode || report.siteId}</div>
+                  </div>
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-700">Job Order:</span>
+                    <div className="text-gray-900">JO064</div>
+                  </div>
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-700">Job Order Date:</span>
+                    <div className="text-gray-900">
+                      {new Date(report.bookingDates.start).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-700">Site:</span>
+                    <div className="text-gray-900">{report.siteName}</div>
+                  </div>
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-700">Size:</span>
+                    <div className="text-gray-900">130ft (H) x 83ft (W) 22 Panels</div>
+                  </div>
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-700">Start Date:</span>
+                    <div className="text-gray-900">
+                      {new Date(report.bookingDates.start).toLocaleDateString("en-US", {
+                        month: "2-digit",
+                        day: "2-digit",
+                        year: "2-digit",
+                      })}
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-700">End Date:</span>
+                    <div className="text-gray-900">
+                      {new Date(report.bookingDates.end).toLocaleDateString("en-US", {
+                        month: "2-digit",
+                        day: "2-digit",
+                        year: "2-digit",
+                      })}
+                    </div>
+                  </div>
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-700">Installation Duration:</span>
+                    <div className="text-gray-900">12 days</div>
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-700">Content:</span>
+                    <div className="text-gray-900">{report.subcategory}</div>
+                  </div>
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-700">Material Specs:</span>
+                    <div className="text-gray-900">Stickers</div>
+                  </div>
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-700">Crew:</span>
+                    <div className="text-gray-900">Team J</div>
+                  </div>
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-700">Illumination:</span>
+                    <div className="text-gray-900">Tech: 2097 (200 Watts x 40)</div>
+                  </div>
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-700">Gondola:</span>
+                    <div className="text-gray-900">YES</div>
+                  </div>
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-700">Technology:</span>
+                    <div className="text-gray-900">Clear Tapes</div>
+                  </div>
+                  <div className="mb-3">
+                    <span className="font-medium text-gray-700">Sales:</span>
+                    <div className="text-gray-900">{report.sales}</div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Project Status */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">Project Status</h2>
+                <Badge className="bg-green-500 text-white px-2 py-1 text-sm font-medium">
+                  {report.installationStatus || report.completionPercentage}%
+                </Badge>
+              </div>
+
+              <div className="mb-6">
+                <div className="text-sm text-gray-600 mb-2">
+                  <span className="font-medium">Date:</span>{" "}
+                  {new Date(report.date).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </div>
+                <div className="text-sm text-gray-600 mb-4">
+                  <span className="font-medium">Status:</span>{" "}
+                  {report.installationStatus || report.completionPercentage}% of 100
+                </div>
+
+                {/* Progress Chart */}
+                <div className="flex items-center justify-center mb-6">
+                  <div className="relative w-32 h-32">
+                    <svg className="w-32 h-32 transform -rotate-90" viewBox="0 0 36 36">
+                      <path
+                        d="M18 2.0845
+                          a 15.9155 15.9155 0 0 1 0 31.831
+                          a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="#e5e7eb"
+                        strokeWidth="3"
                       />
-                    ) : isVideoFile(fullScreenAttachment.fileName || "") ? (
-                      <video
-                        src={fullScreenAttachment.fileUrl}
-                        controls
-                        className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded shadow-lg"
-                        style={{ maxWidth: "calc(90vw - 3rem)" }}
-                        autoPlay
+                      <path
+                        d="M18 2.0845
+                          a 15.9155 15.9155 0 0 1 0 31.831
+                          a 15.9155 15.9155 0 0 1 0 -31.831"
+                        fill="none"
+                        stroke="#06b6d4"
+                        strokeWidth="3"
+                        strokeDasharray={`${report.installationStatus || report.completionPercentage}, 100`}
                       />
-                    ) : isPdfFile(fullScreenAttachment.fileName || "") ? (
-                      <div className="w-full h-[calc(90vh-8rem)] max-w-[calc(90vw-3rem)]">
-                        <iframe
-                          src={fullScreenAttachment.fileUrl}
-                          className="w-full h-full border-0 rounded shadow-lg"
-                          title={fullScreenAttachment.fileName || "PDF Preview"}
-                        />
-                      </div>
-                    ) : (
-                      <div className="text-center text-white space-y-4 p-8">
-                        <div className="flex justify-center">{getFileIcon(fullScreenAttachment.fileName || "")}</div>
-                        <div>
-                          <p className="text-lg font-medium break-all">{fullScreenAttachment.fileName}</p>
-                          <p className="text-sm text-gray-300 mt-2">Preview not available for this file type</p>
-                          <Button
-                            variant="outline"
-                            className="mt-4 bg-transparent border-white text-white hover:bg-white hover:text-black"
-                            onClick={() =>
-                              downloadFile(fullScreenAttachment.fileUrl, fullScreenAttachment.fileName || "file")
-                            }
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Download File
-                          </Button>
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="text-xs text-gray-500">Accomplished</div>
+                        <div className="text-lg font-bold text-cyan-500">
+                          {report.installationStatus || report.completionPercentage}%
                         </div>
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-center text-xs text-gray-500">
+                  <div>Pending</div>
+                  <div>
+                    {100 - Number.parseInt(report.installationStatus || report.completionPercentage.toString())}%
+                  </div>
+                </div>
+              </div>
+
+              {/* Installation Image */}
+              {report.attachments && report.attachments.length > 0 && report.attachments[0].fileUrl && (
+                <div className="mt-6">
+                  <img
+                    src={report.attachments[0].fileUrl || "/placeholder.svg"}
+                    alt="Installation progress"
+                    className="w-full h-48 object-cover rounded-lg"
+                  />
+                </div>
+              )}
+
+              {/* Post Report Button */}
+              <div className="mt-6 text-center">
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2">Post Report</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Attachments Section */}
+        {report.attachments && report.attachments.length > 0 && (
+          <Card className="mt-8">
+            <CardContent className="p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-6">Attachments</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {report.attachments.map((attachment, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4">
+                    {attachment.fileUrl && attachment.fileType?.startsWith("image/") ? (
+                      <img
+                        src={attachment.fileUrl || "/placeholder.svg"}
+                        alt={attachment.fileName}
+                        className="w-full h-32 object-cover rounded mb-2"
+                      />
+                    ) : (
+                      <div className="w-full h-32 bg-gray-100 rounded mb-2 flex items-center justify-center">
+                        <span className="text-gray-500 text-sm">{attachment.fileName}</span>
+                      </div>
                     )}
+                    <p className="text-sm text-gray-600">{attachment.note}</p>
                   </div>
-                ) : (
-                  <div className="text-center text-white p-8">
-                    <p>File not available</p>
-                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Timeline/Delay Information */}
+        {report.installationTimeline === "delayed" && (
+          <Card className="mt-8">
+            <CardContent className="p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-6">Timeline Information</h2>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="destructive">Delayed</Badge>
+                  {report.delayDays && (
+                    <span className="text-sm text-red-700">{report.delayDays} days behind schedule</span>
+                  )}
+                </div>
+                {report.delayReason && (
+                  <p className="text-sm text-red-700">
+                    <span className="font-medium">Reason:</span> {report.delayReason}
+                  </p>
                 )}
               </div>
-            </div>
-
-            {/* Footer with file info */}
-            {fullScreenAttachment?.note && (
-              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-90 p-4 border-t border-gray-700">
-                <p className="text-white text-sm italic text-center">"{fullScreenAttachment.note}"</p>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   )
 }

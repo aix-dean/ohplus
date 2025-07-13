@@ -284,10 +284,10 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         siteCode: product.site_code || "",
         companyId: projectData?.project_id || userData?.project_id || user.uid,
         sellerId: product.seller_id || user.uid,
-        client: "Summit Media", // This would come from booking data in real implementation
-        clientId: "summit-media-id", // This would come from booking data
+        client: "Summit Media",
+        clientId: "summit-media-id",
         bookingDates: {
-          start: "2025-05-20", // This would come from booking data
+          start: "2025-05-20",
           end: "2025-06-20",
         },
         breakdate: "2025-05-20",
@@ -313,19 +313,21 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         tags: [reportType, product.content_type || "general"].filter(Boolean),
       }
 
-      // Only add installation-specific fields if they have non-empty values
+      // Only add installation-specific fields if they have actual values
       if (reportType === "installation-report") {
-        if (status.trim() !== "") {
-          reportData.installationStatus = status
+        if (status && status.trim() !== "") {
+          reportData.installationStatus = status.trim()
         }
         if (timeline && timeline !== "") {
           reportData.installationTimeline = timeline
         }
-        if (timeline === "delayed" && delayReason.trim() !== "") {
-          reportData.delayReason = delayReason
-        }
-        if (timeline === "delayed" && delayDays.trim() !== "") {
-          reportData.delayDays = delayDays
+        if (timeline === "delayed") {
+          if (delayReason && delayReason.trim() !== "") {
+            reportData.delayReason = delayReason.trim()
+          }
+          if (delayDays && delayDays.trim() !== "") {
+            reportData.delayDays = delayDays.trim()
+          }
         }
       }
 
