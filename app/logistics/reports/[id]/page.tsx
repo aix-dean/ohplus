@@ -223,18 +223,15 @@ export default function ReportPreviewPage() {
         </div>
       </div>
 
-      {/* Header - Replace image with coded version */}
-      <div className="w-full bg-gradient-to-r from-cyan-400 to-blue-600 h-20 flex items-center justify-between px-8">
-        <div className="flex items-center space-x-4">
-          <div className="text-white text-2xl font-bold">GTS INCORPORATED</div>
-          <div className="text-white text-sm">
-            <div>Smart. Seamless. Scalable</div>
-            <div className="text-xs opacity-90">Logistics & Operations</div>
-          </div>
+      {/* Header */}
+      <div className="w-full h-20 bg-gradient-to-r from-cyan-400 to-blue-600 flex items-center justify-between px-8">
+        <div className="flex items-center gap-4">
+          <div className="text-white text-2xl font-bold">GTS</div>
+          <div className="text-white text-lg">LOGISTICS OPERATIONS</div>
         </div>
         <div className="text-white text-right">
-          <div className="text-lg font-semibold">OH!</div>
-          <div className="text-xs opacity-90">Digital Solutions</div>
+          <div className="text-sm font-medium">Smart. Seamless. Scalable.</div>
+          <div className="text-2xl font-bold">OH!</div>
         </div>
       </div>
 
@@ -447,15 +444,15 @@ export default function ReportPreviewPage() {
         </div>
       </div>
 
-      {/* Bottom Branding - Replace image with coded version */}
-      <div className="w-full mt-8 bg-gradient-to-r from-cyan-400 to-blue-600 h-16 flex items-center justify-between px-8">
-        <div className="text-white text-sm">
-          <div className="font-semibold">GTS INCORPORATED</div>
-          <div className="text-xs opacity-90">Your Partner in Digital Advertising</div>
+      {/* Bottom Branding */}
+      <div className="w-full h-16 bg-gradient-to-r from-cyan-400 to-blue-600 flex items-center justify-between px-8 mt-8">
+        <div className="flex items-center gap-6">
+          <div className="text-white text-lg font-semibold">GTS INCORPORATED</div>
+          <div className="text-white text-sm">Logistics & Operations Division</div>
         </div>
         <div className="text-white text-right">
-          <div className="text-sm font-semibold">Smart. Seamless. Scalable</div>
-          <div className="text-lg font-bold">OH!</div>
+          <div className="text-sm">Smart. Seamless. Scalable.</div>
+          <div className="text-2xl font-bold">OH!</div>
         </div>
       </div>
 
