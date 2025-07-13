@@ -242,7 +242,7 @@ export async function updateProduct(productId: string, productData: Partial<Prod
 export async function getUserProducts(userId: string): Promise<Product[]> {
   try {
     const productsRef = collection(db, "products")
-    const q = query(productsRef, where("seller_id", "==", userId), orderBy("name", "asc"))
+    const q = query(productsRef, where("company_id", "==", userId), orderBy("name", "asc"))
     const querySnapshot = await getDocs(q)
 
     const products: Product[] = []
@@ -257,7 +257,7 @@ export async function getUserProducts(userId: string): Promise<Product[]> {
   }
 }
 
-// Get paginated products for a user (legacy - filters by seller_id)
+// Get paginated products for a user
 export async function getPaginatedUserProducts(
   userId: string,
   itemsPerPage = 16,
@@ -269,7 +269,7 @@ export async function getPaginatedUserProducts(
     const { searchTerm = "", active } = options
 
     // Start with basic constraints
-    const constraints: any[] = [where("seller_id", "==", userId), orderBy("name", "asc"), limit(itemsPerPage)]
+    const constraints: any[] = [where("company_id", "==", userId), orderBy("name", "asc"), limit(itemsPerPage)]
 
     // Add active filter if specified
     if (active !== undefined) {
@@ -327,77 +327,7 @@ export async function getPaginatedUserProducts(
   }
 }
 
-// NEW: Get paginated products for a company (filters by company_id)
-export async function getPaginatedCompanyProducts(
-  companyId: string,
-  itemsPerPage = 16,
-  lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
-  options: { searchTerm?: string; active?: boolean } = {},
-): Promise<PaginatedResult<Product>> {
-  try {
-    const productsRef = collection(db, "products")
-    const { searchTerm = "", active } = options
-
-    // Start with basic constraints
-    const constraints: any[] = [where("company_id", "==", companyId), orderBy("name", "asc"), limit(itemsPerPage)]
-
-    // Add active filter if specified
-    if (active !== undefined) {
-      constraints.unshift(where("active", "==", active))
-    }
-
-    // Create the query with all constraints
-    let q = query(productsRef, ...constraints)
-
-    // If we have a last document, start after it for pagination
-    if (lastDoc) {
-      q = query(q, startAfter(lastDoc))
-    }
-
-    const querySnapshot = await getDocs(q)
-
-    // Get the last visible document for next pagination
-    const lastVisible = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null
-
-    // Check if there are more documents to fetch
-    const hasMore = querySnapshot.docs.length === itemsPerPage
-
-    // Convert the documents to Product objects
-    const products: Product[] = []
-    querySnapshot.forEach((doc) => {
-      const product = { id: doc.id, ...doc.data() } as Product
-
-      // If there's a search term, filter client-side
-      if (searchTerm && typeof searchTerm === "string") {
-        const searchLower = searchTerm.toLowerCase()
-        if (
-          product.name?.toLowerCase().includes(searchLower) ||
-          product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
-          product.description?.toLowerCase().includes(searchLower)
-        ) {
-          products.push(product)
-        }
-      } else {
-        products.push(product)
-      }
-    })
-
-    return {
-      items: products,
-      lastDoc: lastVisible,
-      hasMore,
-    }
-  } catch (error) {
-    console.error("Error fetching paginated company products:", error)
-    return {
-      items: [],
-      lastDoc: null,
-      hasMore: false,
-    }
-  }
-}
-
-// Get the total count of products for a user (legacy - filters by seller_id)
+// Get the total count of products for a user
 export async function getUserProductsCount(
   userId: string,
   options: { searchTerm?: string; active?: boolean; deleted?: boolean } = {},
@@ -409,7 +339,7 @@ export async function getUserProductsCount(
     const { searchTerm = "", active, deleted } = options
 
     // Start with basic constraints
-    const constraints: any[] = [where("seller_id", "==", userId)]
+    const constraints: any[] = [where("company_id", "==", userId)]
 
     // Add active filter if specified
     if (active !== undefined) {
@@ -450,63 +380,6 @@ export async function getUserProductsCount(
     }
   } catch (error) {
     console.error("Error getting user products count:", error)
-    return 0
-  }
-}
-
-// NEW: Get the total count of products for a company (filters by company_id)
-export async function getCompanyProductsCount(
-  companyId: string,
-  options: { searchTerm?: string; active?: boolean; deleted?: boolean } = {},
-): Promise<number> {
-  try {
-    console.log("Getting company products count for companyId:", companyId, "with options:", options)
-
-    const productsRef = collection(db, "products")
-    const { searchTerm = "", active, deleted } = options
-
-    // Start with basic constraints
-    const constraints: any[] = [where("company_id", "==", companyId)]
-
-    // Add active filter if specified
-    if (active !== undefined) {
-      constraints.push(where("active", "==", active))
-    }
-    // Add deleted filter if specified
-    if (deleted !== undefined) {
-      constraints.push(where("deleted", "==", deleted))
-    }
-
-    // Create the query with all constraints
-    const q = query(productsRef, ...constraints)
-
-    // If there's a search term, we need to fetch all documents and filter client-side
-    if (searchTerm && typeof searchTerm === "string") {
-      const querySnapshot = await getDocs(q)
-      const searchLower = searchTerm.toLowerCase()
-
-      // Filter documents client-side
-      let count = 0
-      querySnapshot.forEach((doc) => {
-        const product = doc.data() as Product
-        if (
-          product.name?.toLowerCase().includes(searchLower) ||
-          product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
-          product.description?.toLowerCase().includes(searchLower)
-        ) {
-          count++
-        }
-      })
-
-      console.log("Company products count (with search):", count)
-      return count
-    } else {
-      // If no search term, we can use the more efficient getCountFromServer
-      const snapshot = await getCountFromServer(q)
-      return snapshot.data().count
-    }
-  } catch (error) {
-    console.error("Error getting company products count:", error)
     return 0
   }
 }
