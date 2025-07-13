@@ -367,16 +367,16 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
           <div className="max-h-[70vh] overflow-y-auto scrollbar-hide space-y-3 px-1">
             {/* Booking Information Section */}
             <div className="bg-gray-100 p-3 rounded-lg space-y-1">
-              <div className="text-sm">
+              <div className="text-base">
                 <span className="font-medium">Site:</span> {product?.name || "Loading..."}
               </div>
-              <div className="text-sm">
+              <div className="text-base">
                 <span className="font-medium">Client:</span> Summit Media
               </div>
-              <div className="text-sm">
+              <div className="text-base">
                 <span className="font-medium">Booking:</span> May 20 - June 20, 2025
               </div>
-              <div className="text-sm">
+              <div className="text-base">
                 <span className="font-medium">Sales:</span> {user?.displayName || user?.email || "Current User"}
               </div>
             </div>
