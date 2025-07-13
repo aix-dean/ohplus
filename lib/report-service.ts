@@ -71,15 +71,14 @@ function cleanReportData(data: any): any {
   if (typeof data === "object" && !(data instanceof File) && !(data instanceof Timestamp)) {
     const cleaned: any = {}
     for (const [key, value] of Object.entries(data)) {
-      // Only include values that are not undefined, null, or empty strings
-      if (value !== undefined && value !== null && value !== "") {
+      if (value !== undefined) {
         const cleanedValue = cleanReportData(value)
-        if (cleanedValue !== null && cleanedValue !== undefined && cleanedValue !== "") {
+        if (cleanedValue !== undefined) {
           cleaned[key] = cleanedValue
         }
       }
     }
-    return cleaned
+    return Object.keys(cleaned).length > 0 ? cleaned : null
   }
 
   return data
@@ -87,12 +86,9 @@ function cleanReportData(data: any): any {
 
 export async function createReport(reportData: ReportData): Promise<string> {
   try {
-    // Clean the data to remove undefined values and empty strings
-    const cleanedData = cleanReportData(reportData)
-
     // Upload attachments first
     const processedAttachments = await Promise.all(
-      (cleanedData.attachments || []).map(async (attachment: any) => {
+      (reportData.attachments || []).map(async (attachment: any) => {
         if (attachment.file) {
           try {
             const fileRef = ref(storage, `reports/${Date.now()}_${attachment.fileName}`)
@@ -123,21 +119,28 @@ export async function createReport(reportData: ReportData): Promise<string> {
       }),
     )
 
+    // Create a clean copy of the report data, removing undefined values
+    const cleanData: any = {}
+
+    // Copy all defined values from reportData
+    Object.keys(reportData).forEach((key) => {
+      const value = (reportData as any)[key]
+      if (value !== undefined) {
+        cleanData[key] = value
+      }
+    })
+
     const finalReportData = {
-      ...cleanedData,
+      ...cleanData,
       attachments: processedAttachments,
       created: Timestamp.now(),
       updated: Timestamp.now(),
     }
 
-    // Remove any remaining undefined values before sending to Firestore
-    const sanitizedData = JSON.parse(
-      JSON.stringify(finalReportData, (key, value) => {
-        return value === undefined ? null : value
-      }),
-    )
+    // Final clean to ensure no undefined values
+    const cleanedFinalData = cleanReportData(finalReportData)
 
-    const docRef = await addDoc(collection(db, "reports"), sanitizedData)
+    const docRef = await addDoc(collection(db, "reports"), cleanedFinalData)
     return docRef.id
   } catch (error) {
     console.error("Error creating report:", error)

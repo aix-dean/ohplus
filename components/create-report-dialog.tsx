@@ -278,16 +278,15 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     setLoading(true)
     try {
       // Build the base report data with only defined values
-      const reportData: ReportData = {
+      const reportData: any = {
         siteId: product.id,
         siteName: product.name || "Unknown Site",
-        siteCode: product.site_code || "",
         companyId: projectData?.project_id || userData?.project_id || user.uid,
         sellerId: product.seller_id || user.uid,
-        client: "Summit Media",
-        clientId: "summit-media-id",
+        client: "Summit Media", // This would come from booking data in real implementation
+        clientId: "summit-media-id", // This would come from booking data
         bookingDates: {
-          start: "2025-05-20",
+          start: "2025-05-20", // This would come from booking data
           end: "2025-06-20",
         },
         breakdate: "2025-05-20",
@@ -305,7 +304,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         status: "draft",
         createdBy: user.uid,
         createdByName: user.displayName || user.email || "Unknown User",
-        location: product.light?.location || product.specs_rental?.location || "",
         category: "logistics",
         subcategory: product.content_type || "general",
         priority: "medium",
@@ -313,25 +311,36 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         tags: [reportType, product.content_type || "general"].filter(Boolean),
       }
 
-      // Only add installation-specific fields if they have actual values
+      // Add optional fields only if they have values
+      if (product.site_code) {
+        reportData.siteCode = product.site_code
+      }
+
+      if (product.light?.location || product.specs_rental?.location) {
+        reportData.location = product.light?.location || product.specs_rental?.location
+      }
+
+      if (selectedTeam) {
+        reportData.assignedTo = selectedTeam
+      }
+
+      // Only add installation-specific fields if they have non-empty values
       if (reportType === "installation-report") {
-        if (status && status.trim() !== "") {
-          reportData.installationStatus = status.trim()
+        if (status.trim() !== "") {
+          reportData.installationStatus = status
         }
         if (timeline && timeline !== "") {
           reportData.installationTimeline = timeline
         }
-        if (timeline === "delayed") {
-          if (delayReason && delayReason.trim() !== "") {
-            reportData.delayReason = delayReason.trim()
-          }
-          if (delayDays && delayDays.trim() !== "") {
-            reportData.delayDays = delayDays.trim()
-          }
+        if (timeline === "delayed" && delayReason.trim() !== "") {
+          reportData.delayReason = delayReason
+        }
+        if (timeline === "delayed" && delayDays.trim() !== "") {
+          reportData.delayDays = delayDays
         }
       }
 
-      const reportId = await createReport(reportData)
+      const reportId = await createReport(reportData as ReportData)
 
       toast({
         title: "Success",
