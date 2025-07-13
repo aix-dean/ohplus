@@ -242,7 +242,7 @@ export async function updateProduct(productId: string, productData: Partial<Prod
 export async function getUserProducts(userId: string): Promise<Product[]> {
   try {
     const productsRef = collection(db, "products")
-    const q = query(productsRef, where("seller_id", "==", userId), orderBy("name", "asc"))
+    const q = query(productsRef, where("company_id", "==", userId), orderBy("name", "asc"))
     const querySnapshot = await getDocs(q)
 
     const products: Product[] = []
@@ -269,7 +269,7 @@ export async function getPaginatedUserProducts(
     const { searchTerm = "", active } = options
 
     // Start with basic constraints
-    const constraints: any[] = [where("seller_id", "==", userId), orderBy("name", "asc"), limit(itemsPerPage)]
+    const constraints: any[] = [where("company_id", "==", userId), orderBy("name", "asc"), limit(itemsPerPage)]
 
     // Add active filter if specified
     if (active !== undefined) {
@@ -339,7 +339,7 @@ export async function getUserProductsCount(
     const { searchTerm = "", active, deleted } = options
 
     // Start with basic constraints
-    const constraints: any[] = [where("seller_id", "==", userId)]
+    const constraints: any[] = [where("company_id", "==", userId)]
 
     // Add active filter if specified
     if (active !== undefined) {
@@ -383,7 +383,6 @@ export async function getUserProductsCount(
     return 0
   }
 }
-
 
 // Create a new product
 export async function createProduct(productData: Partial<Product>): Promise<string> {
