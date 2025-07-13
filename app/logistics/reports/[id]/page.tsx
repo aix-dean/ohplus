@@ -223,9 +223,19 @@ export default function ReportPreviewPage() {
         </div>
       </div>
 
-      {/* Header */}
-      <div className="w-full">
-        <img src="/logistics-header.png" alt="Logistics Header" className="w-full h-auto object-cover" />
+      {/* Header - Replace image with coded version */}
+      <div className="w-full bg-gradient-to-r from-cyan-400 to-blue-600 h-20 flex items-center justify-between px-8">
+        <div className="flex items-center space-x-4">
+          <div className="text-white text-2xl font-bold">GTS INCORPORATED</div>
+          <div className="text-white text-sm">
+            <div>Smart. Seamless. Scalable</div>
+            <div className="text-xs opacity-90">Logistics & Operations</div>
+          </div>
+        </div>
+        <div className="text-white text-right">
+          <div className="text-lg font-semibold">OH!</div>
+          <div className="text-xs opacity-90">Digital Solutions</div>
+        </div>
       </div>
 
       <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -437,9 +447,16 @@ export default function ReportPreviewPage() {
         </div>
       </div>
 
-      {/* Bottom Branding */}
-      <div className="w-full mt-8">
-        <img src="/logistics-footer.png" alt="Logistics Footer" className="w-full h-auto object-cover" />
+      {/* Bottom Branding - Replace image with coded version */}
+      <div className="w-full mt-8 bg-gradient-to-r from-cyan-400 to-blue-600 h-16 flex items-center justify-between px-8">
+        <div className="text-white text-sm">
+          <div className="font-semibold">GTS INCORPORATED</div>
+          <div className="text-xs opacity-90">Your Partner in Digital Advertising</div>
+        </div>
+        <div className="text-white text-right">
+          <div className="text-sm font-semibold">Smart. Seamless. Scalable</div>
+          <div className="text-lg font-bold">OH!</div>
+        </div>
       </div>
 
       {/* Send Report Dialog */}
