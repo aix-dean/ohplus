@@ -2,632 +2,415 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
-import { Upload, ImageIcon, Eye, X, Plus } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { useToast } from "@/hooks/use-toast"
-import { getProductById, type Product } from "@/lib/firebase-service"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CalendarIcon, Upload, X } from "lucide-react"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
 import { createReport, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
-import { useRouter } from "next/navigation"
+import { uploadFile } from "@/lib/video-upload-service"
 
 interface CreateReportDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  siteId: string
+  isOpen: boolean
+  onClose: () => void
+  onReportCreated?: (reportId: string) => void
+  prefilledData?: {
+    siteId?: string
+    siteName?: string
+    assignedTo?: string
+    sales?: string
+    bookingDates?: {
+      start: string
+      end: string
+    }
+  }
 }
 
-interface Team {
-  id: string
-  name: string
-  members: string[]
-  createdAt: string
-}
+export function CreateReportDialog({ isOpen, onClose, onReportCreated, prefilledData }: CreateReportDialogProps) {
+  const { user } = useAuth()
+  const [reportType, setReportType] = useState("")
+  const [siteId, setSiteId] = useState(prefilledData?.siteId || "")
+  const [siteName, setSiteName] = useState(prefilledData?.siteName || "")
+  const [assignedTo, setAssignedTo] = useState(prefilledData?.assignedTo || "")
+  const [date, setDate] = useState<Date>(new Date())
+  const [location, setLocation] = useState("")
+  const [notes, setNotes] = useState("")
+  const [attachments, setAttachments] = useState<
+    Array<{
+      fileName?: string
+      fileUrl?: string
+      note?: string
+    }>
+  >([])
+  const [isUploading, setIsUploading] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportDialogProps) {
-  const [product, setProduct] = useState<Product | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [reportType, setReportType] = useState("completion-report")
-  const [date, setDate] = useState("")
-  const [selectedTeam, setSelectedTeam] = useState("")
-  const [teams, setTeams] = useState<Team[]>([])
-  const [loadingTeams, setLoadingTeams] = useState(false)
-  const [showNewTeamInput, setShowNewTeamInput] = useState(false)
-  const [newTeamName, setNewTeamName] = useState("")
-  const [attachments, setAttachments] = useState<{ note: string; file?: File; fileName?: string; preview?: string }[]>([
-    { note: "" },
-    { note: "" },
-  ])
-  const [previewModal, setPreviewModal] = useState<{ open: boolean; file?: File; preview?: string }>({ open: false })
-
-  // Installation report specific fields
-  const [status, setStatus] = useState("")
-  const [timeline, setTimeline] = useState("on-time")
+  // Installation Report specific fields
+  const [installationStatus, setInstallationStatus] = useState("")
+  const [timeline, setTimeline] = useState("")
   const [delayReason, setDelayReason] = useState("")
-  const [delayDays, setDelayDays] = useState("")
+  const [delayDays, setDelayDays] = useState<number>(0)
 
-  const { toast } = useToast()
-  const { user, userData, projectData } = useAuth()
-  const router = useRouter()
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files || files.length === 0) return
 
-  // Fetch product data when dialog opens
-  useEffect(() => {
-    if (open && siteId) {
-      fetchProductData()
-      fetchTeams()
-      // Auto-fill date with current date
-      setDate(new Date().toISOString().split("T")[0])
-    }
-  }, [open, siteId])
-
-  const fetchProductData = async () => {
+    setIsUploading(true)
     try {
-      const productData = await getProductById(siteId)
-      setProduct(productData)
-    } catch (error) {
-      console.error("Error fetching product data:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load site information",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const fetchTeams = async () => {
-    setLoadingTeams(true)
-    try {
-      // Mock teams data - replace with actual API call
-      const mockTeams: Team[] = [
-        { id: "1", name: "Installation Team A", members: ["John Doe", "Jane Smith"], createdAt: "2024-01-01" },
-        { id: "2", name: "Installation Team B", members: ["Mike Johnson", "Sarah Wilson"], createdAt: "2024-01-02" },
-        { id: "3", name: "Installation Team C", members: ["David Brown", "Lisa Davis"], createdAt: "2024-01-03" },
-        { id: "4", name: "Maintenance Team", members: ["Tom Wilson", "Amy Chen"], createdAt: "2024-01-04" },
-      ]
-      setTeams(mockTeams)
-    } catch (error) {
-      console.error("Error fetching teams:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load teams",
-        variant: "destructive",
-      })
-    } finally {
-      setLoadingTeams(false)
-    }
-  }
-
-  const handleCreateNewTeam = async () => {
-    if (!newTeamName.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a team name",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      // Mock team creation - replace with actual API call
-      const newTeam: Team = {
-        id: Date.now().toString(),
-        name: newTeamName,
-        members: [],
-        createdAt: new Date().toISOString(),
-      }
-
-      setTeams((prev) => [...prev, newTeam])
-      setSelectedTeam(newTeam.id)
-      setNewTeamName("")
-      setShowNewTeamInput(false)
-
-      toast({
-        title: "Success",
-        description: "Team created successfully",
-      })
-    } catch (error) {
-      console.error("Error creating team:", error)
-      toast({
-        title: "Error",
-        description: "Failed to create team",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleAttachmentNoteChange = (index: number, note: string) => {
-    const newAttachments = [...attachments]
-    newAttachments[index].note = note
-    setAttachments(newAttachments)
-  }
-
-  const getFileIcon = (fileName: string) => {
-    const extension = fileName.toLowerCase().split(".").pop()
-
-    switch (extension) {
-      case "jpg":
-      case "jpeg":
-      case "png":
-      case "gif":
-      case "webp":
-        return <ImageIcon className="h-8 w-8 text-green-500" />
-      default:
-        return <ImageIcon className="h-8 w-8 text-gray-500" />
-    }
-  }
-
-  const createFilePreview = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader()
-      reader.onload = (e) => resolve(e.target?.result as string)
-      reader.readAsDataURL(file)
-    })
-  }
-
-  const handleFileUpload = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      const newAttachments = [...attachments]
-      newAttachments[index].file = file
-      newAttachments[index].fileName = file.name
-
-      // Create preview for images
-      if (file.type.startsWith("image/")) {
-        try {
-          const preview = await createFilePreview(file)
-          newAttachments[index].preview = preview
-        } catch (error) {
-          console.error("Error creating preview:", error)
+      const uploadPromises = Array.from(files).map(async (file) => {
+        const fileUrl = await uploadFile(file, "reports")
+        return {
+          fileName: file.name,
+          fileUrl: fileUrl,
+          note: "",
         }
-      }
-
-      setAttachments(newAttachments)
-    }
-  }
-
-  const handlePreviewFile = (
-    attachment: { note: string; file?: File; fileName?: string; preview?: string },
-    e: React.MouseEvent,
-  ) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    if (!attachment.file) return
-
-    // Handle images - show in full screen modal
-    if (attachment.file.type.startsWith("image/")) {
-      setPreviewModal({
-        open: true,
-        file: attachment.file,
-        preview: attachment.preview,
       })
+
+      const uploadedFiles = await Promise.all(uploadPromises)
+      setAttachments((prev) => [...prev, ...uploadedFiles])
+    } catch (error) {
+      console.error("Error uploading files:", error)
+      alert("Failed to upload files. Please try again.")
+    } finally {
+      setIsUploading(false)
     }
   }
 
-  const renderFilePreview = (
-    attachment: { note: string; file?: File; fileName?: string; preview?: string },
-    index: number,
-  ) => {
-    if (!attachment.file || !attachment.fileName) {
-      return (
-        <label
-          htmlFor={`file-${index}`}
-          className="cursor-pointer flex flex-col items-center justify-center h-full space-y-1"
-        >
-          <Upload className="h-6 w-6 text-gray-400" />
-          <span className="text-xs text-gray-500">Upload</span>
-        </label>
-      )
-    }
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index))
+  }
 
-    const isImage = attachment.file.type.startsWith("image/")
-
-    return (
-      <div className="relative w-full h-full group">
-        <label
-          htmlFor={`file-${index}`}
-          className="cursor-pointer flex flex-col items-center justify-center h-full space-y-1 p-1"
-        >
-          {isImage && attachment.preview ? (
-            <img
-              src={attachment.preview || "/placeholder.svg"}
-              alt={attachment.fileName}
-              className="w-full h-full object-cover rounded"
-            />
-          ) : (
-            <div className="flex items-center justify-center">{getFileIcon(attachment.fileName)}</div>
-          )}
-        </label>
-
-        {/* Preview Button */}
-        <button
-          onClick={(e) => handlePreviewFile(attachment, e)}
-          className="absolute top-1 right-1 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Preview file"
-        >
-          <Eye className="h-3 w-3" />
-        </button>
-      </div>
-    )
+  const updateAttachmentNote = (index: number, note: string) => {
+    setAttachments((prev) => prev.map((attachment, i) => (i === index ? { ...attachment, note } : attachment)))
   }
 
   const handleGenerateReport = async () => {
-    if (!product) {
-      toast({
-        title: "Error",
-        description: "Site information not loaded",
-        variant: "destructive",
-      })
+    if (!reportType || !siteId || !siteName) {
+      alert("Please fill in all required fields")
       return
     }
 
-    if (!user) {
-      toast({
-        title: "Error",
-        description: "Please log in to create a report",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setLoading(true)
+    setIsSubmitting(true)
     try {
-      // Build the base report data with only defined values
-      const reportData: ReportData = {
-        siteId: product.id,
-        siteName: product.name || "Unknown Site",
-        siteCode: product.site_code || "",
-        companyId: projectData?.project_id || userData?.project_id || user.uid,
-        sellerId: product.seller_id || user.uid,
-        client: "Summit Media", // This would come from booking data in real implementation
-        clientId: "summit-media-id", // This would come from booking data
-        bookingDates: {
-          start: "2025-05-20", // This would come from booking data
-          end: "2025-06-20",
-        },
-        breakdate: "2025-05-20",
-        sales: user.displayName || user.email || "Unknown User",
+      const reportData: Omit<ReportData, "id" | "created"> = {
         reportType,
-        date,
-        attachments: attachments
-          .filter((att) => att.note.trim() !== "" || att.file)
-          .map((att) => ({
-            note: att.note,
-            file: att.file,
-            fileName: att.fileName || "",
-            fileType: att.file?.type || "",
-          })),
-        status: "draft",
-        createdBy: user.uid,
-        createdByName: user.displayName || user.email || "Unknown User",
-        location: product.light?.location || product.specs_rental?.location || "",
-        category: "logistics",
-        subcategory: product.content_type || "general",
-        priority: "medium",
-        completionPercentage: reportType === "completion-report" ? 100 : 0,
-        tags: [reportType, product.content_type || "general"].filter(Boolean),
+        siteId,
+        siteName,
+        assignedTo,
+        date: format(date, "yyyy-MM-dd"),
+        location: location || "",
+        notes: notes || "",
+        attachments: attachments.filter((att) => att.fileName && att.fileUrl),
+        createdBy: user?.uid || "",
+        createdByName: user?.displayName || user?.email || "",
+        sales: prefilledData?.sales || "",
+        bookingDates: prefilledData?.bookingDates || {
+          start: "",
+          end: "",
+        },
+        completionPercentage: 100,
+        siteCode: siteId || "",
       }
 
-      // Only add installation-specific fields if they have non-empty values
+      // Only add installation-specific fields if they have values and it's an installation report
       if (reportType === "installation-report") {
-        if (status.trim() !== "") {
-          reportData.installationStatus = status
+        if (installationStatus && installationStatus.trim() !== "") {
+          reportData.installationStatus = installationStatus
         }
-        if (timeline && timeline !== "") {
-          reportData.installationTimeline = timeline
+        if (timeline && timeline.trim() !== "") {
+          reportData.timeline = timeline
         }
-        if (timeline === "delayed" && delayReason.trim() !== "") {
+        if (delayReason && delayReason.trim() !== "") {
           reportData.delayReason = delayReason
         }
-        if (timeline === "delayed" && delayDays.trim() !== "") {
+        if (delayDays > 0) {
           reportData.delayDays = delayDays
         }
       }
 
       const reportId = await createReport(reportData)
 
-      toast({
-        title: "Success",
-        description: "Report created successfully",
-      })
+      if (onReportCreated) {
+        onReportCreated(reportId)
+      }
 
-      onOpenChange(false)
       // Reset form
-      setReportType("completion-report")
-      setDate("")
-      setSelectedTeam("")
-      setAttachments([{ note: "" }, { note: "" }])
-      setStatus("")
-      setTimeline("on-time")
+      setReportType("")
+      setSiteId(prefilledData?.siteId || "")
+      setSiteName(prefilledData?.siteName || "")
+      setAssignedTo(prefilledData?.assignedTo || "")
+      setDate(new Date())
+      setLocation("")
+      setNotes("")
+      setAttachments([])
+      setInstallationStatus("")
+      setTimeline("")
       setDelayReason("")
-      setDelayDays("")
+      setDelayDays(0)
 
-      // Navigate to the report preview page
-      router.push(`/logistics/reports/${reportId}`)
+      onClose()
     } catch (error) {
       console.error("Error creating report:", error)
-      toast({
-        title: "Error",
-        description: "Failed to create report",
-        variant: "destructive",
-      })
+      alert("Failed to create report. Please try again.")
     } finally {
-      setLoading(false)
+      setIsSubmitting(false)
     }
   }
 
   return (
-    <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md relative sm:max-w-md fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 p-6">
-          <button
-            onClick={() => onOpenChange(false)}
-            className="absolute -top-2 -right-2 z-10 bg-gray-500 hover:bg-gray-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
-          >
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </button>
-          <DialogHeader className="pb-2">
-            <DialogTitle className="text-base font-semibold">Service Report</DialogTitle>
-          </DialogHeader>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create New Report</DialogTitle>
+        </DialogHeader>
 
-          <div className="max-h-[70vh] overflow-y-auto scrollbar-hide space-y-3 px-1">
-            {/* Booking Information Section */}
-            <div className="bg-gray-100 p-3 rounded-lg space-y-1">
-              <div className="text-base">
-                <span className="font-medium">Site:</span> {product?.name || "Loading..."}
-              </div>
-              <div className="text-base">
-                <span className="font-medium">Client:</span> Summit Media
-              </div>
-              <div className="text-base">
-                <span className="font-medium">Booking:</span> May 20 - June 20, 2025
-              </div>
-              <div className="text-base">
-                <span className="font-medium">Sales:</span> {user?.displayName || user?.email || "Current User"}
-              </div>
-            </div>
+        <div className="space-y-6">
+          {/* Report Type */}
+          <div className="space-y-2">
+            <Label htmlFor="reportType">Report Type *</Label>
+            <Select value={reportType} onValueChange={setReportType}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select report type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="installation-report">Installation Report</SelectItem>
+                <SelectItem value="maintenance-report">Maintenance Report</SelectItem>
+                <SelectItem value="inspection-report">Inspection Report</SelectItem>
+                <SelectItem value="incident-report">Incident Report</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-            {/* Report Type */}
+          {/* Site Information */}
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="report-type" className="text-sm font-semibold text-gray-900">
-                Report Type:
-              </Label>
-              <Select value={reportType} onValueChange={setReportType}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Select report type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="completion-report">Completion Report</SelectItem>
-                  <SelectItem value="monitoring-report">Monitoring Report</SelectItem>
-                  <SelectItem value="installation-report">Installation Report</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Date */}
-            <div className="space-y-2">
-              <Label htmlFor="date" className="text-sm font-semibold text-gray-900">
-                Date:
-              </Label>
+              <Label htmlFor="siteId">Site ID *</Label>
               <Input
-                id="date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                placeholder="AutoFill"
-                className="h-9 text-sm"
+                id="siteId"
+                value={siteId}
+                onChange={(e) => setSiteId(e.target.value)}
+                placeholder="Enter site ID"
               />
             </div>
-
-            {/* Team */}
             <div className="space-y-2">
-              <Label htmlFor="team" className="text-sm font-semibold text-gray-900">
-                Team:
-              </Label>
-              {showNewTeamInput ? (
-                <div className="flex gap-1">
-                  <Input
-                    placeholder="Enter team name"
-                    value={newTeamName}
-                    onChange={(e) => setNewTeamName(e.target.value)}
-                    className="flex-1 h-9 text-sm"
-                  />
-                  <Button
-                    onClick={handleCreateNewTeam}
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 h-9 px-3 text-xs"
-                  >
-                    Add
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setShowNewTeamInput(false)
-                      setNewTeamName("")
-                    }}
-                    size="sm"
-                    variant="outline"
-                    className="h-9 px-3 text-xs"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              ) : (
-                <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Select team" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingTeams ? (
-                      <SelectItem value="loading" disabled>
-                        Loading teams...
-                      </SelectItem>
-                    ) : (
-                      <>
-                        {teams.map((team) => (
-                          <SelectItem key={team.id} value={team.id}>
-                            {team.name}
-                          </SelectItem>
-                        ))}
-                        <SelectItem
-                          value="create-new"
-                          onSelect={() => setShowNewTeamInput(true)}
-                          className="text-blue-600 font-medium"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Plus className="h-4 w-4" />
-                            Create New Team
-                          </div>
-                        </SelectItem>
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-              )}
+              <Label htmlFor="siteName">Site Name *</Label>
+              <Input
+                id="siteName"
+                value={siteName}
+                onChange={(e) => setSiteName(e.target.value)}
+                placeholder="Enter site name"
+              />
             </div>
+          </div>
 
-            {/* Installation Report Specific Fields */}
-            {reportType === "installation-report" && (
-              <>
-                {/* Status */}
-                <div className="space-y-2">
-                  <Label htmlFor="status" className="text-sm font-semibold text-gray-900">
-                    Status:
-                  </Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="status"
-                      type="number"
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value)}
-                      placeholder="0"
-                      className="h-9 text-sm flex-1"
-                      min="0"
-                      max="100"
-                    />
-                    <span className="text-sm text-gray-600 font-medium">% of 100</span>
+          {/* Assignment and Date */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="assignedTo">Assigned To</Label>
+              <Input
+                id="assignedTo"
+                value={assignedTo}
+                onChange={(e) => setAssignedTo(e.target.value)}
+                placeholder="Enter team/person"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date ? format(date, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={date} onSelect={(date) => date && setDate(date)} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          {/* Installation Report Specific Fields */}
+          {reportType === "installation-report" && (
+            <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
+              <h3 className="font-semibold text-lg">Installation Details</h3>
+
+              {/* Installation Status */}
+              <div className="space-y-3">
+                <Label>Installation Status</Label>
+                <RadioGroup value={installationStatus} onValueChange={setInstallationStatus}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="completed" id="completed" />
+                    <Label htmlFor="completed">Completed</Label>
                   </div>
-                </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="in-progress" id="in-progress" />
+                    <Label htmlFor="in-progress">In Progress</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="delayed" id="delayed" />
+                    <Label htmlFor="delayed">Delayed</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="cancelled" id="cancelled" />
+                    <Label htmlFor="cancelled">Cancelled</Label>
+                  </div>
+                </RadioGroup>
+              </div>
 
-                {/* Timeline */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-gray-900">Timeline:</Label>
-                  <RadioGroup value={timeline} onValueChange={setTimeline} className="space-y-2">
+              {/* Timeline */}
+              <div className="space-y-3">
+                <Label>Timeline</Label>
+                <RadioGroup value={timeline} onValueChange={setTimeline}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="on-schedule" id="on-schedule" />
+                    <Label htmlFor="on-schedule">On Schedule</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="ahead-of-schedule" id="ahead-of-schedule" />
+                    <Label htmlFor="ahead-of-schedule">Ahead of Schedule</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="behind-schedule" id="behind-schedule" />
+                    <Label htmlFor="behind-schedule">Behind Schedule</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              {/* Delay Reason (conditional) */}
+              {(installationStatus === "delayed" || timeline === "behind-schedule") && (
+                <div className="space-y-3">
+                  <Label>Reason for Delay</Label>
+                  <RadioGroup value={delayReason} onValueChange={setDelayReason}>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="on-time" id="on-time" className="h-4 w-4" />
-                      <Label htmlFor="on-time" className="text-sm font-medium">
-                        On Time
-                      </Label>
+                      <RadioGroupItem value="weather" id="weather" />
+                      <Label htmlFor="weather">Weather Conditions</Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="delayed" id="delayed" className="h-4 w-4" />
-                      <Label htmlFor="delayed" className="text-sm font-medium">
-                        Delayed
-                      </Label>
+                      <RadioGroupItem value="materials" id="materials" />
+                      <Label htmlFor="materials">Material Shortage</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="permits" id="permits" />
+                      <Label htmlFor="permits">Permit Issues</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="technical" id="technical" />
+                      <Label htmlFor="technical">Technical Issues</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="other" id="other" />
+                      <Label htmlFor="other">Other</Label>
                     </div>
                   </RadioGroup>
-
-                  {/* Delay Details */}
-                  {timeline === "delayed" && (
-                    <div className="space-y-2 mt-3 pl-6 border-l-2 border-red-200">
-                      <Input
-                        placeholder="Reason for delay..."
-                        value={delayReason}
-                        onChange={(e) => setDelayReason(e.target.value)}
-                        className="h-9 text-sm"
-                      />
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          value={delayDays}
-                          onChange={(e) => setDelayDays(e.target.value)}
-                          placeholder="0"
-                          className="h-9 text-sm flex-1"
-                          min="0"
-                        />
-                        <span className="text-sm text-gray-600 font-medium">Days</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
-              </>
-            )}
+              )}
 
-            {/* Attachments */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-900">Attachments:</Label>
-              <div className="grid grid-cols-2 gap-2">
+              {/* Delay Days (conditional) */}
+              {(installationStatus === "delayed" || timeline === "behind-schedule") && (
+                <div className="space-y-2">
+                  <Label htmlFor="delayDays">Number of Delay Days</Label>
+                  <Input
+                    id="delayDays"
+                    type="number"
+                    min="0"
+                    value={delayDays}
+                    onChange={(e) => setDelayDays(Number.parseInt(e.target.value) || 0)}
+                    placeholder="Enter number of days"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Location */}
+          <div className="space-y-2">
+            <Label htmlFor="location">Location</Label>
+            <Input
+              id="location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="Enter specific location details"
+            />
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Enter additional notes or observations"
+              rows={3}
+            />
+          </div>
+
+          {/* File Attachments */}
+          <div className="space-y-2">
+            <Label>Attachments</Label>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+              <input
+                type="file"
+                multiple
+                onChange={handleFileUpload}
+                className="hidden"
+                id="file-upload"
+                accept="image/*,video/*,.pdf,.doc,.docx"
+              />
+              <label htmlFor="file-upload" className="flex flex-col items-center justify-center cursor-pointer">
+                <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                <span className="text-sm text-gray-600">
+                  {isUploading ? "Uploading..." : "Click to upload files or drag and drop"}
+                </span>
+                <span className="text-xs text-gray-400 mt-1">Images, videos, PDFs, and documents</span>
+              </label>
+            </div>
+
+            {/* Attachment List */}
+            {attachments.length > 0 && (
+              <div className="space-y-2 mt-4">
                 {attachments.map((attachment, index) => (
-                  <div key={index} className="space-y-1">
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg h-16 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-center">
-                      <input
-                        type="file"
-                        className="hidden"
-                        id={`file-${index}`}
-                        accept=".jpg,.jpeg,.png,.gif,.webp"
-                        onChange={(e) => handleFileUpload(index, e)}
-                      />
-                      {renderFilePreview(attachment, index)}
-                    </div>
+                  <div key={index} className="flex items-center gap-2 p-2 border rounded">
+                    <span className="flex-1 text-sm truncate">{attachment.fileName}</span>
                     <Input
-                      placeholder="Add Note..."
-                      value={attachment.note}
-                      onChange={(e) => handleAttachmentNoteChange(index, e.target.value)}
-                      className="text-xs h-8"
+                      placeholder="Add note..."
+                      value={attachment.note || ""}
+                      onChange={(e) => updateAttachmentNote(index, e.target.value)}
+                      className="flex-1 h-8"
                     />
+                    <Button variant="ghost" size="sm" onClick={() => removeAttachment(index)}>
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 ))}
               </div>
-            </div>
-
-            {/* Generate Report Button */}
-            <Button
-              onClick={handleGenerateReport}
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white h-10 text-sm font-medium mt-4"
-            >
-              {loading ? "Generating..." : "Generate Report"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Full Screen Preview Modal */}
-      <Dialog open={previewModal.open} onOpenChange={(open) => setPreviewModal({ open })}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0">
-          <div className="relative w-full h-full flex items-center justify-center bg-black">
-            <button
-              onClick={() => setPreviewModal({ open: false })}
-              className="absolute top-4 right-4 z-10 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-2 rounded-full"
-            >
-              <X className="h-6 w-6" />
-            </button>
-
-            {previewModal.file && previewModal.file.type.startsWith("image/") && previewModal.preview && (
-              <img
-                src={previewModal.preview || "/placeholder.svg"}
-                alt="Preview"
-                className="max-w-full max-h-full object-contain"
-              />
             )}
           </div>
-        </DialogContent>
-      </Dialog>
 
-      <style jsx global>{`
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-      `}</style>
-    </>
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleGenerateReport} disabled={isSubmitting || isUploading}>
+              {isSubmitting ? "Creating..." : "Create Report"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

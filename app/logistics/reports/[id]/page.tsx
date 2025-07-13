@@ -184,24 +184,20 @@ export default function ReportPreviewPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Back Button and Content Title Section */}
-      <div className="bg-white px-6 py-4 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="lg"
-            onClick={handleBack}
-            className="text-black rounded-full p-3 hover:bg-gray-100"
-          >
-            <ArrowLeft className="h-6 w-6" />
-          </Button>
-          <Badge className="bg-cyan-400 text-white px-4 py-2 rounded-full font-medium text-lg">
-            {product?.content_type || "Content"}
-          </Badge>
-        </div>
+      {/* Header matching the reference design */}
+      <div className="relative">
+        {/* Back Button positioned over the header */}
+        <Button
+          variant="ghost"
+          size="lg"
+          onClick={handleBack}
+          className="absolute top-4 left-4 z-10 text-white hover:bg-white hover:bg-opacity-20 rounded-full p-3"
+        >
+          <ArrowLeft className="h-6 w-6" />
+        </Button>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-3">
+        {/* Action Buttons positioned over the header */}
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-3">
           {/* Send Button */}
           <Button
             onClick={handleSendReport}
@@ -221,17 +217,17 @@ export default function ReportPreviewPage() {
             {isGeneratingPDF ? "Generating PDF..." : "Download PDF"}
           </Button>
         </div>
-      </div>
 
-      {/* Header */}
-      <div className="w-full h-20 bg-gradient-to-r from-cyan-400 to-blue-600 flex items-center justify-between px-8">
-        <div className="flex items-center gap-4">
-          <div className="text-white text-2xl font-bold">GTS</div>
-          <div className="text-white text-lg">LOGISTICS OPERATIONS</div>
-        </div>
-        <div className="text-white text-right">
-          <div className="text-sm font-medium">Smart. Seamless. Scalable.</div>
-          <div className="text-2xl font-bold">OH!</div>
+        {/* Header with precise gradient and typography matching the reference */}
+        <div className="w-full h-20 bg-gradient-to-r from-cyan-400 via-cyan-500 to-blue-600 flex items-center justify-between px-8">
+          <div className="flex items-center gap-4">
+            <div className="text-white text-2xl font-bold tracking-wide">GTS</div>
+            <div className="text-white text-lg font-medium tracking-wider">LOGISTICS OPERATIONS</div>
+          </div>
+          <div className="text-white text-right">
+            <div className="text-sm font-medium tracking-wide">Smart. Seamless. Scalable.</div>
+            <div className="text-3xl font-bold tracking-wider">OH!</div>
+          </div>
         </div>
       </div>
 
@@ -314,6 +310,66 @@ export default function ReportPreviewPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Installation Status (if applicable) */}
+        {report.reportType === "installation-report" && (
+          <Card>
+            <CardContent className="p-6">
+              <h2 className="text-2xl font-bold mb-6">Installation Status</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  {report.installationStatus && (
+                    <div>
+                      <span className="font-semibold">Status:</span>{" "}
+                      <Badge
+                        className={`ml-2 ${
+                          report.installationStatus === "completed"
+                            ? "bg-green-500"
+                            : report.installationStatus === "in-progress"
+                              ? "bg-blue-500"
+                              : report.installationStatus === "delayed"
+                                ? "bg-red-500"
+                                : "bg-gray-500"
+                        } text-white`}
+                      >
+                        {report.installationStatus.replace("-", " ").toUpperCase()}
+                      </Badge>
+                    </div>
+                  )}
+                  {report.timeline && (
+                    <div>
+                      <span className="font-semibold">Timeline:</span>{" "}
+                      <Badge
+                        className={`ml-2 ${
+                          report.timeline === "on-schedule"
+                            ? "bg-green-500"
+                            : report.timeline === "ahead-of-schedule"
+                              ? "bg-blue-500"
+                              : "bg-red-500"
+                        } text-white`}
+                      >
+                        {report.timeline.replace("-", " ").toUpperCase()}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  {report.delayReason && (
+                    <div>
+                      <span className="font-semibold">Delay Reason:</span>{" "}
+                      {report.delayReason.replace("-", " ").toUpperCase()}
+                    </div>
+                  )}
+                  {report.delayDays && report.delayDays > 0 && (
+                    <div>
+                      <span className="font-semibold">Delay Days:</span> {report.delayDays} days
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Project Status */}
         <div className="space-y-4">

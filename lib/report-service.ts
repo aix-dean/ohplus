@@ -2,64 +2,49 @@ import {
   collection,
   addDoc,
   getDocs,
+  query,
+  orderBy,
+  serverTimestamp,
   doc,
-  getDoc,
   updateDoc,
   deleteDoc,
-  query,
-  where,
-  orderBy,
-  limit,
-  Timestamp,
+  getDoc,
 } from "firebase/firestore"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { db, storage } from "./firebase"
+import { db } from "./firebase"
 
 export interface ReportData {
   id?: string
+  reportType: string
   siteId: string
   siteName: string
-  siteCode?: string
-  companyId: string
-  sellerId: string
-  client: string
-  clientId: string
+  assignedTo: string
+  date: string
+  location?: string
+  notes?: string
+  attachments?: Array<{
+    fileName?: string
+    fileUrl?: string
+    note?: string
+  }>
+  created?: any
+  createdBy?: string
+  createdByName?: string
+  sales?: string
   bookingDates: {
     start: string
     end: string
   }
-  breakdate: string
-  sales: string
-  reportType: string
-  date: string
-  attachments: Array<{
-    note: string
-    file?: File
-    fileName?: string
-    fileType?: string
-    fileUrl?: string
-  }>
-  status: string
-  createdBy: string
-  createdByName: string
-  created?: Timestamp
-  updated?: Timestamp
-  location?: string
-  category: string
-  subcategory: string
-  priority: string
-  completionPercentage: number
-  tags: string[]
-  assignedTo?: string
-  // Installation report specific fields (optional)
+  completionPercentage?: number
+  siteCode?: string
+  // Installation-specific fields
   installationStatus?: string
-  installationTimeline?: string
+  timeline?: string
   delayReason?: string
-  delayDays?: string
+  delayDays?: number
 }
 
-// Helper function to clean data by removing undefined values recursively
-function cleanReportData(data: any): any {
+// Helper function to clean data before sending to Firestore
+const cleanReportData = (data: any): any => {
   if (data === null || data === undefined) {
     return null
   }
@@ -68,13 +53,17 @@ function cleanReportData(data: any): any {
     return data.map(cleanReportData).filter((item) => item !== null && item !== undefined)
   }
 
-  if (typeof data === "object" && !(data instanceof File) && !(data instanceof Timestamp)) {
+  if (typeof data === "object") {
     const cleaned: any = {}
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined && value !== null) {
-        const cleanedValue = cleanReportData(value)
-        if (cleanedValue !== null && cleanedValue !== undefined) {
-          cleaned[key] = cleanedValue
+        if (typeof value === "string" && value.trim() === "") {
+          cleaned[key] = ""
+        } else {
+          const cleanedValue = cleanReportData(value)
+          if (cleanedValue !== null && cleanedValue !== undefined) {
+            cleaned[key] = cleanedValue
+          }
         }
       }
     }
@@ -84,52 +73,48 @@ function cleanReportData(data: any): any {
   return data
 }
 
-export async function createReport(reportData: ReportData): Promise<string> {
+export const createReport = async (reportData: Omit<ReportData, "id" | "created">): Promise<string> => {
   try {
-    // Clean the data to remove undefined values
-    const cleanedData = cleanReportData(reportData)
-
-    // Upload attachments first
-    const processedAttachments = await Promise.all(
-      (cleanedData.attachments || []).map(async (attachment: any) => {
-        if (attachment.file) {
-          try {
-            const fileRef = ref(storage, `reports/${Date.now()}_${attachment.fileName}`)
-            const snapshot = await uploadBytes(fileRef, attachment.file)
-            const downloadURL = await getDownloadURL(snapshot.ref)
-
-            return {
-              note: attachment.note || "",
-              fileName: attachment.fileName,
-              fileType: attachment.fileType,
-              fileUrl: downloadURL,
-            }
-          } catch (error) {
-            console.error("Error uploading attachment:", error)
-            return {
-              note: attachment.note || "",
-              fileName: attachment.fileName || "Unknown file",
-              fileType: attachment.fileType,
-              fileUrl: null,
-            }
-          }
-        }
-        return {
-          note: attachment.note || "",
-          fileName: attachment.fileName || "",
-          fileType: attachment.fileType || "",
-        }
-      }),
-    )
-
-    const finalReportData = {
-      ...cleanedData,
-      attachments: processedAttachments,
-      created: Timestamp.now(),
-      updated: Timestamp.now(),
+    // Ensure all required fields have default values
+    const dataToSave = {
+      reportType: reportData.reportType || "",
+      siteId: reportData.siteId || "",
+      siteName: reportData.siteName || "",
+      assignedTo: reportData.assignedTo || "",
+      date: reportData.date || new Date().toISOString().split("T")[0],
+      location: reportData.location || "",
+      notes: reportData.notes || "",
+      attachments: reportData.attachments || [],
+      createdBy: reportData.createdBy || "",
+      createdByName: reportData.createdByName || "",
+      sales: reportData.sales || "",
+      bookingDates: {
+        start: reportData.bookingDates?.start || "",
+        end: reportData.bookingDates?.end || "",
+      },
+      completionPercentage: reportData.completionPercentage || 100,
+      siteCode: reportData.siteCode || "",
+      created: serverTimestamp(),
     }
 
-    const docRef = await addDoc(collection(db, "reports"), finalReportData)
+    // Only add installation-specific fields if they have values
+    if (reportData.installationStatus && reportData.installationStatus.trim() !== "") {
+      dataToSave.installationStatus = reportData.installationStatus
+    }
+    if (reportData.timeline && reportData.timeline.trim() !== "") {
+      dataToSave.timeline = reportData.timeline
+    }
+    if (reportData.delayReason && reportData.delayReason.trim() !== "") {
+      dataToSave.delayReason = reportData.delayReason
+    }
+    if (reportData.delayDays !== undefined && reportData.delayDays !== null && reportData.delayDays > 0) {
+      dataToSave.delayDays = reportData.delayDays
+    }
+
+    // Clean the data to remove any undefined values
+    const cleanedData = cleanReportData(dataToSave)
+
+    const docRef = await addDoc(collection(db, "reports"), cleanedData)
     return docRef.id
   } catch (error) {
     console.error("Error creating report:", error)
@@ -137,7 +122,7 @@ export async function createReport(reportData: ReportData): Promise<string> {
   }
 }
 
-export async function getReports(): Promise<ReportData[]> {
+export const getReports = async (): Promise<ReportData[]> => {
   try {
     const q = query(collection(db, "reports"), orderBy("created", "desc"))
     const querySnapshot = await getDocs(q)
@@ -152,39 +137,28 @@ export async function getReports(): Promise<ReportData[]> {
   }
 }
 
-export async function getReportsByCompany(companyId: string): Promise<ReportData[]> {
+export const updateReport = async (id: string, updates: Partial<ReportData>): Promise<void> => {
   try {
-    const q = query(collection(db, "reports"), where("companyId", "==", companyId), orderBy("created", "desc"))
-    const querySnapshot = await getDocs(q)
-
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as ReportData[]
+    const cleanedUpdates = cleanReportData(updates)
+    await updateDoc(doc(db, "reports", id), cleanedUpdates)
   } catch (error) {
-    console.error("Error fetching reports by company:", error)
+    console.error("Error updating report:", error)
     throw error
   }
 }
 
-export async function getReportsBySeller(sellerId: string): Promise<ReportData[]> {
+export const deleteReport = async (id: string): Promise<void> => {
   try {
-    const q = query(collection(db, "reports"), where("sellerId", "==", sellerId), orderBy("created", "desc"))
-    const querySnapshot = await getDocs(q)
-
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as ReportData[]
+    await deleteDoc(doc(db, "reports", id))
   } catch (error) {
-    console.error("Error fetching reports by seller:", error)
+    console.error("Error deleting report:", error)
     throw error
   }
 }
 
-export async function getReportById(reportId: string): Promise<ReportData | null> {
+export const getReportById = async (id: string): Promise<ReportData | null> => {
   try {
-    const docRef = doc(db, "reports", reportId)
+    const docRef = doc(db, "reports", id)
     const docSnap = await getDoc(docRef)
 
     if (docSnap.exists()) {
@@ -196,78 +170,7 @@ export async function getReportById(reportId: string): Promise<ReportData | null
       return null
     }
   } catch (error) {
-    console.error("Error fetching report by ID:", error)
-    throw error
-  }
-}
-
-export async function updateReport(reportId: string, updateData: Partial<ReportData>): Promise<void> {
-  try {
-    // Clean the data to remove undefined values
-    const cleanedData = cleanReportData(updateData)
-
-    const docRef = doc(db, "reports", reportId)
-    await updateDoc(docRef, {
-      ...cleanedData,
-      updated: Timestamp.now(),
-    })
-  } catch (error) {
-    console.error("Error updating report:", error)
-    throw error
-  }
-}
-
-export async function deleteReport(reportId: string): Promise<void> {
-  try {
-    const docRef = doc(db, "reports", reportId)
-    await deleteDoc(docRef)
-  } catch (error) {
-    console.error("Error deleting report:", error)
-    throw error
-  }
-}
-
-export async function getRecentReports(limitCount = 10): Promise<ReportData[]> {
-  try {
-    const q = query(collection(db, "reports"), orderBy("created", "desc"), limit(limitCount))
-    const querySnapshot = await getDocs(q)
-
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as ReportData[]
-  } catch (error) {
-    console.error("Error fetching recent reports:", error)
-    throw error
-  }
-}
-
-export async function getReportsByStatus(status: string): Promise<ReportData[]> {
-  try {
-    const q = query(collection(db, "reports"), where("status", "==", status), orderBy("created", "desc"))
-    const querySnapshot = await getDocs(q)
-
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as ReportData[]
-  } catch (error) {
-    console.error("Error fetching reports by status:", error)
-    throw error
-  }
-}
-
-export async function getReportsByType(reportType: string): Promise<ReportData[]> {
-  try {
-    const q = query(collection(db, "reports"), where("reportType", "==", reportType), orderBy("created", "desc"))
-    const querySnapshot = await getDocs(q)
-
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as ReportData[]
-  } catch (error) {
-    console.error("Error fetching reports by type:", error)
+    console.error("Error fetching report:", error)
     throw error
   }
 }
