@@ -222,10 +222,16 @@ export default function ReportPreviewPage() {
       {/* Angular Blue Header */}
       <div className="w-full relative bg-white">
         <div className="relative h-16 overflow-hidden">
-          {/* Main blue section with angular cut */}
-          <div className="absolute inset-0 bg-blue-900 transform skew-x-12 origin-top-left scale-x-110 -translate-x-8"></div>
-          {/* Lighter blue accent */}
-          <div className="absolute right-0 top-0 h-full w-1/3 bg-cyan-400 transform skew-x-12 origin-top-right scale-x-110 translate-x-8"></div>
+          {/* Main blue section */}
+          <div className="absolute inset-0 bg-blue-900"></div>
+          {/* Angular cyan section pointing right */}
+          <div
+            className="absolute top-0 right-0 h-full bg-cyan-400"
+            style={{
+              width: "40%",
+              clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
+            }}
+          ></div>
           {/* Content overlay */}
           <div className="relative z-10 h-full flex items-center px-6">
             <div className="text-white text-lg font-semibold">Logistics</div>
