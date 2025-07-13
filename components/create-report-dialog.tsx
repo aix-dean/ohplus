@@ -326,23 +326,21 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
       // Only add installation-specific fields if they have non-empty values
       if (reportType === "installation-report") {
-        // Only add installationStatus if status has a value
-        if (status && status.trim() !== "" && !isNaN(Number(status))) {
+        // Only add installationStatus if status has a valid numeric value
+        if (status && status.trim() !== "" && !isNaN(Number(status)) && Number(status) >= 0) {
           reportData.installationStatus = status.trim()
         }
 
-        // Only add installationTimeline if it's not the default "on-time"
-        if (timeline && timeline !== "on-time") {
+        // Only add installationTimeline if it's explicitly set to delayed
+        if (timeline === "delayed") {
           reportData.installationTimeline = timeline
 
-          // Only add delay-related fields if timeline is delayed and they have values
-          if (timeline === "delayed") {
-            if (delayReason && delayReason.trim() !== "") {
-              reportData.delayReason = delayReason.trim()
-            }
-            if (delayDays && delayDays.trim() !== "" && !isNaN(Number(delayDays))) {
-              reportData.delayDays = delayDays.trim()
-            }
+          // Only add delay-related fields if they have actual values
+          if (delayReason && delayReason.trim() !== "") {
+            reportData.delayReason = delayReason.trim()
+          }
+          if (delayDays && delayDays.trim() !== "" && !isNaN(Number(delayDays)) && Number(delayDays) > 0) {
+            reportData.delayDays = delayDays.trim()
           }
         }
       }
