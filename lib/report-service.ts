@@ -3,11 +3,13 @@ import {
   addDoc,
   getDocs,
   doc,
+  getDoc,
   updateDoc,
   deleteDoc,
   query,
   where,
   orderBy,
+  limit,
   Timestamp,
 } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
@@ -21,7 +23,7 @@ export interface ReportData {
   companyId: string
   sellerId: string
   client: string
-  clientId?: string
+  clientId: string
   bookingDates: {
     start: string
     end: string
@@ -34,131 +36,93 @@ export interface ReportData {
     note: string
     file?: File
     fileName?: string
-    fileUrl?: string
     fileType?: string
+    fileUrl?: string
   }>
-  status: "draft" | "submitted" | "approved" | "rejected"
+  status: string
   createdBy: string
-  createdByName?: string
-  assignedTo?: string
-  assignedToName?: string
-  priority?: "low" | "medium" | "high"
-  description?: string
-  location?: string
-  weatherConditions?: string
-  equipmentUsed?: string[]
-  issuesEncountered?: string
-  recommendations?: string
-  completionPercentage?: number
-  nextScheduledDate?: string
-  cost?: number
-  currency?: string
-  approvedBy?: string
-  approvedByName?: string
-  approvedDate?: Timestamp
-  rejectedReason?: string
-  submittedDate?: Timestamp
-  tags?: string[]
-  category?: string
-  subcategory?: string
+  createdByName: string
   created?: Timestamp
   updated?: Timestamp
-  // Installation report specific fields
+  location?: string
+  category: string
+  subcategory: string
+  priority: string
+  completionPercentage: number
+  tags: string[]
+  assignedTo?: string
+  // Installation report specific fields (optional)
   installationStatus?: string
   installationTimeline?: string
   delayReason?: string
   delayDays?: string
 }
 
-const REPORTS_COLLECTION = "reports"
+// Helper function to clean data by removing undefined values
+function cleanReportData(data: any): any {
+  if (data === null || data === undefined) {
+    return null
+  }
 
-// Helper function to clean data of undefined values
-const cleanReportData = (data: any): any => {
-  const cleaned: any = {}
-  for (const [key, value] of Object.entries(data)) {
-    if (value !== undefined && value !== null) {
-      if (
-        typeof value === "object" &&
-        !Array.isArray(value) &&
-        !(value instanceof File) &&
-        !(value instanceof Timestamp)
-      ) {
-        const cleanedNested = cleanReportData(value)
-        if (Object.keys(cleanedNested).length > 0) {
-          cleaned[key] = cleanedNested
-        }
-      } else {
-        cleaned[key] = value
+  if (Array.isArray(data)) {
+    return data.map(cleanReportData).filter((item) => item !== null && item !== undefined)
+  }
+
+  if (typeof data === "object") {
+    const cleaned: any = {}
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined && value !== null) {
+        cleaned[key] = cleanReportData(value)
       }
     }
+    return cleaned
   }
-  return cleaned
-}
 
-export async function uploadReportAttachment(file: File, reportId: string, index: number): Promise<string> {
-  try {
-    const fileExtension = file.name.split(".").pop()
-    const fileName = `reports/${reportId}/attachment_${index}.${fileExtension}`
-    const storageRef = ref(storage, fileName)
-
-    await uploadBytes(storageRef, file)
-    const downloadURL = await getDownloadURL(storageRef)
-
-    return downloadURL
-  } catch (error) {
-    console.error("Error uploading attachment:", error)
-    throw error
-  }
+  return data
 }
 
 export async function createReport(reportData: ReportData): Promise<string> {
   try {
-    // Clean the report data to remove undefined values
+    // Clean the data to remove undefined values
     const cleanedData = cleanReportData(reportData)
 
-    // First create the report to get an ID
-    const docRef = await addDoc(collection(db, REPORTS_COLLECTION), {
-      ...cleanedData,
-      attachments: [], // Temporarily empty while we upload files
-      created: Timestamp.now(),
-      updated: Timestamp.now(),
-    })
-
-    // Upload attachments and get URLs
-    const uploadedAttachments = await Promise.all(
-      (reportData.attachments || []).map(async (attachment, index) => {
+    // Upload attachments first
+    const processedAttachments = await Promise.all(
+      (cleanedData.attachments || []).map(async (attachment: any) => {
         if (attachment.file) {
           try {
-            const fileUrl = await uploadReportAttachment(attachment.file, docRef.id, index)
+            const fileRef = ref(storage, `reports/${Date.now()}_${attachment.fileName}`)
+            const snapshot = await uploadBytes(fileRef, attachment.file)
+            const downloadURL = await getDownloadURL(snapshot.ref)
+
             return {
-              note: attachment.note,
+              note: attachment.note || "",
               fileName: attachment.fileName,
-              fileUrl: fileUrl,
               fileType: attachment.fileType,
+              fileUrl: downloadURL,
             }
           } catch (error) {
-            console.error(`Error uploading attachment ${index}:`, error)
+            console.error("Error uploading attachment:", error)
             return {
-              note: attachment.note,
-              fileName: attachment.fileName,
+              note: attachment.note || "",
+              fileName: attachment.fileName || "Unknown file",
               fileType: attachment.fileType,
+              fileUrl: null,
             }
           }
         }
-        return {
-          note: attachment.note,
-          fileName: attachment.fileName,
-          fileType: attachment.fileType,
-        }
+        return attachment
       }),
     )
 
-    // Update the report with the uploaded attachment URLs
-    await updateDoc(doc(db, REPORTS_COLLECTION, docRef.id), {
-      attachments: uploadedAttachments,
+    const finalReportData = {
+      ...cleanedData,
+      attachments: processedAttachments,
+      created: Timestamp.now(),
       updated: Timestamp.now(),
-    })
+    }
 
+    const docRef = await addDoc(collection(db, "reports"), finalReportData)
     return docRef.id
   } catch (error) {
     console.error("Error creating report:", error)
@@ -166,15 +130,11 @@ export async function createReport(reportData: ReportData): Promise<string> {
   }
 }
 
-export async function getReports(siteId?: string): Promise<ReportData[]> {
+export async function getReports(): Promise<ReportData[]> {
   try {
-    let q = query(collection(db, REPORTS_COLLECTION), orderBy("created", "desc"))
-
-    if (siteId) {
-      q = query(collection(db, REPORTS_COLLECTION), where("siteId", "==", siteId), orderBy("created", "desc"))
-    }
-
+    const q = query(collection(db, "reports"), orderBy("created", "desc"))
     const querySnapshot = await getDocs(q)
+
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
@@ -187,8 +147,9 @@ export async function getReports(siteId?: string): Promise<ReportData[]> {
 
 export async function getReportsByCompany(companyId: string): Promise<ReportData[]> {
   try {
-    const q = query(collection(db, REPORTS_COLLECTION), where("companyId", "==", companyId), orderBy("created", "desc"))
+    const q = query(collection(db, "reports"), where("companyId", "==", companyId), orderBy("created", "desc"))
     const querySnapshot = await getDocs(q)
+
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
@@ -201,8 +162,9 @@ export async function getReportsByCompany(companyId: string): Promise<ReportData
 
 export async function getReportsBySeller(sellerId: string): Promise<ReportData[]> {
   try {
-    const q = query(collection(db, REPORTS_COLLECTION), where("sellerId", "==", sellerId), orderBy("created", "desc"))
+    const q = query(collection(db, "reports"), where("sellerId", "==", sellerId), orderBy("created", "desc"))
     const querySnapshot = await getDocs(q)
+
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
@@ -213,12 +175,33 @@ export async function getReportsBySeller(sellerId: string): Promise<ReportData[]
   }
 }
 
-export async function updateReport(reportId: string, updates: Partial<ReportData>): Promise<void> {
+export async function getReportById(reportId: string): Promise<ReportData | null> {
   try {
-    const reportRef = doc(db, REPORTS_COLLECTION, reportId)
-    const cleanedUpdates = cleanReportData(updates)
-    await updateDoc(reportRef, {
-      ...cleanedUpdates,
+    const docRef = doc(db, "reports", reportId)
+    const docSnap = await getDoc(docRef)
+
+    if (docSnap.exists()) {
+      return {
+        id: docSnap.id,
+        ...docSnap.data(),
+      } as ReportData
+    } else {
+      return null
+    }
+  } catch (error) {
+    console.error("Error fetching report by ID:", error)
+    throw error
+  }
+}
+
+export async function updateReport(reportId: string, updateData: Partial<ReportData>): Promise<void> {
+  try {
+    // Clean the data to remove undefined values
+    const cleanedData = cleanReportData(updateData)
+
+    const docRef = doc(db, "reports", reportId)
+    await updateDoc(docRef, {
+      ...cleanedData,
       updated: Timestamp.now(),
     })
   } catch (error) {
@@ -229,9 +212,55 @@ export async function updateReport(reportId: string, updates: Partial<ReportData
 
 export async function deleteReport(reportId: string): Promise<void> {
   try {
-    await deleteDoc(doc(db, REPORTS_COLLECTION, reportId))
+    const docRef = doc(db, "reports", reportId)
+    await deleteDoc(docRef)
   } catch (error) {
     console.error("Error deleting report:", error)
+    throw error
+  }
+}
+
+export async function getRecentReports(limitCount = 10): Promise<ReportData[]> {
+  try {
+    const q = query(collection(db, "reports"), orderBy("created", "desc"), limit(limitCount))
+    const querySnapshot = await getDocs(q)
+
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as ReportData[]
+  } catch (error) {
+    console.error("Error fetching recent reports:", error)
+    throw error
+  }
+}
+
+export async function getReportsByStatus(status: string): Promise<ReportData[]> {
+  try {
+    const q = query(collection(db, "reports"), where("status", "==", status), orderBy("created", "desc"))
+    const querySnapshot = await getDocs(q)
+
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as ReportData[]
+  } catch (error) {
+    console.error("Error fetching reports by status:", error)
+    throw error
+  }
+}
+
+export async function getReportsByType(reportType: string): Promise<ReportData[]> {
+  try {
+    const q = query(collection(db, "reports"), where("reportType", "==", reportType), orderBy("created", "desc"))
+    const querySnapshot = await getDocs(q)
+
+    return querySnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as ReportData[]
+  } catch (error) {
+    console.error("Error fetching reports by type:", error)
     throw error
   }
 }
