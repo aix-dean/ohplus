@@ -353,15 +353,15 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-sm relative sm:max-w-sm fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto">
-          <button
-            onClick={() => onOpenChange(false)}
-            className="absolute -top-2 -right-2 z-10 bg-gray-500 hover:bg-gray-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
-          >
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </button>
-          <DialogHeader className="pb-2">
+          <DialogHeader className="pb-2 relative">
             <DialogTitle className="text-base font-semibold">Service Report</DialogTitle>
+            <button
+              onClick={() => onOpenChange(false)}
+              className="absolute top-0 right-0 bg-gray-500 hover:bg-gray-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </button>
           </DialogHeader>
 
           <div className="space-y-3">
