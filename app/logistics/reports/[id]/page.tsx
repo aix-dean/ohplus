@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send } from "lucide-react"
+import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send, Bell, User } from "lucide-react"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
@@ -166,6 +166,18 @@ export default function ReportPreviewPage() {
     router.back()
   }
 
+  const getCurrentDateTime = () => {
+    const now = new Date()
+    return now.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -184,61 +196,70 @@ export default function ReportPreviewPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Back Button and Content Title Section */}
-      <div className="bg-white px-6 py-4 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="lg"
-            onClick={handleBack}
-            className="text-black rounded-full p-3 hover:bg-gray-100"
-          >
-            <ArrowLeft className="h-6 w-6" />
-          </Button>
-          <Badge className="bg-cyan-400 text-white px-4 py-2 rounded-full font-medium text-lg">
-            {product?.content_type || "Content"}
-          </Badge>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-3">
-          {/* Send Button */}
-          <Button
-            onClick={handleSendReport}
-            className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-full flex items-center gap-2"
-          >
-            <Send className="h-4 w-4" />
-            Send
-          </Button>
-
-          {/* Download PDF Button */}
-          <Button
-            onClick={handleDownloadPDF}
-            disabled={isGeneratingPDF}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            {isGeneratingPDF ? "Generating PDF..." : "Download PDF"}
-          </Button>
-        </div>
-      </div>
-
       {/* Header */}
       <div className="relative w-full h-16 bg-white overflow-hidden">
         {/* Dark navy section */}
-        <div className="absolute left-0 top-0 h-full w-48 bg-[#1e3a8a] flex items-center justify-start px-6 z-10">
-          <div className="text-white text-lg font-semibold tracking-wide">Logistics</div>
+        <div
+          className="absolute left-0 top-0 h-full bg-[#1e3a8a] flex items-center justify-start px-6 z-10"
+          style={{ width: "300px" }}
+        >
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBack}
+              className="text-white hover:bg-white hover:bg-opacity-20 p-2"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="text-white text-lg font-semibold tracking-wide">Logistics - Reports</div>
+          </div>
         </div>
 
         {/* Bright blue section with angular cut */}
         <div
-          className="absolute top-0 h-full bg-[#3b82f6] z-0"
+          className="absolute top-0 h-full bg-[#3b82f6] z-0 flex items-center justify-end px-6"
           style={{
-            left: "120px",
+            left: "220px",
             right: "0",
             clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
           }}
-        />
+        >
+          <div className="flex items-center gap-4 text-white">
+            {/* Action Buttons */}
+            <div className="flex items-center gap-3">
+              {/* Send Button */}
+              <Button
+                onClick={handleSendReport}
+                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+              >
+                <Send className="h-4 w-4" />
+                Send
+              </Button>
+
+              {/* Download PDF Button */}
+              <Button
+                onClick={handleDownloadPDF}
+                disabled={isGeneratingPDF}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                {isGeneratingPDF ? "Generating..." : "PDF"}
+              </Button>
+            </div>
+
+            {/* Right side icons and timestamp */}
+            <div className="flex items-center gap-3 ml-6">
+              <Button variant="ghost" size="sm" className="text-white hover:bg-white hover:bg-opacity-20 p-2">
+                <Bell className="h-5 w-5" />
+              </Button>
+              <Button variant="ghost" size="sm" className="text-white hover:bg-white hover:bg-opacity-20 p-2">
+                <User className="h-5 w-5" />
+              </Button>
+              <div className="text-white text-sm font-medium whitespace-nowrap">{getCurrentDateTime()}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -357,7 +378,7 @@ export default function ReportPreviewPage() {
                               if (parent) {
                                 parent.innerHTML = `
                                   <div class="text-center space-y-2">
-                                    ${getFileIcon(attachment.fileName || "").props.children}
+                                    <div class="flex justify-center">${getFileIcon(attachment.fileName || "")}</div>
                                     <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
                                   </div>
                                 `
@@ -376,7 +397,7 @@ export default function ReportPreviewPage() {
                               if (parent) {
                                 parent.innerHTML = `
                                   <div class="text-center space-y-2">
-                                    ${getFileIcon(attachment.fileName || "").props.children}
+                                    <div class="flex justify-center">${getFileIcon(attachment.fileName || "")}</div>
                                     <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
                                   </div>
                                 `
