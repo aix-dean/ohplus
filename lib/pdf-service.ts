@@ -807,27 +807,36 @@ export async function generateReportPDF(
     // Helper function to create the header section exactly like the preview
     const addHeaderToPage = async () => {
       try {
-        const headerBase64 = await loadImageAsBase64("/logistics-header-new.png")
-        if (headerBase64) {
-          // Get the actual dimensions of the header image
-          const headerDimensions = await getImageDimensions(headerBase64)
+        // Angular Blue Header - exactly like the preview
+        const headerHeight = 16
 
-          // Calculate proper aspect ratio
-          const aspectRatio = headerDimensions.width / headerDimensions.height
+        // Main blue section
+        pdf.setFillColor(30, 58, 138) // blue-900
+        pdf.rect(0, yPosition, pageWidth, headerHeight, "F")
 
-          // Set desired height and calculate width to maintain aspect ratio
-          const headerHeight = 20 // Reduced from 25 to prevent warping
-          const headerWidth = pageWidth // Full page width
+        // Angular cyan section pointing right
+        const cyanlWidth = pageWidth * 0.4
+        const points = [
+          [pageWidth - cyanlWidth + cyanlWidth * 0.25, yPosition], // Start point (25% from left of cyan section)
+          [pageWidth, yPosition], // Top right
+          [pageWidth, yPosition + headerHeight], // Bottom right
+          [pageWidth - cyanlWidth, yPosition + headerHeight], // Bottom left of cyan section
+        ]
 
-          // Add the header image with proper dimensions
-          pdf.addImage(headerBase64, "PNG", 0, yPosition, headerWidth, headerHeight)
-          yPosition += headerHeight + 5
-        } else {
-          // Fallback if image fails to load
-          yPosition += 25
-        }
+        pdf.setFillColor(52, 211, 235) // cyan-400
+        pdf.triangle(points[0][0], points[0][1], points[1][0], points[1][1], points[2][0], points[2][1], "F")
+        pdf.triangle(points[0][0], points[0][1], points[2][0], points[2][1], points[3][0], points[3][1], "F")
+
+        // Add "Logistics" text
+        pdf.setTextColor(255, 255, 255)
+        pdf.setFontSize(12)
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Logistics", margin, yPosition + 10)
+
+        yPosition += headerHeight + 5
+        pdf.setTextColor(0, 0, 0)
       } catch (error) {
-        console.error("Error adding header image:", error)
+        console.error("Error adding header:", error)
         yPosition += 25 // Skip header space if failed
       }
     }
@@ -842,22 +851,20 @@ export async function generateReportPDF(
     // Create cyan badge for report type
     pdf.setFillColor(52, 211, 235) // cyan-400
     const badgeWidth = 50
-
     const badgeHeight = 8
     pdf.rect(margin, yPosition, badgeWidth, badgeHeight, "F")
     pdf.setTextColor(255, 255, 255)
-    pdf.text(getReportTypeDisplay(report.reportType), margin + 2, yPosition + 5)
+    pdf.setFontSize(9)
+    pdf.text("Installation Report", margin + 2, yPosition + 5)
 
     // Add GTS logo on the right
-    try {
-      const logoBase64 = await loadImageAsBase64("/gts-logo.png")
-      if (logoBase64) {
-        const logoSize = 20
-        pdf.addImage(logoBase64, "PNG", pageWidth - margin - logoSize, yPosition - 5, logoSize, logoSize)
-      }
-    } catch (error) {
-      console.error("Error adding logo:", error)
-    }
+    pdf.setFillColor(255, 193, 7) // yellow-400
+    const logoSize = 20
+    pdf.circle(pageWidth - margin - logoSize / 2, yPosition + logoSize / 2 - 5, logoSize / 2, "F")
+    pdf.setTextColor(0, 0, 0)
+    pdf.setFontSize(12)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("GTS", pageWidth - margin - 15, yPosition + 5)
 
     yPosition += badgeHeight + 5
     pdf.setTextColor(0, 0, 0)
@@ -907,7 +914,11 @@ export async function generateReportPDF(
     pdf.setFont("helvetica", "bold")
     pdf.text("Job Order Date:", leftColumn, leftY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(formatDate(createdAt.toISOString().split("T")[0]), leftColumn + 35, leftY)
+    const jobOrderDate =
+      report.created && typeof report.created.toDate === "function"
+        ? report.created.toDate().toISOString().split("T")[0]
+        : report.date
+    pdf.text(formatDate(jobOrderDate), leftColumn + 35, leftY)
     leftY += 5
 
     pdf.setFont("helvetica", "bold")
@@ -1080,7 +1091,11 @@ export async function generateReportPDF(
     yPosition += 4
     pdf.text("LOGISTICS", margin, yPosition)
     yPosition += 4
-    pdf.text(formatDate(createdAt.toISOString().split("T")[0]), margin, yPosition)
+    const preparedDate =
+      report.created && typeof report.created.toDate === "function"
+        ? report.created.toDate().toISOString().split("T")[0]
+        : report.date
+    pdf.text(formatDate(preparedDate), margin, yPosition)
 
     // Add disclaimer - exactly like preview
     pdf.setFontSize(8)
@@ -1092,53 +1107,57 @@ export async function generateReportPDF(
 
     yPosition += 15
 
-    // Add bottom footer using the new PNG image - exactly like preview
+    // Add bottom footer - exactly like preview
     const footerY = pageHeight - 15
     const footerHeight = 15
 
-    try {
-      const footerBase64 = await loadImageAsBase64("/logistics-footer-new.png")
-      if (footerBase64) {
-        // Use the full width footer image
-        pdf.addImage(footerBase64, "PNG", 0, footerY, pageWidth, footerHeight)
-      } else {
-        // Fallback to original gradient if image fails
-        pdf.setFillColor(52, 211, 235) // Cyan
-        pdf.rect(0, footerY, pageWidth * 0.3, footerHeight, "F")
-        pdf.setFillColor(30, 58, 138) // Dark blue
-        pdf.rect(pageWidth * 0.3, footerY, pageWidth * 0.7, footerHeight, "F")
+    // Cyan section on left
+    pdf.setFillColor(52, 211, 235) // cyan-400
+    pdf.rect(0, footerY, pageWidth * 0.4, footerHeight, "F")
 
-        // Add footer text
-        pdf.setTextColor(255, 255, 255)
-        pdf.setFontSize(7)
-        pdf.setFont("helvetica", "normal")
-        pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 50, footerY + 8)
-        pdf.setFont("helvetica", "bold")
-        pdf.text("OH!", pageWidth - margin - 10, footerY + 12)
-      }
-    } catch (error) {
-      console.error("Error adding footer image:", error)
-      // Fallback to original gradient if image fails
-      pdf.setFillColor(52, 211, 235) // Cyan
-      pdf.rect(0, footerY, pageWidth * 0.3, footerHeight, "F")
-      pdf.setFillColor(30, 58, 138) // Dark blue
-      pdf.rect(pageWidth * 0.3, footerY, pageWidth * 0.7, footerHeight, "F")
+    // Angular dark blue section pointing left
+    const blueWidth = pageWidth * 0.6
+    const blueStartX = pageWidth * 0.4 * 0.25 // 25% from left edge
 
-      // Add footer text
-      pdf.setTextColor(255, 255, 255)
-      pdf.setFontSize(7)
-      pdf.setFont("helvetica", "normal")
-      pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 50, footerY + 8)
-      pdf.setFont("helvetica", "bold")
-      pdf.text("OH!", pageWidth - margin - 10, footerY + 12)
-    }
+    pdf.setFillColor(30, 58, 138) // blue-900
+    const footerPoints = [
+      [blueStartX, footerY], // Start point
+      [pageWidth, footerY], // Top right
+      [pageWidth, footerY + footerHeight], // Bottom right
+      [0, footerY + footerHeight], // Bottom left
+    ]
+
+    pdf.triangle(
+      footerPoints[0][0],
+      footerPoints[0][1],
+      footerPoints[1][0],
+      footerPoints[1][1],
+      footerPoints[2][0],
+      footerPoints[2][1],
+      "F",
+    )
+    pdf.triangle(
+      footerPoints[0][0],
+      footerPoints[0][1],
+      footerPoints[2][0],
+      footerPoints[2][1],
+      footerPoints[3][0],
+      footerPoints[3][1],
+      "F",
+    )
+
+    // Add footer text
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(7)
+    pdf.setFont("helvetica", "normal")
+    pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 50, footerY + 8)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("OH!", pageWidth - margin - 10, footerY + 12)
 
     if (returnBase64) {
       return pdf.output("datauristring").split(",")[1]
     } else {
-      const fileName = `report-${getReportTypeDisplay(report.reportType)
-        .replace(/[^a-z0-9]/gi, "_")
-        .toLowerCase()}-${Date.now()}.pdf`
+      const fileName = `report-installation-report-${Date.now()}.pdf`
       pdf.save(fileName)
     }
   } catch (error) {
