@@ -352,7 +352,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-sm relative sm:max-w-sm fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+        <DialogContent className="max-w-sm relative sm:max-w-sm fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 overflow-hidden">
           <button
             onClick={() => onOpenChange(false)}
             className="absolute -top-2 -right-2 z-10 bg-gray-500 hover:bg-gray-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
@@ -360,13 +360,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </button>
-          <DialogHeader className="pb-1">
-            <DialogTitle className="text-sm font-semibold">Service Report</DialogTitle>
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-base font-semibold">Service Report</DialogTitle>
           </DialogHeader>
 
-          <div className="max-h-[70vh] overflow-y-auto scrollbar-hide space-y-2 pr-1">
+          <div className="max-h-[70vh] overflow-y-auto scrollbar-hide space-y-3 px-1">
             {/* Booking Information Section */}
-            <div className="bg-gray-100 p-2 rounded-lg space-y-0.5">
+            <div className="bg-gray-100 p-3 rounded-lg space-y-1">
               <div className="text-xs">
                 <span className="font-medium">Site:</span> {product?.name || "Loading..."}
               </div>
@@ -382,40 +382,44 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             </div>
 
             {/* Report Type */}
-            <div className="space-y-1">
-              <Label htmlFor="report-type" className="text-xs font-semibold text-gray-900">
+            <div className="space-y-2">
+              <Label htmlFor="report-type" className="text-sm font-semibold text-gray-900">
                 Report Type:
               </Label>
-              <Select value={reportType} onValueChange={setReportType}>
-                <SelectTrigger className="h-7 text-xs">
-                  <SelectValue placeholder="Select report type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="completion-report">Completion Report</SelectItem>
-                  <SelectItem value="monitoring-report">Monitoring Report</SelectItem>
-                  <SelectItem value="installation-report">Installation Report</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Select value={reportType} onValueChange={setReportType}>
+                  <SelectTrigger className="h-9 text-sm border-2 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:border-blue-500">
+                    <SelectValue placeholder="Select report type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="completion-report">Completion Report</SelectItem>
+                    <SelectItem value="monitoring-report">Monitoring Report</SelectItem>
+                    <SelectItem value="installation-report">Installation Report</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Date */}
-            <div className="space-y-1">
-              <Label htmlFor="date" className="text-xs font-semibold text-gray-900">
+            <div className="space-y-2">
+              <Label htmlFor="date" className="text-sm font-semibold text-gray-900">
                 Date:
               </Label>
-              <Input
-                id="date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                placeholder="AutoFill"
-                className="h-7 text-xs"
-              />
+              <div className="relative">
+                <Input
+                  id="date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  placeholder="AutoFill"
+                  className="h-9 text-sm border-2 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:border-blue-500"
+                />
+              </div>
             </div>
 
             {/* Team */}
-            <div className="space-y-1">
-              <Label htmlFor="team" className="text-xs font-semibold text-gray-900">
+            <div className="space-y-2">
+              <Label htmlFor="team" className="text-sm font-semibold text-gray-900">
                 Team:
               </Label>
               {showNewTeamInput ? (
@@ -424,12 +428,12 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                     placeholder="Enter team name"
                     value={newTeamName}
                     onChange={(e) => setNewTeamName(e.target.value)}
-                    className="flex-1 h-7 text-xs"
+                    className="flex-1 h-9 text-sm border-2 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:border-blue-500"
                   />
                   <Button
                     onClick={handleCreateNewTeam}
                     size="sm"
-                    className="bg-green-600 hover:bg-green-700 h-7 px-2 text-xs"
+                    className="bg-green-600 hover:bg-green-700 h-9 px-3 text-xs"
                   >
                     Add
                   </Button>
@@ -440,42 +444,44 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                     }}
                     size="sm"
                     variant="outline"
-                    className="h-7 px-2 text-xs"
+                    className="h-9 px-3 text-xs"
                   >
                     Cancel
                   </Button>
                 </div>
               ) : (
-                <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-                  <SelectTrigger className="h-7 text-xs">
-                    <SelectValue placeholder="Select team" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingTeams ? (
-                      <SelectItem value="loading" disabled>
-                        Loading teams...
-                      </SelectItem>
-                    ) : (
-                      <>
-                        {teams.map((team) => (
-                          <SelectItem key={team.id} value={team.id}>
-                            {team.name}
-                          </SelectItem>
-                        ))}
-                        <SelectItem
-                          value="create-new"
-                          onSelect={() => setShowNewTeamInput(true)}
-                          className="text-blue-600 font-medium"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Plus className="h-3 w-3" />
-                            Create New Team
-                          </div>
+                <div className="relative">
+                  <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                    <SelectTrigger className="h-9 text-sm border-2 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:border-blue-500">
+                      <SelectValue placeholder="Select team" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {loadingTeams ? (
+                        <SelectItem value="loading" disabled>
+                          Loading teams...
                         </SelectItem>
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
+                      ) : (
+                        <>
+                          {teams.map((team) => (
+                            <SelectItem key={team.id} value={team.id}>
+                              {team.name}
+                            </SelectItem>
+                          ))}
+                          <SelectItem
+                            value="create-new"
+                            onSelect={() => setShowNewTeamInput(true)}
+                            className="text-blue-600 font-medium"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Plus className="h-4 w-4" />
+                              Create New Team
+                            </div>
+                          </SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
               )}
             </div>
 
@@ -483,62 +489,70 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             {reportType === "installation-report" && (
               <>
                 {/* Status */}
-                <div className="space-y-1">
-                  <Label htmlFor="status" className="text-xs font-semibold text-gray-900">
+                <div className="space-y-2">
+                  <Label htmlFor="status" className="text-sm font-semibold text-gray-900">
                     Status:
                   </Label>
                   <div className="flex items-center gap-2">
-                    <Input
-                      id="status"
-                      type="number"
-                      value={status}
-                      onChange={(e) => setStatus(e.target.value)}
-                      placeholder="0"
-                      className="h-7 text-xs flex-1"
-                      min="0"
-                      max="100"
-                    />
-                    <span className="text-xs text-gray-600 font-medium">% of 100</span>
+                    <div className="relative flex-1">
+                      <Input
+                        id="status"
+                        type="number"
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value)}
+                        placeholder="0"
+                        className="h-9 text-sm border-2 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:border-blue-500"
+                        min="0"
+                        max="100"
+                      />
+                    </div>
+                    <span className="text-sm text-gray-600 font-medium">% of 100</span>
                   </div>
                 </div>
 
                 {/* Timeline */}
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-gray-900">Timeline:</Label>
-                  <RadioGroup value={timeline} onValueChange={setTimeline} className="space-y-1">
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="on-time" id="on-time" className="h-3 w-3" />
-                      <Label htmlFor="on-time" className="text-xs font-medium">
-                        On Time
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="delayed" id="delayed" className="h-3 w-3" />
-                      <Label htmlFor="delayed" className="text-xs font-medium">
-                        Delayed
-                      </Label>
-                    </div>
-                  </RadioGroup>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-gray-900">Timeline:</Label>
+                  <div className="relative">
+                    <RadioGroup value={timeline} onValueChange={setTimeline} className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="on-time" id="on-time" className="h-4 w-4" />
+                        <Label htmlFor="on-time" className="text-sm font-medium">
+                          On Time
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="delayed" id="delayed" className="h-4 w-4" />
+                        <Label htmlFor="delayed" className="text-sm font-medium">
+                          Delayed
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
 
                   {/* Delay Details */}
                   {timeline === "delayed" && (
-                    <div className="space-y-1 mt-2 pl-4 border-l-2 border-red-200">
-                      <Input
-                        placeholder="Reason for delay..."
-                        value={delayReason}
-                        onChange={(e) => setDelayReason(e.target.value)}
-                        className="h-7 text-xs"
-                      />
-                      <div className="flex items-center gap-2">
+                    <div className="space-y-2 mt-3 pl-6 border-l-2 border-red-200">
+                      <div className="relative">
                         <Input
-                          type="number"
-                          value={delayDays}
-                          onChange={(e) => setDelayDays(e.target.value)}
-                          placeholder="0"
-                          className="h-7 text-xs flex-1"
-                          min="0"
+                          placeholder="Reason for delay..."
+                          value={delayReason}
+                          onChange={(e) => setDelayReason(e.target.value)}
+                          className="h-9 text-sm border-2 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:border-blue-500"
                         />
-                        <span className="text-xs text-gray-600 font-medium">Days</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <Input
+                            type="number"
+                            value={delayDays}
+                            onChange={(e) => setDelayDays(e.target.value)}
+                            placeholder="0"
+                            className="h-9 text-sm border-2 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:border-blue-500"
+                            min="0"
+                          />
+                        </div>
+                        <span className="text-sm text-gray-600 font-medium">Days</span>
                       </div>
                     </div>
                   )}
@@ -546,7 +560,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
               </>
             )}
 
-            {/* Attachments - Keep original size */}
+            {/* Attachments */}
             <div className="space-y-2">
               <Label className="text-sm font-semibold text-gray-900">Attachments:</Label>
               <div className="grid grid-cols-2 gap-2">
@@ -562,25 +576,29 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                       />
                       {renderFilePreview(attachment, index)}
                     </div>
-                    <Input
-                      placeholder="Add Note..."
-                      value={attachment.note}
-                      onChange={(e) => handleAttachmentNoteChange(index, e.target.value)}
-                      className="text-xs h-8"
-                    />
+                    <div className="relative">
+                      <Input
+                        placeholder="Add Note..."
+                        value={attachment.note}
+                        onChange={(e) => handleAttachmentNoteChange(index, e.target.value)}
+                        className="text-xs h-8 border-2 focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:border-blue-500"
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Generate Report Button */}
-            <Button
-              onClick={handleGenerateReport}
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs font-medium mt-3"
-            >
-              {loading ? "Generating..." : "Generate Report"}
-            </Button>
+            <div className="pt-2">
+              <Button
+                onClick={handleGenerateReport}
+                disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white h-10 text-sm font-medium"
+              >
+                {loading ? "Generating..." : "Generate Report"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
