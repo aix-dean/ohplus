@@ -3,10 +3,9 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send, Bell, User } from "lucide-react"
+import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send } from "lucide-react"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
@@ -166,18 +165,6 @@ export default function ReportPreviewPage() {
     router.back()
   }
 
-  const getCurrentDateTime = () => {
-    const now = new Date()
-    return now.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    })
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -196,146 +183,142 @@ export default function ReportPreviewPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="relative w-full h-16 bg-white overflow-hidden">
-        {/* Dark navy section */}
-        <div
-          className="absolute left-0 top-0 h-full bg-[#1e3a8a] flex items-center justify-start px-6 z-10"
-          style={{ width: "300px" }}
-        >
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleBack}
-              className="text-white hover:bg-white hover:bg-opacity-20 p-2"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="text-white text-lg font-semibold tracking-wide">Logistics - Reports</div>
+      {/* Top Navigation Bar */}
+      <div className="bg-white px-4 py-3 flex items-center shadow-sm border-b">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleBack}
+            className="text-gray-600 hover:text-gray-800 hover:bg-gray-100 p-2"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="bg-cyan-400 text-white px-3 py-1 rounded text-sm font-medium">
+            {product?.content_type || "Lilo & Stitch"}
           </div>
         </div>
 
-        {/* Bright blue section with angular cut */}
-        <div
-          className="absolute top-0 h-full bg-[#3b82f6] z-0 flex items-center justify-end px-6"
-          style={{
-            left: "220px",
-            right: "0",
-            clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
-          }}
-        >
-          <div className="flex items-center gap-4 text-white">
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3">
-              {/* Send Button */}
-              <Button
-                onClick={handleSendReport}
-                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-              >
-                <Send className="h-4 w-4" />
-                Send
-              </Button>
+        {/* Action Buttons */}
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            onClick={handleSendReport}
+            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm flex items-center gap-2"
+          >
+            <Send className="h-4 w-4" />
+            Send
+          </Button>
+          <Button
+            onClick={handleDownloadPDF}
+            disabled={isGeneratingPDF}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            {isGeneratingPDF ? "Generating..." : "Download"}
+          </Button>
+        </div>
+      </div>
 
-              {/* Download PDF Button */}
-              <Button
-                onClick={handleDownloadPDF}
-                disabled={isGeneratingPDF}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                {isGeneratingPDF ? "Generating..." : "PDF"}
-              </Button>
-            </div>
-
-            {/* Right side icons and timestamp */}
-            <div className="flex items-center gap-3 ml-6">
-              <Button variant="ghost" size="sm" className="text-white hover:bg-white hover:bg-opacity-20 p-2">
-                <Bell className="h-5 w-5" />
-              </Button>
-              <Button variant="ghost" size="sm" className="text-white hover:bg-white hover:bg-opacity-20 p-2">
-                <User className="h-5 w-5" />
-              </Button>
-              <div className="text-white text-sm font-medium whitespace-nowrap">{getCurrentDateTime()}</div>
-            </div>
-          </div>
+      {/* Blue Gradient Header */}
+      <div className="w-full bg-gradient-to-r from-blue-900 via-blue-800 to-cyan-500 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="text-white text-lg font-semibold">Logistics</div>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto p-6 space-y-6">
-        {/* Report Title */}
-        <div className="flex justify-between items-center">
+        {/* Report Header with Badge and Logo */}
+        <div className="flex justify-between items-start">
           <div>
-            <Badge className="bg-cyan-400 text-white text-lg px-4 py-2 rounded-full">
-              {getReportTypeDisplay(report.reportType)}
-            </Badge>
-            <p className="text-gray-600 mt-2 italic">as of {formatDate(report.date)}</p>
+            <div className="bg-cyan-400 text-white px-4 py-2 rounded text-sm font-medium inline-block">
+              Installation Report
+            </div>
+            <p className="text-gray-600 text-sm mt-1">as of {formatDate(report.date)}</p>
           </div>
           <div className="flex-shrink-0">
-            <img src="/gts-logo.png" alt="GTS Incorporated Logo" className="h-24 w-auto" />
+            <div className="bg-yellow-400 rounded-full p-3">
+              <div className="text-black font-bold text-xl">GTS</div>
+            </div>
           </div>
         </div>
 
         {/* Project Information */}
-        <Card>
+        <Card className="shadow-sm">
           <CardContent className="p-6">
-            <h2 className="text-2xl font-bold mb-6">Project Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <div>
-                  <span className="font-semibold">Site ID:</span> {report.siteId}{" "}
-                  {product?.light?.location || product?.specs_rental?.location || ""}
+            <h2 className="text-xl font-bold mb-4 text-gray-900">Project Information</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+              <div className="space-y-2">
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Site ID:</span>
+                  <span className="text-gray-900">
+                    {report.siteId} {product?.light?.location || product?.specs_rental?.location || ""}
+                  </span>
                 </div>
-                <div>
-                  <span className="font-semibold">Job Order:</span> {report.id?.slice(-4).toUpperCase() || "N/A"}
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Job Order:</span>
+                  <span className="text-gray-900">{report.id?.slice(-4).toUpperCase() || "N/A"}</span>
                 </div>
-                <div>
-                  <span className="font-semibold">Job Order Date:</span>{" "}
-                  {formatDate(report.created?.toDate().toISOString().split("T")[0] || report.date)}
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Job Order Date:</span>
+                  <span className="text-gray-900">
+                    {formatDate(report.created?.toDate().toISOString().split("T")[0] || report.date)}
+                  </span>
                 </div>
-                <div>
-                  <span className="font-semibold">Site:</span> {report.siteName}
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Site:</span>
+                  <span className="text-gray-900">{report.siteName}</span>
                 </div>
-                <div>
-                  <span className="font-semibold">Size:</span>{" "}
-                  {product?.specs_rental?.size || product?.light?.size || "N/A"}
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Size:</span>
+                  <span className="text-gray-900">{product?.specs_rental?.size || product?.light?.size || "N/A"}</span>
                 </div>
-                <div>
-                  <span className="font-semibold">Start Date:</span> {formatDate(report.bookingDates.start)}
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Start Date:</span>
+                  <span className="text-gray-900">{formatDate(report.bookingDates.start)}</span>
                 </div>
-                <div>
-                  <span className="font-semibold">End Date:</span> {formatDate(report.bookingDates.end)}
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">End Date:</span>
+                  <span className="text-gray-900">{formatDate(report.bookingDates.end)}</span>
                 </div>
-                <div>
-                  <span className="font-semibold">Installation Duration:</span>{" "}
-                  {Math.ceil(
-                    (new Date(report.bookingDates.end).getTime() - new Date(report.bookingDates.start).getTime()) /
-                      (1000 * 60 * 60 * 24),
-                  )}{" "}
-                  days
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Installation Duration:</span>
+                  <span className="text-gray-900">
+                    {Math.ceil(
+                      (new Date(report.bookingDates.end).getTime() - new Date(report.bookingDates.start).getTime()) /
+                        (1000 * 60 * 60 * 24),
+                    )}{" "}
+                    days
+                  </span>
                 </div>
               </div>
-              <div className="space-y-3">
-                <div>
-                  <span className="font-semibold">Content:</span> {product?.content_type || "N/A"}
+              <div className="space-y-2">
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Content:</span>
+                  <span className="text-gray-900">{product?.content_type || "N/A"}</span>
                 </div>
-                <div>
-                  <span className="font-semibold">Material Specs:</span> {product?.specs_rental?.material || "N/A"}
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Material Specs:</span>
+                  <span className="text-gray-900">{product?.specs_rental?.material || "N/A"}</span>
                 </div>
-                <div>
-                  <span className="font-semibold">Crew:</span> Team {report.assignedTo || "A"}
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Crew:</span>
+                  <span className="text-gray-900">Team {report.assignedTo || "A"}</span>
                 </div>
-                <div>
-                  <span className="font-semibold">Illumination:</span> {product?.light?.illumination || "N/A"}
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Illumination:</span>
+                  <span className="text-gray-900">{product?.light?.illumination || "N/A"}</span>
                 </div>
-                <div>
-                  <span className="font-semibold">Gondola:</span> {product?.specs_rental?.gondola ? "YES" : "NO"}
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Gondola:</span>
+                  <span className="text-gray-900">{product?.specs_rental?.gondola ? "YES" : "NO"}</span>
                 </div>
-                <div>
-                  <span className="font-semibold">Technology:</span> {product?.specs_rental?.technology || "N/A"}
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Technology:</span>
+                  <span className="text-gray-900">{product?.specs_rental?.technology || "N/A"}</span>
                 </div>
-                <div>
-                  <span className="font-semibold">Sales:</span> {report.sales}
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Sales:</span>
+                  <span className="text-gray-900">{report.sales}</span>
                 </div>
               </div>
             </div>
@@ -345,8 +328,10 @@ export default function ReportPreviewPage() {
         {/* Project Status */}
         <div className="space-y-4">
           <div className="flex items-center gap-4">
-            <h2 className="text-2xl font-bold">Project Status</h2>
-            <Badge className="bg-green-500 text-white px-3 py-1 rounded">{report.completionPercentage || 100}%</Badge>
+            <h2 className="text-xl font-bold text-gray-900">Project Status</h2>
+            <div className="bg-green-500 text-white px-3 py-1 rounded text-sm font-medium">
+              {report.completionPercentage || 100}%
+            </div>
           </div>
 
           {/* Attachments/Photos */}
@@ -378,7 +363,7 @@ export default function ReportPreviewPage() {
                               if (parent) {
                                 parent.innerHTML = `
                                   <div class="text-center space-y-2">
-                                    <div class="flex justify-center">${getFileIcon(attachment.fileName || "")}</div>
+                                    ${getFileIcon(attachment.fileName || "").props.children}
                                     <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
                                   </div>
                                 `
@@ -397,7 +382,7 @@ export default function ReportPreviewPage() {
                               if (parent) {
                                 parent.innerHTML = `
                                   <div class="text-center space-y-2">
-                                    <div class="flex justify-center">${getFileIcon(attachment.fileName || "")}</div>
+                                    ${getFileIcon(attachment.fileName || "").props.children}
                                     <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
                                   </div>
                                 `
