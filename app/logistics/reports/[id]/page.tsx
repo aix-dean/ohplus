@@ -184,20 +184,24 @@ export default function ReportPreviewPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header matching the provided design */}
-      <div className="relative">
-        {/* Back Button positioned over the header */}
-        <Button
-          variant="ghost"
-          size="lg"
-          onClick={handleBack}
-          className="absolute top-4 left-4 z-10 text-white hover:bg-white hover:bg-opacity-20 rounded-full p-3"
-        >
-          <ArrowLeft className="h-6 w-6" />
-        </Button>
+      {/* Back Button and Content Title Section */}
+      <div className="bg-white px-6 py-4 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="lg"
+            onClick={handleBack}
+            className="text-black rounded-full p-3 hover:bg-gray-100"
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </Button>
+          <Badge className="bg-cyan-400 text-white px-4 py-2 rounded-full font-medium text-lg">
+            {product?.content_type || "Content"}
+          </Badge>
+        </div>
 
-        {/* Action Buttons positioned over the header */}
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-3">
+        {/* Action Buttons */}
+        <div className="flex items-center gap-3">
           {/* Send Button */}
           <Button
             onClick={handleSendReport}
@@ -217,16 +221,17 @@ export default function ReportPreviewPage() {
             {isGeneratingPDF ? "Generating PDF..." : "Download PDF"}
           </Button>
         </div>
+      </div>
 
-        {/* Header with gradient background matching the design */}
-        <div className="w-full h-20 bg-gradient-to-r from-blue-900 via-blue-800 to-cyan-400 flex items-center justify-between px-8">
-          <div className="flex items-center gap-4">
-            <div className="text-white text-2xl font-bold">Logistics</div>
-          </div>
-          <div className="text-white text-right">
-            <div className="text-sm font-medium">Smart. Seamless. Scalable.</div>
-            <div className="text-2xl font-bold">OH!</div>
-          </div>
+      {/* Header */}
+      <div className="w-full h-20 bg-gradient-to-r from-cyan-400 to-blue-600 flex items-center justify-between px-8">
+        <div className="flex items-center gap-4">
+          <div className="text-white text-2xl font-bold">GTS</div>
+          <div className="text-white text-lg">LOGISTICS OPERATIONS</div>
+        </div>
+        <div className="text-white text-right">
+          <div className="text-sm font-medium">Smart. Seamless. Scalable.</div>
+          <div className="text-2xl font-bold">OH!</div>
         </div>
       </div>
 

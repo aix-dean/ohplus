@@ -277,10 +277,11 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
     setLoading(true)
     try {
+      // Build the base report data with only defined values
       const reportData: ReportData = {
         siteId: product.id,
         siteName: product.name || "Unknown Site",
-        siteCode: product.site_code,
+        siteCode: product.site_code || "",
         companyId: projectData?.project_id || userData?.project_id || user.uid,
         sellerId: product.seller_id || user.uid,
         client: "Summit Media", // This would come from booking data in real implementation
@@ -298,13 +299,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
           .map((att) => ({
             note: att.note,
             file: att.file,
-            fileName: att.fileName,
-            fileType: att.file?.type,
+            fileName: att.fileName || "",
+            fileType: att.file?.type || "",
           })),
         status: "draft",
         createdBy: user.uid,
         createdByName: user.displayName || user.email || "Unknown User",
-        location: product.light?.location || product.specs_rental?.location,
+        location: product.light?.location || product.specs_rental?.location || "",
         category: "logistics",
         subcategory: product.content_type || "general",
         priority: "medium",
@@ -312,12 +313,12 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         tags: [reportType, product.content_type || "general"].filter(Boolean),
       }
 
-      // Add installation-specific fields only if they have values
+      // Only add installation-specific fields if they have non-empty values
       if (reportType === "installation-report") {
         if (status.trim() !== "") {
           reportData.installationStatus = status
         }
-        if (timeline) {
+        if (timeline && timeline !== "") {
           reportData.installationTimeline = timeline
         }
         if (timeline === "delayed" && delayReason.trim() !== "") {

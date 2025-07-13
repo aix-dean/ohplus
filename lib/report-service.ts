@@ -58,7 +58,7 @@ export interface ReportData {
   delayDays?: string
 }
 
-// Helper function to clean data by removing undefined values
+// Helper function to clean data by removing undefined values recursively
 function cleanReportData(data: any): any {
   if (data === null || data === undefined) {
     return null
@@ -68,11 +68,14 @@ function cleanReportData(data: any): any {
     return data.map(cleanReportData).filter((item) => item !== null && item !== undefined)
   }
 
-  if (typeof data === "object") {
+  if (typeof data === "object" && !(data instanceof File) && !(data instanceof Timestamp)) {
     const cleaned: any = {}
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined && value !== null) {
-        cleaned[key] = cleanReportData(value)
+        const cleanedValue = cleanReportData(value)
+        if (cleanedValue !== null && cleanedValue !== undefined) {
+          cleaned[key] = cleanedValue
+        }
       }
     }
     return cleaned
@@ -111,7 +114,11 @@ export async function createReport(reportData: ReportData): Promise<string> {
             }
           }
         }
-        return attachment
+        return {
+          note: attachment.note || "",
+          fileName: attachment.fileName || "",
+          fileType: attachment.fileType || "",
+        }
       }),
     )
 
