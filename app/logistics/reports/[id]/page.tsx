@@ -274,7 +274,11 @@ export default function ReportPreviewPage() {
                 <div className="flex">
                   <span className="font-medium text-gray-700 w-32 flex-shrink-0">Job Order Date:</span>
                   <span className="text-gray-900">
-                    {formatDate(report.created?.toDate().toISOString().split("T")[0] || report.date)}
+                    {formatDate(
+                      report.created && typeof report.created.toDate === "function"
+                        ? report.created.toDate().toISOString().split("T")[0]
+                        : report.date,
+                    )}
                   </span>
                 </div>
                 <div className="flex">
@@ -459,7 +463,13 @@ export default function ReportPreviewPage() {
             <div className="text-sm text-gray-600">
               <div>{report.createdByName}</div>
               <div>LOGISTICS</div>
-              <div>{formatDate(report.created?.toDate().toISOString().split("T")[0] || report.date)}</div>
+              <div>
+                {formatDate(
+                  report.created && typeof report.created.toDate === "function"
+                    ? report.created.toDate().toISOString().split("T")[0]
+                    : report.date,
+                )}
+              </div>
             </div>
           </div>
           <div className="text-right text-sm text-gray-500 italic">
