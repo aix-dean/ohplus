@@ -402,17 +402,23 @@ export default function ReportPreviewPage() {
                             alt={attachment.fileName || `Attachment ${index + 1}`}
                             className="max-w-full max-h-full object-contain rounded"
                             onError={(e) => {
-                              // Fallback to icon if image fails to load
+                              console.error("Image failed to load:", attachment.fileUrl)
                               const target = e.target as HTMLImageElement
                               target.style.display = "none"
                               const parent = target.parentElement
                               if (parent) {
-                                parent.innerHTML = `
-                                  <div class="text-center space-y-2">
-                                    ${getFileIcon(attachment.fileName || "").props.children}
-                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
+                                const iconDiv = document.createElement("div")
+                                iconDiv.className = "text-center space-y-2"
+                                iconDiv.innerHTML = `
+                                  <div class="flex justify-center">
+                                    <svg class="h-12 w-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
                                   </div>
+                                  <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
+                                  <p class="text-xs text-red-500">Failed to load image</p>
                                 `
+                                parent.appendChild(iconDiv)
                               }
                             }}
                           />
@@ -422,17 +428,23 @@ export default function ReportPreviewPage() {
                             controls
                             className="max-w-full max-h-full object-contain rounded"
                             onError={(e) => {
-                              // Fallback to icon if video fails to load
+                              console.error("Video failed to load:", attachment.fileUrl)
                               const target = e.target as HTMLVideoElement
                               target.style.display = "none"
                               const parent = target.parentElement
                               if (parent) {
-                                parent.innerHTML = `
-                                  <div class="text-center space-y-2">
-                                    ${getFileIcon(attachment.fileName || "").props.children}
-                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
+                                const iconDiv = document.createElement("div")
+                                iconDiv.className = "text-center space-y-2"
+                                iconDiv.innerHTML = `
+                                  <div class="flex justify-center">
+                                    <svg class="h-12 w-12 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                    </svg>
                                   </div>
+                                  <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
+                                  <p class="text-xs text-red-500">Failed to load video</p>
                                 `
+                                parent.appendChild(iconDiv)
                               }
                             }}
                           />
@@ -455,16 +467,11 @@ export default function ReportPreviewPage() {
                           <p className="text-xs text-gray-500 italic mt-2 text-center">"{attachment.note}"</p>
                         )}
                       </div>
-                    ) : attachment.fileName ? (
-                      <div className="text-center space-y-2">
-                        {getFileIcon(attachment.fileName)}
-                        <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
-                        {attachment.note && <p className="text-xs text-gray-500 italic">"{attachment.note}"</p>}
-                      </div>
                     ) : (
                       <div className="text-center space-y-2">
                         <ImageIcon className="h-12 w-12 text-gray-400" />
                         <p className="text-sm text-gray-600">Project Photo {index + 1}</p>
+                        <p className="text-xs text-red-500">No file URL available</p>
                       </div>
                     )}
                   </div>
@@ -479,6 +486,11 @@ export default function ReportPreviewPage() {
                     <div>
                       <span className="font-semibold">Location:</span> {report.location || "N/A"}
                     </div>
+                    {attachment.fileName && (
+                      <div>
+                        <span className="font-semibold">File:</span> {attachment.fileName}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -595,6 +607,9 @@ export default function ReportPreviewPage() {
                         alt={fullScreenAttachment.fileName || "Full screen preview"}
                         className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded shadow-lg"
                         style={{ maxWidth: "calc(90vw - 3rem)" }}
+                        onError={(e) => {
+                          console.error("Full screen image failed to load:", fullScreenAttachment.fileUrl)
+                        }}
                       />
                     ) : isVideoFile(fullScreenAttachment.fileName || "") ? (
                       <video
