@@ -323,12 +323,20 @@ export default function CMSDashboardPage() {
   // Handle edit click
   const handleEditClick = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation()
-    router.push(`/cms/details/${product.id}`)
+    // Store the complete product data for the site page
+    localStorage.setItem(`cms-product-${product.id}`, JSON.stringify(product))
+    router.push(`/cms/content/edit/${product.id}`)
   }
 
-  // Handle view details click
-  const handleViewDetails = (productId: string) => {
-    router.push(`/cms/details/${productId}`)
+  // Handle view site details click - Updated to use new site page
+  const handleViewSite = (productId: string) => {
+    // Find the product data to pass along
+    const productData = products.find((p) => p.id === productId)
+    if (productData) {
+      // Store the complete product data for the site page
+      localStorage.setItem(`cms-product-${productId}`, JSON.stringify(productData))
+    }
+    router.push(`/cms/site/${productId}`)
   }
 
   // Use mock data if no products are available from Firebase
@@ -523,7 +531,16 @@ export default function CMSDashboardPage() {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {content.map((item) => (
               <Card key={item.id} className="group cursor-pointer transition-all hover:shadow-md">
-                <div onClick={() => handleViewDetails(item.id)}>
+                <div
+                  onClick={() => {
+                    // Store the original product data, not the mapped content
+                    const originalProduct = products.find((p) => p.id === item.id)
+                    if (originalProduct) {
+                      localStorage.setItem(`cms-product-${item.id}`, JSON.stringify(originalProduct))
+                    }
+                    handleViewSite(item.id)
+                  }}
+                >
                   <div className="relative aspect-video overflow-hidden rounded-t-lg">
                     <Image
                       src={item.thumbnail || "/placeholder.svg"}
@@ -624,7 +641,18 @@ export default function CMSDashboardPage() {
               </TableHeader>
               <TableBody>
                 {content.map((item) => (
-                  <TableRow key={item.id} className="cursor-pointer" onClick={() => handleViewDetails(item.id)}>
+                  <TableRow
+                    key={item.id}
+                    className="cursor-pointer"
+                    onClick={() => {
+                      // Store the original product data, not the mapped content
+                      const originalProduct = products.find((p) => p.id === item.id)
+                      if (originalProduct) {
+                        localStorage.setItem(`cms-product-${item.id}`, JSON.stringify(originalProduct))
+                      }
+                      handleViewSite(item.id)
+                    }}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="relative h-12 w-16 overflow-hidden rounded">
@@ -682,11 +710,11 @@ export default function CMSDashboardPage() {
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation()
-                              handleViewDetails(item.id)
+                              handleViewSite(item.id)
                             }}
                           >
                             <Eye className="mr-2 h-4 w-4" />
-                            View Details
+                            View Site
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => handleEditClick(item as any, e)}>
                             <Edit className="mr-2 h-4 w-4" />
@@ -840,7 +868,7 @@ function ContentCard({
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={onView}>
                 <Eye className="mr-2 h-4 w-4" />
-                View Details
+                View Site
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onEdit}>
                 <Edit className="mr-2 h-4 w-4" />
