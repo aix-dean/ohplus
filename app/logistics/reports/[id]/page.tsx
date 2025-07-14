@@ -260,7 +260,7 @@ export default function ReportPreviewPage() {
             {userData?.company_logo ? (
               <div
                 className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm"
-                style={{ width: "120px", height: "120px" }}
+                style={{ width: "160px", height: "160px" }}
               >
                 <img
                   src={userData.company_logo || "/placeholder.svg"}
@@ -276,7 +276,7 @@ export default function ReportPreviewPage() {
             ) : (
               <div
                 className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm"
-                style={{ width: "120px", height: "120px" }}
+                style={{ width: "160px", height: "160px" }}
               >
                 <img src="/ohplus-new-logo.png" alt="OH+ Logo" className="max-h-full max-w-full object-contain" />
               </div>
