@@ -93,16 +93,15 @@ export default function ContentPage() {
 
   // Filter content
   const filteredContent = content.filter((item) => {
-    const matchesSearch =
-      item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+    const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
     const matchesType = typeFilter === "all" || item.type === typeFilter
     const matchesStatus = statusFilter === "all" || item.status === statusFilter
     return matchesSearch && matchesType && matchesStatus
   })
 
   const handleContentAction = (contentId: string, action: string) => {
-    const contentItem = content.find((c) => c.id === contentId)
+    const contentItem = content.find(c => c.id === contentId)
     if (!contentItem) return
 
     switch (action) {
@@ -118,17 +117,17 @@ export default function ContentPage() {
           id: Date.now().toString(),
           title: `${contentItem.title} (Copy)`,
           status: "draft",
-          createdAt: new Date().toISOString().split("T")[0],
-          updatedAt: new Date().toISOString().split("T")[0],
+          createdAt: new Date().toISOString().split('T')[0],
+          updatedAt: new Date().toISOString().split('T')[0],
         }
-        setContent((prev) => [duplicated, ...prev])
+        setContent(prev => [duplicated, ...prev])
         toast({
           title: "Content Duplicated",
           description: `${contentItem.title} has been duplicated.`,
         })
         break
       case "delete":
-        setContent((prev) => prev.filter((c) => c.id !== contentId))
+        setContent(prev => prev.filter(c => c.id !== contentId))
         toast({
           title: "Content Deleted",
           description: `${contentItem.title} has been deleted.`,
@@ -219,10 +218,18 @@ export default function ContentPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant={viewMode === "grid" ? "default" : "outline"} size="sm" onClick={() => setViewMode("grid")}>
+          <Button
+            variant={viewMode === "grid" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("grid")}
+          >
             Grid
           </Button>
-          <Button variant={viewMode === "list" ? "default" : "outline"} size="sm" onClick={() => setViewMode("list")}>
+          <Button
+            variant={viewMode === "list" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setViewMode("list")}
+          >
             List
           </Button>
         </div>
@@ -243,7 +250,9 @@ export default function ContentPage() {
                   />
                 </div>
                 <div className="absolute top-2 right-2">
-                  <Badge className={getStatusColor(item.status)}>{item.status}</Badge>
+                  <Badge className={getStatusColor(item.status)}>
+                    {item.status}
+                  </Badge>
                 </div>
                 <div className="absolute top-2 left-2">
                   <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-white/90 backdrop-blur-sm">
@@ -257,9 +266,7 @@ export default function ContentPage() {
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1">
                     <h3 className="font-semibold text-gray-900 truncate">{item.title}</h3>
-                    <p className="text-sm text-gray-500">
-                      {item.duration} • {item.size}
-                    </p>
+                    <p className="text-sm text-gray-500">{item.duration} • {item.size}</p>
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -280,7 +287,10 @@ export default function ContentPage() {
                         <FileText className="mr-2 h-4 w-4" />
                         Duplicate
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleContentAction(item.id, "delete")} className="text-red-600">
+                      <DropdownMenuItem 
+                        onClick={() => handleContentAction(item.id, "delete")}
+                        className="text-red-600"
+                      >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete
                       </DropdownMenuItem>
@@ -361,57 +371,4 @@ export default function ContentPage() {
                         </div>
                       </td>
                       <td className="p-4">
-                        <div className="flex items-center gap-1">
-                          {getTypeIcon(item.type)}
-                          <span className="capitalize">{item.type}</span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <Badge className={getStatusColor(item.status)}>{item.status}</Badge>
-                      </td>
-                      <td className="p-4">{item.duration}</td>
-                      <td className="p-4">
-                        <div className="text-sm">{item.displays.length > 0 ? item.displays.join(", ") : "None"}</div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm">{item.updatedAt}</div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleContentAction(item.id, "view")}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleContentAction(item.id, "edit")}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {filteredContent.length === 0 && (
-        <div className="text-center py-12">
-          <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No content found</h3>
-          <p className="text-gray-500 mb-4">
-            {searchTerm || typeFilter !== "all" || statusFilter !== "all"
-              ? "Try adjusting your search or filter criteria."
-              : "Get started by creating your first content."}
-          </p>
-          {!searchTerm && typeFilter === "all" && statusFilter === "all" && (
-            <Button onClick={() => router.push("/cms/content/new")}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Content
-            </Button>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
+                        <div className="flex items-center\

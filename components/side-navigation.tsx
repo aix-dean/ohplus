@@ -24,6 +24,8 @@ import {
   CloudRain,
   Cog,
   Monitor,
+  Play,
+  ImageIcon,
 } from "lucide-react"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
@@ -74,11 +76,12 @@ const navigationItems = [
   {
     section: "cms",
     title: "CMS",
-    icon: FileText,
+    icon: Monitor,
     items: [
       { title: "Dashboard", href: "/cms/dashboard", icon: LayoutDashboard },
+      { title: "Content Library", href: "/cms/content", icon: ImageIcon },
       { title: "Planner", href: "/cms/planner", icon: Calendar },
-      { title: "Orders", href: "/cms/orders", icon: FileText },
+      { title: "Analytics", href: "/cms/analytics", icon: BarChart3 },
     ],
   },
   {
@@ -129,49 +132,48 @@ export function SideNavigation() {
     return null
   }
 
-  const SectionIcon = currentNavItem?.icon
-
   return (
     <div className="w-64 h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 overflow-y-auto shadow-sm">
       <nav className="p-3 space-y-4">
         {currentSection === "cms" ? (
           <>
-            {/* Notification Section */}
+            {/* CMS Notification Section */}
             <div className="bg-gradient-to-br from-green-400 to-green-500 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
+                <h3 className="text-sm font-medium">System Status</h3>
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
               </div>
               <div className="space-y-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
+                <div className="text-xs">
+                  <div className="flex justify-between items-center mb-1">
+                    <span>Active Displays</span>
+                    <span className="font-medium">4/4</span>
                   </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
-                  <div className="flex-1 min-w-0">
-                    <div className="h-2 bg-white/40 rounded-full mb-1"></div>
-                    <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
+                  <div className="flex justify-between items-center mb-1">
+                    <span>Running Campaigns</span>
+                    <span className="font-medium">12</span>
                   </div>
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                  <div className="flex justify-between items-center">
+                    <span>System Health</span>
+                    <span className="font-medium">Excellent</span>
+                  </div>
                 </div>
               </div>
               <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
+                <button className="text-xs text-white/90 hover:text-white transition-colors">View Details</button>
               </div>
             </div>
 
-            {/* To Go Section */}
+            {/* CMS Main Navigation */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
               <div className="px-3 py-2 border-b border-gray-100">
-                <h3 className="text-sm font-medium text-gray-700">To Go</h3>
+                <h3 className="text-sm font-medium text-gray-700">Content Management</h3>
               </div>
               <div className="p-1">
                 {[
                   { title: "Dashboard", href: "/cms/dashboard", icon: LayoutDashboard },
+                  { title: "Content Library", href: "/cms/content", icon: ImageIcon },
+                  { title: "Displays", href: "/cms/displays", icon: Monitor },
                   { title: "Planner", href: "/cms/planner", icon: Calendar },
                 ].map((item) => {
                   const Icon = item.icon
@@ -195,17 +197,16 @@ export function SideNavigation() {
               </div>
             </div>
 
-            {/* To Do Section */}
+            {/* CMS Analytics & Tools */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
               <div className="px-3 py-2 border-b border-gray-100">
-                <h3 className="text-sm font-medium text-gray-700">To Do</h3>
+                <h3 className="text-sm font-medium text-gray-700">Analytics & Tools</h3>
               </div>
               <div className="p-1">
                 {[
-                  { title: "JOs", href: "/cms/orders", icon: ClipboardList },
-                  { title: "Screen Management", href: "/cms/screens", icon: Monitor },
-                  { title: "Campaign Scheduler", href: "/cms/scheduler", icon: Calendar },
                   { title: "Analytics", href: "/cms/analytics", icon: BarChart3 },
+                  { title: "Campaign Manager", href: "/cms/campaigns", icon: Play },
+                  { title: "Media Library", href: "/cms/media", icon: ImageIcon },
                   { title: "Settings", href: "/cms/settings", icon: Cog },
                 ].map((item) => {
                   const Icon = item.icon
@@ -229,34 +230,32 @@ export function SideNavigation() {
               </div>
             </div>
 
-            {/* Intelligence Section */}
+            {/* CMS Intelligence Section */}
             <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
               <div className="flex items-center space-x-2 mb-3">
-                <h3 className="text-sm font-medium">Intelligence</h3>
+                <h3 className="text-sm font-medium">AI Insights</h3>
                 <Sparkles className="h-4 w-4" />
               </div>
-              <div className="relative">
-                <div className="flex items-center space-x-2">
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <div className="flex-1 grid grid-cols-2 gap-2">
-                    <div className="h-12 bg-white/20 rounded-md"></div>
-                    <div className="h-12 bg-white/20 rounded-md"></div>
+              <div className="space-y-2">
+                <div className="text-xs">
+                  <div className="bg-white/20 rounded p-2 mb-2">
+                    <div className="font-medium mb-1">Performance Tip</div>
+                    <div className="text-white/90">Peak engagement hours: 8-10 AM, 5-7 PM</div>
                   </div>
-                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
+                  <div className="bg-white/20 rounded p-2">
+                    <div className="font-medium mb-1">Content Suggestion</div>
+                    <div className="text-white/90">Video content performs 40% better</div>
+                  </div>
                 </div>
               </div>
               <div className="flex justify-end mt-3">
-                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
+                <button className="text-xs text-white/90 hover:text-white transition-colors">View All Insights</button>
               </div>
             </div>
           </>
         ) : currentSection === "logistics" ? (
           <>
-            {/* Notification Section */}
+            {/* Logistics Notification Section */}
             <div className="bg-gradient-to-br from-sky-300 to-sky-400 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium">Notification</h3>
@@ -284,7 +283,7 @@ export function SideNavigation() {
               </div>
             </div>
 
-            {/* To Go Section */}
+            {/* Logistics To Go Section */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
               <div className="px-3 py-2 border-b border-gray-100">
                 <h3 className="text-sm font-medium text-gray-700">To Go</h3>
@@ -316,7 +315,7 @@ export function SideNavigation() {
               </div>
             </div>
 
-            {/* To Do Section */}
+            {/* Logistics To Do Section */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
               <div className="px-3 py-2 border-b border-gray-100">
                 <h3 className="text-sm font-medium text-gray-700">To Do</h3>
@@ -351,7 +350,7 @@ export function SideNavigation() {
               </div>
             </div>
 
-            {/* Intelligence Section */}
+            {/* Logistics Intelligence Section */}
             <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
               <div className="flex items-center space-x-2 mb-3">
                 <h3 className="text-sm font-medium">Intelligence</h3>
@@ -378,7 +377,7 @@ export function SideNavigation() {
           </>
         ) : currentSection === "admin" ? (
           <>
-            {/* Notification Section */}
+            {/* Admin Notification Section */}
             <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium">Notification</h3>
@@ -453,7 +452,7 @@ export function SideNavigation() {
               </div>
             </div>
 
-            {/* Intelligence Section */}
+            {/* Admin Intelligence Section */}
             <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
               <div className="flex items-center space-x-2 mb-3">
                 <h3 className="text-sm font-medium">Intelligence</h3>
@@ -481,7 +480,7 @@ export function SideNavigation() {
         ) : currentSection === "sales" ? (
           // Special grouped layout for sales
           <>
-            {/* Notification Section */}
+            {/* Sales Notification Section */}
             <div className="bg-gradient-to-br from-blue-400 to-blue-500 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium">Notification</h3>
@@ -597,7 +596,7 @@ export function SideNavigation() {
               </div>
             </div>
 
-            {/* Intelligence Section */}
+            {/* Sales Intelligence Section */}
             <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
               <div className="flex items-center space-x-2 mb-3">
                 <h3 className="text-sm font-medium">Intelligence</h3>
