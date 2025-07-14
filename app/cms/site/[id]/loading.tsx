@@ -1,5 +1,21 @@
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
+import type React from "react"
+import { Loader2 } from "lucide-react"
+
+function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse bg-muted rounded ${className}`} />
+}
+
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`rounded-lg border bg-card text-card-foreground shadow-sm ${className}`}>{children}</div>
+}
+
+function CardHeader({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`flex flex-col space-y-1.5 p-6 ${className}`}>{children}</div>
+}
+
+function CardContent({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`p-6 pt-0 ${className}`}>{children}</div>
+}
 
 export default function Loading() {
   return (
@@ -113,6 +129,12 @@ export default function Loading() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Loading indicator */}
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2 text-lg">Loading site details...</span>
       </div>
     </div>
   )

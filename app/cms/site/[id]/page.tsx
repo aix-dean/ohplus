@@ -1,12 +1,12 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Slider } from "@/components/ui/slider"
-import { notFound } from "next/navigation"
-import Link from "next/link"
+"use client"
+
+import React from "react"
+
+import { useState, useEffect } from "react"
+import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
+import { useAuth } from "@/contexts/auth-context"
+import { useToast } from "@/hooks/use-toast"
 import { getProductById, getServiceAssignmentsByProductId } from "@/lib/firebase-service"
 import {
   ArrowLeft,
@@ -30,69 +30,254 @@ import {
   Calendar,
   Plus,
   Eye,
+  Loader2,
 } from "lucide-react"
 
-interface Props {
-  params: {
-    id: string
-  }
+// Inline UI Components
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`rounded-lg border bg-card text-card-foreground shadow-sm ${className}`}>{children}</div>
 }
 
-// Enhanced product data interface for CMS details
-interface CMSProductData {
-  id: string
-  name: string
-  description: string
-  status: string
-  type: string
-  image?: string
-  dimensions?: string
-  created: string
-  updated: string
-  company_id?: string
-  seller_id?: string
-  traffic_count?: number
-  cms: {
-    end_time: string
-    loops_per_day: number
-    spot_duration: number
-    start_time: string
-  }
-  programList: Array<{
-    id: string
-    name: string
-    duration: string
-    timeSlot: string
-    advertiser: string
-    price: string
-    status: string
-  }>
-  serviceAssignments: Array<{
-    id: string
-    title: string
-    assignedTo: string
-    date: string
-    status: string
-    notes: string
-  }>
-  ledStatus: {
-    powerStatus: string
-    temperature: string
-    connection: string
-    videoSource: string
-    activeContent: string
-    lastReboot: string
-    lastTimeSync: string
-    warnings: string[]
-  }
-  livePreview: Array<{
-    id: string
-    health: string
-    image: string
-  }>
+function CardHeader({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`flex flex-col space-y-1.5 p-6 ${className}`}>{children}</div>
 }
 
-// Simple Loop Timeline Component (inline to avoid import issues)
+function CardTitle({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <h3 className={`text-2xl font-semibold leading-none tracking-tight ${className}`}>{children}</h3>
+}
+
+function CardContent({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <div className={`p-6 pt-0 ${className}`}>{children}</div>
+}
+
+function Badge({
+  children,
+  className = "",
+  variant = "default",
+}: { children: React.ReactNode; className?: string; variant?: string }) {
+  const baseClasses =
+    "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+  const variantClasses =
+    variant === "outline"
+      ? "border-input bg-background hover:bg-accent hover:text-accent-foreground"
+      : "border-transparent bg-primary text-primary-foreground hover:bg-primary/80"
+
+  return <div className={`${baseClasses} ${variantClasses} ${className}`}>{children}</div>
+}
+
+function Button({
+  children,
+  className = "",
+  variant = "default",
+  size = "default",
+  onClick,
+  disabled = false,
+}: {
+  children: React.ReactNode
+  className?: string
+  variant?: string
+  size?: string
+  onClick?: () => void
+  disabled?: boolean
+}) {
+  const baseClasses =
+    "inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+
+  const variantClasses = {
+    default: "bg-primary text-primary-foreground hover:bg-primary/90",
+    destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+    outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+    secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+    ghost: "hover:bg-accent hover:text-accent-foreground",
+  }
+
+  const sizeClasses = {
+    default: "h-10 px-4 py-2",
+    sm: "h-9 rounded-md px-3",
+    lg: "h-11 rounded-md px-8",
+  }
+
+  return (
+    <button
+      className={`${baseClasses} ${variantClasses[variant as keyof typeof variantClasses] || variantClasses.default} ${sizeClasses[size as keyof typeof sizeClasses] || sizeClasses.default} ${className}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  )
+}
+
+function Tabs({
+  children,
+  defaultValue,
+  className = "",
+}: { children: React.ReactNode; defaultValue: string; className?: string }) {
+  const [activeTab, setActiveTab] = useState(defaultValue)
+
+  return (
+    <div className={`w-full ${className}`} data-active-tab={activeTab}>
+      {React.Children.map(children, (child) =>
+        React.isValidElement(child) ? React.cloneElement(child, { activeTab, setActiveTab } as any) : child,
+      )}
+    </div>
+  )
+}
+
+function TabsList({
+  children,
+  className = "",
+  activeTab,
+  setActiveTab,
+}: { children: React.ReactNode; className?: string; activeTab?: string; setActiveTab?: (tab: string) => void }) {
+  return (
+    <div
+      className={`inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground ${className}`}
+    >
+      {React.Children.map(children, (child) =>
+        React.isValidElement(child) ? React.cloneElement(child, { activeTab, setActiveTab } as any) : child,
+      )}
+    </div>
+  )
+}
+
+function TabsTrigger({
+  children,
+  value,
+  className = "",
+  activeTab,
+  setActiveTab,
+}: {
+  children: React.ReactNode
+  value: string
+  className?: string
+  activeTab?: string
+  setActiveTab?: (tab: string) => void
+}) {
+  const isActive = activeTab === value
+
+  return (
+    <button
+      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
+        isActive ? "bg-background text-foreground shadow-sm" : "hover:bg-background/50"
+      } ${className}`}
+      onClick={() => setActiveTab?.(value)}
+    >
+      {children}
+    </button>
+  )
+}
+
+function TabsContent({
+  children,
+  value,
+  className = "",
+  activeTab,
+}: { children: React.ReactNode; value: string; className?: string; activeTab?: string }) {
+  if (activeTab !== value) return null
+
+  return (
+    <div
+      className={`mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${className}`}
+    >
+      {children}
+    </div>
+  )
+}
+
+function Table({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className="relative w-full overflow-auto">
+      <table className={`w-full caption-bottom text-sm ${className}`}>{children}</table>
+    </div>
+  )
+}
+
+function TableHeader({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <thead className={`[&_tr]:border-b ${className}`}>{children}</thead>
+}
+
+function TableBody({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <tbody className={`[&_tr:last-child]:border-0 ${className}`}>{children}</tbody>
+}
+
+function TableRow({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <tr className={`border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted ${className}`}>
+      {children}
+    </tr>
+  )
+}
+
+function TableHead({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <th
+      className={`h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 ${className}`}
+    >
+      {children}
+    </th>
+  )
+}
+
+function TableCell({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <td className={`p-4 align-middle [&:has([role=checkbox])]:pr-0 ${className}`}>{children}</td>
+}
+
+function Slider({
+  defaultValue = [50],
+  max = 100,
+  step = 1,
+  className = "",
+  onChange,
+}: {
+  defaultValue?: number[]
+  max?: number
+  step?: number
+  className?: string
+  onChange?: (value: number[]) => void
+}) {
+  const [value, setValue] = useState(defaultValue)
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = [Number.parseInt(e.target.value)]
+    setValue(newValue)
+    onChange?.(newValue)
+  }
+
+  return (
+    <div className={`relative flex w-full touch-none select-none items-center ${className}`}>
+      <input
+        type="range"
+        min="0"
+        max={max}
+        step={step}
+        value={value[0]}
+        onChange={handleChange}
+        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+      />
+      <style jsx>{`
+        .slider::-webkit-slider-thumb {
+          appearance: none;
+          height: 20px;
+          width: 20px;
+          border-radius: 50%;
+          background: #3b82f6;
+          cursor: pointer;
+        }
+        .slider::-moz-range-thumb {
+          height: 20px;
+          width: 20px;
+          border-radius: 50%;
+          background: #3b82f6;
+          cursor: pointer;
+          border: none;
+        }
+      `}</style>
+    </div>
+  )
+}
+
+// Inline Loop Timeline Component
 function LoopTimelineComponent({ cmsData, productId }: { cmsData: any; productId: string }) {
   const startTimeStr = cmsData.start_time || "06:00"
   const endTimeStr = cmsData.end_time || "18:00"
@@ -324,159 +509,257 @@ function LoopTimelineComponent({ cmsData, productId }: { cmsData: any; productId
   )
 }
 
-// Fetch product data from Firebase
-async function getProductData(id: string): Promise<CMSProductData | null> {
-  try {
-    // Get product from Firebase
-    const product = await getProductById(id)
-
-    if (!product) {
-      return null
-    }
-
-    // Get service assignments for this product
-    const serviceAssignments = await getServiceAssignmentsByProductId(id)
-
-    // Convert Firebase product to CMS product data format
-    const cmsProductData: CMSProductData = {
-      id: product.id || id,
-      name: product.name || "Unknown Product",
-      description: product.description || "No description available",
-      status: product.status || "PENDING",
-      type: product.type || "RENTAL",
-      image: product.imageUrl || "/placeholder.svg?height=200&width=200",
-      dimensions: `H: ${product.specs_rental?.height || 12} × W: ${product.specs_rental?.width || 12}`,
-      created: product.created ? new Date(product.created.seconds * 1000).toLocaleDateString() : "Unknown",
-      updated: product.updated ? new Date(product.updated.seconds * 1000).toLocaleDateString() : "Unknown",
-      company_id: product.company_id,
-      seller_id: product.seller_id,
-      traffic_count: product.specs_rental?.traffic_count || 0,
-      cms: {
-        end_time: product.cms?.end_time || "18:00",
-        loops_per_day: product.cms?.loops_per_day || 20,
-        spot_duration: product.cms?.spot_duration || 15,
-        start_time: product.cms?.start_time || "06:00",
-      },
-      // Mock program list - in a real app, this would come from a separate collection
-      programList: [
-        {
-          id: "SPOT001",
-          name: "Morning Slot",
-          duration: "15 seconds",
-          timeSlot: "06:00 AM - 12:00 PM",
-          advertiser: "Coca Cola",
-          price: "PHP 1,200",
-          status: "Active",
-        },
-        {
-          id: "SPOT002",
-          name: "Afternoon Slot",
-          duration: "30 seconds",
-          timeSlot: "12:00 PM - 06:00 PM",
-          advertiser: "Samsung",
-          price: "PHP 1,800",
-          status: "Active",
-        },
-        {
-          id: "SPOT003",
-          name: "Evening Slot",
-          duration: "15 seconds",
-          timeSlot: "06:00 PM - 12:00 AM",
-          advertiser: "Nike",
-          price: "PHP 2,100",
-          status: "Pending",
-        },
-        {
-          id: "SPOT004",
-          name: "Late Night Slot",
-          duration: "30 seconds",
-          timeSlot: "12:00 AM - 06:00 AM",
-          advertiser: "-",
-          price: "PHP 900",
-          status: "Available",
-        },
-      ],
-      // Convert service assignments from Firebase
-      serviceAssignments: serviceAssignments.map((assignment) => ({
-        id: assignment.id,
-        title: assignment.jobDescription || "Service Assignment",
-        assignedTo: assignment.assignedTo || "Unassigned",
-        date: assignment.coveredDateStart ? new Date(assignment.coveredDateStart).toLocaleDateString() : "TBD",
-        status: assignment.status || "Pending",
-        notes: assignment.message || "No notes available",
-      })),
-      // Mock LED status - in a real app, this would come from IoT devices or separate collection
-      ledStatus: {
-        powerStatus: "On",
-        temperature: "32°C",
-        connection: "Online",
-        videoSource: "HDMI 1",
-        activeContent: "Current Campaign",
-        lastReboot: new Date().toLocaleDateString() + " 09:15 AM",
-        lastTimeSync: new Date().toLocaleDateString() + " 08:00 AM",
-        warnings:
-          product.specs_rental?.elevation && product.specs_rental.elevation > 100 ? ["High elevation detected"] : [],
-      },
-      // Mock live preview - in a real app, this would come from live camera feeds
-      livePreview: [
-        {
-          id: `${product.name?.substring(0, 10) || "LED"} 3.2`,
-          health: "100% Healthy",
-          image: "/placeholder.svg?height=100&width=150",
-        },
-        {
-          id: `${product.specs_rental?.location?.substring(0, 10) || "SITE"} 1.0`,
-          health: "100% Healthy",
-          image: "/placeholder.svg?height=100&width=150",
-        },
-        {
-          id: "BACKUP LED 1.0",
-          health: "100% Healthy",
-          image: "/placeholder.svg?height=100&width=150",
-        },
-        {
-          id: "MAIN LED 2.1",
-          health: product.active ? "100% Healthy" : "90% Healthy",
-          image: "/placeholder.svg?height=100&width=150",
-        },
-      ],
-    }
-
-    return cmsProductData
-  } catch (error) {
-    console.error("Error fetching product data:", error)
-    return null
+// Enhanced product data interface for CMS details
+interface CMSProductData {
+  id: string
+  name: string
+  description: string
+  status: string
+  type: string
+  image?: string
+  dimensions?: string
+  created: string
+  updated: string
+  company_id?: string
+  seller_id?: string
+  traffic_count?: number
+  cms: {
+    end_time: string
+    loops_per_day: number
+    spot_duration: number
+    start_time: string
   }
+  programList: Array<{
+    id: string
+    name: string
+    duration: string
+    timeSlot: string
+    advertiser: string
+    price: string
+    status: string
+  }>
+  serviceAssignments: Array<{
+    id: string
+    title: string
+    assignedTo: string
+    date: string
+    status: string
+    notes: string
+  }>
+  ledStatus: {
+    powerStatus: string
+    temperature: string
+    connection: string
+    videoSource: string
+    activeContent: string
+    lastReboot: string
+    lastTimeSync: string
+    warnings: string[]
+  }
+  livePreview: Array<{
+    id: string
+    health: string
+    image: string
+  }>
 }
 
-export default async function Page({ params }: Props) {
-  const { id } = params
+export default function CMSSiteDetailsPage() {
+  const params = useParams()
+  const router = useRouter()
+  const { userData } = useAuth()
+  const { toast } = useToast()
 
-  if (!id) {
-    notFound()
+  const [product, setProduct] = useState<CMSProductData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const productId = params.id as string
+
+  // Fetch product data
+  useEffect(() => {
+    const fetchProduct = async () => {
+      if (!productId) return
+
+      try {
+        setLoading(true)
+
+        // Get product from Firebase
+        const productData = await getProductById(productId)
+
+        if (!productData) {
+          toast({
+            title: "Error",
+            description: "Site not found.",
+            variant: "destructive",
+          })
+          router.push("/cms/dashboard")
+          return
+        }
+
+        // Verify this product belongs to the current user's company
+        if (userData?.company_id && productData.company_id !== userData.company_id) {
+          toast({
+            title: "Access Denied",
+            description: "You don't have permission to view this site.",
+            variant: "destructive",
+          })
+          router.push("/cms/dashboard")
+          return
+        }
+
+        // Get service assignments for this product
+        const serviceAssignments = await getServiceAssignmentsByProductId(productId)
+
+        // Convert Firebase product to CMS product data format
+        const cmsProductData: CMSProductData = {
+          id: productData.id || productId,
+          name: productData.name || "Unknown Product",
+          description: productData.description || "No description available",
+          status: productData.status || "PENDING",
+          type: productData.type || "RENTAL",
+          image: productData.imageUrl || "/placeholder.svg?height=200&width=200",
+          dimensions: `H: ${productData.specs_rental?.height || 12} × W: ${productData.specs_rental?.width || 12}`,
+          created: productData.created ? new Date(productData.created.seconds * 1000).toLocaleDateString() : "Unknown",
+          updated: productData.updated ? new Date(productData.updated.seconds * 1000).toLocaleDateString() : "Unknown",
+          company_id: productData.company_id,
+          seller_id: productData.seller_id,
+          traffic_count: productData.specs_rental?.traffic_count || 0,
+          cms: {
+            end_time: productData.cms?.end_time || "18:00",
+            loops_per_day: productData.cms?.loops_per_day || 20,
+            spot_duration: productData.cms?.spot_duration || 15,
+            start_time: productData.cms?.start_time || "06:00",
+          },
+          // Mock program list - in a real app, this would come from a separate collection
+          programList: [
+            {
+              id: "SPOT001",
+              name: "Morning Slot",
+              duration: "15 seconds",
+              timeSlot: "06:00 AM - 12:00 PM",
+              advertiser: "Coca Cola",
+              price: "PHP 1,200",
+              status: "Active",
+            },
+            {
+              id: "SPOT002",
+              name: "Afternoon Slot",
+              duration: "30 seconds",
+              timeSlot: "12:00 PM - 06:00 PM",
+              advertiser: "Samsung",
+              price: "PHP 1,800",
+              status: "Active",
+            },
+            {
+              id: "SPOT003",
+              name: "Evening Slot",
+              duration: "15 seconds",
+              timeSlot: "06:00 PM - 12:00 AM",
+              advertiser: "Nike",
+              price: "PHP 2,100",
+              status: "Pending",
+            },
+            {
+              id: "SPOT004",
+              name: "Late Night Slot",
+              duration: "30 seconds",
+              timeSlot: "12:00 AM - 06:00 AM",
+              advertiser: "-",
+              price: "PHP 900",
+              status: "Available",
+            },
+          ],
+          // Convert service assignments from Firebase
+          serviceAssignments: serviceAssignments.map((assignment) => ({
+            id: assignment.id,
+            title: assignment.jobDescription || "Service Assignment",
+            assignedTo: assignment.assignedTo || "Unassigned",
+            date: assignment.coveredDateStart ? new Date(assignment.coveredDateStart).toLocaleDateString() : "TBD",
+            status: assignment.status || "Pending",
+            notes: assignment.message || "No notes available",
+          })),
+          // Mock LED status - in a real app, this would come from IoT devices or separate collection
+          ledStatus: {
+            powerStatus: "On",
+            temperature: "32°C",
+            connection: "Online",
+            videoSource: "HDMI 1",
+            activeContent: "Current Campaign",
+            lastReboot: new Date().toLocaleDateString() + " 09:15 AM",
+            lastTimeSync: new Date().toLocaleDateString() + " 08:00 AM",
+            warnings:
+              productData.specs_rental?.elevation && productData.specs_rental.elevation > 100
+                ? ["High elevation detected"]
+                : [],
+          },
+          // Mock live preview - in a real app, this would come from live camera feeds
+          livePreview: [
+            {
+              id: `${productData.name?.substring(0, 10) || "LED"} 3.2`,
+              health: "100% Healthy",
+              image: "/placeholder.svg?height=100&width=150",
+            },
+            {
+              id: `${productData.specs_rental?.location?.substring(0, 10) || "SITE"} 1.0`,
+              health: "100% Healthy",
+              image: "/placeholder.svg?height=100&width=150",
+            },
+            {
+              id: "BACKUP LED 1.0",
+              health: "100% Healthy",
+              image: "/placeholder.svg?height=100&width=150",
+            },
+            {
+              id: "MAIN LED 2.1",
+              health: productData.active ? "100% Healthy" : "90% Healthy",
+              image: "/placeholder.svg?height=100&width=150",
+            },
+          ],
+        }
+
+        setProduct(cmsProductData)
+      } catch (error) {
+        console.error("Error fetching product:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load site details. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProduct()
+  }, [productId, userData?.company_id, toast, router])
+
+  const handleBack = () => {
+    router.push("/cms/dashboard")
   }
 
-  const product = await getProductData(id)
+  const handleEdit = () => {
+    router.push(`/cms/content/edit/${productId}`)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex-1 p-6 flex flex-col items-center justify-center min-h-[50vh]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <p className="text-lg">Loading site details...</p>
+      </div>
+    )
+  }
 
   if (!product) {
-    notFound()
+    return (
+      <div className="flex-1 p-4">
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <h3 className="mb-2 text-lg font-semibold">Site not found</h3>
+          <p className="text-muted-foreground mb-4">The requested site could not be found.</p>
+          <Button onClick={handleBack}>Back to Dashboard</Button>
+        </div>
+      </div>
+    )
   }
-
-  // Calculate spots per loop based on time difference and spot duration
-  const calculateSpotsPerLoop = (startTime: string, endTime: string, spotDuration: number) => {
-    const [startHour, startMinute] = startTime.split(":").map(Number)
-    const [endHour, endMinute] = endTime.split(":").map(Number)
-
-    const startTotalMinutes = startHour * 60 + startMinute
-    const endTotalMinutes = endHour * 60 + endMinute
-
-    const loopDurationMinutes = endTotalMinutes - startTotalMinutes
-    const loopDurationSeconds = loopDurationMinutes * 60
-
-    return Math.floor(loopDurationSeconds / spotDuration)
-  }
-
-  const spotsPerLoop = calculateSpotsPerLoop(product.cms.start_time, product.cms.end_time, product.cms.spot_duration)
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -498,29 +781,18 @@ export default async function Page({ params }: Props) {
     }
   }
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-PH", {
-      style: "currency",
-      currency: "PHP",
-    }).format(price)
-  }
-
-  const formatLocation = (location: string) => {
-    return location && location.length > 50 ? location.substring(0, 50) + "..." : location || "Not specified"
-  }
-
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/cms/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
+          <button onClick={handleBack} className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
             <ArrowLeft size={16} />
             Back to Dashboard
-          </Link>
+          </button>
         </div>
         <div className="flex gap-2">
-          <Button className="bg-blue-600 hover:bg-blue-700">
+          <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleEdit}>
             <Edit size={16} className="mr-2" />
             Edit
           </Button>
