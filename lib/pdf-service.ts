@@ -1080,79 +1080,79 @@ export async function generateReportPDF(
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 8
 
-    pdf.setFontSize(10)
+    pdf.setFontSize(12)
     pdf.setFont("helvetica", "bold")
     pdf.text("Prepared by:", margin, yPosition)
-    yPosition += 5
+    yPosition += 6
 
-    pdf.setFontSize(9)
+    pdf.setFontSize(10)
     pdf.setFont("helvetica", "normal")
-    pdf.text(report.createdByName, margin, yPosition)
-    yPosition += 4
+    pdf.setTextColor(59, 130, 246) // blue color for email
+    pdf.text(report.createdByName || "aixymbiosig@aix.com", margin, yPosition)
+    yPosition += 5
+    pdf.setTextColor(0, 0, 0)
     pdf.text("LOGISTICS", margin, yPosition)
-    yPosition += 4
+    yPosition += 5
     const preparedDate =
       report.created && typeof report.created.toDate === "function"
         ? report.created.toDate().toISOString().split("T")[0]
         : report.date
     pdf.text(formatDate(preparedDate), margin, yPosition)
 
-    // Add disclaimer - exactly like preview
-    pdf.setFontSize(8)
+    // Add disclaimer on the right side - exactly like preview
+    pdf.setFontSize(9)
     pdf.setFont("helvetica", "italic")
     pdf.setTextColor(100, 100, 100)
     const disclaimer = `"All data are based on the latest available records as of ${formatDate(new Date().toISOString().split("T")[0])}."`
-    const disclaimerLines = pdf.splitTextToSize(disclaimer, 80)
-    pdf.text(disclaimerLines, pageWidth - margin - 80, yPosition - 8)
-
-    yPosition += 15
+    const disclaimerLines = pdf.splitTextToSize(disclaimer, 120)
+    pdf.text(disclaimerLines, pageWidth - margin - 120, yPosition - 10)
 
     // Add bottom footer - exactly like preview
-    const footerY = pageHeight - 15
-    const footerHeight = 15
+    const footerY = pageHeight - 12
+    const footerHeight = 12
 
-    // Cyan section on left
+    // Cyan section on left (about 30% of width)
     pdf.setFillColor(52, 211, 235) // cyan-400
-    pdf.rect(0, footerY, pageWidth * 0.4, footerHeight, "F")
+    pdf.rect(0, footerY, pageWidth * 0.3, footerHeight, "F")
 
-    // Angular dark blue section pointing left
-    const blueWidth = pageWidth * 0.6
-    const blueStartX = pageWidth * 0.4 * 0.25 // 25% from left edge
-
+    // Angular blue section - create the diagonal cut
     pdf.setFillColor(30, 58, 138) // blue-900
-    const footerPoints = [
-      [blueStartX, footerY], // Start point
-      [pageWidth, footerY], // Top right
-      [pageWidth, footerY + footerHeight], // Bottom right
-      [0, footerY + footerHeight], // Bottom left
-    ]
+    const diagonalStartX = pageWidth * 0.25 // Start diagonal cut at 25% of page width
 
+    // Create the angular shape using triangles
     pdf.triangle(
-      footerPoints[0][0],
-      footerPoints[0][1],
-      footerPoints[1][0],
-      footerPoints[1][1],
-      footerPoints[2][0],
-      footerPoints[2][1],
+      diagonalStartX,
+      footerY, // Top left of diagonal
+      pageWidth,
+      footerY, // Top right
+      pageWidth,
+      footerY + footerHeight, // Bottom right
       "F",
     )
     pdf.triangle(
-      footerPoints[0][0],
-      footerPoints[0][1],
-      footerPoints[2][0],
-      footerPoints[2][1],
-      footerPoints[3][0],
-      footerPoints[3][1],
+      diagonalStartX,
+      footerY, // Top left of diagonal
+      pageWidth,
+      footerY + footerHeight, // Bottom right
+      diagonalStartX,
+      footerY + footerHeight, // Bottom left of diagonal
       "F",
     )
 
-    // Add footer text
+    // Add footer text - positioned on the right side
     pdf.setTextColor(255, 255, 255)
-    pdf.setFontSize(7)
+    pdf.setFontSize(10)
     pdf.setFont("helvetica", "normal")
-    pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 50, footerY + 8)
+    pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 65, footerY + 6)
+
+    pdf.setFontSize(14)
     pdf.setFont("helvetica", "bold")
-    pdf.text("OH!", pageWidth - margin - 10, footerY + 12)
+    pdf.text("OH!", pageWidth - margin - 15, footerY + 8)
+
+    // Add the "+" symbol
+    pdf.setFontSize(12)
+    pdf.setFont("helvetica", "normal")
+    pdf.text("+", pageWidth - margin - 5, footerY + 8)
 
     if (returnBase64) {
       return pdf.output("datauristring").split(",")[1]
