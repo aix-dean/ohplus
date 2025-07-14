@@ -12,8 +12,7 @@ import {
   limit,
   Timestamp,
 } from "firebase/firestore"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { db, storage } from "./firebase"
+import { db } from "./firebase"
 
 export interface ReportData {
   id?: string
@@ -86,38 +85,28 @@ function cleanReportData(data: any): any {
 
 export async function createReport(reportData: ReportData): Promise<string> {
   try {
-    // Upload attachments first
-    const processedAttachments = await Promise.all(
-      (reportData.attachments || []).map(async (attachment: any) => {
-        if (attachment.file) {
-          try {
-            const fileRef = ref(storage, `reports/${Date.now()}_${attachment.fileName}`)
-            const snapshot = await uploadBytes(fileRef, attachment.file)
-            const downloadURL = await getDownloadURL(snapshot.ref)
-
-            return {
-              note: attachment.note || "",
-              fileName: attachment.fileName,
-              fileType: attachment.fileType,
-              fileUrl: downloadURL,
-            }
-          } catch (error) {
-            console.error("Error uploading attachment:", error)
-            return {
-              note: attachment.note || "",
-              fileName: attachment.fileName || "Unknown file",
-              fileType: attachment.fileType,
-              fileUrl: null,
-            }
+    // Process attachments - no need to upload again since they're already uploaded in the dialog
+    const processedAttachments = (reportData.attachments || [])
+      .map((attachment: any) => {
+        // If attachment already has fileUrl (from Firebase upload), use it directly
+        if (attachment.fileUrl) {
+          return {
+            note: attachment.note || "",
+            fileName: attachment.fileName || "",
+            fileType: attachment.fileType || "",
+            fileUrl: attachment.fileUrl,
           }
         }
+
+        // Fallback for attachments without fileUrl (shouldn't happen with new upload flow)
         return {
           note: attachment.note || "",
-          fileName: attachment.fileName || "",
+          fileName: attachment.fileName || "Unknown file",
           fileType: attachment.fileType || "",
+          fileUrl: null,
         }
-      }),
-    )
+      })
+      .filter((attachment) => attachment.fileUrl) // Only include attachments with valid URLs
 
     // Create the final report data with proper structure
     const finalReportData: any = {
@@ -174,6 +163,8 @@ export async function createReport(reportData: ReportData): Promise<string> {
     if (reportData.delayDays && reportData.delayDays.trim() !== "") {
       finalReportData.delayDays = reportData.delayDays
     }
+
+    console.log("Creating report with processed attachments:", finalReportData.attachments)
 
     const docRef = await addDoc(collection(db, "reports"), finalReportData)
     return docRef.id
