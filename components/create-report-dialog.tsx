@@ -275,6 +275,17 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       return
     }
 
+    // Check if at least one attachment has a file
+    const hasAttachments = attachments.some((att) => att.file)
+    if (!hasAttachments) {
+      toast({
+        title: "Error",
+        description: "Please upload at least one attachment",
+        variant: "destructive",
+      })
+      return
+    }
+
     setLoading(true)
     try {
       // Build the base report data with only defined values
@@ -576,7 +587,9 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
             {/* Attachments */}
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-900">Attachments:</Label>
+              <Label className="text-sm font-semibold text-gray-900">
+                Attachments: <span className="text-red-500">*</span>
+              </Label>
               <div className="grid grid-cols-2 gap-2">
                 {attachments.map((attachment, index) => (
                   <div key={index} className="space-y-1">
