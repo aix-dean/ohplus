@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FirebaseError } from "firebase/app"
+import { EyeIcon, EyeOffIcon, CheckCircleIcon, XCircleIcon } from "lucide-react"
+import { z } from "zod" // Import zod for schema validation
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
@@ -20,6 +22,15 @@ export default function RegisterPage() {
   const [phoneNumber, setPhoneNumber] = useState("")
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [passwordCriteria, setPasswordCriteria] = useState({
+    minLength: false,
+    hasLetter: false,
+    hasNumber: false,
+    hasSpecialChar: false,
+  })
+  const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null)
 
   const { register } = useAuth()
   const router = useRouter()
@@ -27,6 +38,15 @@ export default function RegisterPage() {
 
   // Get organization code from URL parameters
   const orgCode = searchParams.get("orgCode")
+
+  const passwordSchema = z
+    .string()
+    .min(8, { message: "Be at least 8 characters long" })
+    .regex(/[a-zA-Z]/, { message: "Contain at least one letter." })
+    .regex(/[0-9]/, { message: "Contain at least one number." })
+    .regex(/[^a-zA-Z0-9]/, {
+      message: "Contain at least one special character.",
+    })
 
   const getFriendlyErrorMessage = (error: unknown): string => {
     console.error("Raw error during registration:", error)
@@ -49,6 +69,16 @@ export default function RegisterPage() {
     return "An unknown error occurred. Please try again."
   }
 
+  const validatePasswordStrength = (pwd: string) => {
+    const criteria = {
+      minLength: pwd.length >= 8,
+      hasLetter: /[a-zA-Z]/.test(pwd),
+      hasNumber: /[0-9]/.test(pwd),
+      hasSpecialChar: /[^a-zA-Z0-9]/.test(pwd),
+    }
+    setPasswordCriteria(criteria)
+  }
+
   const handleRegister = async () => {
     setErrorMessage(null)
 
@@ -59,6 +89,14 @@ export default function RegisterPage() {
 
     if (password !== confirmPassword) {
       setErrorMessage("Passwords do not match.")
+      return
+    }
+
+    // Validate password strength using Zod
+    const passwordValidationResult = passwordSchema.safeParse(password)
+    if (!passwordValidationResult.success) {
+      const errors = passwordValidationResult.error.flatten().errors.map((err) => err.message)
+      setErrorMessage(`Password does not meet requirements: ${errors.join(", ")}`)
       return
     }
 
@@ -181,23 +219,91 @@ export default function RegisterPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value)
+                      validatePasswordStrength(e.target.value)
+                      setPasswordsMatch(e.target.value === confirmPassword ? true : confirmPassword ? false : null)
+                    }}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    disabled={loading}
+                  >
+                    {showPassword ? (
+                      <EyeOffIcon className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <EyeIcon className="h-4 w-4 text-gray-500" />
+                    )}
+                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
+                  </Button>
+                </div>
+                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  <p className="font-medium">Password must:</p>
+                  <ul className="list-inside list-disc">
+                    <li className={passwordCriteria.minLength ? "text-green-600" : "text-red-500"}>
+                      Be at least 8 characters long
+                    </li>
+                    <li className={passwordCriteria.hasLetter ? "text-green-600" : "text-red-500"}>
+                      Contain at least one letter
+                    </li>
+                    <li className={passwordCriteria.hasNumber ? "text-green-600" : "text-red-500"}>
+                      Contain at least one number
+                    </li>
+                    <li className={passwordCriteria.hasSpecialChar ? "text-green-600" : "text-red-500"}>
+                      Contain at least one special character
+                    </li>
+                  </ul>
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value)
+                      setPasswordsMatch(password === e.target.value ? true : e.target.value ? false : null)
+                    }}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    disabled={loading}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOffIcon className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <EyeIcon className="h-4 w-4 text-gray-500" />
+                    )}
+                    <span className="sr-only">{showConfirmPassword ? "Hide password" : "Show password"}</span>
+                  </Button>
+                  {passwordsMatch !== null && (
+                    <div className="absolute right-10 top-1/2 -translate-y-1/2">
+                      {passwordsMatch ? (
+                        <CheckCircleIcon className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <XCircleIcon className="h-5 w-5 text-red-500" />
+                      )}
+                    </div>
+                  )}
+                </div>
+                {passwordsMatch === false && <p className="text-red-500 text-sm mt-1">Passwords do not match.</p>}
               </div>
               <p className="text-center text-xs text-gray-500 dark:text-gray-400">
                 By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
