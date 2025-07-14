@@ -235,7 +235,7 @@ function SalesDashboardContent() {
 
     setLoadingCount(true)
     try {
-      const count = await getUserProductsCount(userData?.company_id, { active: true, type: "rental" })
+      const count = await getUserProductsCount(userData?.company_id, { active: true })
       setTotalItems(count)
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
@@ -277,10 +277,7 @@ function SalesDashboardContent() {
         // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
-        const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, {
-          active: true,
-          type: "rental",
-        })
+        const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, { active: true })
 
         setProducts(result.items)
         setLastDoc(result.lastDoc)
