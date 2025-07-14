@@ -849,24 +849,14 @@ export async function generateReportPDF(
     pdf.setFontSize(9)
     pdf.text("Installation Report", margin + 2, yPosition + 5)
 
-    // Add GTS logo on the right
-    const gtsLogoUrl = "/company-logos/gts-logo.png" // Path to the GTS logo
-    const gtsLogoBase64 = await loadImageAsBase64(gtsLogoUrl)
-    if (gtsLogoBase64) {
-      const logoSize = 20 // Adjust size as needed
-      const logoX = pageWidth - margin - logoSize
-      const logoY = yPosition - 5 // Adjust Y to align with the badge
-      pdf.addImage(gtsLogoBase64, "PNG", logoX, logoY, logoSize, logoSize)
-    } else {
-      // Fallback if logo fails to load
-      pdf.setFillColor(255, 193, 7) // yellow-400
-      const logoSize = 20
-      pdf.circle(pageWidth - margin - logoSize / 2, yPosition + logoSize / 2 - 5, logoSize / 2, "F")
-      pdf.setTextColor(0, 0, 0)
-      pdf.setFontSize(12)
-      pdf.setFont("helvetica", "bold")
-      pdf.text("GTS", pageWidth - margin - 15, yPosition + 5)
-    }
+    // Add GTS logo on the right (reverted to drawing as per image)
+    pdf.setFillColor(255, 193, 7) // yellow-400
+    const logoSize = 20
+    pdf.circle(pageWidth - margin - logoSize / 2, yPosition + logoSize / 2 - 5, logoSize / 2, "F")
+    pdf.setTextColor(0, 0, 0)
+    pdf.setFontSize(12)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("GTS", pageWidth - margin - 15, yPosition + 5)
 
     yPosition += badgeHeight + 5
     pdf.setTextColor(0, 0, 0)
