@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FirebaseError } from "firebase/app"
 import { EyeIcon, EyeOffIcon, CheckCircleIcon, XCircleIcon } from "lucide-react"
 import { z } from "zod" // Import zod for schema validation
+import { Progress } from "@/components/ui/progress" // Import Progress component
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
@@ -79,6 +80,21 @@ export default function RegisterPage() {
     setPasswordCriteria(criteria)
   }
 
+  const getPasswordStrength = () => {
+    let strength = 0
+    if (passwordCriteria.minLength) strength += 25
+    if (passwordCriteria.hasLetter) strength += 25
+    if (passwordCriteria.hasNumber) strength += 25
+    if (passwordCriteria.hasSpecialChar) strength += 25
+    return strength
+  }
+
+  const getProgressBarColor = (strength: number) => {
+    if (strength < 50) return "bg-red-500"
+    if (strength < 100) return "bg-yellow-500"
+    return "bg-green-500"
+  }
+
   const handleRegister = async () => {
     setErrorMessage(null)
 
@@ -129,6 +145,8 @@ export default function RegisterPage() {
       setLoading(false)
     }
   }
+
+  const passwordStrength = getPasswordStrength()
 
   return (
     <div className="flex min-h-screen">
@@ -247,22 +265,11 @@ export default function RegisterPage() {
                     <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
                   </Button>
                 </div>
-                <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  <p className="font-medium">Password must:</p>
-                  <ul className="list-inside list-disc">
-                    <li className={passwordCriteria.minLength ? "text-green-600" : "text-red-500"}>
-                      Be at least 8 characters long
-                    </li>
-                    <li className={passwordCriteria.hasLetter ? "text-green-600" : "text-red-500"}>
-                      Contain at least one letter
-                    </li>
-                    <li className={passwordCriteria.hasNumber ? "text-green-600" : "text-red-500"}>
-                      Contain at least one number
-                    </li>
-                    <li className={passwordCriteria.hasSpecialChar ? "text-green-600" : "text-red-500"}>
-                      Contain at least one special character
-                    </li>
-                  </ul>
+                <div className="mt-2">
+                  <Progress value={passwordStrength} className={getProgressBarColor(passwordStrength)} />
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Password strength: {passwordStrength}%
+                  </p>
                 </div>
               </div>
               <div className="space-y-2">
