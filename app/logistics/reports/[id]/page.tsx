@@ -24,6 +24,7 @@ export default function ReportPreviewPage() {
   const [isFullScreenOpen, setIsFullScreenOpen] = useState(false)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
+  const [imageLoadErrors, setImageLoadErrors] = useState<Set<string>>(new Set())
   const { user } = useAuth()
   const [userData, setUserData] = useState<User | null>(null)
 
@@ -148,6 +149,22 @@ export default function ReportPreviewPage() {
     window.open(fileUrl, "_blank", "noopener,noreferrer")
   }
 
+  const handleImageError = (fileUrl: string, fileName: string) => {
+    console.error("Image failed to load:", fileUrl)
+    setImageLoadErrors((prev) => new Set(prev).add(fileUrl))
+  }
+
+  const getProxiedImageUrl = (originalUrl: string) => {
+    if (!originalUrl) return ""
+    // Try both proxy endpoints
+    return `/api/firebase-image?url=${encodeURIComponent(originalUrl)}`
+  }
+
+  const getAlternativeProxiedUrl = (originalUrl: string) => {
+    if (!originalUrl) return ""
+    return `/api/proxy-image?url=${encodeURIComponent(originalUrl)}`
+  }
+
   const handleDownloadPDF = async () => {
     if (!report || !product) return
 
@@ -181,20 +198,200 @@ export default function ReportPreviewPage() {
     router.back()
   }
 
-  // Component for rendering image with fallback strategies
+  // Add this function before the ImageDisplay component
+  const cleanFirebaseUrl = (url: string) => {
+    if (!url || !url.includes("firebasestorage.googleapis.com")) {
+      return url
+    }
+
+    try {
+      const urlObj = new URL(url)
+      const pathParts = urlObj.pathname.split("/")
+
+      // Check if the filename in the path looks malformed (contains duplicate extensions)
+      if (pathParts.length >= 6) {
+        const encodedFilename = pathParts[5]
+        const decodedFilename = decodeURIComponent(encodedFilename)
+
+        // Check for duplicate filenames or extensions
+        if (
+          decodedFilename.includes(".png.png") ||
+          decodedFilename.includes(".jpg.jpg") ||
+          decodedFilename.includes(".jpeg.jpeg") ||
+          decodedFilename.includes("logo.pnglogo.png")
+        ) {
+          console.warn("Detected malformed filename:", decodedFilename)
+
+          // Try to fix common filename issues
+          let fixedFilename = decodedFilename
+
+          // Remove duplicate extensions
+          fixedFilename = fixedFilename.replace(/\.png\.png$/i, ".png")
+          fixedFilename = fixedFilename.replace(/\.jpg\.jpg$/i, ".jpg")
+          fixedFilename = fixedFilename.replace(/\.jpeg\.jpeg$/i, ".jpeg")
+
+          // Remove duplicate filename patterns
+          const commonPattern = /(.+?)(\1)$/
+          const match = fixedFilename.match(commonPattern)
+          if (match) {
+            fixedFilename = match[1]
+          }
+
+          // Reconstruct the URL with fixed filename
+          pathParts[5] = encodeURIComponent(fixedFilename)
+          urlObj.pathname = pathParts.join("/")
+
+          console.log("Fixed URL:", urlObj.toString())
+          return urlObj.toString()
+        }
+      }
+
+      return url
+    } catch (error) {
+      console.error("Error cleaning Firebase URL:", error)
+      return url
+    }
+  }
+
+  // Component for rendering image with multiple fallback strategies
   const ImageDisplay = ({ attachment, index }: { attachment: any; index: number }) => {
     const [imageError, setImageError] = useState(false)
-    const [imageLoaded, setImageLoaded] = useState(false)
+    const [retryCount, setRetryCount] = useState(0)
+    const [currentStrategy, setCurrentStrategy] = useState(0)
+    const maxRetries = 2 // Reduced from 3 to 2 for faster fallback
+
+    // Validate and clean Firebase Storage URLs
+    const cleanFirebaseUrl = (url: string) => {
+      if (!url || !url.includes("firebasestorage.googleapis.com")) {
+        return url
+      }
+
+      try {
+        const urlObj = new URL(url)
+        const pathParts = urlObj.pathname.split("/")
+
+        // Check if the filename in the path looks malformed (contains duplicate extensions)
+        if (pathParts.length >= 6) {
+          const encodedFilename = pathParts[5]
+          const decodedFilename = decodeURIComponent(encodedFilename)
+
+          // Check for duplicate filenames or extensions
+          if (
+            decodedFilename.includes(".png.png") ||
+            decodedFilename.includes(".jpg.jpg") ||
+            decodedFilename.includes(".jpeg.jpeg") ||
+            decodedFilename.includes("logo.pnglogo.png")
+          ) {
+            console.warn("Detected malformed filename:", decodedFilename)
+
+            // Try to fix common filename issues
+            let fixedFilename = decodedFilename
+
+            // Remove duplicate extensions
+            fixedFilename = fixedFilename.replace(/\.png\.png$/i, ".png")
+            fixedFilename = fixedFilename.replace(/\.jpg\.jpg$/i, ".jpg")
+            fixedFilename = fixedFilename.replace(/\.jpeg\.jpeg$/i, ".jpeg")
+
+            // Remove duplicate filename patterns
+            const commonPattern = /(.+?)(\1)$/
+            const match = fixedFilename.match(commonPattern)
+            if (match) {
+              fixedFilename = match[1]
+            }
+
+            // Reconstruct the URL with fixed filename
+            pathParts[5] = encodeURIComponent(fixedFilename)
+            urlObj.pathname = pathParts.join("/")
+
+            console.log("Fixed URL:", urlObj.toString())
+            return urlObj.toString()
+          }
+        }
+
+        return url
+      } catch (error) {
+        console.error("Error cleaning Firebase URL:", error)
+        return url
+      }
+    }
+
+    // Different strategies to try
+    const strategies = [
+      () => {
+        const cleanedUrl = cleanFirebaseUrl(attachment.fileUrl)
+        return getProxiedImageUrl(cleanedUrl)
+      },
+      () => {
+        const cleanedUrl = cleanFirebaseUrl(attachment.fileUrl)
+        return getAlternativeProxiedUrl(cleanedUrl)
+      },
+      () => {
+        // Try direct access to cleaned URL
+        return cleanFirebaseUrl(attachment.fileUrl)
+      },
+      () => {
+        // Last resort: try to construct a simple public URL
+        if (attachment.fileUrl?.includes("firebasestorage.googleapis.com")) {
+          try {
+            const url = new URL(attachment.fileUrl)
+            const pathParts = url.pathname.split("/")
+            if (pathParts.length >= 6) {
+              const bucket = pathParts[3]
+              const folder = decodeURIComponent(pathParts[4])
+              const filename = decodeURIComponent(pathParts[5])
+
+              // Clean the filename
+              let cleanFilename = filename
+              if (cleanFilename.includes(".png.png")) {
+                cleanFilename = cleanFilename.replace(/\.png\.png$/i, ".png")
+              }
+              if (cleanFilename.includes(".jpg.jpg")) {
+                cleanFilename = cleanFilename.replace(/\.jpg\.jpg$/i, ".jpg")
+              }
+
+              const cleanPath = `${folder}/${cleanFilename}`
+              return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(cleanPath)}?alt=media`
+            }
+          } catch (error) {
+            console.error("Error constructing fallback URL:", error)
+          }
+        }
+        return attachment.fileUrl
+      },
+    ]
 
     const handleImageLoadError = () => {
-      console.error(`Image load failed:`, attachment.fileUrl)
-      setImageError(true)
+      console.error(`Image load failed (strategy ${currentStrategy}, retry ${retryCount}):`, attachment.fileUrl)
+
+      if (currentStrategy < strategies.length - 1) {
+        setCurrentStrategy((prev) => prev + 1)
+        console.log(`Trying strategy ${currentStrategy + 1}`)
+        // Reset retry count for new strategy
+        setRetryCount(0)
+      } else if (retryCount < maxRetries) {
+        setRetryCount((prev) => prev + 1)
+        console.log(`Retrying current strategy ${currentStrategy}, attempt ${retryCount + 1}`)
+      } else {
+        console.error("All strategies and retries failed for image:", attachment.fileUrl)
+        setImageError(true)
+        handleImageError(attachment.fileUrl, attachment.fileName || "")
+      }
     }
 
     const handleImageLoadSuccess = () => {
-      console.log(`Image loaded successfully:`, attachment.fileUrl)
-      setImageLoaded(true)
+      console.log(`Image loaded successfully with strategy ${currentStrategy}:`, attachment.fileUrl)
       setImageError(false)
+      setRetryCount(0)
+    }
+
+    const getCurrentImageUrl = () => {
+      const url = strategies[currentStrategy]()
+      // Add cache busting for retries
+      if (retryCount > 0) {
+        const separator = url.includes("?") ? "&" : "?"
+        return `${url}${separator}t=${Date.now()}-${retryCount}`
+      }
+      return url
     }
 
     if (!attachment.fileUrl || imageError) {
@@ -212,6 +409,7 @@ export default function ReportPreviewPage() {
           </div>
           <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName || "Unknown file"}</p>
           <p className="text-xs text-red-500">Failed to load image</p>
+          <p className="text-xs text-gray-400">Tried {strategies.length} strategies</p>
           <div className="flex gap-2 justify-center">
             <Button
               variant="outline"
@@ -249,23 +447,24 @@ export default function ReportPreviewPage() {
     if (isImageFile(attachment.fileName || "")) {
       return (
         <div className="w-full h-full relative">
-          {!imageLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-          )}
           <img
-            src={attachment.fileUrl || "/placeholder.svg"}
+            key={`${index}-${currentStrategy}-${retryCount}`} // Force re-render on strategy/retry change
+            src={getCurrentImageUrl() || "/placeholder.svg"}
             alt={attachment.fileName || `Attachment ${index + 1}`}
             className="max-w-full max-h-full object-contain rounded"
             onError={handleImageLoadError}
             onLoad={handleImageLoadSuccess}
-            style={{ display: imageLoaded ? 'block' : 'none' }}
           />
-          {attachment.note && imageLoaded && (
+          {attachment.note && (
             <p className="absolute bottom-2 left-2 right-2 text-xs text-white bg-black bg-opacity-50 p-1 rounded text-center">
               "{attachment.note}"
             </p>
+          )}
+          {/* Debug info */}
+          {process.env.NODE_ENV === "development" && (
+            <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs p-1 rounded">
+              Strategy: {currentStrategy + 1}, Retry: {retryCount}
+            </div>
           )}
         </div>
       )
@@ -278,7 +477,7 @@ export default function ReportPreviewPage() {
             src={attachment.fileUrl}
             controls
             className="max-w-full max-h-full object-contain rounded"
-            onError={() => setImageError(true)}
+            onError={() => handleImageError(attachment.fileUrl, attachment.fileName || "")}
           />
           {attachment.note && (
             <p className="absolute bottom-2 left-2 right-2 text-xs text-white bg-black bg-opacity-50 p-1 rounded text-center">
@@ -404,7 +603,7 @@ export default function ReportPreviewPage() {
         <div className="flex justify-between items-center">
           <div className="flex flex-col">
             <div className="bg-cyan-400 text-white px-6 py-3 rounded-lg text-base font-medium inline-block">
-              {getReportTypeDisplay(report.reportType)}
+              Installation Report
             </div>
             <p className="text-gray-600 text-sm mt-2">as of {formatDate(report.date)}</p>
           </div>
@@ -701,13 +900,19 @@ export default function ReportPreviewPage() {
                   <div className="w-full max-w-full flex items-center justify-center">
                     {isImageFile(fullScreenAttachment.fileName || "") ? (
                       <img
-                        src={fullScreenAttachment.fileUrl || "/placeholder.svg"}
+                        src={(() => {
+                          const cleanedUrl = cleanFirebaseUrl(fullScreenAttachment.fileUrl)
+                          return getProxiedImageUrl(cleanedUrl) || "/placeholder.svg"
+                        })()}
                         alt={fullScreenAttachment.fileName || "Full screen preview"}
                         className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded shadow-lg"
                         style={{ maxWidth: "calc(90vw - 3rem)" }}
-                        onError={() =>
-                          console.error("Full screen image failed to load:", fullScreenAttachment.fileUrl)
-                        }
+                        onError={(e) => {
+                          console.error("Full screen image failed, trying fallback:", fullScreenAttachment.fileUrl)
+                          const target = e.target as HTMLImageElement
+                          const cleanedUrl = cleanFirebaseUrl(fullScreenAttachment.fileUrl)
+                          target.src = cleanedUrl
+                        }}
                         onLoad={() =>
                           console.log("Full screen image loaded successfully:", fullScreenAttachment.fileUrl)
                         }
@@ -741,4 +946,40 @@ export default function ReportPreviewPage() {
                               onClick={() => openInNewTab(fullScreenAttachment.fileUrl)}
                             >
                               <ExternalLink className="h-4 w-4 mr-2" />
-                              Open in\
+                              Open in New Tab
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="bg-transparent border-white text-white hover:bg-white hover:text-black"
+                              onClick={() =>
+                                downloadFile(fullScreenAttachment.fileUrl, fullScreenAttachment.fileName || "file")
+                              }
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Download File
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center text-white p-8">
+                    <p>File not available</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer with file info */}
+            {fullScreenAttachment?.note && (
+              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-90 p-4 border-t border-gray-700">
+                <p className="text-white text-sm italic text-center">"{fullScreenAttachment.note}"</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
