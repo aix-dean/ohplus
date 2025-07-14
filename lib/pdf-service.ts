@@ -796,3 +796,320 @@ export async function generateReportPDF(
       return type
         .split("-")
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ")
+    }
+
+    // Helper function to format date
+    const formatDate = (dateString: string | Date) => {
+      const date = typeof dateString === "string" ? new Date(dateString) : dateString
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    }
+
+    // Helper function to add header to page
+    const addHeaderToPage = () => {
+      // Angular Blue Header
+      pdf.setFillColor(30, 58, 138) // Blue-900
+      pdf.rect(0, yPosition, pageWidth, 16, "F")
+
+      // Angular cyan section
+      pdf.setFillColor(34, 211, 238) // Cyan-400
+      const cyanWidth = pageWidth * 0.4
+      const points = [
+        [pageWidth * 0.25, yPosition],
+        [pageWidth, yPosition],
+        [pageWidth, yPosition + 16],
+        [0, yPosition + 16],
+      ]
+      pdf.triangle(points[0][0], points[0][1], points[1][0], points[1][1], points[2][0], points[2][1], "F")
+      pdf.triangle(points[0][0], points[0][1], points[2][0], points[2][1], points[3][0], points[3][1], "F")
+
+      // Header text
+      pdf.setTextColor(255, 255, 255)
+      pdf.setFontSize(14)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Logistics", margin, yPosition + 10)
+
+      yPosition += 20
+      pdf.setTextColor(0, 0, 0)
+    }
+
+    // Helper function to add footer to page
+    const addFooterToPage = () => {
+      const footerStartY = pageHeight - footerReservedSpace
+
+      // Prepared By Section
+      pdf.setFontSize(10)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Prepared by:", margin, footerStartY + 5)
+
+      pdf.setFontSize(9)
+      pdf.setFont("helvetica", "normal")
+      pdf.setTextColor(59, 130, 246) // Blue-500
+      pdf.text(report.createdByName || "System", margin, footerStartY + 10)
+      pdf.setTextColor(0, 0, 0)
+      pdf.text("LOGISTICS", margin, footerStartY + 14)
+      pdf.text(formatDate(createdAt), margin, footerStartY + 18)
+
+      // Disclaimer text on the right
+      pdf.setFontSize(8)
+      pdf.setTextColor(100, 100, 100)
+      const disclaimerText = `"All data are based on the latest available records as of ${formatDate(new Date())}."`
+      const disclaimerWidth = pdf.getTextWidth(disclaimerText)
+      pdf.text(disclaimerText, pageWidth - margin - disclaimerWidth, footerStartY + 12)
+
+      // Horizontal line above footer
+      pdf.setLineWidth(0.5)
+      pdf.setDrawColor(0, 0, 0)
+      pdf.line(margin, footerStartY, pageWidth - margin, footerStartY)
+
+      // Angular Footer
+      const angularFooterY = footerStartY + 25
+
+      // Cyan section on left
+      pdf.setFillColor(34, 211, 238) // Cyan-400
+      pdf.rect(0, angularFooterY, pageWidth, 16, "F")
+
+      // Angular dark blue section
+      pdf.setFillColor(30, 58, 138) // Blue-900
+      const blueWidth = pageWidth * 0.75
+      const footerPoints = [
+        [pageWidth * 0.25, angularFooterY],
+        [pageWidth, angularFooterY],
+        [pageWidth, angularFooterY + 16],
+        [0, angularFooterY + 16],
+      ]
+      pdf.triangle(
+        footerPoints[0][0],
+        footerPoints[0][1],
+        footerPoints[1][0],
+        footerPoints[1][1],
+        footerPoints[2][0],
+        footerPoints[2][1],
+        "F",
+      )
+      pdf.triangle(
+        footerPoints[0][0],
+        footerPoints[0][1],
+        footerPoints[2][0],
+        footerPoints[2][1],
+        footerPoints[3][0],
+        footerPoints[3][1],
+        "F",
+      )
+
+      // Footer text
+      pdf.setTextColor(255, 255, 255)
+      pdf.setFontSize(9)
+      pdf.setFont("helvetica", "normal")
+      pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 50, angularFooterY + 6)
+
+      pdf.setFontSize(16)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("OH!", pageWidth - margin - 25, angularFooterY + 10)
+      pdf.setTextColor(34, 211, 238) // Cyan-400
+      pdf.text("+", pageWidth - margin - 10, angularFooterY + 10)
+
+      pdf.setTextColor(0, 0, 0)
+    }
+
+    // Add header to first page
+    addHeaderToPage()
+
+    // Report Header with Badge and Logo
+    yPosition += 5
+    pdf.setFillColor(34, 211, 238) // Cyan-400
+    pdf.rect(margin, yPosition - 2, 40, 8, "F")
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Installation Report", margin + 2, yPosition + 3)
+
+    // Date
+    pdf.setTextColor(100, 100, 100)
+    pdf.setFontSize(8)
+    pdf.text(`as of ${formatDate(report.date)}`, margin, yPosition + 8)
+
+    // Logo (GTS badge)
+    pdf.setFillColor(255, 193, 7) // Yellow-400
+    pdf.circle(pageWidth - margin - 10, yPosition + 5, 8, "F")
+    pdf.setTextColor(0, 0, 0)
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("GTS", pageWidth - margin - 15, yPosition + 7)
+
+    yPosition += 20
+    pdf.setTextColor(0, 0, 0)
+
+    // Project Information Section
+    checkNewPage(60)
+    pdf.setFontSize(12)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Project Information", margin, yPosition)
+    yPosition += 8
+
+    // Project details in two columns
+    const leftColumn = margin
+    const rightColumn = margin + contentWidth / 2
+
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+
+    // Left column
+    const leftColumnData = [
+      ["Site ID:", `${report.siteId} ${product?.light?.location || product?.specs_rental?.location || ""}`],
+      ["Job Order:", report.id?.slice(-4).toUpperCase() || "N/A"],
+      ["Job Order Date:", formatDate(createdAt)],
+      ["Site:", report.siteName],
+      ["Size:", product?.specs_rental?.size || product?.light?.size || "N/A"],
+      ["Start Date:", formatDate(startDate)],
+      ["End Date:", formatDate(endDate)],
+      [
+        "Installation Duration:",
+        `${Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))} days`,
+      ],
+    ]
+
+    // Right column
+    const rightColumnData = [
+      ["Content:", product?.content_type || "N/A"],
+      ["Material Specs:", product?.specs_rental?.material || "N/A"],
+      ["Crew:", `Team ${report.assignedTo || "A"}`],
+      ["Illumination:", product?.light?.illumination || "N/A"],
+      ["Gondola:", product?.specs_rental?.gondola ? "YES" : "NO"],
+      ["Technology:", product?.specs_rental?.technology || "N/A"],
+      ["Sales:", report.sales],
+    ]
+
+    // Render left column
+    let leftY = yPosition
+    leftColumnData.forEach(([label, value]) => {
+      pdf.setFont("helvetica", "bold")
+      pdf.text(label, leftColumn, leftY)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(value, leftColumn + 32, leftY)
+      leftY += 4
+    })
+
+    // Render right column
+    let rightY = yPosition
+    rightColumnData.forEach(([label, value]) => {
+      pdf.setFont("helvetica", "bold")
+      pdf.text(label, rightColumn, rightY)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(value, rightColumn + 32, rightY)
+      rightY += 4
+    })
+
+    yPosition = Math.max(leftY, rightY) + 5
+
+    // Project Status Section
+    checkNewPage(80)
+    pdf.setFontSize(12)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Project Status", margin, yPosition)
+
+    // Status badge
+    pdf.setFillColor(34, 197, 94) // Green-500
+    pdf.rect(margin + 50, yPosition - 3, 15, 6, "F")
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(8)
+    pdf.text(`${report.completionPercentage || 100}%`, margin + 52, yPosition)
+    pdf.setTextColor(0, 0, 0)
+
+    yPosition += 10
+
+    // Attachments/Photos Section - Always maintain consistent spacing
+    const attachmentSectionHeight = 70 // Fixed height for attachment section
+    checkNewPage(attachmentSectionHeight)
+
+    if (report.attachments && report.attachments.length > 0) {
+      // Add images if available
+      const imagesToShow = report.attachments.slice(0, 2)
+      let imageX = margin
+      const imageWidth = (contentWidth - 10) / 2
+      const imageHeight = 50
+
+      for (let i = 0; i < imagesToShow.length; i++) {
+        const attachment = imagesToShow[i]
+        if (attachment.fileUrl) {
+          try {
+            const base64 = await loadImageAsBase64(attachment.fileUrl)
+            if (base64) {
+              pdf.addImage(base64, "JPEG", imageX, yPosition, imageWidth, imageHeight)
+            }
+          } catch (error) {
+            // Draw placeholder rectangle if image fails
+            pdf.setFillColor(240, 240, 240)
+            pdf.rect(imageX, yPosition, imageWidth, imageHeight, "F")
+            pdf.setTextColor(100, 100, 100)
+            pdf.setFontSize(8)
+            pdf.text("Image not available", imageX + imageWidth / 2 - 20, yPosition + imageHeight / 2)
+            pdf.setTextColor(0, 0, 0)
+          }
+        } else {
+          // Draw placeholder rectangle
+          pdf.setFillColor(240, 240, 240)
+          pdf.rect(imageX, yPosition, imageWidth, imageHeight, "F")
+          pdf.setTextColor(100, 100, 100)
+          pdf.setFontSize(8)
+          pdf.text(`Project Photo ${i + 1}`, imageX + imageWidth / 2 - 15, yPosition + imageHeight / 2)
+          pdf.setTextColor(0, 0, 0)
+        }
+
+        // Add image details below
+        pdf.setFontSize(7)
+        pdf.text(`Date: ${formatDate(report.date)}`, imageX, yPosition + imageHeight + 3)
+        pdf.text(
+          `Time: ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`,
+          imageX,
+          yPosition + imageHeight + 7,
+        )
+        pdf.text(`Location: ${report.location || "N/A"}`, imageX, yPosition + imageHeight + 11)
+
+        imageX += imageWidth + 10
+      }
+    } else {
+      // Draw placeholder for no attachments - maintain same height
+      pdf.setFillColor(248, 250, 252)
+      pdf.rect(margin, yPosition, contentWidth, attachmentSectionHeight - 20, "F")
+      pdf.setDrawColor(203, 213, 225)
+      pdf.setLineWidth(1)
+      pdf.rect(margin, yPosition, contentWidth, attachmentSectionHeight - 20)
+
+      pdf.setTextColor(100, 100, 100)
+      pdf.setFontSize(10)
+      pdf.text(
+        "No attachments available",
+        margin + contentWidth / 2 - 30,
+        yPosition + (attachmentSectionHeight - 20) / 2 - 5,
+      )
+      pdf.setFontSize(8)
+      pdf.text(
+        "Project photos will appear here when uploaded",
+        margin + contentWidth / 2 - 45,
+        yPosition + (attachmentSectionHeight - 20) / 2 + 2,
+      )
+      pdf.setTextColor(0, 0, 0)
+    }
+
+    // Move to end of page to add footer
+    yPosition = pageHeight - footerReservedSpace - 5
+
+    // Add footer to the page
+    addFooterToPage()
+
+    if (returnBase64) {
+      return pdf.output("datauristring").split(",")[1]
+    } else {
+      const fileName = `report-${report.siteName.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
+      pdf.save(fileName)
+    }
+  } catch (error) {
+    console.error("Error generating Report PDF:", error)
+    throw new Error("Failed to generate Report PDF")
+  }
+}
