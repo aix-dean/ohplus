@@ -258,24 +258,42 @@ export default function ReportPreviewPage() {
           </div>
           <div className="flex-shrink-0">
             {userData?.company_logo ? (
-              <img
-                src={userData.company_logo || "/placeholder.svg"}
-                alt={`${userData.company || "Company"} Logo`}
-                className="h-12 w-24 object-contain rounded-full bg-yellow-400 px-4 py-2 shadow-sm"
-                style={{ minWidth: "96px" }}
-                onError={(e) => {
-                  // Fallback to default logo if company logo fails to load
-                  const target = e.target as HTMLImageElement
-                  target.src = "/company-logos/gts-logo.png"
-                }}
-              />
+              <div
+                className="bg-yellow-400 rounded-full px-6 py-3 flex items-center justify-center"
+                style={{ minWidth: "120px", height: "48px" }}
+              >
+                <div
+                  className="bg-white rounded px-3 py-1 flex items-center justify-center"
+                  style={{ minHeight: "24px", minWidth: "60px" }}
+                >
+                  <img
+                    src={userData.company_logo || "/placeholder.svg"}
+                    alt={`${userData.company || "Company"} Logo`}
+                    className="max-h-5 max-w-full object-contain"
+                    onError={(e) => {
+                      // Fallback to default logo if company logo fails to load
+                      const target = e.target as HTMLImageElement
+                      target.src = "/company-logos/gts-logo.png"
+                    }}
+                  />
+                </div>
+              </div>
             ) : (
-              <img
-                src="/company-logos/gts-logo.png"
-                alt="Company Logo"
-                className="h-12 w-24 object-contain rounded-full bg-yellow-400 px-4 py-2 shadow-sm"
-                style={{ minWidth: "96px" }}
-              />
+              <div
+                className="bg-yellow-400 rounded-full px-6 py-3 flex items-center justify-center"
+                style={{ minWidth: "120px", height: "48px" }}
+              >
+                <div
+                  className="bg-white rounded px-3 py-1 flex items-center justify-center"
+                  style={{ minHeight: "24px", minWidth: "60px" }}
+                >
+                  <img
+                    src="/company-logos/gts-logo.png"
+                    alt="Company Logo"
+                    className="max-h-5 max-w-full object-contain"
+                  />
+                </div>
+              </div>
             )}
           </div>
         </div>
