@@ -1,6 +1,13 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 
@@ -12,23 +19,21 @@ interface ReportPostedSuccessDialogProps {
 
 export function ReportPostedSuccessDialog({ open, onOpenChange, onViewDashboard }: ReportPostedSuccessDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader className="text-center">
-          <DialogTitle className="text-2xl font-bold text-gray-900">Congratulations!</DialogTitle>
-        </DialogHeader>
-
-        <div className="flex flex-col items-center justify-center py-4">
-          <Image src="/party-popper.png" alt="Party Popper" width={120} height={120} className="mb-4" />
-          <p className="text-gray-600 text-center text-lg">You have successfully posted a report!</p>
-        </div>
-
-        <DialogFooter className="flex justify-center">
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent className="max-w-sm rounded-lg p-6 text-center">
+        <AlertDialogHeader className="flex flex-col items-center">
+          <AlertDialogTitle className="text-2xl font-bold text-gray-900 mb-4">Congratulations!</AlertDialogTitle>
+          <Image src="/party-popper.png" alt="Party Popper" width={120} height={120} className="mb-6" />
+          <AlertDialogDescription className="text-gray-600 text-base">
+            You have successfully posted a report!
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="flex justify-center mt-6">
           <Button onClick={onViewDashboard} className="w-full">
-            Go to Dashboard
+            View Dashboard
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }

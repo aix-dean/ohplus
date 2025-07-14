@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { PlusCircle, Search } from "lucide-react"
-import { AllSites } from "./all-sites"
+import AllSitesTab from "./all-sites" // Corrected import to default
 import { StaticSites } from "./static-sites"
 import { LedSites } from "./led-sites"
 import { CreateReportDialog } from "@/components/create-report-dialog"
@@ -61,7 +61,7 @@ export default function DashboardPage() {
                 <CardTitle>All Sites Overview</CardTitle>
               </CardHeader>
               <CardContent>
-                <AllSites />
+                <AllSitesTab /> {/* Corrected usage */}
               </CardContent>
             </Card>
           </TabsContent>
