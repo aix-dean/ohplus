@@ -251,7 +251,7 @@ export default function AdminDashboardPage() {
           <h1 className="text-xl md:text-2xl font-bold">
             {userData?.first_name
   ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
-  : "Logistics Dashboard"}
+  : "Dashboard"}
           </h1>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-grow">
