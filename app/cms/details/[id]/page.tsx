@@ -7,7 +7,7 @@ import { Slider } from "@/components/ui/slider"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
-import { getProductById, getServiceAssignmentsByProductId } from "@/lib/firebase-service"
+import { getProductById, getServiceAssignmentsByProductId, type Product } from "@/lib/firebase-service"
 import {
   ArrowLeft,
   Edit,
@@ -27,8 +27,8 @@ import {
   Sun,
   FolderSyncIcon as Sync,
   Calendar,
+  Clock,
 } from "lucide-react"
-import { Clock } from "lucide-react" // Import Clock component
 
 interface Props {
   params: {
@@ -90,10 +90,139 @@ interface CMSProductData {
   }>
 }
 
-// Fetch product data from Firebase
+// Convert Firebase product to CMS product data format
+function convertProductToCMSData(product: Product, serviceAssignments: any[] = []): CMSProductData {
+  return {
+    id: product.id || "",
+    name: product.name || "Unknown Product",
+    description: product.description || "No description available",
+    status: product.status || "PENDING",
+    type: product.type || "RENTAL",
+    image: product.imageUrl || "/placeholder.svg?height=200&width=200",
+    dimensions: `H: ${product.specs_rental?.height || 12} × W: ${product.specs_rental?.width || 12}`,
+    created: product.created ? new Date(product.created.seconds * 1000).toLocaleDateString() : "Unknown",
+    updated: product.updated ? new Date(product.updated.seconds * 1000).toLocaleDateString() : "Unknown",
+    company_id: product.company_id,
+    seller_id: product.seller_id,
+    traffic_count: product.specs_rental?.traffic_count || 0,
+    cms: {
+      end_time: product.cms?.end_time || "18:00",
+      loops_per_day: product.cms?.loops_per_day || 20,
+      spot_duration: product.cms?.spot_duration || 15,
+      start_time: product.cms?.start_time || "06:00",
+    },
+    // Mock program list - in a real app, this would come from a separate collection
+    programList: [
+      {
+        id: "SPOT001",
+        name: "Morning Slot",
+        duration: "15 seconds",
+        timeSlot: "06:00 AM - 12:00 PM",
+        advertiser: "Coca Cola",
+        price: "PHP 1,200",
+        status: "Active",
+      },
+      {
+        id: "SPOT002",
+        name: "Afternoon Slot",
+        duration: "30 seconds",
+        timeSlot: "12:00 PM - 06:00 PM",
+        advertiser: "Samsung",
+        price: "PHP 1,800",
+        status: "Active",
+      },
+      {
+        id: "SPOT003",
+        name: "Evening Slot",
+        duration: "15 seconds",
+        timeSlot: "06:00 PM - 12:00 AM",
+        advertiser: "Nike",
+        price: "PHP 2,100",
+        status: "Pending",
+      },
+      {
+        id: "SPOT004",
+        name: "Late Night Slot",
+        duration: "30 seconds",
+        timeSlot: "12:00 AM - 06:00 AM",
+        advertiser: "-",
+        price: "PHP 900",
+        status: "Available",
+      },
+    ],
+    // Convert service assignments from Firebase
+    serviceAssignments: serviceAssignments.map((assignment) => ({
+      id: assignment.id,
+      title: assignment.jobDescription || "Service Assignment",
+      assignedTo: assignment.assignedTo || "Unassigned",
+      date: assignment.coveredDateStart ? new Date(assignment.coveredDateStart).toLocaleDateString() : "TBD",
+      status: assignment.status || "Pending",
+      notes: assignment.message || "No notes available",
+    })),
+    // Mock LED status - in a real app, this would come from IoT devices or separate collection
+    ledStatus: {
+      powerStatus: "On",
+      temperature: "32°C",
+      connection: "Online",
+      videoSource: "HDMI 1",
+      activeContent: "Current Campaign",
+      lastReboot: new Date().toLocaleDateString() + " 09:15 AM",
+      lastTimeSync: new Date().toLocaleDateString() + " 08:00 AM",
+      warnings:
+        product.specs_rental?.elevation && product.specs_rental.elevation > 100 ? ["High elevation detected"] : [],
+    },
+    // Mock live preview - in a real app, this would come from live camera feeds
+    livePreview: [
+      {
+        id: `${product.name?.substring(0, 10) || "LED"} 3.2`,
+        health: "100% Healthy",
+        image: "/placeholder.svg?height=100&width=150",
+      },
+      {
+        id: `${product.specs_rental?.location?.substring(0, 10) || "SITE"} 1.0`,
+        health: "100% Healthy",
+        image: "/placeholder.svg?height=100&width=150",
+      },
+      {
+        id: "BACKUP LED 1.0",
+        health: "100% Healthy",
+        image: "/placeholder.svg?height=100&width=150",
+      },
+      {
+        id: "MAIN LED 2.1",
+        health: product.active ? "100% Healthy" : "90% Healthy",
+        image: "/placeholder.svg?height=100&width=150",
+      },
+    ],
+  }
+}
+
+// Optimized product data fetching - tries localStorage first, then Firebase
 async function getProductData(id: string): Promise<CMSProductData | null> {
   try {
-    // Get product from Firebase
+    // First, try to get data from localStorage (passed from dashboard)
+    if (typeof window !== "undefined") {
+      const cachedData = localStorage.getItem(`cms-product-${id}`)
+      if (cachedData) {
+        try {
+          const product: Product = JSON.parse(cachedData)
+          console.log("Using cached product data from dashboard")
+
+          // Still fetch service assignments as they might be updated
+          const serviceAssignments = await getServiceAssignmentsByProductId(id)
+
+          // Clean up the cached data after use
+          localStorage.removeItem(`cms-product-${id}`)
+
+          return convertProductToCMSData(product, serviceAssignments)
+        } catch (parseError) {
+          console.warn("Failed to parse cached product data, falling back to Firebase")
+        }
+      }
+    }
+
+    // Fallback to Firebase if no cached data
+    console.log("Fetching product data from Firebase")
     const product = await getProductById(id)
 
     if (!product) {
@@ -103,112 +232,7 @@ async function getProductData(id: string): Promise<CMSProductData | null> {
     // Get service assignments for this product
     const serviceAssignments = await getServiceAssignmentsByProductId(id)
 
-    // Convert Firebase product to CMS product data format
-    const cmsProductData: CMSProductData = {
-      id: product.id || id,
-      name: product.name || "Unknown Product",
-      description: product.description || "No description available",
-      status: product.status || "PENDING",
-      type: product.type || "RENTAL",
-      image: product.imageUrl || "/placeholder.svg?height=200&width=200",
-      dimensions: `H: ${product.specs_rental?.height || 12} × W: ${product.specs_rental?.width || 12}`,
-      created: product.created ? new Date(product.created.seconds * 1000).toLocaleDateString() : "Unknown",
-      updated: product.updated ? new Date(product.updated.seconds * 1000).toLocaleDateString() : "Unknown",
-      company_id: product.company_id,
-      seller_id: product.seller_id,
-      traffic_count: product.specs_rental?.traffic_count || 0,
-      cms: {
-        end_time: product.cms?.end_time || "18:00",
-        loops_per_day: product.cms?.loops_per_day || 20,
-        spot_duration: product.cms?.spot_duration || 15,
-        start_time: product.cms?.start_time || "06:00",
-      },
-      // Mock program list - in a real app, this would come from a separate collection
-      programList: [
-        {
-          id: "SPOT001",
-          name: "Morning Slot",
-          duration: "15 seconds",
-          timeSlot: "06:00 AM - 12:00 PM",
-          advertiser: "Coca Cola",
-          price: "PHP 1,200",
-          status: "Active",
-        },
-        {
-          id: "SPOT002",
-          name: "Afternoon Slot",
-          duration: "30 seconds",
-          timeSlot: "12:00 PM - 06:00 PM",
-          advertiser: "Samsung",
-          price: "PHP 1,800",
-          status: "Active",
-        },
-        {
-          id: "SPOT003",
-          name: "Evening Slot",
-          duration: "15 seconds",
-          timeSlot: "06:00 PM - 12:00 AM",
-          advertiser: "Nike",
-          price: "PHP 2,100",
-          status: "Pending",
-        },
-        {
-          id: "SPOT004",
-          name: "Late Night Slot",
-          duration: "30 seconds",
-          timeSlot: "12:00 AM - 06:00 AM",
-          advertiser: "-",
-          price: "PHP 900",
-          status: "Available",
-        },
-      ],
-      // Convert service assignments from Firebase
-      serviceAssignments: serviceAssignments.map((assignment) => ({
-        id: assignment.id,
-        title: assignment.jobDescription || "Service Assignment",
-        assignedTo: assignment.assignedTo || "Unassigned",
-        date: assignment.coveredDateStart ? new Date(assignment.coveredDateStart).toLocaleDateString() : "TBD",
-        status: assignment.status || "Pending",
-        notes: assignment.message || "No notes available",
-      })),
-      // Mock LED status - in a real app, this would come from IoT devices or separate collection
-      ledStatus: {
-        powerStatus: "On",
-        temperature: "32°C",
-        connection: "Online",
-        videoSource: "HDMI 1",
-        activeContent: "Current Campaign",
-        lastReboot: new Date().toLocaleDateString() + " 09:15 AM",
-        lastTimeSync: new Date().toLocaleDateString() + " 08:00 AM",
-        warnings:
-          product.specs_rental?.elevation && product.specs_rental.elevation > 100 ? ["High elevation detected"] : [],
-      },
-      // Mock live preview - in a real app, this would come from live camera feeds
-      livePreview: [
-        {
-          id: `${product.name?.substring(0, 10) || "LED"} 3.2`,
-          health: "100% Healthy",
-          image: "/placeholder.svg?height=100&width=150",
-        },
-        {
-          id: `${product.specs_rental?.location?.substring(0, 10) || "SITE"} 1.0`,
-          health: "100% Healthy",
-          image: "/placeholder.svg?height=100&width=150",
-        },
-        {
-          id: "BACKUP LED 1.0",
-          health: "100% Healthy",
-          image: "/placeholder.svg?height=100&width=150",
-        },
-        {
-          id: "MAIN LED 2.1",
-          health: product.active ? "100% Healthy" : "90% Healthy",
-          image: "/placeholder.svg?height=100&width=150",
-        },
-      ],
-    }
-
-    return cmsProductData
+    return convertProductToCMSData(product, serviceAssignments)
   } catch (error) {
     console.error("Error fetching product data:", error)
     return null
