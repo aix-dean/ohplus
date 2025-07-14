@@ -1,13 +1,19 @@
 "use client"
 
-import React from "react"
-
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { getProductById, getServiceAssignmentsByProductId } from "@/lib/firebase-service"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Slider } from "@/components/ui/slider"
+import { Separator } from "@/components/ui/separator"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { getProductById, softDeleteProduct, type Product } from "@/lib/firebase-service"
 import {
   ArrowLeft,
   Edit,
@@ -28,486 +34,13 @@ import {
   Sun,
   FolderSyncIcon as Sync,
   Calendar,
-  Plus,
-  Eye,
   Loader2,
+  MoreVertical,
+  Eye,
+  Download,
+  Share2,
 } from "lucide-react"
-
-// Inline UI Components
-function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`rounded-lg border bg-card text-card-foreground shadow-sm ${className}`}>{children}</div>
-}
-
-function CardHeader({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`flex flex-col space-y-1.5 p-6 ${className}`}>{children}</div>
-}
-
-function CardTitle({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <h3 className={`text-2xl font-semibold leading-none tracking-tight ${className}`}>{children}</h3>
-}
-
-function CardContent({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`p-6 pt-0 ${className}`}>{children}</div>
-}
-
-function Badge({
-  children,
-  className = "",
-  variant = "default",
-}: { children: React.ReactNode; className?: string; variant?: string }) {
-  const baseClasses =
-    "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-  const variantClasses =
-    variant === "outline"
-      ? "border-input bg-background hover:bg-accent hover:text-accent-foreground"
-      : "border-transparent bg-primary text-primary-foreground hover:bg-primary/80"
-
-  return <div className={`${baseClasses} ${variantClasses} ${className}`}>{children}</div>
-}
-
-function Button({
-  children,
-  className = "",
-  variant = "default",
-  size = "default",
-  onClick,
-  disabled = false,
-}: {
-  children: React.ReactNode
-  className?: string
-  variant?: string
-  size?: string
-  onClick?: () => void
-  disabled?: boolean
-}) {
-  const baseClasses =
-    "inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
-
-  const variantClasses = {
-    default: "bg-primary text-primary-foreground hover:bg-primary/90",
-    destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-    outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-    secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-    ghost: "hover:bg-accent hover:text-accent-foreground",
-  }
-
-  const sizeClasses = {
-    default: "h-10 px-4 py-2",
-    sm: "h-9 rounded-md px-3",
-    lg: "h-11 rounded-md px-8",
-  }
-
-  return (
-    <button
-      className={`${baseClasses} ${variantClasses[variant as keyof typeof variantClasses] || variantClasses.default} ${sizeClasses[size as keyof typeof sizeClasses] || sizeClasses.default} ${className}`}
-      onClick={onClick}
-      disabled={disabled}
-    >
-      {children}
-    </button>
-  )
-}
-
-function Tabs({
-  children,
-  defaultValue,
-  className = "",
-}: { children: React.ReactNode; defaultValue: string; className?: string }) {
-  const [activeTab, setActiveTab] = useState(defaultValue)
-
-  return (
-    <div className={`w-full ${className}`} data-active-tab={activeTab}>
-      {React.Children.map(children, (child) =>
-        React.isValidElement(child) ? React.cloneElement(child, { activeTab, setActiveTab } as any) : child,
-      )}
-    </div>
-  )
-}
-
-function TabsList({
-  children,
-  className = "",
-  activeTab,
-  setActiveTab,
-}: { children: React.ReactNode; className?: string; activeTab?: string; setActiveTab?: (tab: string) => void }) {
-  return (
-    <div
-      className={`inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground ${className}`}
-    >
-      {React.Children.map(children, (child) =>
-        React.isValidElement(child) ? React.cloneElement(child, { activeTab, setActiveTab } as any) : child,
-      )}
-    </div>
-  )
-}
-
-function TabsTrigger({
-  children,
-  value,
-  className = "",
-  activeTab,
-  setActiveTab,
-}: {
-  children: React.ReactNode
-  value: string
-  className?: string
-  activeTab?: string
-  setActiveTab?: (tab: string) => void
-}) {
-  const isActive = activeTab === value
-
-  return (
-    <button
-      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ${
-        isActive ? "bg-background text-foreground shadow-sm" : "hover:bg-background/50"
-      } ${className}`}
-      onClick={() => setActiveTab?.(value)}
-    >
-      {children}
-    </button>
-  )
-}
-
-function TabsContent({
-  children,
-  value,
-  className = "",
-  activeTab,
-}: { children: React.ReactNode; value: string; className?: string; activeTab?: string }) {
-  if (activeTab !== value) return null
-
-  return (
-    <div
-      className={`mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${className}`}
-    >
-      {children}
-    </div>
-  )
-}
-
-function Table({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className="relative w-full overflow-auto">
-      <table className={`w-full caption-bottom text-sm ${className}`}>{children}</table>
-    </div>
-  )
-}
-
-function TableHeader({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <thead className={`[&_tr]:border-b ${className}`}>{children}</thead>
-}
-
-function TableBody({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <tbody className={`[&_tr:last-child]:border-0 ${className}`}>{children}</tbody>
-}
-
-function TableRow({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <tr className={`border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted ${className}`}>
-      {children}
-    </tr>
-  )
-}
-
-function TableHead({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return (
-    <th
-      className={`h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 ${className}`}
-    >
-      {children}
-    </th>
-  )
-}
-
-function TableCell({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`p-4 align-middle [&:has([role=checkbox])]:pr-0 ${className}`}>{children}</td>
-}
-
-function Slider({
-  defaultValue = [50],
-  max = 100,
-  step = 1,
-  className = "",
-  onChange,
-}: {
-  defaultValue?: number[]
-  max?: number
-  step?: number
-  className?: string
-  onChange?: (value: number[]) => void
-}) {
-  const [value, setValue] = useState(defaultValue)
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = [Number.parseInt(e.target.value)]
-    setValue(newValue)
-    onChange?.(newValue)
-  }
-
-  return (
-    <div className={`relative flex w-full touch-none select-none items-center ${className}`}>
-      <input
-        type="range"
-        min="0"
-        max={max}
-        step={step}
-        value={value[0]}
-        onChange={handleChange}
-        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-      />
-      <style jsx>{`
-        .slider::-webkit-slider-thumb {
-          appearance: none;
-          height: 20px;
-          width: 20px;
-          border-radius: 50%;
-          background: #3b82f6;
-          cursor: pointer;
-        }
-        .slider::-moz-range-thumb {
-          height: 20px;
-          width: 20px;
-          border-radius: 50%;
-          background: #3b82f6;
-          cursor: pointer;
-          border: none;
-        }
-      `}</style>
-    </div>
-  )
-}
-
-// Inline Loop Timeline Component
-function LoopTimelineComponent({ cmsData, productId }: { cmsData: any; productId: string }) {
-  const startTimeStr = cmsData.start_time || "06:00"
-  const endTimeStr = cmsData.end_time || "18:00"
-  const spotDuration = cmsData.spot_duration || 15
-  const loopsPerDay = cmsData.loops_per_day || 20
-
-  // Calculate spots per loop based on time difference
-  const calculateSpotsPerLoop = () => {
-    const [startHour, startMinute] = startTimeStr.split(":").map(Number)
-    const [endHour, endMinute] = endTimeStr.split(":").map(Number)
-
-    const startTotalMinutes = startHour * 60 + startMinute
-    const endTotalMinutes = endHour * 60 + endMinute
-
-    const loopDurationMinutes = endTotalMinutes - startTotalMinutes
-    const loopDurationSeconds = loopDurationMinutes * 60
-
-    return Math.floor(loopDurationSeconds / spotDuration)
-  }
-
-  const spotsPerLoop = calculateSpotsPerLoop()
-
-  // Convert military time to 12-hour format
-  const convertTo12Hour = (militaryTime: string) => {
-    const [hours, minutes] = militaryTime.split(":").map(Number)
-    const period = hours >= 12 ? "PM" : "AM"
-    const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours
-    return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`
-  }
-
-  const formatDuration = (seconds: number) => {
-    const minutes = Math.floor(seconds / 60)
-    const remainingSeconds = seconds % 60
-
-    if (minutes > 0) {
-      return `${minutes}m ${remainingSeconds}s`
-    } else {
-      return `${remainingSeconds}s`
-    }
-  }
-
-  const totalLoopDuration = spotsPerLoop * spotDuration
-
-  // Generate timeline spots
-  const generateTimelineSpots = () => {
-    const spots = []
-    for (let i = 0; i < loopsPerDay; i++) {
-      const spotNumber = i + 1
-      spots.push({
-        id: `SPOT${String(spotNumber).padStart(3, "0")}`,
-        name: `Spot ${spotNumber}`,
-        duration: spotDuration,
-        status: i < 5 ? "active" : i < 10 ? "pending" : "available",
-        isScheduled: i < 5,
-      })
-    }
-    return spots
-  }
-
-  const timelineSpots = generateTimelineSpots()
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800 border-green-200"
-      case "pending":
-        return "bg-amber-100 text-amber-800 border-amber-200"
-      case "available":
-        return "bg-blue-100 text-blue-800 border-blue-200"
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
-    }
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Loop Configuration Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock size={18} />
-            First Loop Configuration
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <span className="font-medium text-gray-500">Spots per Loop:</span>
-              <div className="text-lg font-semibold">{loopsPerDay}</div>
-            </div>
-            <div>
-              <span className="font-medium text-gray-500">Spot Duration:</span>
-              <div className="text-lg font-semibold">{spotDuration}s</div>
-            </div>
-            <div>
-              <span className="font-medium text-gray-500">Loop Time:</span>
-              <div className="text-lg font-semibold">
-                {convertTo12Hour(startTimeStr)} - {convertTo12Hour(endTimeStr)}
-              </div>
-            </div>
-            <div>
-              <span className="font-medium text-gray-500">Total Loop Duration:</span>
-              <div className="text-lg font-semibold">{formatDuration(totalLoopDuration)}</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Timeline Visualization */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Play size={18} />
-            First Loop Timeline ({loopsPerDay} Spots)
-          </CardTitle>
-          <div className="text-sm text-gray-500">
-            Loop runs from {convertTo12Hour(startTimeStr)} to {convertTo12Hour(endTimeStr)} (
-            {formatDuration(totalLoopDuration)} total)
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* Timeline Header */}
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Clock size={16} className="text-gray-500" />
-                <span className="font-medium">Start: {convertTo12Hour(startTimeStr)}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock size={16} className="text-gray-500" />
-                <span className="font-medium">End: {convertTo12Hour(endTimeStr)}</span>
-              </div>
-            </div>
-
-            {/* Timeline Spots */}
-            <div className="space-y-3">
-              {timelineSpots.map((spot, index) => (
-                <div
-                  key={spot.id}
-                  className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  {/* Spot Number */}
-                  <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span className="font-semibold text-blue-700">{index + 1}</span>
-                  </div>
-
-                  {/* Spot Details */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-medium text-gray-900">{spot.name}</h3>
-                      <Badge variant="outline" className={getStatusColor(spot.status)}>
-                        {spot.status}
-                      </Badge>
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      <span className="font-mono">{spot.duration}s duration</span>
-                    </div>
-                  </div>
-
-                  {/* Timeline Bar */}
-                  <div className="flex-1 max-w-xs">
-                    <div className="relative h-6 bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          spot.status === "active"
-                            ? "bg-green-500"
-                            : spot.status === "pending"
-                              ? "bg-amber-500"
-                              : "bg-blue-500"
-                        }`}
-                        style={{
-                          width: `${(spot.duration / totalLoopDuration) * 100}%`,
-                        }}
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-xs font-medium text-white mix-blend-difference">{spot.duration}s</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Add/View Button */}
-                  {spot.isScheduled ? (
-                    <Button size="sm" variant="secondary" className="flex-shrink-0">
-                      <Eye size={16} />
-                    </Button>
-                  ) : (
-                    <Button size="sm" variant="outline" className="flex-shrink-0 bg-transparent">
-                      <Plus size={16} />
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Timeline Summary */}
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-medium text-blue-900">First Loop Summary</h4>
-                  <p className="text-sm text-blue-700">
-                    This loop contains {spotsPerLoop} advertising spots and will repeat {loopsPerDay} times throughout
-                    the day
-                  </p>
-                </div>
-                <div className="text-right">
-                  <div className="text-lg font-semibold text-blue-900">{formatDuration(totalLoopDuration)}</div>
-                  <div className="text-sm text-blue-700">Loop Duration</div>
-                </div>
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="text-blue-600 font-medium">Active Spots:</span>
-                  <span className="ml-1">{timelineSpots.filter((s) => s.status === "active").length}</span>
-                </div>
-                <div>
-                  <span className="text-blue-600 font-medium">Pending Spots:</span>
-                  <span className="ml-1">{timelineSpots.filter((s) => s.status === "pending").length}</span>
-                </div>
-                <div>
-                  <span className="text-blue-600 font-medium">Available Spots:</span>
-                  <span className="ml-1">{timelineSpots.filter((s) => s.status === "available").length}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 // Enhanced product data interface for CMS details
 interface CMSProductData {
@@ -569,8 +102,10 @@ export default function CMSSiteDetailsPage() {
   const { userData } = useAuth()
   const { toast } = useToast()
 
-  const [product, setProduct] = useState<CMSProductData | null>(null)
+  const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState("program-list")
 
   const productId = params.id as string
 
@@ -582,141 +117,45 @@ export default function CMSSiteDetailsPage() {
       try {
         setLoading(true)
 
-        // Get product from Firebase
-        const productData = await getProductById(productId)
+        // First try to get cached data from localStorage
+        const cachedData = localStorage.getItem(`cms-product-${productId}`)
+        if (cachedData) {
+          try {
+            const parsedData = JSON.parse(cachedData)
+            setProduct(parsedData)
+            setLoading(false)
+            // Clean up cached data after use
+            localStorage.removeItem(`cms-product-${productId}`)
+            console.log("Using cached product data for fast loading")
+            return
+          } catch (error) {
+            console.error("Error parsing cached data:", error)
+          }
+        }
 
-        if (!productData) {
+        // Fallback to Firebase query using existing function
+        console.log("Fetching product data from Firebase...")
+        const productData = await getProductById(productId)
+        if (productData) {
+          // Verify this product belongs to the current user's company
+          if (userData?.company_id && productData.company_id !== userData.company_id) {
+            toast({
+              title: "Access Denied",
+              description: "You don't have permission to view this site.",
+              variant: "destructive",
+            })
+            router.push("/cms/dashboard")
+            return
+          }
+          setProduct(productData)
+        } else {
           toast({
             title: "Error",
             description: "Site not found.",
             variant: "destructive",
           })
           router.push("/cms/dashboard")
-          return
         }
-
-        // Verify this product belongs to the current user's company
-        if (userData?.company_id && productData.company_id !== userData.company_id) {
-          toast({
-            title: "Access Denied",
-            description: "You don't have permission to view this site.",
-            variant: "destructive",
-          })
-          router.push("/cms/dashboard")
-          return
-        }
-
-        // Get service assignments for this product
-        const serviceAssignments = await getServiceAssignmentsByProductId(productId)
-
-        // Convert Firebase product to CMS product data format
-        const cmsProductData: CMSProductData = {
-          id: productData.id || productId,
-          name: productData.name || "Unknown Product",
-          description: productData.description || "No description available",
-          status: productData.status || "PENDING",
-          type: productData.type || "RENTAL",
-          image: productData.imageUrl || "/placeholder.svg?height=200&width=200",
-          dimensions: `H: ${productData.specs_rental?.height || 12} × W: ${productData.specs_rental?.width || 12}`,
-          created: productData.created ? new Date(productData.created.seconds * 1000).toLocaleDateString() : "Unknown",
-          updated: productData.updated ? new Date(productData.updated.seconds * 1000).toLocaleDateString() : "Unknown",
-          company_id: productData.company_id,
-          seller_id: productData.seller_id,
-          traffic_count: productData.specs_rental?.traffic_count || 0,
-          cms: {
-            end_time: productData.cms?.end_time || "18:00",
-            loops_per_day: productData.cms?.loops_per_day || 20,
-            spot_duration: productData.cms?.spot_duration || 15,
-            start_time: productData.cms?.start_time || "06:00",
-          },
-          // Mock program list - in a real app, this would come from a separate collection
-          programList: [
-            {
-              id: "SPOT001",
-              name: "Morning Slot",
-              duration: "15 seconds",
-              timeSlot: "06:00 AM - 12:00 PM",
-              advertiser: "Coca Cola",
-              price: "PHP 1,200",
-              status: "Active",
-            },
-            {
-              id: "SPOT002",
-              name: "Afternoon Slot",
-              duration: "30 seconds",
-              timeSlot: "12:00 PM - 06:00 PM",
-              advertiser: "Samsung",
-              price: "PHP 1,800",
-              status: "Active",
-            },
-            {
-              id: "SPOT003",
-              name: "Evening Slot",
-              duration: "15 seconds",
-              timeSlot: "06:00 PM - 12:00 AM",
-              advertiser: "Nike",
-              price: "PHP 2,100",
-              status: "Pending",
-            },
-            {
-              id: "SPOT004",
-              name: "Late Night Slot",
-              duration: "30 seconds",
-              timeSlot: "12:00 AM - 06:00 AM",
-              advertiser: "-",
-              price: "PHP 900",
-              status: "Available",
-            },
-          ],
-          // Convert service assignments from Firebase
-          serviceAssignments: serviceAssignments.map((assignment) => ({
-            id: assignment.id,
-            title: assignment.jobDescription || "Service Assignment",
-            assignedTo: assignment.assignedTo || "Unassigned",
-            date: assignment.coveredDateStart ? new Date(assignment.coveredDateStart).toLocaleDateString() : "TBD",
-            status: assignment.status || "Pending",
-            notes: assignment.message || "No notes available",
-          })),
-          // Mock LED status - in a real app, this would come from IoT devices or separate collection
-          ledStatus: {
-            powerStatus: "On",
-            temperature: "32°C",
-            connection: "Online",
-            videoSource: "HDMI 1",
-            activeContent: "Current Campaign",
-            lastReboot: new Date().toLocaleDateString() + " 09:15 AM",
-            lastTimeSync: new Date().toLocaleDateString() + " 08:00 AM",
-            warnings:
-              productData.specs_rental?.elevation && productData.specs_rental.elevation > 100
-                ? ["High elevation detected"]
-                : [],
-          },
-          // Mock live preview - in a real app, this would come from live camera feeds
-          livePreview: [
-            {
-              id: `${productData.name?.substring(0, 10) || "LED"} 3.2`,
-              health: "100% Healthy",
-              image: "/placeholder.svg?height=100&width=150",
-            },
-            {
-              id: `${productData.specs_rental?.location?.substring(0, 10) || "SITE"} 1.0`,
-              health: "100% Healthy",
-              image: "/placeholder.svg?height=100&width=150",
-            },
-            {
-              id: "BACKUP LED 1.0",
-              health: "100% Healthy",
-              image: "/placeholder.svg?height=100&width=150",
-            },
-            {
-              id: "MAIN LED 2.1",
-              health: productData.active ? "100% Healthy" : "90% Healthy",
-              image: "/placeholder.svg?height=100&width=150",
-            },
-          ],
-        }
-
-        setProduct(cmsProductData)
       } catch (error) {
         console.error("Error fetching product:", error)
         toast({
@@ -732,19 +171,42 @@ export default function CMSSiteDetailsPage() {
     fetchProduct()
   }, [productId, userData?.company_id, toast, router])
 
-  const handleBack = () => {
-    router.push("/cms/dashboard")
+  const handleDelete = async () => {
+    if (!product?.id) return
+
+    try {
+      await softDeleteProduct(product.id)
+      toast({
+        title: "Site deleted",
+        description: `${product.name} has been successfully deleted.`,
+      })
+      router.push("/cms/dashboard")
+    } catch (error) {
+      console.error("Error deleting product:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete the site. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setDeleteDialogOpen(false)
+    }
   }
 
   const handleEdit = () => {
     router.push(`/cms/content/edit/${productId}`)
   }
 
+  const handleBack = () => {
+    router.push("/cms/dashboard")
+  }
+
   if (loading) {
     return (
-      <div className="flex-1 p-6 flex flex-col items-center justify-center min-h-[50vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-lg">Loading site details...</p>
+      <div className="flex-1 p-4">
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
       </div>
     )
   }
@@ -759,6 +221,134 @@ export default function CMSSiteDetailsPage() {
         </div>
       </div>
     )
+  }
+
+  // Transform product data for CMS display
+  const cmsData: CMSProductData = {
+    id: product.id || productId,
+    name: product.name || "Untitled Site",
+    description: product.description || "No description available",
+    status: product.status || "Draft",
+    type: product.type || "Billboard",
+    image: product.media?.[0]?.url || "/abstract-geometric-sculpture.png",
+    dimensions:
+      product.specs_rental?.width && product.specs_rental?.height
+        ? `${product.specs_rental.width}m × ${product.specs_rental.height}m`
+        : "1920×1080",
+    created:
+      typeof product.created === "string"
+        ? product.created
+        : product.created?.toDate
+          ? product.created.toDate().toLocaleDateString()
+          : "Unknown",
+    updated:
+      typeof product.updated === "string"
+        ? product.updated
+        : product.updated?.toDate
+          ? product.updated.toDate().toLocaleDateString()
+          : "Unknown",
+    company_id: product.company_id,
+    seller_id: product.seller_id,
+    traffic_count: product.specs_rental?.traffic_count || 0,
+    cms: {
+      end_time: product.cms?.end_time || "18:00",
+      loops_per_day: product.cms?.loops_per_day || 20,
+      spot_duration: product.cms?.spot_duration || 15,
+      start_time: product.cms?.start_time || "06:00",
+    },
+    // Mock program list - in a real app, this would come from a separate collection
+    programList: [
+      {
+        id: "SPOT001",
+        name: "Morning Slot",
+        duration: "15 seconds",
+        timeSlot: "06:00 AM - 12:00 PM",
+        advertiser: "Coca Cola",
+        price: "PHP 1,200",
+        status: "Active",
+      },
+      {
+        id: "SPOT002",
+        name: "Afternoon Slot",
+        duration: "30 seconds",
+        timeSlot: "12:00 PM - 06:00 PM",
+        advertiser: "Samsung",
+        price: "PHP 1,800",
+        status: "Active",
+      },
+      {
+        id: "SPOT003",
+        name: "Evening Slot",
+        duration: "15 seconds",
+        timeSlot: "06:00 PM - 12:00 AM",
+        advertiser: "Nike",
+        price: "PHP 2,100",
+        status: "Pending",
+      },
+      {
+        id: "SPOT004",
+        name: "Late Night Slot",
+        duration: "30 seconds",
+        timeSlot: "12:00 AM - 06:00 AM",
+        advertiser: "-",
+        price: "PHP 900",
+        status: "Available",
+      },
+    ],
+    // Mock service assignments
+    serviceAssignments: [
+      {
+        id: "SA001",
+        title: "Monthly Maintenance",
+        assignedTo: "Tech Team A",
+        date: new Date().toLocaleDateString(),
+        status: "Scheduled",
+        notes: "Regular maintenance check",
+      },
+      {
+        id: "SA002",
+        title: "Display Calibration",
+        assignedTo: "Tech Team B",
+        date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+        status: "Pending",
+        notes: "Color and brightness adjustment",
+      },
+    ],
+    // Mock LED status
+    ledStatus: {
+      powerStatus: "On",
+      temperature: "32°C",
+      connection: "Online",
+      videoSource: "HDMI 1",
+      activeContent: "Current Campaign",
+      lastReboot: new Date().toLocaleDateString() + " 09:15 AM",
+      lastTimeSync: new Date().toLocaleDateString() + " 08:00 AM",
+      warnings:
+        product.specs_rental?.elevation && product.specs_rental.elevation > 100 ? ["High elevation detected"] : [],
+    },
+    // Mock live preview
+    livePreview: [
+      {
+        id: `${product.name?.substring(0, 10) || "LED"} 3.2`,
+        health: "100% Healthy",
+        image: "/placeholder.svg?height=100&width=150",
+      },
+      {
+        id: `${product.specs_rental?.location?.substring(0, 10) || "SITE"} 1.0`,
+        health: "100% Healthy",
+        image: "/placeholder.svg?height=100&width=150",
+      },
+      {
+        id: "BACKUP LED 1.0",
+        health: "100% Healthy",
+        image: "/placeholder.svg?height=100&width=150",
+      },
+      {
+        id: "MAIN LED 2.1",
+        health: product.active ? "100% Healthy" : "90% Healthy",
+        image: "/placeholder.svg?height=100&width=150",
+      },
+    ],
   }
 
   const getStatusColor = (status: string) => {
@@ -786,40 +376,62 @@ export default function CMSSiteDetailsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <button onClick={handleBack} className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
-            <ArrowLeft size={16} />
+          <Button variant="ghost" size="sm" onClick={handleBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Dashboard
-          </button>
+          </Button>
         </div>
-        <div className="flex gap-2">
-          <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleEdit}>
-            <Edit size={16} className="mr-2" />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleEdit}>
+            <Edit className="h-4 w-4 mr-2" />
             Edit
           </Button>
-          <Button variant="destructive">
-            <Trash2 size={16} className="mr-2" />
-            Delete
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem>
+                <Eye className="mr-2 h-4 w-4" />
+                Preview
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Share2 className="mr-2 h-4 w-4" />
+                Share
+              </DropdownMenuItem>
+              <Separator className="my-1" />
+              <DropdownMenuItem onClick={() => setDeleteDialogOpen(true)} className="text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
       {/* Title and Badges */}
       <div className="flex items-center gap-3">
-        <h1 className="text-3xl font-bold">{product.name}</h1>
-        <Badge className={getStatusColor(product.status)}>
-          {product.status.charAt(0).toUpperCase() + product.status.slice(1)}
+        <h1 className="text-3xl font-bold">{cmsData.name}</h1>
+        <Badge className={getStatusColor(cmsData.status)}>
+          {cmsData.status.charAt(0).toUpperCase() + cmsData.status.slice(1)}
         </Badge>
-        <Badge variant="outline">{product.type}</Badge>
+        <Badge variant="outline">{cmsData.type}</Badge>
       </div>
 
       {/* Main Content */}
       <div className="grid grid-cols-12 gap-6">
         {/* Left - Image */}
-        <div className="col-span-2">
+        <div className="col-span-12 md:col-span-2">
           <div className="bg-gray-100 rounded-lg p-4">
             <Image
-              src={product.image || "/placeholder.svg"}
-              alt={product.name}
+              src={cmsData.image || "/placeholder.svg"}
+              alt={cmsData.name}
               width={200}
               height={200}
               className="w-full h-auto rounded"
@@ -828,83 +440,87 @@ export default function CMSSiteDetailsPage() {
         </div>
 
         {/* Middle - Description and CMS Config */}
-        <div className="col-span-6 space-y-4">
+        <div className="col-span-12 md:col-span-6 space-y-4">
           <div>
             <h3 className="text-sm font-medium text-gray-500 mb-1">Description</h3>
-            <p className="text-gray-900">{product.description}</p>
+            <p className="text-gray-900">{cmsData.description}</p>
           </div>
 
           <div>
             <h3 className="text-sm font-medium text-gray-500 mb-2">CMS Configuration</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                <span>Spots per loop: {product.cms.loops_per_day}</span>
+                <span>Loops per day: {cmsData.cms.loops_per_day}</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                <span>Spot duration: {product.cms.spot_duration}s</span>
+                <span>Spot duration: {cmsData.cms.spot_duration}s</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 col-span-1 md:col-span-2">
                 <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
                 <span>
-                  Loop time: {product.cms.start_time} - {product.cms.end_time}
+                  Loop time: {cmsData.cms.start_time} - {cmsData.cms.end_time}
                 </span>
               </div>
             </div>
           </div>
 
-          {product.traffic_count && (
+          {cmsData.traffic_count > 0 && (
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1">Traffic Count</h3>
-              <p className="text-gray-900">{product.traffic_count.toLocaleString()}</p>
+              <p className="text-gray-900">{cmsData.traffic_count.toLocaleString()}</p>
             </div>
           )}
         </div>
 
         {/* Right - ID and Dimensions */}
-        <div className="col-span-4 space-y-4">
+        <div className="col-span-12 md:col-span-4 space-y-4">
           <div>
             <h3 className="text-sm font-medium text-gray-500 mb-1">ID</h3>
-            <p className="text-sm font-mono">{product.id}</p>
+            <p className="text-sm font-mono">{cmsData.id}</p>
           </div>
 
           <div>
             <h3 className="text-sm font-medium text-gray-500 mb-1">Dimensions</h3>
-            <p className="text-sm">{product.dimensions}</p>
+            <p className="text-sm">{cmsData.dimensions}</p>
           </div>
 
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <Clock size={14} />
-              <span>Created: {product.created}</span>
+              <span>Created: {cmsData.created}</span>
             </div>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <Clock size={14} />
-              <span>Updated: {product.updated}</span>
+              <span>Updated: {cmsData.updated}</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="program-list" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4 bg-gray-100">
           <TabsTrigger value="program-list" className="flex items-center gap-2">
             <List size={16} />
-            Program List
+            <span className="hidden sm:inline">Program List</span>
+            <span className="sm:hidden">Programs</span>
           </TabsTrigger>
           <TabsTrigger value="service" className="flex items-center gap-2">
             <Wrench size={16} />
-            Service
+            <span className="hidden sm:inline">Service</span>
+            <span className="sm:hidden">Service</span>
           </TabsTrigger>
           <TabsTrigger value="controls" className="flex items-center gap-2">
             <Settings size={16} />
-            Controls
+            <span className="hidden sm:inline">Controls</span>
+            <span className="sm:hidden">Controls</span>
           </TabsTrigger>
           <TabsTrigger value="timeline" className="flex items-center gap-2">
             <Clock size={16} />
-            Loop Timeline
+            <span className="hidden sm:inline">Timeline</span>
+            <span className="sm:hidden">Timeline</span>
           </TabsTrigger>
         </TabsList>
 
@@ -929,34 +545,36 @@ export default function CMSSiteDetailsPage() {
 
           <Card>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Time Slot</TableHead>
-                    <TableHead>Advertiser</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {product.programList.map((program) => (
-                    <TableRow key={program.id}>
-                      <TableCell className="font-mono text-sm">{program.id}</TableCell>
-                      <TableCell className="font-medium">{program.name}</TableCell>
-                      <TableCell>{program.duration}</TableCell>
-                      <TableCell>{program.timeSlot}</TableCell>
-                      <TableCell>{program.advertiser}</TableCell>
-                      <TableCell>{program.price}</TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(program.status)}>{program.status}</Badge>
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Time Slot</TableHead>
+                      <TableHead>Advertiser</TableHead>
+                      <TableHead>Price</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {cmsData.programList.map((program) => (
+                      <TableRow key={program.id}>
+                        <TableCell className="font-mono text-sm">{program.id}</TableCell>
+                        <TableCell className="font-medium">{program.name}</TableCell>
+                        <TableCell>{program.duration}</TableCell>
+                        <TableCell>{program.timeSlot}</TableCell>
+                        <TableCell>{program.advertiser}</TableCell>
+                        <TableCell>{program.price}</TableCell>
+                        <TableCell>
+                          <Badge className={getStatusColor(program.status)}>{program.status}</Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
 
@@ -974,40 +592,42 @@ export default function CMSSiteDetailsPage() {
 
           <Card>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ID</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Assigned To</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Notes</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {product.serviceAssignments.length > 0 ? (
-                    product.serviceAssignments.map((assignment) => (
-                      <TableRow key={assignment.id}>
-                        <TableCell className="font-mono text-sm">{assignment.id}</TableCell>
-                        <TableCell className="font-medium">{assignment.title}</TableCell>
-                        <TableCell>{assignment.assignedTo}</TableCell>
-                        <TableCell>{assignment.date}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(assignment.status)}>{assignment.status}</Badge>
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate">{assignment.notes}</TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-gray-500 py-8">
-                        No service assignments found for this product.
-                      </TableCell>
+                      <TableHead>ID</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Assigned To</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Notes</TableHead>
                     </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {cmsData.serviceAssignments.length > 0 ? (
+                      cmsData.serviceAssignments.map((assignment) => (
+                        <TableRow key={assignment.id}>
+                          <TableCell className="font-mono text-sm">{assignment.id}</TableCell>
+                          <TableCell className="font-medium">{assignment.title}</TableCell>
+                          <TableCell>{assignment.assignedTo}</TableCell>
+                          <TableCell>{assignment.date}</TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(assignment.status)}>{assignment.status}</Badge>
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate">{assignment.notes}</TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-gray-500 py-8">
+                          No service assignments found for this product.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
 
@@ -1018,7 +638,7 @@ export default function CMSSiteDetailsPage() {
 
         {/* Controls Tab */}
         <TabsContent value="controls" className="space-y-6">
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* LED Site Status */}
             <Card>
               <CardHeader>
@@ -1028,50 +648,50 @@ export default function CMSSiteDetailsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <span className="text-sm font-medium text-gray-500">Power Status</span>
                     <div className="flex items-center gap-2 mt-1">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-sm">{product.ledStatus.powerStatus}</span>
+                      <span className="text-sm">{cmsData.ledStatus.powerStatus}</span>
                     </div>
                   </div>
                   <div>
                     <span className="text-sm font-medium text-gray-500">Connection</span>
                     <div className="flex items-center gap-2 mt-1">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-sm">{product.ledStatus.connection}</span>
+                      <span className="text-sm">{cmsData.ledStatus.connection}</span>
                     </div>
                   </div>
                   <div>
                     <span className="text-sm font-medium text-gray-500">Temperature</span>
-                    <p className="text-sm mt-1">{product.ledStatus.temperature}</p>
+                    <p className="text-sm mt-1">{cmsData.ledStatus.temperature}</p>
                   </div>
                   <div>
                     <span className="text-sm font-medium text-gray-500">Video Source</span>
-                    <p className="text-sm mt-1">{product.ledStatus.videoSource}</p>
+                    <p className="text-sm mt-1">{cmsData.ledStatus.videoSource}</p>
                   </div>
                   <div>
                     <span className="text-sm font-medium text-gray-500">Active Content</span>
-                    <p className="text-sm mt-1 text-blue-600">{product.ledStatus.activeContent}</p>
+                    <p className="text-sm mt-1 text-blue-600">{cmsData.ledStatus.activeContent}</p>
                   </div>
                   <div>
                     <span className="text-sm font-medium text-gray-500">Last Time Sync</span>
-                    <p className="text-sm mt-1">{product.ledStatus.lastTimeSync}</p>
+                    <p className="text-sm mt-1">{cmsData.ledStatus.lastTimeSync}</p>
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <span className="text-sm font-medium text-gray-500">Last Reboot</span>
-                    <p className="text-sm mt-1">{product.ledStatus.lastReboot}</p>
+                    <p className="text-sm mt-1">{cmsData.ledStatus.lastReboot}</p>
                   </div>
                 </div>
 
-                {product.ledStatus.warnings.length > 0 && (
+                {cmsData.ledStatus.warnings.length > 0 && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                     <div className="flex items-center gap-2 text-yellow-800">
                       <span className="text-sm font-medium">⚠ Warnings</span>
                     </div>
                     <ul className="mt-1 text-sm text-yellow-700">
-                      {product.ledStatus.warnings.map((warning, index) => (
+                      {cmsData.ledStatus.warnings.map((warning, index) => (
                         <li key={index}>• {warning}</li>
                       ))}
                     </ul>
@@ -1089,7 +709,7 @@ export default function CMSSiteDetailsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Button variant="outline" className="flex items-center gap-2 bg-transparent">
                     <Power size={16} />
                     Power Off
@@ -1102,7 +722,7 @@ export default function CMSSiteDetailsPage() {
 
                 <div>
                   <h4 className="font-medium mb-3">Content Controls</h4>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Button variant="outline" className="flex items-center gap-2 bg-transparent">
                       <Pause size={16} />
                       Pause Content
@@ -1116,7 +736,7 @@ export default function CMSSiteDetailsPage() {
 
                 <div>
                   <h4 className="font-medium mb-3">System Controls</h4>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Button variant="outline" className="flex items-center gap-2 bg-transparent">
                       <Timer size={16} />
                       NTP Time Sync
@@ -1130,7 +750,7 @@ export default function CMSSiteDetailsPage() {
 
                 <div>
                   <h4 className="font-medium mb-3">Monitoring</h4>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Button variant="outline" className="flex items-center gap-2 bg-transparent">
                       <Camera size={16} />
                       Screenshot
@@ -1144,7 +764,7 @@ export default function CMSSiteDetailsPage() {
 
                 <div>
                   <h4 className="font-medium mb-3">Quick Actions</h4>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Button variant="outline" className="flex items-center gap-2 bg-transparent">
                       <TestTube size={16} />
                       Test Pattern
@@ -1171,7 +791,7 @@ export default function CMSSiteDetailsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Live Preview</CardTitle>
-              <div className="flex items-center gap-4 text-sm text-gray-500">
+              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500">
                 <div className="flex items-center gap-2">
                   <span>Content</span>
                   <Badge variant="outline" className="bg-blue-100 text-blue-800">
@@ -1188,8 +808,8 @@ export default function CMSSiteDetailsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-4 gap-4">
-                {product.livePreview.map((preview) => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {cmsData.livePreview.map((preview) => (
                   <div key={preview.id} className="text-center">
                     <div className="bg-gray-100 rounded-lg p-2 mb-2">
                       <Image
@@ -1200,7 +820,7 @@ export default function CMSSiteDetailsPage() {
                         className="w-full h-auto rounded"
                       />
                     </div>
-                    <p className="text-sm font-medium">{preview.id}</p>
+                    <p className="text-sm font-medium truncate">{preview.id}</p>
                     <Badge
                       className={
                         preview.health.includes("100%")
@@ -1219,7 +839,7 @@ export default function CMSSiteDetailsPage() {
           </Card>
 
           {/* Brightness and Volume Controls */}
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle>Brightness Control</CardTitle>
@@ -1254,11 +874,64 @@ export default function CMSSiteDetailsPage() {
           </div>
         </TabsContent>
 
-        {/* Loop Timeline Tab */}
+        {/* Timeline Tab */}
         <TabsContent value="timeline" className="space-y-6">
-          <LoopTimelineComponent cmsData={product.cms} productId={product.id} />
+          <div className="flex items-center gap-2">
+            <Clock size={20} />
+            <h2 className="text-xl font-semibold">Loop Timeline</h2>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Timeline Configuration</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Start Time</label>
+                  <p className="text-lg font-semibold">{cmsData.cms.start_time}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">End Time</label>
+                  <p className="text-lg font-semibold">{cmsData.cms.end_time}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Loops per Day</label>
+                  <p className="text-lg font-semibold">{cmsData.cms.loops_per_day}</p>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <h4 className="font-medium">Timeline Preview</h4>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center justify-between text-sm text-gray-600">
+                    <span>{cmsData.cms.start_time}</span>
+                    <span>Active Period</span>
+                    <span>{cmsData.cms.end_time}</span>
+                  </div>
+                  <div className="mt-2 h-2 bg-gray-200 rounded-full">
+                    <div className="h-2 bg-blue-500 rounded-full" style={{ width: "75%" }}></div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {cmsData.cms.loops_per_day} loops × {cmsData.cms.spot_duration}s per spot
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDelete}
+        title="Delete Site"
+        description={`Are you sure you want to delete "${cmsData.name}"? This action cannot be undone.`}
+      />
     </div>
   )
 }
