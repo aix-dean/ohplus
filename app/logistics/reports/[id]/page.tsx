@@ -259,36 +259,26 @@ export default function ReportPreviewPage() {
           <div className="flex-shrink-0">
             {userData?.company_logo ? (
               <div
-                className="border border-yellow-400 rounded-full flex items-center justify-center"
-                style={{ minWidth: "120px", height: "48px" }}
+                className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm"
+                style={{ minHeight: "48px", minWidth: "120px" }}
               >
-                <div
-                  className="bg-white rounded px-3 py-1 flex items-center justify-center"
-                  style={{ minHeight: "32px", minWidth: "80px" }}
-                >
-                  <img
-                    src={userData.company_logo || "/placeholder.svg"}
-                    alt={`${userData.company || "Company"} Logo`}
-                    className="max-h-5 max-w-full object-contain"
-                    onError={(e) => {
-                      // Fallback to OH+ logo if company logo fails to load
-                      const target = e.target as HTMLImageElement
-                      target.src = "/ohplus-new-logo.png"
-                    }}
-                  />
-                </div>
+                <img
+                  src={userData.company_logo || "/placeholder.svg"}
+                  alt={`${userData.company || "Company"} Logo`}
+                  className="max-h-8 max-w-full object-contain"
+                  onError={(e) => {
+                    // Fallback to OH+ logo if company logo fails to load
+                    const target = e.target as HTMLImageElement
+                    target.src = "/ohplus-new-logo.png"
+                  }}
+                />
               </div>
             ) : (
               <div
-                className="border border-yellow-400 rounded-full flex items-center justify-center"
-                style={{ minWidth: "120px", height: "48px" }}
+                className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm"
+                style={{ minHeight: "48px", minWidth: "120px" }}
               >
-                <div
-                  className="bg-white rounded px-3 py-1 flex items-center justify-center"
-                  style={{ minHeight: "32px", minWidth: "80px" }}
-                >
-                  <img src="/ohplus-new-logo.png" alt="OH+ Logo" className="max-h-5 max-w-full object-contain" />
-                </div>
+                <img src="/ohplus-new-logo.png" alt="OH+ Logo" className="max-h-8 max-w-full object-contain" />
               </div>
             )}
           </div>
