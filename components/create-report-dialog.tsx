@@ -223,9 +223,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       setAttachments(newAttachments)
 
       try {
-        // Upload to Firebase Storage
-        const uploadPath = `reports/${siteId}/${Date.now()}_`
+        // Upload to Firebase Storage with a proper path structure
+        const timestamp = Date.now()
+        const uploadPath = `reports/${siteId}/${timestamp}_${file.name}`
+
+        console.log("Uploading file to Firebase Storage:", uploadPath)
         const downloadURL = await uploadFileToFirebaseStorage(file, uploadPath)
+        console.log("File uploaded successfully, download URL:", downloadURL)
 
         // Update attachment with Firebase URL
         const updatedAttachments = [...attachments]
@@ -235,16 +239,10 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
           fileName: file.name,
           fileType: file.type,
           preview: newAttachments[index].preview,
-          fileUrl: downloadURL,
+          fileUrl: downloadURL, // This is the key field that was missing
           uploading: false,
         }
         setAttachments(updatedAttachments)
-
-        console.log("File uploaded successfully:", {
-          fileName: file.name,
-          fileType: file.type,
-          fileUrl: downloadURL,
-        })
 
         toast({
           title: "Success",
@@ -335,6 +333,19 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         >
           <Eye className="h-3 w-3" />
         </button>
+
+        {/* Success indicator when uploaded */}
+        {attachment.fileUrl && !attachment.uploading && (
+          <div className="absolute bottom-1 right-1 bg-green-500 text-white p-1 rounded-full">
+            <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </div>
+        )}
       </div>
     )
   }
@@ -359,8 +370,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     }
 
     // Check if at least one attachment has a file with fileUrl
-    const validAttachments = attachments.filter((att) => att.file && att.fileUrl)
-    if (validAttachments.length === 0) {
+    const hasValidAttachments = attachments.some((att) => att.file && att.fileUrl)
+    if (!hasValidAttachments) {
       toast({
         title: "Error",
         description: "Please upload at least one attachment and wait for it to finish uploading",
@@ -382,7 +393,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
     setLoading(true)
     try {
-      // Build the report data for preview with proper attachment structure
+      // Build the report data for preview (without saving to Firebase)
       const reportData: any = {
         id: `preview-${Date.now()}`, // Temporary ID for preview
         siteId: product.id,
@@ -402,10 +413,10 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         attachments: attachments
           .filter((att) => (att.note.trim() !== "" || att.file) && att.fileUrl) // Only include attachments with fileUrl
           .map((att) => ({
-            note: att.note || "",
+            note: att.note,
             fileName: att.fileName || "",
-            fileType: att.fileType || "",
-            fileUrl: att.fileUrl, // This is the Firebase Storage URL
+            fileType: att.fileType || att.file?.type || "",
+            fileUrl: att.fileUrl, // This is the crucial field for the report display
           })),
         status: "draft",
         createdBy: user.uid,
@@ -453,10 +464,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         }
       }
 
-      console.log("Report data being saved:", {
-        attachments: reportData.attachments,
-        totalAttachments: reportData.attachments.length,
-      })
+      console.log("Generated report data with attachments:", reportData.attachments)
 
       // Store the report data in sessionStorage for the preview page
       sessionStorage.setItem("previewReportData", JSON.stringify(reportData))
@@ -722,10 +730,14 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             {/* Generate Report Button */}
             <Button
               onClick={handleGenerateReport}
-              disabled={loading}
+              disabled={loading || attachments.some((att) => att.uploading)}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white h-10 text-sm font-medium mt-4"
             >
-              {loading ? "Generating..." : "Generate Report"}
+              {loading
+                ? "Generating..."
+                : attachments.some((att) => att.uploading)
+                  ? "Uploading files..."
+                  : "Generate Report"}
             </Button>
           </div>
         </DialogContent>
