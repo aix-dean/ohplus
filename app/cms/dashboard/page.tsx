@@ -323,20 +323,20 @@ export default function CMSDashboardPage() {
   // Handle edit click
   const handleEditClick = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation()
-    // Store the complete product data for the details page
+    // Store the complete product data for the site page
     localStorage.setItem(`cms-product-${product.id}`, JSON.stringify(product))
-    router.push(`/cms/details/${product.id}`)
+    router.push(`/cms/content/edit/${product.id}`)
   }
 
-  // Handle view details click
-  const handleViewDetails = (productId: string) => {
+  // Handle view site details click - Updated to use new site page
+  const handleViewSite = (productId: string) => {
     // Find the product data to pass along
     const productData = products.find((p) => p.id === productId)
     if (productData) {
-      // Store the complete product data for the details page
+      // Store the complete product data for the site page
       localStorage.setItem(`cms-product-${productId}`, JSON.stringify(productData))
     }
-    router.push(`/cms/details/${productId}`)
+    router.push(`/cms/site/${productId}`)
   }
 
   // Use mock data if no products are available from Firebase
@@ -538,7 +538,7 @@ export default function CMSDashboardPage() {
                     if (originalProduct) {
                       localStorage.setItem(`cms-product-${item.id}`, JSON.stringify(originalProduct))
                     }
-                    handleViewDetails(item.id)
+                    handleViewSite(item.id)
                   }}
                 >
                   <div className="relative aspect-video overflow-hidden rounded-t-lg">
@@ -650,7 +650,7 @@ export default function CMSDashboardPage() {
                       if (originalProduct) {
                         localStorage.setItem(`cms-product-${item.id}`, JSON.stringify(originalProduct))
                       }
-                      handleViewDetails(item.id)
+                      handleViewSite(item.id)
                     }}
                   >
                     <TableCell>
@@ -710,11 +710,11 @@ export default function CMSDashboardPage() {
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation()
-                              handleViewDetails(item.id)
+                              handleViewSite(item.id)
                             }}
                           >
                             <Eye className="mr-2 h-4 w-4" />
-                            View Details
+                            View Site
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => handleEditClick(item as any, e)}>
                             <Edit className="mr-2 h-4 w-4" />
@@ -868,7 +868,7 @@ function ContentCard({
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={onView}>
                 <Eye className="mr-2 h-4 w-4" />
-                View Details
+                View Site
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onEdit}>
                 <Edit className="mr-2 h-4 w-4" />
