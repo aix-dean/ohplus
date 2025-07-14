@@ -487,7 +487,9 @@ export default function CMSDashboardPage() {
       <div className="flex flex-col gap-3">
         {/* Header with title and actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <h1 className="text-2xl font-bold">Content Management</h1>
+          <h1 className="text-2xl font-bold">
+            {user?.first_name ? `${user.first_name}'s Content Management` : "Content Management"}
+          </h1>
         </div>
 
         {/* Screen Analytics Monitoring */}
@@ -823,7 +825,6 @@ function ContentCard({
 
       <CardContent className="p-3">
         <div className="flex flex-col space-y-2">
-
           {/* Title/Location */}
           <h3 className="text-base font-semibold text-gray-900">{content.title}</h3>
 

@@ -248,7 +248,9 @@ export default function AdminDashboardPage() {
       <div className="flex flex-col gap-6">
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
+          <h1 className="text-xl md:text-2xl font-bold">
+            {user?.first_name ? `${user.first_name}'s Dashboard` : "Dashboard"}
+          </h1>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-grow">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
