@@ -899,7 +899,6 @@ export async function generateReportPDF(
     pdf.setTextColor(0, 0, 0)
 
     // Add company logo on the right (similar to web page - smaller size)
-    const logoSize = 25 // Reduced from 40 to 25 to match web page proportions
     const logoContainerSize = 30 // Container size
     const logoX = pageWidth - margin - logoContainerSize
     const logoY = yPosition - 2 // Aligned with badge
@@ -911,15 +910,28 @@ export async function generateReportPDF(
       // Add white background container for logo (similar to web page)
       pdf.setFillColor(255, 255, 255)
       pdf.rect(logoX - 2, logoY, logoContainerSize + 4, logoContainerSize, "F")
-      // Removed pdf.setDrawColor and pdf.rect to remove the border
-      // pdf.setDrawColor(220, 220, 220)
-      // pdf.setLineWidth(0.5)
-      // pdf.rect(logoX - 2, logoY, logoContainerSize + 4, logoContainerSize)
 
-      // Add logo centered in container
-      const logoOffsetX = (logoContainerSize - logoSize) / 2
-      const logoOffsetY = (logoContainerSize - logoSize) / 2
-      pdf.addImage(logoBase64, "PNG", logoX + logoOffsetX, logoY + logoOffsetY, logoSize, logoSize)
+      // Calculate actual dimensions to fit within the container while maintaining aspect ratio
+      const { width: actualLogoWidth, height: actualLogoHeight } = await getImageDimensions(logoBase64)
+
+      let finalLogoWidth = logoContainerSize
+      let finalLogoHeight = logoContainerSize
+
+      // Adjust dimensions to fit within the container while maintaining aspect ratio
+      const logoAspectRatio = actualLogoWidth / actualLogoHeight
+      if (logoAspectRatio > 1) {
+        // Wider than tall
+        finalLogoHeight = logoContainerSize / logoAspectRatio
+      } else {
+        // Taller than wide or square
+        finalLogoWidth = logoContainerSize * logoAspectRatio
+      }
+
+      // Center the logo within its container
+      const logoOffsetX = (logoContainerSize - finalLogoWidth) / 2
+      const logoOffsetY = (logoContainerSize - finalLogoHeight) / 2
+
+      pdf.addImage(logoBase64, "PNG", logoX + logoOffsetX, logoY + logoOffsetY, finalLogoWidth, finalLogoHeight)
     }
 
     yPosition += badgeHeight + 5
