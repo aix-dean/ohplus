@@ -469,10 +469,14 @@ export default function CMSDashboardPage() {
 
   return (
     <div className="flex-1 p-4">
-      <div className="flex flex-col gap-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold">Content Management</h1>
+      <div className="flex flex-col gap-3">
+        {/* Header with title and actions */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <h1 className="text-2xl font-bold">
+            {userData?.first_name
+              ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+              : "Dashboard"}
+          </h1>
           <p className="text-muted-foreground">Manage your digital billboard content and campaigns</p>
         </div>
 
@@ -773,5 +777,123 @@ export default function CMSDashboardPage() {
         description={`Are you sure you want to delete "${productToDelete?.name}"? This action cannot be undone.`}
       />
     </div>
+  )
+}
+
+// Content Card Component for Grid View
+function ContentCard({
+  content,
+  onView,
+  onEdit,
+  onDelete,
+}: {
+  content: any
+  onView: () => void
+  onEdit: (e: React.MouseEvent) => void
+  onDelete: (e: React.MouseEvent) => void
+}) {
+  return (
+    <Card
+      className="overflow-hidden cursor-pointer transition-all border border-gray-300 shadow-sm hover:shadow-md rounded-lg bg-white"
+      onClick={onView}
+    >
+      <div className="h-32 bg-gray-200 relative">
+        <Image
+          src={content.thumbnail || "/placeholder.svg"}
+          alt={content.title || "Content thumbnail"}
+          fill
+          className="object-cover"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            target.src = "/abstract-geometric-sculpture.png"
+            target.className = "opacity-50 object-contain"
+          }}
+        />
+
+        {/* Status Badge - positioned at bottom left of image */}
+        <div className="absolute bottom-2 left-2 z-10">
+          <Badge
+            className={`${
+              content.status === "Published"
+                ? "bg-blue-500 text-white border-0 font-medium px-3 py-1"
+                : content.status === "Draft"
+                  ? "bg-orange-500 text-white border-0 font-medium px-3 py-1"
+                  : "bg-gray-500 text-white border-0 font-medium px-3 py-1"
+            }`}
+          >
+            {content.status === "Published" ? "OCCUPIED" : content.status.toUpperCase()}
+          </Badge>
+        </div>
+
+        {/* Action Menu - top right */}
+        <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="secondary"
+                size="icon"
+                className="h-7 w-7 bg-white/90 backdrop-blur-sm border-0 shadow-sm"
+              >
+                <MoreVertical size={14} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onView}>
+                <Eye className="mr-2 h-4 w-4" />
+                View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onEdit}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Content
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Content
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      <CardContent className="p-3">
+        <div className="flex flex-col space-y-2">
+          {/* Title/Location */}
+          <h3 className="text-base font-semibold text-gray-900">{content.title}</h3>
+
+          {/* Location Info */}
+          <div className="text-sm text-gray-700">
+            <div className="flex items-center gap-1 mb-1 line-clamp-1">
+              <span>{content.location}</span>
+            </div>
+          </div>
+
+          {/* CMS Schedule Info */}
+          {content.cms && (
+            <div className="mt-2 pt-2 border-t border-gray-100">
+              <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                <div className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  <span>
+                    {content.cms.start_time} - {content.cms.end_time}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Play className="h-3 w-3" />
+                  <span>{content.cms.spot_duration}s spots</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Repeat className="h-3 w-3" />
+                  <span>{content.cms.loops_per_day} loops/day</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs">•</span>
+                  <span>{content.cms.spots_per_loop} spots/loop</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
