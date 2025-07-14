@@ -223,9 +223,10 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       setAttachments(newAttachments)
 
       try {
-        // Upload to Firebase Storage with a proper path structure
+        // Create a clean filename without special characters
+        const cleanFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_")
         const timestamp = Date.now()
-        const uploadPath = `reports/${siteId}/${timestamp}_${file.name}`
+        const uploadPath = `reports/${siteId}/${timestamp}_${cleanFileName}`
 
         console.log("Uploading file to Firebase Storage:", uploadPath)
         const downloadURL = await uploadFileToFirebaseStorage(file, uploadPath)
@@ -239,7 +240,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
           fileName: file.name,
           fileType: file.type,
           preview: newAttachments[index].preview,
-          fileUrl: downloadURL, // This is the key field that was missing
+          fileUrl: downloadURL,
           uploading: false,
         }
         setAttachments(updatedAttachments)
