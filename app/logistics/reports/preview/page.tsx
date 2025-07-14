@@ -303,7 +303,6 @@ export default function ReportPreviewPage() {
           <div className="bg-cyan-400 text-white px-3 py-1 rounded text-sm font-medium">
             {product?.content_type || "Lilo & Stitch"}
           </div>
-          <div className="bg-orange-500 text-white px-3 py-1 rounded text-sm font-medium">PREVIEW</div>
         </div>
 
         {/* Action Buttons */}
