@@ -119,31 +119,63 @@ export async function createReport(reportData: ReportData): Promise<string> {
       }),
     )
 
-    // Create a clean copy of the report data, explicitly removing undefined values
-    const cleanData: any = {}
-
-    // Copy all defined values from reportData, excluding undefined values
-    Object.entries(reportData).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== "") {
-        cleanData[key] = value
-      }
-    })
-
-    const finalReportData = {
-      ...cleanData,
+    // Create the final report data with proper structure
+    const finalReportData: any = {
+      siteId: reportData.siteId,
+      siteName: reportData.siteName,
+      companyId: reportData.companyId,
+      sellerId: reportData.sellerId,
+      client: reportData.client,
+      clientId: reportData.clientId,
+      bookingDates: reportData.bookingDates,
+      breakdate: reportData.breakdate,
+      sales: reportData.sales,
+      reportType: reportData.reportType,
+      date: reportData.date,
       attachments: processedAttachments,
+      status: reportData.status,
+      createdBy: reportData.createdBy,
+      createdByName: reportData.createdByName,
+      category: reportData.category,
+      subcategory: reportData.subcategory,
+      priority: reportData.priority,
+      completionPercentage: reportData.completionPercentage,
+      tags: reportData.tags,
       created: Timestamp.now(),
       updated: Timestamp.now(),
     }
 
-    // Remove any remaining undefined values recursively
-    const cleanedFinalData = JSON.parse(
-      JSON.stringify(finalReportData, (key, value) => {
-        return value === undefined ? null : value
-      }),
-    )
+    // Add optional fields only if they have values
+    if (reportData.siteCode) {
+      finalReportData.siteCode = reportData.siteCode
+    }
 
-    const docRef = await addDoc(collection(db, "reports"), cleanedFinalData)
+    if (reportData.location) {
+      finalReportData.location = reportData.location
+    }
+
+    if (reportData.assignedTo) {
+      finalReportData.assignedTo = reportData.assignedTo
+    }
+
+    // Add installation-specific fields only if they have values
+    if (reportData.installationStatus && reportData.installationStatus.trim() !== "") {
+      finalReportData.installationStatus = reportData.installationStatus
+    }
+
+    if (reportData.installationTimeline && reportData.installationTimeline.trim() !== "") {
+      finalReportData.installationTimeline = reportData.installationTimeline
+    }
+
+    if (reportData.delayReason && reportData.delayReason.trim() !== "") {
+      finalReportData.delayReason = reportData.delayReason
+    }
+
+    if (reportData.delayDays && reportData.delayDays.trim() !== "") {
+      finalReportData.delayDays = reportData.delayDays
+    }
+
+    const docRef = await addDoc(collection(db, "reports"), finalReportData)
     return docRef.id
   } catch (error) {
     console.error("Error creating report:", error)
@@ -217,14 +249,21 @@ export async function getReportById(reportId: string): Promise<ReportData | null
 
 export async function updateReport(reportId: string, updateData: Partial<ReportData>): Promise<void> {
   try {
-    // Clean the data to remove undefined values
-    const cleanedData = cleanReportData(updateData)
+    // Create a clean update object with only defined values
+    const cleanUpdateData: any = {}
+
+    // Copy only defined values, excluding undefined and null
+    Object.entries(updateData).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        cleanUpdateData[key] = value
+      }
+    })
+
+    // Always update the timestamp
+    cleanUpdateData.updated = Timestamp.now()
 
     const docRef = doc(db, "reports", reportId)
-    await updateDoc(docRef, {
-      ...cleanedData,
-      updated: Timestamp.now(),
-    })
+    await updateDoc(docRef, cleanUpdateData)
   } catch (error) {
     console.error("Error updating report:", error)
     throw error
