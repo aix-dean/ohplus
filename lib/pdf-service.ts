@@ -1111,25 +1111,40 @@ export async function generateReportPDF(
     const footerY = pageHeight - 12
     const footerHeight = 12
 
-    // Cyan section on left (about 30% of width)
+    // Cyan section on left with diagonal cut
     pdf.setFillColor(52, 211, 235) // cyan-400
-    pdf.rect(0, footerY, pageWidth * 0.3, footerHeight, "F")
+    const cyanWidth = pageWidth * 0.3
+    const diagonalCutWidth = pageWidth * 0.05 // Width of the diagonal cut
 
-    // Angular blue section - create the diagonal cut using lines
+    // Draw the main cyan rectangle
+    pdf.rect(0, footerY, cyanWidth - diagonalCutWidth, footerHeight, "F")
+
+    // Draw the diagonal part of cyan section using triangle
+    pdf.triangle(
+      cyanWidth - diagonalCutWidth,
+      footerY, // Top left of diagonal
+      cyanWidth,
+      footerY, // Top right of diagonal
+      cyanWidth - diagonalCutWidth,
+      footerY + footerHeight, // Bottom left of diagonal
+      "F",
+    )
+
+    // Angular blue section - starts from the diagonal cut
     pdf.setFillColor(30, 58, 138) // blue-900
-    const diagonalStartX = pageWidth * 0.25 // Start diagonal cut at 25% of page width
+    const blueStartX = cyanWidth - diagonalCutWidth
 
-    // Create the angular shape using lines method
-    pdf.lines(
-      [
-        [pageWidth - diagonalStartX, 0], // Width of the blue section
-        [0, footerHeight], // Go down to bottom
-        [-(pageWidth - diagonalStartX), 0], // Go back left
-        [0, -footerHeight], // Go back up (closes the shape)
-      ],
-      diagonalStartX,
-      footerY,
-      [1, 1],
+    // Draw the main blue rectangle
+    pdf.rect(cyanWidth, footerY, pageWidth - cyanWidth, footerHeight, "F")
+
+    // Draw the diagonal connecting part of blue section using triangle
+    pdf.triangle(
+      blueStartX,
+      footerY + footerHeight, // Bottom left
+      cyanWidth,
+      footerY, // Top right of diagonal
+      cyanWidth,
+      footerY + footerHeight, // Bottom right
       "F",
     )
 
