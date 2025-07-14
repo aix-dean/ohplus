@@ -1,24 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft, Search, MoreVertical, Plus, ImageIcon, Eye } from "lucide-react"
+import { ArrowLeft, Search, MoreVertical, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { useRouter } from "next/navigation"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
-
-interface AttachmentData {
-  fileName: string
-  fileType: string
-  fileUrl: string
-  note: string
-}
 
 export default function ServiceReportsPage() {
   const [reports, setReports] = useState<ReportData[]>([])
@@ -31,10 +23,6 @@ export default function ServiceReportsPage() {
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [postedReportId, setPostedReportId] = useState<string>("")
-
-  // Image preview modal state
-  const [previewImage, setPreviewImage] = useState<AttachmentData | null>(null)
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
 
   const router = useRouter()
   const { user } = useAuth()
@@ -170,78 +158,6 @@ export default function ServiceReportsPage() {
     })
   }
 
-  const getAttachments = (report: ReportData): AttachmentData[] => {
-    if (!report.attachments || !Array.isArray(report.attachments)) {
-      return []
-    }
-
-    return report.attachments
-      .filter((attachment: any) => attachment && typeof attachment === "object")
-      .map((attachment: any) => ({
-        fileName: attachment.fileName || "Unknown file",
-        fileType: attachment.fileType || "unknown",
-        fileUrl: attachment.fileUrl || "",
-        note: attachment.note || "",
-      }))
-      .filter((attachment: AttachmentData) => attachment.fileUrl) // Only include attachments with valid URLs
-  }
-
-  const getImageAttachments = (report: ReportData): AttachmentData[] => {
-    const attachments = getAttachments(report)
-    return attachments.filter((attachment) => attachment.fileType && attachment.fileType.startsWith("image/"))
-  }
-
-  const handleImagePreview = (attachment: AttachmentData) => {
-    setPreviewImage(attachment)
-    setIsPreviewOpen(true)
-  }
-
-  const renderAttachmentThumbnails = (report: ReportData) => {
-    const imageAttachments = getImageAttachments(report)
-
-    if (imageAttachments.length === 0) {
-      return (
-        <div className="flex items-center text-gray-400">
-          <ImageIcon className="h-4 w-4 mr-1" />
-          <span className="text-xs">No images</span>
-        </div>
-      )
-    }
-
-    return (
-      <div className="flex items-center gap-1">
-        {imageAttachments.slice(0, 3).map((attachment, index) => (
-          <div
-            key={index}
-            className="relative w-8 h-8 rounded border border-gray-200 overflow-hidden cursor-pointer hover:border-blue-400 transition-colors group"
-            onClick={() => handleImagePreview(attachment)}
-          >
-            <img
-              src={attachment.fileUrl || "/placeholder.svg"}
-              alt={attachment.fileName}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement
-                target.src = "/placeholder.svg"
-              }}
-            />
-            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-              <Eye className="h-3 w-3 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-            </div>
-          </div>
-        ))}
-        {imageAttachments.length > 3 && (
-          <div className="w-8 h-8 rounded border border-gray-200 bg-gray-100 flex items-center justify-center">
-            <span className="text-xs text-gray-600">+{imageAttachments.length - 3}</span>
-          </div>
-        )}
-        <span className="text-xs text-gray-500 ml-1">
-          {imageAttachments.length} image{imageAttachments.length !== 1 ? "s" : ""}
-        </span>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -326,9 +242,6 @@ export default function ServiceReportsPage() {
                   Report Type
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Attachments
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Reported By
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -339,7 +252,7 @@ export default function ServiceReportsPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                       <span className="ml-2">Loading reports...</span>
@@ -348,7 +261,7 @@ export default function ServiceReportsPage() {
                 </tr>
               ) : filteredReports.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
                     No reports found
                   </td>
                 </tr>
@@ -366,9 +279,6 @@ export default function ServiceReportsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {getReportTypeDisplay(report.reportType)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {renderAttachmentThumbnails(report)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {report.createdByName || "Unknown User"}
@@ -410,42 +320,6 @@ export default function ServiceReportsPage() {
 
       {/* Report Post Success Dialog */}
       <ReportPostSuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog} reportId={postedReportId} />
-
-      {/* Image Preview Modal */}
-      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-          <div className="relative">
-            <DialogTitle className="sr-only">{previewImage?.fileName || "Image Preview"}</DialogTitle>
-            {previewImage && (
-              <div className="p-6">
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900 truncate">{previewImage.fileName}</h3>
-                  {previewImage.note && <p className="text-sm text-gray-600 mt-1 italic">"{previewImage.note}"</p>}
-                </div>
-                <div className="flex justify-center">
-                  <img
-                    src={previewImage.fileUrl || "/placeholder.svg"}
-                    alt={previewImage.fileName}
-                    className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-lg"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.src = "/placeholder.svg"
-                    }}
-                  />
-                </div>
-                <div className="mt-4 flex justify-center">
-                  <Button
-                    onClick={() => window.open(previewImage.fileUrl, "_blank")}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    Open Full Size
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
