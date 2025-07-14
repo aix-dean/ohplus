@@ -3,7 +3,18 @@
 import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
-import { getQuotationsPaginated } from "@/lib/quotation-service"
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  getDocs,
+  type DocumentData,
+  type QueryDocumentSnapshot,
+} from "firebase/firestore"
+import { db } from "@/lib/firebase" // Assuming db is exported from lib/firebase
 import { format } from "date-fns"
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -12,17 +23,17 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
-export default function QuotationsListPage() {
+export default function SalesQuotationsPage() {
   const { user } = useAuth()
   const [quotations, setQuotations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [lastQuotationId, setLastQuotationId] = useState<string | null>(null)
+  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
-  const [pageHistory, setPageHistory] = useState<string[]>([""]) // Stores the lastQuotationId for each page
+  const [pageSnapshots, setPageSnapshots] = useState<QueryDocumentSnapshot<DocumentData>[]>([]) // Stores the last document of each page
 
   const router = useRouter()
-  const pageSize = 10 // 10 items per page as requested
+  const pageSize = 10 // 10 items per page
 
   const fetchQuotations = useCallback(
     async (direction: "next" | "prev" | "first" = "first") => {
@@ -33,35 +44,62 @@ export default function QuotationsListPage() {
 
       try {
         setLoading(true)
-        let currentLastId: string | null = null
+        const quotationsRef = collection(db, "quotation")
+        let q
 
-        if (direction === "next") {
-          currentLastId = lastQuotationId
+        if (direction === "first") {
+          q = query(quotationsRef, where("seller_id", "==", user.uid), orderBy("created", "desc"), limit(pageSize))
+        } else if (direction === "next" && lastVisible) {
+          q = query(
+            quotationsRef,
+            where("seller_id", "==", user.uid),
+            orderBy("created", "desc"),
+            startAfter(lastVisible),
+            limit(pageSize),
+          )
         } else if (direction === "prev" && currentPage > 1) {
-          currentLastId = pageHistory[currentPage - 2] // Get the ID of the first item of the previous page
-        } else if (direction === "first") {
-          currentLastId = null
+          // To go back, we need the document *before* the first document of the current page.
+          // This is stored as the last document of the previous page in pageSnapshots.
+          const prevPageLastDoc = pageSnapshots[currentPage - 2]
+          if (prevPageLastDoc) {
+            q = query(
+              quotationsRef,
+              where("seller_id", "==", user.uid),
+              orderBy("created", "desc"),
+              startAfter(prevPageLastDoc),
+              limit(pageSize),
+            )
+          } else {
+            // If no previous snapshot (e.g., going from page 2 to 1), fetch the first page
+            q = query(quotationsRef, where("seller_id", "==", user.uid), orderBy("created", "desc"), limit(pageSize))
+          }
+        } else {
+          // Default to first page if no specific direction or cursor
+          q = query(quotationsRef, where("seller_id", "==", user.uid), orderBy("created", "desc"), limit(pageSize))
         }
 
-        const {
-          quotations: fetchedQuotations,
-          lastVisibleId: newLastVisibleId,
-          hasMore: newHasMore,
-        } = await getQuotationsPaginated(user.uid, pageSize, currentLastId)
+        const querySnapshot = await getDocs(q)
+        const fetchedQuotations: any[] = []
+        querySnapshot.forEach((doc) => {
+          fetchedQuotations.push({ id: doc.id, ...doc.data() })
+        })
+
+        const newLastVisible = querySnapshot.docs[querySnapshot.docs.length - 1] || null
+        const newHasMore = querySnapshot.docs.length === pageSize
 
         setQuotations(fetchedQuotations)
-        setLastQuotationId(newLastVisibleId)
+        setLastVisible(newLastVisible)
         setHasMore(newHasMore)
 
-        if (direction === "next") {
+        if (direction === "first") {
+          setCurrentPage(1)
+          setPageSnapshots([querySnapshot.docs[0] || null]) // Store the first doc of the first page
+        } else if (direction === "next") {
           setCurrentPage((prev) => prev + 1)
-          setPageHistory((prev) => [...prev, currentLastId || ""]) // Store the ID used to fetch this page
+          setPageSnapshots((prev) => [...prev, querySnapshot.docs[0] || null]) // Store the first doc of the new page
         } else if (direction === "prev") {
           setCurrentPage((prev) => prev - 1)
-          setPageHistory((prev) => prev.slice(0, -1))
-        } else if (direction === "first") {
-          setCurrentPage(1)
-          setPageHistory([""]) // Reset history for the first page
+          setPageSnapshots((prev) => prev.slice(0, -1)) // Remove the current page's first doc from history
         }
       } catch (error) {
         console.error("Error fetching quotations:", error)
@@ -69,7 +107,7 @@ export default function QuotationsListPage() {
         setLoading(false)
       }
     },
-    [user?.uid, lastQuotationId, currentPage, pageHistory, pageSize],
+    [user?.uid, lastVisible, currentPage, pageSnapshots, pageSize],
   )
 
   useEffect(() => {
@@ -245,6 +283,13 @@ export default function QuotationsListPage() {
           </Card>
         )}
       </div>
+      {loading && (
+        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50">
+          <div className="bg-white p-4 rounded-lg shadow">
+            <p>Loading quotations...</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
