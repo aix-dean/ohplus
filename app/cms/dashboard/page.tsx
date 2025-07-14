@@ -488,7 +488,9 @@ export default function CMSDashboardPage() {
         {/* Header with title and actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <h1 className="text-2xl font-bold">
-            {user?.first_name ? `${user.first_name}'s Content Management` : "Content Management"}
+            {userData?.first_name
+  ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Logistics Dashboard`
+  : "Logistics Dashboard"}
           </h1>
         </div>
 
