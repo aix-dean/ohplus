@@ -260,12 +260,12 @@ export default function ReportPreviewPage() {
             {userData?.company_logo ? (
               <div
                 className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm"
-                style={{ minHeight: "48px", minWidth: "120px" }}
+                style={{ width: "120px", height: "120px" }}
               >
                 <img
                   src={userData.company_logo || "/placeholder.svg"}
                   alt={`${userData.company || "Company"} Logo`}
-                  className="max-h-8 max-w-full object-contain"
+                  className="max-h-full max-w-full object-contain"
                   onError={(e) => {
                     // Fallback to OH+ logo if company logo fails to load
                     const target = e.target as HTMLImageElement
@@ -276,9 +276,9 @@ export default function ReportPreviewPage() {
             ) : (
               <div
                 className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm"
-                style={{ minHeight: "48px", minWidth: "120px" }}
+                style={{ width: "120px", height: "120px" }}
               >
-                <img src="/ohplus-new-logo.png" alt="OH+ Logo" className="max-h-8 max-w-full object-contain" />
+                <img src="/ohplus-new-logo.png" alt="OH+ Logo" className="max-h-full max-w-full object-contain" />
               </div>
             )}
           </div>
@@ -419,6 +419,7 @@ export default function ReportPreviewPage() {
                         ) : isVideoFile(attachment.fileName || "") ? (
                           <video
                             src={attachment.fileUrl}
+                            controls
                             className="max-w-full max-h-full object-contain rounded"
                             onError={(e) => {
                               // Fallback to icon if video fails to load
