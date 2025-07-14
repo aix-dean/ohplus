@@ -139,7 +139,7 @@ export default function SalesQuotationsPage() {
                 <TableBody>
                   {Array(pageSize)
                     .fill(0)
-                    .map((_, i) => (
+                    .map((_, i) => {
                       <TableRow key={i} className="border-b border-gray-100">
                         <TableCell className="py-3">
                           <Skeleton className="h-4 w-24" />
@@ -157,7 +157,7 @@ export default function SalesQuotationsPage() {
                           <Skeleton className="h-4 w-28" />
                         </TableCell>
                       </TableRow>
-                    ))}
+                    })}
                 </TableBody>
               </Table>
             ) : quotations.length === 0 ? (
@@ -196,7 +196,7 @@ export default function SalesQuotationsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {quotations.map((quotation) => (
+                    {quotations.map((quotation) => {
                       <TableRow
                         key={quotation.id}
                         className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
@@ -214,7 +214,7 @@ export default function SalesQuotationsPage() {
                           {quotation.quotation_number || quotation.id.substring(0, 8)}
                         </TableCell>
                       </TableRow>
-                    ))}
+                    })}
                   </TableBody>
                 </Table>
               </div>
