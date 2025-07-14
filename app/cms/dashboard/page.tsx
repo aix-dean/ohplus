@@ -32,7 +32,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { getPaginatedUserProducts, getUserProductsCount, softDeleteProduct, type Product } from "@/lib/firebase-service"
+import {
+  getProductsByContentTypeAndCompany,
+  getProductsCountByContentTypeAndCompany,
+  softDeleteProduct,
+  type Product,
+} from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 
 // Number of items to display per page
@@ -89,7 +94,7 @@ export default function CMSDashboardPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingCount, setLoadingCount] = useState(false)
 
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
 
@@ -114,13 +119,13 @@ export default function CMSDashboardPage() {
     router.push("/cms/orders")
   }
 
-  // Fetch total count of products
+  // Fetch total count of CMS products
   const fetchTotalCount = useCallback(async () => {
-    if (!user?.uid) return
+    if (!userData?.company_id) return
 
     setLoadingCount(true)
     try {
-      const count = await getUserProductsCount(user.uid, searchTerm)
+      const count = await getProductsCountByContentTypeAndCompany("cms", searchTerm)
       setTotalItems(count)
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
@@ -133,12 +138,12 @@ export default function CMSDashboardPage() {
     } finally {
       setLoadingCount(false)
     }
-  }, [user, toast, searchTerm])
+  }, [userData, toast, searchTerm])
 
-  // Fetch products for the current page
+  // Fetch CMS products for the current page
   const fetchProducts = useCallback(
     async (page: number) => {
-      if (!user?.uid) return
+      if (!userData?.company_id) return
 
       // Check if we have this page in cache
       const cacheKey = `${page}-${searchTerm}`
@@ -158,7 +163,12 @@ export default function CMSDashboardPage() {
         // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
-        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, searchTerm)
+        const result = await getProductsByContentTypeAndCompany(
+          "cms", // Content type filter for CMS products
+          ITEMS_PER_PAGE,
+          startDoc,
+          searchTerm,
+        )
 
         setProducts(result.items)
         setLastDoc(result.lastDoc)
@@ -185,7 +195,7 @@ export default function CMSDashboardPage() {
         setLoadingMore(false)
       }
     },
-    [user, lastDoc, pageCache, toast, searchTerm],
+    [userData, lastDoc, pageCache, toast, searchTerm],
   )
 
   // Store products in localStorage for use in breadcrumbs
@@ -206,18 +216,18 @@ export default function CMSDashboardPage() {
 
   // Load initial data and count
   useEffect(() => {
-    if (user?.uid) {
+    if (userData?.company_id) {
       fetchProducts(1)
       fetchTotalCount()
     }
-  }, [user, fetchProducts, fetchTotalCount])
+  }, [userData?.company_id, fetchProducts, fetchTotalCount])
 
   // Load data when page changes
   useEffect(() => {
-    if (user?.uid && currentPage > 0) {
+    if (userData?.company_id && currentPage > 0) {
       fetchProducts(currentPage)
     }
-  }, [currentPage, fetchProducts, user])
+  }, [currentPage, fetchProducts, userData?.company_id])
 
   // Handle search
   const handleSearch = (e: React.FormEvent) => {
@@ -344,16 +354,14 @@ export default function CMSDashboardPage() {
     router.push(`/cms/details/${productId}`)
   }
 
-  // Handle add new c
-
   // Use mock data if no products are available from Firebase
   const [useMockData, setUseMockData] = useState(false)
 
   useEffect(() => {
-    if (!loading && products.length === 0 && !user?.uid) {
+    if (!loading && products.length === 0 && !userData?.company_id) {
       setUseMockData(true)
     }
-  }, [loading, products, user])
+  }, [loading, products, userData])
 
   // Mock data for demonstration when no Firebase data is available
   const mockContent = [
@@ -823,7 +831,6 @@ function ContentCard({
 
       <CardContent className="p-3">
         <div className="flex flex-col space-y-2">
-
           {/* Title/Location */}
           <h3 className="text-base font-semibold text-gray-900">{content.title}</h3>
 
