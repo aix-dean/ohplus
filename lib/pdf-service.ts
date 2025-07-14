@@ -898,10 +898,10 @@ export async function generateReportPDF(
     pdf.text("Installation Report", margin + 2, yPosition + 5)
     pdf.setTextColor(0, 0, 0)
 
-    // Add company logo on the right - much smaller to match the web page
-    const logoSize = 18 // Reduced from 40 to 18 to match web page size
-    const logoBoxWidth = 25 // Reduced box width
-    const logoBoxHeight = 20 // Reduced box height
+    // Add company logo on the right - matching the web page size (40x40px equivalent)
+    const logoSize = 12 // Much smaller - equivalent to 40px in web page
+    const logoBoxWidth = 16 // Small box width
+    const logoBoxHeight = 14 // Small box height
     const logoX = pageWidth - margin - logoBoxWidth
     const logoY = yPosition - 2
 
@@ -909,30 +909,15 @@ export async function generateReportPDF(
     const companyLogoUrl = "/ohplus-new-logo.png" // Default to OH+ logo
     const logoBase64 = await loadImageAsBase64(companyLogoUrl)
     if (logoBase64) {
-      // Add simple white background for logo (no rounded corners)
+      // Add white background for logo (small box like in web page)
       pdf.setFillColor(255, 255, 255)
       pdf.rect(logoX, logoY, logoBoxWidth, logoBoxHeight, "F")
       pdf.setDrawColor(200, 200, 200)
-      pdf.setLineWidth(0.5)
+      pdf.setLineWidth(0.3)
       pdf.rect(logoX, logoY, logoBoxWidth, logoBoxHeight)
 
-      // Add the logo - centered in the box
-      pdf.addImage(logoBase64, "PNG", logoX + 3, logoY + 2, logoSize, logoSize - 2)
-    } else {
-      // Fallback: create OH! text logo in simple white box
-      pdf.setFillColor(255, 255, 255)
-      pdf.rect(logoX, logoY, logoBoxWidth, logoBoxHeight, "F")
-      pdf.setDrawColor(200, 200, 200)
-      pdf.setLineWidth(0.5)
-      pdf.rect(logoX, logoY, logoBoxWidth, logoBoxHeight)
-
-      pdf.setFontSize(10)
-      pdf.setFont("helvetica", "bold")
-      pdf.setTextColor(30, 58, 138) // Blue color
-      pdf.text("OH!", logoX + 4, logoY + 12)
-      pdf.setTextColor(52, 211, 235) // Cyan color for +
-      pdf.text("+", logoX + 17, logoY + 12)
-      pdf.setTextColor(0, 0, 0)
+      // Add the logo - small size to match web page
+      pdf.addImage(logoBase64, "PNG", logoX + 2, logoY + 1, logoSize, logoSize)
     }
 
     yPosition += badgeHeight + 5
