@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge" // Added missing Badge
 export default function AdminDashboardPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { user } = useAuth() // Get user data from auth context
+  const { user, userData } = useAuth() // Get user data from auth context
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
 
@@ -249,7 +249,9 @@ export default function AdminDashboardPage() {
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h1 className="text-xl md:text-2xl font-bold">
-            {user?.first_name ? `${user.first_name}'s Dashboard` : "Dashboard"}
+            {userData?.first_name
+  ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Logistics Dashboard`
+  : "Logistics Dashboard"}
           </h1>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-grow">
