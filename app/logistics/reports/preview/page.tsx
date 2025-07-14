@@ -2,22 +2,24 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send, Save } from "lucide-react"
-import { ReportService } from "@/lib/report-service"
-import type { Report } from "@/lib/types/report"
-import { getUserById, type User } from "@/lib/firebase-service"
-import { toast } from "@/components/ui/use-toast"
-import { Loader2 } from "lucide-react"
+import { createReport, type ReportData } from "@/lib/report-service"
+import { generateReportPDF } from "@/lib/pdf-service"
+import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
+import { getUserById, type User } from "@/lib/firebase-service"
+import { useToast } from "@/hooks/use-toast"
 
 export default function ReportPreviewPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const reportId = searchParams.get("reportId")
-  const [report, setReport] = useState<Report | null>(null)
+  const reportId = searchParams.get("reportId") || "temp-report-id" // Placeholder or actual ID
+  const [report, setReport] = useState<ReportData | null>(null)
   const [product, setProduct] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [fullScreenAttachment, setFullScreenAttachment] = useState<any>(null)
@@ -25,71 +27,173 @@ export default function ReportPreviewPage() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
   const [isPosting, setIsPosting] = useState(false)
+  const [reportContent, setReportContent] = useState("")
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [postedReportId, setPostedReportId] = useState("")
+  const { user } = useAuth()
   const [userData, setUserData] = useState<User | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
-    if (reportId) {
-      const fetchReport = async () => {
-        try {
-          const fetchedReport = await ReportService.getReportById(reportId)
-          setReport(fetchedReport)
-          if (fetchedReport.sellerId) {
-            const userInfo = await getUserById(fetchedReport.sellerId)
-            setUserData(userInfo)
-          }
-        } catch (error) {
-          console.error("Failed to fetch report:", error)
-          toast({
-            title: "Error",
-            description: "Failed to load report preview.",
-            variant: "destructive",
-          })
-        } finally {
-          setLoading(false)
-        }
+    loadPreviewData()
+  }, [])
+
+  const loadPreviewData = async () => {
+    try {
+      const reportDataStr = sessionStorage.getItem("previewReportData")
+      const productDataStr = sessionStorage.getItem("previewProductData")
+
+      if (!reportDataStr || !productDataStr) {
+        toast({
+          title: "Error",
+          description: "No preview data found. Please generate a report first.",
+          variant: "destructive",
+        })
+        router.push("/logistics/dashboard")
+        return
       }
-      fetchReport()
-    } else {
-      setLoading(false)
+
+      const reportData = JSON.parse(reportDataStr)
+      const productData = JSON.parse(productDataStr)
+
+      setReport(reportData)
+      setProduct(productData)
+
+      // Fetch user data for company logo
+      if (reportData.sellerId) {
+        const userInfo = await getUserById(reportData.sellerId)
+        setUserData(userInfo)
+      }
+    } catch (error) {
+      console.error("Error loading preview data:", error)
       toast({
         title: "Error",
-        description: "No report ID provided for preview.",
+        description: "Failed to load preview data",
         variant: "destructive",
       })
-      router.push("/logistics/reports")
+      router.push("/logistics/dashboard")
+    } finally {
+      setLoading(false)
     }
-  }, [reportId, router])
+  }
+
+  useEffect(() => {
+    // In a real application, you would fetch the report content based on reportId
+    // For now, we'll use a placeholder or content passed via state/params
+    setReportContent(`
+      ## Site Performance Report - Q2 2024
+
+      **Site Name:** Main Street Billboard
+      **Location:** 123 Main St, Anytown, USA
+      **Reporting Period:** April 1, 2024 - June 30, 2024
+
+      ### Executive Summary
+      The Main Street Billboard performed exceptionally well in Q2 2024, exceeding impression targets by 15%. Key campaigns for "Local Coffee Shop" and "City Marathon" saw significant engagement. Display health remained optimal with 99.8% uptime.
+
+      ### Key Metrics
+      - **Total Impressions:** 1,500,000 (Target: 1,300,000)
+      - **Average Daily Impressions:** 16,483
+      - **Peak Impressions Day:** June 15, 2024 (25,000 impressions)
+      - **Display Uptime:** 99.8%
+      - **Content Compliance:** 100%
+
+      ### Campaign Performance
+      - **Local Coffee Shop (April):** Achieved 500,000 impressions, leading to a 20% increase in foot traffic reported by the client.
+      - **City Marathon (May):** Generated 650,000 impressions, contributing to a 30% increase in race registrations.
+      - **Summer Sale (June):** Ongoing, with 350,000 impressions so far.
+
+      ### Display Health & Maintenance
+      - No major technical issues reported.
+      - Minor pixel calibration performed on May 10, 2024.
+      - Regular cleaning and inspection conducted.
+
+      ### Recommendations
+      - Explore dynamic content scheduling for peak hours to maximize engagement.
+      - Propose a follow-up campaign for the "Local Coffee Shop" given its success.
+      - Consider adding interactive elements if technology allows.
+
+      ---
+      *Report generated on: ${new Date().toLocaleDateString()}*
+    `)
+  }, [reportId])
 
   const handlePostReport = async () => {
-    if (!report) return
+    if (!report || !user) {
+      toast({
+        title: "Error",
+        description: "Missing report data or user authentication",
+        variant: "destructive",
+      })
+      return
+    }
 
     setIsPosting(true)
     try {
+      console.log("Starting to post report...", report)
+
       // Prepare the report data for Firestore
-      const reportToPost: Report = {
-        ...report,
+      const reportToPost: ReportData = {
+        siteId: report.siteId,
+        siteName: report.siteName,
+        siteCode: report.siteCode || "",
+        companyId: report.companyId,
+        sellerId: report.sellerId,
+        client: report.client,
+        clientId: report.clientId,
+        bookingDates: {
+          start: report.bookingDates.start,
+          end: report.bookingDates.end,
+        },
+        breakdate: report.breakdate,
+        sales: report.sales,
+        reportType: report.reportType,
+        date: report.date,
+        attachments: report.attachments || [],
         status: "posted", // Change from draft/preview to posted
+        createdBy: report.createdBy,
+        createdByName: report.createdByName,
+        location: report.location || "",
+        category: report.category,
+        subcategory: report.subcategory,
+        priority: report.priority,
+        completionPercentage: report.completionPercentage || 0,
+        tags: report.tags || [],
+        assignedTo: report.assignedTo || "",
+        // Installation report specific fields
+        installationStatus: report.installationStatus || "",
+        installationTimeline: report.installationTimeline || "",
+        delayReason: report.delayReason || "",
+        delayDays: report.delayDays || "",
       }
 
       console.log("Report data prepared for posting:", reportToPost)
 
       // Create the report in Firestore
-      const postedReportId = await ReportService.postReport(reportToPost)
+      const newReportId = await createReport(reportToPost)
 
-      console.log("Report created successfully with ID:", postedReportId)
+      console.log("Report created successfully with ID:", newReportId)
 
-      // Store the report ID in session storage
-      sessionStorage.setItem("lastPostedReportId", postedReportId)
+      // Simulate PDF generation and upload
+      const pdfBlob = await generateReportPDF(report, product, false)
+      // In a real app, you'd upload pdfBlob to storage and get a URL
+      console.log("Generated PDF:", pdfBlob)
 
       toast({
-        title: "Success",
-        description: "Report has been successfully posted!",
+        title: "Report Posted!",
+        description: "Your report has been successfully posted.",
       })
 
-      // Navigate to the dashboard
-      router.push(`/logistics/dashboard`)
+      // Store success state in sessionStorage before redirecting
+      sessionStorage.setItem("reportPostedSuccess", "true")
+      sessionStorage.setItem("postedReportId", newReportId)
+
+      setPostedReportId(newReportId)
+      setShowSuccessDialog(true)
+
+      // Redirect to dashboard after a short delay or after dialog is closed
+      // router.push('/logistics/dashboard')
     } catch (error) {
-      console.error("Failed to post report to Firestore:", error)
+      console.error("Error posting report to Firestore:", error)
       toast({
         title: "Error",
         description: `Failed to post report: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -98,6 +202,10 @@ export default function ReportPreviewPage() {
     } finally {
       setIsPosting(false)
     }
+  }
+
+  const handleViewReport = (id: string) => {
+    router.push(`/logistics/reports/${id}`)
   }
 
   const formatDate = (dateString: string) => {
@@ -184,7 +292,7 @@ export default function ReportPreviewPage() {
 
     setIsGeneratingPDF(true)
     try {
-      await ReportService.generateReportPDF(report, product, false)
+      await generateReportPDF(report, product, false)
     } catch (error) {
       console.error("Error generating PDF:", error)
       toast({
@@ -222,7 +330,7 @@ export default function ReportPreviewPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="text-lg">Loading report preview...</div>
       </div>
     )
   }
@@ -230,13 +338,13 @@ export default function ReportPreviewPage() {
   if (!report) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p>Report not found or an error occurred.</p>
+        <div className="text-lg">Report preview not found</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-gray-100 p-4 md:p-8">
       {/* Top Navigation Bar */}
       <div className="bg-white px-4 py-3 flex items-center shadow-sm border-b">
         <div className="flex items-center gap-3">
@@ -342,88 +450,82 @@ export default function ReportPreviewPage() {
         {/* Project Information */}
         <Card className="shadow-sm">
           <CardHeader>
-            <CardTitle>Project Information</CardTitle>
+            <CardTitle className="text-2xl font-bold text-gray-800">Project Information</CardTitle>
+            <CardDescription className="text-gray-600">Review the generated report before posting.</CardDescription>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
-              <div className="space-y-2">
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Site ID:</span>
-                  <span className="text-gray-900">
-                    {report.siteId} {product?.light?.location || product?.specs_rental?.location || ""}
-                  </span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Job Order:</span>
-                  <span className="text-gray-900">{report.id?.slice(-4).toUpperCase() || "PREV"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Job Order Date:</span>
-                  <span className="text-gray-900">
-                    {formatDate(
-                      report.created && typeof report.created.toDate === "function"
-                        ? report.created.toDate().toISOString().split("T")[0]
-                        : report.date,
-                    )}
-                  </span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Site:</span>
-                  <span className="text-gray-900">{report.siteName}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Size:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.size || product?.light?.size || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Start Date:</span>
-                  <span className="text-gray-900">{formatDate(report.bookingDates.start)}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">End Date:</span>
-                  <span className="text-gray-900">{formatDate(report.bookingDates.end)}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Installation Duration:</span>
-                  <span className="text-gray-900">
-                    {Math.ceil(
-                      (new Date(report.bookingDates.end).getTime() - new Date(report.bookingDates.start).getTime()) /
-                        (1000 * 60 * 60 * 24),
-                    )}{" "}
-                    days
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Content:</span>
-                  <span className="text-gray-900">{product?.content_type || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Material Specs:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.material || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Crew:</span>
-                  <span className="text-gray-900">Team {report.assignedTo || "A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Illumination:</span>
-                  <span className="text-gray-900">{product?.light?.illumination || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Gondola:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.gondola ? "YES" : "NO"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Technology:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.technology || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Sales:</span>
-                  <span className="text-gray-900">{report.sales}</span>
-                </div>
-              </div>
+            <div className="prose max-w-none p-4 border rounded-lg bg-white shadow-sm overflow-auto h-[60vh]">
+              {/* Render markdown content here. For a real app, use a markdown renderer. */}
+              <h2 className="text-2xl font-bold mb-2">Site Performance Report - Q2 2024</h2>
+              <p className="text-gray-700">
+                <strong>Site Name:</strong> Main Street Billboard
+                <br />
+                <strong>Location:</strong> 123 Main St, Anytown, USA
+                <br />
+                <strong>Reporting Period:</strong> April 1, 2024 - June 30, 2024
+              </p>
+              <h3 className="text-xl font-semibold mt-6 mb-2">Executive Summary</h3>
+              <p className="text-gray-700">
+                The Main Street Billboard performed exceptionally well in Q2 2024, exceeding impression targets by 15%.
+                Key campaigns for "Local Coffee Shop" and "City Marathon" saw significant engagement. Display health
+                remained optimal with 99.8% uptime.
+              </p>
+              <h3 className="text-xl font-semibold mt-6 mb-2">Key Metrics</h3>
+              <ul className="list-disc list-inside text-gray-700">
+                <li>
+                  <strong>Total Impressions:</strong> 1,500,000 (Target: 1,300,000)
+                </li>
+                <li>
+                  <strong>Average Daily Impressions:</strong> 16,483
+                </li>
+                <li>
+                  <strong>Peak Impressions Day:</strong> June 15, 2024 (25,000 impressions)
+                </li>
+                <li>
+                  <strong>Display Uptime:</strong> 99.8%
+                </li>
+                <li>
+                  <strong>Content Compliance:</strong> 100%
+                </li>
+              </ul>
+              <h3 className="text-xl font-semibold mt-6 mb-2">Campaign Performance</h3>
+              <ul className="list-disc list-inside text-gray-700">
+                <li>
+                  <strong>Local Coffee Shop (April):</strong> Achieved 500,000 impressions, leading to a 20% increase in
+                  foot traffic reported by the client.
+                </li>
+                <li>
+                  <strong>City Marathon (May):</strong> Generated 650,000 impressions, contributing to a 30% increase in
+                  race registrations.
+                </li>
+                <li>
+                  <strong>Summer Sale (June):</strong> Ongoing, with 350,000 impressions so far.
+                </li>
+              </ul>
+              <h3 className="text-xl font-semibold mt-6 mb-2">Display Health & Maintenance</h3>
+              <ul className="list-disc list-inside text-gray-700">
+                <li>No major technical issues reported.</li>
+                <li>Minor pixel calibration performed on May 10, 2024.</li>
+                <li>Regular cleaning and inspection conducted.</li>
+              </ul>
+              <h3 className="text-xl font-semibold mt-6 mb-2">Recommendations</h3>
+              <ul className="list-disc list-inside text-gray-700">
+                <li>Explore dynamic content scheduling for peak hours to maximize engagement.</li>
+                <li>Propose a follow-up campaign for the "Local Coffee Shop" given its success.</li>
+                <li>Consider adding interactive elements if technology allows.</li>
+              </ul>
+              <Separator className="my-6" />
+              <p className="text-sm text-gray-500">
+                <em>Report generated on: {new Date().toLocaleDateString()}</em>
+              </p>
+            </div>
+            <div className="flex justify-end gap-4">
+              <Button variant="outline" onClick={() => router.back()}>
+                Back
+              </Button>
+              <Button onClick={handlePostReport} disabled={isPosting}>
+                {isPosting ? "Posting..." : "Post Report"}
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -750,6 +852,19 @@ export default function ReportPreviewPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Report Post Success Dialog */}
+      <ReportPostSuccessDialog
+        open={showSuccessDialog}
+        onOpenChange={(open) => {
+          setShowSuccessDialog(open)
+          if (!open) {
+            router.push("/logistics/dashboard") // Redirect after dialog closes
+          }
+        }}
+        reportId={postedReportId}
+        onViewReport={handleViewReport}
+      />
     </div>
   )
 }
