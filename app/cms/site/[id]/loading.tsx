@@ -11,7 +11,7 @@ export default function Loading() {
         </div>
         <div className="flex items-center gap-2">
           <Skeleton className="h-9 w-16" />
-          <Skeleton className="h-9 w-10" />
+          <Skeleton className="h-9 w-9" />
         </div>
       </div>
 
@@ -31,12 +31,11 @@ export default function Loading() {
           </div>
         </div>
 
-        {/* Middle - Description Skeleton */}
+        {/* Middle - Description and CMS Config Skeleton */}
         <div className="col-span-12 md:col-span-6 space-y-4">
           <div>
-            <Skeleton className="h-4 w-20 mb-2" />
-            <Skeleton className="h-4 w-full mb-1" />
-            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-20 mb-1" />
+            <Skeleton className="h-16 w-full" />
           </div>
 
           <div>
@@ -49,20 +48,20 @@ export default function Loading() {
           </div>
 
           <div>
-            <Skeleton className="h-4 w-24 mb-2" />
-            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-24 mb-1" />
+            <Skeleton className="h-4 w-32" />
           </div>
         </div>
 
-        {/* Right - Details Skeleton */}
+        {/* Right - ID and Dimensions Skeleton */}
         <div className="col-span-12 md:col-span-4 space-y-4">
           <div>
-            <Skeleton className="h-4 w-8 mb-2" />
-            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-8 mb-1" />
+            <Skeleton className="h-4 w-48" />
           </div>
 
           <div>
-            <Skeleton className="h-4 w-20 mb-2" />
+            <Skeleton className="h-4 w-20 mb-1" />
             <Skeleton className="h-4 w-24" />
           </div>
 
@@ -75,7 +74,7 @@ export default function Loading() {
 
       {/* Tabs Skeleton */}
       <div className="space-y-4">
-        <div className="grid grid-cols-4 gap-2 bg-gray-100 p-1 rounded-lg">
+        <div className="grid w-full grid-cols-4 bg-gray-100 rounded-lg p-1">
           <Skeleton className="h-10 rounded" />
           <Skeleton className="h-10 rounded" />
           <Skeleton className="h-10 rounded" />
@@ -116,8 +115,8 @@ export default function Loading() {
                   <Skeleton className="h-4 w-20" />
                   <Skeleton className="h-4 w-16" />
                   <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-4 w-16" />
                   <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-16" />
                   <Skeleton className="h-6 w-16 rounded-full" />
                 </div>
               ))}

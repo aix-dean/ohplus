@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Slider } from "@/components/ui/slider"
 import { Separator } from "@/components/ui/separator"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import LoopTimeline from "@/components/loop-timeline"
 import { getProductById, softDeleteProduct, type Product } from "@/lib/firebase-service"
 import {
   ArrowLeft,
@@ -874,53 +875,14 @@ export default function CMSSiteDetailsPage() {
           </div>
         </TabsContent>
 
-        {/* Timeline Tab */}
+        {/* Timeline Tab - Using LoopTimeline Component */}
         <TabsContent value="timeline" className="space-y-6">
-          <div className="flex items-center gap-2">
-            <Clock size={20} />
-            <h2 className="text-xl font-semibold">Loop Timeline</h2>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Timeline Configuration</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Start Time</label>
-                  <p className="text-lg font-semibold">{cmsData.cms.start_time}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">End Time</label>
-                  <p className="text-lg font-semibold">{cmsData.cms.end_time}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Loops per Day</label>
-                  <p className="text-lg font-semibold">{cmsData.cms.loops_per_day}</p>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2">
-                <h4 className="font-medium">Timeline Preview</h4>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center justify-between text-sm text-gray-600">
-                    <span>{cmsData.cms.start_time}</span>
-                    <span>Active Period</span>
-                    <span>{cmsData.cms.end_time}</span>
-                  </div>
-                  <div className="mt-2 h-2 bg-gray-200 rounded-full">
-                    <div className="h-2 bg-blue-500 rounded-full" style={{ width: "75%" }}></div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {cmsData.cms.loops_per_day} loops × {cmsData.cms.spot_duration}s per spot
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <LoopTimeline
+            cmsData={cmsData.cms}
+            productId={cmsData.id}
+            companyId={cmsData.company_id}
+            sellerId={cmsData.seller_id}
+          />
         </TabsContent>
       </Tabs>
 
