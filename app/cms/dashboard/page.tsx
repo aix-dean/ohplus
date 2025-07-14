@@ -8,7 +8,6 @@ import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import {
-  Plus,
   MoreVertical,
   FileText,
   LayoutGrid,
@@ -93,25 +92,6 @@ export default function CMSDashboardPage() {
   const { toast } = useToast()
 
   // Navigation handlers for analytics cards
-  const handleNavigateToActiveScreens = () => {
-    // Navigate to active screens page (you can change this to the appropriate route)
-    router.push("/cms/screens/active")
-  }
-
-  const handleNavigateToInactiveScreens = () => {
-    // Navigate to inactive screens page
-    router.push("/cms/screens/inactive")
-  }
-
-  const handleNavigateToWarnings = () => {
-    // Navigate to warnings page
-    router.push("/cms/warnings")
-  }
-
-  const handleNavigateToOrders = () => {
-    // Navigate to orders page
-    router.push("/cms/orders")
-  }
 
   // Fetch total count of dynamic products
   const fetchTotalCount = useCallback(async () => {
@@ -491,70 +471,12 @@ export default function CMSDashboardPage() {
     <div className="flex-1 p-4">
       <div className="flex flex-col gap-6">
         {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Content Management</h1>
-            <p className="text-muted-foreground">Manage your digital billboard content and campaigns</p>
-          </div>
-          <Button onClick={() => router.push("/cms/content/new")} className="w-full sm:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            Create Content
-          </Button>
+        <div>
+          <h1 className="text-2xl font-bold">Content Management</h1>
+          <p className="text-muted-foreground">Manage your digital billboard content and campaigns</p>
         </div>
 
         {/* Analytics Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={handleNavigateToActiveScreens}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Active Screens</p>
-                  <p className="text-2xl font-bold">24</p>
-                </div>
-                <div className="h-4 w-4 rounded-full bg-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card
-            className="cursor-pointer transition-colors hover:bg-muted/50"
-            onClick={handleNavigateToInactiveScreens}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Inactive Screens</p>
-                  <p className="text-2xl font-bold">3</p>
-                </div>
-                <div className="h-4 w-4 rounded-full bg-red-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={handleNavigateToWarnings}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Warnings</p>
-                  <p className="text-2xl font-bold">2</p>
-                </div>
-                <div className="h-4 w-4 rounded-full bg-yellow-500" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="cursor-pointer transition-colors hover:bg-muted/50" onClick={handleNavigateToOrders}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Pending Orders</p>
-                  <p className="text-2xl font-bold">8</p>
-                </div>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Search and View Toggle */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -589,13 +511,9 @@ export default function CMSDashboardPage() {
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
             <h3 className="mb-2 text-lg font-semibold">No content found</h3>
-            <p className="mb-4 text-muted-foreground">
-              {searchTerm ? "No content matches your search criteria." : "Get started by creating your first content."}
+            <p className="text-muted-foreground">
+              {searchTerm ? "No content matches your search criteria." : "No content available."}
             </p>
-            <Button onClick={() => router.push("/cms/content/new")}>
-              <Plus className="mr-2 h-4 w-4" />
-              Create Content
-            </Button>
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
