@@ -119,13 +119,13 @@ export default function CMSDashboardPage() {
     router.push("/cms/orders")
   }
 
-  // Fetch total count of CMS products
+  // Fetch total count of dynamic products
   const fetchTotalCount = useCallback(async () => {
     if (!userData?.company_id) return
 
     setLoadingCount(true)
     try {
-      const count = await getProductsCountByContentTypeAndCompany("cms", searchTerm)
+      const count = await getProductsCountByContentTypeAndCompany("dynamic", searchTerm)
       setTotalItems(count)
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
@@ -140,7 +140,7 @@ export default function CMSDashboardPage() {
     }
   }, [userData, toast, searchTerm])
 
-  // Fetch CMS products for the current page
+  // Fetch dynamic products for the current page
   const fetchProducts = useCallback(
     async (page: number) => {
       if (!userData?.company_id) return
@@ -164,7 +164,7 @@ export default function CMSDashboardPage() {
         const startDoc = isFirstPage ? null : lastDoc
 
         const result = await getProductsByContentTypeAndCompany(
-          "cms", // Content type filter for CMS products
+          "dynamic", // Content type filter for dynamic products
           ITEMS_PER_PAGE,
           startDoc,
           searchTerm,
