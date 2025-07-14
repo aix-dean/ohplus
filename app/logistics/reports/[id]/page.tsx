@@ -488,7 +488,7 @@ export default function ReportPreviewPage() {
           <div
             className="absolute top-0 right-0 h-full bg-blue-900"
             style={{
-              width: "60%",
+              width: "75%",
               clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
             }}
           ></div>
