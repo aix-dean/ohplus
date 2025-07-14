@@ -831,101 +831,107 @@ export async function generateReportPDF(
     // Helper function to create the angular header exactly like the page
     const addHeaderToPage = async () => {
       try {
-        const headerHeight = 16
+        const headerHeight = 20 // Slightly taller to match the image
 
-        // Main blue section
+        // Main blue section (full width)
         pdf.setFillColor(30, 58, 138) // blue-900
         pdf.rect(0, yPosition, pageWidth, headerHeight, "F")
 
-        // Angular cyan section pointing right using polygon
-        const cyanlWidth = pageWidth * 0.4
-        const startX = pageWidth - cyanlWidth + cyanlWidth * 0.25
+        // Angular cyan section on the right
+        const cyanWidth = pageWidth * 0.35 // Adjust width to match image
+        const startX = pageWidth - cyanWidth
 
-        // Create the angular shape using triangles
+        // Create the angular cyan shape
         pdf.setFillColor(52, 211, 235) // cyan-400
 
-        // First triangle (top part)
-        pdf.triangle(startX, yPosition, pageWidth, yPosition, pageWidth, yPosition + headerHeight / 2, "F")
+        // Draw the angular shape using a polygon approach
+        const points = [
+          [startX + 20, yPosition], // Start point with angle
+          [pageWidth, yPosition], // Top right
+          [pageWidth, yPosition + headerHeight], // Bottom right
+          [startX, yPosition + headerHeight], // Bottom left
+        ]
 
-        // Second triangle (bottom part)
-        pdf.triangle(
-          startX,
-          yPosition,
-          pageWidth,
-          yPosition + headerHeight / 2,
-          pageWidth,
-          yPosition + headerHeight,
-          "F",
-        )
-
-        // Third triangle (left connecting part)
-        pdf.triangle(
-          startX,
-          yPosition,
-          pageWidth,
-          yPosition + headerHeight,
-          pageWidth - cyanlWidth,
-          yPosition + headerHeight,
-          "F",
-        )
+        // Draw triangles to create the angular shape
+        pdf.triangle(points[0][0], points[0][1], points[1][0], points[1][1], points[2][0], points[2][1], "F")
+        pdf.triangle(points[0][0], points[0][1], points[2][0], points[2][1], points[3][0], points[3][1], "F")
 
         // Add "Logistics" text
         pdf.setTextColor(255, 255, 255)
-        pdf.setFontSize(12)
+        pdf.setFontSize(14)
         pdf.setFont("helvetica", "bold")
-        pdf.text("Logistics", margin, yPosition + 10)
+        pdf.text("Logistics", margin, yPosition + 12)
 
-        yPosition += headerHeight + 5
+        yPosition += headerHeight + 10 // More space after header
         pdf.setTextColor(0, 0, 0)
       } catch (error) {
         console.error("Error adding header:", error)
-        yPosition += 25
+        yPosition += 30
       }
     }
 
     // Add header to first page
     await addHeaderToPage()
 
-    // Report Title Section with badge and logo
-    const badgeWidth = 50
-    const badgeHeight = 8
+    // Report Title Section with badge and logo - matching the image exactly
+    const badgeWidth = 55 // Slightly wider to match "Installation Report"
+    const badgeHeight = 10 // Taller badge
 
     // Create cyan badge for "Installation Report"
     pdf.setFillColor(52, 211, 235) // cyan-400
-    pdf.rect(margin, yPosition, badgeWidth, badgeHeight, "F")
+    pdf.roundedRect(margin, yPosition, badgeWidth, badgeHeight, 2, 2, "F") // Rounded corners
     pdf.setTextColor(255, 255, 255)
-    pdf.setFontSize(9)
-    pdf.text("Installation Report", margin + 2, yPosition + 5)
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Installation Report", margin + 3, yPosition + 7)
     pdf.setTextColor(0, 0, 0)
 
-    // Add company logo on the right (much smaller to match the page)
-    const logoSize = 20 // Reduced from 40 to 20
-    const logoX = pageWidth - margin - logoSize - 5
-    const logoY = yPosition - 8
+    // Add company logo on the right - positioned like in the image
+    const logoSize = 18 // Compact size
+    const logoBoxWidth = 25
+    const logoBoxHeight = 20
+    const logoX = pageWidth - margin - logoBoxWidth
+    const logoY = yPosition - 2
 
-    // Try to load company logo, fallback to OH+ logo
-    const companyLogoUrl = "/ohplus-new-logo.png" // Default to OH+ logo
+    // Try to load OH+ logo
+    const companyLogoUrl = "/ohplus-new-logo.png"
     const logoBase64 = await loadImageAsBase64(companyLogoUrl)
     if (logoBase64) {
-      // Add white background for logo (smaller box)
-      pdf.setFillColor(255, 255, 255)
-      pdf.rect(logoX - 3, logoY, logoSize + 6, logoSize + 6, "F")
-      pdf.setDrawColor(200, 200, 200)
-      pdf.setLineWidth(0.5)
-      pdf.rect(logoX - 3, logoY, logoSize + 6, logoSize + 6)
+      // Add light gray background box
+      pdf.setFillColor(248, 248, 248)
+      pdf.roundedRect(logoX, logoY, logoBoxWidth, logoBoxHeight, 2, 2, "F")
+      pdf.setDrawColor(220, 220, 220)
+      pdf.setLineWidth(0.3)
+      pdf.roundedRect(logoX, logoY, logoBoxWidth, logoBoxHeight, 2, 2)
 
-      pdf.addImage(logoBase64, "PNG", logoX, logoY + 3, logoSize, logoSize)
+      // Add the logo
+      pdf.addImage(logoBase64, "PNG", logoX + 3, logoY + 2, logoSize, logoSize - 2)
+    } else {
+      // Fallback: create OH! text logo
+      pdf.setFillColor(248, 248, 248)
+      pdf.roundedRect(logoX, logoY, logoBoxWidth, logoBoxHeight, 2, 2, "F")
+      pdf.setDrawColor(220, 220, 220)
+      pdf.setLineWidth(0.3)
+      pdf.roundedRect(logoX, logoY, logoBoxWidth, logoBoxHeight, 2, 2)
+
+      pdf.setFontSize(12)
+      pdf.setFont("helvetica", "bold")
+      pdf.setTextColor(30, 58, 138) // Blue color
+      pdf.text("OH!", logoX + 4, logoY + 12)
+      pdf.setTextColor(52, 211, 235) // Cyan color for +
+      pdf.text("+", logoX + 17, logoY + 12)
+      pdf.setTextColor(0, 0, 0)
     }
 
-    yPosition += badgeHeight + 5
+    yPosition += badgeHeight + 8
 
-    // "as of" date text
+    // "as of" date text - positioned like in the image
     pdf.setFontSize(9)
-    pdf.setFont("helvetica", "italic")
+    pdf.setFont("helvetica", "normal")
     pdf.setTextColor(100, 100, 100)
     pdf.text(`as of ${formatDate(report.date)}`, margin, yPosition)
     pdf.setTextColor(0, 0, 0)
-    yPosition += 15
+    yPosition += 20 // More space before next section
 
     // Project Information Section
     checkNewPage(70)
