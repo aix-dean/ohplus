@@ -11,7 +11,6 @@ import type { Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
-import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ReportPreviewPage() {
@@ -24,7 +23,6 @@ export default function ReportPreviewPage() {
   const [isFullScreenOpen, setIsFullScreenOpen] = useState(false)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
-  const [isSuccessDialogOpen, setIsSuccessDialogOpen] = useState(false)
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<string>>(new Set())
   const { user } = useAuth()
   const { toast } = useToast()
@@ -117,8 +115,13 @@ export default function ReportPreviewPage() {
       sessionStorage.removeItem("previewReportData")
       sessionStorage.removeItem("previewProductData")
 
-      // Show success dialog instead of toast
-      setIsSuccessDialogOpen(true)
+      toast({
+        title: "Success",
+        description: "Report posted successfully!",
+      })
+
+      // Navigate to service reports page
+      router.push("/logistics/service-reports")
     } catch (error) {
       console.error("Error posting report:", error)
       toast({
@@ -129,12 +132,6 @@ export default function ReportPreviewPage() {
     } finally {
       setPosting(false)
     }
-  }
-
-  const handleSuccessDialogClose = () => {
-    setIsSuccessDialogOpen(false)
-    // Navigate to service reports page after closing success dialog
-    router.push("/logistics/service-reports")
   }
 
   const formatDate = (dateString: string) => {
@@ -549,13 +546,6 @@ export default function ReportPreviewPage() {
           onSelectOption={handleSendOption}
         />
       )}
-
-      {/* Success Dialog */}
-      <ReportPostSuccessDialog
-        open={isSuccessDialogOpen}
-        onOpenChange={setIsSuccessDialogOpen}
-        onClose={handleSuccessDialogClose}
-      />
 
       {/* Full Screen Preview Dialog */}
       <Dialog open={isFullScreenOpen} onOpenChange={setIsFullScreenOpen}>
