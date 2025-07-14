@@ -293,7 +293,6 @@ export default function ReportPreviewPage() {
           <div className="bg-cyan-400 text-white px-3 py-1 rounded text-sm font-medium">
             {product?.content_type || "Preview"}
           </div>
-          <div className="bg-yellow-400 text-black px-3 py-1 rounded text-sm font-medium">PREVIEW</div>
         </div>
 
         {/* Action Buttons */}
