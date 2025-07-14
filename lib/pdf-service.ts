@@ -898,26 +898,27 @@ export async function generateReportPDF(
     pdf.text("Installation Report", margin + 2, yPosition + 5)
     pdf.setTextColor(0, 0, 0)
 
-    // Add company logo on the right - matching the web page size (40x40px equivalent)
-    const logoSize = 12 // Much smaller - equivalent to 40px in web page
-    const logoBoxWidth = 16 // Small box width
-    const logoBoxHeight = 14 // Small box height
-    const logoX = pageWidth - margin - logoBoxWidth
-    const logoY = yPosition - 2
+    // Add company logo on the right (similar to web page - smaller size)
+    const logoSize = 25 // Reduced from 40 to 25 to match web page proportions
+    const logoContainerSize = 30 // Container size
+    const logoX = pageWidth - margin - logoContainerSize
+    const logoY = yPosition - 15
 
     // Try to load company logo, fallback to OH+ logo
     const companyLogoUrl = "/ohplus-new-logo.png" // Default to OH+ logo
     const logoBase64 = await loadImageAsBase64(companyLogoUrl)
     if (logoBase64) {
-      // Add white background for logo (small box like in web page)
+      // Add white background container for logo (similar to web page)
       pdf.setFillColor(255, 255, 255)
-      pdf.rect(logoX, logoY, logoBoxWidth, logoBoxHeight, "F")
-      pdf.setDrawColor(200, 200, 200)
-      pdf.setLineWidth(0.3)
-      pdf.rect(logoX, logoY, logoBoxWidth, logoBoxHeight)
+      pdf.rect(logoX - 2, logoY, logoContainerSize + 4, logoContainerSize, "F")
+      pdf.setDrawColor(220, 220, 220)
+      pdf.setLineWidth(0.5)
+      pdf.rect(logoX - 2, logoY, logoContainerSize + 4, logoContainerSize)
 
-      // Add the logo - small size to match web page
-      pdf.addImage(logoBase64, "PNG", logoX + 2, logoY + 1, logoSize, logoSize)
+      // Add logo centered in container
+      const logoOffsetX = (logoContainerSize - logoSize) / 2
+      const logoOffsetY = (logoContainerSize - logoSize) / 2
+      pdf.addImage(logoBase64, "PNG", logoX + logoOffsetX, logoY + logoOffsetY, logoSize, logoSize)
     }
 
     yPosition += badgeHeight + 5
