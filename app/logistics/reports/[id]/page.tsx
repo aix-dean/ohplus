@@ -26,7 +26,6 @@ export default function ReportPreviewPage() {
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
   const { user } = useAuth()
   const [userData, setUserData] = useState<User | null>(null)
-  const [imageLoadErrors, setImageLoadErrors] = useState<{ [key: string]: boolean }>({})
 
   useEffect(() => {
     if (reportId) {
@@ -136,19 +135,9 @@ export default function ReportPreviewPage() {
     const link = document.createElement("a")
     link.href = fileUrl
     link.download = fileName
-    link.target = "_blank"
-    link.rel = "noopener noreferrer"
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-  }
-
-  const handleImageError = (index: number, url: string) => {
-    console.error("Failed to load image:", url)
-    setImageLoadErrors((prev) => ({
-      ...prev,
-      [index]: true,
-    }))
   }
 
   const handleDownloadPDF = async () => {
@@ -394,68 +383,65 @@ export default function ReportPreviewPage() {
           {/* Attachments/Photos */}
           {report.attachments && report.attachments.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {report.attachments.slice(0, 2).map((attachment, index) => {
-                const attachmentUrl = attachment.fileURL || attachment.fileUrl
-                const hasImageError = imageLoadErrors[index]
-
-                return (
-                  <div key={index} className="space-y-2">
-                    <div
-                      className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
-                      onClick={() => attachmentUrl && openFullScreen(attachment)}
-                    >
-                      {attachmentUrl && !hasImageError ? (
-                        <div className="w-full h-full flex flex-col items-center justify-center relative">
-                          {/* Zoom overlay */}
-                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-                            <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                          </div>
-
-                          {isImageFile(attachment.fileName || "") ? (
-                            <img
-                              src={attachmentUrl || "/placeholder.svg"}
-                              alt={attachment.fileName || `Attachment ${index + 1}`}
-                              className="max-w-full max-h-full object-contain rounded"
-                              onError={() => handleImageError(index, attachmentUrl)}
-                              referrerPolicy="no-referrer"
-                            />
-                          ) : isVideoFile(attachment.fileName || "") ? (
-                            <video
-                              src={attachmentUrl}
-                              controls
-                              className="max-w-full max-h-full object-contain rounded"
-                              onError={() => handleImageError(index, attachmentUrl)}
-                            />
-                          ) : (
-                            <div className="text-center space-y-2">
-                              {getFileIcon(attachment.fileName || "")}
-                              <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
-                              <a
-                                href={attachmentUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-blue-600 hover:text-blue-800 underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                Open File
-                              </a>
-                            </div>
-                          )}
-                          {attachment.notes && (
-                            <p className="text-xs text-gray-500 italic mt-2 text-center">"{attachment.notes}"</p>
-                          )}
+              {report.attachments.slice(0, 2).map((attachment, index) => (
+                <div key={index} className="space-y-2">
+                  <div
+                    className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
+                    onClick={() => attachment.fileUrl && openFullScreen(attachment)}
+                  >
+                    {attachment.fileUrl ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center relative">
+                        {/* Zoom overlay */}
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
+                          <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                         </div>
-                      ) : (
-                        <div className="text-center space-y-2">
-                          {getFileIcon(attachment.fileName || "")}
-                          <p className="text-sm text-gray-700 font-medium break-all">
-                            {attachment.fileName || `Attachment ${index + 1}`}
-                          </p>
-                          {hasImageError && <p className="text-xs text-red-500">Failed to load image</p>}
-                          {attachment.notes && <p className="text-xs text-gray-500 italic">"{attachment.notes}"</p>}
-                          {attachmentUrl && (
+
+                        {isImageFile(attachment.fileName || "") ? (
+                          <img
+                            src={attachment.fileUrl || "/placeholder.svg"}
+                            alt={attachment.fileName || `Attachment ${index + 1}`}
+                            className="max-w-full max-h-full object-contain rounded"
+                            onError={(e) => {
+                              // Fallback to icon if image fails to load
+                              const target = e.target as HTMLImageElement
+                              target.style.display = "none"
+                              const parent = target.parentElement
+                              if (parent) {
+                                parent.innerHTML = `
+                                  <div class="text-center space-y-2">
+                                    ${getFileIcon(attachment.fileName || "").props.children}
+                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
+                                  </div>
+                                `
+                              }
+                            }}
+                          />
+                        ) : isVideoFile(attachment.fileName || "") ? (
+                          <video
+                            src={attachment.fileUrl}
+                            controls
+                            className="max-w-full max-h-full object-contain rounded"
+                            onError={(e) => {
+                              // Fallback to icon if video fails to load
+                              const target = e.target as HTMLVideoElement
+                              target.style.display = "none"
+                              const parent = target.parentElement
+                              if (parent) {
+                                parent.innerHTML = `
+                                  <div class="text-center space-y-2">
+                                    ${getFileIcon(attachment.fileName || "").props.children}
+                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
+                                  </div>
+                                `
+                              }
+                            }}
+                          />
+                        ) : (
+                          <div className="text-center space-y-2">
+                            {getFileIcon(attachment.fileName || "")}
+                            <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
                             <a
-                              href={attachmentUrl}
+                              href={attachment.fileUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-xs text-blue-600 hover:text-blue-800 underline"
@@ -463,25 +449,39 @@ export default function ReportPreviewPage() {
                             >
                               Open File
                             </a>
-                          )}
-                        </div>
-                      )}
+                          </div>
+                        )}
+                        {attachment.note && (
+                          <p className="text-xs text-gray-500 italic mt-2 text-center">"{attachment.note}"</p>
+                        )}
+                      </div>
+                    ) : attachment.fileName ? (
+                      <div className="text-center space-y-2">
+                        {getFileIcon(attachment.fileName)}
+                        <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
+                        {attachment.note && <p className="text-xs text-gray-500 italic">"{attachment.note}"</p>}
+                      </div>
+                    ) : (
+                      <div className="text-center space-y-2">
+                        <ImageIcon className="h-12 w-12 text-gray-400" />
+                        <p className="text-sm text-gray-600">Project Photo {index + 1}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <div>
+                      <span className="font-semibold">Date:</span> {formatDate(report.date)}
                     </div>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <div>
-                        <span className="font-semibold">Date:</span> {formatDate(report.date)}
-                      </div>
-                      <div>
-                        <span className="font-semibold">Time:</span>{" "}
-                        {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                      </div>
-                      <div>
-                        <span className="font-semibold">Location:</span> {report.location || "N/A"}
-                      </div>
+                    <div>
+                      <span className="font-semibold">Time:</span>{" "}
+                      {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Location:</span> {report.location || "N/A"}
                     </div>
                   </div>
-                )
-              })}
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -563,16 +563,11 @@ export default function ReportPreviewPage() {
                 {fullScreenAttachment?.fileName || "File Preview"}
               </DialogTitle>
               <div className="flex items-center gap-2 flex-shrink-0">
-                {(fullScreenAttachment?.fileURL || fullScreenAttachment?.fileUrl) && (
+                {fullScreenAttachment?.fileUrl && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() =>
-                      downloadFile(
-                        fullScreenAttachment.fileURL || fullScreenAttachment.fileUrl,
-                        fullScreenAttachment.fileName || "file",
-                      )
-                    }
+                    onClick={() => downloadFile(fullScreenAttachment.fileUrl, fullScreenAttachment.fileName || "file")}
                     className="text-white hover:bg-white hover:bg-opacity-20"
                   >
                     <Download className="h-4 w-4" />
@@ -592,19 +587,18 @@ export default function ReportPreviewPage() {
             {/* Scrollable Content Container */}
             <div className="flex-1 overflow-auto pt-16 pb-16">
               <div className="min-h-full flex items-center justify-center p-6">
-                {fullScreenAttachment?.fileURL || fullScreenAttachment?.fileUrl ? (
+                {fullScreenAttachment?.fileUrl ? (
                   <div className="w-full max-w-full flex items-center justify-center">
                     {isImageFile(fullScreenAttachment.fileName || "") ? (
                       <img
-                        src={fullScreenAttachment.fileURL || fullScreenAttachment.fileUrl}
+                        src={fullScreenAttachment.fileUrl || "/placeholder.svg"}
                         alt={fullScreenAttachment.fileName || "Full screen preview"}
                         className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded shadow-lg"
                         style={{ maxWidth: "calc(90vw - 3rem)" }}
-                        referrerPolicy="no-referrer"
                       />
                     ) : isVideoFile(fullScreenAttachment.fileName || "") ? (
                       <video
-                        src={fullScreenAttachment.fileURL || fullScreenAttachment.fileUrl}
+                        src={fullScreenAttachment.fileUrl}
                         controls
                         className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded shadow-lg"
                         style={{ maxWidth: "calc(90vw - 3rem)" }}
@@ -613,7 +607,7 @@ export default function ReportPreviewPage() {
                     ) : isPdfFile(fullScreenAttachment.fileName || "") ? (
                       <div className="w-full h-[calc(90vh-8rem)] max-w-[calc(90vw-3rem)]">
                         <iframe
-                          src={fullScreenAttachment.fileURL || fullScreenAttachment.fileUrl}
+                          src={fullScreenAttachment.fileUrl}
                           className="w-full h-full border-0 rounded shadow-lg"
                           title={fullScreenAttachment.fileName || "PDF Preview"}
                         />
@@ -628,10 +622,7 @@ export default function ReportPreviewPage() {
                             variant="outline"
                             className="mt-4 bg-transparent border-white text-white hover:bg-white hover:text-black"
                             onClick={() =>
-                              downloadFile(
-                                fullScreenAttachment.fileURL || fullScreenAttachment.fileUrl,
-                                fullScreenAttachment.fileName || "file",
-                              )
+                              downloadFile(fullScreenAttachment.fileUrl, fullScreenAttachment.fileName || "file")
                             }
                           >
                             <Download className="h-4 w-4 mr-2" />
@@ -650,9 +641,9 @@ export default function ReportPreviewPage() {
             </div>
 
             {/* Footer with file info */}
-            {fullScreenAttachment?.notes && (
+            {fullScreenAttachment?.note && (
               <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-90 p-4 border-t border-gray-700">
-                <p className="text-white text-sm italic text-center">"{fullScreenAttachment.notes}"</p>
+                <p className="text-white text-sm italic text-center">"{fullScreenAttachment.note}"</p>
               </div>
             )}
           </div>
