@@ -1,64 +1,59 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Loader2, Users, Package, CreditCard, Calendar, Crown, CheckCircle, XCircle } from "lucide-react"
-import { getSubscriptionByLicenseKey } from "@/lib/subscription-service"
-import type { Subscription } from "@/lib/types/subscription"
-import { collection, query, where, getCountFromServer } from "firebase/firestore"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAuth } from "@/contexts/auth-context"
+import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-service"
+import type { BillingCycle, SubscriptionPlanType } from "@/lib/types/subscription"
+import { CheckCircle, Loader2, ArrowRight } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
+import Link from "next/link"
 import { db } from "@/lib/firebase"
+import { collection, query, where, getDocs } from "firebase/firestore"
 import { getUserProductsCount } from "@/lib/firebase-service"
 
-export default function AdminSubscriptionsPage() {
+// Move promoEndDate outside the component to ensure it's a stable reference
+const promoEndDate = new Date(2025, 6, 19, 23, 59, 0) // July 19, 2025, 11:59 PM PH time (UTC+8)
+
+export default function SubscriptionPage() {
+  const { user, userData, subscriptionData, loading, refreshSubscriptionData } = useAuth()
+  const { toast } = useToast()
   const router = useRouter()
-  const { userData, loading: authLoading } = useAuth()
-  const [subscription, setSubscription] = useState<Subscription | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
   const [currentUserCount, setCurrentUserCount] = useState<number>(0)
   const [loadingUserCount, setLoadingUserCount] = useState(true)
   const [currentInventoryCount, setCurrentInventoryCount] = useState<number>(0)
   const [loadingInventoryCount, setLoadingInventoryCount] = useState(true)
+  const [timeLeft, setTimeLeft] = useState<{
+    days: number
+    hours: number
+    minutes: number
+    seconds: number
+  } | null>(null)
 
-  // Fetch subscription data
+  const plans = getSubscriptionPlans()
+
   useEffect(() => {
-    const fetchSubscription = async () => {
-      if (!userData?.license_key) {
-        setLoading(false)
-        return
-      }
-
-      try {
-        const subscriptionData = await getSubscriptionByLicenseKey(userData.license_key)
-        setSubscription(subscriptionData)
-      } catch (error) {
-        console.error("Error fetching subscription:", error)
-      } finally {
-        setLoading(false)
-      }
+    if (!loading && !user) {
+      router.push("/login")
     }
-
-    if (!authLoading && userData) {
-      fetchSubscription()
-    }
-  }, [userData, authLoading])
+  }, [loading, user, router])
 
   // Fetch current user count
   useEffect(() => {
     const fetchUserCount = async () => {
-      if (!userData?.license_key) {
-        setLoadingUserCount(false)
-        return
-      }
+      if (!userData?.license_key) return
 
       try {
+        setLoadingUserCount(true)
         const usersRef = collection(db, "iboard_users")
-        const q = query(usersRef, where("license_key", "==", userData.license_key))
-        const snapshot = await getCountFromServer(q)
-        setCurrentUserCount(snapshot.data().count)
+        const usersQuery = query(usersRef, where("license_key", "==", userData.license_key))
+        const usersSnapshot = await getDocs(usersQuery)
+        setCurrentUserCount(usersSnapshot.size)
       } catch (error) {
         console.error("Error fetching user count:", error)
         setCurrentUserCount(0)
@@ -67,20 +62,16 @@ export default function AdminSubscriptionsPage() {
       }
     }
 
-    if (userData?.license_key) {
-      fetchUserCount()
-    }
+    fetchUserCount()
   }, [userData?.license_key])
 
   // Fetch current inventory count
   useEffect(() => {
     const fetchInventoryCount = async () => {
-      if (!userData?.company_id) {
-        setLoadingInventoryCount(false)
-        return
-      }
+      if (!userData?.company_id) return
 
       try {
+        setLoadingInventoryCount(true)
         const count = await getUserProductsCount(userData.company_id, { active: true })
         setCurrentInventoryCount(count)
       } catch (error) {
@@ -91,221 +82,277 @@ export default function AdminSubscriptionsPage() {
       }
     }
 
-    if (userData?.company_id) {
-      fetchInventoryCount()
-    }
+    fetchInventoryCount()
   }, [userData?.company_id])
 
-  if (authLoading || loading) {
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const now = new Date().getTime()
+      const difference = promoEndDate.getTime() - now
+
+      if (difference <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+        return
+      }
+
+      const days = Math.floor(difference / (1000 * 60 * 60 * 24))
+      const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+      const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60))
+      const seconds = Math.floor((difference % (1000 * 60)) / 1000)
+
+      setTimeLeft({ days, hours, minutes, seconds })
+    }
+
+    calculateTimeLeft()
+    const timer = setInterval(calculateTimeLeft, 1000)
+
+    return () => clearInterval(timer)
+  }, [])
+
+  // handleUpgrade is no longer directly used on this page, but kept for context if needed elsewhere
+  const handleUpgrade = useCallback(
+    async (planId: string) => {
+      if (!user || !userData?.license_key) {
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to manage your subscription.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setIsUpdating(true)
+      setSelectedPlanId(planId)
+
+      try {
+        const selectedPlan = plans.find((plan) => plan.id === planId)
+        if (!selectedPlan) {
+          toast({
+            title: "Error",
+            description: "Selected plan not found.",
+            variant: "destructive",
+          })
+          return
+        }
+
+        if (selectedPlan.id === "enterprise") {
+          toast({
+            title: "Enterprise Plan",
+            description: "Please contact us directly for Enterprise plan inquiries.",
+            variant: "default",
+          })
+          return
+        }
+
+        const newPlanType: SubscriptionPlanType = selectedPlan.id as SubscriptionPlanType
+        const billingCycle: BillingCycle = selectedPlan.billingCycle === "N/A" ? "monthly" : selectedPlan.billingCycle
+
+        await subscriptionService.createSubscription(
+          userData.license_key,
+          newPlanType,
+          billingCycle,
+          user.uid,
+          new Date(),
+          null,
+          "active",
+          null,
+          null,
+        )
+
+        toast({
+          title: "Subscription Activated",
+          description: `Welcome to the ${selectedPlan.name}! Your new subscription has been created.`,
+        })
+
+        await refreshSubscriptionData()
+      } catch (error: any) {
+        console.error("Failed to select plan:", error)
+        toast({
+          title: "Error",
+          description: `Failed to activate subscription: ${error instanceof Error ? error.message : String(error)}`,
+          variant: "destructive",
+        })
+      } finally {
+        setIsUpdating(false)
+        setSelectedPlanId(null)
+      }
+    },
+    [user, userData, plans, refreshSubscriptionData, toast],
+  )
+
+  const isCurrentPlan = useCallback(
+    (planId: string) => {
+      return subscriptionData?.planType === planId
+    },
+    [subscriptionData],
+  )
+
+  if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     )
   }
 
-  if (!userData?.license_key) {
-    return (
-      <div className="flex-1 p-4 md:p-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Subscription</h1>
-          <p className="text-gray-600 mt-2">Manage your subscription and billing</p>
-        </div>
+  const currentPlan = subscriptionData?.planType || "None"
+  const currentPlanDetails = plans.find((plan) => plan.id === currentPlan)
 
-        <Card className="max-w-md mx-auto">
-          <CardContent className="p-6 text-center">
-            <div className="mb-4">
-              <CreditCard className="h-12 w-12 mx-auto text-gray-400" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">No Active Subscription</h3>
-            <p className="text-gray-600 mb-4">You don't have an active subscription. Choose a plan to get started.</p>
-            <Button onClick={() => router.push("/admin/subscriptions/choose-plan")}>Choose Plan</Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  if (!subscription) {
-    return (
-      <div className="flex-1 p-4 md:p-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Subscription</h1>
-          <p className="text-gray-600 mt-2">Manage your subscription and billing</p>
-        </div>
-
-        <Card className="max-w-md mx-auto">
-          <CardContent className="p-6 text-center">
-            <div className="mb-4">
-              <XCircle className="h-12 w-12 mx-auto text-red-400" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">Subscription Not Found</h3>
-            <p className="text-gray-600 mb-4">We couldn't find your subscription details. Please contact support.</p>
-            <Button variant="outline" onClick={() => router.push("/help")}>
-              Contact Support
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
+  const formatDate = (date: Date | null) => {
+    if (!date) return "N/A"
+    return new Date(date).toLocaleDateString("en-US", {
       year: "numeric",
-      month: "long",
+      month: "short",
       day: "numeric",
     })
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "active":
-        return "bg-green-100 text-green-800"
-      case "inactive":
-      case "cancelled":
-        return "bg-red-100 text-red-800"
-      case "trial":
-        return "bg-blue-100 text-blue-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  const getPlanIcon = (planType: string) => {
-    switch (planType.toLowerCase()) {
-      case "enterprise":
-        return <Crown className="h-5 w-5" />
-      default:
-        return <CreditCard className="h-5 w-5" />
-    }
-  }
-
   return (
-    <div className="flex-1 p-4 md:p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Subscription</h1>
-        <p className="text-gray-600 mt-2">Manage your subscription and billing</p>
+    <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl">
+        {/* Current Plan Details Section */}
+        {subscriptionData && (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl mb-6">
+              Current Plan:{" "}
+              <span
+                className={cn(
+                  "font-extrabold",
+                  subscriptionData.status === "active" && "text-green-600",
+                  subscriptionData.status === "trialing" && "text-blue-600",
+                  (subscriptionData.status === "inactive" ||
+                    subscriptionData.status === "expired" ||
+                    subscriptionData.status === "cancelled") &&
+                    "text-red-600",
+                )}
+              >
+                {currentPlanDetails?.name || "No Active Plan"}
+              </span>
+            </h2>
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+              {/* Plan Card */}
+              <Card className="flex flex-col rounded-xl border-2 shadow-sm">
+                <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
+                  <CardTitle className="text-xl font-bold">Plan</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col justify-between p-6">
+                  <div>
+                    <h3 className="text-xl font-semibold capitalize text-gray-900">
+                      {currentPlanDetails?.name || "N/A"}
+                    </h3>
+                    {currentPlanDetails?.price !== 0 && currentPlanDetails?.billingCycle !== "N/A" && (
+                      <p className="text-lg text-gray-700 mt-1">
+                        Php {currentPlanDetails?.price.toLocaleString()}{" "}
+                        <span className="text-base font-medium text-gray-500">
+                          /{currentPlanDetails?.billingCycle === "monthly" ? "month" : "year"}
+                        </span>
+                      </p>
+                    )}
+                    <ul className="mt-4 space-y-2 text-sm text-gray-700">
+                      {currentPlanDetails?.features.map((feature, index) => (
+                        <li key={index} className="flex items-center">
+                          <CheckCircle className="mr-2 h-4 w-4 flex-shrink-0 text-green-500" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Cycle Card */}
+              <Card className="flex flex-col rounded-xl border-2 shadow-sm">
+                <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
+                  <CardTitle className="text-xl font-bold">Cycle</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col justify-between p-6">
+                  <div>
+                    <p className="text-lg font-semibold text-gray-900">
+                      Start: {formatDate(subscriptionData.startDate)}
+                    </p>
+                    <p className="text-lg font-semibold text-gray-900">End: {formatDate(subscriptionData.endDate)}</p>
+                  </div>
+                  <Button variant="outline" className="mt-4 w-full bg-transparent">
+                    Extend
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Users Card */}
+              <Card className="flex flex-col rounded-xl border-2 shadow-sm">
+                <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
+                  <CardTitle className="text-xl font-bold">Users</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col justify-between p-6">
+                  <div>
+                    {loadingUserCount ? (
+                      <div className="flex items-center space-x-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <p className="text-sm text-gray-600">Loading...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-lg font-semibold text-gray-900">{currentUserCount} users</p>
+                        <p className="text-sm text-gray-600">
+                          {subscriptionData.maxUsers === -1
+                            ? "(Unlimited users)"
+                            : `(Max of ${subscriptionData.maxUsers} users)`}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  <Button variant="outline" className="mt-4 w-full bg-transparent">
+                    Expand
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Inventory Card */}
+              <Card className="flex flex-col rounded-xl border-2 shadow-sm">
+                <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
+                  <CardTitle className="text-xl font-bold">Inventory</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col justify-between p-6">
+                  <div>
+                    {loadingInventoryCount ? (
+                      <div className="flex items-center space-x-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <p className="text-sm text-gray-600">Loading...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-lg font-semibold text-gray-900">{currentInventoryCount} sites</p>
+                        <p className="text-sm text-gray-600">
+                          {subscriptionData.maxProducts === -1
+                            ? "(Unlimited sites)"
+                            : `(Max of ${subscriptionData.maxProducts} sites)`}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  <Button variant="outline" className="mt-4 w-full bg-transparent">
+                    Expand
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Manage Your Subscription</h1>
+          <p className="mt-3 text-lg text-gray-600">
+            View your current plan or select a new one to fit your evolving needs.
+          </p>
+          <div className="mt-6">
+            <Link href="/admin/subscriptions/choose-plan">
+              <Button className="bg-primary text-white hover:bg-primary/90">
+                Select or Upgrade Subscription <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </div>
       </div>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Current Plan Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Current Plan</CardTitle>
-            {getPlanIcon(subscription.planType)}
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold capitalize">{subscription.planType}</div>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge className={getStatusColor(subscription.status)}>{subscription.status}</Badge>
-              {subscription.status === "active" && <CheckCircle className="h-4 w-4 text-green-600" />}
-            </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              {subscription.billingCycle === "monthly" ? "Billed Monthly" : "Billed Annually"}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Users Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Users</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {loadingUserCount ? (
-                <Loader2 className="h-6 w-6 animate-spin" />
-              ) : (
-                `${currentUserCount}${subscription.maxUsers === -1 ? "" : ` / ${subscription.maxUsers}`}`
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {subscription.maxUsers === -1 ? "Unlimited users" : `Max ${subscription.maxUsers} users`}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Inventory Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inventory</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {loadingInventoryCount ? (
-                <Loader2 className="h-6 w-6 animate-spin" />
-              ) : (
-                `${currentInventoryCount}${subscription.maxProducts === -1 ? "" : ` / ${subscription.maxProducts}`}`
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {subscription.maxProducts === -1 ? "Unlimited sites" : `Max ${subscription.maxProducts} sites`}
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Billing Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Billing</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">₱{subscription.price.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              {subscription.billingCycle === "monthly" ? "per month" : "per year"}
-            </p>
-            {subscription.nextBillingDate && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Next billing: {formatDate(subscription.nextBillingDate)}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Subscription Details Card */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Subscription Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm font-medium text-gray-500">License Key</p>
-                <p className="text-sm font-mono bg-gray-100 p-2 rounded">{subscription.licenseKey}</p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">Start Date</p>
-                <p className="text-sm">{formatDate(subscription.startDate)}</p>
-              </div>
-              {subscription.endDate && (
-                <div>
-                  <p className="text-sm font-medium text-gray-500">End Date</p>
-                  <p className="text-sm">{formatDate(subscription.endDate)}</p>
-                </div>
-              )}
-              <div>
-                <p className="text-sm font-medium text-gray-500">Features</p>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {subscription.features.map((feature, index) => (
-                    <Badge key={index} variant="secondary" className="text-xs">
-                      {feature}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-4">
-              <Button onClick={() => router.push("/admin/subscriptions/choose-plan")}>Upgrade Plan</Button>
-              <Button variant="outline">Manage Billing</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    </main>
   )
 }
