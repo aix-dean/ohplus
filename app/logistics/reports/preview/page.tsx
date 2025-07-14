@@ -128,7 +128,7 @@ export default function ReportPreviewPage() {
 
       toast({
         title: "Success",
-        description: "Report posted successfully to Firestore",
+        description: "Service Report Posted Successfully!",
       })
 
       // Clear preview data from session storage
