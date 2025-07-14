@@ -811,6 +811,7 @@ export async function generateReportPDF(
             height = maxHeight
             width = height * aspectRatio
           }
+          // If the image is wider than tall, scale its width to maxWidth and adjust height
         } else {
           height = maxHeight
           width = height * aspectRatio
@@ -818,6 +819,7 @@ export async function generateReportPDF(
             width = maxWidth
             height = width / aspectRatio
           }
+          // If the image is taller than wide or square, scale its height to maxHeight and adjust width
         }
 
         pdf.addImage(base64, "JPEG", x, y, width, height)
@@ -1058,10 +1060,21 @@ export async function generateReportPDF(
       const attachmentsToShow = report.attachments.slice(0, 2)
       const imageWidth = (contentWidth - 10) / 2 // Space for 2 images side by side
       const imageHeight = 60
+      const imageSpacing = 10 // Spacing between images
+
+      let startXForImages = margin
+      if (attachmentsToShow.length === 1) {
+        // Center single image
+        startXForImages = margin + (contentWidth - imageWidth) / 2
+      } else if (attachmentsToShow.length === 2) {
+        // Center two images with spacing
+        const totalImagesWidth = imageWidth * 2 + imageSpacing
+        startXForImages = margin + (contentWidth - totalImagesWidth) / 2
+      }
 
       for (let i = 0; i < attachmentsToShow.length; i++) {
         const attachment = attachmentsToShow[i]
-        const currentX = i === 0 ? margin : margin + imageWidth + 10
+        const currentX = startXForImages + i * (imageWidth + imageSpacing)
 
         // Draw border for attachment box
         pdf.setLineWidth(0.5)
@@ -1101,7 +1114,7 @@ export async function generateReportPDF(
       pdf.setFont("helvetica", "normal")
 
       for (let i = 0; i < attachmentsToShow.length; i++) {
-        const currentX = i === 0 ? margin : margin + imageWidth + 10
+        const currentX = startXForImages + i * (imageWidth + imageSpacing)
 
         pdf.setFont("helvetica", "bold")
         pdf.text("Date:", currentX, yPosition)
