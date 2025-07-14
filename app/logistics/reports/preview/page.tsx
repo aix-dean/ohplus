@@ -1,24 +1,22 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send } from "lucide-react"
-import { getReports, type ReportData, postReport } from "@/lib/report-service"
-import { getProductById, type Product } from "@/lib/firebase-service"
+import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send, Save } from "lucide-react"
+import { createReport, type ReportData } from "@/lib/report-service"
 import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
 import { getUserById, type User } from "@/lib/firebase-service"
+import { useToast } from "@/hooks/use-toast"
 
 export default function ReportPreviewPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const reportId = searchParams.get("reportId")
   const [report, setReport] = useState<ReportData | null>(null)
-  const [product, setProduct] = useState<Product | null>(null)
+  const [product, setProduct] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [fullScreenAttachment, setFullScreenAttachment] = useState<any>(null)
   const [isFullScreenOpen, setIsFullScreenOpen] = useState(false)
@@ -27,56 +25,128 @@ export default function ReportPreviewPage() {
   const [isPosting, setIsPosting] = useState(false)
   const { user } = useAuth()
   const [userData, setUserData] = useState<User | null>(null)
+  const { toast } = useToast()
 
   useEffect(() => {
-    if (reportId) {
-      fetchReportData()
-    }
-  }, [reportId])
+    loadPreviewData()
+  }, [])
 
-  const fetchReportData = async () => {
+  const loadPreviewData = async () => {
     try {
-      // Get all reports and find the one with matching ID
-      const reports = await getReports()
-      const foundReport = reports.find((r) => r.id === reportId)
+      const reportDataStr = sessionStorage.getItem("previewReportData")
+      const productDataStr = sessionStorage.getItem("previewProductData")
 
-      if (foundReport) {
-        setReport(foundReport)
+      if (!reportDataStr || !productDataStr) {
+        toast({
+          title: "Error",
+          description: "No preview data found. Please generate a report first.",
+          variant: "destructive",
+        })
+        router.push("/logistics/dashboard")
+        return
+      }
 
-        // Fetch product data for additional details
-        if (foundReport.siteId) {
-          const productData = await getProductById(foundReport.siteId)
-          setProduct(productData)
-        }
+      const reportData = JSON.parse(reportDataStr)
+      const productData = JSON.parse(productDataStr)
 
-        // Fetch user data for company logo
-        if (foundReport.sellerId) {
-          const userInfo = await getUserById(foundReport.sellerId)
-          setUserData(userInfo)
-        }
+      setReport(reportData)
+      setProduct(productData)
+
+      // Fetch user data for company logo
+      if (reportData.sellerId) {
+        const userInfo = await getUserById(reportData.sellerId)
+        setUserData(userInfo)
       }
     } catch (error) {
-      console.error("Error fetching report data:", error)
+      console.error("Error loading preview data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load preview data",
+        variant: "destructive",
+      })
+      router.push("/logistics/dashboard")
     } finally {
       setLoading(false)
     }
   }
 
   const handlePostReport = async () => {
-    if (!report) return
+    if (!report || !user) {
+      toast({
+        title: "Error",
+        description: "Missing report data or user authentication",
+        variant: "destructive",
+      })
+      return
+    }
 
     setIsPosting(true)
     try {
-      await postReport(report.id)
-      
-      // Store the posted report ID in session storage for the success dialog
-      sessionStorage.setItem('postedReportId', report.id)
-      
-      // Navigate to service-reports page instead of dashboard
-      router.push('/logistics/service-reports')
+      console.log("Starting to post report...", report)
+
+      // Prepare the report data for Firestore
+      const reportToPost: ReportData = {
+        siteId: report.siteId,
+        siteName: report.siteName,
+        siteCode: report.siteCode || "",
+        companyId: report.companyId,
+        sellerId: report.sellerId,
+        client: report.client,
+        clientId: report.clientId,
+        bookingDates: {
+          start: report.bookingDates.start,
+          end: report.bookingDates.end,
+        },
+        breakdate: report.breakdate,
+        sales: report.sales,
+        reportType: report.reportType,
+        date: report.date,
+        attachments: report.attachments || [],
+        status: "posted", // Change from draft/preview to posted
+        createdBy: report.createdBy,
+        createdByName: report.createdByName,
+        location: report.location || "",
+        category: report.category,
+        subcategory: report.subcategory,
+        priority: report.priority,
+        completionPercentage: report.completionPercentage || 0,
+        tags: report.tags || [],
+        assignedTo: report.assignedTo || "",
+        // Installation report specific fields
+        installationStatus: report.installationStatus || "",
+        installationTimeline: report.installationTimeline || "",
+        delayReason: report.delayReason || "",
+        delayDays: report.delayDays || "",
+      }
+
+      console.log("Report data prepared for posting:", reportToPost)
+
+      // Create the report in Firestore
+      const reportId = await createReport(reportToPost)
+
+      console.log("Report created successfully with ID:", reportId)
+
+      // Store the report ID in session storage
+      sessionStorage.setItem("lastPostedReportId", reportId)
+
+      toast({
+        title: "Success",
+        description: "Service Report Posted Successfully!",
+      })
+
+      // Clear preview data from session storage
+      sessionStorage.removeItem("previewReportData")
+      sessionStorage.removeItem("previewProductData")
+
+      // Navigate to the service reports page
+      router.push(`/logistics/service-reports`)
     } catch (error) {
-      console.error("Error posting report:", error)
-      alert("Failed to post report. Please try again.")
+      console.error("Error posting report to Firestore:", error)
+      toast({
+        title: "Error",
+        description: `Failed to post report: ${error instanceof Error ? error.message : "Unknown error"}`,
+        variant: "destructive",
+      })
     } finally {
       setIsPosting(false)
     }
@@ -169,7 +239,11 @@ export default function ReportPreviewPage() {
       await generateReportPDF(report, product, false)
     } catch (error) {
       console.error("Error generating PDF:", error)
-      alert("Failed to generate PDF. Please try again.")
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsGeneratingPDF(false)
     }
@@ -191,13 +265,16 @@ export default function ReportPreviewPage() {
   }
 
   const handleBack = () => {
+    // Clear preview data when going back
+    sessionStorage.removeItem("previewReportData")
+    sessionStorage.removeItem("previewProductData")
     router.back()
   }
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading report...</div>
+        <div className="text-lg">Loading report preview...</div>
       </div>
     )
   }
@@ -205,7 +282,7 @@ export default function ReportPreviewPage() {
   if (!report) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Report not found</div>
+        <div className="text-lg">Report preview not found</div>
       </div>
     )
   }
@@ -235,6 +312,7 @@ export default function ReportPreviewPage() {
             disabled={isPosting}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm flex items-center gap-2"
           >
+            <Save className="h-4 w-4" />
             {isPosting ? "Posting..." : "Post Report"}
           </Button>
           <Button
@@ -255,7 +333,6 @@ export default function ReportPreviewPage() {
         </div>
       </div>
 
-      {/* Rest of the component remains the same as the original report preview */}
       {/* Angular Blue Header */}
       <div className="w-full relative bg-white">
         <div className="relative h-16 overflow-hidden">
@@ -281,7 +358,7 @@ export default function ReportPreviewPage() {
         <div className="flex justify-between items-center">
           <div className="flex flex-col">
             <div className="bg-cyan-400 text-white px-6 py-3 rounded-lg text-base font-medium inline-block">
-              Installation Report
+              {getReportTypeDisplay(report.reportType)}
             </div>
             <p className="text-gray-600 text-sm mt-2">as of {formatDate(report.date)}</p>
           </div>
@@ -327,7 +404,7 @@ export default function ReportPreviewPage() {
                 </div>
                 <div className="flex">
                   <span className="font-medium text-gray-700 w-32 flex-shrink-0">Job Order:</span>
-                  <span className="text-gray-900">{report.id?.slice(-4).toUpperCase() || "N/A"}</span>
+                  <span className="text-gray-900">{report.id?.slice(-4).toUpperCase() || "PREV"}</span>
                 </div>
                 <div className="flex">
                   <span className="font-medium text-gray-700 w-32 flex-shrink-0">Job Order Date:</span>
@@ -409,6 +486,50 @@ export default function ReportPreviewPage() {
             </div>
           </div>
 
+          {/* Installation Report Specific Status */}
+          {report.reportType === "installation-report" && (
+            <div className="bg-blue-50 p-4 rounded-lg space-y-2">
+              {report.installationStatus && (
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-700">Installation Progress:</span>
+                  <span className="text-gray-900">{report.installationStatus}%</span>
+                  <div className="flex-1 bg-gray-200 rounded-full h-2 ml-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full"
+                      style={{ width: `${report.installationStatus}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+              {report.installationTimeline && (
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-700">Timeline:</span>
+                  <span
+                    className={`px-2 py-1 rounded text-sm ${
+                      report.installationTimeline === "delayed"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-green-100 text-green-800"
+                    }`}
+                  >
+                    {report.installationTimeline === "delayed" ? "Delayed" : "On Time"}
+                  </span>
+                </div>
+              )}
+              {report.delayReason && (
+                <div className="flex items-start gap-2">
+                  <span className="font-medium text-gray-700">Delay Reason:</span>
+                  <span className="text-gray-900">{report.delayReason}</span>
+                </div>
+              )}
+              {report.delayDays && (
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-700">Delay Duration:</span>
+                  <span className="text-gray-900">{report.delayDays} days</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Attachments/Photos */}
           {report.attachments && report.attachments.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -438,7 +559,7 @@ export default function ReportPreviewPage() {
                               if (parent) {
                                 parent.innerHTML = `
                                   <div class="text-center space-y-2">
-                                    ${getFileIcon(attachment.fileName || "").props.children}
+                                    <div class="flex justify-center">${getFileIcon(attachment.fileName || "").type}</div>
                                     <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
                                   </div>
                                 `
@@ -458,7 +579,7 @@ export default function ReportPreviewPage() {
                               if (parent) {
                                 parent.innerHTML = `
                                   <div class="text-center space-y-2">
-                                    ${getFileIcon(attachment.fileName || "").props.children}
+                                    <div class="flex justify-center">${getFileIcon(attachment.fileName || "").type}</div>
                                     <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
                                   </div>
                                 `
@@ -649,4 +770,35 @@ export default function ReportPreviewPage() {
                           <p className="text-sm text-gray-300 mt-2">Preview not available for this file type</p>
                           <Button
                             variant="outline"
-                            className="mt-4 bg-transparent\
+                            className="mt-4 bg-transparent border-white text-white hover:bg-white hover:text-black"
+                            onClick={() =>
+                              downloadFile(fullScreenAttachment.fileUrl, fullScreenAttachment.fileName || "file")
+                            }
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download File
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center text-white p-8">
+                    <p>File not available</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer with file info */}
+            {fullScreenAttachment?.note && (
+              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-90 p-4 border-t border-gray-700">
+                <p className="text-white text-sm italic text-center">"{fullScreenAttachment.note}"</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
