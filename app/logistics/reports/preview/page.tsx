@@ -39,7 +39,7 @@ export default function ReportPreviewPage() {
       if (!reportDataStr || !productDataStr) {
         toast({
           title: "Error",
-          description: "Service Report Generated Successfully!",
+          description: "No preview data found. Please generate a report first.",
           variant: "destructive",
         })
         router.push("/logistics/dashboard")

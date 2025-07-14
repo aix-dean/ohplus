@@ -366,7 +366,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
       toast({
         title: "Success",
-        description: "Report preview generated successfully",
+        description: "Service Report Generated Successfully!",
       })
 
       onOpenChange(false)
