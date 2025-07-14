@@ -285,13 +285,6 @@ export default function AdminDashboardPage() {
       members: ["John"],
       isAvailable: false,
     },
-    {
-      id: "addDepartment",
-      name: "+ Add New Department",
-      headerColor: "bg-department-add-darkgray",
-      contentBgColor: "bg-card-content-add",
-      members: [], // No members for this card
-    },
   ]
 
   // Filter departments based on search term
