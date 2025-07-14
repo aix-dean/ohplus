@@ -259,12 +259,12 @@ export default function ReportPreviewPage() {
           <div className="flex-shrink-0">
             {userData?.company_logo ? (
               <div
-                className="bg-yellow-400 rounded-full px-6 py-3 flex items-center justify-center"
+                className="border border-yellow-400 rounded-full flex items-center justify-center"
                 style={{ minWidth: "120px", height: "48px" }}
               >
                 <div
                   className="bg-white rounded px-3 py-1 flex items-center justify-center"
-                  style={{ minHeight: "24px", minWidth: "60px" }}
+                  style={{ minHeight: "32px", minWidth: "80px" }}
                 >
                   <img
                     src={userData.company_logo || "/placeholder.svg"}
@@ -280,12 +280,12 @@ export default function ReportPreviewPage() {
               </div>
             ) : (
               <div
-                className="bg-yellow-400 rounded-full px-6 py-3 flex items-center justify-center"
+                className="border border-yellow-400 rounded-full flex items-center justify-center"
                 style={{ minWidth: "120px", height: "48px" }}
               >
                 <div
                   className="bg-white rounded px-3 py-1 flex items-center justify-center"
-                  style={{ minHeight: "24px", minWidth: "60px" }}
+                  style={{ minHeight: "32px", minWidth: "80px" }}
                 >
                   <img src="/ohplus-new-logo.png" alt="OH+ Logo" className="max-h-5 max-w-full object-contain" />
                 </div>
