@@ -1113,7 +1113,7 @@ export async function generateReportPDF(
 
     // Cyan section on left with diagonal cut
     pdf.setFillColor(52, 211, 235) // cyan-400
-    const cyanWidth = pageWidth * 0.3
+    const cyanWidth = pageWidth * 0.25
     const diagonalCutWidth = pageWidth * 0.05 // Width of the diagonal cut
 
     // Draw the main cyan rectangle
