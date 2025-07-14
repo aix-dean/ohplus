@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send } from "lucide-react"
+import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send, ExternalLink } from "lucide-react"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
@@ -145,6 +145,10 @@ export default function ReportPreviewPage() {
     document.body.removeChild(link)
   }
 
+  const openInNewTab = (fileUrl: string) => {
+    window.open(fileUrl, "_blank", "noopener,noreferrer")
+  }
+
   const handleImageError = (fileUrl: string, fileName: string) => {
     console.error("Image failed to load:", fileUrl)
     setImageLoadErrors((prev) => new Set(prev).add(fileUrl))
@@ -181,6 +185,153 @@ export default function ReportPreviewPage() {
 
   const handleBack = () => {
     router.back()
+  }
+
+  // Component for rendering image using webview/iframe approach
+  const ImageWebView = ({ attachment, index }: { attachment: any; index: number }) => {
+    const [webviewError, setWebviewError] = useState(false)
+    const hasImageError = imageLoadErrors.has(attachment.fileUrl || "")
+
+    if (!attachment.fileUrl || hasImageError || webviewError) {
+      return (
+        <div className="text-center space-y-2">
+          <div className="flex justify-center">
+            <svg className="h-12 w-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+              />
+            </svg>
+          </div>
+          <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName || "Unknown file"}</p>
+          <p className="text-xs text-red-500">Failed to load image</p>
+          <div className="flex gap-2 justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (attachment.fileUrl) {
+                  openInNewTab(attachment.fileUrl)
+                }
+              }}
+              className="text-xs"
+            >
+              <ExternalLink className="h-3 w-3 mr-1" />
+              Open
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (attachment.fileUrl) {
+                  downloadFile(attachment.fileUrl, attachment.fileName || "file")
+                }
+              }}
+              className="text-xs"
+            >
+              <Download className="h-3 w-3 mr-1" />
+              Download
+            </Button>
+          </div>
+        </div>
+      )
+    }
+
+    if (isImageFile(attachment.fileName || "")) {
+      return (
+        <div className="w-full h-full relative">
+          {/* Try direct image first, fallback to iframe */}
+          <img
+            src={attachment.fileUrl || "/placeholder.svg"}
+            alt={attachment.fileName || `Attachment ${index + 1}`}
+            className="max-w-full max-h-full object-contain rounded"
+            style={{ display: webviewError ? "none" : "block" }}
+            onError={() => {
+              console.log("Direct image failed, trying webview approach")
+              setWebviewError(true)
+            }}
+            onLoad={() => console.log("Direct image loaded successfully:", attachment.fileUrl)}
+          />
+
+          {/* Fallback iframe webview */}
+          {webviewError && (
+            <iframe
+              src={attachment.fileUrl}
+              className="w-full h-full border-0 rounded"
+              title={attachment.fileName || `Attachment ${index + 1}`}
+              sandbox="allow-same-origin allow-scripts"
+              onError={() => {
+                console.error("Webview also failed for:", attachment.fileUrl)
+                handleImageError(attachment.fileUrl, attachment.fileName || "")
+              }}
+            />
+          )}
+
+          {attachment.note && (
+            <p className="absolute bottom-2 left-2 right-2 text-xs text-white bg-black bg-opacity-50 p-1 rounded text-center">
+              "{attachment.note}"
+            </p>
+          )}
+        </div>
+      )
+    }
+
+    if (isVideoFile(attachment.fileName || "")) {
+      return (
+        <div className="w-full h-full relative">
+          <video
+            src={attachment.fileUrl}
+            controls
+            className="max-w-full max-h-full object-contain rounded"
+            onError={() => handleImageError(attachment.fileUrl, attachment.fileName || "")}
+          />
+          {attachment.note && (
+            <p className="absolute bottom-2 left-2 right-2 text-xs text-white bg-black bg-opacity-50 p-1 rounded text-center">
+              "{attachment.note}"
+            </p>
+          )}
+        </div>
+      )
+    }
+
+    // For other file types
+    return (
+      <div className="text-center space-y-2">
+        {getFileIcon(attachment.fileName || "")}
+        <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
+        <div className="flex gap-2 justify-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation()
+              openInNewTab(attachment.fileUrl)
+            }}
+            className="text-xs"
+          >
+            <ExternalLink className="h-3 w-3 mr-1" />
+            Open
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation()
+              downloadFile(attachment.fileUrl, attachment.fileName || "file")
+            }}
+            className="text-xs"
+          >
+            <Download className="h-3 w-3 mr-1" />
+            Download
+          </Button>
+        </div>
+        {attachment.note && <p className="text-xs text-gray-500 italic mt-2 text-center">"{attachment.note}"</p>}
+      </div>
+    )
   }
 
   if (loading) {
@@ -393,132 +544,43 @@ export default function ReportPreviewPage() {
           {/* Attachments/Photos */}
           {report.attachments && report.attachments.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {report.attachments.slice(0, 2).map((attachment, index) => {
-                const hasImageError = imageLoadErrors.has(attachment.fileUrl || "")
-
-                return (
-                  <div key={index} className="space-y-2">
-                    <div
-                      className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
-                      onClick={() => attachment.fileUrl && !hasImageError && openFullScreen(attachment)}
-                    >
-                      {attachment.fileUrl && !hasImageError ? (
-                        <div className="w-full h-full flex flex-col items-center justify-center relative">
-                          {/* Zoom overlay */}
-                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-                            <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                          </div>
-
-                          {isImageFile(attachment.fileName || "") ? (
-                            <img
-                              src={attachment.fileUrl || "/placeholder.svg"}
-                              alt={attachment.fileName || `Attachment ${index + 1}`}
-                              className="max-w-full max-h-full object-contain rounded"
-                              crossOrigin="anonymous"
-                              referrerPolicy="no-referrer"
-                              onError={() => handleImageError(attachment.fileUrl, attachment.fileName || "")}
-                              onLoad={() => console.log("Image loaded successfully:", attachment.fileUrl)}
-                            />
-                          ) : isVideoFile(attachment.fileName || "") ? (
-                            <video
-                              src={attachment.fileUrl}
-                              controls
-                              className="max-w-full max-h-full object-contain rounded"
-                              crossOrigin="anonymous"
-                              onError={() => handleImageError(attachment.fileUrl, attachment.fileName || "")}
-                            />
-                          ) : (
-                            <div className="text-center space-y-2">
-                              {getFileIcon(attachment.fileName || "")}
-                              <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
-                              <a
-                                href={attachment.fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-blue-600 hover:text-blue-800 underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                Open File
-                              </a>
-                            </div>
-                          )}
-                          {attachment.note && (
-                            <p className="text-xs text-gray-500 italic mt-2 text-center">"{attachment.note}"</p>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="text-center space-y-2">
-                          {hasImageError ? (
-                            <>
-                              <div className="flex justify-center">
-                                <svg
-                                  className="h-12 w-12 text-red-500"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="2"
-                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-                                  />
-                                </svg>
-                              </div>
-                              <p className="text-sm text-gray-700 font-medium break-all">
-                                {attachment.fileName || "Unknown file"}
-                              </p>
-                              <p className="text-xs text-red-500">Failed to load image</p>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (attachment.fileUrl) {
-                                    downloadFile(attachment.fileUrl, attachment.fileName || "file")
-                                  }
-                                }}
-                                className="text-xs"
-                              >
-                                <Download className="h-3 w-3 mr-1" />
-                                Download
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <ImageIcon className="h-12 w-12 text-gray-400" />
-                              <p className="text-sm text-gray-600">Project Photo {index + 1}</p>
-                              <p className="text-xs text-red-500">No file URL available</p>
-                            </>
-                          )}
-                        </div>
-                      )}
+              {report.attachments.slice(0, 2).map((attachment, index) => (
+                <div key={index} className="space-y-2">
+                  <div
+                    className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
+                    onClick={() => attachment.fileUrl && openFullScreen(attachment)}
+                  >
+                    {/* Zoom overlay */}
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center z-10">
+                      <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                     </div>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <div>
-                        <span className="font-semibold">Date:</span> {formatDate(report.date)}
-                      </div>
-                      <div>
-                        <span className="font-semibold">Time:</span>{" "}
-                        {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                      </div>
-                      <div>
-                        <span className="font-semibold">Location:</span> {report.location || "N/A"}
-                      </div>
-                      {attachment.fileName && (
-                        <div>
-                          <span className="font-semibold">File:</span> {attachment.fileName}
-                        </div>
-                      )}
-                      {attachment.fileType && (
-                        <div>
-                          <span className="font-semibold">Type:</span> {attachment.fileType}
-                        </div>
-                      )}
-                    </div>
+
+                    <ImageWebView attachment={attachment} index={index} />
                   </div>
-                )
-              })}
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <div>
+                      <span className="font-semibold">Date:</span> {formatDate(report.date)}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Time:</span>{" "}
+                      {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Location:</span> {report.location || "N/A"}
+                    </div>
+                    {attachment.fileName && (
+                      <div>
+                        <span className="font-semibold">File:</span> {attachment.fileName}
+                      </div>
+                    )}
+                    {attachment.fileType && (
+                      <div>
+                        <span className="font-semibold">Type:</span> {attachment.fileType}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
@@ -609,14 +671,26 @@ export default function ReportPreviewPage() {
               </DialogTitle>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {fullScreenAttachment?.fileUrl && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => downloadFile(fullScreenAttachment.fileUrl, fullScreenAttachment.fileName || "file")}
-                    className="text-white hover:bg-white hover:bg-opacity-20"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openInNewTab(fullScreenAttachment.fileUrl)}
+                      className="text-white hover:bg-white hover:bg-opacity-20"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        downloadFile(fullScreenAttachment.fileUrl, fullScreenAttachment.fileName || "file")
+                      }
+                      className="text-white hover:bg-white hover:bg-opacity-20"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </>
                 )}
                 <Button
                   variant="ghost"
@@ -635,25 +709,20 @@ export default function ReportPreviewPage() {
                 {fullScreenAttachment?.fileUrl ? (
                   <div className="w-full max-w-full flex items-center justify-center">
                     {isImageFile(fullScreenAttachment.fileName || "") ? (
-                      <img
-                        src={fullScreenAttachment.fileUrl || "/placeholder.svg"}
-                        alt={fullScreenAttachment.fileName || "Full screen preview"}
-                        className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded shadow-lg"
-                        style={{ maxWidth: "calc(90vw - 3rem)" }}
-                        crossOrigin="anonymous"
-                        referrerPolicy="no-referrer"
-                        onError={() => console.error("Full screen image failed to load:", fullScreenAttachment.fileUrl)}
-                        onLoad={() =>
-                          console.log("Full screen image loaded successfully:", fullScreenAttachment.fileUrl)
-                        }
-                      />
+                      <div className="w-full h-full max-w-[calc(90vw-3rem)] max-h-[calc(90vh-8rem)]">
+                        <iframe
+                          src={fullScreenAttachment.fileUrl}
+                          className="w-full h-full border-0 rounded shadow-lg"
+                          title={fullScreenAttachment.fileName || "Image Preview"}
+                          sandbox="allow-same-origin allow-scripts"
+                        />
+                      </div>
                     ) : isVideoFile(fullScreenAttachment.fileName || "") ? (
                       <video
                         src={fullScreenAttachment.fileUrl}
                         controls
                         className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded shadow-lg"
                         style={{ maxWidth: "calc(90vw - 3rem)" }}
-                        crossOrigin="anonymous"
                         autoPlay
                       />
                     ) : isPdfFile(fullScreenAttachment.fileName || "") ? (
@@ -670,16 +739,26 @@ export default function ReportPreviewPage() {
                         <div>
                           <p className="text-lg font-medium break-all">{fullScreenAttachment.fileName}</p>
                           <p className="text-sm text-gray-300 mt-2">Preview not available for this file type</p>
-                          <Button
-                            variant="outline"
-                            className="mt-4 bg-transparent border-white text-white hover:bg-white hover:text-black"
-                            onClick={() =>
-                              downloadFile(fullScreenAttachment.fileUrl, fullScreenAttachment.fileName || "file")
-                            }
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Download File
-                          </Button>
+                          <div className="flex gap-2 justify-center mt-4">
+                            <Button
+                              variant="outline"
+                              className="bg-transparent border-white text-white hover:bg-white hover:text-black"
+                              onClick={() => openInNewTab(fullScreenAttachment.fileUrl)}
+                            >
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              Open in New Tab
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="bg-transparent border-white text-white hover:bg-white hover:text-black"
+                              onClick={() =>
+                                downloadFile(fullScreenAttachment.fileUrl, fullScreenAttachment.fileName || "file")
+                              }
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Download File
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     )}
