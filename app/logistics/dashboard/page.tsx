@@ -19,7 +19,7 @@ export default function LogisticsDashboardPage() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h1 className="text-xl md:text-2xl font-bold">
               {userData?.first_name
-  ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Logistics Dashboard`
+  ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
   : "Logistics Dashboard"}
             </h1>
           </div>
