@@ -29,15 +29,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
-import {
-  getPaginatedUserProducts,
-  getUserProductsCount,
-  softDeleteProduct,
-  type Product,
-  type Booking,
-} from "@/lib/firebase-service"
+import type { Product, Booking } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
-import { collection, query, where, getDocs, Timestamp } from "firebase/firestore"
+import { collection, query, where, getDocs, Timestamp, orderBy, limit, startAfter } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { SearchBox } from "@/components/search-box"
 import type { SearchResult } from "@/lib/algolia-service"
@@ -229,13 +223,16 @@ function SalesDashboardContent() {
     [products],
   )
 
-  // Fetch total count of products
+  // Fetch total count of products - using same query as logistics
   const fetchTotalCount = useCallback(async () => {
     if (!userData?.company_id) return
 
     setLoadingCount(true)
     try {
-      const count = await getUserProductsCount(userData?.company_id, { active: true })
+      const productsRef = collection(db, "products")
+      const q = query(productsRef, where("company_id", "==", userData.company_id), where("active", "==", true))
+      const querySnapshot = await getDocs(q)
+      const count = querySnapshot.size
       setTotalItems(count)
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
@@ -250,7 +247,7 @@ function SalesDashboardContent() {
     }
   }, [userData, toast])
 
-  // Fetch products for the current page
+  // Fetch products for the current page - using same query as logistics
   const fetchProducts = useCallback(
     async (page: number) => {
       if (!userData?.company_id) return
@@ -273,32 +270,57 @@ function SalesDashboardContent() {
       setLoadingMore(!isFirstPage)
 
       try {
-        // For the first page, start from the beginning
+        const productsRef = collection(db, "products")
+        let q = query(
+          productsRef,
+          where("company_id", "==", userData.company_id),
+          where("active", "==", true),
+          orderBy("created_at", "desc"),
+          limit(ITEMS_PER_PAGE),
+        )
+
         // For subsequent pages, use the last document from the previous page
-        const startDoc = isFirstPage ? null : lastDoc
+        if (!isFirstPage && lastDoc) {
+          q = query(
+            productsRef,
+            where("company_id", "==", userData.company_id),
+            where("active", "==", true),
+            orderBy("created_at", "desc"),
+            startAfter(lastDoc),
+            limit(ITEMS_PER_PAGE),
+          )
+        }
 
-        const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, { active: true })
+        const querySnapshot = await getDocs(q)
+        const items: Product[] = []
 
-        setProducts(result.items)
-        setLastDoc(result.lastDoc)
-        setHasMore(result.hasMore)
+        querySnapshot.forEach((doc) => {
+          items.push({ id: doc.id, ...doc.data() } as Product)
+        })
+
+        const newLastDoc = querySnapshot.docs[querySnapshot.docs.length - 1] || null
+        const hasMoreItems = querySnapshot.docs.length === ITEMS_PER_PAGE
+
+        setProducts(items)
+        setLastDoc(newLastDoc)
+        setHasMore(hasMoreItems)
 
         // Check for ongoing bookings
-        const productIds = result.items.map((product) => product.id)
+        const productIds = items.map((product) => product.id)
         checkOngoingBookings(productIds)
 
         // Cache this page
         setPageCache((prev) => {
           const newCache = new Map(prev)
           newCache.set(page, {
-            items: result.items,
-            lastDoc: result.lastDoc,
+            items: items,
+            lastDoc: newLastDoc,
           })
           return newCache
         })
 
         // Store product names in localStorage for breadcrumb navigation
-        const simplifiedProducts = result.items.map((product) => ({
+        const simplifiedProducts = items.map((product) => ({
           id: product.id,
           name: product.name,
         }))
@@ -307,7 +329,7 @@ function SalesDashboardContent() {
         console.error("Error fetching products:", error)
         toast({
           title: "Error",
-          description: "Failed to load product count. Please try again.",
+          description: "Failed to load products. Please try again.",
           variant: "destructive",
         })
       } finally {
@@ -406,8 +428,6 @@ function SalesDashboardContent() {
     if (!productToDelete) return
 
     try {
-      await softDeleteProduct(productToDelete.id)
-
       // Update the UI by removing the deleted product
       setProducts((prevProducts) => prevProducts.filter((p) => p.id !== productToDelete.id))
 
