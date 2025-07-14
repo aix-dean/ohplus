@@ -12,7 +12,6 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useToast } from "@/hooks/use-toast"
 import { getProductById, type Product } from "@/lib/firebase-service"
-import { createReport, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 
@@ -29,6 +28,14 @@ interface Team {
   createdAt: string
 }
 
+interface AttachmentData {
+  note: string
+  file?: File
+  fileName?: string
+  fileType?: string
+  preview?: string
+}
+
 export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportDialogProps) {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(false)
@@ -39,10 +46,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   const [loadingTeams, setLoadingTeams] = useState(false)
   const [showNewTeamInput, setShowNewTeamInput] = useState(false)
   const [newTeamName, setNewTeamName] = useState("")
-  const [attachments, setAttachments] = useState<{ note: string; file?: File; fileName?: string; preview?: string }[]>([
-    { note: "" },
-    { note: "" },
-  ])
+  const [attachments, setAttachments] = useState<AttachmentData[]>([{ note: "" }, { note: "" }])
   const [previewModal, setPreviewModal] = useState<{ open: boolean; file?: File; preview?: string }>({ open: false })
 
   // Installation report specific fields
@@ -162,40 +166,55 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   }
 
   const createFilePreview = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader()
-      reader.onload = (e) => resolve(e.target?.result as string)
+      reader.onload = (e) => {
+        const result = e.target?.result
+        if (typeof result === "string") {
+          resolve(result)
+        } else {
+          reject(new Error("Failed to read file as string"))
+        }
+      }
+      reader.onerror = () => reject(new Error("Failed to read file"))
       reader.readAsDataURL(file)
     })
   }
 
   const handleFileUpload = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) {
-      // Validate file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        toast({
-          title: "Error",
-          description: "File size must be less than 10MB",
-          variant: "destructive",
-        })
-        return
-      }
+    if (!file) return
 
-      // Validate file type
-      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
-      if (!allowedTypes.includes(file.type)) {
-        toast({
-          title: "Error",
-          description: "Only image files (JPG, PNG, GIF, WebP) are allowed",
-          variant: "destructive",
-        })
-        return
-      }
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please upload only image files (JPG, PNG, GIF, WebP)",
+        variant: "destructive",
+      })
+      return
+    }
 
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    if (file.size > maxSize) {
+      toast({
+        title: "File Too Large",
+        description: "Please upload files smaller than 10MB",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
       const newAttachments = [...attachments]
-      newAttachments[index].file = file
-      newAttachments[index].fileName = file.name
+      newAttachments[index] = {
+        ...newAttachments[index],
+        file: file,
+        fileName: file.name,
+        fileType: file.type,
+      }
 
       // Create preview for images
       if (file.type.startsWith("image/")) {
@@ -204,17 +223,31 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
           newAttachments[index].preview = preview
         } catch (error) {
           console.error("Error creating preview:", error)
+          toast({
+            title: "Preview Error",
+            description: "Could not create image preview, but file was uploaded",
+            variant: "destructive",
+          })
         }
       }
 
       setAttachments(newAttachments)
+
+      toast({
+        title: "File Uploaded",
+        description: `${file.name} uploaded successfully`,
+      })
+    } catch (error) {
+      console.error("Error handling file upload:", error)
+      toast({
+        title: "Upload Error",
+        description: "Failed to process the uploaded file",
+        variant: "destructive",
+      })
     }
   }
 
-  const handlePreviewFile = (
-    attachment: { note: string; file?: File; fileName?: string; preview?: string },
-    e: React.MouseEvent,
-  ) => {
+  const handlePreviewFile = (attachment: AttachmentData, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
 
@@ -230,10 +263,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     }
   }
 
-  const renderFilePreview = (
-    attachment: { note: string; file?: File; fileName?: string; preview?: string },
-    index: number,
-  ) => {
+  const renderFilePreview = (attachment: AttachmentData, index: number) => {
     if (!attachment.file || !attachment.fileName) {
       return (
         <label
@@ -296,16 +326,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       return
     }
 
-    // Validate required fields
-    if (!date) {
-      toast({
-        title: "Error",
-        description: "Please select a date",
-        variant: "destructive",
-      })
-      return
-    }
-
     // Check if at least one attachment has a file
     const hasAttachments = attachments.some((att) => att.file)
     if (!hasAttachments) {
@@ -317,42 +337,26 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       return
     }
 
-    // Validate installation report specific fields
-    if (reportType === "installation-report") {
-      if (!status || isNaN(Number(status)) || Number(status) < 0 || Number(status) > 100) {
-        toast({
-          title: "Error",
-          description: "Please enter a valid status percentage (0-100)",
-          variant: "destructive",
-        })
-        return
-      }
-
-      if (timeline === "delayed") {
-        if (!delayReason.trim()) {
-          toast({
-            title: "Error",
-            description: "Please provide a reason for delay",
-            variant: "destructive",
-          })
-          return
-        }
-        if (!delayDays || isNaN(Number(delayDays)) || Number(delayDays) <= 0) {
-          toast({
-            title: "Error",
-            description: "Please enter valid delay days",
-            variant: "destructive",
-          })
-          return
-        }
-      }
+    // Validate that all uploaded files have notes
+    const attachmentsWithFiles = attachments.filter((att) => att.file)
+    const hasEmptyNotes = attachmentsWithFiles.some((att) => !att.note.trim())
+    if (hasEmptyNotes) {
+      toast({
+        title: "Missing Notes",
+        description: "Please add notes for all uploaded files",
+        variant: "destructive",
+      })
+      return
     }
 
     setLoading(true)
     try {
-      // Build the report data
-      const reportData: ReportData = {
-        siteId: product.id!,
+      console.log("Preparing report data with attachments:", attachments)
+
+      // Build the report data for preview
+      const reportData: any = {
+        id: `preview-${Date.now()}`, // Temporary ID for preview
+        siteId: product.id,
         siteName: product.name || "Unknown Site",
         companyId: projectData?.project_id || userData?.project_id || user.uid,
         sellerId: product.seller_id || user.uid,
@@ -367,21 +371,32 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         reportType,
         date,
         attachments: attachments
-          .filter((att) => att.file) // Only include attachments with files
-          .map((att) => ({
-            note: att.note || "",
-            file: att.file!, // We know file exists due to filter
-            fileName: att.fileName || att.file!.name,
-            fileType: att.file!.type,
-          })),
-        status: "published", // Change from draft to published
+          .filter((att) => att.file && att.note.trim() !== "")
+          .map((att) => {
+            console.log("Processing attachment:", {
+              fileName: att.fileName,
+              fileType: att.fileType,
+              fileSize: att.file?.size,
+              note: att.note,
+            })
+
+            return {
+              note: att.note.trim(),
+              file: att.file, // Keep the actual File object for upload
+              fileName: att.fileName || "",
+              fileType: att.fileType || "",
+            }
+          }),
+        status: "draft",
         createdBy: user.uid,
         createdByName: user.displayName || user.email || "Unknown User",
         category: "logistics",
         subcategory: product.content_type || "general",
         priority: "medium",
-        completionPercentage: reportType === "completion-report" ? 100 : Number(status) || 0,
+        completionPercentage: reportType === "completion-report" ? 100 : 0,
         tags: [reportType, product.content_type || "general"].filter(Boolean),
+        created: new Date(), // Use current date for preview
+        isPreview: true, // Flag to indicate this is a preview
       }
 
       // Add optional fields only if they have values
@@ -397,15 +412,18 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         reportData.assignedTo = selectedTeam
       }
 
-      // Add installation-specific fields only if they have non-empty values
+      // Only add installation-specific fields if they have non-empty values
       if (reportType === "installation-report") {
+        // Only add installationStatus if status has a valid numeric value
         if (status && status.trim() !== "" && !isNaN(Number(status)) && Number(status) >= 0) {
           reportData.installationStatus = status.trim()
         }
 
+        // Only add installationTimeline if it's explicitly set to delayed
         if (timeline === "delayed") {
           reportData.installationTimeline = timeline
 
+          // Only add delay-related fields if they have actual values
           if (delayReason && delayReason.trim() !== "") {
             reportData.delayReason = delayReason.trim()
           }
@@ -415,12 +433,11 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         }
       }
 
-      console.log("Creating report with data:", reportData)
+      console.log("Final report data prepared:", reportData)
 
-      // Create the report (this will upload files to Firebase Storage)
-      const reportId = await createReport(reportData)
-
-      console.log("Report created successfully with ID:", reportId)
+      // Store the report data in sessionStorage for the preview page
+      sessionStorage.setItem("previewReportData", JSON.stringify(reportData))
+      sessionStorage.setItem("previewProductData", JSON.stringify(product))
 
       toast({
         title: "Success",
@@ -428,7 +445,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       })
 
       onOpenChange(false)
-
       // Reset form
       setReportType("completion-report")
       setDate("")
@@ -439,13 +455,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       setDelayReason("")
       setDelayDays("")
 
-      // Navigate to the actual report page
-      router.push(`/logistics/reports/${reportId}`)
+      // Navigate to the report preview page with preview flag
+      router.push(`/logistics/reports/preview`)
     } catch (error) {
-      console.error("Error creating report:", error)
+      console.error("Error generating report preview:", error)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create report",
+        description: "Failed to generate report preview",
         variant: "destructive",
       })
     } finally {
@@ -505,7 +521,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             {/* Date */}
             <div className="space-y-2">
               <Label htmlFor="date" className="text-sm font-semibold text-gray-900">
-                Date: <span className="text-red-500">*</span>
+                Date:
               </Label>
               <Input
                 id="date"
@@ -514,7 +530,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                 onChange={(e) => setDate(e.target.value)}
                 placeholder="AutoFill"
                 className="h-9 text-sm"
-                required
               />
             </div>
 
@@ -590,7 +605,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                 {/* Status */}
                 <div className="space-y-2">
                   <Label htmlFor="status" className="text-sm font-semibold text-gray-900">
-                    Status: <span className="text-red-500">*</span>
+                    Status:
                   </Label>
                   <div className="flex items-center gap-2">
                     <Input
@@ -602,7 +617,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                       className="h-9 text-sm flex-1"
                       min="0"
                       max="100"
-                      required
                     />
                     <span className="text-sm text-gray-600 font-medium">% of 100</span>
                   </div>
@@ -630,11 +644,10 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                   {timeline === "delayed" && (
                     <div className="space-y-2 mt-3 pl-6 border-l-2 border-red-200">
                       <Input
-                        placeholder="Reason for delay... *"
+                        placeholder="Reason for delay..."
                         value={delayReason}
                         onChange={(e) => setDelayReason(e.target.value)}
                         className="h-9 text-sm"
-                        required
                       />
                       <div className="flex items-center gap-2">
                         <Input
@@ -643,8 +656,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                           onChange={(e) => setDelayDays(e.target.value)}
                           placeholder="0"
                           className="h-9 text-sm flex-1"
-                          min="1"
-                          required
+                          min="0"
                         />
                         <span className="text-sm text-gray-600 font-medium">Days</span>
                       </div>
@@ -681,7 +693,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-gray-500">Supported formats: JPG, PNG, GIF, WebP (Max 10MB each)</p>
             </div>
 
             {/* Generate Report Button */}
@@ -690,7 +701,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
               disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white h-10 text-sm font-medium mt-4"
             >
-              {loading ? "Creating Report..." : "Generate Report"}
+              {loading ? "Generating..." : "Generate Report"}
             </Button>
           </div>
         </DialogContent>

@@ -86,32 +86,33 @@ function cleanReportData(data: any): any {
 
 export async function createReport(reportData: ReportData): Promise<string> {
   try {
-    console.log("Starting report creation with attachments:", reportData.attachments?.length || 0)
+    console.log("Starting report creation with data:", reportData)
 
     // Upload attachments first
     const processedAttachments = await Promise.all(
       (reportData.attachments || []).map(async (attachment: any, index: number) => {
-        if (attachment.file) {
-          try {
-            console.log(`Uploading attachment ${index + 1}:`, attachment.fileName)
+        console.log(`Processing attachment ${index + 1}:`, {
+          hasFile: !!attachment.file,
+          fileName: attachment.fileName,
+          fileType: attachment.fileType,
+          fileSize: attachment.file?.size,
+          note: attachment.note,
+        })
 
+        if (attachment.file && attachment.file instanceof File) {
+          try {
             // Create a unique filename with timestamp
             const timestamp = Date.now()
             const sanitizedFileName = attachment.fileName?.replace(/[^a-zA-Z0-9.-]/g, "_") || `file_${index}`
-            const uniqueFileName = `${timestamp}_${sanitizedFileName}`
+            const storageFileName = `${timestamp}_${sanitizedFileName}`
 
-            // Create storage reference
-            const fileRef = ref(storage, `reports/${uniqueFileName}`)
+            console.log(`Uploading file to Firebase Storage: reports/${storageFileName}`)
 
-            console.log(`Uploading to Firebase Storage: reports/${uniqueFileName}`)
-
-            // Upload file to Firebase Storage
+            const fileRef = ref(storage, `reports/${storageFileName}`)
             const snapshot = await uploadBytes(fileRef, attachment.file)
-            console.log(`Upload successful for ${uniqueFileName}`)
-
-            // Get download URL
             const downloadURL = await getDownloadURL(snapshot.ref)
-            console.log(`Download URL obtained: ${downloadURL}`)
+
+            console.log(`File uploaded successfully. Download URL: ${downloadURL}`)
 
             return {
               note: attachment.note || "",
@@ -126,19 +127,29 @@ export async function createReport(reportData: ReportData): Promise<string> {
             return {
               note: attachment.note || "",
               fileName: attachment.fileName || "Unknown file",
-              fileType: attachment.fileType || "unknown",
+              fileType: attachment.fileType || "",
               fileUrl: null,
               uploadError: error instanceof Error ? error.message : "Upload failed",
             }
           }
-        }
-
-        // For attachments without files (shouldn't happen in normal flow)
-        return {
-          note: attachment.note || "",
-          fileName: attachment.fileName || "",
-          fileType: attachment.fileType || "",
-          fileUrl: attachment.fileUrl || null,
+        } else if (attachment.fileUrl) {
+          // If attachment already has a URL (e.g., from preview), keep it
+          console.log(`Attachment ${index + 1} already has URL:`, attachment.fileUrl)
+          return {
+            note: attachment.note || "",
+            fileName: attachment.fileName || "",
+            fileType: attachment.fileType || "",
+            fileUrl: attachment.fileUrl,
+          }
+        } else {
+          // Return basic attachment info for attachments without files
+          console.log(`Attachment ${index + 1} has no file or URL`)
+          return {
+            note: attachment.note || "",
+            fileName: attachment.fileName || "",
+            fileType: attachment.fileType || "",
+            fileUrl: null,
+          }
         }
       }),
     )
@@ -201,9 +212,8 @@ export async function createReport(reportData: ReportData): Promise<string> {
       finalReportData.delayDays = reportData.delayDays
     }
 
-    console.log("Creating Firestore document with data:", finalReportData)
+    console.log("Final report data to be saved:", finalReportData)
 
-    // Save to Firestore
     const docRef = await addDoc(collection(db, "reports"), finalReportData)
 
     console.log("Report created successfully with ID:", docRef.id)
@@ -211,7 +221,7 @@ export async function createReport(reportData: ReportData): Promise<string> {
     return docRef.id
   } catch (error) {
     console.error("Error creating report:", error)
-    throw new Error(`Failed to create report: ${error instanceof Error ? error.message : "Unknown error"}`)
+    throw error
   }
 }
 
