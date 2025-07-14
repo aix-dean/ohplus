@@ -787,14 +787,6 @@ export async function generateReportPDF(
       }
     }
 
-    // Helper function to get report type display
-    const getReportTypeDisplay = (type: string) => {
-      return type
-        .split("-")
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ")
-    }
-
     // Helper function to format date
     const formatDate = (dateString: string) => {
       return new Date(dateString).toLocaleDateString("en-US", {
@@ -858,13 +850,23 @@ export async function generateReportPDF(
     pdf.text("Installation Report", margin + 2, yPosition + 5)
 
     // Add GTS logo on the right
-    pdf.setFillColor(255, 193, 7) // yellow-400
-    const logoSize = 20
-    pdf.circle(pageWidth - margin - logoSize / 2, yPosition + logoSize / 2 - 5, logoSize / 2, "F")
-    pdf.setTextColor(0, 0, 0)
-    pdf.setFontSize(12)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("GTS", pageWidth - margin - 15, yPosition + 5)
+    const gtsLogoUrl = "/company-logos/gts-logo.png" // Path to the GTS logo
+    const gtsLogoBase64 = await loadImageAsBase64(gtsLogoUrl)
+    if (gtsLogoBase64) {
+      const logoSize = 20 // Adjust size as needed
+      const logoX = pageWidth - margin - logoSize
+      const logoY = yPosition - 5 // Adjust Y to align with the badge
+      pdf.addImage(gtsLogoBase64, "PNG", logoX, logoY, logoSize, logoSize)
+    } else {
+      // Fallback if logo fails to load
+      pdf.setFillColor(255, 193, 7) // yellow-400
+      const logoSize = 20
+      pdf.circle(pageWidth - margin - logoSize / 2, yPosition + logoSize / 2 - 5, logoSize / 2, "F")
+      pdf.setTextColor(0, 0, 0)
+      pdf.setFontSize(12)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("GTS", pageWidth - margin - 15, yPosition + 5)
+    }
 
     yPosition += badgeHeight + 5
     pdf.setTextColor(0, 0, 0)
@@ -1013,66 +1015,41 @@ export async function generateReportPDF(
 
     yPosition += 15
 
-    // Attachments Section - exactly like the preview
-    if (report.attachments && report.attachments.length > 0) {
-      checkNewPage(80)
+    // QR Code and Details Section (replaces attachments in this view)
+    checkNewPage(80) // Ensure enough space for QR code and text
+    const qrCodeViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/logistics/reports/${report.id}`
+    const qrCodeDataUrl = await generateQRCode(qrCodeViewUrl)
 
-      const attachmentsToShow = report.attachments.slice(0, 2)
-      let currentX = margin
-      const imageWidth = (contentWidth - 10) / 2
-      const imageHeight = 60
+    const qrSize = 50 // Larger QR code size
+    const qrX = margin + (contentWidth - qrSize) / 2 // Center QR code
+    const qrY = yPosition + 5
 
-      for (let i = 0; i < attachmentsToShow.length; i++) {
-        const attachment = attachmentsToShow[i]
-
-        if (i === 1) {
-          currentX = margin + imageWidth + 10
-        }
-
-        // Draw border for attachment box - exactly like preview
-        pdf.setLineWidth(1)
-        pdf.setDrawColor(0, 0, 0)
-        pdf.rect(currentX, yPosition, imageWidth, imageHeight)
-
-        // Try to add actual image if it's an image file
-        if (attachment.fileUrl && attachment.fileName) {
-          const extension = attachment.fileName.toLowerCase().split(".").pop()
-          if (["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")) {
-            try {
-              const imageBase64 = await loadImageAsBase64(attachment.fileUrl)
-              if (imageBase64) {
-                pdf.addImage(imageBase64, "JPEG", currentX + 2, yPosition + 2, imageWidth - 4, imageHeight - 4)
-              }
-            } catch (error) {
-              console.error("Error adding attachment image:", error)
-              // Add placeholder text
-              pdf.setFontSize(8)
-              pdf.text(attachment.fileName, currentX + 5, yPosition + imageHeight / 2)
-            }
-          } else {
-            // Add file name for non-image files
-            pdf.setFontSize(8)
-            pdf.text(attachment.fileName, currentX + 5, yPosition + imageHeight / 2)
-          }
-        }
-
-        // Add attachment info below - exactly like preview
-        pdf.setFontSize(8)
-        pdf.text(`Date: ${formatDate(report.date)}`, currentX, yPosition + imageHeight + 5)
-        pdf.text(
-          `Time: ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`,
-          currentX,
-          yPosition + imageHeight + 9,
-        )
-        pdf.text(`Location: ${report.location || "N/A"}`, currentX, yPosition + imageHeight + 13)
-
-        if (attachment.note) {
-          pdf.text(`Note: ${attachment.note}`, currentX, yPosition + imageHeight + 17)
-        }
-      }
-
-      yPosition += imageHeight + 25
+    const qrBase64 = await loadImageAsBase64(qrCodeDataUrl)
+    if (qrBase64) {
+      pdf.addImage(qrBase64, "PNG", qrX, qrY, qrSize, qrSize)
     }
+
+    yPosition = qrY + qrSize + 5 // Position below QR code
+
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(
+      `Date: ${formatDate(report.date)}`,
+      margin + (contentWidth - pdf.getTextWidth(`Date: ${formatDate(report.date)}`)) / 2,
+      yPosition,
+    )
+    yPosition += 4
+
+    const currentTime = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+    pdf.text(`Time: ${currentTime}`, margin + (contentWidth - pdf.getTextWidth(`Time: ${currentTime}`)) / 2, yPosition)
+    yPosition += 4
+
+    pdf.text(
+      `Location: ${report.location || "N/A"}`,
+      margin + (contentWidth - pdf.getTextWidth(`Location: ${report.location || "N/A"}`)) / 2,
+      yPosition,
+    )
+    yPosition += 15 // Space after QR code details
 
     // Footer Section - exactly like the preview
     checkNewPage(40)
