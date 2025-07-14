@@ -18,7 +18,7 @@ export default function LogisticsDashboardPage() {
           {/* Header Section */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h1 className="text-xl md:text-2xl font-bold">
-              {user?.first_name ? `${user.first_name}'s Logistics Dashboard` : "Logistics Dashboard"}
+              {userData?.first_name ? `${userData.first_name}'s Logistics Dashboard` : "Logistics Dashboard"}
             </h1>
           </div>
 
