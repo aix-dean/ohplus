@@ -49,11 +49,11 @@ export default function SalesQuotationsPage() {
       let q
 
       if (direction === "first") {
-        q = query(quotationsRef, where("seller_id", "==", user.uid), orderBy("created", "desc"), limit(pageSize))
+        q = query(quotationsRef, where("created_by", "==", user.uid), orderBy("created", "desc"), limit(pageSize))
       } else if (direction === "next" && lastVisible) {
         q = query(
           quotationsRef,
-          where("seller_id", "==", user.uid),
+          where("created_by", "==", user.uid),
           orderBy("created", "desc"),
           startAfter(lastVisible),
           limit(pageSize),
