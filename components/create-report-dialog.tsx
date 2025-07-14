@@ -12,9 +12,10 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useToast } from "@/hooks/use-toast"
 import { getProductById, type Product } from "@/lib/firebase-service"
-import { createReport, type ReportData } from "@/lib/report-service"
+import type { ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
+import { generateReportPDF } from "@/lib/pdf-service" // Import generateReportPDF
 
 interface CreateReportDialogProps {
   open: boolean
@@ -311,6 +312,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             file: att.file,
             fileName: att.fileName || "",
             fileType: att.file?.type || "",
+            // For PDF generation, we need the preview URL if available
+            fileUrl: att.preview || "", // Use preview as fileUrl for PDF generation
           })),
         status: "draft",
         createdBy: user.uid,
@@ -356,11 +359,12 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         }
       }
 
-      const reportId = await createReport(reportData as ReportData)
+      // Generate PDF directly without saving to Firebase
+      await generateReportPDF(reportData as ReportData, product, false) // false to trigger download
 
       toast({
         title: "Success",
-        description: "Report created successfully",
+        description: "Report generated successfully",
       })
 
       onOpenChange(false)
@@ -374,13 +378,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       setDelayReason("")
       setDelayDays("")
 
-      // Navigate to the report preview page
-      router.push(`/logistics/reports/${reportId}`)
+      // Removed navigation to report preview page as it's not saved to DB
+      // router.push(`/logistics/reports/${reportId}`)
     } catch (error) {
-      console.error("Error creating report:", error)
+      console.error("Error generating report:", error)
       toast({
         title: "Error",
-        description: "Failed to create report",
+        description: "Failed to generate report",
         variant: "destructive",
       })
     } finally {
