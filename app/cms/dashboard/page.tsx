@@ -490,7 +490,7 @@ export default function CMSDashboardPage() {
           <h1 className="text-2xl font-bold">
             {userData?.first_name
   ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
-  : "Logistics Dashboard"}
+  : "Dashboard"}
           </h1>
         </div>
 
