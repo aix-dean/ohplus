@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/contexts/auth-context"
 import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-service"
 import type { BillingCycle, SubscriptionPlanType } from "@/lib/types/subscription"
-import { CheckCircle, Loader2, ArrowRight, Users } from "lucide-react"
+import { CheckCircle, Loader2, ArrowRight } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -43,10 +43,7 @@ export default function SubscriptionPage() {
   // Fetch current user count
   useEffect(() => {
     const fetchUserCount = async () => {
-      if (!userData?.license_key) {
-        setLoadingUserCount(false)
-        return
-      }
+      if (!userData?.license_key) return
 
       try {
         setLoadingUserCount(true)
@@ -56,18 +53,14 @@ export default function SubscriptionPage() {
         setCurrentUserCount(usersSnapshot.size)
       } catch (error) {
         console.error("Error fetching user count:", error)
-        toast({
-          title: "Error",
-          description: "Failed to fetch user count",
-          variant: "destructive",
-        })
+        setCurrentUserCount(0)
       } finally {
         setLoadingUserCount(false)
       }
     }
 
     fetchUserCount()
-  }, [userData?.license_key, toast])
+  }, [userData?.license_key])
 
   useEffect(() => {
     const calculateTimeLeft = () => {
@@ -191,9 +184,6 @@ export default function SubscriptionPage() {
     })
   }
 
-  const maxUsers = subscriptionData?.maxUsers || 0
-  const isUnlimitedUsers = maxUsers === -1
-
   return (
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
@@ -268,54 +258,29 @@ export default function SubscriptionPage() {
               {/* Users Card */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
-                  <CardTitle className="text-xl font-bold flex items-center">
-                    <Users className="mr-2 h-5 w-5" />
-                    Users
-                  </CardTitle>
+                  <CardTitle className="text-xl font-bold">Users</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
                     {loadingUserCount ? (
                       <div className="flex items-center space-x-2">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm text-gray-600">Loading...</span>
+                        <p className="text-sm text-gray-600">Loading...</p>
                       </div>
                     ) : (
                       <>
-                        <p className="text-lg font-semibold text-gray-900">
-                          {currentUserCount} user{currentUserCount !== 1 ? "s" : ""}
-                        </p>
+                        <p className="text-lg font-semibold text-gray-900">{currentUserCount} users</p>
                         <p className="text-sm text-gray-600">
-                          {isUnlimitedUsers ? (
-                            "Unlimited users"
-                          ) : (
-                            <>
-                              Max of {maxUsers} user{maxUsers !== 1 ? "s" : ""}
-                              <br />
-                              <span
-                                className={cn(
-                                  "font-medium",
-                                  currentUserCount >= maxUsers ? "text-red-600" : "text-green-600",
-                                )}
-                              >
-                                {maxUsers - currentUserCount} remaining
-                              </span>
-                            </>
-                          )}
+                          {subscriptionData.maxUsers === -1
+                            ? "(Unlimited users)"
+                            : `(Max of ${subscriptionData.maxUsers} users)`}
                         </p>
-                        {!isUnlimitedUsers && currentUserCount >= maxUsers && (
-                          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
-                            <p className="text-xs text-red-600 font-medium">User limit reached</p>
-                          </div>
-                        )}
                       </>
                     )}
                   </div>
-                  <Link href="/admin/user-management">
-                    <Button variant="outline" className="mt-4 w-full bg-transparent">
-                      Manage Users
-                    </Button>
-                  </Link>
+                  <Button variant="outline" className="mt-4 w-full bg-transparent">
+                    Expand
+                  </Button>
                 </CardContent>
               </Card>
 
@@ -329,15 +294,11 @@ export default function SubscriptionPage() {
                     <p className="text-lg font-semibold text-gray-900">100 static sites</p>
                     <p className="text-lg font-semibold text-gray-900">15 dynamic sites</p>
                     <p className="text-lg font-semibold text-gray-900">3 developments</p>
-                    <p className="text-sm text-gray-600">
-                      (Max of {subscriptionData.maxProducts === -1 ? "unlimited" : subscriptionData.maxProducts} sites)
-                    </p>
+                    <p className="text-sm text-gray-600">(Max of {subscriptionData.maxProducts} sites)</p>
                   </div>
-                  <Link href="/admin/inventory">
-                    <Button variant="outline" className="mt-4 w-full bg-transparent">
-                      View Inventory
-                    </Button>
-                  </Link>
+                  <Button variant="outline" className="mt-4 w-full bg-transparent">
+                    Expand
+                  </Button>
                 </CardContent>
               </Card>
             </div>
