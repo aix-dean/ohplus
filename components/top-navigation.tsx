@@ -165,7 +165,7 @@ export function TopNavigation() {
     router.push(href)
     setIsOpen(false)
   }
-
+  console.log(`title page ${pageTitle}`)
   return (
     <nav className={`top-nav relative ${navBgColor} z-40`}>
       {/* Diagonal section - positioned to always be before the date area */}
