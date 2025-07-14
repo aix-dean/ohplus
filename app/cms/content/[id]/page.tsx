@@ -6,7 +6,7 @@ interface PageProps {
   }
 }
 
-export default function ContentEditRedirect({ params }: PageProps) {
-  // Redirect old content edit route to new details route
+export default function ContentDetailRedirect({ params }: PageProps) {
+  // Redirect old content detail route to new details route
   redirect(`/cms/details/${params.id}`)
 }

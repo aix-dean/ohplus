@@ -14,6 +14,8 @@ import ProgramListTab from "./tabs/program-list-tab"
 import ServiceTab from "./tabs/service-tab"
 import ControlsTab from "./tabs/controls-tab"
 import TimelineTab from "./tabs/timeline-tab"
+// Add breadcrumb to the top of the page
+import CMSBreadcrumb from "@/components/cms-breadcrumb"
 
 interface CMSDetailsContentProps {
   product: Product
@@ -95,6 +97,9 @@ export default function CMSDetailsContent({ product, serviceAssignments }: CMSDe
 
   return (
     <div className="container mx-auto p-6 space-y-8">
+      <CMSBreadcrumb currentPage="details" productId={productData.id} productName={productData.name} />
+
+      {/* Rest of the existing content */}
       {/* Header */}
       <div className="flex items-center justify-between">
         <Link
