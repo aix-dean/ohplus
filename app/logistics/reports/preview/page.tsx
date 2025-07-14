@@ -138,7 +138,7 @@ export default function ReportPreviewPage() {
       sessionStorage.removeItem("previewReportData")
       sessionStorage.removeItem("previewProductData")
 
-      // Navigate to the dashboard
+      // Navigate to the service reports page
       router.push(`/logistics/service-reports`)
     } catch (error) {
       console.error("Error posting report to Firestore:", error)

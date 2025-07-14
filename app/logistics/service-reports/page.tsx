@@ -10,7 +10,6 @@ import { useRouter } from "next/navigation"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 
 export default function ServiceReportsPage() {
   const [reports, setReports] = useState<ReportData[]>([])
@@ -20,8 +19,6 @@ export default function ServiceReportsPage() {
   const [filterType, setFilterType] = useState("All")
   const [activeTab, setActiveTab] = useState("From Logistics")
   const [showDrafts, setShowDrafts] = useState(false)
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [lastPostedReportId, setLastPostedReportId] = useState("")
 
   const router = useRouter()
   const { user } = useAuth()
@@ -29,21 +26,11 @@ export default function ServiceReportsPage() {
 
   useEffect(() => {
     fetchReports()
-    checkForPostedReport()
   }, [])
 
   useEffect(() => {
     filterReports()
   }, [reports, searchQuery, filterType, activeTab, showDrafts])
-
-  const checkForPostedReport = () => {
-    const reportId = sessionStorage.getItem("lastPostedReportId")
-    if (reportId) {
-      setLastPostedReportId(reportId)
-      setShowSuccessDialog(true)
-      sessionStorage.removeItem("lastPostedReportId")
-    }
-  }
 
   const fetchReports = async () => {
     try {
@@ -314,13 +301,6 @@ export default function ServiceReportsPage() {
           Create New Report
         </Button>
       </div>
-
-      {/* Success Dialog */}
-      <ReportPostSuccessDialog
-        open={showSuccessDialog}
-        onOpenChange={setShowSuccessDialog}
-        reportId={lastPostedReportId}
-      />
     </div>
   )
 }
