@@ -902,7 +902,7 @@ export async function generateReportPDF(
     const logoSize = 25 // Reduced from 40 to 25 to match web page proportions
     const logoContainerSize = 30 // Container size
     const logoX = pageWidth - margin - logoContainerSize
-    const logoY = yPosition - 15
+    const logoY = yPosition + 5 // Changed from yPosition - 15 to yPosition + 5 to move it down
 
     // Try to load company logo, fallback to OH+ logo
     const companyLogoUrl = "/ohplus-new-logo.png" // Default to OH+ logo
