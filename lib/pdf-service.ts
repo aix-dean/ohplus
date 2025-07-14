@@ -67,6 +67,32 @@ async function logProposalPDFGenerated(proposalId: string, userId: string, userN
   return Promise.resolve()
 }
 
+// New helper function to calculate image dimensions for fitting
+async function calculateImageFitDimensions(
+  imageUrl: string,
+  maxWidth: number,
+  maxHeight: number,
+): Promise<{ base64: string | null; width: number; height: number }> {
+  const base64 = await loadImageAsBase64(imageUrl)
+  if (!base64) return { base64: null, width: 0, height: 0 }
+
+  const dimensions = await getImageDimensions(base64)
+  let { width, height } = dimensions
+  const aspectRatio = width / height
+
+  // Scale to fit within max bounds
+  if (width > maxWidth) {
+    width = maxWidth
+    height = width / aspectRatio
+  }
+  if (height > maxHeight) {
+    height = maxHeight
+    width = height * aspectRatio
+  }
+
+  return { base64, width, height }
+}
+
 export async function generateProposalPDF(proposal: Proposal, returnBase64 = false): Promise<string | void> {
   try {
     // Create new PDF document
@@ -132,43 +158,6 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
 
     // Add QR code to first page
     await addQRCodeToPage()
-
-    // Helper function to add image to PDF
-    const addImageToPDF = async (imageUrl: string, x: number, y: number, maxWidth: number, maxHeight: number) => {
-      try {
-        const base64 = await loadImageAsBase64(imageUrl)
-        if (!base64) return { width: 0, height: 0 }
-
-        const dimensions = await getImageDimensions(base64)
-
-        // Calculate scaled dimensions to fit within max bounds
-        let { width, height } = dimensions
-        const aspectRatio = width / height
-
-        // Scale to fill the maximum available space
-        if (width > height) {
-          width = maxWidth
-          height = width / aspectRatio
-          if (height > maxHeight) {
-            height = maxHeight
-            width = height * aspectRatio
-          }
-        } else {
-          height = maxHeight
-          width = height * aspectRatio
-          if (width > maxWidth) {
-            width = maxWidth
-            height = width / aspectRatio
-          }
-        }
-
-        pdf.addImage(base64, "JPEG", x, y, width, height)
-        return { width, height }
-      } catch (error) {
-        console.error("Error adding image to PDF:", error)
-        return { width: 0, height: 0 }
-      }
-    }
 
     // Header (adjusted to avoid QR code area)
     const headerContentWidth = contentWidth - 30 // Leave space for QR code
@@ -363,14 +352,15 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
                 checkNewPage(singleImageHeight + 10)
 
                 try {
-                  const imageDimensions = await addImageToPDF(
+                  const { base64, width, height } = await calculateImageFitDimensions(
                     media.url,
-                    centerX,
-                    yPosition,
                     singleImageWidth,
                     singleImageHeight,
                   )
-                  yPosition += imageDimensions.height + 5
+                  if (base64) {
+                    pdf.addImage(base64, "JPEG", centerX, yPosition, width, height)
+                    yPosition += height + 5
+                  }
                 } catch (error) {
                   console.error("Error adding product image:", error)
                 }
@@ -383,19 +373,20 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
                 }
 
                 try {
-                  const imageDimensions = await addImageToPDF(
+                  const { base64, width, height } = await calculateImageFitDimensions(
                     media.url,
-                    currentX,
-                    yPosition,
                     maxImageWidth,
                     maxImageHeight,
                   )
+                  if (base64) {
+                    pdf.addImage(base64, "JPEG", currentX, yPosition, width, height)
 
-                  if (imageDimensions.height > maxImageHeightInRow) {
-                    maxImageHeightInRow = imageDimensions.height
+                    if (height > maxImageHeightInRow) {
+                      maxImageHeightInRow = height
+                    }
+
+                    currentX += maxImageWidth + imageSpacing
                   }
-
-                  currentX += maxImageWidth + imageSpacing
                 } catch (error) {
                   console.error("Error adding product image:", error)
                 }
@@ -1079,7 +1070,17 @@ export async function generateReportPDF(
           const extension = attachment.fileName.toLowerCase().split(".").pop()
           if (["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")) {
             try {
-              await addImageToPDF(attachment.fileUrl, currentX + 2, yPosition + 2, imageWidth - 4, imageHeight - 4)
+              const { base64, width, height } = await calculateImageFitDimensions(
+                attachment.fileUrl,
+                imageWidth - 4, // Max width for the image inside the border
+                imageHeight - 4, // Max height for the image inside the border
+              )
+
+              if (base64) {
+                // Calculate x position to center the image within its container
+                const centeredX = currentX + (imageWidth - width) / 2
+                pdf.addImage(base64, "JPEG", centeredX, yPosition + 2, width, height)
+              }
             } catch (error) {
               console.error("Error adding attachment image:", error)
               // Add placeholder text
