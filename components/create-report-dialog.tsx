@@ -12,10 +12,8 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useToast } from "@/hooks/use-toast"
 import { getProductById, type Product } from "@/lib/firebase-service"
-import type { ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
-import { generateReportPDF } from "@/lib/pdf-service" // Import generateReportPDF
 
 interface CreateReportDialogProps {
   open: boolean
@@ -289,8 +287,9 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
     setLoading(true)
     try {
-      // Build the base report data with only defined values
+      // Build the report data for preview (without saving to Firebase)
       const reportData: any = {
+        id: `preview-${Date.now()}`, // Temporary ID for preview
         siteId: product.id,
         siteName: product.name || "Unknown Site",
         companyId: projectData?.project_id || userData?.project_id || user.uid,
@@ -312,8 +311,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             file: att.file,
             fileName: att.fileName || "",
             fileType: att.file?.type || "",
-            // For PDF generation, we need the preview URL if available
-            fileUrl: att.preview || "", // Use preview as fileUrl for PDF generation
+            // For preview, create temporary URLs for files
+            fileUrl: att.file ? URL.createObjectURL(att.file) : null,
           })),
         status: "draft",
         createdBy: user.uid,
@@ -323,6 +322,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         priority: "medium",
         completionPercentage: reportType === "completion-report" ? 100 : 0,
         tags: [reportType, product.content_type || "general"].filter(Boolean),
+        created: new Date(), // Use current date for preview
+        isPreview: true, // Flag to indicate this is a preview
       }
 
       // Add optional fields only if they have values
@@ -359,12 +360,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         }
       }
 
-      // Generate PDF directly without saving to Firebase
-      await generateReportPDF(reportData as ReportData, product, false) // false to trigger download
+      // Store the report data in sessionStorage for the preview page
+      sessionStorage.setItem("previewReportData", JSON.stringify(reportData))
+      sessionStorage.setItem("previewProductData", JSON.stringify(product))
 
       toast({
         title: "Success",
-        description: "Report generated successfully",
+        description: "Report preview generated successfully",
       })
 
       onOpenChange(false)
@@ -378,13 +380,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       setDelayReason("")
       setDelayDays("")
 
-      // Removed navigation to report preview page as it's not saved to DB
-      // router.push(`/logistics/reports/${reportId}`)
+      // Navigate to the report preview page with preview flag
+      router.push(`/logistics/reports/preview`)
     } catch (error) {
-      console.error("Error generating report:", error)
+      console.error("Error generating report preview:", error)
       toast({
         title: "Error",
-        description: "Failed to generate report",
+        description: "Failed to generate report preview",
         variant: "destructive",
       })
     } finally {

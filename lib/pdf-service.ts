@@ -189,6 +189,7 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
     pdf.text("CLIENT INFORMATION", margin, yPosition)
     yPosition += 5
 
+    // Draw line under section header
     pdf.setLineWidth(0.3)
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 5
@@ -790,6 +791,40 @@ export async function generateReportPDF(
       }
     }
 
+    // Helper function to add image to PDF
+    const addImageToPDF = async (imageUrl: string, x: number, y: number, maxWidth: number, maxHeight: number) => {
+      try {
+        const base64 = await loadImageAsBase64(imageUrl)
+        if (!base64) return { width: 0, height: 0 }
+
+        const dimensions = await getImageDimensions(base64)
+        let { width, height } = dimensions
+        const aspectRatio = width / height
+
+        if (width > height) {
+          width = maxWidth
+          height = width / aspectRatio
+          if (height > maxHeight) {
+            height = maxHeight
+            width = height * aspectRatio
+          }
+        } else {
+          height = maxHeight
+          width = height * aspectRatio
+          if (width > maxWidth) {
+            width = maxWidth
+            height = width / aspectRatio
+          }
+        }
+
+        pdf.addImage(base64, "JPEG", x, y, width, height)
+        return { width, height }
+      } catch (error) {
+        console.error("Error adding image to PDF:", error)
+        return { width: 0, height: 0 }
+      }
+    }
+
     // Helper function to create the angular header exactly like the page
     const addHeaderToPage = async () => {
       try {
@@ -1018,17 +1053,17 @@ export async function generateReportPDF(
       checkNewPage(80)
 
       const attachmentsToShow = report.attachments.slice(0, 2)
-      const imageContainerWidth = (contentWidth - 10) / 2 // Space for 2 images side by side
-      const imageContainerHeight = 60
+      const imageWidth = (contentWidth - 10) / 2 // Space for 2 images side by side
+      const imageHeight = 60
 
       for (let i = 0; i < attachmentsToShow.length; i++) {
         const attachment = attachmentsToShow[i]
-        const currentX = i === 0 ? margin : margin + imageContainerWidth + 10
+        const currentX = i === 0 ? margin : margin + imageWidth + 10
 
         // Draw border for attachment box
         pdf.setLineWidth(0.5)
         pdf.setDrawColor(200, 200, 200)
-        pdf.rect(currentX, yPosition, imageContainerWidth, imageContainerHeight)
+        pdf.rect(currentX, yPosition, imageWidth, imageHeight)
 
         // Try to add actual image if it's an image file
         if (attachment.fileUrl && attachment.fileName) {
@@ -1037,45 +1072,43 @@ export async function generateReportPDF(
             try {
               const { base64, width, height } = await calculateImageFitDimensions(
                 attachment.fileUrl,
-                imageContainerWidth - 4, // Max width for the image inside the border
-                imageContainerHeight - 4, // Max height for the image inside the border
+                imageWidth - 4, // Max width for the image inside the border
+                imageHeight - 4, // Max height for the image inside the border
               )
 
               if (base64) {
                 // Calculate x position to center the image within its container
-                const centeredX = currentX + (imageContainerWidth - width) / 2
-                // Calculate y position to center the image vertically within its container
-                const centeredY = yPosition + (imageContainerHeight - height) / 2
-                pdf.addImage(base64, "JPEG", centeredX, centeredY, width, height)
+                const centeredX = currentX + (imageWidth - width) / 2
+                pdf.addImage(base64, "JPEG", centeredX, yPosition + 2, width, height)
               }
             } catch (error) {
               console.error("Error adding attachment image:", error)
               // Add placeholder text
               pdf.setFontSize(8)
-              pdf.text(attachment.fileName, currentX + 5, yPosition + imageContainerHeight / 2)
+              pdf.text(attachment.fileName, currentX + 5, yPosition + imageHeight / 2)
             }
           } else {
             // Add file name for non-image files
             pdf.setFontSize(8)
-            pdf.text(attachment.fileName, currentX + 5, yPosition + imageContainerHeight / 2)
+            pdf.text(attachment.fileName, currentX + 5, yPosition + imageHeight / 2)
           }
         } else {
           // Placeholder for missing attachment
           pdf.setFontSize(8)
           pdf.setTextColor(100, 100, 100)
-          pdf.text(`Project Photo ${i + 1}`, currentX + 5, yPosition + imageContainerHeight / 2)
+          pdf.text(`Project Photo ${i + 1}`, currentX + 5, yPosition + imageHeight / 2)
           pdf.setTextColor(0, 0, 0)
         }
       }
 
-      yPosition += imageContainerHeight + 5
+      yPosition += imageHeight + 5
 
       // Add attachment info below images (like in the page)
       pdf.setFontSize(8)
       pdf.setFont("helvetica", "normal")
 
       for (let i = 0; i < attachmentsToShow.length; i++) {
-        const currentX = i === 0 ? margin : margin + imageContainerWidth + 10
+        const currentX = i === 0 ? margin : margin + imageWidth + 10
 
         pdf.setFont("helvetica", "bold")
         pdf.text("Date:", currentX, yPosition)
