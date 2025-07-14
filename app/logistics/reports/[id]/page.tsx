@@ -11,6 +11,7 @@ import { getProductById, type Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
+import { getUserById, type User } from "@/lib/firebase-service"
 
 export default function ReportPreviewPage() {
   const params = useParams()
@@ -24,6 +25,7 @@ export default function ReportPreviewPage() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
   const { user } = useAuth()
+  const [userData, setUserData] = useState<User | null>(null)
 
   useEffect(() => {
     if (reportId) {
@@ -44,6 +46,12 @@ export default function ReportPreviewPage() {
         if (foundReport.siteId) {
           const productData = await getProductById(foundReport.siteId)
           setProduct(productData)
+        }
+
+        // Fetch user data for company logo
+        if (foundReport.sellerId) {
+          const userInfo = await getUserById(foundReport.sellerId)
+          setUserData(userInfo)
         }
       }
     } catch (error) {
@@ -249,9 +257,24 @@ export default function ReportPreviewPage() {
             <p className="text-gray-600 text-sm mt-1">as of {formatDate(report.date)}</p>
           </div>
           <div className="flex-shrink-0">
-            <div className="bg-yellow-400 rounded-full p-3">
-              <div className="text-black font-bold text-xl">GTS</div>
-            </div>
+            {userData?.company_logo ? (
+              <img
+                src={userData.company_logo || "/placeholder.svg"}
+                alt={`${userData.company || "Company"} Logo`}
+                className="h-16 w-16 object-contain rounded-lg bg-white p-2 shadow-sm"
+                onError={(e) => {
+                  // Fallback to default logo if company logo fails to load
+                  const target = e.target as HTMLImageElement
+                  target.src = "/company-logos/gts-logo.png"
+                }}
+              />
+            ) : (
+              <img
+                src="/company-logos/gts-logo.png"
+                alt="Company Logo"
+                className="h-16 w-16 object-contain rounded-lg bg-white p-2 shadow-sm"
+              />
+            )}
           </div>
         </div>
 
