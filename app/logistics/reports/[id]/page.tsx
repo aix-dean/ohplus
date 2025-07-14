@@ -154,6 +154,12 @@ export default function ReportPreviewPage() {
     setImageLoadErrors((prev) => new Set(prev).add(fileUrl))
   }
 
+  const getProxiedImageUrl = (originalUrl: string) => {
+    if (!originalUrl) return ""
+    // Use our proxy API route to serve the image
+    return `/api/proxy-image?url=${encodeURIComponent(originalUrl)}`
+  }
+
   const handleDownloadPDF = async () => {
     if (!report || !product) return
 
@@ -187,12 +193,30 @@ export default function ReportPreviewPage() {
     router.back()
   }
 
-  // Component for rendering image using webview/iframe approach
-  const ImageWebView = ({ attachment, index }: { attachment: any; index: number }) => {
-    const [webviewError, setWebviewError] = useState(false)
-    const hasImageError = imageLoadErrors.has(attachment.fileUrl || "")
+  // Component for rendering image using proxy approach
+  const ImageDisplay = ({ attachment, index }: { attachment: any; index: number }) => {
+    const [imageError, setImageError] = useState(false)
+    const [retryCount, setRetryCount] = useState(0)
+    const maxRetries = 2
 
-    if (!attachment.fileUrl || hasImageError || webviewError) {
+    const handleImageLoadError = () => {
+      console.error("Proxied image failed to load:", attachment.fileUrl)
+      if (retryCount < maxRetries) {
+        setRetryCount((prev) => prev + 1)
+        // Force reload by adding timestamp
+        setTimeout(() => {
+          const img = document.querySelector(`[data-attachment-index="${index}"]`) as HTMLImageElement
+          if (img) {
+            img.src = `${getProxiedImageUrl(attachment.fileUrl)}&t=${Date.now()}`
+          }
+        }, 1000)
+      } else {
+        setImageError(true)
+        handleImageError(attachment.fileUrl, attachment.fileName || "")
+      }
+    }
+
+    if (!attachment.fileUrl || imageError) {
       return (
         <div className="text-center space-y-2">
           <div className="flex justify-center">
@@ -244,33 +268,18 @@ export default function ReportPreviewPage() {
     if (isImageFile(attachment.fileName || "")) {
       return (
         <div className="w-full h-full relative">
-          {/* Try direct image first, fallback to iframe */}
           <img
-            src={attachment.fileUrl || "/placeholder.svg"}
+            data-attachment-index={index}
+            src={getProxiedImageUrl(attachment.fileUrl) || "/placeholder.svg"}
             alt={attachment.fileName || `Attachment ${index + 1}`}
             className="max-w-full max-h-full object-contain rounded"
-            style={{ display: webviewError ? "none" : "block" }}
-            onError={() => {
-              console.log("Direct image failed, trying webview approach")
-              setWebviewError(true)
+            onError={handleImageLoadError}
+            onLoad={() => {
+              console.log("Proxied image loaded successfully:", attachment.fileUrl)
+              setImageError(false)
+              setRetryCount(0)
             }}
-            onLoad={() => console.log("Direct image loaded successfully:", attachment.fileUrl)}
           />
-
-          {/* Fallback iframe webview */}
-          {webviewError && (
-            <iframe
-              src={attachment.fileUrl}
-              className="w-full h-full border-0 rounded"
-              title={attachment.fileName || `Attachment ${index + 1}`}
-              sandbox="allow-same-origin allow-scripts"
-              onError={() => {
-                console.error("Webview also failed for:", attachment.fileUrl)
-                handleImageError(attachment.fileUrl, attachment.fileName || "")
-              }}
-            />
-          )}
-
           {attachment.note && (
             <p className="absolute bottom-2 left-2 right-2 text-xs text-white bg-black bg-opacity-50 p-1 rounded text-center">
               "{attachment.note}"
@@ -555,7 +564,7 @@ export default function ReportPreviewPage() {
                       <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                     </div>
 
-                    <ImageWebView attachment={attachment} index={index} />
+                    <ImageDisplay attachment={attachment} index={index} />
                   </div>
                   <div className="text-sm text-gray-600 space-y-1">
                     <div>
@@ -709,14 +718,18 @@ export default function ReportPreviewPage() {
                 {fullScreenAttachment?.fileUrl ? (
                   <div className="w-full max-w-full flex items-center justify-center">
                     {isImageFile(fullScreenAttachment.fileName || "") ? (
-                      <div className="w-full h-full max-w-[calc(90vw-3rem)] max-h-[calc(90vh-8rem)]">
-                        <iframe
-                          src={fullScreenAttachment.fileUrl}
-                          className="w-full h-full border-0 rounded shadow-lg"
-                          title={fullScreenAttachment.fileName || "Image Preview"}
-                          sandbox="allow-same-origin allow-scripts"
-                        />
-                      </div>
+                      <img
+                        src={getProxiedImageUrl(fullScreenAttachment.fileUrl) || "/placeholder.svg"}
+                        alt={fullScreenAttachment.fileName || "Full screen preview"}
+                        className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded shadow-lg"
+                        style={{ maxWidth: "calc(90vw - 3rem)" }}
+                        onError={() =>
+                          console.error("Full screen proxied image failed to load:", fullScreenAttachment.fileUrl)
+                        }
+                        onLoad={() =>
+                          console.log("Full screen proxied image loaded successfully:", fullScreenAttachment.fileUrl)
+                        }
+                      />
                     ) : isVideoFile(fullScreenAttachment.fileName || "") ? (
                       <video
                         src={fullScreenAttachment.fileUrl}
