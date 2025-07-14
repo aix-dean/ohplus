@@ -43,15 +43,15 @@ export default function SubscriptionPage() {
     }
   }, [loading, user, router])
 
-  // Fetch current user count
+  // Fetch current user count using organization users query
   useEffect(() => {
     const fetchUserCount = async () => {
-      if (!userData?.license_key) return
+      if (!userData?.company_id) return
 
       try {
         setLoadingUserCount(true)
         const usersRef = collection(db, "iboard_users")
-        const usersQuery = query(usersRef, where("license_key", "==", userData.license_key))
+        const usersQuery = query(usersRef, where("company_id", "==", userData.company_id))
         const usersSnapshot = await getDocs(usersQuery)
         setCurrentUserCount(usersSnapshot.size)
       } catch (error) {
@@ -63,7 +63,7 @@ export default function SubscriptionPage() {
     }
 
     fetchUserCount()
-  }, [userData?.license_key])
+  }, [userData?.company_id])
 
   // Fetch current inventory count
   useEffect(() => {
