@@ -94,20 +94,31 @@ interface CMSProductData {
 // Fetch product data from Firebase
 async function getProductData(id: string): Promise<CMSProductData | null> {
   try {
-    console.log("Fetching product with ID:", id)
-
     // Get product from Firebase
     const product = await getProductById(id)
-    console.log("Product fetched:", product ? "Found" : "Not found")
 
     if (!product) {
-      console.log("Product not found in database")
       return null
     }
 
     // Get service assignments for this product
     const serviceAssignments = await getServiceAssignmentsByProductId(id)
-    console.log("Service assignments found:", serviceAssignments.length)
+
+    // Safe date conversion helper
+    const safeFormatDate = (timestamp: any): string => {
+      try {
+        if (!timestamp) return "Unknown"
+        if (timestamp.seconds) {
+          return new Date(timestamp.seconds * 1000).toLocaleDateString()
+        }
+        if (timestamp instanceof Date) {
+          return timestamp.toLocaleDateString()
+        }
+        return "Unknown"
+      } catch (error) {
+        return "Unknown"
+      }
+    }
 
     // Convert Firebase product to CMS product data format
     const cmsProductData: CMSProductData = {
@@ -118,8 +129,8 @@ async function getProductData(id: string): Promise<CMSProductData | null> {
       type: product.type || "RENTAL",
       image: product.imageUrl || "/placeholder.svg?height=200&width=200",
       dimensions: `H: ${product.specs_rental?.height || 12} × W: ${product.specs_rental?.width || 12}`,
-      created: product.created ? new Date(product.created.seconds * 1000).toLocaleDateString() : "Unknown",
-      updated: product.updated ? new Date(product.updated.seconds * 1000).toLocaleDateString() : "Unknown",
+      created: safeFormatDate(product.created),
+      updated: safeFormatDate(product.updated),
       company_id: product.company_id,
       seller_id: product.seller_id,
       traffic_count: product.specs_rental?.traffic_count || 0,
@@ -214,7 +225,6 @@ async function getProductData(id: string): Promise<CMSProductData | null> {
       ],
     }
 
-    console.log("CMS product data created successfully")
     return cmsProductData
   } catch (error) {
     console.error("Error fetching product data:", error)
@@ -223,39 +233,18 @@ async function getProductData(id: string): Promise<CMSProductData | null> {
 }
 
 export default async function Page({ params }: Props) {
-  const { id } = params
-
-  console.log("CMS Details page - Product ID:", id)
-
-  if (!id) {
-    console.log("No product ID provided")
+  // Ensure params and id exist
+  if (!params || !params.id) {
     notFound()
   }
+
+  const { id } = params
 
   const product = await getProductData(id)
 
   if (!product) {
-    console.log("Product not found, showing 404")
     notFound()
   }
-
-  console.log("Rendering CMS details for product:", product.name)
-
-  // Calculate spots per loop based on time difference and spot duration
-  const calculateSpotsPerLoop = (startTime: string, endTime: string, spotDuration: number) => {
-    const [startHour, startMinute] = startTime.split(":").map(Number)
-    const [endHour, endMinute] = endTime.split(":").map(Number)
-
-    const startTotalMinutes = startHour * 60 + startMinute
-    const endTotalMinutes = endHour * 60 + endMinute
-
-    const loopDurationMinutes = endTotalMinutes - startTotalMinutes
-    const loopDurationSeconds = loopDurationMinutes * 60
-
-    return Math.floor(loopDurationSeconds / spotDuration)
-  }
-
-  const spotsPerLoop = calculateSpotsPerLoop(product.cms.start_time, product.cms.end_time, product.cms.spot_duration)
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -275,17 +264,6 @@ export default async function Page({ params }: Props) {
       default:
         return "bg-gray-100 text-gray-800"
     }
-  }
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-PH", {
-      style: "currency",
-      currency: "PHP",
-    }).format(price)
-  }
-
-  const formatLocation = (location: string) => {
-    return location && location.length > 50 ? location.substring(0, 50) + "..." : location || "Not specified"
   }
 
   return (
@@ -361,7 +339,7 @@ export default async function Page({ params }: Props) {
             </div>
           </div>
 
-          {product.traffic_count && (
+          {product.traffic_count > 0 && (
             <div>
               <h3 className="text-sm font-medium text-gray-500 mb-1">Traffic Count</h3>
               <p className="text-gray-900">{product.traffic_count.toLocaleString()}</p>
