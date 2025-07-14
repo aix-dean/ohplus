@@ -3,18 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  startAfter,
-  getDocs,
-  type DocumentData,
-  type QueryDocumentSnapshot,
-} from "firebase/firestore"
-import { db } from "@/lib/firebase" // Assuming db is exported from lib/firebase
+import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { format } from "date-fns"
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { getQuotationsPaginated } from "@/lib/quotation-service" // Import the paginated fetch function
 
 export default function SalesQuotationsPage() {
   const { user } = useAuth()
@@ -47,33 +37,14 @@ export default function SalesQuotationsPage() {
 
       setLoading(true)
       try {
-        const quotationsRef = collection(db, "quotation")
-        let q
-
         // Determine the startAfter document based on the page we want to fetch
         const startDoc = pageCursors[pageToFetch - 1] || null // Use null for the first page
 
-        if (startDoc) {
-          q = query(
-            quotationsRef,
-            where("seller_id", "==", user.uid),
-            orderBy("created", "desc"),
-            startAfter(startDoc),
-            limit(pageSize),
-          )
-        } else {
-          // For the first page (pageToFetch === 1), startDoc will be null
-          q = query(quotationsRef, where("seller_id", "==", user.uid), orderBy("created", "desc"), limit(pageSize))
-        }
-
-        const querySnapshot = await getDocs(q)
-        const fetchedQuotations: any[] = []
-        querySnapshot.forEach((doc) => {
-          fetchedQuotations.push({ id: doc.id, ...doc.data() })
-        })
-
-        const newLastVisible = querySnapshot.docs[querySnapshot.docs.length - 1] || null
-        const newHasMore = querySnapshot.docs.length === pageSize
+        const {
+          quotations: fetchedQuotations,
+          lastVisibleId: newLastVisible,
+          hasMore: newHasMore,
+        } = await getQuotationsPaginated(user.uid, pageSize, startDoc)
 
         setQuotations(fetchedQuotations)
         setHasMore(newHasMore)
@@ -83,15 +54,15 @@ export default function SalesQuotationsPage() {
         // If we are moving to a new page (forward), add the newLastVisible to the history.
         // If we are going back, the history is already correct up to that point.
         setPageCursors((prev) => {
-          const newCursors = [...prev]
-          // If we are fetching page N, we store its lastVisible at index N
-          // This means pageCursors[0] is null (for page 1), pageCursors[1] is lastVisible of page 1, etc.
-          newCursors[pageToFetch] = newLastVisible
-          // If we went back, we might have extra cursors, so truncate if necessary
-          if (newCursors.length > pageToFetch + 1) {
-            newCursors.length = pageToFetch + 1
+          const updatedCursors = [...prev]
+          // If we are fetching page `pageToFetch`, we store the `newLastVisible` (which is the last doc of `pageToFetch`)
+          // at index `pageToFetch`. This means `updatedCursors[pageToFetch]` will be the startAfter for `pageToFetch + 1`.
+          updatedCursors[pageToFetch] = newLastVisible
+          // If we navigated back, we might have extra cursors beyond the current page, so truncate.
+          if (updatedCursors.length > pageToFetch + 1) {
+            updatedCursors.length = pageToFetch + 1
           }
-          return newCursors
+          return updatedCursors
         })
       } catch (error) {
         console.error("Error fetching quotations:", error)

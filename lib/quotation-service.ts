@@ -490,6 +490,8 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 5
 
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
     yPosition = addText(quotation.notes, margin, yPosition, contentWidth)
     yPosition += 10
   }
