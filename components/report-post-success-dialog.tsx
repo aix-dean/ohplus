@@ -1,26 +1,32 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import Image from "next/image"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 
 interface ReportPostSuccessDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  reportId: string
+  isOpen: boolean
+  onClose: () => void
+  reportId?: string | null
 }
 
-export function ReportPostSuccessDialog({ open, onOpenChange, reportId }: ReportPostSuccessDialogProps) {
+export function ReportPostSuccessDialog({ isOpen, onClose, reportId }: ReportPostSuccessDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm text-center p-6">
-        <DialogHeader>
-          <div className="flex justify-center mb-4">
-            <Image src="/party-popper.png" alt="Party Popper" width={120} height={120} className="object-contain" />
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <div className="flex flex-col items-center justify-center p-6 text-center space-y-4">
+          {/* Party Popper Icon */}
+          <div className="w-20 h-20 flex items-center justify-center">
+            <img
+              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-rMQJeATLoOf5wGOwTMDAI5fBvfrCgZ.png"
+              alt="Party Popper"
+              className="w-full h-full object-contain"
+            />
           </div>
-          <DialogTitle className="text-2xl font-bold text-gray-900 text-center">Congratulations!</DialogTitle>
-        </DialogHeader>
-        <div className="py-4">
-          <p className="text-gray-600 text-lg">You have successfully posted a report!</p>
+
+          {/* Congratulations Text */}
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-gray-900 text-center">Congratulations!</h2>
+            <p className="text-gray-600 text-center">You have successfully posted a report!</p>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

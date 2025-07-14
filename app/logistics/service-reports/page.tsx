@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
+import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 
 export default function ServiceReportsPage() {
   const [reports, setReports] = useState<ReportData[]>([])
@@ -19,6 +20,8 @@ export default function ServiceReportsPage() {
   const [filterType, setFilterType] = useState("All")
   const [activeTab, setActiveTab] = useState("From Logistics")
   const [showDrafts, setShowDrafts] = useState(false)
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [lastPostedReportId, setLastPostedReportId] = useState<string | null>(null)
 
   const router = useRouter()
   const { user } = useAuth()
@@ -26,11 +29,22 @@ export default function ServiceReportsPage() {
 
   useEffect(() => {
     fetchReports()
+    checkForSuccessDialog()
   }, [])
 
   useEffect(() => {
     filterReports()
   }, [reports, searchQuery, filterType, activeTab, showDrafts])
+
+  const checkForSuccessDialog = () => {
+    const reportId = sessionStorage.getItem("lastPostedReportId")
+    if (reportId) {
+      setLastPostedReportId(reportId)
+      setShowSuccessDialog(true)
+      // Clear the session storage item
+      sessionStorage.removeItem("lastPostedReportId")
+    }
+  }
 
   const fetchReports = async () => {
     try {
@@ -140,6 +154,11 @@ export default function ServiceReportsPage() {
       title: "Delete Report",
       description: "Delete functionality will be implemented",
     })
+  }
+
+  const handleCloseSuccessDialog = () => {
+    setShowSuccessDialog(false)
+    setLastPostedReportId(null)
   }
 
   return (
@@ -301,6 +320,13 @@ export default function ServiceReportsPage() {
           Create New Report
         </Button>
       </div>
+
+      {/* Success Dialog */}
+      <ReportPostSuccessDialog
+        isOpen={showSuccessDialog}
+        onClose={handleCloseSuccessDialog}
+        reportId={lastPostedReportId}
+      />
     </div>
   )
 }
