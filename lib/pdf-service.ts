@@ -1115,21 +1115,23 @@ export async function generateReportPDF(
     pdf.setFillColor(52, 211, 235) // cyan-400
     pdf.rect(0, footerY, pageWidth * 0.3, footerHeight, "F")
 
-    // Angular blue section - create the diagonal cut
+    // Angular blue section - create the diagonal cut using lines
     pdf.setFillColor(30, 58, 138) // blue-900
     const diagonalStartX = pageWidth * 0.25 // Start diagonal cut at 25% of page width
 
-    // Create the angular shape using a polygon for clean diagonal cut
-    const points = [
-      [diagonalStartX, footerY], // Top left of diagonal
-      [pageWidth, footerY], // Top right
-      [pageWidth, footerY + footerHeight], // Bottom right
-      [diagonalStartX, footerY + footerHeight], // Bottom left of diagonal
-    ]
-
-    // Draw the blue section as a polygon
-    pdf.setFillColor(30, 58, 138)
-    pdf.polygon(points, "F")
+    // Create the angular shape using lines method
+    pdf.lines(
+      [
+        [pageWidth - diagonalStartX, 0], // Width of the blue section
+        [0, footerHeight], // Go down to bottom
+        [-(pageWidth - diagonalStartX), 0], // Go back left
+        [0, -footerHeight], // Go back up (closes the shape)
+      ],
+      diagonalStartX,
+      footerY,
+      [1, 1],
+      "F",
+    )
 
     // Add footer text - positioned on the right side
     pdf.setTextColor(255, 255, 255)
