@@ -62,7 +62,7 @@ export default function SalesQuotationsPage() {
         const prevDoc = pageHistory[pageHistory.length - 1]
         q = query(
           quotationsRef,
-          where("seller_id", "==", user.uid),
+          where("created_by", "==", user.uid),
           orderBy("created", "desc"),
           startAfter(prevDoc),
           limit(pageSize),
