@@ -1,50 +1,73 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { ChevronRight, Home } from "lucide-react"
+import { cn } from "@/lib/utils"
 
-interface BreadcrumbItem {
-  label: string
-  href: string
-}
+export function CMSBreadcrumb() {
+  const pathname = usePathname()
 
-interface CMSBreadcrumbProps {
-  currentPage: string
-  productId?: string
-  productName?: string
-}
+  // Parse the pathname to create breadcrumb items
+  const pathSegments = pathname.split("/").filter(Boolean)
 
-export default function CMSBreadcrumb({ currentPage, productId, productName }: CMSBreadcrumbProps) {
-  const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([])
+  const breadcrumbItems = [
+    { label: "Home", href: "/", icon: Home },
+    { label: "CMS", href: "/cms/dashboard" },
+  ]
 
-  useEffect(() => {
-    const items: BreadcrumbItem[] = [{ label: "Dashboard", href: "/cms/dashboard" }]
-
-    if (currentPage === "details" && productId) {
-      items.push({
-        label: productName || "Product Details",
-        href: `/cms/details/${productId}`,
-      })
-    }
-
-    setBreadcrumbs(items)
-  }, [currentPage, productId, productName])
+  // Add specific breadcrumb items based on the current path
+  if (pathSegments.includes("details") && pathSegments.length > 2) {
+    const id = pathSegments[pathSegments.length - 1]
+    breadcrumbItems.push({
+      label: "Details",
+      href: "/cms/details",
+    })
+    breadcrumbItems.push({
+      label: `Product ${id}`,
+      href: `/cms/details/${id}`,
+    })
+  } else if (pathSegments.includes("planner")) {
+    breadcrumbItems.push({
+      label: "Planner",
+      href: "/cms/planner",
+    })
+  } else if (pathSegments.includes("orders")) {
+    breadcrumbItems.push({
+      label: "Orders",
+      href: "/cms/orders",
+    })
+  }
 
   return (
-    <nav className="flex items-center space-x-2 text-sm text-gray-500">
-      <Link href="/cms/dashboard" className="flex items-center hover:text-gray-700">
-        <Home size={16} className="mr-1" />
-        CMS
-      </Link>
-      {breadcrumbs.map((item, index) => (
-        <div key={index} className="flex items-center">
-          <ChevronRight size={14} className="mx-2" />
-          <Link href={item.href} className="hover:text-gray-700">
-            {item.label}
-          </Link>
-        </div>
-      ))}
+    <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-4">
+      {breadcrumbItems.map((item, index) => {
+        const isLast = index === breadcrumbItems.length - 1
+        const Icon = item.icon
+
+        return (
+          <div key={item.href} className="flex items-center">
+            {index > 0 && <ChevronRight className="h-4 w-4 mx-2 text-gray-400" />}
+            {isLast ? (
+              <span className="font-medium text-gray-900 flex items-center">
+                {Icon && <Icon className="h-4 w-4 mr-1" />}
+                {item.label}
+              </span>
+            ) : (
+              <Link
+                href={item.href}
+                className={cn(
+                  "hover:text-gray-900 transition-colors flex items-center",
+                  index === 0 && "text-blue-600 hover:text-blue-700",
+                )}
+              >
+                {Icon && <Icon className="h-4 w-4 mr-1" />}
+                {item.label}
+              </Link>
+            )}
+          </div>
+        )
+      })}
     </nav>
   )
 }

@@ -11,8 +11,7 @@ const SideNavigation: React.FC = () => {
     { label: "Dashboard", href: "/dashboard" },
     { label: "Users", href: "/users" },
     { label: "Products", href: "/products" },
-    { label: "CMS Details 1", href: "/cms/details/1" }, // Updated route
-    { label: "CMS Details 2", href: "/cms/details/2" }, // Updated route
+    { label: "CMS Details", href: "/cms/details" },
     { label: "Settings", href: "/settings" },
   ]
 

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
-export default function CMSContentPage() {
+export default function CMSDetailsIndexPage() {
   redirect("/cms/dashboard")
 }

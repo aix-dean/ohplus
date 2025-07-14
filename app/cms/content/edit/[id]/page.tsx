@@ -1,12 +1,11 @@
 import { redirect } from "next/navigation"
 
-interface PageProps {
+interface CMSContentEditPageProps {
   params: {
     id: string
   }
 }
 
-export default function ContentEditRedirect({ params }: PageProps) {
-  // Redirect old content edit route to new details route
+export default function CMSContentEditPage({ params }: CMSContentEditPageProps) {
   redirect(`/cms/details/${params.id}`)
 }

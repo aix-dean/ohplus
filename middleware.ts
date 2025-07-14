@@ -1,4 +1,5 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -6,16 +7,12 @@ export function middleware(request: NextRequest) {
   // Redirect old CMS content routes to new details routes
   if (pathname.startsWith("/cms/content/edit/")) {
     const id = pathname.split("/").pop()
-    if (id) {
-      return NextResponse.redirect(new URL(`/cms/details/${id}`, request.url))
-    }
+    return NextResponse.redirect(new URL(`/cms/details/${id}`, request.url))
   }
 
   if (pathname.startsWith("/cms/content/") && pathname !== "/cms/content") {
     const id = pathname.split("/").pop()
-    if (id) {
-      return NextResponse.redirect(new URL(`/cms/details/${id}`, request.url))
-    }
+    return NextResponse.redirect(new URL(`/cms/details/${id}`, request.url))
   }
 
   if (pathname === "/cms/content") {
