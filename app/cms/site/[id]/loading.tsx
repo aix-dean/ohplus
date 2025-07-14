@@ -100,7 +100,7 @@ export default function CMSSiteDetailsLoading() {
                 </div>
                 <div className="h-px bg-muted" />
                 <div className="space-y-2">
-                  {Array.from({ length: 2 }).map((_, i) => (
+                  {Array.from({ length: 3 }).map((_, i) => (
                     <div key={i} className="flex items-center gap-2">
                       <div className="h-4 w-4 bg-muted animate-pulse rounded" />
                       <div>

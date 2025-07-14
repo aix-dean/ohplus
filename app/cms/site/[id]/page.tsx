@@ -45,7 +45,7 @@ export default function CMSSiteDetailsPage() {
   // Fetch product data
   useEffect(() => {
     const fetchProduct = async () => {
-      if (!productId || !userData?.company_id) return
+      if (!productId) return
 
       try {
         setLoading(true)
@@ -66,10 +66,20 @@ export default function CMSSiteDetailsPage() {
           }
         }
 
-        // Fallback to Firebase query
+        // Fallback to Firebase query using existing function
         console.log("Fetching product data from Firebase...")
         const productData = await getProductById(productId)
         if (productData) {
+          // Verify this product belongs to the current user's company
+          if (userData?.company_id && productData.company_id !== userData.company_id) {
+            toast({
+              title: "Access Denied",
+              description: "You don't have permission to view this site.",
+              variant: "destructive",
+            })
+            router.push("/cms/dashboard")
+            return
+          }
           setProduct(productData)
         } else {
           toast({
@@ -95,7 +105,7 @@ export default function CMSSiteDetailsPage() {
   }, [productId, userData?.company_id, toast, router])
 
   const handleDelete = async () => {
-    if (!product) return
+    if (!product?.id) return
 
     try {
       await softDeleteProduct(product.id)
@@ -161,9 +171,20 @@ export default function CMSSiteDetailsPage() {
     dimensions: product.dimensions || "1920×1080",
     format: product.format || "Image",
     cms: product.cms || null,
-    created: product.created || "Unknown",
-    updated: product.updated || "Unknown",
+    created:
+      typeof product.created === "string"
+        ? product.created
+        : product.created?.toDate
+          ? product.created.toDate().toLocaleDateString()
+          : "Unknown",
+    updated:
+      typeof product.updated === "string"
+        ? product.updated
+        : product.updated?.toDate
+          ? product.updated.toDate().toLocaleDateString()
+          : "Unknown",
     author: product.seller_name || "Unknown",
+    price: product.price || 0,
   }
 
   return (
@@ -240,6 +261,9 @@ export default function CMSSiteDetailsPage() {
                 <div className="mt-4 space-y-2">
                   <h3 className="font-semibold">{siteData.title}</h3>
                   <p className="text-sm text-muted-foreground">{siteData.description}</p>
+                  {siteData.price > 0 && (
+                    <p className="text-lg font-semibold text-green-600">₱{siteData.price.toLocaleString()}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -270,6 +294,39 @@ export default function CMSSiteDetailsPage() {
                     </Badge>
                   </div>
                 </div>
+                {product.specs_rental && (
+                  <div className="mt-4 pt-4 border-t">
+                    <h4 className="font-medium mb-2">Additional Specifications</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      {product.specs_rental.audience_type && (
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Audience Type</label>
+                          <p className="text-sm">{product.specs_rental.audience_type}</p>
+                        </div>
+                      )}
+                      {product.specs_rental.traffic_count && (
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Traffic Count</label>
+                          <p className="text-sm">{product.specs_rental.traffic_count.toLocaleString()}</p>
+                        </div>
+                      )}
+                      {product.specs_rental.elevation && (
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Elevation</label>
+                          <p className="text-sm">{product.specs_rental.elevation}m</p>
+                        </div>
+                      )}
+                      {product.specs_rental.height && product.specs_rental.width && (
+                        <div>
+                          <label className="text-sm font-medium text-muted-foreground">Physical Size</label>
+                          <p className="text-sm">
+                            {product.specs_rental.width}m × {product.specs_rental.height}m
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -343,6 +400,18 @@ export default function CMSSiteDetailsPage() {
                   <label className="text-sm font-medium text-muted-foreground">Site ID</label>
                   <p className="text-sm font-mono">{siteData.productId}</p>
                 </div>
+                {product.categories && product.categories.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Categories</label>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {product.categories.map((category, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {category}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -362,6 +431,10 @@ export default function CMSSiteDetailsPage() {
                     {siteData.displayHealth}
                   </Badge>
                 </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Active</span>
+                  <Badge variant={product.active ? "default" : "secondary"}>{product.active ? "Yes" : "No"}</Badge>
+                </div>
                 <Separator />
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -376,6 +449,13 @@ export default function CMSSiteDetailsPage() {
                     <div>
                       <p className="text-sm font-medium">Last Updated</p>
                       <p className="text-sm text-muted-foreground">{siteData.updated}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-4 w-4" />
+                    <div>
+                      <p className="text-sm font-medium">Author</p>
+                      <p className="text-sm text-muted-foreground">{siteData.author}</p>
                     </div>
                   </div>
                 </div>
