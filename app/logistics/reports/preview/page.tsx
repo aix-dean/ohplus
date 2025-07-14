@@ -6,12 +6,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send, ExternalLink } from "lucide-react"
-import { createReport, type ReportData } from "@/lib/report-service"
+import { postReport, type ReportData } from "@/lib/report-service"
 import type { Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
-import { getUserById, type User } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ReportPreviewPage() {
@@ -19,46 +18,49 @@ export default function ReportPreviewPage() {
   const [report, setReport] = useState<ReportData | null>(null)
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
+  const [posting, setPosting] = useState(false)
   const [fullScreenAttachment, setFullScreenAttachment] = useState<any>(null)
   const [isFullScreenOpen, setIsFullScreenOpen] = useState(false)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
-  const [isPosting, setIsPosting] = useState(false)
+  const [imageLoadErrors, setImageLoadErrors] = useState<Set<string>>(new Set())
   const { user } = useAuth()
-  const [userData, setUserData] = useState<User | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
     loadPreviewData()
   }, [])
 
-  const loadPreviewData = async () => {
+  const loadPreviewData = () => {
     try {
-      // Get preview data from sessionStorage
-      const previewReportData = sessionStorage.getItem("previewReportData")
-      const previewProductData = sessionStorage.getItem("previewProductData")
+      const reportDataString = sessionStorage.getItem("previewReportData")
+      const productDataString = sessionStorage.getItem("previewProductData")
 
-      if (previewReportData && previewProductData) {
-        const reportData = JSON.parse(previewReportData)
-        const productData = JSON.parse(previewProductData)
+      if (reportDataString && productDataString) {
+        const reportData = JSON.parse(reportDataString)
+        const productData = JSON.parse(productDataString)
 
         console.log("Loaded preview report data:", reportData)
-        console.log("Report attachments:", reportData.attachments)
+        console.log("Preview report attachments:", reportData.attachments)
 
         setReport(reportData)
         setProduct(productData)
-
-        // Fetch user data for company logo
-        if (reportData.sellerId) {
-          const userInfo = await getUserById(reportData.sellerId)
-          setUserData(userInfo)
-        }
       } else {
-        // Redirect back if no preview data
+        console.error("No preview data found in session storage")
+        toast({
+          title: "Error",
+          description: "No preview data found",
+          variant: "destructive",
+        })
         router.push("/logistics/dashboard")
       }
     } catch (error) {
       console.error("Error loading preview data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load preview data",
+        variant: "destructive",
+      })
       router.push("/logistics/dashboard")
     } finally {
       setLoading(false)
@@ -66,29 +68,45 @@ export default function ReportPreviewPage() {
   }
 
   const handlePostReport = async () => {
-    if (!report || !product) {
+    if (!report) {
       toast({
         title: "Error",
-        description: "Report data not available",
+        description: "No report data available",
         variant: "destructive",
       })
       return
     }
 
-    setIsPosting(true)
+    setPosting(true)
     try {
-      // Prepare the report data for posting
-      const reportToPost: ReportData = {
+      console.log("Posting report with attachments:", report.attachments)
+
+      // Remove the isPreview flag and set proper timestamps
+      const finalReportData: ReportData = {
         ...report,
-        status: "posted", // Change status from draft to posted
-        isPreview: undefined, // Remove preview flag
-        id: undefined, // Remove temporary preview ID
+        status: "posted",
+        // Remove preview-specific fields
+        id: undefined,
+        created: undefined,
+        updated: undefined,
       }
 
-      console.log("Posting report with attachments:", reportToPost.attachments)
+      // Ensure attachments are properly formatted
+      if (finalReportData.attachments) {
+        finalReportData.attachments = finalReportData.attachments
+          .filter((attachment: any) => attachment && attachment.fileUrl && attachment.fileName)
+          .map((attachment: any) => ({
+            note: attachment.note || "",
+            fileName: attachment.fileName,
+            fileType: attachment.fileType || "unknown",
+            fileUrl: attachment.fileUrl,
+          }))
+      }
 
-      // Create the report in Firebase
-      const reportId = await createReport(reportToPost)
+      console.log("Final report data being posted:", finalReportData)
+      console.log("Final attachments data:", finalReportData.attachments)
+
+      const reportId = await postReport(finalReportData)
 
       // Store the posted report ID for success dialog
       sessionStorage.setItem("lastPostedReportId", reportId)
@@ -112,7 +130,7 @@ export default function ReportPreviewPage() {
         variant: "destructive",
       })
     } finally {
-      setIsPosting(false)
+      setPosting(false)
     }
   }
 
@@ -201,6 +219,11 @@ export default function ReportPreviewPage() {
     window.open(fileUrl, "_blank", "noopener,noreferrer")
   }
 
+  const handleImageError = (fileUrl: string, fileName: string) => {
+    console.error("Image failed to load:", fileUrl)
+    setImageLoadErrors((prev) => new Set(prev).add(fileUrl))
+  }
+
   const handleDownloadPDF = async () => {
     if (!report || !product) return
 
@@ -249,7 +272,7 @@ export default function ReportPreviewPage() {
   if (!report) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Report preview not found</div>
+        <div className="text-lg">No report data available</div>
       </div>
     )
   }
@@ -270,24 +293,18 @@ export default function ReportPreviewPage() {
           <div className="bg-cyan-400 text-white px-3 py-1 rounded text-sm font-medium">
             {product?.content_type || "Preview"}
           </div>
+          <div className="bg-yellow-400 text-black px-3 py-1 rounded text-sm font-medium">PREVIEW</div>
         </div>
 
         {/* Action Buttons */}
         <div className="ml-auto flex items-center gap-2">
           <Button
             onClick={handlePostReport}
-            disabled={isPosting}
+            disabled={posting}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm flex items-center gap-2"
           >
             <Send className="h-4 w-4" />
-            {isPosting ? "Posting..." : "Post Report"}
-          </Button>
-          <Button
-            onClick={handleSendReport}
-            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm flex items-center gap-2"
-          >
-            <Send className="h-4 w-4" />
-            Send
+            {posting ? "Posting..." : "Post Report"}
           </Button>
           <Button
             onClick={handleDownloadPDF}
@@ -303,9 +320,7 @@ export default function ReportPreviewPage() {
       {/* Angular Blue Header */}
       <div className="w-full relative bg-white">
         <div className="relative h-16 overflow-hidden">
-          {/* Main blue section */}
           <div className="absolute inset-0 bg-blue-900"></div>
-          {/* Angular cyan section pointing right */}
           <div
             className="absolute top-0 right-0 h-full bg-cyan-400"
             style={{
@@ -313,7 +328,6 @@ export default function ReportPreviewPage() {
               clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
             }}
           ></div>
-          {/* Content overlay */}
           <div className="relative z-10 h-full flex items-center px-6">
             <div className="text-white text-lg font-semibold">Logistics</div>
           </div>
@@ -321,7 +335,7 @@ export default function ReportPreviewPage() {
       </div>
 
       <div className="max-w-6xl mx-auto p-6 space-y-6">
-        {/* Report Header with Badge and Logo */}
+        {/* Report Header */}
         <div className="flex justify-between items-center">
           <div className="flex flex-col">
             <div className="bg-cyan-400 text-white px-6 py-3 rounded-lg text-base font-medium inline-block">
@@ -330,30 +344,12 @@ export default function ReportPreviewPage() {
             <p className="text-gray-600 text-sm mt-2">as of {formatDate(report.date)}</p>
           </div>
           <div className="flex-shrink-0">
-            {userData?.company_logo ? (
-              <div
-                className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm"
-                style={{ width: "160px", height: "160px" }}
-              >
-                <img
-                  src={userData.company_logo || "/placeholder.svg"}
-                  alt={`${userData.company || "Company"} Logo`}
-                  className="max-h-full max-w-full object-contain"
-                  onError={(e) => {
-                    // Fallback to OH+ logo if company logo fails to load
-                    const target = e.target as HTMLImageElement
-                    target.src = "/ohplus-new-logo.png"
-                  }}
-                />
-              </div>
-            ) : (
-              <div
-                className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm"
-                style={{ width: "160px", height: "160px" }}
-              >
-                <img src="/ohplus-new-logo.png" alt="OH+ Logo" className="max-h-full max-w-full object-contain" />
-              </div>
-            )}
+            <div
+              className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm"
+              style={{ width: "160px", height: "160px" }}
+            >
+              <img src="/ohplus-new-logo.png" alt="OH+ Logo" className="max-h-full max-w-full object-contain" />
+            </div>
           </div>
         </div>
 
@@ -366,7 +362,7 @@ export default function ReportPreviewPage() {
                 <div className="flex">
                   <span className="font-medium text-gray-700 w-32 flex-shrink-0">Site ID:</span>
                   <span className="text-gray-900">
-                    {report.siteId} {product?.light?.location || product?.specs_rental?.location || ""}
+                    {report.siteId} {report.location || ""}
                   </span>
                 </div>
                 <div className="flex">
@@ -393,16 +389,6 @@ export default function ReportPreviewPage() {
                   <span className="font-medium text-gray-700 w-32 flex-shrink-0">End Date:</span>
                   <span className="text-gray-900">{formatDate(report.bookingDates.end)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Installation Duration:</span>
-                  <span className="text-gray-900">
-                    {Math.ceil(
-                      (new Date(report.bookingDates.end).getTime() - new Date(report.bookingDates.start).getTime()) /
-                        (1000 * 60 * 60 * 24),
-                    )}{" "}
-                    days
-                  </span>
-                </div>
               </div>
               <div className="space-y-2">
                 <div className="flex">
@@ -416,18 +402,6 @@ export default function ReportPreviewPage() {
                 <div className="flex">
                   <span className="font-medium text-gray-700 w-32 flex-shrink-0">Crew:</span>
                   <span className="text-gray-900">Team {report.assignedTo || "A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Illumination:</span>
-                  <span className="text-gray-900">{product?.light?.illumination || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Gondola:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.gondola ? "YES" : "NO"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Technology:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.technology || "N/A"}</span>
                 </div>
                 <div className="flex">
                   <span className="font-medium text-gray-700 w-32 flex-shrink-0">Sales:</span>
@@ -456,57 +430,22 @@ export default function ReportPreviewPage() {
                     className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
                     onClick={() => attachment.fileUrl && openFullScreen(attachment)}
                   >
-                    {/* Zoom overlay */}
                     <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center z-10">
                       <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                     </div>
 
-                    {attachment.fileUrl ? (
-                      isImageFile(attachment.fileName || "") ? (
-                        <img
-                          src={attachment.fileUrl || "/placeholder.svg"}
-                          alt={attachment.fileName || `Attachment ${index + 1}`}
-                          className="max-w-full max-h-full object-contain rounded"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.src = "/placeholder.svg"
-                          }}
-                        />
-                      ) : isVideoFile(attachment.fileName || "") ? (
-                        <video
-                          src={attachment.fileUrl}
-                          controls
-                          className="max-w-full max-h-full object-contain rounded"
-                        />
-                      ) : (
-                        <div className="text-center space-y-2">
-                          {getFileIcon(attachment.fileName || "")}
-                          <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
-                        </div>
-                      )
+                    {attachment.fileUrl && isImageFile(attachment.fileName) ? (
+                      <img
+                        src={attachment.fileUrl || "/placeholder.svg"}
+                        alt={attachment.fileName}
+                        className="max-w-full max-h-full object-contain rounded"
+                        onError={(e) => handleImageError(attachment.fileUrl, attachment.fileName)}
+                      />
                     ) : (
                       <div className="text-center space-y-2">
-                        <div className="flex justify-center">
-                          <svg className="h-12 w-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-                            />
-                          </svg>
-                        </div>
-                        <p className="text-sm text-gray-700 font-medium break-all">
-                          {attachment.fileName || "Unknown file"}
-                        </p>
-                        <p className="text-xs text-red-500">File not available</p>
+                        {getFileIcon(attachment.fileName)}
+                        <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
                       </div>
-                    )}
-
-                    {attachment.note && (
-                      <p className="absolute bottom-2 left-2 right-2 text-xs text-white bg-black bg-opacity-50 p-1 rounded text-center">
-                        "{attachment.note}"
-                      </p>
                     )}
                   </div>
                   <div className="text-sm text-gray-600 space-y-1">
@@ -525,9 +464,9 @@ export default function ReportPreviewPage() {
                         <span className="font-semibold">File:</span> {attachment.fileName}
                       </div>
                     )}
-                    {attachment.fileType && (
+                    {attachment.note && (
                       <div>
-                        <span className="font-semibold">Type:</span> {attachment.fileType}
+                        <span className="font-semibold">Note:</span> {attachment.note}
                       </div>
                     )}
                   </div>
@@ -565,9 +504,7 @@ export default function ReportPreviewPage() {
       {/* Angular Footer */}
       <div className="w-full relative bg-white mt-8">
         <div className="relative h-16 overflow-hidden">
-          {/* Cyan section on left */}
           <div className="absolute inset-0 bg-cyan-400"></div>
-          {/* Angular dark blue section pointing left */}
           <div
             className="absolute top-0 right-0 h-full bg-blue-900"
             style={{
@@ -575,11 +512,9 @@ export default function ReportPreviewPage() {
               clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
             }}
           ></div>
-          {/* Content overlay */}
           <div className="relative z-10 h-full flex items-center justify-between px-8">
             <div className="flex items-center gap-6">
               <div className="text-white text-lg font-semibold">{""}</div>
-              <div className="text-white text-sm">{""}</div>
             </div>
             <div className="text-white text-right flex items-center gap-2">
               <div className="text-sm font-medium">Smart. Seamless. Scalable</div>
@@ -610,7 +545,6 @@ export default function ReportPreviewPage() {
       <Dialog open={isFullScreenOpen} onOpenChange={setIsFullScreenOpen}>
         <DialogContent className="max-w-[90vw] max-h-[90vh] w-full h-full p-0 bg-black border-2 border-gray-800">
           <div className="relative w-full h-full flex flex-col">
-            {/* Header with controls */}
             <div className="absolute top-0 left-0 right-0 z-10 bg-black bg-opacity-90 p-4 flex justify-between items-center border-b border-gray-700">
               <DialogTitle className="text-white text-lg font-medium truncate pr-4">
                 {fullScreenAttachment?.fileName || "File Preview"}
@@ -649,7 +583,6 @@ export default function ReportPreviewPage() {
               </div>
             </div>
 
-            {/* Scrollable Content Container */}
             <div className="flex-1 overflow-auto pt-16 pb-16">
               <div className="min-h-full flex items-center justify-center p-6">
                 {fullScreenAttachment?.fileUrl ? (
@@ -660,53 +593,13 @@ export default function ReportPreviewPage() {
                         alt={fullScreenAttachment.fileName || "Full screen preview"}
                         className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded shadow-lg"
                         style={{ maxWidth: "calc(90vw - 3rem)" }}
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.src = "/placeholder.svg"
-                        }}
                       />
-                    ) : isVideoFile(fullScreenAttachment.fileName || "") ? (
-                      <video
-                        src={fullScreenAttachment.fileUrl}
-                        controls
-                        className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded shadow-lg"
-                        style={{ maxWidth: "calc(90vw - 3rem)" }}
-                        autoPlay
-                      />
-                    ) : isPdfFile(fullScreenAttachment.fileName || "") ? (
-                      <div className="w-full h-[calc(90vh-8rem)] max-w-[calc(90vw-3rem)]">
-                        <iframe
-                          src={fullScreenAttachment.fileUrl}
-                          className="w-full h-full border-0 rounded shadow-lg"
-                          title={fullScreenAttachment.fileName || "PDF Preview"}
-                        />
-                      </div>
                     ) : (
                       <div className="text-center text-white space-y-4 p-8">
                         <div className="flex justify-center">{getFileIcon(fullScreenAttachment.fileName || "")}</div>
                         <div>
                           <p className="text-lg font-medium break-all">{fullScreenAttachment.fileName}</p>
                           <p className="text-sm text-gray-300 mt-2">Preview not available for this file type</p>
-                          <div className="flex gap-2 justify-center mt-4">
-                            <Button
-                              variant="outline"
-                              className="bg-transparent border-white text-white hover:bg-white hover:text-black"
-                              onClick={() => openInNewTab(fullScreenAttachment.fileUrl)}
-                            >
-                              <ExternalLink className="h-4 w-4 mr-2" />
-                              Open in New Tab
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="bg-transparent border-white text-white hover:bg-white hover:text-black"
-                              onClick={() =>
-                                downloadFile(fullScreenAttachment.fileUrl, fullScreenAttachment.fileName || "file")
-                              }
-                            >
-                              <Download className="h-4 w-4 mr-2" />
-                              Download File
-                            </Button>
-                          </div>
                         </div>
                       </div>
                     )}
@@ -719,7 +612,6 @@ export default function ReportPreviewPage() {
               </div>
             </div>
 
-            {/* Footer with file info */}
             {fullScreenAttachment?.note && (
               <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-90 p-4 border-t border-gray-700">
                 <p className="text-white text-sm italic text-center">"{fullScreenAttachment.note}"</p>

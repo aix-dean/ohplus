@@ -33,10 +33,9 @@ export interface ReportData {
   date: string
   attachments: Array<{
     note: string
-    file?: File
-    fileName?: string
-    fileType?: string
-    fileUrl?: string
+    fileName: string
+    fileType: string
+    fileUrl: string
   }>
   status: string
   createdBy: string
@@ -85,28 +84,28 @@ function cleanReportData(data: any): any {
 
 export async function createReport(reportData: ReportData): Promise<string> {
   try {
-    // Process attachments - no need to upload again since they're already uploaded in the dialog
-    const processedAttachments = (reportData.attachments || [])
-      .map((attachment: any) => {
-        // If attachment already has fileUrl (from Firebase upload), use it directly
-        if (attachment.fileUrl) {
-          return {
-            note: attachment.note || "",
-            fileName: attachment.fileName || "",
-            fileType: attachment.fileType || "",
-            fileUrl: attachment.fileUrl,
-          }
-        }
+    console.log("Creating report with data:", reportData)
+    console.log("Report attachments before processing:", reportData.attachments)
 
-        // Fallback for attachments without fileUrl (shouldn't happen with new upload flow)
-        return {
+    // Process attachments - ensure they have all required fields
+    const processedAttachments = (reportData.attachments || [])
+      .filter((attachment: any) => {
+        // Only include attachments that have a fileUrl (successfully uploaded)
+        return attachment && attachment.fileUrl && attachment.fileName
+      })
+      .map((attachment: any) => {
+        const processedAttachment = {
           note: attachment.note || "",
           fileName: attachment.fileName || "Unknown file",
-          fileType: attachment.fileType || "",
-          fileUrl: null,
+          fileType: attachment.fileType || "unknown",
+          fileUrl: attachment.fileUrl,
         }
+
+        console.log("Processed attachment:", processedAttachment)
+        return processedAttachment
       })
-      .filter((attachment) => attachment.fileUrl) // Only include attachments with valid URLs
+
+    console.log("Processed attachments:", processedAttachments)
 
     // Create the final report data with proper structure
     const finalReportData: any = {
@@ -116,20 +115,23 @@ export async function createReport(reportData: ReportData): Promise<string> {
       sellerId: reportData.sellerId,
       client: reportData.client,
       clientId: reportData.clientId,
-      bookingDates: reportData.bookingDates,
+      bookingDates: {
+        start: reportData.bookingDates.start,
+        end: reportData.bookingDates.end,
+      },
       breakdate: reportData.breakdate,
       sales: reportData.sales,
       reportType: reportData.reportType,
       date: reportData.date,
       attachments: processedAttachments,
-      status: reportData.status,
+      status: reportData.status || "draft",
       createdBy: reportData.createdBy,
       createdByName: reportData.createdByName,
       category: reportData.category,
       subcategory: reportData.subcategory,
       priority: reportData.priority,
       completionPercentage: reportData.completionPercentage,
-      tags: reportData.tags,
+      tags: reportData.tags || [],
       created: Timestamp.now(),
       updated: Timestamp.now(),
     }
@@ -164,9 +166,11 @@ export async function createReport(reportData: ReportData): Promise<string> {
       finalReportData.delayDays = reportData.delayDays
     }
 
-    console.log("Creating report with processed attachments:", finalReportData.attachments)
+    console.log("Final report data to be saved:", finalReportData)
 
     const docRef = await addDoc(collection(db, "reports"), finalReportData)
+    console.log("Report created with ID:", docRef.id)
+
     return docRef.id
   } catch (error) {
     console.error("Error creating report:", error)
@@ -179,10 +183,21 @@ export async function getReports(): Promise<ReportData[]> {
     const q = query(collection(db, "reports"), orderBy("created", "desc"))
     const querySnapshot = await getDocs(q)
 
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as ReportData[]
+    const reports = querySnapshot.docs.map((doc) => {
+      const data = doc.data()
+      console.log("Retrieved report data:", data)
+      console.log("Report attachments:", data.attachments)
+
+      return {
+        id: doc.id,
+        ...data,
+        // Ensure attachments is always an array
+        attachments: Array.isArray(data.attachments) ? data.attachments : [],
+      }
+    }) as ReportData[]
+
+    console.log("Total reports retrieved:", reports.length)
+    return reports
   } catch (error) {
     console.error("Error fetching reports:", error)
     throw error
@@ -197,6 +212,7 @@ export async function getReportsByCompany(companyId: string): Promise<ReportData
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
+      attachments: Array.isArray(doc.data().attachments) ? doc.data().attachments : [],
     })) as ReportData[]
   } catch (error) {
     console.error("Error fetching reports by company:", error)
@@ -212,6 +228,7 @@ export async function getReportsBySeller(sellerId: string): Promise<ReportData[]
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
+      attachments: Array.isArray(doc.data().attachments) ? doc.data().attachments : [],
     })) as ReportData[]
   } catch (error) {
     console.error("Error fetching reports by seller:", error)
@@ -225,11 +242,17 @@ export async function getReportById(reportId: string): Promise<ReportData | null
     const docSnap = await getDoc(docRef)
 
     if (docSnap.exists()) {
+      const data = docSnap.data()
+      console.log("Retrieved single report data:", data)
+      console.log("Single report attachments:", data.attachments)
+
       return {
         id: docSnap.id,
-        ...docSnap.data(),
+        ...data,
+        attachments: Array.isArray(data.attachments) ? data.attachments : [],
       } as ReportData
     } else {
+      console.log("No report found with ID:", reportId)
       return null
     }
   } catch (error) {
@@ -250,11 +273,27 @@ export async function updateReport(reportId: string, updateData: Partial<ReportD
       }
     })
 
+    // Handle attachments specifically
+    if (updateData.attachments) {
+      cleanUpdateData.attachments = updateData.attachments
+        .filter((attachment: any) => attachment && attachment.fileUrl && attachment.fileName)
+        .map((attachment: any) => ({
+          note: attachment.note || "",
+          fileName: attachment.fileName || "Unknown file",
+          fileType: attachment.fileType || "unknown",
+          fileUrl: attachment.fileUrl,
+        }))
+    }
+
     // Always update the timestamp
     cleanUpdateData.updated = Timestamp.now()
 
+    console.log("Updating report with data:", cleanUpdateData)
+
     const docRef = doc(db, "reports", reportId)
     await updateDoc(docRef, cleanUpdateData)
+
+    console.log("Report updated successfully")
   } catch (error) {
     console.error("Error updating report:", error)
     throw error
@@ -265,6 +304,7 @@ export async function deleteReport(reportId: string): Promise<void> {
   try {
     const docRef = doc(db, "reports", reportId)
     await deleteDoc(docRef)
+    console.log("Report deleted successfully")
   } catch (error) {
     console.error("Error deleting report:", error)
     throw error
@@ -279,6 +319,7 @@ export async function getRecentReports(limitCount = 10): Promise<ReportData[]> {
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
+      attachments: Array.isArray(doc.data().attachments) ? doc.data().attachments : [],
     })) as ReportData[]
   } catch (error) {
     console.error("Error fetching recent reports:", error)
@@ -294,6 +335,7 @@ export async function getReportsByStatus(status: string): Promise<ReportData[]> 
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
+      attachments: Array.isArray(doc.data().attachments) ? doc.data().attachments : [],
     })) as ReportData[]
   } catch (error) {
     console.error("Error fetching reports by status:", error)
@@ -309,9 +351,31 @@ export async function getReportsByType(reportType: string): Promise<ReportData[]
     return querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
+      attachments: Array.isArray(doc.data().attachments) ? doc.data().attachments : [],
     })) as ReportData[]
   } catch (error) {
     console.error("Error fetching reports by type:", error)
+    throw error
+  }
+}
+
+export async function postReport(reportData: ReportData): Promise<string> {
+  try {
+    console.log("Posting report with attachments:", reportData.attachments)
+
+    // Set status to "posted" when posting the report
+    const postData = {
+      ...reportData,
+      status: "posted",
+      updated: Timestamp.now(),
+    }
+
+    const reportId = await createReport(postData)
+    console.log("Report posted successfully with ID:", reportId)
+
+    return reportId
+  } catch (error) {
+    console.error("Error posting report:", error)
     throw error
   }
 }
