@@ -35,7 +35,7 @@ export default function SalesQuotationsPage() {
 
   const router = useRouter()
   const pageSize = 10
-
+  console.log(user.uid)
   const fetchQuotations = async (direction: "first" | "next" | "prev" = "first") => {
     if (!user?.uid) {
       setLoading(false)
