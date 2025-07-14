@@ -415,7 +415,7 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
           </Card>
 
           {/* Summary */}
-          <Card>
+          <Card className="bg-green-50">
             <CardHeader>
               <CardTitle className="text-lg">Summary</CardTitle>
             </CardHeader>
