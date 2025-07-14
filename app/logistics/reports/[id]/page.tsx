@@ -6,12 +6,14 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send } from "lucide-react"
-import { getReports, type ReportData } from "@/lib/report-service"
+import type { ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
 import { getUserById, type User } from "@/lib/firebase-service"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export default function ReportPreviewPage() {
   const params = useParams()
@@ -35,24 +37,26 @@ export default function ReportPreviewPage() {
 
   const fetchReportData = async () => {
     try {
-      // Get all reports and find the one with matching ID
-      const reports = await getReports()
-      const foundReport = reports.find((r) => r.id === reportId)
+      // Query report directly from Firestore
+      const reportDoc = await getDoc(doc(db, "reports", reportId))
 
-      if (foundReport) {
-        setReport(foundReport)
+      if (reportDoc.exists()) {
+        const reportData = { id: reportDoc.id, ...reportDoc.data() } as ReportData
+        setReport(reportData)
 
         // Fetch product data for additional details
-        if (foundReport.siteId) {
-          const productData = await getProductById(foundReport.siteId)
+        if (reportData.siteId) {
+          const productData = await getProductById(reportData.siteId)
           setProduct(productData)
         }
 
         // Fetch user data for company logo
-        if (foundReport.sellerId) {
-          const userInfo = await getUserById(foundReport.sellerId)
+        if (reportData.sellerId) {
+          const userInfo = await getUserById(reportData.sellerId)
           setUserData(userInfo)
         }
+      } else {
+        console.error("Report not found")
       }
     } catch (error) {
       console.error("Error fetching report data:", error)
@@ -122,7 +126,12 @@ export default function ReportPreviewPage() {
   }
 
   const openFullScreen = (attachment: any) => {
-    setFullScreenAttachment(attachment)
+    const fullScreenAttachment = {
+      ...attachment,
+      fileUrl: attachment.url || attachment.fileUrl,
+      fileName: attachment.name || attachment.fileName,
+    }
+    setFullScreenAttachment(fullScreenAttachment)
     setIsFullScreenOpen(true)
   }
 
@@ -387,61 +396,67 @@ export default function ReportPreviewPage() {
                 <div key={index} className="space-y-2">
                   <div
                     className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
-                    onClick={() => attachment.fileUrl && openFullScreen(attachment)}
+                    onClick={() => (attachment.url || attachment.fileUrl) && openFullScreen(attachment)}
                   >
-                    {attachment.fileUrl ? (
+                    {attachment.url || attachment.fileUrl ? (
                       <div className="w-full h-full flex flex-col items-center justify-center relative">
                         {/* Zoom overlay */}
                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
                           <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                         </div>
 
-                        {isImageFile(attachment.fileName || "") ? (
+                        {isImageFile(attachment.name || attachment.fileName || "") ? (
                           <img
-                            src={attachment.fileUrl || "/placeholder.svg"}
-                            alt={attachment.fileName || `Attachment ${index + 1}`}
+                            src={attachment.url || attachment.fileUrl || "/placeholder.svg"}
+                            alt={attachment.name || attachment.fileName || `Attachment ${index + 1}`}
                             className="max-w-full max-h-full object-contain rounded"
                             onError={(e) => {
-                              // Fallback to icon if image fails to load
                               const target = e.target as HTMLImageElement
                               target.style.display = "none"
                               const parent = target.parentElement
                               if (parent) {
+                                const icon = getFileIcon(attachment.name || attachment.fileName || "")
                                 parent.innerHTML = `
-                                  <div class="text-center space-y-2">
-                                    ${getFileIcon(attachment.fileName || "").props.children}
-                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
-                                  </div>
-                                `
+                        <div class="text-center space-y-2">
+                          <div class="flex justify-center">${icon.type === "svg" ? icon.props.children : ""}</div>
+                          <p class="text-sm text-gray-700 font-medium break-all">${attachment.name || attachment.fileName || "Unknown file"}</p>
+                        </div>
+                      `
                               }
                             }}
                           />
-                        ) : isVideoFile(attachment.fileName || "") ? (
+                        ) : isVideoFile(attachment.name || attachment.fileName || "") ? (
                           <video
-                            src={attachment.fileUrl}
+                            src={attachment.url || attachment.fileUrl}
                             controls
                             className="max-w-full max-h-full object-contain rounded"
                             onError={(e) => {
-                              // Fallback to icon if video fails to load
                               const target = e.target as HTMLVideoElement
                               target.style.display = "none"
                               const parent = target.parentElement
                               if (parent) {
+                                const iconElement = getFileIcon(attachment.name || attachment.fileName || "")
                                 parent.innerHTML = `
-                                  <div class="text-center space-y-2">
-                                    ${getFileIcon(attachment.fileName || "").props.children}
-                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
-                                  </div>
-                                `
+                        <div class="text-center space-y-2">
+                          <div class="flex justify-center text-purple-500">
+                            <svg class="h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                          </div>
+                          <p class="text-sm text-gray-700 font-medium break-all">${attachment.name || attachment.fileName || "Unknown file"}</p>
+                        </div>
+                      `
                               }
                             }}
                           />
                         ) : (
                           <div className="text-center space-y-2">
-                            {getFileIcon(attachment.fileName || "")}
-                            <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
+                            {getFileIcon(attachment.name || attachment.fileName || "")}
+                            <p className="text-sm text-gray-700 font-medium break-all">
+                              {attachment.name || attachment.fileName}
+                            </p>
                             <a
-                              href={attachment.fileUrl}
+                              href={attachment.url || attachment.fileUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="text-xs text-blue-600 hover:text-blue-800 underline"
@@ -455,10 +470,12 @@ export default function ReportPreviewPage() {
                           <p className="text-xs text-gray-500 italic mt-2 text-center">"{attachment.note}"</p>
                         )}
                       </div>
-                    ) : attachment.fileName ? (
+                    ) : attachment.name || attachment.fileName ? (
                       <div className="text-center space-y-2">
-                        {getFileIcon(attachment.fileName)}
-                        <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
+                        {getFileIcon(attachment.name || attachment.fileName)}
+                        <p className="text-sm text-gray-700 font-medium break-all">
+                          {attachment.name || attachment.fileName}
+                        </p>
                         {attachment.note && <p className="text-xs text-gray-500 italic">"{attachment.note}"</p>}
                       </div>
                     ) : (
