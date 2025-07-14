@@ -25,7 +25,7 @@ import {
   Clock,
   RotateCcw,
 } from "lucide-react"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "@/hooks/use-toast"
 import type { Product } from "@/lib/firebase-service"
 
 interface ControlsTabProps {
@@ -42,7 +42,7 @@ interface DisplayMetrics {
   lastUpdate: string
 }
 
-export function ControlsTab({ product }: ControlsTabProps) {
+export default function ControlsTab({ product }: ControlsTabProps) {
   const [isOnline, setIsOnline] = useState(true)
   const [brightness, setBrightness] = useState([75])
   const [volume, setVolume] = useState([60])

@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Edit, Trash2, Calendar, Clock, AlertCircle, CheckCircle, XCircle } from "lucide-react"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "@/hooks/use-toast"
 import type { Product, ServiceAssignment } from "@/lib/firebase-service"
 
 interface ServiceTabProps {
@@ -20,7 +20,7 @@ interface ServiceTabProps {
   serviceAssignments: ServiceAssignment[]
 }
 
-export function ServiceTab({ product, serviceAssignments }: ServiceTabProps) {
+export default function ServiceTab({ product, serviceAssignments }: ServiceTabProps) {
   const [assignments, setAssignments] = useState<ServiceAssignment[]>(serviceAssignments)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingAssignment, setEditingAssignment] = useState<ServiceAssignment | null>(null)

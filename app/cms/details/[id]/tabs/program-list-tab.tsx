@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Edit, Trash2, Play, Pause, Calendar } from "lucide-react"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "@/hooks/use-toast"
 import type { Product } from "@/lib/firebase-service"
 
 interface Program {
@@ -32,7 +32,7 @@ interface ProgramListTabProps {
   product: Product
 }
 
-export function ProgramListTab({ product }: ProgramListTabProps) {
+export default function ProgramListTab({ product }: ProgramListTabProps) {
   const [programs, setPrograms] = useState<Program[]>([
     {
       id: "1",

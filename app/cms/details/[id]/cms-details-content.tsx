@@ -9,14 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { toast } from "@/components/ui/use-toast"
+import { toast } from "@/hooks/use-toast"
 import type { Product, ServiceAssignment } from "@/lib/firebase-service"
 
-// Tab Components
-import { ProgramListTab } from "./tabs/program-list-tab"
-import { ServiceTab } from "./tabs/service-tab"
-import { ControlsTab } from "./tabs/controls-tab"
-import { TimelineTab } from "./tabs/timeline-tab"
+// Tab Components - using default imports
+import ProgramListTab from "./tabs/program-list-tab"
+import ServiceTab from "./tabs/service-tab"
+import ControlsTab from "./tabs/controls-tab"
+import TimelineTab from "./tabs/timeline-tab"
 
 interface CMSDetailsContentProps {
   product: Product

@@ -1,4 +1,5 @@
 "use client"
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,18 +13,10 @@ interface TimelineTabProps {
 }
 
 export default function TimelineTab({ product, cmsData }: TimelineTabProps) {
-  // Convert the cmsData format to match what LoopTimeline expects
-  const loopTimelineData = {
-    start_time: cmsData.startTime,
-    end_time: cmsData.endTime,
-    spot_duration: cmsData.spotDuration,
-    loops_per_day: cmsData.loopsPerDay,
-  }
-
   // Calculate timeline metrics
-  const operatingHours = calculateOperatingHours(cmsData.startTime, cmsData.endTime)
-  const totalSpotsPerDay = cmsData.loopsPerDay * 4 // Assuming 4 spots per loop
-  const totalContentTime = (totalSpotsPerDay * cmsData.spotDuration) / 60 // in minutes
+  const operatingHours = calculateOperatingHours(cmsData.start_time, cmsData.end_time)
+  const totalSpotsPerDay = cmsData.loops_per_day * 4 // Assuming 4 spots per loop
+  const totalContentTime = (totalSpotsPerDay * cmsData.spot_duration) / 60 // in minutes
 
   return (
     <div className="space-y-6">
@@ -52,22 +45,22 @@ export default function TimelineTab({ product, cmsData }: TimelineTabProps) {
             <div className="text-2xl font-bold text-blue-600">{operatingHours}h</div>
             <div className="text-sm text-gray-500">Operating Hours</div>
             <div className="text-xs text-gray-400 mt-1">
-              {cmsData.startTime} - {cmsData.endTime}
+              {cmsData.start_time} - {cmsData.end_time}
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">{cmsData.loopsPerDay}</div>
+            <div className="text-2xl font-bold text-green-600">{cmsData.loops_per_day}</div>
             <div className="text-sm text-gray-500">Loops per Day</div>
             <div className="text-xs text-gray-400 mt-1">
-              Every {Math.round((operatingHours * 60) / cmsData.loopsPerDay)} minutes
+              Every {Math.round((operatingHours * 60) / cmsData.loops_per_day)} minutes
             </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-purple-600">{cmsData.spotDuration}s</div>
+            <div className="text-2xl font-bold text-purple-600">{cmsData.spot_duration}s</div>
             <div className="text-sm text-gray-500">Spot Duration</div>
             <div className="text-xs text-gray-400 mt-1">Per advertisement</div>
           </CardContent>
@@ -96,7 +89,7 @@ export default function TimelineTab({ product, cmsData }: TimelineTabProps) {
                 Active
               </Badge>
               <div className="text-sm">
-                <div className="font-medium">Loop 15 of {cmsData.loopsPerDay}</div>
+                <div className="font-medium">Loop 15 of {cmsData.loops_per_day}</div>
                 <div className="text-gray-500">Next loop in 3 minutes</div>
               </div>
             </div>
@@ -117,10 +110,9 @@ export default function TimelineTab({ product, cmsData }: TimelineTabProps) {
       {/* Loop Timeline Component */}
       <LoopTimeline
         cmsData={cmsData}
-        onUpdateCMS={(data) => {
-          // Handle CMS data updates
-          console.log("CMS data updated:", data)
-        }}
+        productId={product.id}
+        companyId={product.company_id || ""}
+        sellerId={product.seller_id || ""}
       />
 
       {/* Schedule Details */}
@@ -136,11 +128,11 @@ export default function TimelineTab({ product, cmsData }: TimelineTabProps) {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-500">Start Time:</span>
-                    <span className="font-medium">{cmsData.startTime}</span>
+                    <span className="font-medium">{cmsData.start_time}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">End Time:</span>
-                    <span className="font-medium">{cmsData.endTime}</span>
+                    <span className="font-medium">{cmsData.end_time}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Total Hours:</span>
@@ -157,17 +149,17 @@ export default function TimelineTab({ product, cmsData }: TimelineTabProps) {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-500">Loops per Day:</span>
-                    <span className="font-medium">{cmsData.loopsPerDay}</span>
+                    <span className="font-medium">{cmsData.loops_per_day}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Loop Interval:</span>
                     <span className="font-medium">
-                      {Math.round((operatingHours * 60) / cmsData.loopsPerDay)} minutes
+                      {Math.round((operatingHours * 60) / cmsData.loops_per_day)} minutes
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Spot Duration:</span>
-                    <span className="font-medium">{cmsData.spotDuration} seconds</span>
+                    <span className="font-medium">{cmsData.spot_duration} seconds</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Spots per Loop:</span>
