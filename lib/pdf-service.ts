@@ -902,7 +902,7 @@ export async function generateReportPDF(
     const logoSize = 25 // Reduced from 40 to 25 to match web page proportions
     const logoContainerSize = 30 // Container size
     const logoX = pageWidth - margin - logoContainerSize
-    const logoY = yPosition - 2 // Changed from yPosition + 5 to yPosition - 2 to align with badge
+    const logoY = yPosition - 2 // Aligned with badge
 
     // Try to load company logo, fallback to OH+ logo
     const companyLogoUrl = "/ohplus-new-logo.png" // Default to OH+ logo
@@ -911,9 +911,10 @@ export async function generateReportPDF(
       // Add white background container for logo (similar to web page)
       pdf.setFillColor(255, 255, 255)
       pdf.rect(logoX - 2, logoY, logoContainerSize + 4, logoContainerSize, "F")
-      pdf.setDrawColor(220, 220, 220)
-      pdf.setLineWidth(0.5)
-      pdf.rect(logoX - 2, logoY, logoContainerSize + 4, logoContainerSize)
+      // Removed pdf.setDrawColor and pdf.rect to remove the border
+      // pdf.setDrawColor(220, 220, 220)
+      // pdf.setLineWidth(0.5)
+      // pdf.rect(logoX - 2, logoY, logoContainerSize + 4, logoContainerSize)
 
       // Add logo centered in container
       const logoOffsetX = (logoContainerSize - logoSize) / 2
