@@ -12,9 +12,9 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useToast } from "@/hooks/use-toast"
 import { getProductById, type Product } from "@/lib/firebase-service"
-import { createReport, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
+import { createReport } from "@/lib/report-service"
 
 interface CreateReportDialogProps {
   open: boolean
@@ -29,6 +29,16 @@ interface Team {
   createdAt: string
 }
 
+interface AttachmentWithFile {
+  note: string
+  file?: File
+  fileName?: string
+  preview?: string
+  uploading?: boolean
+  uploaded?: boolean
+  fileUrl?: string
+}
+
 export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportDialogProps) {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(false)
@@ -39,10 +49,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   const [loadingTeams, setLoadingTeams] = useState(false)
   const [showNewTeamInput, setShowNewTeamInput] = useState(false)
   const [newTeamName, setNewTeamName] = useState("")
-  const [attachments, setAttachments] = useState<{ note: string; file?: File; fileName?: string; preview?: string }[]>([
-    { note: "" },
-    { note: "" },
-  ])
+  const [attachments, setAttachments] = useState<AttachmentWithFile[]>([{ note: "" }, { note: "" }])
   const [previewModal, setPreviewModal] = useState<{ open: boolean; file?: File; preview?: string }>({ open: false })
 
   // Installation report specific fields
@@ -169,33 +176,42 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     })
   }
 
+  const uploadFileToFirebase = async (file: File, reportId: string, attachmentIndex: number): Promise<string> => {
+    try {
+      // Import Firebase functions
+      const { ref, uploadBytes, getDownloadURL } = await import("firebase/storage")
+      const { storage } = await import("@/lib/firebase")
+
+      // Create unique filename
+      const timestamp = Date.now()
+      const fileName = `reports/${reportId}/attachment_${attachmentIndex}_${timestamp}_${file.name}`
+      const storageRef = ref(storage, fileName)
+
+      console.log("Uploading file to Firebase:", fileName)
+
+      // Upload file
+      const snapshot = await uploadBytes(storageRef, file)
+      console.log("File uploaded successfully:", snapshot.ref.fullPath)
+
+      // Get download URL
+      const downloadURL = await getDownloadURL(snapshot.ref)
+      console.log("Download URL obtained:", downloadURL)
+
+      return downloadURL
+    } catch (error) {
+      console.error("Error uploading file to Firebase:", error)
+      throw new Error(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : "Unknown error"}`)
+    }
+  }
+
   const handleFileUpload = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      // Validate file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        toast({
-          title: "Error",
-          description: "File size must be less than 10MB",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Validate file type
-      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
-      if (!allowedTypes.includes(file.type)) {
-        toast({
-          title: "Error",
-          description: "Only image files (JPG, PNG, GIF, WebP) are allowed",
-          variant: "destructive",
-        })
-        return
-      }
-
       const newAttachments = [...attachments]
       newAttachments[index].file = file
       newAttachments[index].fileName = file.name
+      newAttachments[index].uploading = false
+      newAttachments[index].uploaded = false
 
       // Create preview for images
       if (file.type.startsWith("image/")) {
@@ -211,10 +227,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     }
   }
 
-  const handlePreviewFile = (
-    attachment: { note: string; file?: File; fileName?: string; preview?: string },
-    e: React.MouseEvent,
-  ) => {
+  const handlePreviewFile = (attachment: AttachmentWithFile, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
 
@@ -230,10 +243,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     }
   }
 
-  const renderFilePreview = (
-    attachment: { note: string; file?: File; fileName?: string; preview?: string },
-    index: number,
-  ) => {
+  const renderFilePreview = (attachment: AttachmentWithFile, index: number) => {
     if (!attachment.file || !attachment.fileName) {
       return (
         <label
@@ -264,6 +274,25 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             <div className="flex items-center justify-center">{getFileIcon(attachment.fileName)}</div>
           )}
         </label>
+
+        {/* Upload status indicator */}
+        {attachment.uploading && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded">
+            <div className="text-white text-xs">Uploading...</div>
+          </div>
+        )}
+
+        {attachment.uploaded && (
+          <div className="absolute top-1 left-1 bg-green-500 text-white rounded-full p-1">
+            <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </div>
+        )}
 
         {/* Preview Button */}
         <button
@@ -296,16 +325,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       return
     }
 
-    // Validate required fields
-    if (!date) {
-      toast({
-        title: "Error",
-        description: "Please select a date",
-        variant: "destructive",
-      })
-      return
-    }
-
     // Check if at least one attachment has a file
     const hasAttachments = attachments.some((att) => att.file)
     if (!hasAttachments) {
@@ -317,42 +336,74 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       return
     }
 
-    // Validate installation report specific fields
-    if (reportType === "installation-report") {
-      if (!status || isNaN(Number(status)) || Number(status) < 0 || Number(status) > 100) {
+    setLoading(true)
+    try {
+      // Generate a temporary report ID for file uploads
+      const tempReportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+      // Upload all files to Firebase Storage first
+      const uploadedAttachments = await Promise.all(
+        attachments
+          .filter((att) => att.file)
+          .map(async (attachment, index) => {
+            if (!attachment.file) return null
+
+            try {
+              // Update UI to show uploading status
+              const newAttachments = [...attachments]
+              newAttachments[index].uploading = true
+              setAttachments(newAttachments)
+
+              // Upload file to Firebase
+              const fileUrl = await uploadFileToFirebase(attachment.file, tempReportId, index)
+
+              // Update UI to show uploaded status
+              const updatedAttachments = [...attachments]
+              updatedAttachments[index].uploading = false
+              updatedAttachments[index].uploaded = true
+              updatedAttachments[index].fileUrl = fileUrl
+              setAttachments(updatedAttachments)
+
+              return {
+                note: attachment.note,
+                fileName: attachment.fileName || "",
+                fileType: attachment.file.type || "",
+                fileUrl: fileUrl,
+              }
+            } catch (error) {
+              console.error("Error uploading attachment:", error)
+
+              // Update UI to show error
+              const errorAttachments = [...attachments]
+              errorAttachments[index].uploading = false
+              errorAttachments[index].uploaded = false
+              setAttachments(errorAttachments)
+
+              toast({
+                title: "Upload Error",
+                description: `Failed to upload ${attachment.fileName}: ${error instanceof Error ? error.message : "Unknown error"}`,
+                variant: "destructive",
+              })
+              throw error
+            }
+          }),
+      )
+
+      // Filter out null values
+      const validAttachments = uploadedAttachments.filter((att) => att !== null)
+
+      if (validAttachments.length === 0) {
         toast({
           title: "Error",
-          description: "Please enter a valid status percentage (0-100)",
+          description: "No files were successfully uploaded",
           variant: "destructive",
         })
         return
       }
 
-      if (timeline === "delayed") {
-        if (!delayReason.trim()) {
-          toast({
-            title: "Error",
-            description: "Please provide a reason for delay",
-            variant: "destructive",
-          })
-          return
-        }
-        if (!delayDays || isNaN(Number(delayDays)) || Number(delayDays) <= 0) {
-          toast({
-            title: "Error",
-            description: "Please enter valid delay days",
-            variant: "destructive",
-          })
-          return
-        }
-      }
-    }
-
-    setLoading(true)
-    try {
       // Build the report data
-      const reportData: ReportData = {
-        siteId: product.id!,
+      const reportData: any = {
+        siteId: product.id,
         siteName: product.name || "Unknown Site",
         companyId: projectData?.project_id || userData?.project_id || user.uid,
         sellerId: product.seller_id || user.uid,
@@ -366,21 +417,14 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         sales: user.displayName || user.email || "Unknown User",
         reportType,
         date,
-        attachments: attachments
-          .filter((att) => att.file) // Only include attachments with files
-          .map((att) => ({
-            note: att.note || "",
-            file: att.file!, // We know file exists due to filter
-            fileName: att.fileName || att.file!.name,
-            fileType: att.file!.type,
-          })),
-        status: "published", // Change from draft to published
+        attachments: validAttachments,
+        status: "active",
         createdBy: user.uid,
         createdByName: user.displayName || user.email || "Unknown User",
         category: "logistics",
         subcategory: product.content_type || "general",
         priority: "medium",
-        completionPercentage: reportType === "completion-report" ? 100 : Number(status) || 0,
+        completionPercentage: reportType === "completion-report" ? 100 : 0,
         tags: [reportType, product.content_type || "general"].filter(Boolean),
       }
 
@@ -397,15 +441,18 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         reportData.assignedTo = selectedTeam
       }
 
-      // Add installation-specific fields only if they have non-empty values
+      // Only add installation-specific fields if they have non-empty values
       if (reportType === "installation-report") {
+        // Only add installationStatus if status has a valid numeric value
         if (status && status.trim() !== "" && !isNaN(Number(status)) && Number(status) >= 0) {
           reportData.installationStatus = status.trim()
         }
 
+        // Only add installationTimeline if it's explicitly set to delayed
         if (timeline === "delayed") {
           reportData.installationTimeline = timeline
 
+          // Only add delay-related fields if they have actual values
           if (delayReason && delayReason.trim() !== "") {
             reportData.delayReason = delayReason.trim()
           }
@@ -415,11 +462,9 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         }
       }
 
+      // Save the report to Firebase
       console.log("Creating report with data:", reportData)
-
-      // Create the report (this will upload files to Firebase Storage)
       const reportId = await createReport(reportData)
-
       console.log("Report created successfully with ID:", reportId)
 
       toast({
@@ -428,7 +473,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       })
 
       onOpenChange(false)
-
       // Reset form
       setReportType("completion-report")
       setDate("")
@@ -439,13 +483,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       setDelayReason("")
       setDelayDays("")
 
-      // Navigate to the actual report page
+      // Navigate to the report page
       router.push(`/logistics/reports/${reportId}`)
     } catch (error) {
-      console.error("Error creating report:", error)
+      console.error("Error generating report:", error)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create report",
+        description: `Failed to generate report: ${error instanceof Error ? error.message : "Unknown error"}`,
         variant: "destructive",
       })
     } finally {
@@ -505,7 +549,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             {/* Date */}
             <div className="space-y-2">
               <Label htmlFor="date" className="text-sm font-semibold text-gray-900">
-                Date: <span className="text-red-500">*</span>
+                Date:
               </Label>
               <Input
                 id="date"
@@ -514,7 +558,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                 onChange={(e) => setDate(e.target.value)}
                 placeholder="AutoFill"
                 className="h-9 text-sm"
-                required
               />
             </div>
 
@@ -590,7 +633,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                 {/* Status */}
                 <div className="space-y-2">
                   <Label htmlFor="status" className="text-sm font-semibold text-gray-900">
-                    Status: <span className="text-red-500">*</span>
+                    Status:
                   </Label>
                   <div className="flex items-center gap-2">
                     <Input
@@ -602,7 +645,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                       className="h-9 text-sm flex-1"
                       min="0"
                       max="100"
-                      required
                     />
                     <span className="text-sm text-gray-600 font-medium">% of 100</span>
                   </div>
@@ -630,11 +672,10 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                   {timeline === "delayed" && (
                     <div className="space-y-2 mt-3 pl-6 border-l-2 border-red-200">
                       <Input
-                        placeholder="Reason for delay... *"
+                        placeholder="Reason for delay..."
                         value={delayReason}
                         onChange={(e) => setDelayReason(e.target.value)}
                         className="h-9 text-sm"
-                        required
                       />
                       <div className="flex items-center gap-2">
                         <Input
@@ -643,8 +684,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                           onChange={(e) => setDelayDays(e.target.value)}
                           placeholder="0"
                           className="h-9 text-sm flex-1"
-                          min="1"
-                          required
+                          min="0"
                         />
                         <span className="text-sm text-gray-600 font-medium">Days</span>
                       </div>
@@ -681,7 +721,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-gray-500">Supported formats: JPG, PNG, GIF, WebP (Max 10MB each)</p>
             </div>
 
             {/* Generate Report Button */}
@@ -690,7 +729,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
               disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white h-10 text-sm font-medium mt-4"
             >
-              {loading ? "Creating Report..." : "Generate Report"}
+              {loading ? "Generating..." : "Generate Report"}
             </Button>
           </div>
         </DialogContent>

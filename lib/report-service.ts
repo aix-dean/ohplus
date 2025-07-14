@@ -86,64 +86,38 @@ function cleanReportData(data: any): any {
 
 export async function createReport(reportData: ReportData): Promise<string> {
   try {
-    console.log("Starting report creation with attachments:", reportData.attachments?.length || 0)
-
     // Upload attachments first
     const processedAttachments = await Promise.all(
-      (reportData.attachments || []).map(async (attachment: any, index: number) => {
+      (reportData.attachments || []).map(async (attachment: any) => {
         if (attachment.file) {
           try {
-            console.log(`Uploading attachment ${index + 1}:`, attachment.fileName)
-
-            // Create a unique filename with timestamp
-            const timestamp = Date.now()
-            const sanitizedFileName = attachment.fileName?.replace(/[^a-zA-Z0-9.-]/g, "_") || `file_${index}`
-            const uniqueFileName = `${timestamp}_${sanitizedFileName}`
-
-            // Create storage reference
-            const fileRef = ref(storage, `reports/${uniqueFileName}`)
-
-            console.log(`Uploading to Firebase Storage: reports/${uniqueFileName}`)
-
-            // Upload file to Firebase Storage
+            const fileRef = ref(storage, `reports/${Date.now()}_${attachment.fileName}`)
             const snapshot = await uploadBytes(fileRef, attachment.file)
-            console.log(`Upload successful for ${uniqueFileName}`)
-
-            // Get download URL
             const downloadURL = await getDownloadURL(snapshot.ref)
-            console.log(`Download URL obtained: ${downloadURL}`)
 
             return {
               note: attachment.note || "",
-              fileName: attachment.fileName || sanitizedFileName,
-              fileType: attachment.fileType || attachment.file.type,
+              fileName: attachment.fileName,
+              fileType: attachment.fileType,
               fileUrl: downloadURL,
             }
           } catch (error) {
-            console.error(`Error uploading attachment ${index + 1}:`, error)
-
-            // Return attachment info without URL if upload fails
+            console.error("Error uploading attachment:", error)
             return {
               note: attachment.note || "",
               fileName: attachment.fileName || "Unknown file",
-              fileType: attachment.fileType || "unknown",
+              fileType: attachment.fileType,
               fileUrl: null,
-              uploadError: error instanceof Error ? error.message : "Upload failed",
             }
           }
         }
-
-        // For attachments without files (shouldn't happen in normal flow)
         return {
           note: attachment.note || "",
           fileName: attachment.fileName || "",
           fileType: attachment.fileType || "",
-          fileUrl: attachment.fileUrl || null,
         }
       }),
     )
-
-    console.log("Processed attachments:", processedAttachments)
 
     // Create the final report data with proper structure
     const finalReportData: any = {
@@ -201,17 +175,11 @@ export async function createReport(reportData: ReportData): Promise<string> {
       finalReportData.delayDays = reportData.delayDays
     }
 
-    console.log("Creating Firestore document with data:", finalReportData)
-
-    // Save to Firestore
     const docRef = await addDoc(collection(db, "reports"), finalReportData)
-
-    console.log("Report created successfully with ID:", docRef.id)
-
     return docRef.id
   } catch (error) {
     console.error("Error creating report:", error)
-    throw new Error(`Failed to create report: ${error instanceof Error ? error.message : "Unknown error"}`)
+    throw error
   }
 }
 
