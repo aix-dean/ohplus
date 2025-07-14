@@ -28,6 +28,16 @@ interface Team {
   createdAt: string
 }
 
+interface AttachmentData {
+  note: string
+  file?: File
+  fileName?: string
+  preview?: string
+  fileUrl?: string
+  uploading?: boolean
+  fileType?: string
+}
+
 export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportDialogProps) {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(false)
@@ -38,14 +48,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   const [loadingTeams, setLoadingTeams] = useState(false)
   const [showNewTeamInput, setShowNewTeamInput] = useState(false)
   const [newTeamName, setNewTeamName] = useState("")
-  const [attachments, setAttachments] = useState<{
-    note: string
-    file?: File
-    fileName?: string
-    preview?: string
-    fileUrl?: string
-    uploading?: boolean
-  }>([{ note: "" }, { note: "" }])
+  const [attachments, setAttachments] = useState<AttachmentData[]>([{ note: "" }, { note: "" }])
   const [previewModal, setPreviewModal] = useState<{ open: boolean; file?: File; preview?: string }>({ open: false })
 
   // Installation report specific fields
@@ -197,11 +200,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         return
       }
 
+      // Set uploading state immediately
       const newAttachments = [...attachments]
       newAttachments[index] = {
         ...newAttachments[index],
         file,
         fileName: file.name,
+        fileType: file.type,
         uploading: true,
       }
 
@@ -228,11 +233,18 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
           ...updatedAttachments[index],
           file,
           fileName: file.name,
+          fileType: file.type,
           preview: newAttachments[index].preview,
           fileUrl: downloadURL,
           uploading: false,
         }
         setAttachments(updatedAttachments)
+
+        console.log("File uploaded successfully:", {
+          fileName: file.name,
+          fileType: file.type,
+          fileUrl: downloadURL,
+        })
 
         toast({
           title: "Success",
@@ -258,10 +270,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     }
   }
 
-  const handlePreviewFile = (
-    attachment: { note: string; file?: File; fileName?: string; preview?: string },
-    e: React.MouseEvent,
-  ) => {
+  const handlePreviewFile = (attachment: AttachmentData, e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
 
@@ -277,10 +286,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     }
   }
 
-  const renderFilePreview = (
-    attachment: { note: string; file?: File; fileName?: string; preview?: string; uploading?: boolean },
-    index: number,
-  ) => {
+  const renderFilePreview = (attachment: AttachmentData, index: number) => {
     if (attachment.uploading) {
       return (
         <div className="flex flex-col items-center justify-center h-full space-y-1">
@@ -352,12 +358,23 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       return
     }
 
-    // Check if at least one attachment has a file
-    const hasAttachments = attachments.some((att) => att.file)
-    if (!hasAttachments) {
+    // Check if at least one attachment has a file with fileUrl
+    const validAttachments = attachments.filter((att) => att.file && att.fileUrl)
+    if (validAttachments.length === 0) {
       toast({
         title: "Error",
-        description: "Please upload at least one attachment",
+        description: "Please upload at least one attachment and wait for it to finish uploading",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Check if any files are still uploading
+    const isUploading = attachments.some((att) => att.uploading)
+    if (isUploading) {
+      toast({
+        title: "Error",
+        description: "Please wait for all files to finish uploading",
         variant: "destructive",
       })
       return
@@ -365,7 +382,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
     setLoading(true)
     try {
-      // Build the report data for preview (without saving to Firebase)
+      // Build the report data for preview with proper attachment structure
       const reportData: any = {
         id: `preview-${Date.now()}`, // Temporary ID for preview
         siteId: product.id,
@@ -383,12 +400,12 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         reportType,
         date,
         attachments: attachments
-          .filter((att) => att.note.trim() !== "" || att.file)
+          .filter((att) => (att.note.trim() !== "" || att.file) && att.fileUrl) // Only include attachments with fileUrl
           .map((att) => ({
-            note: att.note,
+            note: att.note || "",
             fileName: att.fileName || "",
-            fileType: att.file?.type || "",
-            fileUrl: att.fileUrl || null, // Use the Firebase URL instead of creating object URLs
+            fileType: att.fileType || "",
+            fileUrl: att.fileUrl, // This is the Firebase Storage URL
           })),
         status: "draft",
         createdBy: user.uid,
@@ -435,6 +452,11 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
           }
         }
       }
+
+      console.log("Report data being saved:", {
+        attachments: reportData.attachments,
+        totalAttachments: reportData.attachments.length,
+      })
 
       // Store the report data in sessionStorage for the preview page
       sessionStorage.setItem("previewReportData", JSON.stringify(reportData))
