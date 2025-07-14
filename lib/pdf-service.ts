@@ -787,11 +787,9 @@ export async function generateReportPDF(
 
     // Helper function to check if we need a new page
     const checkNewPage = (requiredHeight: number) => {
-      if (yPosition + requiredHeight > pageHeight - 30) {
-        pdf.addPage()
-        yPosition = 0
-        addHeaderToPage()
-      }
+      // For single page layout, we don't add new pages
+      // Just ensure we have enough space, otherwise compress content
+      return true
     }
 
     // Helper function to add image to PDF
@@ -886,10 +884,10 @@ export async function generateReportPDF(
     pdf.text("Installation Report", margin + 3, yPosition + 7)
     pdf.setTextColor(0, 0, 0)
 
-    // Add company logo on the right - positioned like in the image
-    const logoSize = 18 // Compact size
-    const logoBoxWidth = 25
-    const logoBoxHeight = 20
+    // Add company logo on the right - simple white box
+    const logoSize = 16 // Smaller for single page
+    const logoBoxWidth = 22
+    const logoBoxHeight = 18
     const logoX = pageWidth - margin - logoBoxWidth
     const logoY = yPosition - 2
 
@@ -897,29 +895,29 @@ export async function generateReportPDF(
     const companyLogoUrl = "/ohplus-new-logo.png"
     const logoBase64 = await loadImageAsBase64(companyLogoUrl)
     if (logoBase64) {
-      // Add light gray background box
-      pdf.setFillColor(248, 248, 248)
-      pdf.roundedRect(logoX, logoY, logoBoxWidth, logoBoxHeight, 2, 2, "F")
-      pdf.setDrawColor(220, 220, 220)
-      pdf.setLineWidth(0.3)
-      pdf.roundedRect(logoX, logoY, logoBoxWidth, logoBoxHeight, 2, 2)
+      // Add simple white background box (no rounded corners)
+      pdf.setFillColor(255, 255, 255)
+      pdf.rect(logoX, logoY, logoBoxWidth, logoBoxHeight, "F")
+      pdf.setDrawColor(200, 200, 200)
+      pdf.setLineWidth(0.5)
+      pdf.rect(logoX, logoY, logoBoxWidth, logoBoxHeight)
 
       // Add the logo
       pdf.addImage(logoBase64, "PNG", logoX + 3, logoY + 2, logoSize, logoSize - 2)
     } else {
-      // Fallback: create OH! text logo
-      pdf.setFillColor(248, 248, 248)
-      pdf.roundedRect(logoX, logoY, logoBoxWidth, logoBoxHeight, 2, 2, "F")
-      pdf.setDrawColor(220, 220, 220)
-      pdf.setLineWidth(0.3)
-      pdf.roundedRect(logoX, logoY, logoBoxWidth, logoBoxHeight, 2, 2)
+      // Fallback: create OH! text logo in simple white box
+      pdf.setFillColor(255, 255, 255)
+      pdf.rect(logoX, logoY, logoBoxWidth, logoBoxHeight, "F")
+      pdf.setDrawColor(200, 200, 200)
+      pdf.setLineWidth(0.5)
+      pdf.rect(logoX, logoY, logoBoxWidth, logoBoxHeight)
 
-      pdf.setFontSize(12)
+      pdf.setFontSize(10)
       pdf.setFont("helvetica", "bold")
       pdf.setTextColor(30, 58, 138) // Blue color
-      pdf.text("OH!", logoX + 4, logoY + 12)
+      pdf.text("OH!", logoX + 4, logoY + 10)
       pdf.setTextColor(52, 211, 235) // Cyan color for +
-      pdf.text("+", logoX + 17, logoY + 12)
+      pdf.text("+", logoX + 15, logoY + 10)
       pdf.setTextColor(0, 0, 0)
     }
 
@@ -931,21 +929,21 @@ export async function generateReportPDF(
     pdf.setTextColor(100, 100, 100)
     pdf.text(`as of ${formatDate(report.date)}`, margin, yPosition)
     pdf.setTextColor(0, 0, 0)
-    yPosition += 20 // More space before next section
+    yPosition += 8 // More space before next section
 
     // Project Information Section
     checkNewPage(70)
     pdf.setFontSize(14)
     pdf.setFont("helvetica", "bold")
     pdf.text("Project Information", margin, yPosition)
-    yPosition += 8
+    yPosition += 6
 
-    // Draw border around project info table
+    // Draw border around project info table (smaller for single page)
     pdf.setLineWidth(1)
     pdf.setDrawColor(0, 0, 0)
-    const tableHeight = 55
+    const tableHeight = 45 // Reduced from 55
     pdf.rect(margin, yPosition, contentWidth, tableHeight)
-    yPosition += 5
+    yPosition += 4 // Reduced padding
 
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
@@ -1020,7 +1018,7 @@ export async function generateReportPDF(
       rightY += 5
     })
 
-    yPosition += tableHeight + 10
+    yPosition += tableHeight + 6
 
     // Project Status Section
     checkNewPage(30)
@@ -1038,81 +1036,70 @@ export async function generateReportPDF(
     pdf.text(`${report.completionPercentage || 100}%`, margin + 95, yPosition)
     pdf.setTextColor(0, 0, 0)
 
-    yPosition += 15
+    yPosition += 6
 
-    // Attachments/Photos Section (2 side by side like in the page)
+    // Attachments/Photos Section (smaller for single page)
     if (report.attachments && report.attachments.length > 0) {
-      checkNewPage(80)
+      const attachmentsToShow = report.attachments.slice(0, 1) // Show only 1 image for single page
+      const imageWidth = contentWidth * 0.6 // Centered single image
+      const imageHeight = 45 // Smaller height
+      const currentX = margin + (contentWidth - imageWidth) / 2 // Center the image
 
-      const attachmentsToShow = report.attachments.slice(0, 2)
-      const imageWidth = (contentWidth - 10) / 2 // Space for 2 images side by side
-      const imageHeight = 60
+      // Draw border for attachment box
+      pdf.setLineWidth(0.5)
+      pdf.setDrawColor(200, 200, 200)
+      pdf.rect(currentX, yPosition, imageWidth, imageHeight)
 
-      for (let i = 0; i < attachmentsToShow.length; i++) {
-        const attachment = attachmentsToShow[i]
-        const currentX = i === 0 ? margin : margin + imageWidth + 10
-
-        // Draw border for attachment box
-        pdf.setLineWidth(0.5)
-        pdf.setDrawColor(200, 200, 200)
-        pdf.rect(currentX, yPosition, imageWidth, imageHeight)
-
-        // Try to add actual image if it's an image file
-        if (attachment.fileUrl && attachment.fileName) {
-          const extension = attachment.fileName.toLowerCase().split(".").pop()
-          if (["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")) {
-            try {
-              await addImageToPDF(attachment.fileUrl, currentX + 2, yPosition + 2, imageWidth - 4, imageHeight - 4)
-            } catch (error) {
-              console.error("Error adding attachment image:", error)
-              // Add placeholder text
-              pdf.setFontSize(8)
-              pdf.text(attachment.fileName, currentX + 5, yPosition + imageHeight / 2)
-            }
-          } else {
-            // Add file name for non-image files
+      // Try to add actual image if it's an image file
+      if (attachmentsToShow[0]?.fileUrl && attachmentsToShow[0]?.fileName) {
+        const extension = attachmentsToShow[0].fileName.toLowerCase().split(".").pop()
+        if (["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")) {
+          try {
+            await addImageToPDF(
+              attachmentsToShow[0].fileUrl,
+              currentX + 2,
+              yPosition + 2,
+              imageWidth - 4,
+              imageHeight - 4,
+            )
+          } catch (error) {
+            console.error("Error adding attachment image:", error)
             pdf.setFontSize(8)
-            pdf.text(attachment.fileName, currentX + 5, yPosition + imageHeight / 2)
+            pdf.text(attachmentsToShow[0].fileName, currentX + 5, yPosition + imageHeight / 2)
           }
         } else {
-          // Placeholder for missing attachment
           pdf.setFontSize(8)
-          pdf.setTextColor(100, 100, 100)
-          pdf.text(`Project Photo ${i + 1}`, currentX + 5, yPosition + imageHeight / 2)
-          pdf.setTextColor(0, 0, 0)
+          pdf.text(attachmentsToShow[0].fileName, currentX + 5, yPosition + imageHeight / 2)
         }
+      } else {
+        pdf.setFontSize(8)
+        pdf.setTextColor(100, 100, 100)
+        pdf.text("Project Photo", currentX + 5, yPosition + imageHeight / 2)
+        pdf.setTextColor(0, 0, 0)
       }
 
-      yPosition += imageHeight + 5
+      yPosition += imageHeight + 3
 
-      // Add attachment info below images (like in the page)
+      // Add attachment info below image (compact)
       pdf.setFontSize(8)
       pdf.setFont("helvetica", "normal")
 
-      for (let i = 0; i < attachmentsToShow.length; i++) {
-        const currentX = i === 0 ? margin : margin + imageWidth + 10
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Date:", currentX, yPosition)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(formatDate(report.date), currentX + 15, yPosition)
 
-        pdf.setFont("helvetica", "bold")
-        pdf.text("Date:", currentX, yPosition)
-        pdf.setFont("helvetica", "normal")
-        pdf.text(formatDate(report.date), currentX + 15, yPosition)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Time:", currentX + 60, yPosition)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }), currentX + 75, yPosition)
 
-        pdf.setFont("helvetica", "bold")
-        pdf.text("Time:", currentX, yPosition + 4)
-        pdf.setFont("helvetica", "normal")
-        pdf.text(
-          new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-          currentX + 15,
-          yPosition + 4,
-        )
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Location:", currentX, yPosition + 4)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(report.location || "N/A", currentX + 25, yPosition + 4)
 
-        pdf.setFont("helvetica", "bold")
-        pdf.text("Location:", currentX, yPosition + 8)
-        pdf.setFont("helvetica", "normal")
-        pdf.text(report.location || "N/A", currentX + 25, yPosition + 8)
-      }
-
-      yPosition += 20
+      yPosition += 12
     }
 
     // Footer Section
