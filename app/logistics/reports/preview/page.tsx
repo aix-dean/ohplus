@@ -1,21 +1,23 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Card, CardContent } from "@/components/ui/card"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send, Save } from "lucide-react"
-import { createReport, type ReportData } from "@/lib/report-service"
-import { generateReportPDF } from "@/lib/pdf-service"
-import { useAuth } from "@/contexts/auth-context"
-import { SendReportDialog } from "@/components/send-report-dialog"
+import { ReportService } from "@/lib/report-service"
+import type { Report } from "@/lib/types/report"
 import { getUserById, type User } from "@/lib/firebase-service"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "@/components/ui/use-toast"
+import { Loader2 } from "lucide-react"
+import { SendReportDialog } from "@/components/send-report-dialog"
 
 export default function ReportPreviewPage() {
   const router = useRouter()
-  const [report, setReport] = useState<ReportData | null>(null)
+  const searchParams = useSearchParams()
+  const reportId = searchParams.get("reportId")
+  const [report, setReport] = useState<Report | null>(null)
   const [product, setProduct] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [fullScreenAttachment, setFullScreenAttachment] = useState<any>(null)
@@ -23,125 +25,71 @@ export default function ReportPreviewPage() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
   const [isPosting, setIsPosting] = useState(false)
-  const { user } = useAuth()
   const [userData, setUserData] = useState<User | null>(null)
-  const { toast } = useToast()
 
   useEffect(() => {
-    loadPreviewData()
-  }, [])
-
-  const loadPreviewData = async () => {
-    try {
-      const reportDataStr = sessionStorage.getItem("previewReportData")
-      const productDataStr = sessionStorage.getItem("previewProductData")
-
-      if (!reportDataStr || !productDataStr) {
-        toast({
-          title: "Error",
-          description: "No preview data found. Please generate a report first.",
-          variant: "destructive",
-        })
-        router.push("/logistics/dashboard")
-        return
+    if (reportId) {
+      const fetchReport = async () => {
+        try {
+          const fetchedReport = await ReportService.getReportById(reportId)
+          setReport(fetchedReport)
+          if (fetchedReport.sellerId) {
+            const userInfo = await getUserById(fetchedReport.sellerId)
+            setUserData(userInfo)
+          }
+        } catch (error) {
+          console.error("Failed to fetch report:", error)
+          toast({
+            title: "Error",
+            description: "Failed to load report preview.",
+            variant: "destructive",
+          })
+        } finally {
+          setLoading(false)
+        }
       }
-
-      const reportData = JSON.parse(reportDataStr)
-      const productData = JSON.parse(productDataStr)
-
-      setReport(reportData)
-      setProduct(productData)
-
-      // Fetch user data for company logo
-      if (reportData.sellerId) {
-        const userInfo = await getUserById(reportData.sellerId)
-        setUserData(userInfo)
-      }
-    } catch (error) {
-      console.error("Error loading preview data:", error)
+      fetchReport()
+    } else {
+      setLoading(false)
       toast({
         title: "Error",
-        description: "Failed to load preview data",
+        description: "No report ID provided for preview.",
         variant: "destructive",
       })
-      router.push("/logistics/dashboard")
-    } finally {
-      setLoading(false)
+      router.push("/logistics/reports")
     }
-  }
+  }, [reportId, router])
 
   const handlePostReport = async () => {
-    if (!report || !user) {
-      toast({
-        title: "Error",
-        description: "Missing report data or user authentication",
-        variant: "destructive",
-      })
-      return
-    }
+    if (!report) return
 
     setIsPosting(true)
     try {
-      console.log("Starting to post report...", report)
-
       // Prepare the report data for Firestore
-      const reportToPost: ReportData = {
-        siteId: report.siteId,
-        siteName: report.siteName,
-        siteCode: report.siteCode || "",
-        companyId: report.companyId,
-        sellerId: report.sellerId,
-        client: report.client,
-        clientId: report.clientId,
-        bookingDates: {
-          start: report.bookingDates.start,
-          end: report.bookingDates.end,
-        },
-        breakdate: report.breakdate,
-        sales: report.sales,
-        reportType: report.reportType,
-        date: report.date,
-        attachments: report.attachments || [],
+      const reportToPost: Report = {
+        ...report,
         status: "posted", // Change from draft/preview to posted
-        createdBy: report.createdBy,
-        createdByName: report.createdByName,
-        location: report.location || "",
-        category: report.category,
-        subcategory: report.subcategory,
-        priority: report.priority,
-        completionPercentage: report.completionPercentage || 0,
-        tags: report.tags || [],
-        assignedTo: report.assignedTo || "",
-        // Installation report specific fields
-        installationStatus: report.installationStatus || "",
-        installationTimeline: report.installationTimeline || "",
-        delayReason: report.delayReason || "",
-        delayDays: report.delayDays || "",
       }
 
       console.log("Report data prepared for posting:", reportToPost)
 
       // Create the report in Firestore
-      const reportId = await createReport(reportToPost)
+      const postedReportId = await ReportService.postReport(reportToPost)
 
-      console.log("Report created successfully with ID:", reportId)
+      console.log("Report created successfully with ID:", postedReportId)
 
       // Store the report ID in session storage
-      sessionStorage.setItem("lastPostedReportId", reportId)
+      sessionStorage.setItem("lastPostedReportId", postedReportId)
 
       toast({
         title: "Success",
-        description: "Service Report Posted Successfully!",
+        description: "Report has been successfully posted!",
       })
-
-      // Clear preview data from session storage
-      sessionStorage.removeItem("previewReportData")
-      sessionStorage.removeItem("previewProductData")
 
       // Navigate to the dashboard
       router.push(`/logistics/dashboard`)
     } catch (error) {
-      console.error("Error posting report to Firestore:", error)
+      console.error("Failed to post report to Firestore:", error)
       toast({
         title: "Error",
         description: `Failed to post report: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -236,7 +184,7 @@ export default function ReportPreviewPage() {
 
     setIsGeneratingPDF(true)
     try {
-      await generateReportPDF(report, product, false)
+      await ReportService.generateReportPDF(report, product, false)
     } catch (error) {
       console.error("Error generating PDF:", error)
       toast({
@@ -274,7 +222,7 @@ export default function ReportPreviewPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading report preview...</div>
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     )
   }
@@ -282,7 +230,7 @@ export default function ReportPreviewPage() {
   if (!report) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Report preview not found</div>
+        <p>Report not found or an error occurred.</p>
       </div>
     )
   }
@@ -393,8 +341,10 @@ export default function ReportPreviewPage() {
 
         {/* Project Information */}
         <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle>Project Information</CardTitle>
+          </CardHeader>
           <CardContent className="p-6">
-            <h2 className="text-xl font-bold mb-4 text-gray-900">Project Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
               <div className="space-y-2">
                 <div className="flex">
