@@ -21,7 +21,7 @@ export default function ServiceReportsPage() {
   const [activeTab, setActiveTab] = useState("From Logistics")
   const [showDrafts, setShowDrafts] = useState(false)
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [lastPostedReportId, setLastPostedReportId] = useState<string | null>(null)
+  const [lastPostedReportId, setLastPostedReportId] = useState("")
 
   const router = useRouter()
   const { user } = useAuth()
@@ -29,19 +29,18 @@ export default function ServiceReportsPage() {
 
   useEffect(() => {
     fetchReports()
-    checkForSuccessDialog()
+    checkForPostedReport()
   }, [])
 
   useEffect(() => {
     filterReports()
   }, [reports, searchQuery, filterType, activeTab, showDrafts])
 
-  const checkForSuccessDialog = () => {
+  const checkForPostedReport = () => {
     const reportId = sessionStorage.getItem("lastPostedReportId")
     if (reportId) {
       setLastPostedReportId(reportId)
       setShowSuccessDialog(true)
-      // Clear the session storage item
       sessionStorage.removeItem("lastPostedReportId")
     }
   }
@@ -154,11 +153,6 @@ export default function ServiceReportsPage() {
       title: "Delete Report",
       description: "Delete functionality will be implemented",
     })
-  }
-
-  const handleCloseSuccessDialog = () => {
-    setShowSuccessDialog(false)
-    setLastPostedReportId(null)
   }
 
   return (
@@ -323,8 +317,8 @@ export default function ServiceReportsPage() {
 
       {/* Success Dialog */}
       <ReportPostSuccessDialog
-        isOpen={showSuccessDialog}
-        onClose={handleCloseSuccessDialog}
+        open={showSuccessDialog}
+        onOpenChange={setShowSuccessDialog}
         reportId={lastPostedReportId}
       />
     </div>

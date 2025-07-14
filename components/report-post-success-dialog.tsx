@@ -1,32 +1,26 @@
 "use client"
 
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import Image from "next/image"
 
 interface ReportPostSuccessDialogProps {
-  isOpen: boolean
-  onClose: () => void
-  reportId?: string | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  reportId: string
 }
 
-export function ReportPostSuccessDialog({ isOpen, onClose, reportId }: ReportPostSuccessDialogProps) {
+export function ReportPostSuccessDialog({ open, onOpenChange, reportId }: ReportPostSuccessDialogProps) {
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <div className="flex flex-col items-center justify-center p-6 text-center space-y-4">
-          {/* Party Popper Icon */}
-          <div className="w-20 h-20 flex items-center justify-center">
-            <img
-              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-rMQJeATLoOf5wGOwTMDAI5fBvfrCgZ.png"
-              alt="Party Popper"
-              className="w-full h-full object-contain"
-            />
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm text-center p-6">
+        <DialogHeader>
+          <div className="flex justify-center mb-4">
+            <Image src="/party-popper.png" alt="Party Popper" width={120} height={120} className="object-contain" />
           </div>
-
-          {/* Congratulations Text */}
-          <div className="space-y-2">
-            <h2 className="text-2xl font-bold text-gray-900 text-center">Congratulations!</h2>
-            <p className="text-gray-600 text-center">You have successfully posted a report!</p>
-          </div>
+          <DialogTitle className="text-2xl font-bold text-gray-900 text-center">Congratulations!</DialogTitle>
+        </DialogHeader>
+        <div className="py-4">
+          <p className="text-gray-600 text-lg">You have successfully posted a report!</p>
         </div>
       </DialogContent>
     </Dialog>
