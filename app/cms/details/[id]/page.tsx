@@ -7,6 +7,7 @@ import { Slider } from "@/components/ui/slider"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
+import LoopTimeline from "@/components/loop-timeline"
 import { getProductById, getServiceAssignmentsByProductId } from "@/lib/firebase-service"
 import {
   ArrowLeft,
@@ -762,19 +763,12 @@ export default async function Page({ params }: Props) {
 
         {/* Loop Timeline Tab */}
         <TabsContent value="timeline" className="space-y-6">
-          <div className="p-8 text-center">
-            <h3 className="text-lg font-semibold mb-2">Loop Timeline</h3>
-            <p className="text-gray-600">Timeline component will be displayed here</p>
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-500">
-                Product ID: {product.id}
-                <br />
-                Company ID: {product.company_id}
-                <br />
-                Seller ID: {product.seller_id}
-              </p>
-            </div>
-          </div>
+          <LoopTimeline
+            cmsData={product.cms}
+            productId={product.id}
+            companyId={product.company_id}
+            sellerId={product.seller_id}
+          />
         </TabsContent>
       </Tabs>
     </div>
