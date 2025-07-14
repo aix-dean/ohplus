@@ -12,7 +12,6 @@ import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
 import { getUserById, type User } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
-import { Timestamp } from "firebase/firestore"
 
 export default function ReportPreviewPage() {
   const router = useRouter()
@@ -72,66 +71,77 @@ export default function ReportPreviewPage() {
   }
 
   const handlePostReport = async () => {
-    if (!report || !user) return
+    if (!report || !user) {
+      toast({
+        title: "Error",
+        description: "Missing report data or user authentication",
+        variant: "destructive",
+      })
+      return
+    }
 
     setIsPosting(true)
     try {
-      // Convert file objects to actual uploads and create the report in Firebase
-      const processedAttachments = await Promise.all(
-        (report.attachments || []).map(async (attachment: any) => {
-          if (attachment.file) {
-            // For the actual post, we would upload the file to Firebase Storage
-            // For now, we'll just keep the file reference
-            return {
-              note: attachment.note || "",
-              fileName: attachment.fileName,
-              fileType: attachment.fileType,
-              file: attachment.file, // This will be processed by createReport
-            }
-          }
-          return {
-            note: attachment.note || "",
-            fileName: attachment.fileName || "",
-            fileType: attachment.fileType || "",
-          }
-        }),
-      )
+      console.log("Starting to post report...", report)
 
-      // Remove preview-specific fields and add proper data for Firebase
-      const finalReportData = {
-        ...report,
-        attachments: processedAttachments,
-        status: "posted", // Change status from draft to posted
-        // Remove preview-specific fields
-        isPreview: undefined,
-        id: undefined,
-        // Set proper Firebase Timestamps
-        created: Timestamp.now(),
-        updated: Timestamp.now(),
+      // Prepare the report data for Firestore
+      const reportToPost: ReportData = {
+        siteId: report.siteId,
+        siteName: report.siteName,
+        siteCode: report.siteCode || "",
+        companyId: report.companyId,
+        sellerId: report.sellerId,
+        client: report.client,
+        clientId: report.clientId,
+        bookingDates: {
+          start: report.bookingDates.start,
+          end: report.bookingDates.end,
+        },
+        breakdate: report.breakdate,
+        sales: report.sales,
+        reportType: report.reportType,
+        date: report.date,
+        attachments: report.attachments || [],
+        status: "posted", // Change from draft/preview to posted
+        createdBy: report.createdBy,
+        createdByName: report.createdByName,
+        location: report.location || "",
+        category: report.category,
+        subcategory: report.subcategory,
+        priority: report.priority,
+        completionPercentage: report.completionPercentage || 0,
+        tags: report.tags || [],
+        assignedTo: report.assignedTo || "",
+        // Installation report specific fields
+        installationStatus: report.installationStatus || "",
+        installationTimeline: report.installationTimeline || "",
+        delayReason: report.delayReason || "",
+        delayDays: report.delayDays || "",
       }
 
-      // Remove the temporary ID and isPreview flag
-      delete finalReportData.id
-      delete finalReportData.isPreview
+      console.log("Report data prepared for posting:", reportToPost)
 
-      const reportId = await createReport(finalReportData as ReportData)
+      // Create the report in Firestore
+      const reportId = await createReport(reportToPost)
+
+      console.log("Report created successfully with ID:", reportId)
 
       toast({
         title: "Success",
-        description: "Report posted successfully",
+        description: "Report posted successfully to Firestore",
       })
 
-      // Clear preview data
+      // Clear preview data from session storage
       sessionStorage.removeItem("previewReportData")
       sessionStorage.removeItem("previewProductData")
 
       // Navigate to the actual report page
       router.push(`/logistics/reports/${reportId}`)
     } catch (error) {
-      console.error("Error posting report:", error)
+      console.error("Error posting report to Firestore:", error)
       toast({
         title: "Error",
-        description: "Failed to post report",
+        description: `Failed to post report: ${error instanceof Error ? error.message : "Unknown error"}`,
         variant: "destructive",
       })
     } finally {
@@ -226,7 +236,11 @@ export default function ReportPreviewPage() {
       await generateReportPDF(report, product, false)
     } catch (error) {
       console.error("Error generating PDF:", error)
-      alert("Failed to generate PDF. Please try again.")
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setIsGeneratingPDF(false)
     }
