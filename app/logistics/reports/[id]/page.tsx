@@ -271,9 +271,9 @@ export default function ReportPreviewPage() {
                     alt={`${userData.company || "Company"} Logo`}
                     className="max-h-5 max-w-full object-contain"
                     onError={(e) => {
-                      // Fallback to default logo if company logo fails to load
+                      // Fallback to OH+ logo if company logo fails to load
                       const target = e.target as HTMLImageElement
-                      target.src = "/company-logos/gts-logo.png"
+                      target.src = "/ohplus-new-logo.png"
                     }}
                   />
                 </div>
@@ -287,11 +287,7 @@ export default function ReportPreviewPage() {
                   className="bg-white rounded px-3 py-1 flex items-center justify-center"
                   style={{ minHeight: "24px", minWidth: "60px" }}
                 >
-                  <img
-                    src="/company-logos/gts-logo.png"
-                    alt="Company Logo"
-                    className="max-h-5 max-w-full object-contain"
-                  />
+                  <img src="/ohplus-new-logo.png" alt="OH+ Logo" className="max-h-5 max-w-full object-contain" />
                 </div>
               </div>
             )}
