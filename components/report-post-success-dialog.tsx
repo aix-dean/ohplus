@@ -1,36 +1,41 @@
 "use client"
 
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import Image from "next/image"
 
 interface ReportPostSuccessDialogProps {
-  isOpen: boolean
-  onClose: () => void
-  onViewReport?: () => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  reportId: string
+  onViewReport?: (reportId: string) => void
 }
 
-export function ReportPostSuccessDialog({ isOpen, onClose, onViewReport }: ReportPostSuccessDialogProps) {
+export function ReportPostSuccessDialog({ open, onOpenChange, reportId, onViewReport }: ReportPostSuccessDialogProps) {
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md p-8 text-center">
-        <div className="flex flex-col items-center space-y-6">
-          {/* Party Popper Icon */}
-          <div className="flex justify-center">
-            <img src="/party-popper.png" alt="Party Popper" className="w-20 h-20 object-contain" />
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm text-center p-6">
+        <DialogHeader>
+          <div className="flex justify-center mb-4">
+            <Image src="/party-popper.png" alt="Party Popper" width={120} height={120} className="object-contain" />
           </div>
-
-          {/* Congratulations Text - Centered */}
-          <h2 className="text-2xl font-bold text-gray-900 text-center">Congratulations!</h2>
-
-          {/* Success Message */}
-          <p className="text-gray-600 text-center">You have successfully posted a report!</p>
-
-          {/* View Report Button */}
-          {onViewReport && (
-            <Button onClick={onViewReport} className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2">
-              View Report
-            </Button>
-          )}
+          <DialogTitle className="text-2xl font-bold text-gray-900 text-center">Congratulations!</DialogTitle>
+        </DialogHeader>
+        <div className="py-4">
+          <p className="text-gray-600 text-lg">You have successfully posted a report!</p>
+        </div>
+        <div className="flex justify-center pt-4">
+          <Button
+            onClick={() => {
+              onOpenChange(false)
+              if (onViewReport) {
+                onViewReport(reportId)
+              }
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            View Report
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
