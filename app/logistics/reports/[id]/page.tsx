@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
@@ -24,7 +26,6 @@ export default function ReportPreviewPage() {
   const [isFullScreenOpen, setIsFullScreenOpen] = useState(false)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
-  const [imageLoadErrors, setImageLoadErrors] = useState<Set<string>>(new Set())
   const { user } = useAuth()
   const [userData, setUserData] = useState<User | null>(null)
 
@@ -149,20 +150,22 @@ export default function ReportPreviewPage() {
     window.open(fileUrl, "_blank", "noopener,noreferrer")
   }
 
-  const handleImageError = (fileUrl: string, fileName: string) => {
-    console.error("Image failed to load:", fileUrl)
-    setImageLoadErrors((prev) => new Set(prev).add(fileUrl))
-  }
+  // Improved image URL handling with better Firebase Storage support
+  const getImageUrl = (originalUrl: string) => {
+    if (!originalUrl) return "/placeholder.svg"
 
-  const getProxiedImageUrl = (originalUrl: string) => {
-    if (!originalUrl) return ""
-    // Try both proxy endpoints
-    return `/api/firebase-image?url=${encodeURIComponent(originalUrl)}`
-  }
+    // If it's already a Firebase Storage URL with token, use it directly
+    if (originalUrl.includes("firebasestorage.googleapis.com") && originalUrl.includes("token=")) {
+      return originalUrl
+    }
 
-  const getAlternativeProxiedUrl = (originalUrl: string) => {
-    if (!originalUrl) return ""
-    return `/api/proxy-image?url=${encodeURIComponent(originalUrl)}`
+    // If it's a Firebase Storage URL without token, try to use it directly first
+    if (originalUrl.includes("firebasestorage.googleapis.com")) {
+      return originalUrl
+    }
+
+    // For other URLs, return as is
+    return originalUrl
   }
 
   const handleDownloadPDF = async () => {
@@ -198,50 +201,24 @@ export default function ReportPreviewPage() {
     router.back()
   }
 
-  // Component for rendering image with multiple fallback strategies
+  // Simplified image component with better error handling
   const ImageDisplay = ({ attachment, index }: { attachment: any; index: number }) => {
     const [imageError, setImageError] = useState(false)
-    const [retryCount, setRetryCount] = useState(0)
-    const [currentStrategy, setCurrentStrategy] = useState(0)
-    const maxRetries = 3
+    const [isLoading, setIsLoading] = useState(true)
 
-    // Different strategies to try
-    const strategies = [
-      () => getProxiedImageUrl(attachment.fileUrl), // Firebase-specific proxy
-      () => getAlternativeProxiedUrl(attachment.fileUrl), // General proxy
-      () => attachment.fileUrl, // Direct URL as last resort
-    ]
-
-    const handleImageLoadError = () => {
-      console.error(`Image load failed (strategy ${currentStrategy}, retry ${retryCount}):`, attachment.fileUrl)
-
-      if (retryCount < maxRetries) {
-        setRetryCount((prev) => prev + 1)
-        // Try next strategy
-        if (currentStrategy < strategies.length - 1) {
-          setCurrentStrategy((prev) => prev + 1)
-          console.log(`Trying strategy ${currentStrategy + 1}`)
-        }
-        // Force reload with new strategy
-        setTimeout(() => {
-          const img = document.querySelector(`[data-attachment-index="${index}"]`) as HTMLImageElement
-          if (img) {
-            img.src = `${strategies[currentStrategy]()}&t=${Date.now()}`
-          }
-        }, 500)
-      } else {
-        console.error("All strategies failed for image:", attachment.fileUrl)
-        setImageError(true)
-        handleImageError(attachment.fileUrl, attachment.fileName || "")
-      }
+    const handleImageLoadError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+      console.error(`Image load failed for:`, attachment.fileUrl)
+      setImageError(true)
+      setIsLoading(false)
     }
 
     const handleImageLoadSuccess = () => {
-      console.log(`Image loaded successfully with strategy ${currentStrategy}:`, attachment.fileUrl)
+      console.log(`Image loaded successfully:`, attachment.fileUrl)
       setImageError(false)
-      setRetryCount(0)
+      setIsLoading(false)
     }
 
+    // If no fileUrl or image failed to load, show fallback
     if (!attachment.fileUrl || imageError) {
       return (
         <div className="text-center space-y-2">
@@ -257,7 +234,6 @@ export default function ReportPreviewPage() {
           </div>
           <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName || "Unknown file"}</p>
           <p className="text-xs text-red-500">Failed to load image</p>
-          <p className="text-xs text-gray-400">Tried {maxRetries + 1} strategies</p>
           <div className="flex gap-2 justify-center">
             <Button
               variant="outline"
@@ -295,24 +271,23 @@ export default function ReportPreviewPage() {
     if (isImageFile(attachment.fileName || "")) {
       return (
         <div className="w-full h-full relative">
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            </div>
+          )}
           <img
-            data-attachment-index={index}
-            src={strategies[currentStrategy]() || "/placeholder.svg"}
+            src={getImageUrl(attachment.fileUrl) || "/placeholder.svg"}
             alt={attachment.fileName || `Attachment ${index + 1}`}
             className="max-w-full max-h-full object-contain rounded"
             onError={handleImageLoadError}
             onLoad={handleImageLoadSuccess}
+            style={{ display: isLoading ? "none" : "block" }}
           />
-          {attachment.note && (
+          {attachment.note && !isLoading && (
             <p className="absolute bottom-2 left-2 right-2 text-xs text-white bg-black bg-opacity-50 p-1 rounded text-center">
               "{attachment.note}"
             </p>
-          )}
-          {/* Debug info */}
-          {process.env.NODE_ENV === "development" && (
-            <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs p-1 rounded">
-              Strategy: {currentStrategy + 1}, Retry: {retryCount}
-            </div>
           )}
         </div>
       )
@@ -325,7 +300,10 @@ export default function ReportPreviewPage() {
             src={attachment.fileUrl}
             controls
             className="max-w-full max-h-full object-contain rounded"
-            onError={() => handleImageError(attachment.fileUrl, attachment.fileName || "")}
+            onError={() => {
+              console.error("Video load failed:", attachment.fileUrl)
+              setImageError(true)
+            }}
           />
           {attachment.note && (
             <p className="absolute bottom-2 left-2 right-2 text-xs text-white bg-black bg-opacity-50 p-1 rounded text-center">
@@ -748,15 +726,13 @@ export default function ReportPreviewPage() {
                   <div className="w-full max-w-full flex items-center justify-center">
                     {isImageFile(fullScreenAttachment.fileName || "") ? (
                       <img
-                        src={getProxiedImageUrl(fullScreenAttachment.fileUrl) || "/placeholder.svg"}
+                        src={getImageUrl(fullScreenAttachment.fileUrl) || "/placeholder.svg"}
                         alt={fullScreenAttachment.fileName || "Full screen preview"}
                         className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded shadow-lg"
                         style={{ maxWidth: "calc(90vw - 3rem)" }}
-                        onError={() =>
-                          console.error("Full screen proxied image failed to load:", fullScreenAttachment.fileUrl)
-                        }
+                        onError={() => console.error("Full screen image failed to load:", fullScreenAttachment.fileUrl)}
                         onLoad={() =>
-                          console.log("Full screen proxied image loaded successfully:", fullScreenAttachment.fileUrl)
+                          console.log("Full screen image loaded successfully:", fullScreenAttachment.fileUrl)
                         }
                       />
                     ) : isVideoFile(fullScreenAttachment.fileName || "") ? (
