@@ -89,7 +89,7 @@ export default function CMSDashboardPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingCount, setLoadingCount] = useState(false)
 
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
 
