@@ -768,25 +768,6 @@ export async function generateReportPDF(
     const startDate = safeToDate(report.bookingDates.start)
     const endDate = safeToDate(report.bookingDates.end)
 
-    // Helper function to add text with word wrapping
-    const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
-      pdf.setFontSize(fontSize)
-      const lines = pdf.splitTextToSize(text, maxWidth)
-      pdf.text(lines, x, y)
-      return y + lines.length * fontSize * 0.3
-    }
-
-    // Helper function to check if we need a new page
-    const checkNewPage = (requiredHeight: number) => {
-      if (yPosition + requiredHeight > pageHeight - 20) {
-        // Leave space for footer
-        pdf.addPage()
-        yPosition = 0
-        // Add header to new page
-        addHeaderToPage()
-      }
-    }
-
     // Helper function to format date
     const formatDate = (dateString: string) => {
       return new Date(dateString).toLocaleDateString("en-US", {
@@ -796,10 +777,19 @@ export async function generateReportPDF(
       })
     }
 
-    // Helper function to create the header section exactly like the preview
+    // Helper function to format time
+    const formatTime = () => {
+      return new Date().toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      })
+    }
+
+    // Create the header section exactly like the image
     const addHeaderToPage = async () => {
       try {
-        // Angular Blue Header - exactly like the preview
+        // Angular Blue Header
         const headerHeight = 16
 
         // Main blue section
@@ -807,12 +797,12 @@ export async function generateReportPDF(
         pdf.rect(0, yPosition, pageWidth, headerHeight, "F")
 
         // Angular cyan section pointing right
-        const cyanlWidth = pageWidth * 0.4
+        const cyanWidth = pageWidth * 0.4
         const points = [
-          [pageWidth - cyanlWidth + cyanlWidth * 0.25, yPosition], // Start point (25% from left of cyan section)
-          [pageWidth, yPosition], // Top right
-          [pageWidth, yPosition + headerHeight], // Bottom right
-          [pageWidth - cyanlWidth, yPosition + headerHeight], // Bottom left of cyan section
+          [pageWidth - cyanWidth + cyanWidth * 0.25, yPosition],
+          [pageWidth, yPosition],
+          [pageWidth, yPosition + headerHeight],
+          [pageWidth - cyanWidth, yPosition + headerHeight],
         ]
 
         pdf.setFillColor(52, 211, 235) // cyan-400
@@ -829,14 +819,14 @@ export async function generateReportPDF(
         pdf.setTextColor(0, 0, 0)
       } catch (error) {
         console.error("Error adding header:", error)
-        yPosition += 25 // Skip header space if failed
+        yPosition += 25
       }
     }
 
-    // Add header to first page
+    // Add header to page
     await addHeaderToPage()
 
-    // Report Title Section - exactly like the preview
+    // Report Title Section with badge and logo
     pdf.setFontSize(12)
     pdf.setFont("helvetica", "bold")
 
@@ -849,14 +839,24 @@ export async function generateReportPDF(
     pdf.setFontSize(9)
     pdf.text("Installation Report", margin + 2, yPosition + 5)
 
-    // Add GTS logo on the right (reverted to drawing as per image)
-    pdf.setFillColor(255, 193, 7) // yellow-400
-    const logoSize = 20
-    pdf.circle(pageWidth - margin - logoSize / 2, yPosition + logoSize / 2 - 5, logoSize / 2, "F")
-    pdf.setTextColor(0, 0, 0)
-    pdf.setFontSize(12)
-    pdf.setFont("helvetica", "bold")
-    pdf.text("GTS", pageWidth - margin - 15, yPosition + 5)
+    // Add GTS logo on the right (try to load actual logo, fallback to circle)
+    const gtsLogoUrl = "/company-logos/gts-logo.png"
+    const gtsLogoBase64 = await loadImageAsBase64(gtsLogoUrl)
+    if (gtsLogoBase64) {
+      const logoSize = 20
+      const logoX = pageWidth - margin - logoSize
+      const logoY = yPosition - 5
+      pdf.addImage(gtsLogoBase64, "PNG", logoX, logoY, logoSize, logoSize)
+    } else {
+      // Fallback yellow circle with GTS text
+      pdf.setFillColor(255, 193, 7) // yellow-400
+      const logoSize = 20
+      pdf.circle(pageWidth - margin - logoSize / 2, yPosition + logoSize / 2 - 5, logoSize / 2, "F")
+      pdf.setTextColor(0, 0, 0)
+      pdf.setFontSize(12)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("GTS", pageWidth - margin - 15, yPosition + 5)
+    }
 
     yPosition += badgeHeight + 5
     pdf.setTextColor(0, 0, 0)
@@ -865,14 +865,13 @@ export async function generateReportPDF(
     pdf.text(`as of ${formatDate(report.date)}`, margin, yPosition)
     yPosition += 15
 
-    // Project Information Section - exactly like the preview
-    checkNewPage(70)
+    // Project Information Section
     pdf.setFontSize(14)
     pdf.setFont("helvetica", "bold")
     pdf.text("Project Information", margin, yPosition)
     yPosition += 8
 
-    // Draw border around project info - exactly like preview
+    // Draw border around project info table
     pdf.setLineWidth(1)
     pdf.setDrawColor(0, 0, 0)
     const tableHeight = 55
@@ -882,14 +881,14 @@ export async function generateReportPDF(
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
 
-    // Left column
+    // Table content - two columns
     const leftColumn = margin + 3
     const rightColumn = margin + contentWidth / 2 + 5
 
     let leftY = yPosition
     let rightY = yPosition
 
-    // Left column data - exactly matching the preview layout
+    // Left column data
     pdf.setFont("helvetica", "bold")
     pdf.text("Site ID:", leftColumn, leftY)
     pdf.setFont("helvetica", "normal")
@@ -943,11 +942,11 @@ export async function generateReportPDF(
     const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
     pdf.text(`${duration} days`, leftColumn + 45, leftY)
 
-    // Right column data - exactly matching the preview layout
+    // Right column data
     pdf.setFont("helvetica", "bold")
     pdf.text("Content:", rightColumn, rightY)
     pdf.setFont("helvetica", "normal")
-    pdf.text(product?.content_type || "N/A", rightColumn + 25, rightY)
+    pdf.text(product?.content_type || "Static", rightColumn + 25, rightY)
     rightY += 5
 
     pdf.setFont("helvetica", "bold")
@@ -987,13 +986,12 @@ export async function generateReportPDF(
 
     yPosition += tableHeight + 10
 
-    // Project Status Section - exactly like the preview
-    checkNewPage(30)
+    // Project Status Section
     pdf.setFontSize(14)
     pdf.setFont("helvetica", "bold")
     pdf.text("Project Status", margin, yPosition)
 
-    // Status badge - green like in preview
+    // Status badge - green
     pdf.setFillColor(34, 197, 94) // green-500
     const statusBadgeWidth = 25
     const statusBadgeHeight = 6
@@ -1003,46 +1001,43 @@ export async function generateReportPDF(
     pdf.text(`${report.completionPercentage || 100}%`, margin + 95, yPosition)
     pdf.setTextColor(0, 0, 0)
 
-    yPosition += 15
+    yPosition += 20
 
-    // QR Code and Details Section (replaces attachments in this view)
-    checkNewPage(80) // Ensure enough space for QR code and text
+    // QR Code Section - centered
     const qrCodeViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/logistics/reports/${report.id}`
     const qrCodeDataUrl = await generateQRCode(qrCodeViewUrl)
 
-    const qrSize = 50 // Larger QR code size
-    const qrX = margin + (contentWidth - qrSize) / 2 // Center QR code
-    const qrY = yPosition + 5
+    const qrSize = 50
+    const qrX = margin + (contentWidth - qrSize) / 2
+    const qrY = yPosition
 
     const qrBase64 = await loadImageAsBase64(qrCodeDataUrl)
     if (qrBase64) {
       pdf.addImage(qrBase64, "PNG", qrX, qrY, qrSize, qrSize)
     }
 
-    yPosition = qrY + qrSize + 5 // Position below QR code
+    yPosition = qrY + qrSize + 8
 
+    // QR Code details - centered below QR code
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
-    pdf.text(
-      `Date: ${formatDate(report.date)}`,
-      margin + (contentWidth - pdf.getTextWidth(`Date: ${formatDate(report.date)}`)) / 2,
-      yPosition,
-    )
+
+    const dateText = `Date: ${formatDate(report.date)}`
+    const dateWidth = pdf.getTextWidth(dateText)
+    pdf.text(dateText, margin + (contentWidth - dateWidth) / 2, yPosition)
     yPosition += 4
 
-    const currentTime = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-    pdf.text(`Time: ${currentTime}`, margin + (contentWidth - pdf.getTextWidth(`Time: ${currentTime}`)) / 2, yPosition)
+    const timeText = `Time: ${formatTime()}`
+    const timeWidth = pdf.getTextWidth(timeText)
+    pdf.text(timeText, margin + (contentWidth - timeWidth) / 2, yPosition)
     yPosition += 4
 
-    pdf.text(
-      `Location: ${report.location || "N/A"}`,
-      margin + (contentWidth - pdf.getTextWidth(`Location: ${report.location || "N/A"}`)) / 2,
-      yPosition,
-    )
-    yPosition += 15 // Space after QR code details
+    const locationText = `Location: ${report.location || "Guadalupe Viejo"}`
+    const locationWidth = pdf.getTextWidth(locationText)
+    pdf.text(locationText, margin + (contentWidth - locationWidth) / 2, yPosition)
+    yPosition += 25
 
-    // Footer Section - exactly like the preview
-    checkNewPage(40)
+    // Prepared by section
     pdf.setLineWidth(0.5)
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 8
@@ -1066,7 +1061,7 @@ export async function generateReportPDF(
         : report.date
     pdf.text(formatDate(preparedDate), margin, yPosition)
 
-    // Add disclaimer on the right side - exactly like preview
+    // Disclaimer on the right side
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "italic")
     pdf.setTextColor(100, 100, 100)
@@ -1074,48 +1069,40 @@ export async function generateReportPDF(
     const disclaimerLines = pdf.splitTextToSize(disclaimer, 120)
     pdf.text(disclaimerLines, pageWidth - margin - 120, yPosition - 10)
 
-    // Add bottom footer - exactly like preview
+    // Angular Footer
     const footerY = pageHeight - 12
     const footerHeight = 12
 
     // Cyan section on left with diagonal cut
     pdf.setFillColor(52, 211, 235) // cyan-400
     const cyanWidth = pageWidth * 0.3
-    const diagonalCutWidth = pageWidth * 0.05 // Width of the diagonal cut
+    const diagonalCutWidth = pageWidth * 0.05
 
-    // Draw the main cyan rectangle
+    // Main cyan rectangle
     pdf.rect(0, footerY, cyanWidth - diagonalCutWidth, footerHeight, "F")
 
-    // Draw the diagonal part of cyan section using triangle
+    // Diagonal part of cyan section
     pdf.triangle(
       cyanWidth - diagonalCutWidth,
-      footerY, // Top left of diagonal
+      footerY,
       cyanWidth,
-      footerY, // Top right of diagonal
+      footerY,
       cyanWidth - diagonalCutWidth,
-      footerY + footerHeight, // Bottom left of diagonal
+      footerY + footerHeight,
       "F",
     )
 
-    // Angular blue section - starts from the diagonal cut
+    // Angular blue section
     pdf.setFillColor(30, 58, 138) // blue-900
     const blueStartX = cyanWidth - diagonalCutWidth
 
-    // Draw the main blue rectangle
+    // Main blue rectangle
     pdf.rect(cyanWidth, footerY, pageWidth - cyanWidth, footerHeight, "F")
 
-    // Draw the diagonal connecting part of blue section using triangle
-    pdf.triangle(
-      blueStartX,
-      footerY + footerHeight, // Bottom left
-      cyanWidth,
-      footerY, // Top right of diagonal
-      cyanWidth,
-      footerY + footerHeight, // Bottom right
-      "F",
-    )
+    // Diagonal connecting part
+    pdf.triangle(blueStartX, footerY + footerHeight, cyanWidth, footerY, cyanWidth, footerY + footerHeight, "F")
 
-    // Add footer text - positioned on the right side
+    // Footer text
     pdf.setTextColor(255, 255, 255)
     pdf.setFontSize(10)
     pdf.setFont("helvetica", "normal")
@@ -1125,7 +1112,7 @@ export async function generateReportPDF(
     pdf.setFont("helvetica", "bold")
     pdf.text("OH!", pageWidth - margin - 15, footerY + 8)
 
-    // Add the "+" symbol
+    // Plus symbol
     pdf.setFontSize(12)
     pdf.setFont("helvetica", "normal")
     pdf.text("+", pageWidth - margin - 5, footerY + 8)
