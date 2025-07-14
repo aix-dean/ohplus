@@ -249,19 +249,20 @@ export default function ReportPreviewPage() {
 
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         {/* Report Header with Badge and Logo */}
-        <div className="flex justify-between items-start">
-          <div>
-            <div className="bg-cyan-400 text-white px-4 py-2 rounded text-sm font-medium inline-block">
+        <div className="flex justify-between items-center">
+          <div className="flex flex-col">
+            <div className="bg-cyan-400 text-white px-6 py-3 rounded-lg text-base font-medium inline-block">
               Installation Report
             </div>
-            <p className="text-gray-600 text-sm mt-1">as of {formatDate(report.date)}</p>
+            <p className="text-gray-600 text-sm mt-2">as of {formatDate(report.date)}</p>
           </div>
           <div className="flex-shrink-0">
             {userData?.company_logo ? (
               <img
                 src={userData.company_logo || "/placeholder.svg"}
                 alt={`${userData.company || "Company"} Logo`}
-                className="h-16 w-16 object-contain rounded-lg bg-white p-2 shadow-sm"
+                className="h-12 w-24 object-contain rounded-full bg-yellow-400 px-4 py-2 shadow-sm"
+                style={{ minWidth: "96px" }}
                 onError={(e) => {
                   // Fallback to default logo if company logo fails to load
                   const target = e.target as HTMLImageElement
@@ -272,7 +273,8 @@ export default function ReportPreviewPage() {
               <img
                 src="/company-logos/gts-logo.png"
                 alt="Company Logo"
-                className="h-16 w-16 object-contain rounded-lg bg-white p-2 shadow-sm"
+                className="h-12 w-24 object-contain rounded-full bg-yellow-400 px-4 py-2 shadow-sm"
+                style={{ minWidth: "96px" }}
               />
             )}
           </div>
