@@ -14,11 +14,19 @@ interface TimelineTabProps {
     loopsPerDay: number
   }
   productId: string
-  companyId?: string
-  sellerId?: string
+  companyId: string
+  sellerId: string
 }
 
 export default function TimelineTab({ cmsData, productId, companyId, sellerId }: TimelineTabProps) {
+  // Convert the cmsData format to match what LoopTimeline expects
+  const loopTimelineData = {
+    start_time: cmsData.startTime,
+    end_time: cmsData.endTime,
+    spot_duration: cmsData.spotDuration,
+    loops_per_day: cmsData.loopsPerDay,
+  }
+
   // Calculate timeline metrics
   const operatingHours = calculateOperatingHours(cmsData.startTime, cmsData.endTime)
   const totalSpotsPerDay = cmsData.loopsPerDay * 4 // Assuming 4 spots per loop
@@ -114,14 +122,12 @@ export default function TimelineTab({ cmsData, productId, companyId, sellerId }:
       </Card>
 
       {/* Loop Timeline Component */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Timeline Visualization</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <LoopTimeline cmsData={cmsData} productId={productId} companyId={companyId} sellerId={sellerId} />
-        </CardContent>
-      </Card>
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Loop Timeline</h2>
+        <p className="text-gray-600">Manage advertising spots and scheduling for this display</p>
+      </div>
+
+      <LoopTimeline cmsData={loopTimelineData} productId={productId} companyId={companyId} sellerId={sellerId} />
 
       {/* Schedule Details */}
       <Card>

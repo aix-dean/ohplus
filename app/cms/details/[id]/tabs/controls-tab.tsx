@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,358 +8,411 @@ import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import Image from "next/image"
 import {
-  Settings,
   Power,
-  RotateCcw,
-  Pause,
-  Play,
-  ToggleLeft,
-  Timer,
-  RefreshCw,
-  Camera,
-  TestTube,
-  Sun,
   Volume2,
+  Sun,
   Monitor,
   Wifi,
-  Thermometer,
   Activity,
+  Thermometer,
+  Zap,
+  RefreshCw,
+  Settings,
+  AlertTriangle,
 } from "lucide-react"
 import type { Product } from "@/lib/firebase-service"
+import { toast } from "@/hooks/use-toast"
 
 interface ControlsTabProps {
   product: Product
 }
 
-export default function ControlsTab({ product }: ControlsTabProps) {
-  const [brightness, setBrightness] = useState([75])
-  const [volume, setVolume] = useState([60])
-  const [autoMode, setAutoMode] = useState(true)
-  const [powerStatus, setPowerStatus] = useState(true)
+interface DisplayStatus {
+  power: boolean
+  brightness: number
+  volume: number
+  temperature: number
+  uptime: string
+  connectionStatus: "online" | "offline" | "unstable"
+  lastUpdate: Date
+}
 
-  // Mock LED status data
-  const ledStatus = {
-    powerStatus: powerStatus ? "On" : "Off",
-    temperature: "32°C",
-    connection: "Online",
-    videoSource: "HDMI 1",
-    activeContent: "Current Campaign",
-    lastReboot: new Date().toLocaleDateString() + " 09:15 AM",
-    lastTimeSync: new Date().toLocaleDateString() + " 08:00 AM",
-    warnings:
-      product.specs_rental?.elevation && product.specs_rental.elevation > 100 ? ["High elevation detected"] : [],
-    uptime: "15 days, 8 hours",
-    signalStrength: "Excellent",
-    memoryUsage: "68%",
-    cpuUsage: "45%",
+export default function ControlsTab({ product }: ControlsTabProps) {
+  const [displayStatus, setDisplayStatus] = useState<DisplayStatus>({
+    power: true,
+    brightness: 75,
+    volume: 50,
+    temperature: 42,
+    uptime: "72h 15m",
+    connectionStatus: "online",
+    lastUpdate: new Date(),
+  })
+  const [loading, setLoading] = useState(false)
+  const [autoRefresh, setAutoRefresh] = useState(true)
+
+  // Simulate real-time updates
+  useEffect(() => {
+    if (!autoRefresh) return
+
+    const interval = setInterval(() => {
+      setDisplayStatus((prev) => ({
+        ...prev,
+        temperature: 40 + Math.random() * 10, // 40-50°C
+        lastUpdate: new Date(),
+        connectionStatus: Math.random() > 0.1 ? "online" : "unstable", // 90% online
+      }))
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [autoRefresh])
+
+  const handlePowerToggle = async () => {
+    setLoading(true)
+    try {
+      // Simulate API call
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      setDisplayStatus((prev) => ({
+        ...prev,
+        power: !prev.power,
+        lastUpdate: new Date(),
+      }))
+
+      toast({
+        title: "Success",
+        description: `Display ${displayStatus.power ? "turned off" : "turned on"}`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to toggle power",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // Mock live preview data
-  const livePreview = [
-    {
-      id: `${product.name?.substring(0, 10) || "LED"} 3.2`,
-      health: "100% Healthy",
-      image: "/placeholder.svg?height=100&width=150",
-    },
-    {
-      id: `${product.specs_rental?.location?.substring(0, 10) || "SITE"} 1.0`,
-      health: "100% Healthy",
-      image: "/placeholder.svg?height=100&width=150",
-    },
-    {
-      id: "BACKUP LED 1.0",
-      health: "100% Healthy",
-      image: "/placeholder.svg?height=100&width=150",
-    },
-    {
-      id: "MAIN LED 2.1",
-      health: product.active ? "100% Healthy" : "90% Healthy",
-      image: "/placeholder.svg?height=100&width=150",
-    },
-  ]
+  const handleBrightnessChange = async (value: number[]) => {
+    const brightness = value[0]
+    setDisplayStatus((prev) => ({
+      ...prev,
+      brightness,
+      lastUpdate: new Date(),
+    }))
+
+    // Debounced API call would go here
+    console.log("Setting brightness to:", brightness)
+  }
+
+  const handleVolumeChange = async (value: number[]) => {
+    const volume = value[0]
+    setDisplayStatus((prev) => ({
+      ...prev,
+      volume,
+      lastUpdate: new Date(),
+    }))
+
+    // Debounced API call would go here
+    console.log("Setting volume to:", volume)
+  }
+
+  const handleRefresh = async () => {
+    setLoading(true)
+    try {
+      // Simulate API call to refresh status
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+
+      setDisplayStatus((prev) => ({
+        ...prev,
+        lastUpdate: new Date(),
+        temperature: 40 + Math.random() * 10,
+        connectionStatus: "online",
+      }))
+
+      toast({
+        title: "Success",
+        description: "Display status refreshed",
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to refresh status",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getConnectionStatusColor = (status: string) => {
+    switch (status) {
+      case "online":
+        return "bg-green-100 text-green-800 border-green-200"
+      case "offline":
+        return "bg-red-100 text-red-800 border-red-200"
+      case "unstable":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200"
+    }
+  }
+
+  const getTemperatureStatus = (temp: number) => {
+    if (temp > 50) return { color: "text-red-600", status: "High" }
+    if (temp > 45) return { color: "text-yellow-600", status: "Warm" }
+    return { color: "text-green-600", status: "Normal" }
+  }
+
+  const tempStatus = getTemperatureStatus(displayStatus.temperature)
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-2">
-        <Settings size={20} />
-        <h2 className="text-xl font-semibold">LED Display Controls</h2>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Display Controls</h2>
+          <p className="text-gray-600">Monitor and control LED display settings</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="auto-refresh">Auto Refresh</Label>
+            <Switch id="auto-refresh" checked={autoRefresh} onCheckedChange={setAutoRefresh} />
+          </div>
+          <Button variant="outline" onClick={handleRefresh} disabled={loading}>
+            <RefreshCw size={16} className={`mr-2 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* System Status */}
+      {/* Status Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity size={18} />
-              System Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Power size={16} className={powerStatus ? "text-green-500" : "text-red-500"} />
-                  <span className="text-sm font-medium">Power Status</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={powerStatus ? "default" : "destructive"}>{ledStatus.powerStatus}</Badge>
-                  <Switch checked={powerStatus} onCheckedChange={setPowerStatus} />
-                </div>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${displayStatus.power ? "bg-green-100" : "bg-red-100"}`}>
+                <Power size={20} className={displayStatus.power ? "text-green-600" : "text-red-600"} />
               </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Wifi size={16} className="text-green-500" />
-                  <span className="text-sm font-medium">Connection</span>
-                </div>
-                <Badge variant="default">{ledStatus.connection}</Badge>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Thermometer size={16} className="text-blue-500" />
-                  <span className="text-sm font-medium">Temperature</span>
-                </div>
-                <span className="text-sm">{ledStatus.temperature}</span>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Monitor size={16} className="text-purple-500" />
-                  <span className="text-sm font-medium">Video Source</span>
-                </div>
-                <span className="text-sm">{ledStatus.videoSource}</span>
+              <div>
+                <p className="text-sm text-gray-600">Power Status</p>
+                <p className="text-lg font-semibold">{displayStatus.power ? "Online" : "Offline"}</p>
               </div>
             </div>
-
-            <Separator />
-
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Uptime</span>
-                <span className="text-sm font-medium">{ledStatus.uptime}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Signal Strength</span>
-                <span className="text-sm font-medium">{ledStatus.signalStrength}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Memory Usage</span>
-                <span className="text-sm font-medium">{ledStatus.memoryUsage}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">CPU Usage</span>
-                <span className="text-sm font-medium">{ledStatus.cpuUsage}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-500">Last Time Sync</span>
-                <span className="text-sm font-medium">{ledStatus.lastTimeSync}</span>
-              </div>
-            </div>
-
-            {ledStatus.warnings.length > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                <div className="flex items-center gap-2 text-yellow-800">
-                  <span className="text-sm font-medium">⚠ Warnings</span>
-                </div>
-                <ul className="mt-1 text-sm text-yellow-700">
-                  {ledStatus.warnings.map((warning, index) => (
-                    <li key={index}>• {warning}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </CardContent>
         </Card>
 
-        {/* Remote Controls */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Wifi size={20} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Connection</p>
+                <Badge className={getConnectionStatusColor(displayStatus.connectionStatus)}>
+                  {displayStatus.connectionStatus}
+                </Badge>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <Thermometer size={20} className="text-orange-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Temperature</p>
+                <p className={`text-lg font-semibold ${tempStatus.color}`}>{displayStatus.temperature.toFixed(1)}°C</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <Activity size={20} className="text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Uptime</p>
+                <p className="text-lg font-semibold">{displayStatus.uptime}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Control Panels */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Power & Display Controls */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Power size={18} />
-              Remote Controls
+              Power & Display
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Power Controls */}
-            <div>
-              <h4 className="font-medium mb-3">Power Controls</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  variant="outline"
-                  className="flex items-center gap-2 bg-transparent"
-                  onClick={() => setPowerStatus(false)}
-                >
-                  <Power size={16} />
-                  Power Off
-                </Button>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                  <RotateCcw size={16} />
-                  Restart
-                </Button>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Content Controls */}
-            <div>
-              <h4 className="font-medium mb-3">Content Controls</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                  <Pause size={16} />
-                  Pause
-                </Button>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                  <Play size={16} />
-                  Resume
-                </Button>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                  <ToggleLeft size={16} />
-                  Switch Source
-                </Button>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                  <RefreshCw size={16} />
-                  Refresh
-                </Button>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* System Controls */}
-            <div>
-              <h4 className="font-medium mb-3">System Controls</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                  <Timer size={16} />
-                  Time Sync
-                </Button>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                  <Camera size={16} />
-                  Screenshot
-                </Button>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                  <TestTube size={16} />
-                  Test Pattern
-                </Button>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                  <RefreshCw size={16} />
-                  Diagnostics
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Display Controls */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Brightness Control */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sun size={18} />
-              Brightness Control
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Brightness Level</Label>
-                <span className="text-sm font-medium">{brightness[0]}%</span>
-              </div>
-              <Slider value={brightness} onValueChange={setBrightness} max={100} step={1} className="w-full" />
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>0%</span>
-                <span>50%</span>
-                <span>100%</span>
-              </div>
-            </div>
+            {/* Power Control */}
             <div className="flex items-center justify-between">
-              <Label htmlFor="auto-brightness">Auto Brightness</Label>
-              <Switch id="auto-brightness" checked={autoMode} onCheckedChange={setAutoMode} />
+              <div>
+                <Label className="text-base font-medium">Power</Label>
+                <p className="text-sm text-gray-600">Turn display on/off</p>
+              </div>
+              <Button
+                variant={displayStatus.power ? "destructive" : "default"}
+                onClick={handlePowerToggle}
+                disabled={loading}
+              >
+                <Power size={16} className="mr-2" />
+                {displayStatus.power ? "Turn Off" : "Turn On"}
+              </Button>
+            </div>
+
+            <Separator />
+
+            {/* Brightness Control */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-medium">Brightness</Label>
+                <span className="text-sm text-gray-600">{displayStatus.brightness}%</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Sun size={16} className="text-gray-400" />
+                <Slider
+                  value={[displayStatus.brightness]}
+                  onValueChange={handleBrightnessChange}
+                  max={100}
+                  step={1}
+                  className="flex-1"
+                  disabled={!displayStatus.power}
+                />
+                <Sun size={20} className="text-gray-600" />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Volume Control */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-medium">Volume</Label>
+                <span className="text-sm text-gray-600">{displayStatus.volume}%</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Volume2 size={16} className="text-gray-400" />
+                <Slider
+                  value={[displayStatus.volume]}
+                  onValueChange={handleVolumeChange}
+                  max={100}
+                  step={1}
+                  className="flex-1"
+                  disabled={!displayStatus.power}
+                />
+                <Volume2 size={20} className="text-gray-600" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Volume Control */}
+        {/* System Information */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Volume2 size={18} />
-              Volume Control
+              <Monitor size={18} />
+              System Information
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Volume Level</Label>
-                <span className="text-sm font-medium">{volume[0]}%</span>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">Display ID:</span>
+                <p className="font-mono font-medium">{product.id}</p>
               </div>
-              <Slider value={volume} onValueChange={setVolume} max={100} step={1} className="w-full" />
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>Mute</span>
-                <span>50%</span>
-                <span>Max</span>
+              <div>
+                <span className="text-gray-600">Resolution:</span>
+                <p className="font-medium">
+                  {product.specs_rental?.width || 1920} × {product.specs_rental?.height || 1080}
+                </p>
+              </div>
+              <div>
+                <span className="text-gray-600">Location:</span>
+                <p className="font-medium">{product.specs_rental?.location || "Unknown"}</p>
+              </div>
+              <div>
+                <span className="text-gray-600">Last Update:</span>
+                <p className="font-medium">{displayStatus.lastUpdate.toLocaleTimeString()}</p>
+              </div>
+              <div>
+                <span className="text-gray-600">Temperature:</span>
+                <p className={`font-medium ${tempStatus.color}`}>
+                  {displayStatus.temperature.toFixed(1)}°C ({tempStatus.status})
+                </p>
+              </div>
+              <div>
+                <span className="text-gray-600">Uptime:</span>
+                <p className="font-medium">{displayStatus.uptime}</p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setVolume([0])}>
-                Mute
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setVolume([50])}>
-                50%
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setVolume([100])}>
-                Max
-              </Button>
+
+            <Separator />
+
+            {/* System Alerts */}
+            <div className="space-y-3">
+              <Label className="text-base font-medium">System Alerts</Label>
+              <div className="space-y-2">
+                {displayStatus.temperature > 50 && (
+                  <div className="flex items-center gap-2 p-2 bg-red-50 rounded-lg">
+                    <AlertTriangle size={16} className="text-red-600" />
+                    <span className="text-sm text-red-800">High temperature detected</span>
+                  </div>
+                )}
+                {displayStatus.connectionStatus === "unstable" && (
+                  <div className="flex items-center gap-2 p-2 bg-yellow-50 rounded-lg">
+                    <Wifi size={16} className="text-yellow-600" />
+                    <span className="text-sm text-yellow-800">Connection unstable</span>
+                  </div>
+                )}
+                {displayStatus.connectionStatus === "online" && displayStatus.temperature <= 50 && (
+                  <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg">
+                    <Activity size={16} className="text-green-600" />
+                    <span className="text-sm text-green-800">All systems normal</span>
+                  </div>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Live Preview */}
+      {/* Advanced Controls */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Camera size={18} />
-            Live Preview
+            <Settings size={18} />
+            Advanced Controls
           </CardTitle>
-          <div className="flex items-center gap-4 text-sm text-gray-500">
-            <Badge variant="outline" className="bg-green-100 text-green-800">
-              Live Feed
-            </Badge>
-            <span>{new Date().toLocaleString()}</span>
-            <Button size="sm" variant="outline">
-              Refresh
-            </Button>
-          </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {livePreview.map((preview) => (
-              <div key={preview.id} className="text-center space-y-2">
-                <div className="bg-gray-100 rounded-lg p-2 aspect-video">
-                  <Image
-                    src={preview.image || "/placeholder.svg"}
-                    alt={preview.id}
-                    width={150}
-                    height={100}
-                    className="w-full h-full object-cover rounded"
-                  />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">{preview.id}</p>
-                  <Badge variant={preview.health.includes("100%") ? "default" : "secondary"} className="text-xs">
-                    {preview.health}
-                  </Badge>
-                </div>
-              </div>
-            ))}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Button variant="outline" disabled={!displayStatus.power}>
+              <Monitor size={16} className="mr-2" />
+              Screen Test
+            </Button>
+            <Button variant="outline" disabled={!displayStatus.power}>
+              <Zap size={16} className="mr-2" />
+              Restart Display
+            </Button>
+            <Button variant="outline" disabled={!displayStatus.power}>
+              <Settings size={16} className="mr-2" />
+              Display Settings
+            </Button>
           </div>
         </CardContent>
       </Card>

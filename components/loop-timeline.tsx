@@ -9,14 +9,14 @@ import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 interface CMSData {
-  end_time: string
-  loops_per_day: number
-  spot_duration: number
-  start_time: string
+  end_time?: string
+  loops_per_day?: number
+  spot_duration?: number
+  start_time?: string
 }
 
 interface LoopTimelineProps {
-  cmsData: CMSData
+  cmsData?: CMSData
   productId?: string
   companyId?: string
   sellerId?: string
@@ -69,45 +69,113 @@ export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTi
     fetchScreenSchedules()
   }, [productId])
 
-  // Extract CMS configuration from database structure
-  const startTimeStr = cmsData.start_time // "16:44"
-  const endTimeStr = cmsData.end_time // "18:44"
-  const spotDuration = cmsData.spot_duration // 15 seconds
-  const loopsPerDay = cmsData.loops_per_day // 20
+  // Safe extraction of CMS data with fallbacks
+  const startTimeStr = cmsData?.start_time || "06:00"
+  const endTimeStr = cmsData?.end_time || "18:00"
+  const spotDuration = cmsData?.spot_duration || 15
+  const loopsPerDay = cmsData?.loops_per_day || 20
 
   // Calculate spots per loop based on time difference
   const calculateSpotsPerLoop = () => {
-    const [startHour, startMinute] = startTimeStr.split(":").map(Number)
-    const [endHour, endMinute] = endTimeStr.split(":").map(Number)
+    try {
+      // Validate time strings before splitting
+      if (!startTimeStr || !endTimeStr || typeof startTimeStr !== "string" || typeof endTimeStr !== "string") {
+        console.warn("Invalid time strings, using default values")
+        return 20 // Default fallback
+      }
 
-    const startTotalMinutes = startHour * 60 + startMinute
-    const endTotalMinutes = endHour * 60 + endMinute
+      const startParts = startTimeStr.split(":")
+      const endParts = endTimeStr.split(":")
 
-    const loopDurationMinutes = endTotalMinutes - startTotalMinutes
-    const loopDurationSeconds = loopDurationMinutes * 60
+      if (startParts.length !== 2 || endParts.length !== 2) {
+        console.warn("Invalid time format, using default values")
+        return 20 // Default fallback
+      }
 
-    return Math.floor(loopDurationSeconds / spotDuration)
+      const startHour = Number.parseInt(startParts[0], 10)
+      const startMinute = Number.parseInt(startParts[1], 10)
+      const endHour = Number.parseInt(endParts[0], 10)
+      const endMinute = Number.parseInt(endParts[1], 10)
+
+      // Validate parsed numbers
+      if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
+        console.warn("Invalid time values, using default values")
+        return 20 // Default fallback
+      }
+
+      const startTotalMinutes = startHour * 60 + startMinute
+      const endTotalMinutes = endHour * 60 + endMinute
+
+      const loopDurationMinutes = endTotalMinutes - startTotalMinutes
+      const loopDurationSeconds = loopDurationMinutes * 60
+
+      if (loopDurationSeconds <= 0 || spotDuration <= 0) {
+        console.warn("Invalid duration values, using default values")
+        return 20 // Default fallback
+      }
+
+      return Math.floor(loopDurationSeconds / spotDuration)
+    } catch (error) {
+      console.error("Error calculating spots per loop:", error)
+      return 20 // Default fallback
+    }
   }
 
   const spotsPerLoop = calculateSpotsPerLoop()
 
   // Convert military time to 12-hour format
   const convertTo12Hour = (militaryTime: string) => {
-    const [hours, minutes] = militaryTime.split(":").map(Number)
-    const period = hours >= 12 ? "PM" : "AM"
-    const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours
-    return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`
+    try {
+      if (!militaryTime || typeof militaryTime !== "string") {
+        return "12:00 AM"
+      }
+
+      const parts = militaryTime.split(":")
+      if (parts.length !== 2) {
+        return "12:00 AM"
+      }
+
+      const hours = Number.parseInt(parts[0], 10)
+      const minutes = Number.parseInt(parts[1], 10)
+
+      if (isNaN(hours) || isNaN(minutes)) {
+        return "12:00 AM"
+      }
+
+      const period = hours >= 12 ? "PM" : "AM"
+      const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours
+      return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`
+    } catch (error) {
+      console.error("Error converting time:", error)
+      return "12:00 AM"
+    }
   }
 
-  // Parse start and end times
-  const [startHour, startMinute] = startTimeStr.split(":").map(Number)
-  const [endHour, endMinute] = endTimeStr.split(":").map(Number)
+  // Parse start and end times safely
+  const parseTime = (timeStr: string) => {
+    try {
+      const parts = timeStr.split(":")
+      if (parts.length !== 2) return { hour: 6, minute: 0 }
+
+      const hour = Number.parseInt(parts[0], 10)
+      const minute = Number.parseInt(parts[1], 10)
+
+      if (isNaN(hour) || isNaN(minute)) return { hour: 6, minute: 0 }
+
+      return { hour, minute }
+    } catch {
+      return { hour: 6, minute: 0 }
+    }
+  }
+
+  const startTime = parseTime(startTimeStr)
+  const endTime = parseTime(endTimeStr)
 
   const loopStartTime = new Date()
-  loopStartTime.setHours(startHour, startMinute, 0, 0)
+  loopStartTime.setHours(startTime.hour, startTime.minute, 0, 0)
 
   const loopEndTime = new Date()
-  loopEndTime.setHours(endHour, endMinute, 0, 0)
+  loopEndTime.setHours(endTime.hour, endTime.minute, 0, 0)
 
   // Calculate total loop duration in seconds
   const totalLoopDuration = spotsPerLoop * spotDuration
