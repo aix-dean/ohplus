@@ -6,19 +6,18 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send } from "lucide-react"
+import { getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
 import { getUserById, type User } from "@/lib/firebase-service"
-import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore"
-import { db } from "@/lib/firebase"
 
 export default function ReportPreviewPage() {
   const params = useParams()
   const router = useRouter()
   const reportId = params.id as string
-  const [report, setReport] = useState<any | null>(null)
+  const [report, setReport] = useState<ReportData | null>(null)
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [fullScreenAttachment, setFullScreenAttachment] = useState<any>(null)
@@ -36,47 +35,23 @@ export default function ReportPreviewPage() {
 
   const fetchReportData = async () => {
     try {
-      // Query reports collection from Firestore
-      const reportsRef = collection(db, "reports")
-      const q = query(reportsRef, where("__name__", "==", reportId))
-      const querySnapshot = await getDocs(q)
+      // Get all reports and find the one with matching ID
+      const reports = await getReports()
+      const foundReport = reports.find((r) => r.id === reportId)
 
-      if (!querySnapshot.empty) {
-        const reportDoc = querySnapshot.docs[0]
-        const reportData = { id: reportDoc.id, ...reportDoc.data() } as any
-        setReport(reportData)
+      if (foundReport) {
+        setReport(foundReport)
 
         // Fetch product data for additional details
-        if (reportData.siteId) {
-          const productData = await getProductById(reportData.siteId)
+        if (foundReport.siteId) {
+          const productData = await getProductById(foundReport.siteId)
           setProduct(productData)
         }
 
         // Fetch user data for company logo
-        if (reportData.sellerId) {
-          const userInfo = await getUserById(reportData.sellerId)
+        if (foundReport.sellerId) {
+          const userInfo = await getUserById(foundReport.sellerId)
           setUserData(userInfo)
-        }
-      } else {
-        // Try direct document fetch as fallback
-        const reportDocRef = doc(db, "reports", reportId)
-        const reportDoc = await getDoc(reportDocRef)
-
-        if (reportDoc.exists()) {
-          const reportData = { id: reportDoc.id, ...reportDoc.data() } as any
-          setReport(reportData)
-
-          // Fetch product data for additional details
-          if (reportData.siteId) {
-            const productData = await getProductById(reportData.siteId)
-            setProduct(productData)
-          }
-
-          // Fetch user data for company logo
-          if (reportData.sellerId) {
-            const userInfo = await getUserById(reportData.sellerId)
-            setUserData(userInfo)
-          }
         }
       }
     } catch (error) {
@@ -408,108 +383,105 @@ export default function ReportPreviewPage() {
           {/* Attachments/Photos */}
           {report.attachments && report.attachments.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {report.attachments.slice(0, 2).map((attachment, index) => {
-                // Handle different attachment data structures
-                const attachmentData =
-                  typeof attachment === "string" ? { fileName: attachment, fileUrl: attachment } : attachment
+              {report.attachments.slice(0, 2).map((attachment, index) => (
+                <div key={index} className="space-y-2">
+                  <div
+                    className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
+                    onClick={() => attachment.fileUrl && openFullScreen(attachment)}
+                  >
+                    {attachment.fileUrl ? (
+                      <div className="w-full h-full flex flex-col items-center justify-center relative">
+                        {/* Zoom overlay */}
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
+                          <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                        </div>
 
-                const fileName = attachmentData?.fileName || attachmentData?.name || `Attachment ${index + 1}`
-                const fileUrl = attachmentData?.fileUrl || attachmentData?.url || attachmentData?.downloadURL
-                const note = attachmentData?.note || attachmentData?.description
-
-                return (
-                  <div key={index} className="space-y-2">
-                    <div
-                      className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
-                      onClick={() => fileUrl && openFullScreen({ fileName, fileUrl, note })}
-                    >
-                      {fileUrl ? (
-                        <div className="w-full h-full flex flex-col items-center justify-center relative">
-                          {/* Zoom overlay */}
-                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-                            <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                        {isImageFile(attachment.fileName || "") ? (
+                          <img
+                            src={attachment.fileUrl || "/placeholder.svg"}
+                            alt={attachment.fileName || `Attachment ${index + 1}`}
+                            className="max-w-full max-h-full object-contain rounded"
+                            onError={(e) => {
+                              // Fallback to icon if image fails to load
+                              const target = e.target as HTMLImageElement
+                              target.style.display = "none"
+                              const parent = target.parentElement
+                              if (parent) {
+                                parent.innerHTML = `
+                                  <div class="text-center space-y-2">
+                                    ${getFileIcon(attachment.fileName || "").props.children}
+                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
+                                  </div>
+                                `
+                              }
+                            }}
+                          />
+                        ) : isVideoFile(attachment.fileName || "") ? (
+                          <video
+                            src={attachment.fileUrl}
+                            controls
+                            className="max-w-full max-h-full object-contain rounded"
+                            onError={(e) => {
+                              // Fallback to icon if video fails to load
+                              const target = e.target as HTMLVideoElement
+                              target.style.display = "none"
+                              const parent = target.parentElement
+                              if (parent) {
+                                parent.innerHTML = `
+                                  <div class="text-center space-y-2">
+                                    ${getFileIcon(attachment.fileName || "").props.children}
+                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
+                                  </div>
+                                `
+                              }
+                            }}
+                          />
+                        ) : (
+                          <div className="text-center space-y-2">
+                            {getFileIcon(attachment.fileName || "")}
+                            <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
+                            <a
+                              href={attachment.fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:text-blue-800 underline"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              Open File
+                            </a>
                           </div>
-
-                          {isImageFile(fileName) ? (
-                            <img
-                              src={fileUrl || "/placeholder.svg"}
-                              alt={fileName}
-                              className="max-w-full max-h-full object-contain rounded"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement
-                                target.style.display = "none"
-                                const parent = target.parentElement
-                                if (parent) {
-                                  const iconElement = getFileIcon(fileName)
-                                  parent.innerHTML = `
-                                    <div class="text-center space-y-2">
-                                      <div class="flex justify-center">${iconElement.type === "svg" ? iconElement.props.children : ""}</div>
-                                      <p class="text-sm text-gray-700 font-medium break-all">${fileName}</p>
-                                    </div>
-                                  `
-                                }
-                              }}
-                            />
-                          ) : isVideoFile(fileName) ? (
-                            <video
-                              src={fileUrl}
-                              controls
-                              className="max-w-full max-h-full object-contain rounded"
-                              onError={(e) => {
-                                const target = e.target as HTMLVideoElement
-                                target.style.display = "none"
-                                const parent = target.parentElement
-                                if (parent) {
-                                  const iconElement = getFileIcon(fileName)
-                                  parent.innerHTML = `
-                                    <div class="text-center space-y-2">
-                                      <div class="flex justify-center">${iconElement.type === "svg" ? iconElement.props.children : ""}</div>
-                                      <p class="text-sm text-gray-700 font-medium break-all">${fileName}</p>
-                                    </div>
-                                  `
-                                }
-                              }}
-                            />
-                          ) : (
-                            <div className="text-center space-y-2">
-                              {getFileIcon(fileName)}
-                              <p className="text-sm text-gray-700 font-medium break-all">{fileName}</p>
-                              <a
-                                href={fileUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-blue-600 hover:text-blue-800 underline"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                Open File
-                              </a>
-                            </div>
-                          )}
-                          {note && <p className="text-xs text-gray-500 italic mt-2 text-center">"{note}"</p>}
-                        </div>
-                      ) : (
-                        <div className="text-center space-y-2">
-                          {getFileIcon(fileName)}
-                          <p className="text-sm text-gray-700 font-medium break-all">{fileName}</p>
-                          {note && <p className="text-xs text-gray-500 italic">"{note}"</p>}
-                        </div>
-                      )}
+                        )}
+                        {attachment.note && (
+                          <p className="text-xs text-gray-500 italic mt-2 text-center">"{attachment.note}"</p>
+                        )}
+                      </div>
+                    ) : attachment.fileName ? (
+                      <div className="text-center space-y-2">
+                        {getFileIcon(attachment.fileName)}
+                        <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
+                        {attachment.note && <p className="text-xs text-gray-500 italic">"{attachment.note}"</p>}
+                      </div>
+                    ) : (
+                      <div className="text-center space-y-2">
+                        <ImageIcon className="h-12 w-12 text-gray-400" />
+                        <p className="text-sm text-gray-600">Project Photo {index + 1}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <div>
+                      <span className="font-semibold">Date:</span> {formatDate(report.date)}
                     </div>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <div>
-                        <span className="font-semibold">Date:</span> {formatDate(report.date)}
-                      </div>
-                      <div>
-                        <span className="font-semibold">Time:</span>{" "}
-                        {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                      </div>
-                      <div>
-                        <span className="font-semibold">Location:</span> {report.location || "N/A"}
-                      </div>
+                    <div>
+                      <span className="font-semibold">Time:</span>{" "}
+                      {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                    <div>
+                      <span className="font-semibold">Location:</span> {report.location || "N/A"}
                     </div>
                   </div>
-                )
-              })}
+                </div>
+              ))}
             </div>
           )}
         </div>

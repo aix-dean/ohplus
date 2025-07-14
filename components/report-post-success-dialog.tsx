@@ -1,17 +1,15 @@
 "use client"
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
 import Image from "next/image"
 
 interface ReportPostSuccessDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   reportId: string
-  onViewReport?: (reportId: string) => void
 }
 
-export function ReportPostSuccessDialog({ open, onOpenChange, reportId, onViewReport }: ReportPostSuccessDialogProps) {
+export function ReportPostSuccessDialog({ open, onOpenChange, reportId }: ReportPostSuccessDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm text-center p-6">
@@ -23,19 +21,6 @@ export function ReportPostSuccessDialog({ open, onOpenChange, reportId, onViewRe
         </DialogHeader>
         <div className="py-4">
           <p className="text-gray-600 text-lg">You have successfully posted a report!</p>
-        </div>
-        <div className="flex justify-center pt-4">
-          <Button
-            onClick={() => {
-              onOpenChange(false)
-              if (onViewReport) {
-                onViewReport(reportId)
-              }
-            }}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            View Report
-          </Button>
         </div>
       </DialogContent>
     </Dialog>
