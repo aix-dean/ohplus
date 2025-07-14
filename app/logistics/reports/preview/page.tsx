@@ -126,17 +126,12 @@ export default function ReportPreviewPage() {
 
       console.log("Report created successfully with ID:", reportId)
 
-      toast({
-        title: "Success",
-        description: "Service Report Posted Successfully!",
-      })
-
       // Clear preview data from session storage
       sessionStorage.removeItem("previewReportData")
       sessionStorage.removeItem("previewProductData")
 
-      // Navigate to the actual report page
-      router.push(`/logistics/reports/${reportId}`)
+      // Redirect to dashboard with a query parameter to show the success dialog
+      router.push(`/logistics/dashboard?reportPosted=true`)
     } catch (error) {
       console.error("Error posting report to Firestore:", error)
       toast({
