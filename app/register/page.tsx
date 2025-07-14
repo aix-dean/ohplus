@@ -27,7 +27,8 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [passwordCriteria, setPasswordCriteria] = useState({
     minLength: false,
-    hasLetter: false,
+    hasLowerCase: false,
+    hasUpperCase: false,
     hasNumber: false,
     hasSpecialChar: false,
   })
@@ -43,7 +44,8 @@ export default function RegisterPage() {
   const passwordSchema = z
     .string()
     .min(8, { message: "Be at least 8 characters long" })
-    .regex(/[a-zA-Z]/, { message: "Contain at least one letter." })
+    .regex(/[a-z]/, { message: "Contain at least one lowercase letter." })
+    .regex(/[A-Z]/, { message: "Contain at least one uppercase letter." })
     .regex(/[0-9]/, { message: "Contain at least one number." })
     .regex(/[^a-zA-Z0-9]/, {
       message: "Contain at least one special character.",
@@ -73,7 +75,8 @@ export default function RegisterPage() {
   const validatePasswordStrength = (pwd: string) => {
     const criteria = {
       minLength: pwd.length >= 8,
-      hasLetter: /[a-zA-Z]/.test(pwd),
+      hasLowerCase: /[a-z]/.test(pwd),
+      hasUpperCase: /[A-Z]/.test(pwd),
       hasNumber: /[0-9]/.test(pwd),
       hasSpecialChar: /[^a-zA-Z0-9]/.test(pwd),
     }
@@ -81,12 +84,23 @@ export default function RegisterPage() {
   }
 
   const getPasswordStrength = () => {
-    let strength = 0
-    if (passwordCriteria.minLength) strength += 25
-    if (passwordCriteria.hasLetter) strength += 25
-    if (passwordCriteria.hasNumber) strength += 25
-    if (passwordCriteria.hasSpecialChar) strength += 25
-    return strength
+    let score = 0
+    if (passwordCriteria.minLength) score += 1
+    if (passwordCriteria.hasLowerCase) score += 1
+    if (passwordCriteria.hasUpperCase) score += 1
+    if (passwordCriteria.hasNumber) score += 1
+    if (passwordCriteria.hasSpecialChar) score += 1
+
+    // Map score to a percentage for the progress bar
+    return (score / 5) * 100 // 5 criteria in total
+  }
+
+  const getStrengthText = (strength: number) => {
+    if (strength === 100) return "Strong password"
+    if (strength >= 75) return "Good password"
+    if (strength >= 50) return "Moderate password"
+    if (strength > 0) return "Weak password"
+    return ""
   }
 
   const getProgressBarColor = (strength: number) => {
@@ -267,9 +281,26 @@ export default function RegisterPage() {
                 </div>
                 <div className="mt-2">
                   <Progress value={passwordStrength} className={getProgressBarColor(passwordStrength)} />
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Password strength: {passwordStrength}%
-                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{getStrengthText(passwordStrength)}</p>
+                  {passwordStrength < 100 && password.length > 0 && (
+                    <ul className="list-inside text-sm mt-1">
+                      {!passwordCriteria.minLength && (
+                        <li className="text-red-500">Password should be at least 8 characters long</li>
+                      )}
+                      {!passwordCriteria.hasLowerCase && (
+                        <li className="text-red-500">Password should contain at least one lowercase letter</li>
+                      )}
+                      {!passwordCriteria.hasUpperCase && (
+                        <li className="text-red-500">Password should contain at least one uppercase letter</li>
+                      )}
+                      {!passwordCriteria.hasNumber && (
+                        <li className="text-red-500">Password should contain at least one number</li>
+                      )}
+                      {!passwordCriteria.hasSpecialChar && (
+                        <li className="text-red-500">Password should contain at least one special character</li>
+                      )}
+                    </ul>
+                  )}
                 </div>
               </div>
               <div className="space-y-2">
