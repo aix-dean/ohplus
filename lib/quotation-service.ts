@@ -11,6 +11,7 @@ import {
   orderBy,
   limit,
   startAfter,
+  type DocumentData,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { addQuotationToCampaign } from "@/lib/campaign-service"
@@ -487,8 +488,6 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 5
 
-    pdf.setFontSize(9)
-    pdf.setFont("helvetica", "normal")
     yPosition = addText(quotation.notes, margin, yPosition, contentWidth)
     yPosition += 10
   }
@@ -575,58 +574,55 @@ export async function updateQuotationStatus(quotationId: string, status: string)
 export async function getQuotationsPaginated(
   userId: string,
   limitCount: number,
-  lastQuotationId?: string | null,
-): Promise<{ quotations: Quotation[]; lastVisibleId: string | null; hasMore: boolean }> {
+  lastQuotationId: string | null,
+): Promise<{
+  quotations: DocumentData[]
+  lastVisibleId: string | null
+  hasMore: boolean
+}> {
   try {
-    if (!db) {
-      throw new Error("Firestore not initialized")
-    }
-
     const quotationsRef = collection(db, "quotations")
-    let q = query(quotationsRef, where("created_by", "==", userId), orderBy("created", "desc"), limit(limitCount + 1)) // Fetch one extra to check hasMore
+    let q
 
     if (lastQuotationId) {
-      const lastDocSnapshot = await getDoc(doc(db, "quotations", lastQuotationId))
-      if (lastDocSnapshot.exists()) {
-        q = query(
-          quotationsRef,
-          where("created_by", "==", userId),
-          orderBy("created", "desc"),
-          startAfter(lastDocSnapshot),
-          limit(limitCount + 1),
-        )
-      } else {
-        console.warn(`Last document with ID ${lastQuotationId} not found. Starting from beginning.`)
+      // To get the actual document for startAfter, we need to fetch it first
+      const lastVisibleDocQuery = query(quotationsRef, where("__name__", "==", lastQuotationId))
+      const lastVisibleDocSnapshot = await getDocs(lastVisibleDocQuery)
+      const lastVisibleDoc = lastVisibleDocSnapshot.docs[0]
+
+      if (!lastVisibleDoc) {
+        console.warn("Last visible document not found for ID:", lastQuotationId)
+        return { quotations: [], lastVisibleId: null, hasMore: false }
       }
+
+      q = query(
+        quotationsRef,
+        where("seller_id", "==", userId),
+        orderBy("created", "desc"),
+        startAfter(lastVisibleDoc),
+        limit(limitCount),
+      )
+    } else {
+      q = query(quotationsRef, where("seller_id", "==", userId), orderBy("created", "desc"), limit(limitCount))
     }
 
     const querySnapshot = await getDocs(q)
-    const fetchedQuotations: Quotation[] = []
-    let lastVisibleId: string | null = null
-    let hasMore = false
-
-    querySnapshot.forEach((doc, index) => {
-      if (index < limitCount) {
-        // Only take up to limitCount
-        fetchedQuotations.push({ id: doc.id, ...doc.data() } as Quotation)
-      }
+    const fetchedQuotations: DocumentData[] = []
+    querySnapshot.forEach((doc) => {
+      fetchedQuotations.push({ id: doc.id, ...doc.data() })
     })
 
-    if (querySnapshot.docs.length > limitCount) {
-      hasMore = true
-      lastVisibleId = querySnapshot.docs[limitCount - 1]?.id || null // The ID of the last document on the current page
-    } else {
-      lastVisibleId = querySnapshot.docs[querySnapshot.docs.length - 1]?.id || null
-    }
+    const newLastVisibleId = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1].id : null
+    const hasMore = querySnapshot.docs.length === limitCount
 
     return {
       quotations: fetchedQuotations,
-      lastVisibleId,
-      hasMore,
+      lastVisibleId: newLastVisibleId,
+      hasMore: hasMore,
     }
   } catch (error) {
     console.error("Error fetching paginated quotations:", error)
-    return { quotations: [], lastVisibleId: null, hasMore: false }
+    throw error
   }
 }
 
