@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/auth-context"
 export default function LogisticsDashboardPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const { user } = useAuth()
-
+  console.log(JSON.stringify(users))
   return (
     <div className="flex-1 overflow-auto relative">
       <main className="p-4">
