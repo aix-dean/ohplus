@@ -107,7 +107,8 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
     const addQRCodeToPage = async () => {
       try {
         const qrSize = 25
-        const qrX = pageWidth - margin - qrSize
+        // Calculate qrX to center the QR code horizontally
+        const qrX = (pageWidth - qrSize) / 2
         const qrY = margin
 
         // Load QR code image and add to PDF
@@ -118,7 +119,9 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
           // Add small text below QR code
           pdf.setFontSize(6)
           pdf.setTextColor(100, 100, 100)
-          pdf.text("Scan to view online", qrX, qrY + qrSize + 3)
+          // Adjust text position to be centered below the QR code
+          const textWidth = pdf.getTextWidth("Scan to view online")
+          pdf.text("Scan to view online", qrX + (qrSize - textWidth) / 2, qrY + qrSize + 3)
           pdf.setTextColor(0, 0, 0)
         }
       } catch (error) {
@@ -528,7 +531,8 @@ export async function generateCostEstimatePDF(
     const addQRCodeToPage = async () => {
       try {
         const qrSize = 25
-        const qrX = pageWidth - margin - qrSize
+        // Calculate qrX to center the QR code horizontally
+        const qrX = (pageWidth - qrSize) / 2
         const qrY = margin
 
         const qrBase64 = await loadImageAsBase64(qrCodeUrl)
@@ -536,7 +540,9 @@ export async function generateCostEstimatePDF(
           pdf.addImage(qrBase64, "PNG", qrX, qrY, qrSize, qrSize)
           pdf.setFontSize(6)
           pdf.setTextColor(100, 100, 100)
-          pdf.text("Scan to view online", qrX, qrY + qrSize + 3)
+          // Adjust text position to be centered below the QR code
+          const textWidth = pdf.getTextWidth("Scan to view online")
+          pdf.text("Scan to view online", qrX + (qrSize - textWidth) / 2, qrY + qrSize + 3)
           pdf.setTextColor(0, 0, 0)
         }
       } catch (error) {
@@ -811,7 +817,6 @@ export async function generateReportPDF(
             height = maxHeight
             width = height * aspectRatio
           }
-          // If the image is wider than tall, scale its width to maxWidth and adjust height
         } else {
           height = maxHeight
           width = height * aspectRatio
@@ -819,7 +824,6 @@ export async function generateReportPDF(
             width = maxWidth
             height = width / aspectRatio
           }
-          // If the image is taller than wide or square, scale its height to maxHeight and adjust width
         }
 
         pdf.addImage(base64, "JPEG", x, y, width, height)
@@ -1060,21 +1064,10 @@ export async function generateReportPDF(
       const attachmentsToShow = report.attachments.slice(0, 2)
       const imageWidth = (contentWidth - 10) / 2 // Space for 2 images side by side
       const imageHeight = 60
-      const imageSpacing = 10 // Spacing between images
-
-      let startXForImages = margin
-      if (attachmentsToShow.length === 1) {
-        // Center single image
-        startXForImages = margin + (contentWidth - imageWidth) / 2
-      } else if (attachmentsToShow.length === 2) {
-        // Center two images with spacing
-        const totalImagesWidth = imageWidth * 2 + imageSpacing
-        startXForImages = margin + (contentWidth - totalImagesWidth) / 2
-      }
 
       for (let i = 0; i < attachmentsToShow.length; i++) {
         const attachment = attachmentsToShow[i]
-        const currentX = startXForImages + i * (imageWidth + imageSpacing)
+        const currentX = i === 0 ? margin : margin + imageWidth + 10
 
         // Draw border for attachment box
         pdf.setLineWidth(0.5)
@@ -1114,7 +1107,7 @@ export async function generateReportPDF(
       pdf.setFont("helvetica", "normal")
 
       for (let i = 0; i < attachmentsToShow.length; i++) {
-        const currentX = startXForImages + i * (imageWidth + imageSpacing)
+        const currentX = i === 0 ? margin : margin + imageWidth + 10
 
         pdf.setFont("helvetica", "bold")
         pdf.text("Date:", currentX, yPosition)
