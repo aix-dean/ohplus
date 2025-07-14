@@ -156,7 +156,12 @@ export default function ReportPreviewPage() {
 
   const getProxiedImageUrl = (originalUrl: string) => {
     if (!originalUrl) return ""
-    // Use our proxy API route to serve the image
+    // Try both proxy endpoints
+    return `/api/firebase-image?url=${encodeURIComponent(originalUrl)}`
+  }
+
+  const getAlternativeProxiedUrl = (originalUrl: string) => {
+    if (!originalUrl) return ""
     return `/api/proxy-image?url=${encodeURIComponent(originalUrl)}`
   }
 
@@ -193,27 +198,48 @@ export default function ReportPreviewPage() {
     router.back()
   }
 
-  // Component for rendering image using proxy approach
+  // Component for rendering image with multiple fallback strategies
   const ImageDisplay = ({ attachment, index }: { attachment: any; index: number }) => {
     const [imageError, setImageError] = useState(false)
     const [retryCount, setRetryCount] = useState(0)
-    const maxRetries = 2
+    const [currentStrategy, setCurrentStrategy] = useState(0)
+    const maxRetries = 3
+
+    // Different strategies to try
+    const strategies = [
+      () => getProxiedImageUrl(attachment.fileUrl), // Firebase-specific proxy
+      () => getAlternativeProxiedUrl(attachment.fileUrl), // General proxy
+      () => attachment.fileUrl, // Direct URL as last resort
+    ]
 
     const handleImageLoadError = () => {
-      console.error("Proxied image failed to load:", attachment.fileUrl)
+      console.error(`Image load failed (strategy ${currentStrategy}, retry ${retryCount}):`, attachment.fileUrl)
+
       if (retryCount < maxRetries) {
         setRetryCount((prev) => prev + 1)
-        // Force reload by adding timestamp
+        // Try next strategy
+        if (currentStrategy < strategies.length - 1) {
+          setCurrentStrategy((prev) => prev + 1)
+          console.log(`Trying strategy ${currentStrategy + 1}`)
+        }
+        // Force reload with new strategy
         setTimeout(() => {
           const img = document.querySelector(`[data-attachment-index="${index}"]`) as HTMLImageElement
           if (img) {
-            img.src = `${getProxiedImageUrl(attachment.fileUrl)}&t=${Date.now()}`
+            img.src = `${strategies[currentStrategy]()}&t=${Date.now()}`
           }
-        }, 1000)
+        }, 500)
       } else {
+        console.error("All strategies failed for image:", attachment.fileUrl)
         setImageError(true)
         handleImageError(attachment.fileUrl, attachment.fileName || "")
       }
+    }
+
+    const handleImageLoadSuccess = () => {
+      console.log(`Image loaded successfully with strategy ${currentStrategy}:`, attachment.fileUrl)
+      setImageError(false)
+      setRetryCount(0)
     }
 
     if (!attachment.fileUrl || imageError) {
@@ -231,6 +257,7 @@ export default function ReportPreviewPage() {
           </div>
           <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName || "Unknown file"}</p>
           <p className="text-xs text-red-500">Failed to load image</p>
+          <p className="text-xs text-gray-400">Tried {maxRetries + 1} strategies</p>
           <div className="flex gap-2 justify-center">
             <Button
               variant="outline"
@@ -270,20 +297,22 @@ export default function ReportPreviewPage() {
         <div className="w-full h-full relative">
           <img
             data-attachment-index={index}
-            src={getProxiedImageUrl(attachment.fileUrl) || "/placeholder.svg"}
+            src={strategies[currentStrategy]() || "/placeholder.svg"}
             alt={attachment.fileName || `Attachment ${index + 1}`}
             className="max-w-full max-h-full object-contain rounded"
             onError={handleImageLoadError}
-            onLoad={() => {
-              console.log("Proxied image loaded successfully:", attachment.fileUrl)
-              setImageError(false)
-              setRetryCount(0)
-            }}
+            onLoad={handleImageLoadSuccess}
           />
           {attachment.note && (
             <p className="absolute bottom-2 left-2 right-2 text-xs text-white bg-black bg-opacity-50 p-1 rounded text-center">
               "{attachment.note}"
             </p>
+          )}
+          {/* Debug info */}
+          {process.env.NODE_ENV === "development" && (
+            <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs p-1 rounded">
+              Strategy: {currentStrategy + 1}, Retry: {retryCount}
+            </div>
           )}
         </div>
       )
