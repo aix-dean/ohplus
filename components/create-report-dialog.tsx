@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
-import { createReport } from "@/lib/report-service"
+import { createReport, type ReportData } from "@/lib/report-service" // Import createReport and ReportData
 
 interface CreateReportDialogProps {
   open: boolean
@@ -29,16 +29,6 @@ interface Team {
   createdAt: string
 }
 
-interface AttachmentWithFile {
-  note: string
-  file?: File
-  fileName?: string
-  preview?: string
-  uploading?: boolean
-  uploaded?: boolean
-  fileUrl?: string
-}
-
 export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportDialogProps) {
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(false)
@@ -49,7 +39,10 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   const [loadingTeams, setLoadingTeams] = useState(false)
   const [showNewTeamInput, setShowNewTeamInput] = useState(false)
   const [newTeamName, setNewTeamName] = useState("")
-  const [attachments, setAttachments] = useState<AttachmentWithFile[]>([{ note: "" }, { note: "" }])
+  const [attachments, setAttachments] = useState<{ note: string; file?: File; fileName?: string; preview?: string }[]>([
+    { note: "" },
+    { note: "" },
+  ])
   const [previewModal, setPreviewModal] = useState<{ open: boolean; file?: File; preview?: string }>({ open: false })
 
   // Installation report specific fields
@@ -176,42 +169,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     })
   }
 
-  const uploadFileToFirebase = async (file: File, reportId: string, attachmentIndex: number): Promise<string> => {
-    try {
-      // Import Firebase functions
-      const { ref, uploadBytes, getDownloadURL } = await import("firebase/storage")
-      const { storage } = await import("@/lib/firebase")
-
-      // Create unique filename
-      const timestamp = Date.now()
-      const fileName = `reports/${reportId}/attachment_${attachmentIndex}_${timestamp}_${file.name}`
-      const storageRef = ref(storage, fileName)
-
-      console.log("Uploading file to Firebase:", fileName)
-
-      // Upload file
-      const snapshot = await uploadBytes(storageRef, file)
-      console.log("File uploaded successfully:", snapshot.ref.fullPath)
-
-      // Get download URL
-      const downloadURL = await getDownloadURL(snapshot.ref)
-      console.log("Download URL obtained:", downloadURL)
-
-      return downloadURL
-    } catch (error) {
-      console.error("Error uploading file to Firebase:", error)
-      throw new Error(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : "Unknown error"}`)
-    }
-  }
-
   const handleFileUpload = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
       const newAttachments = [...attachments]
       newAttachments[index].file = file
       newAttachments[index].fileName = file.name
-      newAttachments[index].uploading = false
-      newAttachments[index].uploaded = false
+      newAttachments[index].fileType = file.type // Store file type
 
       // Create preview for images
       if (file.type.startsWith("image/")) {
@@ -227,7 +191,10 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     }
   }
 
-  const handlePreviewFile = (attachment: AttachmentWithFile, e: React.MouseEvent) => {
+  const handlePreviewFile = (
+    attachment: { note: string; file?: File; fileName?: string; preview?: string },
+    e: React.MouseEvent,
+  ) => {
     e.preventDefault()
     e.stopPropagation()
 
@@ -243,7 +210,10 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     }
   }
 
-  const renderFilePreview = (attachment: AttachmentWithFile, index: number) => {
+  const renderFilePreview = (
+    attachment: { note: string; file?: File; fileName?: string; preview?: string },
+    index: number,
+  ) => {
     if (!attachment.file || !attachment.fileName) {
       return (
         <label
@@ -274,25 +244,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             <div className="flex items-center justify-center">{getFileIcon(attachment.fileName)}</div>
           )}
         </label>
-
-        {/* Upload status indicator */}
-        {attachment.uploading && (
-          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded">
-            <div className="text-white text-xs">Uploading...</div>
-          </div>
-        )}
-
-        {attachment.uploaded && (
-          <div className="absolute top-1 left-1 bg-green-500 text-white rounded-full p-1">
-            <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </div>
-        )}
 
         {/* Preview Button */}
         <button
@@ -338,74 +289,11 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
     setLoading(true)
     try {
-      // Generate a temporary report ID for file uploads
-      const tempReportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-
-      // Upload all files to Firebase Storage first
-      const uploadedAttachments = await Promise.all(
-        attachments
-          .filter((att) => att.file)
-          .map(async (attachment, index) => {
-            if (!attachment.file) return null
-
-            try {
-              // Update UI to show uploading status
-              const newAttachments = [...attachments]
-              newAttachments[index].uploading = true
-              setAttachments(newAttachments)
-
-              // Upload file to Firebase
-              const fileUrl = await uploadFileToFirebase(attachment.file, tempReportId, index)
-
-              // Update UI to show uploaded status
-              const updatedAttachments = [...attachments]
-              updatedAttachments[index].uploading = false
-              updatedAttachments[index].uploaded = true
-              updatedAttachments[index].fileUrl = fileUrl
-              setAttachments(updatedAttachments)
-
-              return {
-                note: attachment.note,
-                fileName: attachment.fileName || "",
-                fileType: attachment.file.type || "",
-                fileUrl: fileUrl,
-              }
-            } catch (error) {
-              console.error("Error uploading attachment:", error)
-
-              // Update UI to show error
-              const errorAttachments = [...attachments]
-              errorAttachments[index].uploading = false
-              errorAttachments[index].uploaded = false
-              setAttachments(errorAttachments)
-
-              toast({
-                title: "Upload Error",
-                description: `Failed to upload ${attachment.fileName}: ${error instanceof Error ? error.message : "Unknown error"}`,
-                variant: "destructive",
-              })
-              throw error
-            }
-          }),
-      )
-
-      // Filter out null values
-      const validAttachments = uploadedAttachments.filter((att) => att !== null)
-
-      if (validAttachments.length === 0) {
-        toast({
-          title: "Error",
-          description: "No files were successfully uploaded",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Build the report data
-      const reportData: any = {
-        siteId: product.id,
+      // Prepare the report data for submission to Firebase
+      const reportData: ReportData = {
+        siteId: product.id!,
         siteName: product.name || "Unknown Site",
-        companyId: projectData?.project_id || userData?.project_id || user.uid,
+        companyId: projectData?.project_id || userData?.project_id || user.uid, // Use projectData or userData company_id
         sellerId: product.seller_id || user.uid,
         client: "Summit Media", // This would come from booking data in real implementation
         clientId: "summit-media-id", // This would come from booking data
@@ -417,8 +305,16 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         sales: user.displayName || user.email || "Unknown User",
         reportType,
         date,
-        attachments: validAttachments,
-        status: "active",
+        attachments: attachments
+          .filter((att) => att.note.trim() !== "" || att.file) // Only include attachments with notes or files
+          .map((att) => ({
+            note: att.note,
+            file: att.file, // Pass the File object for upload
+            fileName: att.fileName || "",
+            fileType: att.file?.type || "",
+            fileUrl: att.fileUrl || "", // fileUrl will be populated by createReport after upload
+          })) as Array<{ note: string; file?: File; fileName?: string; fileType?: string; fileUrl?: string }>,
+        status: "draft",
         createdBy: user.uid,
         createdByName: user.displayName || user.email || "Unknown User",
         category: "logistics",
@@ -426,6 +322,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         priority: "medium",
         completionPercentage: reportType === "completion-report" ? 100 : 0,
         tags: [reportType, product.content_type || "general"].filter(Boolean),
+        // created and updated timestamps will be set by the createReport function
       }
 
       // Add optional fields only if they have values
@@ -462,14 +359,12 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         }
       }
 
-      // Save the report to Firebase
-      console.log("Creating report with data:", reportData)
-      const reportId = await createReport(reportData)
-      console.log("Report created successfully with ID:", reportId)
+      // Call the createReport function to save to Firebase
+      const newReportId = await createReport(reportData)
 
       toast({
         title: "Success",
-        description: "Service Report Generated Successfully!",
+        description: "Service Report Created Successfully!",
       })
 
       onOpenChange(false)
@@ -483,13 +378,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       setDelayReason("")
       setDelayDays("")
 
-      // Navigate to the report page
-      router.push(`/logistics/reports/${reportId}`)
+      // Navigate to the newly created report's view page
+      router.push(`/logistics/reports/${newReportId}`)
     } catch (error) {
-      console.error("Error generating report:", error)
+      console.error("Error creating report:", error)
       toast({
         title: "Error",
-        description: `Failed to generate report: ${error instanceof Error ? error.message : "Unknown error"}`,
+        description: "Failed to create report. Please try again.",
         variant: "destructive",
       })
     } finally {
