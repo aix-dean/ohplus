@@ -1,377 +1,415 @@
 "use client"
-
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Edit, Trash2, Clock, Play, Pause, RotateCcw } from "lucide-react"
-import { toast } from "@/hooks/use-toast"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Plus, Clock, Play, Eye } from "lucide-react"
+import { useState, useEffect } from "react"
+import VideoUploadDialog from "./video-upload-dialog"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 interface CMSData {
-  start_time: string
   end_time: string
-  spot_duration: number
   loops_per_day: number
-  spots_per_loop?: number
-}
-
-interface TimeSlot {
-  id: string
-  position: number
-  content_type: "advertisement" | "content" | "empty"
-  title: string
-  advertiser?: string
-  duration: number
-  status: "active" | "scheduled" | "paused"
+  spot_duration: number
   start_time: string
-  end_time: string
 }
 
 interface LoopTimelineProps {
   cmsData: CMSData
-  productId: string
-  companyId: string
-  sellerId: string
+  productId?: string
+  companyId?: string
+  sellerId?: string
 }
 
-export default function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTimelineProps) {
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([])
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [editingSlot, setEditingSlot] = useState<TimeSlot | null>(null)
-  const [selectedPosition, setSelectedPosition] = useState<number | null>(null)
-  const [currentLoop, setCurrentLoop] = useState(1)
-  const [isPlaying, setIsPlaying] = useState(true)
+interface TimelineSpot {
+  id: string
+  name: string
+  startTime: Date
+  endTime: Date
+  duration: number
+  status: "active" | "pending" | "available"
+  isScheduled: boolean
+}
 
-  const [slotForm, setSlotForm] = useState({
-    title: "",
-    content_type: "advertisement" as "advertisement" | "content" | "empty",
-    advertiser: "",
-    duration: cmsData.spot_duration || 30,
-  })
+export function LoopTimeline({ cmsData, productId, companyId, sellerId }: LoopTimelineProps) {
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
+  const [selectedSpotNumber, setSelectedSpotNumber] = useState<number | null>(null)
+  const [screenSchedules, setScreenSchedules] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Initialize time slots
+  // Fetch screen schedules on component mount
   useEffect(() => {
-    const spotsPerLoop = cmsData.spots_per_loop || 6
-    const initialSlots: TimeSlot[] = []
+    const fetchScreenSchedules = async () => {
+      if (!productId) {
+        setLoading(false)
+        return
+      }
 
-    for (let i = 0; i < spotsPerLoop; i++) {
-      const startMinutes = (i * (cmsData.spot_duration || 30)) / 60
-      const endMinutes = ((i + 1) * (cmsData.spot_duration || 30)) / 60
-
-      initialSlots.push({
-        id: `slot-${i}`,
-        position: i + 1,
-        content_type: "empty",
-        title: `Slot ${i + 1}`,
-        duration: cmsData.spot_duration || 30,
-        status: "scheduled",
-        start_time: formatTime(startMinutes),
-        end_time: formatTime(endMinutes),
-      })
+      setLoading(true)
+      try {
+        const q = query(
+          collection(db, "screen_schedule"),
+          where("product_id", "==", productId),
+          where("deleted", "==", false),
+        )
+        const querySnapshot = await getDocs(q)
+        const schedules = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        setScreenSchedules(schedules)
+      } catch (error) {
+        console.error("Error fetching screen schedules:", error)
+      } finally {
+        setLoading(false)
+      }
     }
 
-    setTimeSlots(initialSlots)
-  }, [cmsData])
+    fetchScreenSchedules()
+  }, [productId])
 
-  // Simulate loop progression
-  useEffect(() => {
-    if (!isPlaying) return
+  // Extract CMS configuration from database structure
+  const startTimeStr = cmsData.start_time // "16:44"
+  const endTimeStr = cmsData.end_time // "18:44"
+  const spotDuration = cmsData.spot_duration // 15 seconds
+  const loopsPerDay = cmsData.loops_per_day // 20
 
-    const loopDuration = (cmsData.spots_per_loop || 6) * (cmsData.spot_duration || 30) * 1000
-    const interval = setInterval(() => {
-      setCurrentLoop((prev) => (prev >= cmsData.loops_per_day ? 1 : prev + 1))
-    }, loopDuration)
+  // Calculate spots per loop based on time difference
+  const calculateSpotsPerLoop = () => {
+    const [startHour, startMinute] = startTimeStr.split(":").map(Number)
+    const [endHour, endMinute] = endTimeStr.split(":").map(Number)
 
-    return () => clearInterval(interval)
-  }, [isPlaying, cmsData])
+    const startTotalMinutes = startHour * 60 + startMinute
+    const endTotalMinutes = endHour * 60 + endMinute
 
-  const formatTime = (minutes: number): string => {
-    const hours = Math.floor(minutes / 60)
-    const mins = Math.floor(minutes % 60)
-    return `${hours.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`
+    const loopDurationMinutes = endTotalMinutes - startTotalMinutes
+    const loopDurationSeconds = loopDurationMinutes * 60
+
+    return Math.floor(loopDurationSeconds / spotDuration)
   }
 
-  const handleAddContent = (position: number) => {
-    setSelectedPosition(position)
-    setSlotForm({
-      title: "",
-      content_type: "advertisement",
-      advertiser: "",
-      duration: cmsData.spot_duration || 30,
-    })
-    setIsAddDialogOpen(true)
+  const spotsPerLoop = calculateSpotsPerLoop()
+
+  // Convert military time to 12-hour format
+  const convertTo12Hour = (militaryTime: string) => {
+    const [hours, minutes] = militaryTime.split(":").map(Number)
+    const period = hours >= 12 ? "PM" : "AM"
+    const displayHours = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours
+    return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`
   }
 
-  const handleEditSlot = (slot: TimeSlot) => {
-    setEditingSlot(slot)
-    setSlotForm({
-      title: slot.title,
-      content_type: slot.content_type,
-      advertiser: slot.advertiser || "",
-      duration: slot.duration,
-    })
-    setIsAddDialogOpen(true)
-  }
+  // Parse start and end times
+  const [startHour, startMinute] = startTimeStr.split(":").map(Number)
+  const [endHour, endMinute] = endTimeStr.split(":").map(Number)
 
-  const handleSaveSlot = () => {
-    if (editingSlot) {
-      // Update existing slot
-      setTimeSlots((prev) =>
-        prev.map((slot) =>
-          slot.id === editingSlot.id
-            ? {
-                ...slot,
-                title: slotForm.title,
-                content_type: slotForm.content_type,
-                advertiser: slotForm.advertiser,
-                duration: slotForm.duration,
-                status: "scheduled",
-              }
-            : slot,
-        ),
+  const loopStartTime = new Date()
+  loopStartTime.setHours(startHour, startMinute, 0, 0)
+
+  const loopEndTime = new Date()
+  loopEndTime.setHours(endHour, endMinute, 0, 0)
+
+  // Calculate total loop duration in seconds
+  const totalLoopDuration = spotsPerLoop * spotDuration
+
+  // Generate timeline spots based on calculated spots per loop
+  const generateTimelineSpots = (): TimelineSpot[] => {
+    const spots: TimelineSpot[] = []
+    let currentTime = new Date(loopStartTime)
+
+    for (let i = 0; i < loopsPerDay; i++) {
+      const spotEndTime = new Date(currentTime.getTime() + spotDuration * 1000)
+      const spotNumber = i + 1
+
+      // Check if this spot has scheduled content
+      const hasScheduledContent = screenSchedules.some(
+        (schedule) => schedule.spot_number === spotNumber && schedule.active,
       )
-      toast({
-        title: "Slot Updated",
-        description: "Time slot has been updated successfully.",
+
+      spots.push({
+        id: `SPOT${String(spotNumber).padStart(3, "0")}`,
+        name: `Spot ${spotNumber}`,
+        startTime: new Date(currentTime),
+        endTime: new Date(spotEndTime),
+        duration: spotDuration,
+        status: hasScheduledContent ? "active" : "available",
+        isScheduled: hasScheduledContent,
       })
-    } else if (selectedPosition !== null) {
-      // Add content to selected position
-      setTimeSlots((prev) =>
-        prev.map((slot) =>
-          slot.position === selectedPosition
-            ? {
-                ...slot,
-                title: slotForm.title,
-                content_type: slotForm.content_type,
-                advertiser: slotForm.advertiser,
-                duration: slotForm.duration,
-                status: "scheduled",
-              }
-            : slot,
-        ),
-      )
-      toast({
-        title: "Content Added",
-        description: "Content has been added to the timeline.",
-      })
+
+      currentTime = new Date(spotEndTime)
     }
 
-    setIsAddDialogOpen(false)
-    setEditingSlot(null)
-    setSelectedPosition(null)
+    return spots
   }
 
-  const handleRemoveContent = (slotId: string) => {
-    setTimeSlots((prev) =>
-      prev.map((slot) =>
-        slot.id === slotId
-          ? {
-              ...slot,
-              title: `Slot ${slot.position}`,
-              content_type: "empty",
-              advertiser: undefined,
-              status: "scheduled",
-            }
-          : slot,
-      ),
-    )
-    toast({
-      title: "Content Removed",
-      description: "Content has been removed from the timeline.",
+  const timelineSpots = generateTimelineSpots()
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
     })
   }
 
-  const getSlotColor = (slot: TimeSlot) => {
-    switch (slot.content_type) {
-      case "advertisement":
-        return "bg-blue-100 border-blue-300 text-blue-800"
-      case "content":
-        return "bg-green-100 border-green-300 text-green-800"
-      case "empty":
-        return "bg-gray-100 border-gray-300 text-gray-600 border-dashed"
-      default:
-        return "bg-gray-100 border-gray-300 text-gray-600"
+  const formatDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+
+    if (minutes > 0) {
+      return `${minutes}m ${remainingSeconds}s`
+    } else {
+      return `${remainingSeconds}s`
     }
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "active":
-        return "bg-green-100 text-green-800"
-      case "scheduled":
-        return "bg-blue-100 text-blue-800"
-      case "paused":
-        return "bg-yellow-100 text-yellow-800"
+        return "bg-green-100 text-green-800 border-green-200"
+      case "pending":
+        return "bg-amber-100 text-amber-800 border-amber-200"
+      case "available":
+        return "bg-blue-100 text-blue-800 border-blue-200"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-gray-100 text-gray-800 border-gray-200"
     }
+  }
+
+  const handleAddSpot = (spotNumber: number) => {
+    setSelectedSpotNumber(spotNumber)
+    setUploadDialogOpen(true)
+  }
+
+  const handleViewSpot = (spotNumber: number) => {
+    // Find the scheduled content for this spot
+    const scheduledContent = screenSchedules.find((schedule) => schedule.spot_number === spotNumber && schedule.active)
+
+    if (scheduledContent && scheduledContent.media) {
+      // Open the video in a new tab/window
+      window.open(scheduledContent.media, "_blank")
+    }
+  }
+
+  const handleUploadSuccess = async () => {
+    setUploadDialogOpen(false)
+    setSelectedSpotNumber(null)
+
+    // Refresh screen schedules
+    if (productId) {
+      try {
+        const q = query(
+          collection(db, "screen_schedule"),
+          where("product_id", "==", productId),
+          where("deleted", "==", false),
+        )
+        const querySnapshot = await getDocs(q)
+        const schedules = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        setScreenSchedules(schedules)
+      } catch (error) {
+        console.error("Error refreshing screen schedules:", error)
+      }
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span className="ml-2">Loading timeline...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-6">
-      {/* Timeline Controls */}
+      {/* Loop Configuration Summary */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Loop Timeline
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">
-                Loop {currentLoop} of {cmsData.loops_per_day}
-              </Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="flex items-center gap-2"
-              >
-                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                {isPlaying ? "Pause" : "Play"}
-              </Button>
-              <Button variant="outline" size="sm" className="flex items-center gap-2 bg-transparent">
-                <RotateCcw className="h-4 w-4" />
-                Reset
-              </Button>
-            </div>
+          <CardTitle className="flex items-center gap-2">
+            <Clock size={18} />
+            First Loop Configuration
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {timeSlots.map((slot) => (
-              <div
-                key={slot.id}
-                className={`relative border-2 rounded-lg p-4 transition-all hover:shadow-md ${getSlotColor(slot)}`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium">Slot {slot.position}</span>
-                  <Badge className={getStatusColor(slot.status)} variant="outline">
-                    {slot.status}
-                  </Badge>
-                </div>
-
-                <div className="space-y-2">
-                  <h4 className="font-medium text-sm truncate">{slot.title}</h4>
-
-                  {slot.advertiser && <p className="text-xs text-gray-600 truncate">by {slot.advertiser}</p>}
-
-                  <div className="text-xs text-gray-500">
-                    <div>
-                      {slot.start_time} - {slot.end_time}
-                    </div>
-                    <div>{slot.duration}s duration</div>
-                  </div>
-
-                  <div className="flex items-center gap-1 mt-3">
-                    {slot.content_type === "empty" ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleAddContent(slot.position)}
-                        className="w-full text-xs"
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Add
-                      </Button>
-                    ) : (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditSlot(slot)}
-                          className="flex-1 text-xs"
-                        >
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleRemoveContent(slot.id)}
-                          className="flex-1 text-xs text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span className="font-medium text-gray-500">Spots per Loop:</span>
+              <div className="text-lg font-semibold">{loopsPerDay}</div>
+            </div>
+            <div>
+              <span className="font-medium text-gray-500">Spot Duration:</span>
+              <div className="text-lg font-semibold">{spotDuration}s</div>
+            </div>
+            <div>
+              <span className="font-medium text-gray-500">Loop Time:</span>
+              <div className="text-lg font-semibold">
+                {convertTo12Hour(startTimeStr)} - {convertTo12Hour(endTimeStr)}
               </div>
-            ))}
+            </div>
+            <div>
+              <span className="font-medium text-gray-500">Total Loop Duration:</span>
+              <div className="text-lg font-semibold">{formatDuration(totalLoopDuration)}</div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Add/Edit Content Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{editingSlot ? "Edit Content" : `Add Content to Slot ${selectedPosition}`}</DialogTitle>
-          </DialogHeader>
+      {/* Timeline Visualization */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Play size={18} />
+            First Loop Timeline ({loopsPerDay} Spots)
+          </CardTitle>
+          <div className="text-sm text-gray-500">
+            Loop runs from {convertTo12Hour(startTimeStr)} to {convertTo12Hour(endTimeStr)} (
+            {formatDuration(totalLoopDuration)} total)
+          </div>
+        </CardHeader>
+        <CardContent>
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="content-title">Title</Label>
-              <Input
-                id="content-title"
-                value={slotForm.title}
-                onChange={(e) => setSlotForm((prev) => ({ ...prev, title: e.target.value }))}
-                placeholder="Enter content title"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="content-type">Content Type</Label>
-              <Select
-                value={slotForm.content_type}
-                onValueChange={(value) => setSlotForm((prev) => ({ ...prev, content_type: value as any }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="advertisement">Advertisement</SelectItem>
-                  <SelectItem value="content">Content</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {slotForm.content_type === "advertisement" && (
-              <div>
-                <Label htmlFor="advertiser">Advertiser</Label>
-                <Input
-                  id="advertiser"
-                  value={slotForm.advertiser}
-                  onChange={(e) => setSlotForm((prev) => ({ ...prev, advertiser: e.target.value }))}
-                  placeholder="Enter advertiser name"
-                />
+            {/* Timeline Header */}
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Clock size={16} className="text-gray-500" />
+                <span className="font-medium">Start: {convertTo12Hour(startTimeStr)}</span>
               </div>
-            )}
+              <div className="flex items-center gap-2">
+                <Clock size={16} className="text-gray-500" />
+                <span className="font-medium">End: {convertTo12Hour(endTimeStr)}</span>
+              </div>
+            </div>
 
-            <div>
-              <Label htmlFor="duration">Duration (seconds)</Label>
-              <Input
-                id="duration"
-                type="number"
-                value={slotForm.duration}
-                onChange={(e) => setSlotForm((prev) => ({ ...prev, duration: Number.parseInt(e.target.value) || 30 }))}
-                min="5"
-                max="300"
-              />
+            {/* Timeline Spots */}
+            <div className="space-y-3">
+              {timelineSpots.map((spot, index) => (
+                <div
+                  key={spot.id}
+                  className="flex items-center gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  {/* Spot Number */}
+                  <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="font-semibold text-blue-700">{index + 1}</span>
+                  </div>
+
+                  {/* Spot Details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-medium text-gray-900">{spot.name}</h3>
+                      <Badge variant="outline" className={getStatusColor(spot.status)}>
+                        {spot.status}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      <span className="font-mono">
+                        {formatTime(spot.startTime)} - {formatTime(spot.endTime)}
+                      </span>
+                      <span className="ml-2">({spot.duration}s duration)</span>
+                    </div>
+                  </div>
+
+                  {/* Timeline Bar */}
+                  <div className="flex-1 max-w-xs">
+                    <div className="relative h-6 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          spot.status === "active"
+                            ? "bg-green-500"
+                            : spot.status === "pending"
+                              ? "bg-amber-500"
+                              : "bg-blue-500"
+                        }`}
+                        style={{
+                          width: `${(spot.duration / totalLoopDuration) * 100}%`,
+                        }}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-xs font-medium text-white mix-blend-difference">{spot.duration}s</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Add/View Button */}
+                  {spot.isScheduled ? (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="flex-shrink-0"
+                      onClick={() => handleViewSpot(index + 1)}
+                    >
+                      <Eye size={16} />
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-shrink-0 bg-transparent"
+                      onClick={() => handleAddSpot(index + 1)}
+                    >
+                      <Plus size={16} />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Timeline Summary */}
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium text-blue-900">First Loop Summary</h4>
+                  <p className="text-sm text-blue-700">
+                    This loop contains {spotsPerLoop} advertising spots and will repeat {loopsPerDay} times throughout
+                    the day
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-semibold text-blue-900">{formatDuration(totalLoopDuration)}</div>
+                  <div className="text-sm text-blue-700">Loop Duration</div>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-blue-600 font-medium">Active Spots:</span>
+                  <span className="ml-1">{timelineSpots.filter((s) => s.status === "active").length}</span>
+                </div>
+                <div>
+                  <span className="text-blue-600 font-medium">Pending Spots:</span>
+                  <span className="ml-1">{timelineSpots.filter((s) => s.status === "pending").length}</span>
+                </div>
+                <div>
+                  <span className="text-blue-600 font-medium">Available Spots:</span>
+                  <span className="ml-1">{timelineSpots.filter((s) => s.status === "available").length}</span>
+                </div>
+              </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="flex justify-end gap-2 mt-6">
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveSlot}>{editingSlot ? "Update" : "Add"} Content</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Video Upload Dialog */}
+      <VideoUploadDialog
+        open={uploadDialogOpen}
+        onOpenChange={setUploadDialogOpen}
+        onUploadSuccess={handleUploadSuccess}
+        productId={productId}
+        spotNumber={selectedSpotNumber}
+        companyId={companyId}
+        sellerId={sellerId}
+      />
     </div>
   )
 }
+
+export default LoopTimeline

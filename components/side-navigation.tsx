@@ -203,6 +203,7 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "JOs", href: "/cms/orders", icon: ClipboardList },
+                  { title: "Content Library", href: "/cms/content", icon: FileText },
                   { title: "Screen Management", href: "/cms/screens", icon: Monitor },
                   { title: "Campaign Scheduler", href: "/cms/scheduler", icon: Calendar },
                   { title: "Analytics", href: "/cms/analytics", icon: BarChart3 },
