@@ -12,7 +12,6 @@ import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
 import { getUserById, type User } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2 } from "lucide-react"
 
 export default function ReportPreviewPage() {
   const router = useRouter()
@@ -27,15 +26,6 @@ export default function ReportPreviewPage() {
   const { user } = useAuth()
   const [userData, setUserData] = useState<User | null>(null)
   const { toast } = useToast()
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      // After "posting" the report, redirect to the dashboard with a success flag
-      router.push("/logistics/dashboard?reportPosted=true")
-    }, 1000) // Simulate a delay for posting
-
-    return () => clearTimeout(timer)
-  }, [router])
 
   useEffect(() => {
     loadPreviewData()
@@ -140,8 +130,11 @@ export default function ReportPreviewPage() {
       sessionStorage.removeItem("previewReportData")
       sessionStorage.removeItem("previewProductData")
 
-      // Redirect to dashboard with a query parameter to show the success dialog
-      router.push(`/logistics/dashboard?reportPosted=true`)
+      // Set a flag in session storage to indicate successful report posting
+      sessionStorage.setItem("reportPostedSuccess", "true")
+
+      // Navigate to the logistics dashboard
+      router.push("/logistics/dashboard")
     } catch (error) {
       console.error("Error posting report to Firestore:", error)
       toast({
@@ -276,9 +269,7 @@ export default function ReportPreviewPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
-        <h2 className="text-xl font-semibold text-gray-800">Loading report preview...</h2>
-        <p className="text-gray-600 mt-2">Please wait while your report is being processed.</p>
+        <div className="text-lg">Loading report preview...</div>
       </div>
     )
   }
