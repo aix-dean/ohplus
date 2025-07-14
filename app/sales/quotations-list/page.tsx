@@ -12,20 +12,20 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
-export default function SalesQuotationsPage() {
+export default function QuotationsListPage() {
   const { user } = useAuth()
   const [quotations, setQuotations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [pageSize] = useState(10) // Set page size to 10
-  const [lastVisibleId, setLastVisibleId] = useState<string | null>(null) // Stores ID of last doc for next page
+  const [lastQuotationId, setLastQuotationId] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
-  const [pageCursors, setPageCursors] = useState<string[]>([""]) // Stores the lastVisibleId of the *previous* page
+  const [pageHistory, setPageHistory] = useState<string[]>([""]) // Stores the lastQuotationId for each page
 
   const router = useRouter()
+  const pageSize = 10 // 10 items per page as requested
 
   const fetchQuotations = useCallback(
-    async (direction: "next" | "prev" | "first" = "first", cursorId: string | null = null) => {
+    async (direction: "next" | "prev" | "first" = "first") => {
       if (!user?.uid) {
         setLoading(false)
         return
@@ -33,33 +33,35 @@ export default function SalesQuotationsPage() {
 
       try {
         setLoading(true)
-        let currentCursor = cursorId
+        let currentLastId: string | null = null
 
-        if (direction === "prev" && currentPage > 1) {
-          currentCursor = pageCursors[currentPage - 2] // Get cursor for the page before the current one
+        if (direction === "next") {
+          currentLastId = lastQuotationId
+        } else if (direction === "prev" && currentPage > 1) {
+          currentLastId = pageHistory[currentPage - 2] // Get the ID of the first item of the previous page
         } else if (direction === "first") {
-          currentCursor = null // Reset cursor for first page
+          currentLastId = null
         }
 
         const {
           quotations: fetchedQuotations,
           lastVisibleId: newLastVisibleId,
           hasMore: newHasMore,
-        } = await getQuotationsPaginated(user.uid, pageSize, currentCursor)
+        } = await getQuotationsPaginated(user.uid, pageSize, currentLastId)
 
         setQuotations(fetchedQuotations)
-        setLastVisibleId(newLastVisibleId)
+        setLastQuotationId(newLastVisibleId)
         setHasMore(newHasMore)
 
-        if (direction === "first") {
-          setCurrentPage(1)
-          setPageCursors(["", newLastVisibleId || ""]) // Reset and add current page's last ID
-        } else if (direction === "next") {
+        if (direction === "next") {
           setCurrentPage((prev) => prev + 1)
-          setPageCursors((prev) => [...prev, newLastVisibleId || ""]) // Add new cursor
+          setPageHistory((prev) => [...prev, currentLastId || ""]) // Store the ID used to fetch this page
         } else if (direction === "prev") {
           setCurrentPage((prev) => prev - 1)
-          setPageCursors((prev) => prev.slice(0, -1)) // Remove current page's cursor
+          setPageHistory((prev) => prev.slice(0, -1))
+        } else if (direction === "first") {
+          setCurrentPage(1)
+          setPageHistory([""]) // Reset history for the first page
         }
       } catch (error) {
         console.error("Error fetching quotations:", error)
@@ -67,7 +69,7 @@ export default function SalesQuotationsPage() {
         setLoading(false)
       }
     },
-    [user?.uid, pageSize, currentPage, pageCursors],
+    [user?.uid, lastQuotationId, currentPage, pageHistory, pageSize],
   )
 
   useEffect(() => {
@@ -77,13 +79,13 @@ export default function SalesQuotationsPage() {
   }, [user?.uid, fetchQuotations])
 
   const handleNextPage = () => {
-    if (lastVisibleId && hasMore) {
-      fetchQuotations("next", lastVisibleId)
+    if (hasMore && !loading) {
+      fetchQuotations("next")
     }
   }
 
   const handlePrevPage = () => {
-    if (currentPage > 1) {
+    if (currentPage > 1 && !loading) {
       fetchQuotations("prev")
     }
   }
@@ -107,10 +109,16 @@ export default function SalesQuotationsPage() {
     switch (status?.toLowerCase()) {
       case "accepted":
         return "bg-green-100 text-green-800 border-green-200"
-      case "pending":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200"
-      case "declined":
+      case "sent":
+        return "bg-blue-100 text-blue-800 border-blue-200"
+      case "draft":
+        return "bg-gray-100 text-gray-800 border-gray-200"
+      case "rejected":
         return "bg-red-100 text-red-800 border-red-200"
+      case "expired":
+        return "bg-orange-100 text-orange-800 border-orange-200"
+      case "viewed":
+        return "bg-purple-100 text-purple-800 border-purple-200"
       default:
         return "bg-gray-100 text-gray-800 border-gray-200"
     }
@@ -139,7 +147,7 @@ export default function SalesQuotationsPage() {
                 <TableBody>
                   {Array(pageSize)
                     .fill(0)
-                    .map((_, i) => {
+                    .map((_, i) => (
                       <TableRow key={i} className="border-b border-gray-100">
                         <TableCell className="py-3">
                           <Skeleton className="h-4 w-24" />
@@ -157,95 +165,86 @@ export default function SalesQuotationsPage() {
                           <Skeleton className="h-4 w-28" />
                         </TableCell>
                       </TableRow>
-                    })}
+                    ))}
                 </TableBody>
               </Table>
-            ) : quotations.length === 0 ? (
-              <CardContent className="text-center py-12">
-                <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="h-8 w-8 text-gray-400"
-                  >
-                    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
-                    <path d="M3 6h18" />
-                    <path d="M16 10a4 4 0 0 1-8 0" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No quotations yet</h3>
-                <p className="text-gray-600 mb-6">Create your first quotation to get started.</p>
-              </CardContent>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50 border-b border-gray-200">
-                      <TableHead className="font-semibold text-gray-900 py-3">Date</TableHead>
-                      <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
-                      <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
-                      <TableHead className="font-semibold text-gray-900 py-3">Amount</TableHead>
-                      <TableHead className="font-semibold text-gray-900 py-3">Reference</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {quotations.map((quotation) => {
-                      <TableRow
-                        key={quotation.id}
-                        className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
-                        onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                      >
-                        <TableCell className="font-medium py-3">{formatDate(quotation.created)}</TableCell>
-                        <TableCell className="py-3">{quotation.client_name}</TableCell>
-                        <TableCell className="py-3">
-                          <Badge variant="outline" className={`${getStatusColor(quotation.status)} border font-medium`}>
-                            {quotation.status || "Unknown"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="py-3">₱{quotation.total_amount?.toLocaleString() || "N/A"}</TableCell>
-                        <TableCell className="py-3">
-                          {quotation.quotation_number || quotation.id.substring(0, 8)}
-                        </TableCell>
+            ) : quotations.length > 0 ? (
+              <>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50 border-b border-gray-200">
+                        <TableHead className="font-semibold text-gray-900 py-3">Date</TableHead>
+                        <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
+                        <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
+                        <TableHead className="font-semibold text-gray-900 py-3">Amount</TableHead>
+                        <TableHead className="font-semibold text-gray-900 py-3">Reference</TableHead>
                       </TableRow>
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {quotations.map((quotation) => (
+                        <TableRow
+                          key={quotation.id}
+                          className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                          onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
+                        >
+                          <TableCell className="py-3 text-sm text-gray-700">{formatDate(quotation.created)}</TableCell>
+                          <TableCell className="py-3 text-sm text-gray-700">{quotation.client_name || "N/A"}</TableCell>
+                          <TableCell className="py-3">
+                            <Badge
+                              variant="outline"
+                              className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
+                                quotation.status,
+                              )}`}
+                            >
+                              {quotation.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-3 text-sm text-gray-700">
+                            ₱{quotation.total_amount?.toLocaleString() || "0.00"}
+                          </TableCell>
+                          <TableCell className="py-3 text-sm text-gray-700">
+                            {quotation.quotation_number || "N/A"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+                <div className="flex justify-between items-center p-4 border-t border-gray-200">
+                  <Button
+                    variant="outline"
+                    onClick={handlePrevPage}
+                    disabled={currentPage === 1 || loading}
+                    className="flex items-center gap-2 text-gray-600 hover:text-gray-900 bg-transparent"
+                  >
+                    <ChevronLeft className="h-4 w-4" /> Previous
+                  </Button>
+                  <span className="text-sm text-gray-700">Page {currentPage}</span>
+                  <Button
+                    variant="outline"
+                    onClick={handleNextPage}
+                    disabled={!hasMore || loading}
+                    className="flex items-center gap-2 text-gray-600 hover:text-gray-900 bg-transparent"
+                  >
+                    Next <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <CardContent className="p-6 text-center text-gray-600">
+                <p>No quotations found for your account.</p>
+              </CardContent>
             )}
           </Card>
-\
-          <div className="flex justify-between items-center mt-6 px-2">
-            <div className="text-sm text-gray-500">
-              Page {currentPage}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handlePrevPage} disabled={currentPage <= 1 || loading}>
-                <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleNextPage} disabled={!hasMore || loading}>
-                Next <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
-          </div>
         ) : (
-          <p className="text-center py-10 text-gray-600">Please log in to view your quotations.</p>
+          <Card className="border-gray-200 shadow-sm rounded-xl">
+            <CardContent className="p-6 text-center text-gray-600">
+              <p>Please log in to view your quotations.</p>
+            </CardContent>
+          </Card>
         )}
       </div>
-  \
-  loading && (
-    <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50">
-      <div className="bg-white p-4 rounded-lg shadow">
-        <p>Loading quotations...</p>
-      </div>
     </div>
-  )
-  </div>
   )
 }
