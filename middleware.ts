@@ -2,12 +2,17 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  console.log("Middleware - Processing request:", request.nextUrl.pathname)
 
-  console.log("Middleware: Processing request for:", pathname)
+  // Log all CMS routes
+  if (request.nextUrl.pathname.startsWith("/cms")) {
+    console.log("Middleware - CMS route detected:", request.nextUrl.pathname)
+  }
 
-  // Allow all requests to pass through for now
-  // Add any specific middleware logic here if needed
+  // Check for specific route patterns that might conflict
+  if (request.nextUrl.pathname.match(/\/cms\/details\/[^/]+$/)) {
+    console.log("Middleware - CMS details route matched:", request.nextUrl.pathname)
+  }
 
   return NextResponse.next()
 }
