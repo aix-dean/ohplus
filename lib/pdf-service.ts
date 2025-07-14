@@ -898,22 +898,23 @@ export async function generateReportPDF(
     pdf.text("Installation Report", margin + 2, yPosition + 5)
     pdf.setTextColor(0, 0, 0)
 
-    // Add company logo on the right (160x160px area like in the page)
-    const logoSize = 40 // Adjust to fit in PDF
-    const logoX = pageWidth - margin - logoSize
-    const logoY = yPosition - 10
+    // Add company logo on the right (much smaller to match the page)
+    const logoSize = 20 // Reduced from 40 to 20
+    const logoX = pageWidth - margin - logoSize - 5
+    const logoY = yPosition - 8
 
     // Try to load company logo, fallback to OH+ logo
     const companyLogoUrl = "/ohplus-new-logo.png" // Default to OH+ logo
     const logoBase64 = await loadImageAsBase64(companyLogoUrl)
     if (logoBase64) {
-      // Add white background for logo
+      // Add white background for logo (smaller box)
       pdf.setFillColor(255, 255, 255)
-      pdf.rect(logoX - 5, logoY, logoSize + 10, logoSize, "F")
+      pdf.rect(logoX - 3, logoY, logoSize + 6, logoSize + 6, "F")
       pdf.setDrawColor(200, 200, 200)
-      pdf.rect(logoX - 5, logoY, logoSize + 10, logoSize)
+      pdf.setLineWidth(0.5)
+      pdf.rect(logoX - 3, logoY, logoSize + 6, logoSize + 6)
 
-      pdf.addImage(logoBase64, "PNG", logoX, logoY + 5, logoSize, logoSize - 10)
+      pdf.addImage(logoBase64, "PNG", logoX, logoY + 3, logoSize, logoSize)
     }
 
     yPosition += badgeHeight + 5
