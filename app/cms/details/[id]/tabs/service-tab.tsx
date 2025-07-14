@@ -7,14 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Wrench, Calendar, Clock, User, AlertTriangle } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Plus, MoreVertical, Edit, Trash2, Calendar, Clock, User, AlertTriangle, CheckCircle } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import type { ServiceAssignment } from "@/lib/firebase-service"
-import { toast } from "@/hooks/use-toast"
 
 interface ServiceTabProps {
   productId: string
@@ -22,205 +23,230 @@ interface ServiceTabProps {
 }
 
 export default function ServiceTab({ productId, serviceAssignments }: ServiceTabProps) {
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const [assignments, setAssignments] = useState<ServiceAssignment[]>(serviceAssignments)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [selectedAssignment, setSelectedAssignment] = useState<ServiceAssignment | null>(null)
+  const { toast } = useToast()
+
   const [formData, setFormData] = useState({
-    title: "",
-    description: "",
+    saNumber: "",
+    serviceType: "",
+    assignedTo: "",
+    jobDescription: "",
+    message: "",
+    coveredDateStart: "",
+    coveredDateEnd: "",
+    alarmDate: "",
+    alarmTime: "",
     priority: "medium" as "low" | "medium" | "high" | "urgent",
-    assignee: "",
-    dueDate: "",
   })
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const resetForm = () => {
+    setFormData({
+      saNumber: "",
+      serviceType: "",
+      assignedTo: "",
+      jobDescription: "",
+      message: "",
+      coveredDateStart: "",
+      coveredDateEnd: "",
+      alarmDate: "",
+      alarmTime: "",
+      priority: "medium",
+    })
+  }
+
+  const handleCreate = () => {
+    setIsCreateOpen(true)
+    resetForm()
+    // Generate SA number
+    setFormData((prev) => ({
+      ...prev,
+      saNumber: `SA-${Date.now().toString().slice(-6)}`,
+    }))
+  }
+
+  const handleEdit = (assignment: ServiceAssignment) => {
+    setSelectedAssignment(assignment)
+    setFormData({
+      saNumber: assignment.saNumber,
+      serviceType: assignment.serviceType,
+      assignedTo: assignment.assignedTo,
+      jobDescription: assignment.jobDescription,
+      message: assignment.message,
+      coveredDateStart: assignment.coveredDateStart?.toISOString().split("T")[0] || "",
+      coveredDateEnd: assignment.coveredDateEnd?.toISOString().split("T")[0] || "",
+      alarmDate: assignment.alarmDate?.toISOString().split("T")[0] || "",
+      alarmTime: assignment.alarmTime || "",
+      priority: "medium",
+    })
+    setIsEditOpen(true)
+  }
+
+  const handleDelete = (assignmentId: string) => {
+    setAssignments((prev) => prev.filter((a) => a.id !== assignmentId))
+    toast({
+      title: "Service assignment deleted",
+      description: "The service assignment has been removed.",
+    })
+  }
+
+  const handleStatusChange = (assignmentId: string, newStatus: string) => {
+    setAssignments((prev) =>
+      prev.map((a) =>
+        a.id === assignmentId
+          ? {
+              ...a,
+              status: newStatus,
+              updated: new Date(),
+            }
+          : a,
+      ),
+    )
+    toast({
+      title: "Status updated",
+      description: `Service assignment status changed to ${newStatus}.`,
+    })
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    try {
-      // Here you would typically save to Firebase
-      console.log("Creating service assignment:", formData)
-
+    if (selectedAssignment) {
+      // Edit existing assignment
+      setAssignments((prev) =>
+        prev.map((a) =>
+          a.id === selectedAssignment.id
+            ? {
+                ...a,
+                saNumber: formData.saNumber,
+                serviceType: formData.serviceType,
+                assignedTo: formData.assignedTo,
+                jobDescription: formData.jobDescription,
+                message: formData.message,
+                coveredDateStart: formData.coveredDateStart ? new Date(formData.coveredDateStart) : null,
+                coveredDateEnd: formData.coveredDateEnd ? new Date(formData.coveredDateEnd) : null,
+                alarmDate: formData.alarmDate ? new Date(formData.alarmDate) : null,
+                alarmTime: formData.alarmTime,
+                updated: new Date(),
+              }
+            : a,
+        ),
+      )
       toast({
-        title: "Success",
-        description: "Service assignment created successfully",
+        title: "Service assignment updated",
+        description: "The service assignment has been updated successfully.",
       })
-
-      setDialogOpen(false)
-      setFormData({
-        title: "",
-        description: "",
-        priority: "medium",
-        assignee: "",
-        dueDate: "",
-      })
-    } catch (error) {
-      console.error("Error creating service assignment:", error)
+      setIsEditOpen(false)
+    } else {
+      // Create new assignment
+      const newAssignment: ServiceAssignment = {
+        id: Date.now().toString(),
+        saNumber: formData.saNumber,
+        projectSiteId: productId,
+        projectSiteName: "LED Display Site",
+        projectSiteLocation: "Current Location",
+        serviceType: formData.serviceType,
+        assignedTo: formData.assignedTo,
+        jobDescription: formData.jobDescription,
+        requestedBy: {
+          id: "current-user",
+          name: "Current User",
+          department: "CMS",
+        },
+        message: formData.message,
+        coveredDateStart: formData.coveredDateStart ? new Date(formData.coveredDateStart) : null,
+        coveredDateEnd: formData.coveredDateEnd ? new Date(formData.coveredDateEnd) : null,
+        alarmDate: formData.alarmDate ? new Date(formData.alarmDate) : null,
+        alarmTime: formData.alarmTime,
+        attachments: [],
+        status: "pending",
+        created: new Date(),
+        updated: new Date(),
+      }
+      setAssignments((prev) => [...prev, newAssignment])
       toast({
-        title: "Error",
-        description: "Failed to create service assignment",
-        variant: "destructive",
+        title: "Service assignment created",
+        description: "New service assignment has been created successfully.",
       })
+      setIsCreateOpen(false)
+    }
+
+    setSelectedAssignment(null)
+    resetForm()
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "completed":
+        return "bg-green-100 text-green-800"
+      case "ongoing":
+      case "in progress":
+        return "bg-blue-100 text-blue-800"
+      case "pending":
+        return "bg-yellow-100 text-yellow-800"
+      case "cancelled":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-gray-100 text-gray-800"
     }
   }
 
   const getPriorityColor = (priority: string) => {
-    switch (priority) {
+    switch (priority.toLowerCase()) {
       case "urgent":
-        return "bg-red-100 text-red-800 border-red-200"
+        return "bg-red-100 text-red-800"
       case "high":
-        return "bg-orange-100 text-orange-800 border-orange-200"
+        return "bg-orange-100 text-orange-800"
       case "medium":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+        return "bg-blue-100 text-blue-800"
       case "low":
-        return "bg-green-100 text-green-800 border-green-200"
+        return "bg-gray-100 text-gray-800"
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
+        return "bg-gray-100 text-gray-800"
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
+  const getStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
       case "completed":
-        return "bg-green-100 text-green-800 border-green-200"
-      case "in_progress":
+        return <CheckCircle className="h-4 w-4 text-green-600" />
       case "ongoing":
-        return "bg-blue-100 text-blue-800 border-blue-200"
+      case "in progress":
+        return <Clock className="h-4 w-4 text-blue-600" />
       case "pending":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200"
-      case "cancelled":
-        return "bg-red-100 text-red-800 border-red-200"
+        return <AlertTriangle className="h-4 w-4 text-yellow-600" />
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
+        return <Clock className="h-4 w-4 text-gray-600" />
     }
   }
-
-  const formatDate = (timestamp: any) => {
-    try {
-      if (!timestamp) return "Not set"
-      if (timestamp.seconds) {
-        return new Date(timestamp.seconds * 1000).toLocaleDateString()
-      }
-      if (timestamp instanceof Date) {
-        return timestamp.toLocaleDateString()
-      }
-      if (typeof timestamp === "string") {
-        return new Date(timestamp).toLocaleDateString()
-      }
-      return "Invalid date"
-    } catch {
-      return "Invalid date"
-    }
-  }
-
-  // Get service statistics
-  const totalAssignments = serviceAssignments.length
-  const completedAssignments = serviceAssignments.filter((sa) => sa.status === "completed").length
-  const pendingAssignments = serviceAssignments.filter((sa) => sa.status === "pending").length
-  const urgentAssignments = serviceAssignments.filter((sa) => sa.priority === "urgent").length
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Service Management</h2>
-          <p className="text-gray-600">Track maintenance and service assignments for this display</p>
+          <h3 className="text-lg font-semibold">Service Assignments</h3>
+          <p className="text-sm text-muted-foreground">Manage maintenance and service tasks for this display</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus size={16} className="mr-2" />
-              New Service Request
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Create Service Assignment</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="title">Service Title</Label>
-                <Input
-                  id="title"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="e.g., LED Panel Replacement"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
-                  placeholder="Describe the service requirements..."
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="priority">Priority</Label>
-                  <Select
-                    value={formData.priority}
-                    onValueChange={(value: "low" | "medium" | "high" | "urgent") =>
-                      setFormData({ ...formData, priority: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="urgent">Urgent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="assignee">Assignee</Label>
-                  <Input
-                    id="assignee"
-                    value={formData.assignee}
-                    onChange={(e) => setFormData({ ...formData, assignee: e.target.value })}
-                    placeholder="Technician name"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="dueDate">Due Date</Label>
-                <Input
-                  id="dueDate"
-                  type="date"
-                  value={formData.dueDate}
-                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                />
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">Create Assignment</Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={handleCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          New Assignment
+        </Button>
       </div>
 
-      {/* Service Statistics */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Wrench size={20} className="text-blue-600" />
-              </div>
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Assignments</p>
-                <p className="text-2xl font-bold">{totalAssignments}</p>
+                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="text-2xl font-bold">{assignments.length}</p>
+              </div>
+              <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+                <Calendar className="h-4 w-4 text-blue-600" />
               </div>
             </div>
           </CardContent>
@@ -228,13 +254,15 @@ export default function ServiceTab({ productId, serviceAssignments }: ServiceTab
 
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Calendar size={20} className="text-green-600" />
-              </div>
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Completed</p>
-                <p className="text-2xl font-bold">{completedAssignments}</p>
+                <p className="text-sm text-muted-foreground">Pending</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {assignments.filter((a) => a.status.toLowerCase() === "pending").length}
+                </p>
+              </div>
+              <div className="h-8 w-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                <AlertTriangle className="h-4 w-4 text-yellow-600" />
               </div>
             </div>
           </CardContent>
@@ -242,13 +270,15 @@ export default function ServiceTab({ productId, serviceAssignments }: ServiceTab
 
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <Clock size={20} className="text-yellow-600" />
-              </div>
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Pending</p>
-                <p className="text-2xl font-bold">{pendingAssignments}</p>
+                <p className="text-sm text-muted-foreground">Ongoing</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {assignments.filter((a) => a.status.toLowerCase() === "ongoing").length}
+                </p>
+              </div>
+              <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+                <Clock className="h-4 w-4 text-blue-600" />
               </div>
             </div>
           </CardContent>
@@ -256,76 +286,103 @@ export default function ServiceTab({ productId, serviceAssignments }: ServiceTab
 
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <AlertTriangle size={20} className="text-red-600" />
-              </div>
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Urgent</p>
-                <p className="text-2xl font-bold">{urgentAssignments}</p>
+                <p className="text-sm text-muted-foreground">Completed</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {assignments.filter((a) => a.status.toLowerCase() === "completed").length}
+                </p>
+              </div>
+              <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle className="h-4 w-4 text-green-600" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Service Assignments Table */}
+      {/* Assignments Table */}
       <Card>
         <CardHeader>
           <CardTitle>Service Assignments</CardTitle>
         </CardHeader>
         <CardContent>
-          {serviceAssignments.length === 0 ? (
+          {assignments.length === 0 ? (
             <div className="text-center py-8">
-              <Wrench size={48} className="mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-500">No service assignments found</p>
-              <p className="text-sm text-gray-400 mt-1">
-                Create your first service assignment to track maintenance tasks
-              </p>
+              <p className="text-muted-foreground">No service assignments found for this display.</p>
+              <Button onClick={handleCreate} className="mt-4">
+                Create First Assignment
+              </Button>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Service</TableHead>
-                  <TableHead>Priority</TableHead>
+                  <TableHead>SA Number</TableHead>
+                  <TableHead>Service Type</TableHead>
+                  <TableHead>Assigned To</TableHead>
+                  <TableHead>Schedule</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Assignee</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Created</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {serviceAssignments.map((assignment) => (
+                {assignments.map((assignment) => (
                   <TableRow key={assignment.id}>
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{assignment.title || "Untitled Service"}</div>
-                        <div className="text-sm text-gray-500 truncate max-w-xs">
-                          {assignment.description || "No description"}
-                        </div>
-                      </div>
+                      <div className="font-medium">{assignment.saNumber}</div>
+                      <div className="text-sm text-muted-foreground">{assignment.jobDescription}</div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={getPriorityColor(assignment.priority || "medium")}>
-                        {(assignment.priority || "medium").charAt(0).toUpperCase() +
-                          (assignment.priority || "medium").slice(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(assignment.status || "pending")}>
-                        {(assignment.status || "pending").replace("_", " ").charAt(0).toUpperCase() +
-                          (assignment.status || "pending").replace("_", " ").slice(1)}
-                      </Badge>
+                      <Badge variant="outline">{assignment.serviceType}</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <User size={16} className="text-gray-400" />
-                        <span>{assignment.assignee || "Unassigned"}</span>
+                        <User className="h-4 w-4" />
+                        {assignment.assignedTo}
                       </div>
                     </TableCell>
-                    <TableCell>{formatDate(assignment.due_date)}</TableCell>
-                    <TableCell>{formatDate(assignment.created)}</TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        {assignment.coveredDateStart && (
+                          <div>Start: {assignment.coveredDateStart.toLocaleDateString()}</div>
+                        )}
+                        {assignment.coveredDateEnd && <div>End: {assignment.coveredDateEnd.toLocaleDateString()}</div>}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(assignment.status)}
+                        <Badge className={getStatusColor(assignment.status)}>{assignment.status.toUpperCase()}</Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(assignment)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleStatusChange(assignment.id, "ongoing")}>
+                            <Clock className="h-4 w-4 mr-2" />
+                            Mark Ongoing
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleStatusChange(assignment.id, "completed")}>
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Mark Completed
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDelete(assignment.id)} className="text-red-600">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -333,6 +390,246 @@ export default function ServiceTab({ productId, serviceAssignments }: ServiceTab
           )}
         </CardContent>
       </Card>
+
+      {/* Create Assignment Dialog */}
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create Service Assignment</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="saNumber">SA Number</Label>
+              <Input id="saNumber" value={formData.saNumber} disabled />
+            </div>
+
+            <div>
+              <Label htmlFor="serviceType">Service Type</Label>
+              <Select
+                value={formData.serviceType}
+                onValueChange={(value) => setFormData({ ...formData, serviceType: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select service type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="repair">Repair</SelectItem>
+                  <SelectItem value="installation">Installation</SelectItem>
+                  <SelectItem value="inspection">Inspection</SelectItem>
+                  <SelectItem value="cleaning">Cleaning</SelectItem>
+                  <SelectItem value="upgrade">Upgrade</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="assignedTo">Assigned To</Label>
+              <Input
+                id="assignedTo"
+                value={formData.assignedTo}
+                onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                placeholder="Enter technician name"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="jobDescription">Job Description</Label>
+              <Textarea
+                id="jobDescription"
+                value={formData.jobDescription}
+                onChange={(e) => setFormData({ ...formData, jobDescription: e.target.value })}
+                placeholder="Describe the service task"
+                rows={3}
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="message">Additional Notes</Label>
+              <Textarea
+                id="message"
+                value={formData.message}
+                onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                placeholder="Any additional information"
+                rows={2}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="coveredDateStart">Start Date</Label>
+                <Input
+                  id="coveredDateStart"
+                  type="date"
+                  value={formData.coveredDateStart}
+                  onChange={(e) => setFormData({ ...formData, coveredDateStart: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="coveredDateEnd">End Date</Label>
+                <Input
+                  id="coveredDateEnd"
+                  type="date"
+                  value={formData.coveredDateEnd}
+                  onChange={(e) => setFormData({ ...formData, coveredDateEnd: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="alarmDate">Reminder Date</Label>
+                <Input
+                  id="alarmDate"
+                  type="date"
+                  value={formData.alarmDate}
+                  onChange={(e) => setFormData({ ...formData, alarmDate: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="alarmTime">Reminder Time</Label>
+                <Input
+                  id="alarmTime"
+                  type="time"
+                  value={formData.alarmTime}
+                  onChange={(e) => setFormData({ ...formData, alarmTime: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Create Assignment</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Assignment Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Service Assignment</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label htmlFor="edit-saNumber">SA Number</Label>
+              <Input id="edit-saNumber" value={formData.saNumber} disabled />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-serviceType">Service Type</Label>
+              <Select
+                value={formData.serviceType}
+                onValueChange={(value) => setFormData({ ...formData, serviceType: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select service type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                  <SelectItem value="repair">Repair</SelectItem>
+                  <SelectItem value="installation">Installation</SelectItem>
+                  <SelectItem value="inspection">Inspection</SelectItem>
+                  <SelectItem value="cleaning">Cleaning</SelectItem>
+                  <SelectItem value="upgrade">Upgrade</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-assignedTo">Assigned To</Label>
+              <Input
+                id="edit-assignedTo"
+                value={formData.assignedTo}
+                onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                placeholder="Enter technician name"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-jobDescription">Job Description</Label>
+              <Textarea
+                id="edit-jobDescription"
+                value={formData.jobDescription}
+                onChange={(e) => setFormData({ ...formData, jobDescription: e.target.value })}
+                placeholder="Describe the service task"
+                rows={3}
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="edit-message">Additional Notes</Label>
+              <Textarea
+                id="edit-message"
+                value={formData.message}
+                onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                placeholder="Any additional information"
+                rows={2}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-coveredDateStart">Start Date</Label>
+                <Input
+                  id="edit-coveredDateStart"
+                  type="date"
+                  value={formData.coveredDateStart}
+                  onChange={(e) => setFormData({ ...formData, coveredDateStart: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-coveredDateEnd">End Date</Label>
+                <Input
+                  id="edit-coveredDateEnd"
+                  type="date"
+                  value={formData.coveredDateEnd}
+                  onChange={(e) => setFormData({ ...formData, coveredDateEnd: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="edit-alarmDate">Reminder Date</Label>
+                <Input
+                  id="edit-alarmDate"
+                  type="date"
+                  value={formData.alarmDate}
+                  onChange={(e) => setFormData({ ...formData, alarmDate: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="edit-alarmTime">Reminder Time</Label>
+                <Input
+                  id="edit-alarmTime"
+                  type="time"
+                  value={formData.alarmTime}
+                  onChange={(e) => setFormData({ ...formData, alarmTime: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">Update Assignment</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
