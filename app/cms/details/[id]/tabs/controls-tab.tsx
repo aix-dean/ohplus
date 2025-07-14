@@ -7,488 +7,390 @@ import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Power,
-  Sun,
+  Volume2,
+  FlashlightIcon as Brightness4,
   Monitor,
   Wifi,
-  Activity,
+  HardDrive,
   Thermometer,
-  Zap,
+  Activity,
   RefreshCw,
   Settings,
   AlertTriangle,
   CheckCircle,
-  Play,
-  Pause,
+  Clock,
   RotateCcw,
 } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "@/components/ui/use-toast"
 import type { Product } from "@/lib/firebase-service"
 
 interface ControlsTabProps {
   product: Product
 }
 
-interface DisplayStatus {
-  power: boolean
-  brightness: number
-  volume: number
+interface DisplayMetrics {
   temperature: number
+  cpuUsage: number
+  memoryUsage: number
+  diskUsage: number
   uptime: string
-  connectionStatus: "online" | "offline" | "unstable"
+  signalStrength: number
   lastUpdate: string
-  errors: string[]
-  warnings: string[]
 }
 
-export default function ControlsTab({ product }: ControlsTabProps) {
-  const [displayStatus, setDisplayStatus] = useState<DisplayStatus>({
-    power: true,
-    brightness: 80,
-    volume: 65,
+export function ControlsTab({ product }: ControlsTabProps) {
+  const [isOnline, setIsOnline] = useState(true)
+  const [brightness, setBrightness] = useState([75])
+  const [volume, setVolume] = useState([60])
+  const [powerStatus, setPowerStatus] = useState(true)
+  const [autoSchedule, setAutoSchedule] = useState(true)
+  const [displayMode, setDisplayMode] = useState("normal")
+  const [refreshInterval, setRefreshInterval] = useState(30)
+
+  const [metrics, setMetrics] = useState<DisplayMetrics>({
     temperature: 42,
-    uptime: "72h 15m",
-    connectionStatus: "online",
+    cpuUsage: 35,
+    memoryUsage: 68,
+    diskUsage: 45,
+    uptime: "7d 14h 32m",
+    signalStrength: 85,
     lastUpdate: new Date().toLocaleTimeString(),
-    errors: [],
-    warnings: ["High temperature detected"],
   })
 
-  const [isLoading, setIsLoading] = useState(false)
-  const [autoRefresh, setAutoRefresh] = useState(true)
-  const { toast } = useToast()
-
-  // Auto-refresh status every 30 seconds
+  // Simulate real-time metrics updates
   useEffect(() => {
-    if (!autoRefresh) return
-
     const interval = setInterval(() => {
-      setDisplayStatus((prev) => ({
+      setMetrics((prev) => ({
         ...prev,
+        temperature: 40 + Math.random() * 10,
+        cpuUsage: 30 + Math.random() * 40,
+        memoryUsage: 60 + Math.random() * 20,
+        diskUsage: 40 + Math.random() * 20,
+        signalStrength: 80 + Math.random() * 20,
         lastUpdate: new Date().toLocaleTimeString(),
-        temperature: Math.max(35, Math.min(50, prev.temperature + (Math.random() - 0.5) * 2)),
       }))
-    }, 30000)
+    }, refreshInterval * 1000)
 
     return () => clearInterval(interval)
-  }, [autoRefresh])
+  }, [refreshInterval])
 
-  const handlePowerToggle = async () => {
-    setIsLoading(true)
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
-
-      setDisplayStatus((prev) => ({
-        ...prev,
-        power: !prev.power,
-        lastUpdate: new Date().toLocaleTimeString(),
-      }))
-
-      toast({
-        title: displayStatus.power ? "Display powered off" : "Display powered on",
-        description: `Display is now ${displayStatus.power ? "offline" : "online"}`,
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to toggle power. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+  const handlePowerToggle = () => {
+    setPowerStatus(!powerStatus)
+    toast({
+      title: powerStatus ? "Display Powered Off" : "Display Powered On",
+      description: powerStatus
+        ? "The display has been turned off remotely."
+        : "The display has been turned on remotely.",
+    })
   }
 
-  const handleBrightnessChange = async (value: number[]) => {
-    const brightness = value[0]
-    setDisplayStatus((prev) => ({
-      ...prev,
-      brightness,
-      lastUpdate: new Date().toLocaleTimeString(),
-    }))
-
-    // Debounced API call simulation
-    setTimeout(() => {
-      toast({
-        title: "Brightness updated",
-        description: `Display brightness set to ${brightness}%`,
-      })
-    }, 500)
+  const handleBrightnessChange = (value: number[]) => {
+    setBrightness(value)
+    toast({
+      title: "Brightness Updated",
+      description: `Display brightness set to ${value[0]}%`,
+    })
   }
 
-  const handleVolumeChange = async (value: number[]) => {
-    const volume = value[0]
-    setDisplayStatus((prev) => ({
-      ...prev,
-      volume,
-      lastUpdate: new Date().toLocaleTimeString(),
-    }))
-
-    // Debounced API call simulation
-    setTimeout(() => {
-      toast({
-        title: "Volume updated",
-        description: `Display volume set to ${volume}%`,
-      })
-    }, 500)
+  const handleVolumeChange = (value: number[]) => {
+    setVolume(value)
+    toast({
+      title: "Volume Updated",
+      description: `Display volume set to ${value[0]}%`,
+    })
   }
 
-  const handleRestart = async () => {
-    setIsLoading(true)
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 3000))
-
-      setDisplayStatus((prev) => ({
-        ...prev,
-        uptime: "0h 1m",
-        temperature: 38,
-        errors: [],
-        warnings: [],
-        lastUpdate: new Date().toLocaleTimeString(),
-      }))
-
-      toast({
-        title: "Display restarted",
-        description: "Display has been successfully restarted",
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to restart display. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+  const handleReboot = () => {
+    toast({
+      title: "Reboot Initiated",
+      description: "The display system is restarting. This may take a few minutes.",
+    })
   }
 
-  const handleRefreshStatus = async () => {
-    setIsLoading(true)
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-
-      setDisplayStatus((prev) => ({
-        ...prev,
-        lastUpdate: new Date().toLocaleTimeString(),
-        temperature: Math.max(35, Math.min(50, prev.temperature + (Math.random() - 0.5) * 3)),
-        connectionStatus: Math.random() > 0.1 ? "online" : "unstable",
-      }))
-
-      toast({
-        title: "Status refreshed",
-        description: "Display status has been updated",
-      })
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to refresh status. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+  const handleRefresh = () => {
+    toast({
+      title: "Refreshing Display",
+      description: "Display content is being refreshed.",
+    })
   }
 
-  const getConnectionStatusColor = (status: string) => {
-    switch (status) {
-      case "online":
-        return "bg-green-100 text-green-800"
-      case "offline":
-        return "bg-red-100 text-red-800"
-      case "unstable":
-        return "bg-yellow-100 text-yellow-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
+  const getMetricColor = (value: number, thresholds: { warning: number; critical: number }) => {
+    if (value >= thresholds.critical) return "text-red-600"
+    if (value >= thresholds.warning) return "text-yellow-600"
+    return "text-green-600"
   }
 
-  const getConnectionIcon = (status: string) => {
-    switch (status) {
-      case "online":
-        return <CheckCircle className="h-4 w-4 text-green-600" />
-      case "offline":
-        return <AlertTriangle className="h-4 w-4 text-red-600" />
-      case "unstable":
-        return <AlertTriangle className="h-4 w-4 text-yellow-600" />
-      default:
-        return <Activity className="h-4 w-4 text-gray-600" />
-    }
+  const getStatusIcon = (value: number, thresholds: { warning: number; critical: number }) => {
+    if (value >= thresholds.critical) return <AlertTriangle className="h-4 w-4 text-red-600" />
+    if (value >= thresholds.warning) return <AlertTriangle className="h-4 w-4 text-yellow-600" />
+    return <CheckCircle className="h-4 w-4 text-green-600" />
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Display Controls</h3>
-          <p className="text-sm text-muted-foreground">Monitor and control LED display hardware</p>
+          <h2 className="text-lg font-semibold text-gray-900">Display Controls</h2>
+          <p className="text-sm text-gray-500">Monitor and control the LED display system remotely</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="auto-refresh">Auto-refresh</Label>
-            <Switch id="auto-refresh" checked={autoRefresh} onCheckedChange={setAutoRefresh} />
-          </div>
-          <Button variant="outline" size="sm" onClick={handleRefreshStatus} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
+          <Badge variant={isOnline ? "default" : "secondary"} className="flex items-center gap-1">
+            <div className={`w-2 h-2 rounded-full ${isOnline ? "bg-green-500" : "bg-gray-400"}`} />
+            {isOnline ? "Online" : "Offline"}
+          </Badge>
         </div>
       </div>
 
-      {/* Status Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Power Status</p>
-                <p className={`text-lg font-semibold ${displayStatus.power ? "text-green-600" : "text-red-600"}`}>
-                  {displayStatus.power ? "ON" : "OFF"}
-                </p>
-              </div>
-              <div
-                className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                  displayStatus.power ? "bg-green-100" : "bg-red-100"
-                }`}
-              >
-                <Power className={`h-4 w-4 ${displayStatus.power ? "text-green-600" : "text-red-600"}`} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Connection</p>
-                <div className="flex items-center gap-2">
-                  {getConnectionIcon(displayStatus.connectionStatus)}
-                  <Badge className={getConnectionStatusColor(displayStatus.connectionStatus)}>
-                    {displayStatus.connectionStatus.toUpperCase()}
-                  </Badge>
-                </div>
-              </div>
-              <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <Wifi className="h-4 w-4 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Temperature</p>
-                <p
-                  className={`text-lg font-semibold ${
-                    displayStatus.temperature > 45
-                      ? "text-red-600"
-                      : displayStatus.temperature > 40
-                        ? "text-yellow-600"
-                        : "text-green-600"
-                  }`}
-                >
-                  {displayStatus.temperature}°C
-                </p>
-              </div>
-              <div className="h-8 w-8 bg-orange-100 rounded-full flex items-center justify-center">
-                <Thermometer className="h-4 w-4 text-orange-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Uptime</p>
-                <p className="text-lg font-semibold">{displayStatus.uptime}</p>
-              </div>
-              <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center">
-                <Activity className="h-4 w-4 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Alerts */}
-      {(displayStatus.errors.length > 0 || displayStatus.warnings.length > 0) && (
-        <div className="space-y-2">
-          {displayStatus.errors.map((error, index) => (
-            <Alert key={`error-${index}`} variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          ))}
-          {displayStatus.warnings.map((warning, index) => (
-            <Alert key={`warning-${index}`}>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>{warning}</AlertDescription>
-            </Alert>
-          ))}
-        </div>
-      )}
-
-      {/* Control Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Power Controls */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Power className="h-5 w-5" />
-              Power Controls
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="power-switch">Display Power</Label>
-                <p className="text-sm text-muted-foreground">Turn display on/off</p>
-              </div>
-              <Switch
-                id="power-switch"
-                checked={displayStatus.power}
-                onCheckedChange={handlePowerToggle}
-                disabled={isLoading}
-              />
-            </div>
-
-            <Separator />
-
-            <div className="space-y-4">
-              <Button
-                onClick={handleRestart}
-                disabled={isLoading || !displayStatus.power}
-                className="w-full bg-transparent"
-                variant="outline"
-              >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Restart Display
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Display Settings */}
+        {/* Power & Display Controls */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Monitor className="h-5 w-5" />
-              Display Settings
+              Display Controls
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Power Control */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Power className="h-4 w-4" />
+                <Label>Power</Label>
+              </div>
+              <Switch checked={powerStatus} onCheckedChange={handlePowerToggle} disabled={!isOnline} />
+            </div>
+
+            {/* Brightness Control */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="brightness">Brightness</Label>
-                <span className="text-sm text-muted-foreground">{displayStatus.brightness}%</span>
+                <div className="flex items-center gap-2">
+                  <Brightness4 className="h-4 w-4" />
+                  <Label>Brightness</Label>
+                </div>
+                <span className="text-sm font-medium">{brightness[0]}%</span>
               </div>
               <Slider
-                id="brightness"
-                min={0}
+                value={brightness}
+                onValueChange={handleBrightnessChange}
                 max={100}
                 step={1}
-                value={[displayStatus.brightness]}
-                onValueChange={handleBrightnessChange}
-                disabled={!displayStatus.power}
+                disabled={!powerStatus || !isOnline}
                 className="w-full"
               />
             </div>
 
+            {/* Volume Control */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="volume">Volume</Label>
-                <span className="text-sm text-muted-foreground">{displayStatus.volume}%</span>
+                <div className="flex items-center gap-2">
+                  <Volume2 className="h-4 w-4" />
+                  <Label>Volume</Label>
+                </div>
+                <span className="text-sm font-medium">{volume[0]}%</span>
               </div>
               <Slider
-                id="volume"
-                min={0}
+                value={volume}
+                onValueChange={handleVolumeChange}
                 max={100}
                 step={1}
-                value={[displayStatus.volume]}
-                onValueChange={handleVolumeChange}
-                disabled={!displayStatus.power}
+                disabled={!powerStatus || !isOnline}
                 className="w-full"
               />
+            </div>
+
+            {/* Display Mode */}
+            <div className="space-y-2">
+              <Label>Display Mode</Label>
+              <Select value={displayMode} onValueChange={setDisplayMode} disabled={!powerStatus || !isOnline}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="normal">Normal</SelectItem>
+                  <SelectItem value="eco">Eco Mode</SelectItem>
+                  <SelectItem value="high_contrast">High Contrast</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Auto Schedule */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                <Label>Auto Schedule</Label>
+              </div>
+              <Switch checked={autoSchedule} onCheckedChange={setAutoSchedule} disabled={!isOnline} />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* System Metrics */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              System Metrics
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Temperature */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Thermometer className="h-4 w-4" />
+                <span className="text-sm">Temperature</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {getStatusIcon(metrics.temperature, { warning: 50, critical: 60 })}
+                <span
+                  className={`text-sm font-medium ${getMetricColor(metrics.temperature, { warning: 50, critical: 60 })}`}
+                >
+                  {metrics.temperature.toFixed(1)}°C
+                </span>
+              </div>
+            </div>
+
+            {/* CPU Usage */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Monitor className="h-4 w-4" />
+                <span className="text-sm">CPU Usage</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {getStatusIcon(metrics.cpuUsage, { warning: 70, critical: 90 })}
+                <span
+                  className={`text-sm font-medium ${getMetricColor(metrics.cpuUsage, { warning: 70, critical: 90 })}`}
+                >
+                  {metrics.cpuUsage.toFixed(1)}%
+                </span>
+              </div>
+            </div>
+
+            {/* Memory Usage */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <HardDrive className="h-4 w-4" />
+                <span className="text-sm">Memory</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {getStatusIcon(metrics.memoryUsage, { warning: 80, critical: 95 })}
+                <span
+                  className={`text-sm font-medium ${getMetricColor(metrics.memoryUsage, { warning: 80, critical: 95 })}`}
+                >
+                  {metrics.memoryUsage.toFixed(1)}%
+                </span>
+              </div>
+            </div>
+
+            {/* Disk Usage */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <HardDrive className="h-4 w-4" />
+                <span className="text-sm">Storage</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {getStatusIcon(metrics.diskUsage, { warning: 80, critical: 95 })}
+                <span
+                  className={`text-sm font-medium ${getMetricColor(metrics.diskUsage, { warning: 80, critical: 95 })}`}
+                >
+                  {metrics.diskUsage.toFixed(1)}%
+                </span>
+              </div>
+            </div>
+
+            {/* Signal Strength */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Wifi className="h-4 w-4" />
+                <span className="text-sm">Signal</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {getStatusIcon(100 - metrics.signalStrength, { warning: 30, critical: 50 })}
+                <span
+                  className={`text-sm font-medium ${getMetricColor(100 - metrics.signalStrength, { warning: 30, critical: 50 })}`}
+                >
+                  {metrics.signalStrength.toFixed(0)}%
+                </span>
+              </div>
+            </div>
+
+            {/* Uptime */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                <span className="text-sm">Uptime</span>
+              </div>
+              <span className="text-sm font-medium">{metrics.uptime}</span>
+            </div>
+
+            {/* Last Update */}
+            <div className="text-xs text-gray-500 text-center pt-2 border-t">Last updated: {metrics.lastUpdate}</div>
+          </CardContent>
+        </Card>
+
+        {/* System Actions */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              System Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Button
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={!isOnline}
+                className="flex items-center gap-2 bg-transparent"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh Content
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => toast({ title: "Screenshot Captured", description: "Display screenshot saved." })}
+                disabled={!powerStatus || !isOnline}
+                className="flex items-center gap-2"
+              >
+                <Monitor className="h-4 w-4" />
+                Screenshot
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={handleReboot}
+                disabled={!isOnline}
+                className="flex items-center gap-2 bg-transparent"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reboot System
+              </Button>
+
+              <div className="flex items-center gap-2">
+                <Label htmlFor="refresh-interval" className="text-sm">
+                  Refresh
+                </Label>
+                <Input
+                  id="refresh-interval"
+                  type="number"
+                  value={refreshInterval}
+                  onChange={(e) => setRefreshInterval(Number.parseInt(e.target.value) || 30)}
+                  min="5"
+                  max="300"
+                  className="w-16 h-8"
+                />
+                <span className="text-xs text-gray-500">sec</span>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* System Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            System Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-            <div>
-              <span className="text-muted-foreground">Product ID:</span>
-              <p className="font-medium">{product.id?.substring(0, 8).toUpperCase()}</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Location:</span>
-              <p className="font-medium">{product.specs_rental?.location || "Unknown"}</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Dimensions:</span>
-              <p className="font-medium">
-                {product.specs_rental?.width || 12}" × {product.specs_rental?.height || 12}"
-              </p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Last Update:</span>
-              <p className="font-medium">{displayStatus.lastUpdate}</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Firmware:</span>
-              <p className="font-medium">v2.1.4</p>
-            </div>
-            <div>
-              <span className="text-muted-foreground">IP Address:</span>
-              <p className="font-medium">192.168.1.100</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Quick Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button variant="outline" disabled={!displayStatus.power}>
-              <Play className="h-4 w-4 mr-2" />
-              Test Content
-            </Button>
-            <Button variant="outline" disabled={!displayStatus.power}>
-              <Pause className="h-4 w-4 mr-2" />
-              Pause Display
-            </Button>
-            <Button variant="outline" disabled={!displayStatus.power}>
-              <Sun className="h-4 w-4 mr-2" />
-              Auto Brightness
-            </Button>
-            <Button variant="outline" disabled={!displayStatus.power}>
-              <Zap className="h-4 w-4 mr-2" />
-              Power Save
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

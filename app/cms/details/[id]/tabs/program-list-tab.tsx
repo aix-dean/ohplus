@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,189 +10,187 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Plus, MoreVertical, Edit, Trash2, Play, Pause, Calendar, Clock } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { Plus, Edit, Trash2, Play, Pause, Calendar } from "lucide-react"
+import { toast } from "@/components/ui/use-toast"
+import type { Product } from "@/lib/firebase-service"
 
 interface Program {
   id: string
   name: string
-  description: string
-  type: "image" | "video" | "html"
-  duration: number
-  status: "active" | "paused" | "scheduled" | "expired"
+  type: "advertising" | "content" | "emergency"
+  status: "active" | "paused" | "scheduled" | "completed"
   startDate: string
   endDate: string
-  priority: number
-  fileUrl?: string
+  duration: number
+  priority: "high" | "medium" | "low"
+  advertiser?: string
+  description?: string
   createdAt: string
-  updatedAt: string
 }
 
 interface ProgramListTabProps {
-  productId: string
+  product: Product
 }
 
-export default function ProgramListTab({ productId }: ProgramListTabProps) {
+export function ProgramListTab({ product }: ProgramListTabProps) {
   const [programs, setPrograms] = useState<Program[]>([
     {
       id: "1",
       name: "Summer Sale Campaign",
-      description: "Promotional video for summer sale event",
-      type: "video",
-      duration: 30,
+      type: "advertising",
       status: "active",
       startDate: "2024-06-01",
       endDate: "2024-08-31",
-      priority: 1,
-      fileUrl: "/placeholder.mp4",
+      duration: 30,
+      priority: "high",
+      advertiser: "MerryMart",
+      description: "Summer promotional campaign for retail store",
       createdAt: "2024-05-15",
-      updatedAt: "2024-06-01",
     },
     {
       id: "2",
       name: "Brand Awareness",
-      description: "Static brand image display",
-      type: "image",
+      type: "advertising",
+      status: "scheduled",
+      startDate: "2024-07-01",
+      endDate: "2024-07-31",
       duration: 15,
-      status: "active",
-      startDate: "2024-01-01",
-      endDate: "2024-12-31",
-      priority: 2,
-      fileUrl: "/placeholder.jpg",
-      createdAt: "2023-12-15",
-      updatedAt: "2024-01-01",
+      priority: "medium",
+      advertiser: "Samsung",
+      description: "Brand awareness campaign for new product launch",
+      createdAt: "2024-06-01",
     },
     {
       id: "3",
-      name: "Interactive Product Demo",
-      description: "HTML-based interactive product showcase",
-      type: "html",
-      duration: 45,
-      status: "scheduled",
-      startDate: "2024-09-01",
-      endDate: "2024-11-30",
-      priority: 3,
-      createdAt: "2024-07-10",
-      updatedAt: "2024-07-10",
+      name: "Emergency Alert System",
+      type: "emergency",
+      status: "paused",
+      startDate: "2024-01-01",
+      endDate: "2024-12-31",
+      duration: 10,
+      priority: "high",
+      description: "Emergency alert and notification system",
+      createdAt: "2024-01-01",
     },
   ])
 
-  const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [isEditOpen, setIsEditOpen] = useState(false)
-  const [selectedProgram, setSelectedProgram] = useState<Program | null>(null)
-  const { toast } = useToast()
-
-  const [formData, setFormData] = useState({
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [editingProgram, setEditingProgram] = useState<Program | null>(null)
+  const [programForm, setProgramForm] = useState({
     name: "",
-    description: "",
-    type: "image" as "image" | "video" | "html",
-    duration: 15,
+    type: "advertising" as "advertising" | "content" | "emergency",
     startDate: "",
     endDate: "",
-    priority: 1,
-    fileUrl: "",
+    duration: 30,
+    priority: "medium" as "high" | "medium" | "low",
+    advertiser: "",
+    description: "",
   })
 
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      description: "",
-      type: "image",
-      duration: 15,
-      startDate: "",
-      endDate: "",
-      priority: 1,
-      fileUrl: "",
+  const handleAddProgram = () => {
+    const newProgram: Program = {
+      id: Date.now().toString(),
+      name: programForm.name,
+      type: programForm.type,
+      status: "scheduled",
+      startDate: programForm.startDate,
+      endDate: programForm.endDate,
+      duration: programForm.duration,
+      priority: programForm.priority,
+      advertiser: programForm.advertiser,
+      description: programForm.description,
+      createdAt: new Date().toISOString(),
+    }
+
+    setPrograms((prev) => [...prev, newProgram])
+    setIsAddDialogOpen(false)
+    resetForm()
+
+    toast({
+      title: "Program Added",
+      description: "New advertising program has been created successfully.",
     })
   }
 
-  const handleCreate = () => {
-    setIsCreateOpen(true)
-    resetForm()
-  }
-
-  const handleEdit = (program: Program) => {
-    setSelectedProgram(program)
-    setFormData({
+  const handleEditProgram = (program: Program) => {
+    setEditingProgram(program)
+    setProgramForm({
       name: program.name,
-      description: program.description,
       type: program.type,
-      duration: program.duration,
       startDate: program.startDate,
       endDate: program.endDate,
+      duration: program.duration,
       priority: program.priority,
-      fileUrl: program.fileUrl || "",
+      advertiser: program.advertiser || "",
+      description: program.description || "",
     })
-    setIsEditOpen(true)
+    setIsAddDialogOpen(true)
   }
 
-  const handleDelete = (programId: string) => {
-    setPrograms((prev) => prev.filter((p) => p.id !== programId))
+  const handleUpdateProgram = () => {
+    if (!editingProgram) return
+
+    setPrograms((prev) =>
+      prev.map((program) =>
+        program.id === editingProgram.id
+          ? {
+              ...program,
+              name: programForm.name,
+              type: programForm.type,
+              startDate: programForm.startDate,
+              endDate: programForm.endDate,
+              duration: programForm.duration,
+              priority: programForm.priority,
+              advertiser: programForm.advertiser,
+              description: programForm.description,
+            }
+          : program,
+      ),
+    )
+
+    setIsAddDialogOpen(false)
+    setEditingProgram(null)
+    resetForm()
+
     toast({
-      title: "Program deleted",
-      description: "The advertising program has been removed.",
+      title: "Program Updated",
+      description: "Program has been updated successfully.",
+    })
+  }
+
+  const handleDeleteProgram = (programId: string) => {
+    setPrograms((prev) => prev.filter((program) => program.id !== programId))
+
+    toast({
+      title: "Program Deleted",
+      description: "Program has been removed from the schedule.",
     })
   }
 
   const handleToggleStatus = (programId: string) => {
     setPrograms((prev) =>
-      prev.map((p) =>
-        p.id === programId
+      prev.map((program) =>
+        program.id === programId
           ? {
-              ...p,
-              status: p.status === "active" ? "paused" : "active",
-              updatedAt: new Date().toISOString().split("T")[0],
+              ...program,
+              status: program.status === "active" ? "paused" : "active",
             }
-          : p,
+          : program,
       ),
     )
-    toast({
-      title: "Status updated",
-      description: "Program status has been changed.",
-    })
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (selectedProgram) {
-      // Edit existing program
-      setPrograms((prev) =>
-        prev.map((p) =>
-          p.id === selectedProgram.id
-            ? {
-                ...p,
-                ...formData,
-                updatedAt: new Date().toISOString().split("T")[0],
-              }
-            : p,
-        ),
-      )
-      toast({
-        title: "Program updated",
-        description: "The advertising program has been updated successfully.",
-      })
-      setIsEditOpen(false)
-    } else {
-      // Create new program
-      const newProgram: Program = {
-        id: Date.now().toString(),
-        ...formData,
-        status: "scheduled",
-        createdAt: new Date().toISOString().split("T")[0],
-        updatedAt: new Date().toISOString().split("T")[0],
-      }
-      setPrograms((prev) => [...prev, newProgram])
-      toast({
-        title: "Program created",
-        description: "New advertising program has been created successfully.",
-      })
-      setIsCreateOpen(false)
-    }
-
-    setSelectedProgram(null)
-    resetForm()
+  const resetForm = () => {
+    setProgramForm({
+      name: "",
+      type: "advertising",
+      startDate: "",
+      endDate: "",
+      duration: 30,
+      priority: "medium",
+      advertiser: "",
+      description: "",
+    })
   }
 
   const getStatusColor = (status: string) => {
@@ -205,36 +201,35 @@ export default function ProgramListTab({ productId }: ProgramListTabProps) {
         return "bg-yellow-100 text-yellow-800"
       case "scheduled":
         return "bg-blue-100 text-blue-800"
-      case "expired":
-        return "bg-red-100 text-red-800"
+      case "completed":
+        return "bg-gray-100 text-gray-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
   }
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "video":
-        return "🎥"
-      case "image":
-        return "🖼️"
-      case "html":
-        return "🌐"
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "high":
+        return "bg-red-100 text-red-800"
+      case "medium":
+        return "bg-yellow-100 text-yellow-800"
+      case "low":
+        return "bg-green-100 text-green-800"
       default:
-        return "📄"
+        return "bg-gray-100 text-gray-800"
     }
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold">Advertising Programs</h3>
-          <p className="text-sm text-muted-foreground">Manage content programs for this display</p>
+          <h2 className="text-lg font-semibold text-gray-900">Program List</h2>
+          <p className="text-sm text-gray-500">Manage advertising programs and content scheduling</p>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="h-4 w-4 mr-2" />
+        <Button onClick={() => setIsAddDialogOpen(true)} className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
           Add Program
         </Button>
       </div>
@@ -242,88 +237,59 @@ export default function ProgramListTab({ productId }: ProgramListTabProps) {
       {/* Programs Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Active Programs ({programs.length})</CardTitle>
+          <CardTitle>Active Programs</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Program</TableHead>
+                <TableHead>Program Name</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Schedule</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Priority</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
+                <TableHead>Duration</TableHead>
+                <TableHead>Schedule</TableHead>
+                <TableHead>Advertiser</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {programs.map((program) => (
                 <TableRow key={program.id}>
+                  <TableCell className="font-medium">{program.name}</TableCell>
                   <TableCell>
-                    <div>
-                      <div className="font-medium flex items-center gap-2">
-                        <span>{getTypeIcon(program.type)}</span>
-                        {program.name}
-                      </div>
-                      <div className="text-sm text-muted-foreground">{program.description}</div>
-                    </div>
+                    <Badge variant="outline" className="capitalize">
+                      {program.type}
+                    </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{program.type.toUpperCase()}</Badge>
+                    <Badge className={getStatusColor(program.status)}>{program.status}</Badge>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {program.duration}s
-                    </div>
+                    <Badge className={getPriorityColor(program.priority)}>{program.priority}</Badge>
                   </TableCell>
+                  <TableCell>{program.duration}s</TableCell>
                   <TableCell>
                     <div className="text-sm">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        {program.startDate}
+                        {program.startDate} - {program.endDate}
                       </div>
-                      <div className="text-muted-foreground">to {program.endDate}</div>
                     </div>
                   </TableCell>
+                  <TableCell>{program.advertiser || "-"}</TableCell>
                   <TableCell>
-                    <Badge className={getStatusColor(program.status)}>{program.status.toUpperCase()}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">#{program.priority}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(program)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleToggleStatus(program.id)}>
-                          {program.status === "active" ? (
-                            <>
-                              <Pause className="h-4 w-4 mr-2" />
-                              Pause
-                            </>
-                          ) : (
-                            <>
-                              <Play className="h-4 w-4 mr-2" />
-                              Activate
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDelete(program.id)} className="text-red-600">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(program.id)}>
+                        {program.status === "active" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleEditProgram(program)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteProgram(program.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -332,229 +298,128 @@ export default function ProgramListTab({ productId }: ProgramListTabProps) {
         </CardContent>
       </Card>
 
-      {/* Create Program Dialog */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-md">
+      {/* Add/Edit Program Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Create New Program</DialogTitle>
+            <DialogTitle>{editingProgram ? "Edit Program" : "Add New Program"}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="name">Program Name</Label>
+              <Label htmlFor="program-name">Program Name</Label>
               <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                id="program-name"
+                value={programForm.name}
+                onChange={(e) => setProgramForm((prev) => ({ ...prev, name: e.target.value }))}
                 placeholder="Enter program name"
-                required
               />
             </div>
 
             <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Enter program description"
-                rows={3}
+              <Label htmlFor="program-type">Program Type</Label>
+              <Select
+                value={programForm.type}
+                onValueChange={(value) => setProgramForm((prev) => ({ ...prev, type: value as any }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="advertising">Advertising</SelectItem>
+                  <SelectItem value="content">Content</SelectItem>
+                  <SelectItem value="emergency">Emergency</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="start-date">Start Date</Label>
+              <Input
+                id="start-date"
+                type="date"
+                value={programForm.startDate}
+                onChange={(e) => setProgramForm((prev) => ({ ...prev, startDate: e.target.value }))}
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="type">Content Type</Label>
-                <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="image">Image</SelectItem>
-                    <SelectItem value="video">Video</SelectItem>
-                    <SelectItem value="html">HTML</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="duration">Duration (seconds)</Label>
-                <Input
-                  id="duration"
-                  type="number"
-                  value={formData.duration}
-                  onChange={(e) => setFormData({ ...formData, duration: Number.parseInt(e.target.value) || 15 })}
-                  min="1"
-                  max="300"
-                />
-              </div>
+            <div>
+              <Label htmlFor="end-date">End Date</Label>
+              <Input
+                id="end-date"
+                type="date"
+                value={programForm.endDate}
+                onChange={(e) => setProgramForm((prev) => ({ ...prev, endDate: e.target.value }))}
+              />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="startDate">Start Date</Label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="endDate">End Date</Label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  required
-                />
-              </div>
+            <div>
+              <Label htmlFor="duration">Duration (seconds)</Label>
+              <Input
+                id="duration"
+                type="number"
+                value={programForm.duration}
+                onChange={(e) =>
+                  setProgramForm((prev) => ({ ...prev, duration: Number.parseInt(e.target.value) || 30 }))
+                }
+                min="1"
+                max="300"
+              />
             </div>
 
             <div>
               <Label htmlFor="priority">Priority</Label>
+              <Select
+                value={programForm.priority}
+                onValueChange={(value) => setProgramForm((prev) => ({ ...prev, priority: value as any }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="col-span-2">
+              <Label htmlFor="advertiser">Advertiser/Client</Label>
               <Input
-                id="priority"
-                type="number"
-                value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: Number.parseInt(e.target.value) || 1 })}
-                min="1"
-                max="10"
+                id="advertiser"
+                value={programForm.advertiser}
+                onChange={(e) => setProgramForm((prev) => ({ ...prev, advertiser: e.target.value }))}
+                placeholder="Enter advertiser name"
               />
             </div>
 
-            <div>
-              <Label htmlFor="fileUrl">File URL</Label>
-              <Input
-                id="fileUrl"
-                value={formData.fileUrl}
-                onChange={(e) => setFormData({ ...formData, fileUrl: e.target.value })}
-                placeholder="Enter file URL"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setIsCreateOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">Create Program</Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Program Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Program</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <Label htmlFor="edit-name">Program Name</Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Enter program name"
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="edit-description">Description</Label>
+            <div className="col-span-2">
+              <Label htmlFor="description">Description</Label>
               <Textarea
-                id="edit-description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                id="description"
+                value={programForm.description}
+                onChange={(e) => setProgramForm((prev) => ({ ...prev, description: e.target.value }))}
                 placeholder="Enter program description"
                 rows={3}
               />
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-type">Content Type</Label>
-                <Select value={formData.type} onValueChange={(value: any) => setFormData({ ...formData, type: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="image">Image</SelectItem>
-                    <SelectItem value="video">Video</SelectItem>
-                    <SelectItem value="html">HTML</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="edit-duration">Duration (seconds)</Label>
-                <Input
-                  id="edit-duration"
-                  type="number"
-                  value={formData.duration}
-                  onChange={(e) => setFormData({ ...formData, duration: Number.parseInt(e.target.value) || 15 })}
-                  min="1"
-                  max="300"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="edit-startDate">Start Date</Label>
-                <Input
-                  id="edit-startDate"
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="edit-endDate">End Date</Label>
-                <Input
-                  id="edit-endDate"
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="edit-priority">Priority</Label>
-              <Input
-                id="edit-priority"
-                type="number"
-                value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: Number.parseInt(e.target.value) || 1 })}
-                min="1"
-                max="10"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="edit-fileUrl">File URL</Label>
-              <Input
-                id="edit-fileUrl"
-                value={formData.fileUrl}
-                onChange={(e) => setFormData({ ...formData, fileUrl: e.target.value })}
-                placeholder="Enter file URL"
-              />
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">Update Program</Button>
-            </div>
-          </form>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddDialogOpen(false)
+                setEditingProgram(null)
+                resetForm()
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={editingProgram ? handleUpdateProgram : handleAddProgram}>
+              {editingProgram ? "Update" : "Add"} Program
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
