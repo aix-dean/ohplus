@@ -28,7 +28,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
-import { getUserProduct, softDeleteProduct, type Product } from "@/lib/firebase-service"
+import { getProductById, softDeleteProduct, type Product } from "@/lib/firebase-service"
 
 export default function CMSSiteDetailsPage() {
   const params = useParams()
@@ -68,7 +68,7 @@ export default function CMSSiteDetailsPage() {
 
         // Fallback to Firebase query
         console.log("Fetching product data from Firebase...")
-        const productData = await getUserProduct(userData.company_id, productId)
+        const productData = await getProductById(productId)
         if (productData) {
           setProduct(productData)
         } else {
