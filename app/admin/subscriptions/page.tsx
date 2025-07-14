@@ -6,11 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/contexts/auth-context"
 import { getSubscriptionPlans, subscriptionService } from "@/lib/subscription-service"
 import type { BillingCycle, SubscriptionPlanType } from "@/lib/types/subscription"
-import { CheckCircle, Loader2, ArrowRight } from "lucide-react"
+import { CheckCircle, Loader2, ArrowRight, Users } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { db } from "@/lib/firebase"
+import { collection, query, where, getDocs } from "firebase/firestore"
 
 // Move promoEndDate outside the component to ensure it's a stable reference
 const promoEndDate = new Date(2025, 6, 19, 23, 59, 0) // July 19, 2025, 11:59 PM PH time (UTC+8)
@@ -21,6 +23,8 @@ export default function SubscriptionPage() {
   const router = useRouter()
   const [isUpdating, setIsUpdating] = useState(false)
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
+  const [currentUserCount, setCurrentUserCount] = useState<number>(0)
+  const [loadingUserCount, setLoadingUserCount] = useState(true)
   const [timeLeft, setTimeLeft] = useState<{
     days: number
     hours: number
@@ -35,6 +39,35 @@ export default function SubscriptionPage() {
       router.push("/login")
     }
   }, [loading, user, router])
+
+  // Fetch current user count
+  useEffect(() => {
+    const fetchUserCount = async () => {
+      if (!userData?.license_key) {
+        setLoadingUserCount(false)
+        return
+      }
+
+      try {
+        setLoadingUserCount(true)
+        const usersRef = collection(db, "iboard_users")
+        const usersQuery = query(usersRef, where("license_key", "==", userData.license_key))
+        const usersSnapshot = await getDocs(usersQuery)
+        setCurrentUserCount(usersSnapshot.size)
+      } catch (error) {
+        console.error("Error fetching user count:", error)
+        toast({
+          title: "Error",
+          description: "Failed to fetch user count",
+          variant: "destructive",
+        })
+      } finally {
+        setLoadingUserCount(false)
+      }
+    }
+
+    fetchUserCount()
+  }, [userData?.license_key, toast])
 
   useEffect(() => {
     const calculateTimeLeft = () => {
@@ -158,6 +191,9 @@ export default function SubscriptionPage() {
     })
   }
 
+  const maxUsers = subscriptionData?.maxUsers || 0
+  const isUnlimitedUsers = maxUsers === -1
+
   return (
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
@@ -229,19 +265,57 @@ export default function SubscriptionPage() {
                 </CardContent>
               </Card>
 
-              {/* Users Card (Placeholder Data) */}
+              {/* Users Card */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
-                  <CardTitle className="text-xl font-bold">Users</CardTitle>
+                  <CardTitle className="text-xl font-bold flex items-center">
+                    <Users className="mr-2 h-5 w-5" />
+                    Users
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
-                    <p className="text-lg font-semibold text-gray-900">23 users</p>
-                    <p className="text-sm text-gray-600">(Max of 30 users)</p>
+                    {loadingUserCount ? (
+                      <div className="flex items-center space-x-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm text-gray-600">Loading...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-lg font-semibold text-gray-900">
+                          {currentUserCount} user{currentUserCount !== 1 ? "s" : ""}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {isUnlimitedUsers ? (
+                            "Unlimited users"
+                          ) : (
+                            <>
+                              Max of {maxUsers} user{maxUsers !== 1 ? "s" : ""}
+                              <br />
+                              <span
+                                className={cn(
+                                  "font-medium",
+                                  currentUserCount >= maxUsers ? "text-red-600" : "text-green-600",
+                                )}
+                              >
+                                {maxUsers - currentUserCount} remaining
+                              </span>
+                            </>
+                          )}
+                        </p>
+                        {!isUnlimitedUsers && currentUserCount >= maxUsers && (
+                          <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md">
+                            <p className="text-xs text-red-600 font-medium">User limit reached</p>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
-                  <Button variant="outline" className="mt-4 w-full bg-transparent">
-                    Expand
-                  </Button>
+                  <Link href="/admin/user-management">
+                    <Button variant="outline" className="mt-4 w-full bg-transparent">
+                      Manage Users
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
 
@@ -255,11 +329,15 @@ export default function SubscriptionPage() {
                     <p className="text-lg font-semibold text-gray-900">100 static sites</p>
                     <p className="text-lg font-semibold text-gray-900">15 dynamic sites</p>
                     <p className="text-lg font-semibold text-gray-900">3 developments</p>
-                    <p className="text-sm text-gray-600">(Max of {subscriptionData.maxProducts} sites)</p>
+                    <p className="text-sm text-gray-600">
+                      (Max of {subscriptionData.maxProducts === -1 ? "unlimited" : subscriptionData.maxProducts} sites)
+                    </p>
                   </div>
-                  <Button variant="outline" className="mt-4 w-full bg-transparent">
-                    Expand
-                  </Button>
+                  <Link href="/admin/inventory">
+                    <Button variant="outline" className="mt-4 w-full bg-transparent">
+                      View Inventory
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
             </div>

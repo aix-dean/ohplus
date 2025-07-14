@@ -1,378 +1,341 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Plus, MoreHorizontal, Eye, Mail, Ban, Calendar, Shield, Users, AlertTriangle } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, onSnapshot, orderBy, doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { subscriptionService } from "@/lib/subscription-service"
+import { collection, query, where, onSnapshot, orderBy, doc, updateDoc } from "firebase/firestore"
+import { Loader2, Copy, Eye, EyeOff, Users, AlertTriangle, CheckCircle } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import { GenerateInvitationCodeDialog } from "@/components/generate-invitation-code-dialog"
 import { InvitationCodeDetailsDialog } from "@/components/invitation-code-details-dialog"
-import { SendInvitationEmailDialog } from "@/components/send-invitation-email-dialog"
-import { toast } from "sonner"
+import { useRouter } from "next/navigation"
+import { subscriptionService } from "@/lib/subscription-service"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface InvitationCode {
   id: string
   code: string
-  created_at: any
-  expires_at: any
-  max_usage: number
-  usage_count: number
+  description: string
+  usageLimit: number
+  usedCount: number
+  expirationDate: any
   role: string
-  permissions: string[]
-  status: "active" | "inactive" | "expired"
-  created_by: string
-  company_id: string
-  license_key?: string
-  description?: string
-  used_by: string[]
+  createdBy: string
+  licenseKey: string
+  createdAt: any
+  isActive: boolean
 }
 
 export default function InvitationCodesPage() {
-  const { userData, subscriptionData } = useAuth()
-  const [codes, setCodes] = useState<InvitationCode[]>([])
-  const [loading, setLoading] = useState(true)
+  const { user, userData, loading } = useAuth()
+  const { toast } = useToast()
+  const router = useRouter()
+  const [invitationCodes, setInvitationCodes] = useState<InvitationCode[]>([])
+  const [loadingCodes, setLoadingCodes] = useState(true)
+  const [showCodes, setShowCodes] = useState<{ [key: string]: boolean }>({})
+  const [selectedCode, setSelectedCode] = useState<InvitationCode | null>(null)
   const [userLimitInfo, setUserLimitInfo] = useState<{
     canInvite: boolean
     currentUsers: number
     maxUsers: number
   } | null>(null)
-  const [generateDialogOpen, setGenerateDialogOpen] = useState(false)
-  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
-  const [emailDialogOpen, setEmailDialogOpen] = useState(false)
-  const [selectedCode, setSelectedCode] = useState<InvitationCode | null>(null)
+  const [loadingUserLimits, setLoadingUserLimits] = useState(true)
 
-  console.log("InvitationCodesPage - userData:", userData)
-
-  // Check user limits
   useEffect(() => {
-    const checkUserLimits = async () => {
-      if (userData?.license_key) {
-        try {
-          const limitInfo = await subscriptionService.checkUserLimit(userData.license_key)
-          setUserLimitInfo(limitInfo)
-        } catch (error) {
-          console.error("Error checking user limits:", error)
-          setUserLimitInfo({ canInvite: false, currentUsers: 0, maxUsers: 0 })
-        }
+    if (!loading && !user) {
+      router.push("/login")
+    }
+  }, [loading, user, router])
+
+  // Fetch user limit information
+  useEffect(() => {
+    const fetchUserLimits = async () => {
+      if (!userData?.license_key) {
+        setLoadingUserLimits(false)
+        return
+      }
+
+      try {
+        const limitInfo = await subscriptionService.checkUserLimit(userData.license_key)
+        setUserLimitInfo(limitInfo)
+      } catch (error) {
+        console.error("Error fetching user limits:", error)
+        toast({
+          title: "Error",
+          description: "Failed to fetch user limits",
+          variant: "destructive",
+        })
+      } finally {
+        setLoadingUserLimits(false)
       }
     }
 
-    checkUserLimits()
-  }, [userData?.license_key])
+    fetchUserLimits()
+  }, [userData?.license_key, toast])
 
   useEffect(() => {
-    if (!userData?.company_id) {
-      console.log("No company_id found in userData")
-      setLoading(false)
-      return
-    }
-
-    console.log("Setting up Firestore listener for company:", userData.company_id)
+    if (!userData?.license_key) return
 
     const q = query(
       collection(db, "invitation_codes"),
-      where("company_id", "==", userData.company_id),
-      orderBy("created_at", "desc"),
+      where("licenseKey", "==", userData.license_key),
+      orderBy("createdAt", "desc"),
     )
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        console.log("Firestore snapshot received, docs count:", snapshot.docs.length)
-        const codesData = snapshot.docs.map((doc) => {
-          const data = doc.data()
-          console.log("Document data:", data)
-          return {
-            id: doc.id,
-            ...data,
-          } as InvitationCode
-        })
-        setCodes(codesData)
-        setLoading(false)
-      },
-      (error) => {
-        console.error("Error fetching invitation codes:", error)
-        setLoading(false)
-      },
-    )
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const codes: InvitationCode[] = []
+      querySnapshot.forEach((doc) => {
+        codes.push({ id: doc.id, ...doc.data() } as InvitationCode)
+      })
+      setInvitationCodes(codes)
+      setLoadingCodes(false)
+    })
 
     return () => unsubscribe()
-  }, [userData?.company_id])
+  }, [userData?.license_key])
 
-  const formatDate = (timestamp: any) => {
+  const copyToClipboard = (code: string) => {
+    navigator.clipboard.writeText(code)
+    toast({
+      title: "Copied!",
+      description: "Invitation code copied to clipboard.",
+    })
+  }
+
+  const toggleCodeVisibility = (codeId: string) => {
+    setShowCodes((prev) => ({
+      ...prev,
+      [codeId]: !prev[codeId],
+    }))
+  }
+
+  const toggleCodeStatus = async (codeId: string, currentStatus: boolean) => {
     try {
-      if (!timestamp) return "N/A"
+      const codeRef = doc(db, "invitation_codes", codeId)
+      await updateDoc(codeRef, {
+        isActive: !currentStatus,
+      })
 
-      let date: Date
-      if (timestamp.toDate) {
-        date = timestamp.toDate()
-      } else if (timestamp instanceof Date) {
-        date = timestamp
-      } else if (typeof timestamp === "string") {
-        date = new Date(timestamp)
-      } else {
-        return "Invalid Date"
-      }
-
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
+      toast({
+        title: "Success",
+        description: `Invitation code ${!currentStatus ? "activated" : "deactivated"}.`,
       })
     } catch (error) {
-      console.error("Error formatting date:", error)
-      return "Invalid Date"
+      console.error("Error updating code status:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update invitation code status.",
+        variant: "destructive",
+      })
     }
+  }
+
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return "N/A"
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  const isExpired = (expirationDate: any) => {
+    if (!expirationDate) return false
+    const expDate = expirationDate.toDate ? expirationDate.toDate() : new Date(expirationDate)
+    return new Date() > expDate
   }
 
   const getStatusBadge = (code: InvitationCode) => {
-    const now = new Date()
-    let expiresAt: Date
-
-    try {
-      if (code.expires_at?.toDate) {
-        expiresAt = code.expires_at.toDate()
-      } else if (code.expires_at instanceof Date) {
-        expiresAt = code.expires_at
-      } else {
-        expiresAt = new Date(code.expires_at)
-      }
-
-      if (code.status === "inactive") {
-        return <Badge variant="secondary">Inactive</Badge>
-      }
-
-      if (now > expiresAt) {
-        return <Badge variant="destructive">Expired</Badge>
-      }
-
-      if (code.max_usage > 0 && code.usage_count >= code.max_usage) {
-        return <Badge variant="secondary">Used Up</Badge>
-      }
-
-      return <Badge variant="default">Active</Badge>
-    } catch (error) {
-      return <Badge variant="secondary">Unknown</Badge>
+    if (!code.isActive) {
+      return <Badge variant="secondary">Inactive</Badge>
     }
-  }
-
-  const handleDeactivate = async (codeId: string) => {
-    try {
-      await updateDoc(doc(db, "invitation_codes", codeId), {
-        status: "inactive",
-      })
-      toast.success("Invitation code deactivated")
-    } catch (error) {
-      console.error("Error deactivating code:", error)
-      toast.error("Failed to deactivate code")
+    if (isExpired(code.expirationDate)) {
+      return <Badge variant="destructive">Expired</Badge>
     }
-  }
-
-  const handleViewDetails = (code: InvitationCode) => {
-    setSelectedCode(code)
-    setDetailsDialogOpen(true)
-  }
-
-  const handleSendEmail = (code: InvitationCode) => {
-    setSelectedCode(code)
-    setEmailDialogOpen(true)
-  }
-
-  const handleGenerateCode = () => {
-    if (!userLimitInfo?.canInvite) {
-      toast.error("User limit reached for your subscription plan")
-      return
+    if (code.usedCount >= code.usageLimit) {
+      return <Badge variant="outline">Used Up</Badge>
     }
-    setGenerateDialogOpen(true)
-  }
-
-  if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading invitation codes...</p>
-          </div>
-        </div>
+      <Badge variant="default" className="bg-green-500">
+        Active
+      </Badge>
+    )
+  }
+
+  if (loading || loadingCodes || loadingUserLimits) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     )
   }
 
-  if (!userData?.company_id) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="text-center py-12">
-          <h2 className="text-2xl font-bold mb-4">No Company Associated</h2>
-          <p className="text-muted-foreground">You need to be associated with a company to manage invitation codes.</p>
-        </div>
-      </div>
-    )
-  }
+  const remainingSlots =
+    userLimitInfo && userLimitInfo.maxUsers !== -1 ? userLimitInfo.maxUsers - userLimitInfo.currentUsers : null
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Invitation Codes</h1>
-          <p className="text-muted-foreground">Manage invitation codes for user registration</p>
+    <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-gray-900">Invitation Codes</h1>
+              <p className="mt-2 text-gray-600">Manage invitation codes to invite new users to your organization.</p>
+            </div>
+            <GenerateInvitationCodeDialog
+              onCodeGenerated={() => {
+                // Refresh user limits after generating a code
+                if (userData?.license_key) {
+                  subscriptionService.checkUserLimit(userData.license_key).then(setUserLimitInfo)
+                }
+              }}
+            />
+          </div>
         </div>
-        <Button onClick={handleGenerateCode} disabled={!userLimitInfo?.canInvite}>
-          <Plus className="h-4 w-4 mr-2" />
-          Generate Code
-        </Button>
-      </div>
 
-      {/* User Limit Information */}
-      {userLimitInfo && (
-        <Card className="border-l-4 border-l-blue-500">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Users className="h-5 w-5 text-blue-500" />
+        {/* User Limit Status Card */}
+        {userLimitInfo && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Users className="mr-2 h-5 w-5" />
+                User Limit Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium">User Limit Status</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {userLimitInfo.currentUsers} /{" "}
-                    {userLimitInfo.maxUsers === -1 ? "Unlimited" : userLimitInfo.maxUsers} users
+                  <p className="text-lg font-semibold">
+                    {userLimitInfo.currentUsers} / {userLimitInfo.maxUsers === -1 ? "∞" : userLimitInfo.maxUsers} Users
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    {userLimitInfo.maxUsers === -1
+                      ? "Unlimited users available"
+                      : `${userLimitInfo.maxUsers - userLimitInfo.currentUsers} slots remaining`}
                   </p>
                 </div>
+                <div className="flex items-center">
+                  {userLimitInfo.canInvite ? (
+                    <CheckCircle className="h-6 w-6 text-green-500" />
+                  ) : (
+                    <AlertTriangle className="h-6 w-6 text-red-500" />
+                  )}
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-sm font-medium">
-                  {userLimitInfo.maxUsers === -1
-                    ? "Unlimited"
-                    : `${userLimitInfo.maxUsers - userLimitInfo.currentUsers} slots remaining`}
-                </p>
-                <p className="text-xs text-muted-foreground">Plan: {subscriptionData?.planType || "Unknown"}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
-      {/* Warning if user limit reached */}
-      {userLimitInfo && !userLimitInfo.canInvite && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            You have reached the user limit for your subscription plan. Please upgrade your plan to invite more users.
-          </AlertDescription>
-        </Alert>
-      )}
+              {!userLimitInfo.canInvite && (
+                <Alert variant="destructive" className="mt-4">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    You have reached the maximum number of users for your subscription plan. Please upgrade your plan to
+                    invite more users.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Codes Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Invitation Codes</CardTitle>
-          <CardDescription>View and manage all generated invitation codes</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {codes.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-4">
-                <Plus className="h-12 w-12 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">No invitation codes yet</h3>
-              <p className="text-muted-foreground">Generate your first invitation code to get started</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Usage</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Expires</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {codes.map((code) => (
-                  <TableRow key={code.id}>
-                    <TableCell>
-                      <div className="font-mono text-sm bg-muted px-2 py-1 rounded">{code.code}</div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Shield className="h-4 w-4 text-muted-foreground" />
-                        <span className="capitalize">{code.role}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(code)}</TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {code.usage_count} / {code.max_usage === 0 ? "∞" : code.max_usage}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{formatDate(code.created_at)}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{formatDate(code.expires_at)}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewDetails(code)}>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleSendEmail(code)}>
-                            <Mail className="h-4 w-4 mr-2" />
-                            Send Email
-                          </DropdownMenuItem>
-                          {code.status === "active" && (
-                            <DropdownMenuItem onClick={() => handleDeactivate(code.id)}>
-                              <Ban className="h-4 w-4 mr-2" />
-                              Deactivate
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+        {/* Invitation Codes Grid */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {invitationCodes.map((code) => (
+            <Card key={code.id} className="relative">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">{code.description}</CardTitle>
+                  {getStatusBadge(code)}
+                </div>
+                <CardDescription>Created {formatDate(code.createdAt)}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <div className="flex-1 font-mono text-sm bg-gray-100 p-2 rounded">
+                    {showCodes[code.id] ? code.code : "••••••••••••••••"}
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => toggleCodeVisibility(code.id)}>
+                    {showCodes[code.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copyToClipboard(code.code)}
+                    disabled={!code.isActive || isExpired(code.expirationDate)}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
 
-      {/* Dialogs */}
-      <GenerateInvitationCodeDialog open={generateDialogOpen} onOpenChange={setGenerateDialogOpen} />
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-600">Usage</p>
+                    <p className="font-semibold">
+                      {code.usedCount} / {code.usageLimit}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Role</p>
+                    <p className="font-semibold capitalize">{code.role}</p>
+                  </div>
+                </div>
 
-      {selectedCode && (
-        <>
+                <div className="text-sm">
+                  <p className="text-gray-600">Expires</p>
+                  <p className={`font-semibold ${isExpired(code.expirationDate) ? "text-red-600" : ""}`}>
+                    {formatDate(code.expirationDate)}
+                  </p>
+                </div>
+
+                <div className="flex space-x-2">
+                  <Button variant="outline" size="sm" onClick={() => setSelectedCode(code)} className="flex-1">
+                    View Details
+                  </Button>
+                  <Button
+                    variant={code.isActive ? "destructive" : "default"}
+                    size="sm"
+                    onClick={() => toggleCodeStatus(code.id, code.isActive)}
+                    className="flex-1"
+                  >
+                    {code.isActive ? "Deactivate" : "Activate"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {invitationCodes.length === 0 && (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Users className="h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No invitation codes yet</h3>
+              <p className="text-gray-600 text-center mb-6">
+                Create your first invitation code to start inviting users to your organization.
+              </p>
+              <GenerateInvitationCodeDialog
+                onCodeGenerated={() => {
+                  if (userData?.license_key) {
+                    subscriptionService.checkUserLimit(userData.license_key).then(setUserLimitInfo)
+                  }
+                }}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {selectedCode && (
           <InvitationCodeDetailsDialog
-            open={detailsDialogOpen}
-            onOpenChange={setDetailsDialogOpen}
             code={selectedCode}
+            open={!!selectedCode}
+            onOpenChange={(open) => !open && setSelectedCode(null)}
           />
-          <SendInvitationEmailDialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen} code={selectedCode} />
-        </>
-      )}
-    </div>
+        )}
+      </div>
+    </main>
   )
 }
