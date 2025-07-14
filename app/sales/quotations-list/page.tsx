@@ -45,7 +45,7 @@ export default function SalesQuotationsPage() {
     setLoading(true)
 
     try {
-      const quotationsRef = collection(db, "quotation")
+      const quotationsRef = collection(db, "quotations")
       let q
 
       if (direction === "first") {
