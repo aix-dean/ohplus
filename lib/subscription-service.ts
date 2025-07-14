@@ -9,8 +9,8 @@ import {
   serverTimestamp,
   Timestamp,
   updateDoc,
-  orderBy, // Import orderBy
-  limit, // Import limit
+  orderBy,
+  limit,
 } from "firebase/firestore"
 import {
   type Subscription,
@@ -19,6 +19,7 @@ import {
   type SubscriptionStatus,
   calculateSubscriptionEndDate,
   getMaxProductsForPlan,
+  getMaxUsersForPlan, // Import the new function
 } from "@/lib/types/subscription"
 import type { SubscriptionPlan } from "./types/subscription"
 
@@ -32,6 +33,7 @@ export const subscriptionService = {
     endDate: Date | null = null,
     status: SubscriptionStatus = "active",
     maxProducts: number | null = null,
+    maxUsers: number | null = null, // Add maxUsers parameter
     trialEndDate: Date | null = null,
   ): Promise<Subscription> {
     console.log("subscriptionService: Creating subscription for licenseKey:", licenseKey)
@@ -47,20 +49,19 @@ export const subscriptionService = {
       planType,
       billingCycle,
       uid,
-      startDate: startDate, // Store as Date object, Firestore will convert to Timestamp
-      endDate: endDate || calculatedEndDate, // Use provided or calculated
+      startDate: startDate,
+      endDate: endDate || calculatedEndDate,
       status,
       maxProducts: maxProducts || getMaxProductsForPlan(planType),
-      trialEndDate: trialEndDate || calculatedTrialEndDate, // Use provided or calculated
+      maxUsers: maxUsers || getMaxUsersForPlan(planType), // Add maxUsers to subscription data
+      trialEndDate: trialEndDate || calculatedTrialEndDate,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }
 
-    // Use addDoc to let Firestore generate the document ID
     const docRef = await addDoc(collection(db, "subscriptions"), subscriptionData)
     console.log("subscriptionService: Subscription created with ID:", docRef.id)
 
-    // Return the created subscription with the Firestore ID and converted dates
     const newSubscription: Subscription = {
       id: docRef.id,
       licenseKey,
@@ -71,9 +72,10 @@ export const subscriptionService = {
       endDate: endDate || calculatedEndDate,
       status,
       maxProducts: maxProducts || getMaxProductsForPlan(planType),
+      maxUsers: maxUsers || getMaxUsersForPlan(planType), // Add maxUsers to return object
       trialEndDate: trialEndDate || calculatedTrialEndDate,
-      createdAt: new Date(), // Approximate, will be updated on next fetch
-      updatedAt: new Date(), // Approximate, will be updated on next fetch
+      createdAt: new Date(),
+      updatedAt: new Date(),
     }
     return newSubscription
   },
@@ -81,7 +83,6 @@ export const subscriptionService = {
   async getSubscriptionByLicenseKey(licenseKey: string): Promise<Subscription | null> {
     console.log("subscriptionService: Fetching subscription for licenseKey:", licenseKey)
     const subscriptionsRef = collection(db, "subscriptions")
-    // Query for the license key, order by createdAt descending, and limit to 1 to get the latest
     const q = query(subscriptionsRef, where("licenseKey", "==", licenseKey), orderBy("createdAt", "desc"), limit(1))
     const querySnapshot = await getDocs(q)
 
@@ -93,7 +94,6 @@ export const subscriptionService = {
     const docSnap = querySnapshot.docs[0]
     const data = docSnap.data()
 
-    // Convert Firestore Timestamps to JavaScript Date objects
     const subscription: Subscription = {
       id: docSnap.id,
       licenseKey: data.licenseKey,
@@ -104,6 +104,7 @@ export const subscriptionService = {
       endDate: data.endDate instanceof Timestamp ? data.endDate.toDate() : data.endDate,
       status: data.status,
       maxProducts: data.maxProducts,
+      maxUsers: data.maxUsers || getMaxUsersForPlan(data.planType), // Handle legacy subscriptions without maxUsers
       trialEndDate: data.trialEndDate instanceof Timestamp ? data.trialEndDate.toDate() : data.trialEndDate,
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : data.createdAt,
       updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : data.updatedAt,
@@ -120,13 +121,11 @@ export const subscriptionService = {
 
     if (querySnapshot.empty) {
       console.error("subscriptionService: No subscription found to update for licenseKey:", licenseKey)
-      // Throw an error that can be caught by the caller to handle creation fallback
       throw new Error("Subscription document not found for update.")
     }
 
     const docRef = doc(db, "subscriptions", querySnapshot.docs[0].id)
 
-    // Prepare updates, converting Date objects to serverTimestamp if present
     const updateData: { [key: string]: any } = { ...updates }
     if (updateData.startDate instanceof Date) {
       updateData.startDate = updateData.startDate
@@ -143,7 +142,7 @@ export const subscriptionService = {
     }
     updateData.updatedAt = serverTimestamp()
 
-    // Recalculate endDate and trialEndDate if planType or billingCycle changes
+    // Recalculate limits if planType changes
     if (updates.planType || updates.billingCycle || updates.startDate) {
       const currentSubscription = querySnapshot.docs[0].data() as Subscription
       const newPlanType = updates.planType || currentSubscription.planType
@@ -158,6 +157,7 @@ export const subscriptionService = {
       updateData.endDate = recalculatedEndDate
       updateData.trialEndDate = recalculatedTrialEndDate
       updateData.maxProducts = getMaxProductsForPlan(newPlanType)
+      updateData.maxUsers = getMaxUsersForPlan(newPlanType) // Update maxUsers when plan changes
     }
 
     await updateDoc(docRef, updateData)
@@ -172,7 +172,29 @@ export const subscriptionService = {
     const trialEnd = new Date(subscription.trialEndDate)
     const diffTime = trialEnd.getTime() - today.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return Math.max(0, diffDays) // Ensure it doesn't return negative days
+    return Math.max(0, diffDays)
+  },
+
+  // New method to check if user limit is reached
+  async checkUserLimit(licenseKey: string): Promise<{ canInvite: boolean; currentUsers: number; maxUsers: number }> {
+    console.log("subscriptionService: Checking user limit for licenseKey:", licenseKey)
+
+    const subscription = await this.getSubscriptionByLicenseKey(licenseKey)
+    if (!subscription) {
+      return { canInvite: false, currentUsers: 0, maxUsers: 0 }
+    }
+
+    // Count current users with this license key
+    const usersRef = collection(db, "iboard_users")
+    const usersQuery = query(usersRef, where("license_key", "==", licenseKey))
+    const usersSnapshot = await getDocs(usersQuery)
+    const currentUsers = usersSnapshot.size
+
+    const maxUsers = subscription.maxUsers
+    const canInvite = maxUsers === -1 || currentUsers < maxUsers // -1 means unlimited
+
+    console.log("subscriptionService: User limit check result:", { canInvite, currentUsers, maxUsers })
+    return { canInvite, currentUsers, maxUsers }
   },
 }
 
@@ -186,8 +208,11 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
       description: "Ideal for first time users and media owners with 1-3 OOH sites.",
       price: 1500,
       billingCycle: "monthly",
+      maxProducts: 3,
+      maxUsers: 12,
       features: [
         "Manage up to 3 sites",
+        "Up to 12 users",
         "FREE Listing to OOH Marketplaces",
         "FREE 1-Day onboarding training",
         "ERP + Programmatic CMS",
@@ -200,8 +225,11 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
       description: "Ideal for media owners with around 5 OOH sites.",
       price: 2100,
       billingCycle: "monthly",
+      maxProducts: 5,
+      maxUsers: 18,
       features: [
         "Manage up to 5 sites",
+        "Up to 18 users",
         "FREE Listing to OOH Marketplaces",
         "FREE 1-Day onboarding training",
         "ERP + Programmatic CMS",
@@ -214,8 +242,11 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
       description: "Access exclusive perks and features from OH!Plus.",
       price: 30000,
       billingCycle: "annually",
+      maxProducts: 8,
+      maxUsers: 20,
       features: [
         "Manage up to 8 sites",
+        "Up to 20 users",
         "FREE Listing to OOH Marketplaces",
         "FREE 1-Day onboarding training",
         "ERP + Programmatic CMS + Planning",
@@ -227,25 +258,30 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
       id: "enterprise",
       name: "Enterprise",
       description: "Tailored for large companies with extensive needs.",
-      price: 0, // Indicates "Contact Us"
+      price: 0,
       billingCycle: "N/A",
+      maxProducts: -1, // Unlimited
+      maxUsers: -1, // Unlimited
       features: [
+        "Unlimited sites",
+        "Unlimited users",
         "Flexible Pricing",
         "Flexible Payment Terms",
         "Embassy Privileges",
         "Priority Assistance",
-        "Full- Access",
+        "Full Access",
       ],
       buttonText: "Let's Talk",
     },
-    // Retaining existing plans for compatibility if needed, though they might be removed later
     {
       id: "trial",
       name: "Trial Plan",
       description: "Try out our platform for a limited time.",
       price: 0,
       billingCycle: "N/A",
-      features: ["60-day free trial", "Limited features", "Basic support"],
+      maxProducts: 3,
+      maxUsers: 5,
+      features: ["60-day free trial", "Up to 3 sites", "Up to 5 users", "Limited features", "Basic support"],
       buttonText: "Start Free Trial",
     },
     {
@@ -254,7 +290,9 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
       description: "Special plan for Graphic Expo attendees.",
       price: 0,
       billingCycle: "N/A",
-      features: ["5 Products", "Event-specific features", "Limited duration"],
+      maxProducts: 5,
+      maxUsers: 10,
+      features: ["5 Products", "10 users", "Event-specific features", "Limited duration"],
       buttonText: "Activate Event Plan",
     },
   ]
