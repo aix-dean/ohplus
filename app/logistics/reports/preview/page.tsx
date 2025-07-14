@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
 import { getUserById, type User } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
+import { Timestamp } from "firebase/firestore"
 
 export default function ReportPreviewPage() {
   const router = useRouter()
@@ -101,8 +102,12 @@ export default function ReportPreviewPage() {
         ...report,
         attachments: processedAttachments,
         status: "posted", // Change status from draft to posted
-        isPreview: undefined, // Remove preview flag
-        id: undefined, // Remove temporary ID so Firebase generates a new one
+        // Remove preview-specific fields
+        isPreview: undefined,
+        id: undefined,
+        // Set proper Firebase Timestamps
+        created: Timestamp.now(),
+        updated: Timestamp.now(),
       }
 
       // Remove the temporary ID and isPreview flag
@@ -337,7 +342,7 @@ export default function ReportPreviewPage() {
         <div className="flex justify-between items-center">
           <div className="flex flex-col">
             <div className="bg-cyan-400 text-white px-6 py-3 rounded-lg text-base font-medium inline-block">
-              Installation Report
+              {getReportTypeDisplay(report.reportType)}
             </div>
             <p className="text-gray-600 text-sm mt-2">as of {formatDate(report.date)}</p>
           </div>
@@ -465,6 +470,50 @@ export default function ReportPreviewPage() {
             </div>
           </div>
 
+          {/* Installation Report Specific Status */}
+          {report.reportType === "installation-report" && (
+            <div className="bg-blue-50 p-4 rounded-lg space-y-2">
+              {report.installationStatus && (
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-700">Installation Progress:</span>
+                  <span className="text-gray-900">{report.installationStatus}%</span>
+                  <div className="flex-1 bg-gray-200 rounded-full h-2 ml-2">
+                    <div
+                      className="bg-blue-600 h-2 rounded-full"
+                      style={{ width: `${report.installationStatus}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+              {report.installationTimeline && (
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-700">Timeline:</span>
+                  <span
+                    className={`px-2 py-1 rounded text-sm ${
+                      report.installationTimeline === "delayed"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-green-100 text-green-800"
+                    }`}
+                  >
+                    {report.installationTimeline === "delayed" ? "Delayed" : "On Time"}
+                  </span>
+                </div>
+              )}
+              {report.delayReason && (
+                <div className="flex items-start gap-2">
+                  <span className="font-medium text-gray-700">Delay Reason:</span>
+                  <span className="text-gray-900">{report.delayReason}</span>
+                </div>
+              )}
+              {report.delayDays && (
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-gray-700">Delay Duration:</span>
+                  <span className="text-gray-900">{report.delayDays} days</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Attachments/Photos */}
           {report.attachments && report.attachments.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -494,7 +543,7 @@ export default function ReportPreviewPage() {
                               if (parent) {
                                 parent.innerHTML = `
                                   <div class="text-center space-y-2">
-                                    ${getFileIcon(attachment.fileName || "").props.children}
+                                    <div class="flex justify-center">${getFileIcon(attachment.fileName || "").type}</div>
                                     <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
                                   </div>
                                 `
@@ -514,7 +563,7 @@ export default function ReportPreviewPage() {
                               if (parent) {
                                 parent.innerHTML = `
                                   <div class="text-center space-y-2">
-                                    ${getFileIcon(attachment.fileName || "").props.children}
+                                    <div class="flex justify-center">${getFileIcon(attachment.fileName || "").type}</div>
                                     <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
                                   </div>
                                 `
