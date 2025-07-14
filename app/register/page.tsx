@@ -94,12 +94,19 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Left Panel - Logo and Company Name */}
-      <div className="hidden w-[40%] items-center justify-center bg-gray-50 lg:flex">
-        <div className="flex flex-col items-center">
+      {/* Left Panel - Image */}
+      <div className="relative hidden w-[40%] items-center justify-center bg-gray-900 lg:flex">
+        <div className="flex flex-col items-center justify-center">
           <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={200} height={200} priority />
-          <span className="mt-4 text-2xl font-bold text-gray-800">OH Plus</span>
+          <span className="mt-4 text-2xl font-bold text-white">OH Plus</span>
         </div>
+        <Image
+          src="/registration-background.png"
+          alt="Background"
+          layout="fill"
+          objectFit="cover"
+          className="absolute inset-0 z-0 opacity-50"
+        />
       </div>
 
       {/* Right Panel - Form */}
