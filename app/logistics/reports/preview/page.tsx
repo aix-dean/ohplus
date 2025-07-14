@@ -126,20 +126,20 @@ export default function ReportPreviewPage() {
 
       console.log("Report created successfully with ID:", reportId)
 
-      // Remove this toast call:
-      // toast({
-      //   title: "Success",
-      //   description: "Service Report Posted Successfully!",
-      // })
+      // Store the report ID in session storage
+      sessionStorage.setItem("lastPostedReportId", reportId)
+
+      toast({
+        title: "Success",
+        description: "Service Report Posted Successfully!",
+      })
 
       // Clear preview data from session storage
       sessionStorage.removeItem("previewReportData")
       sessionStorage.removeItem("previewProductData")
 
-      // Set a flag in session storage to show the dialog on the dashboard
-      sessionStorage.setItem("showReportSuccessDialog", "true")
-      // Navigate to the logistics dashboard
-      router.push("/logistics/dashboard")
+      // Navigate to the dashboard
+      router.push(`/logistics/dashboard`)
     } catch (error) {
       console.error("Error posting report to Firestore:", error)
       toast({
