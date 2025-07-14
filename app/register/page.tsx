@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FirebaseError } from "firebase/app"
 import { EyeIcon, EyeOffIcon, CheckCircleIcon, XCircleIcon } from "lucide-react"
 import { z } from "zod" // Import zod for schema validation
-import { Progress } from "@/components/ui/progress" // Import Progress component
+// No longer importing Progress component as we're creating custom bars
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
@@ -83,30 +83,28 @@ export default function RegisterPage() {
     setPasswordCriteria(criteria)
   }
 
-  const getPasswordStrength = () => {
+  const getPasswordStrengthScore = () => {
     let score = 0
     if (passwordCriteria.minLength) score += 1
     if (passwordCriteria.hasLowerCase) score += 1
     if (passwordCriteria.hasUpperCase) score += 1
     if (passwordCriteria.hasNumber) score += 1
     if (passwordCriteria.hasSpecialChar) score += 1
-
-    // Map score to a percentage for the progress bar
-    return (score / 5) * 100 // 5 criteria in total
+    return score // Score from 0 to 5
   }
 
-  const getStrengthText = (strength: number) => {
-    if (strength === 100) return "Strong password"
-    if (strength >= 75) return "Good password"
-    if (strength >= 50) return "Moderate password"
-    if (strength > 0) return "Weak password"
+  const getStrengthText = (score: number) => {
+    if (score === 5) return "Strong password"
+    if (score >= 3) return "Moderate password"
+    if (score > 0) return "Weak password"
     return ""
   }
 
-  const getProgressBarColor = (strength: number) => {
-    if (strength < 50) return "bg-red-500"
-    if (strength < 100) return "bg-yellow-500"
-    return "bg-green-500"
+  const getBarColorClass = (score: number) => {
+    if (score === 5) return "bg-green-500"
+    if (score >= 3) return "bg-yellow-500"
+    if (score > 0) return "bg-red-500"
+    return "bg-gray-300" // Default for empty password
   }
 
   const handleRegister = async () => {
@@ -160,7 +158,7 @@ export default function RegisterPage() {
     }
   }
 
-  const passwordStrength = getPasswordStrength()
+  const passwordStrengthScore = getPasswordStrengthScore()
 
   return (
     <div className="flex min-h-screen">
@@ -280,9 +278,20 @@ export default function RegisterPage() {
                   </Button>
                 </div>
                 <div className="mt-2">
-                  <Progress value={passwordStrength} className={getProgressBarColor(passwordStrength)} />
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{getStrengthText(passwordStrength)}</p>
-                  {passwordStrength < 100 && password.length > 0 && (
+                  <div className="flex gap-1 h-2">
+                    {[...Array(5)].map((_, i) => (
+                      <div
+                        key={i}
+                        className={`flex-1 rounded-full ${
+                          i < passwordStrengthScore ? getBarColorClass(passwordStrengthScore) : "bg-gray-300"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    {getStrengthText(passwordStrengthScore)}
+                  </p>
+                  {passwordStrengthScore < 5 && password.length > 0 && (
                     <ul className="list-inside text-sm mt-1">
                       {!passwordCriteria.minLength && (
                         <li className="text-red-500">Password should be at least 8 characters long</li>
