@@ -27,54 +27,42 @@ export default function SalesQuotationsPage() {
   const { user } = useAuth()
   const [quotations, setQuotations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
-  const [pageSnapshots, setPageSnapshots] = useState<QueryDocumentSnapshot<DocumentData>[]>([]) // Stores the last document of each page
+  // pageCursors will store the last document snapshot of the *previous* page
+  // pageCursors[0] will be null (for the very first page)
+  // pageCursors[1] will be the last document of page 1 (used to fetch page 2)
+  // pageCursors[2] will be the last document of page 2 (used to fetch page 3)
+  const [pageCursors, setPageCursors] = useState<(QueryDocumentSnapshot<DocumentData> | null)[]>([null])
 
   const router = useRouter()
   const pageSize = 10 // 10 items per page
 
   const fetchQuotations = useCallback(
-    async (direction: "next" | "prev" | "first" = "first") => {
+    async (pageToFetch: number) => {
       if (!user?.uid) {
         setLoading(false)
         return
       }
 
+      setLoading(true)
       try {
-        setLoading(true)
         const quotationsRef = collection(db, "quotation")
         let q
 
-        if (direction === "first") {
-          q = query(quotationsRef, where("seller_id", "==", user.uid), orderBy("created", "desc"), limit(pageSize))
-        } else if (direction === "next" && lastVisible) {
+        // Determine the startAfter document based on the page we want to fetch
+        const startDoc = pageCursors[pageToFetch - 1] || null // Use null for the first page
+
+        if (startDoc) {
           q = query(
             quotationsRef,
             where("seller_id", "==", user.uid),
             orderBy("created", "desc"),
-            startAfter(lastVisible),
+            startAfter(startDoc),
             limit(pageSize),
           )
-        } else if (direction === "prev" && currentPage > 1) {
-          // To go back, we need the document *before* the first document of the current page.
-          // This is stored as the last document of the previous page in pageSnapshots.
-          const prevPageLastDoc = pageSnapshots[currentPage - 2]
-          if (prevPageLastDoc) {
-            q = query(
-              quotationsRef,
-              where("seller_id", "==", user.uid),
-              orderBy("created", "desc"),
-              startAfter(prevPageLastDoc),
-              limit(pageSize),
-            )
-          } else {
-            // If no previous snapshot (e.g., going from page 2 to 1), fetch the first page
-            q = query(quotationsRef, where("seller_id", "==", user.uid), orderBy("created", "desc"), limit(pageSize))
-          }
         } else {
-          // Default to first page if no specific direction or cursor
+          // For the first page (pageToFetch === 1), startDoc will be null
           q = query(quotationsRef, where("seller_id", "==", user.uid), orderBy("created", "desc"), limit(pageSize))
         }
 
@@ -88,43 +76,47 @@ export default function SalesQuotationsPage() {
         const newHasMore = querySnapshot.docs.length === pageSize
 
         setQuotations(fetchedQuotations)
-        setLastVisible(newLastVisible)
         setHasMore(newHasMore)
+        setCurrentPage(pageToFetch)
 
-        if (direction === "first") {
-          setCurrentPage(1)
-          setPageSnapshots([querySnapshot.docs[0] || null]) // Store the first doc of the first page
-        } else if (direction === "next") {
-          setCurrentPage((prev) => prev + 1)
-          setPageSnapshots((prev) => [...prev, querySnapshot.docs[0] || null]) // Store the first doc of the new page
-        } else if (direction === "prev") {
-          setCurrentPage((prev) => prev - 1)
-          setPageSnapshots((prev) => prev.slice(0, -1)) // Remove the current page's first doc from history
-        }
+        // Update pageCursors:
+        // If we are moving to a new page (forward), add the newLastVisible to the history.
+        // If we are going back, the history is already correct up to that point.
+        setPageCursors((prev) => {
+          const newCursors = [...prev]
+          // If we are fetching page N, we store its lastVisible at index N
+          // This means pageCursors[0] is null (for page 1), pageCursors[1] is lastVisible of page 1, etc.
+          newCursors[pageToFetch] = newLastVisible
+          // If we went back, we might have extra cursors, so truncate if necessary
+          if (newCursors.length > pageToFetch + 1) {
+            newCursors.length = pageToFetch + 1
+          }
+          return newCursors
+        })
       } catch (error) {
         console.error("Error fetching quotations:", error)
       } finally {
         setLoading(false)
       }
     },
-    [user?.uid, lastVisible, currentPage, pageSnapshots, pageSize],
+    [user?.uid, pageCursors, pageSize],
   )
 
   useEffect(() => {
     if (user?.uid) {
-      fetchQuotations("first")
+      fetchQuotations(1) // Fetch the first page on component mount or user change
     }
   }, [user?.uid, fetchQuotations])
 
   const handleNextPage = () => {
     if (hasMore && !loading) {
-      fetchQuotations("next")
+      fetchQuotations(currentPage + 1)
     }
   }
 
   const handlePrevPage = () => {
     if (currentPage > 1 && !loading) {
-      fetchQuotations("prev")
+      fetchQuotations(currentPage - 1)
     }
   }
 

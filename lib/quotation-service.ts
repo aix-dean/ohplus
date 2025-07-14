@@ -9,6 +9,10 @@ import {
   where,
   updateDoc,
   orderBy,
+  limit,
+  startAfter,
+  type DocumentData,
+  type QueryDocumentSnapshot,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { addQuotationToCampaign } from "@/lib/campaign-service"
@@ -41,6 +45,7 @@ export interface Quotation {
   campaignId?: string // Add campaign ID field
   proposalId?: string // Add proposal ID field
   valid_until?: any // Added valid_until field
+  seller_id?: string // Added seller_id field for pagination
 }
 
 // Create a new quotation
@@ -485,8 +490,6 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 5
 
-    pdf.setFontSize(9)
-    pdf.setFont("helvetica", "normal")
     yPosition = addText(quotation.notes, margin, yPosition, contentWidth)
     yPosition += 10
   }
@@ -615,4 +618,37 @@ export async function getQuotationsByCreatedBy(userId: string): Promise<Quotatio
     console.error("Error fetching quotations by created_by ID:", error)
     return []
   }
+}
+
+// Get paginated quotations by seller ID
+export async function getQuotationsPaginated(
+  userId: string,
+  pageSize: number,
+  startAfterDoc: QueryDocumentSnapshot<DocumentData> | null,
+) {
+  const quotationsRef = collection(db, "quotations")
+  let q
+
+  if (startAfterDoc) {
+    q = query(
+      quotationsRef,
+      where("seller_id", "==", userId),
+      orderBy("created", "desc"),
+      startAfter(startAfterDoc),
+      limit(pageSize),
+    )
+  } else {
+    q = query(quotationsRef, where("seller_id", "==", userId), orderBy("created", "desc"), limit(pageSize))
+  }
+
+  const querySnapshot = await getDocs(q)
+  const quotations: any[] = []
+  querySnapshot.forEach((doc) => {
+    quotations.push({ id: doc.id, ...doc.data() })
+  })
+
+  const lastVisibleId = querySnapshot.docs[querySnapshot.docs.length - 1] || null
+  const hasMore = querySnapshot.docs.length === pageSize
+
+  return { quotations, lastVisibleId, hasMore }
 }
