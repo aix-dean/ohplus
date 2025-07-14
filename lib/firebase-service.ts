@@ -262,11 +262,11 @@ export async function getPaginatedUserProducts(
   userId: string,
   itemsPerPage = 16,
   lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
-  options: { searchTerm?: string; active?: boolean } = {},
+  options: { searchTerm?: string; active?: boolean; content_type?: string } = {},
 ): Promise<PaginatedResult<Product>> {
   try {
     const productsRef = collection(db, "products")
-    const { searchTerm = "", active } = options
+    const { searchTerm = "", active, content_type } = options
 
     // Start with basic constraints
     const constraints: any[] = [where("company_id", "==", userId), orderBy("name", "asc"), limit(itemsPerPage)]
@@ -274,6 +274,13 @@ export async function getPaginatedUserProducts(
     // Add active filter if specified
     if (active !== undefined) {
       constraints.unshift(where("active", "==", active))
+    }
+
+    // Add content_type filter if specified (case-insensitive handled client-side due to Firestore limitations)
+    if (content_type) {
+      // Note: Firestore doesn't support case-insensitive queries, so we'll need to handle this client-side
+      // For now, we'll fetch more items and filter client-side
+      constraints[constraints.length - 1] = limit(itemsPerPage * 2) // Fetch more to account for filtering
     }
 
     // Create the query with all constraints
@@ -287,15 +294,21 @@ export async function getPaginatedUserProducts(
     const querySnapshot = await getDocs(q)
 
     // Get the last visible document for next pagination
-    const lastVisible = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null
+    let lastVisible = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null
 
-    // Check if there are more documents to fetch
-    const hasMore = querySnapshot.docs.length === itemsPerPage
-
-    // Convert the documents to Product objects
+    // Convert the documents to Product objects and apply filters
     const products: Product[] = []
     querySnapshot.forEach((doc) => {
       const product = { id: doc.id, ...doc.data() } as Product
+
+      // Apply content_type filter (case-insensitive)
+      if (content_type) {
+        const productContentType = (product.content_type || "").toLowerCase()
+        const filterContentType = content_type.toLowerCase()
+        if (productContentType !== filterContentType) {
+          return // Skip this product
+        }
+      }
 
       // If there's a search term, filter client-side
       if (searchTerm && typeof searchTerm === "string") {
@@ -312,8 +325,20 @@ export async function getPaginatedUserProducts(
       }
     })
 
+    // If we filtered by content_type, we might have fewer items than requested
+    // Adjust pagination accordingly
+    const actualItems = products.slice(0, itemsPerPage)
+    const hasMore = content_type ? products.length > itemsPerPage : querySnapshot.docs.length === itemsPerPage
+
+    // Update lastVisible if we sliced the results
+    if (content_type && actualItems.length > 0) {
+      // Find the last document that corresponds to our last item
+      const lastItemId = actualItems[actualItems.length - 1].id
+      lastVisible = querySnapshot.docs.find((doc) => doc.id === lastItemId) || lastVisible
+    }
+
     return {
-      items: products,
+      items: actualItems,
       lastDoc: lastVisible,
       hasMore,
     }
@@ -330,13 +355,13 @@ export async function getPaginatedUserProducts(
 // Get the total count of products for a user
 export async function getUserProductsCount(
   userId: string,
-  options: { searchTerm?: string; active?: boolean; deleted?: boolean } = {},
+  options: { searchTerm?: string; active?: boolean; deleted?: boolean; content_type?: string } = {},
 ): Promise<number> {
   try {
     console.log("Getting user products count for userId:", userId, "with options:", options)
 
     const productsRef = collection(db, "products")
-    const { searchTerm = "", active, deleted } = options
+    const { searchTerm = "", active, deleted, content_type } = options
 
     // Start with basic constraints
     const constraints: any[] = [where("company_id", "==", userId)]
@@ -353,28 +378,43 @@ export async function getUserProductsCount(
     // Create the query with all constraints
     const q = query(productsRef, ...constraints)
 
-    // If there's a search term, we need to fetch all documents and filter client-side
-    if (searchTerm && typeof searchTerm === "string") {
+    // If there's a search term or content_type filter, we need to fetch all documents and filter client-side
+    if ((searchTerm && typeof searchTerm === "string") || content_type) {
       const querySnapshot = await getDocs(q)
-      const searchLower = searchTerm.toLowerCase()
+      const searchLower = searchTerm ? searchTerm.toLowerCase() : ""
+      const contentTypeLower = content_type ? content_type.toLowerCase() : ""
 
       // Filter documents client-side
       let count = 0
       querySnapshot.forEach((doc) => {
         const product = doc.data() as Product
-        if (
-          product.name?.toLowerCase().includes(searchLower) ||
-          product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
-          product.description?.toLowerCase().includes(searchLower)
-        ) {
+
+        // Apply content_type filter if specified
+        if (content_type) {
+          const productContentType = (product.content_type || "").toLowerCase()
+          if (productContentType !== contentTypeLower) {
+            return // Skip this product
+          }
+        }
+
+        // Apply search filter if specified
+        if (searchTerm && typeof searchTerm === "string") {
+          if (
+            product.name?.toLowerCase().includes(searchLower) ||
+            product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
+            product.description?.toLowerCase().includes(searchLower)
+          ) {
+            count++
+          }
+        } else {
           count++
         }
       })
 
-      console.log("User products count (with search):", count)
+      console.log("User products count (with filters):", count)
       return count
     } else {
-      // If no search term, we can use the more efficient getCountFromServer
+      // If no search term or content_type, we can use the more efficient getCountFromServer
       const snapshot = await getCountFromServer(q)
       return snapshot.data().count
     }
@@ -463,215 +503,7 @@ export async function searchUserProducts(userId: string, searchTerm: string): Pr
   }
 }
 
-// NEW SERVER-SIDE QUERY FUNCTIONS WITH PROPER PAGINATION
-
-// Server-side paginated query for products by content type and company
-export async function getProductsByContentTypeServerSide(
-  companyId: string,
-  contentType: string,
-  itemsPerPage = 16,
-  lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
-  searchTerm = "",
-): Promise<PaginatedResult<Product>> {
-  try {
-    const productsRef = collection(db, "products")
-
-    // Build base constraints for server-side filtering
-    const baseConstraints: any[] = [
-      where("company_id", "==", companyId),
-      where("deleted", "==", false),
-      where("active", "==", true),
-    ]
-
-    // Add content_type filter - try multiple case variations for better matching
-    const contentTypeVariations = [
-      contentType.toLowerCase(),
-      contentType.toUpperCase(),
-      contentType.charAt(0).toUpperCase() + contentType.slice(1).toLowerCase(),
-    ]
-
-    // For now, we'll query with the exact case provided and handle variations in a follow-up query if needed
-    baseConstraints.push(where("content_type", "==", contentType))
-
-    // Add ordering and limit
-    baseConstraints.push(orderBy("name", "asc"))
-    baseConstraints.push(limit(itemsPerPage))
-
-    // Create the query
-    let q = query(productsRef, ...baseConstraints)
-
-    // Add pagination if we have a last document
-    if (lastDoc) {
-      q = query(productsRef, ...baseConstraints.slice(0, -2), startAfter(lastDoc), limit(itemsPerPage))
-    }
-
-    const querySnapshot = await getDocs(q)
-
-    // Get the last visible document for next pagination
-    const lastVisible = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null
-
-    // Check if there are more documents to fetch
-    const hasMore = querySnapshot.docs.length === itemsPerPage
-
-    // Convert documents to Product objects and apply search filter if needed
-    const products: Product[] = []
-    querySnapshot.forEach((doc) => {
-      const product = { id: doc.id, ...doc.data() } as Product
-
-      // Apply search term filter if provided
-      if (searchTerm && typeof searchTerm === "string") {
-        const searchLower = searchTerm.toLowerCase()
-        if (
-          product.name?.toLowerCase().includes(searchLower) ||
-          product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
-          product.description?.toLowerCase().includes(searchLower)
-        ) {
-          products.push(product)
-        }
-      } else {
-        products.push(product)
-      }
-    })
-
-    return {
-      items: products,
-      lastDoc: lastVisible,
-      hasMore,
-    }
-  } catch (error) {
-    console.error("Error fetching products by content type (server-side):", error)
-    return {
-      items: [],
-      lastDoc: null,
-      hasMore: false,
-    }
-  }
-}
-
-// Server-side count for products by content type and company
-export async function getProductsCountByContentTypeServerSide(
-  companyId: string,
-  contentType: string,
-  searchTerm = "",
-): Promise<number> {
-  try {
-    const productsRef = collection(db, "products")
-
-    // Build constraints for counting
-    const constraints: any[] = [
-      where("company_id", "==", companyId),
-      where("deleted", "==", false),
-      where("active", "==", true),
-      where("content_type", "==", contentType),
-    ]
-
-    const q = query(productsRef, ...constraints)
-
-    // If there's a search term, we need to fetch and filter client-side for the count
-    if (searchTerm && typeof searchTerm === "string") {
-      const querySnapshot = await getDocs(q)
-      const searchLower = searchTerm.toLowerCase()
-
-      let count = 0
-      querySnapshot.forEach((doc) => {
-        const product = doc.data() as Product
-        if (
-          product.name?.toLowerCase().includes(searchLower) ||
-          product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
-          product.description?.toLowerCase().includes(searchLower)
-        ) {
-          count++
-        }
-      })
-
-      return count
-    } else {
-      // Use efficient count query when no search term
-      const snapshot = await getCountFromServer(q)
-      return snapshot.data().count
-    }
-  } catch (error) {
-    console.error("Error getting count by content type (server-side):", error)
-    return 0
-  }
-}
-
-// Case-insensitive server-side query (queries multiple variations)
-export async function getProductsByContentTypeCaseInsensitive(
-  companyId: string,
-  contentType: string,
-  itemsPerPage = 16,
-  lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
-  searchTerm = "",
-): Promise<PaginatedResult<Product>> {
-  try {
-    // Try different case variations of the content type
-    const contentTypeVariations = [
-      contentType.toLowerCase(),
-      contentType.toUpperCase(),
-      contentType.charAt(0).toUpperCase() + contentType.slice(1).toLowerCase(),
-      contentType, // original case
-    ]
-
-    const allProducts: Product[] = []
-    const allDocs: QueryDocumentSnapshot<DocumentData>[] = []
-
-    // Query each variation (this is a workaround since Firestore doesn't support case-insensitive queries)
-    for (const variation of contentTypeVariations) {
-      try {
-        const result = await getProductsByContentTypeServerSide(
-          companyId,
-          variation,
-          itemsPerPage * 2, // Get more to account for duplicates
-          null, // Start fresh for each variation
-          searchTerm,
-        )
-
-        // Add products that aren't already in our results
-        result.items.forEach((product) => {
-          if (!allProducts.find((p) => p.id === product.id)) {
-            allProducts.push(product)
-          }
-        })
-
-        // Collect all docs for pagination
-        if (result.lastDoc) {
-          allDocs.push(result.lastDoc)
-        }
-      } catch (error) {
-        console.log(`No products found for content_type variation: ${variation}`)
-      }
-    }
-
-    // Sort by name and apply pagination
-    allProducts.sort((a, b) => (a.name || "").localeCompare(b.name || ""))
-
-    // Apply pagination to the combined results
-    const startIndex = lastDoc ? 0 : 0 // For simplicity, restart pagination with case-insensitive search
-    const paginatedProducts = allProducts.slice(startIndex, startIndex + itemsPerPage)
-
-    // Determine if there are more results
-    const hasMore = allProducts.length > startIndex + itemsPerPage
-
-    // Get the last document for pagination (simplified approach)
-    const lastVisible = paginatedProducts.length > 0 ? null : null // Simplified for case-insensitive queries
-
-    return {
-      items: paginatedProducts,
-      lastDoc: lastVisible,
-      hasMore,
-    }
-  } catch (error) {
-    console.error("Error fetching products by content type (case-insensitive):", error)
-    return {
-      items: [],
-      lastDoc: null,
-      hasMore: false,
-    }
-  }
-}
-
-// LEGACY FUNCTIONS (keeping for backward compatibility)
+// NEW OPTIMIZED FUNCTIONS
 
 // Get products by content type with pagination and filtering
 export async function getProductsByContentType(
@@ -1211,6 +1043,7 @@ export async function getProductsByContentTypeAndCompany(
         // Check search term match
         return (
           product.name?.toLowerCase().includes(searchLower) ||
+          product.light?.location?.toLowerCase().includes(searchLower) ||
           product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
           product.description?.toLowerCase().includes(searchLower)
         )
@@ -1293,6 +1126,7 @@ export async function getProductsCountByContentTypeAndCompany(contentType: strin
         if (productContentType === contentTypeLower && product.company_id) {
           if (
             product.name?.toLowerCase().includes(searchLower) ||
+            product.light?.location?.toLowerCase().includes(searchLower) ||
             product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
             product.description?.toLowerCase().includes(searchLower)
           ) {

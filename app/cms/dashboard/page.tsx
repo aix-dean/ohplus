@@ -6,12 +6,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import {
-  getProductsByContentTypeCaseInsensitive,
-  getProductsCountByContentTypeServerSide,
-  softDeleteProduct,
-  type Product,
-} from "@/lib/firebase-service"
+import { getPaginatedUserProducts, getUserProductsCount, softDeleteProduct, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 
 // Number of items to display per page
@@ -93,13 +88,17 @@ export default function CMSDashboardPage() {
     router.push("/cms/orders")
   }
 
-  // Fetch total count of dynamic products using server-side query
+  // Fetch total count of dynamic products
   const fetchTotalCount = useCallback(async () => {
     if (!userData?.company_id) return
 
     setLoadingCount(true)
     try {
-      const count = await getProductsCountByContentTypeServerSide(userData.company_id, "dynamic", searchTerm)
+      const count = await getUserProductsCount(userData?.company_id, { 
+        active: true, 
+        content_type: "dynamic",
+        searchTerm 
+      })
       setTotalItems(count)
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
@@ -114,7 +113,7 @@ export default function CMSDashboardPage() {
     }
   }, [userData, toast, searchTerm])
 
-  // Fetch dynamic products for the current page using server-side query
+  // Fetch dynamic products for the current page
   const fetchProducts = useCallback(
     async (page: number) => {
       if (!userData?.company_id) return
@@ -137,13 +136,15 @@ export default function CMSDashboardPage() {
         // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
-        // Use the new server-side case-insensitive query
-        const result = await getProductsByContentTypeCaseInsensitive(
-          userData.company_id,
-          "dynamic", // Content type filter for dynamic products (case-insensitive)
+        const result = await getPaginatedUserProducts(
+          userData?.company_id,
           ITEMS_PER_PAGE,
           startDoc,
-          searchTerm,
+          { 
+            active: true, 
+            content_type: "dynamic",
+            searchTerm 
+          }
         )
 
         setProducts(result.items)
@@ -339,4 +340,133 @@ export default function CMSDashboardPage() {
     }
   }, [loading, products, userData])
 
-// Mock data for demonstration when no Firebase data is available
+  // Mock data for demonstration when no Firebase data is available
+  const mockContent = [
+    {
+      id: "1",
+      title: "Bocaue 11",
+      type: "Billboard",
+      status: "Published",
+      author: "John Smith",
+      dateCreated: "2023-05-15",
+      dateModified: "2023-06-10",
+      thumbnail: "/abstract-geometric-sculpture.png",
+      tags: ["Sale", "Summer"],
+      dimensions: "14' × 48'",
+      duration: "30 days",
+      scheduledDates: { start: "2023-06-01", end: "2023-06-30" },
+      locations: ["Downtown", "Highway 101"],
+      format: "Static Image",
+      approvalStatus: "Approved",
+      campaignName: "Summer 2023",
+      impressions: 45000,
+      productId: "NAN20010",
+      location: "Bocaue 11",
+      operation: "MerryMart",
+      displayHealth: "ON",
+      cms: {
+        start_time: "16:44",
+        end_time: "18:44",
+        spot_duration: 15,
+        loops_per_day: 20,
+        spots_per_loop: 5,
+      },
+    },
+    {
+      id: "2",
+      title: "EDSA Corner Shaw",
+      type: "LED Display",
+      status: "Draft",
+      author: "Sarah Johnson",
+      dateCreated: "2023-06-20",
+      dateModified: "2023-06-20",
+      thumbnail: "/roadside-billboard.png",
+      tags: ["Product Launch", "Digital"],
+      dimensions: "1920×1080",
+      duration: "15s",
+      scheduledDates: { start: "Not scheduled", end: "Not scheduled" },
+      locations: [],
+      format: "Video",
+      approvalStatus: "Pending",
+      campaignName: "Q3 Launch",
+      impressions: 0,
+      productId: "LED20011",
+      location: "EDSA Corner Shaw",
+      operation: "Jollibee Campaign",
+      displayHealth: "OFF",
+      cms: {
+        start_time: "08:00",
+        end_time: "22:00",
+        spot_duration: 30,
+        loops_per_day: 48,
+        spots_per_loop: 3,
+      },
+    },
+    {
+      id: "3",
+      title: "Ayala Triangle",
+      type: "LED Display",
+      status: "Published",
+      author: "Michael Brown",
+      dateCreated: "2023-04-01",
+      dateModified: "2023-04-15",
+      thumbnail: "/led-billboard-1.png",
+      tags: ["Holiday", "Promotion"],
+      dimensions: "1920×1080",
+      duration: "20s",
+      scheduledDates: { start: "2023-12-01", end: "2023-12-31" },
+      locations: ["Shopping Mall", "City Center"],
+      format: "HTML Animation",
+      approvalStatus: "Approved",
+      campaignName: "Holiday 2023",
+      impressions: 28500,
+      productId: "AYA30001",
+      location: "Ayala Triangle",
+      operation: "Samsung Promo",
+      displayHealth: "ON",
+      cms: {
+        start_time: "06:00",
+        end_time: "24:00",
+        spot_duration: 20,
+        loops_per_day: 72,
+        spots_per_loop: 4,
+      },
+    },
+    {
+      id: "4",
+      title: "BGC Central Square",
+      type: "Billboard",
+      status: "Review",
+      author: "Emily Davis",
+      dateCreated: "2023-05-10",
+      dateModified: "2023-06-05",
+      thumbnail: "/led-billboard-2.png",
+      tags: ["Brand", "Awareness"],
+      dimensions: "10' × 30'",
+      duration: "45 days",
+      scheduledDates: { start: "2023-07-01", end: "2023-08-15" },
+      locations: ["Airport", "Train Station"],
+      format: "Static Image",
+      approvalStatus: "In Review",
+      campaignName: "Brand Expansion",
+      impressions: 0,
+      productId: "BGC40001",
+      location: "BGC Central Square",
+      operation: "Nike Campaign",
+      displayHealth: "ON",
+      cms: {
+        start_time: "07:00",
+        end_time: "23:00",
+        spot_duration: 25,
+        loops_per_day: 32,
+        spots_per_loop: 6,
+      },
+    },
+  ]
+
+  // Map products to content format for display
+  const content = useMockData ? mockContent : products.map(mapProductToContent)
+
+  return (
+    <div className="flex-1 p-4">
+      <div className="flex flex-col gap-\
