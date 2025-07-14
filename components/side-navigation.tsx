@@ -52,6 +52,7 @@ const navigationItems = [
       { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
       { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
       { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
+      { title: "Quotations", href: "/sales/quotations-list", icon: FileText }, // Added new item for Quotations
       { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
       { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
       { title: "Clients", href: "/sales/clients", icon: Users },
@@ -114,6 +115,10 @@ export function SideNavigation() {
   }
   if (pathname?.startsWith("/admin")) {
     currentSection = "admin"
+  }
+  if (pathname?.startsWith("/sales/quotations-list")) {
+    // Ensure sales section is active for new quotations page
+    currentSection = "sales"
   }
 
   // Find the navigation item for the current section
@@ -562,6 +567,7 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
+                  { title: "Quotations", href: "/sales/quotations-list", icon: FileText }, // Added new item for Quotations
                   { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
                   { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
                   { title: "Clients", href: "/sales/clients", icon: Users },
