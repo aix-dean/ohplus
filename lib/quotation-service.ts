@@ -9,11 +9,13 @@ import {
   where,
   updateDoc,
   orderBy,
+  limit,
+  startAfter,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { addQuotationToCampaign } from "@/lib/campaign-service"
 import { jsPDF } from "jspdf"
-import { loadImageAsBase64, generateQRCode, getImageDimensions } from "@/lib/pdf-service" // Import getImageDimensions
+import { loadImageAsBase64, generateQRCode, getImageDimensions } from "@/lib/pdf-service"
 
 export interface Quotation {
   id?: string
@@ -569,32 +571,68 @@ export async function updateQuotationStatus(quotationId: string, status: string)
   }
 }
 
-// Get quotations by campaign ID
-export async function getQuotationsByCampaignId(campaignId: string): Promise<Quotation[]> {
+// New function for paginated fetching
+export async function getQuotationsPaginated(
+  userId: string,
+  limitCount: number,
+  lastQuotationId?: string | null,
+): Promise<{ quotations: Quotation[]; lastVisibleId: string | null; hasMore: boolean }> {
   try {
     if (!db) {
       throw new Error("Firestore not initialized")
     }
 
     const quotationsRef = collection(db, "quotations")
-    const q = query(quotationsRef, where("campaignId", "==", campaignId))
+    let q = query(quotationsRef, where("created_by", "==", userId), orderBy("created", "desc"), limit(limitCount + 1)) // Fetch one extra to check hasMore
+
+    if (lastQuotationId) {
+      const lastDocSnapshot = await getDoc(doc(db, "quotations", lastQuotationId))
+      if (lastDocSnapshot.exists()) {
+        q = query(
+          quotationsRef,
+          where("created_by", "==", userId),
+          orderBy("created", "desc"),
+          startAfter(lastDocSnapshot),
+          limit(limitCount + 1),
+        )
+      } else {
+        console.warn(`Last document with ID ${lastQuotationId} not found. Starting from beginning.`)
+      }
+    }
 
     const querySnapshot = await getDocs(q)
-    const quotations: Quotation[] = []
+    const fetchedQuotations: Quotation[] = []
+    let lastVisibleId: string | null = null
+    let hasMore = false
 
-    querySnapshot.forEach((doc) => {
-      quotations.push({ id: doc.id, ...doc.data() } as Quotation)
+    querySnapshot.forEach((doc, index) => {
+      if (index < limitCount) {
+        // Only take up to limitCount
+        fetchedQuotations.push({ id: doc.id, ...doc.data() } as Quotation)
+      }
     })
 
-    return quotations
+    if (querySnapshot.docs.length > limitCount) {
+      hasMore = true
+      lastVisibleId = querySnapshot.docs[limitCount - 1]?.id || null // The ID of the last document on the current page
+    } else {
+      lastVisibleId = querySnapshot.docs[querySnapshot.docs.length - 1]?.id || null
+    }
+
+    return {
+      quotations: fetchedQuotations,
+      lastVisibleId,
+      hasMore,
+    }
   } catch (error) {
-    console.error("Error fetching quotations by campaign ID:", error)
-    return []
+    console.error("Error fetching paginated quotations:", error)
+    return { quotations: [], lastVisibleId: null, hasMore: false }
   }
 }
 
-// Get quotations by created_by ID
-export async function getQuotationsByCreatedBy(userId: string): Promise<Quotation[]> {
+// Original getQuotationsByCreatedBy (renamed to avoid conflict and keep paginated version)
+// This function is no longer directly used by the paginated list, but kept for reference
+export async function getQuotationsByCreatedByOld(userId: string): Promise<Quotation[]> {
   try {
     if (!db) {
       throw new Error("Firestore not initialized")
