@@ -11,10 +11,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useToast } from "@/hooks/use-toast"
-import { getProductById, type Product } from "@/lib/firebase-service"
+import { getProductById, type Product, uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
-import { createReport, type ReportData } from "@/lib/report-service" // Import createReport and ReportData
 
 interface CreateReportDialogProps {
   open: boolean
@@ -39,10 +38,14 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   const [loadingTeams, setLoadingTeams] = useState(false)
   const [showNewTeamInput, setShowNewTeamInput] = useState(false)
   const [newTeamName, setNewTeamName] = useState("")
-  const [attachments, setAttachments] = useState<{ note: string; file?: File; fileName?: string; preview?: string }[]>([
-    { note: "" },
-    { note: "" },
-  ])
+  const [attachments, setAttachments] = useState<{
+    note: string
+    file?: File
+    fileName?: string
+    preview?: string
+    fileUrl?: string
+    uploading?: boolean
+  }>([{ note: "" }, { note: "" }])
   const [previewModal, setPreviewModal] = useState<{ open: boolean; file?: File; preview?: string }>({ open: false })
 
   // Installation report specific fields
@@ -172,12 +175,37 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   const handleFileUpload = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      const newAttachments = [...attachments]
-      newAttachments[index].file = file
-      newAttachments[index].fileName = file.name
-      newAttachments[index].fileType = file.type // Store file type
+      // Validate file type
+      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "Error",
+          description: "Please upload only image files (JPEG, PNG, GIF, WebP)",
+          variant: "destructive",
+        })
+        return
+      }
 
-      // Create preview for images
+      // Validate file size (max 10MB)
+      const maxSize = 10 * 1024 * 1024 // 10MB
+      if (file.size > maxSize) {
+        toast({
+          title: "Error",
+          description: "File size must be less than 10MB",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const newAttachments = [...attachments]
+      newAttachments[index] = {
+        ...newAttachments[index],
+        file,
+        fileName: file.name,
+        uploading: true,
+      }
+
+      // Create preview for images immediately
       if (file.type.startsWith("image/")) {
         try {
           const preview = await createFilePreview(file)
@@ -188,6 +216,45 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       }
 
       setAttachments(newAttachments)
+
+      try {
+        // Upload to Firebase Storage
+        const uploadPath = `reports/${siteId}/${Date.now()}_`
+        const downloadURL = await uploadFileToFirebaseStorage(file, uploadPath)
+
+        // Update attachment with Firebase URL
+        const updatedAttachments = [...attachments]
+        updatedAttachments[index] = {
+          ...updatedAttachments[index],
+          file,
+          fileName: file.name,
+          preview: newAttachments[index].preview,
+          fileUrl: downloadURL,
+          uploading: false,
+        }
+        setAttachments(updatedAttachments)
+
+        toast({
+          title: "Success",
+          description: "File uploaded successfully",
+        })
+      } catch (error) {
+        console.error("Error uploading file:", error)
+
+        // Reset the attachment on error
+        const errorAttachments = [...attachments]
+        errorAttachments[index] = {
+          note: newAttachments[index].note,
+          uploading: false,
+        }
+        setAttachments(errorAttachments)
+
+        toast({
+          title: "Error",
+          description: "Failed to upload file. Please try again.",
+          variant: "destructive",
+        })
+      }
     }
   }
 
@@ -211,9 +278,18 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   }
 
   const renderFilePreview = (
-    attachment: { note: string; file?: File; fileName?: string; preview?: string },
+    attachment: { note: string; file?: File; fileName?: string; preview?: string; uploading?: boolean },
     index: number,
   ) => {
+    if (attachment.uploading) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full space-y-1">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          <span className="text-xs text-blue-600">Uploading...</span>
+        </div>
+      )
+    }
+
     if (!attachment.file || !attachment.fileName) {
       return (
         <label
@@ -289,11 +365,12 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
     setLoading(true)
     try {
-      // Prepare the report data for submission to Firebase
-      const reportData: ReportData = {
-        siteId: product.id!,
+      // Build the report data for preview (without saving to Firebase)
+      const reportData: any = {
+        id: `preview-${Date.now()}`, // Temporary ID for preview
+        siteId: product.id,
         siteName: product.name || "Unknown Site",
-        companyId: projectData?.project_id || userData?.project_id || user.uid, // Use projectData or userData company_id
+        companyId: projectData?.project_id || userData?.project_id || user.uid,
         sellerId: product.seller_id || user.uid,
         client: "Summit Media", // This would come from booking data in real implementation
         clientId: "summit-media-id", // This would come from booking data
@@ -306,14 +383,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         reportType,
         date,
         attachments: attachments
-          .filter((att) => att.note.trim() !== "" || att.file) // Only include attachments with notes or files
+          .filter((att) => att.note.trim() !== "" || att.file)
           .map((att) => ({
             note: att.note,
-            file: att.file, // Pass the File object for upload
             fileName: att.fileName || "",
             fileType: att.file?.type || "",
-            fileUrl: att.fileUrl || "", // fileUrl will be populated by createReport after upload
-          })) as Array<{ note: string; file?: File; fileName?: string; fileType?: string; fileUrl?: string }>,
+            fileUrl: att.fileUrl || null, // Use the Firebase URL instead of creating object URLs
+          })),
         status: "draft",
         createdBy: user.uid,
         createdByName: user.displayName || user.email || "Unknown User",
@@ -322,7 +398,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         priority: "medium",
         completionPercentage: reportType === "completion-report" ? 100 : 0,
         tags: [reportType, product.content_type || "general"].filter(Boolean),
-        // created and updated timestamps will be set by the createReport function
+        created: new Date(), // Use current date for preview
+        isPreview: true, // Flag to indicate this is a preview
       }
 
       // Add optional fields only if they have values
@@ -359,12 +436,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         }
       }
 
-      // Call the createReport function to save to Firebase
-      const newReportId = await createReport(reportData)
+      // Store the report data in sessionStorage for the preview page
+      sessionStorage.setItem("previewReportData", JSON.stringify(reportData))
+      sessionStorage.setItem("previewProductData", JSON.stringify(product))
 
       toast({
         title: "Success",
-        description: "Service Report Created Successfully!",
+        description: "Service Report Generated Successfully!",
       })
 
       onOpenChange(false)
@@ -378,13 +456,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       setDelayReason("")
       setDelayDays("")
 
-      // Navigate to the newly created report's view page
-      router.push(`/logistics/reports/${newReportId}`)
+      // Navigate to the report preview page with preview flag
+      router.push(`/logistics/reports/preview`)
     } catch (error) {
-      console.error("Error creating report:", error)
+      console.error("Error generating report preview:", error)
       toast({
         title: "Error",
-        description: "Failed to create report. Please try again.",
+        description: "Failed to generate report preview",
         variant: "destructive",
       })
     } finally {
@@ -604,6 +682,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                         id={`file-${index}`}
                         accept=".jpg,.jpeg,.png,.gif,.webp"
                         onChange={(e) => handleFileUpload(index, e)}
+                        disabled={attachment.uploading}
                       />
                       {renderFilePreview(attachment, index)}
                     </div>
