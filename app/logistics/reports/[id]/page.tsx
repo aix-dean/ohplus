@@ -182,7 +182,7 @@ export default function ReportPreviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Top Navigation Bar */}
       <div className="bg-white px-4 py-3 flex items-center shadow-sm border-b">
         <div className="flex items-center gap-3">
@@ -239,273 +239,293 @@ export default function ReportPreviewPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
-        {/* Report Header with Badge and Logo */}
-        <div className="flex justify-between items-start">
-          <div>
-            <div className="bg-cyan-400 text-white px-4 py-2 rounded text-sm font-medium inline-block">
-              Installation Report
+      {/* Main Content Container - flex-1 to push footer down */}
+      <div className="flex-1 flex flex-col">
+        <div className="max-w-6xl mx-auto p-6 space-y-6 flex-1">
+          {/* Report Header with Badge and Logo */}
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="bg-cyan-400 text-white px-4 py-2 rounded text-sm font-medium inline-block">
+                Installation Report
+              </div>
+              <p className="text-gray-600 text-sm mt-1">as of {formatDate(report.date)}</p>
             </div>
-            <p className="text-gray-600 text-sm mt-1">as of {formatDate(report.date)}</p>
+            <div className="flex-shrink-0">
+              <div className="bg-yellow-400 rounded-full p-3">
+                <div className="text-black font-bold text-xl">GTS</div>
+              </div>
+            </div>
           </div>
-          <div className="flex-shrink-0">
-            <div className="bg-yellow-400 rounded-full p-3">
-              <div className="text-black font-bold text-xl">GTS</div>
+
+          {/* Project Information */}
+          <Card className="shadow-sm">
+            <CardContent className="p-6">
+              <h2 className="text-xl font-bold mb-4 text-gray-900">Project Information</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                <div className="space-y-2">
+                  <div className="flex">
+                    <span className="font-medium text-gray-700 w-32 flex-shrink-0">Site ID:</span>
+                    <span className="text-gray-900">
+                      {report.siteId} {product?.light?.location || product?.specs_rental?.location || ""}
+                    </span>
+                  </div>
+                  <div className="flex">
+                    <span className="font-medium text-gray-700 w-32 flex-shrink-0">Job Order:</span>
+                    <span className="text-gray-900">{report.id?.slice(-4).toUpperCase() || "N/A"}</span>
+                  </div>
+                  <div className="flex">
+                    <span className="font-medium text-gray-700 w-32 flex-shrink-0">Job Order Date:</span>
+                    <span className="text-gray-900">
+                      {formatDate(
+                        report.created && typeof report.created.toDate === "function"
+                          ? report.created.toDate().toISOString().split("T")[0]
+                          : report.date,
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex">
+                    <span className="font-medium text-gray-700 w-32 flex-shrink-0">Site:</span>
+                    <span className="text-gray-900">{report.siteName}</span>
+                  </div>
+                  <div className="flex">
+                    <span className="font-medium text-gray-700 w-32 flex-shrink-0">Size:</span>
+                    <span className="text-gray-900">
+                      {product?.specs_rental?.size || product?.light?.size || "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex">
+                    <span className="font-medium text-gray-700 w-32 flex-shrink-0">Start Date:</span>
+                    <span className="text-gray-900">{formatDate(report.bookingDates.start)}</span>
+                  </div>
+                  <div className="flex">
+                    <span className="font-medium text-gray-700 w-32 flex-shrink-0">End Date:</span>
+                    <span className="text-gray-900">{formatDate(report.bookingDates.end)}</span>
+                  </div>
+                  <div className="flex">
+                    <span className="font-medium text-gray-700 w-32 flex-shrink-0">Installation Duration:</span>
+                    <span className="text-gray-900">
+                      {Math.ceil(
+                        (new Date(report.bookingDates.end).getTime() - new Date(report.bookingDates.start).getTime()) /
+                          (1000 * 60 * 60 * 24),
+                      )}{" "}
+                      days
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex">
+                    <span className="font-medium text-gray-700 w-32 flex-shrink-0">Content:</span>
+                    <span className="text-gray-900">{product?.content_type || "N/A"}</span>
+                  </div>
+                  <div className="flex">
+                    <span className="font-medium text-gray-700 w-32 flex-shrink-0">Material Specs:</span>
+                    <span className="text-gray-900">{product?.specs_rental?.material || "N/A"}</span>
+                  </div>
+                  <div className="flex">
+                    <span className="font-medium text-gray-700 w-32 flex-shrink-0">Crew:</span>
+                    <span className="text-gray-900">Team {report.assignedTo || "A"}</span>
+                  </div>
+                  <div className="flex">
+                    <span className="font-medium text-gray-700 w-32 flex-shrink-0">Illumination:</span>
+                    <span className="text-gray-900">{product?.light?.illumination || "N/A"}</span>
+                  </div>
+                  <div className="flex">
+                    <span className="font-medium text-gray-700 w-32 flex-shrink-0">Gondola:</span>
+                    <span className="text-gray-900">{product?.specs_rental?.gondola ? "YES" : "NO"}</span>
+                  </div>
+                  <div className="flex">
+                    <span className="font-medium text-gray-700 w-32 flex-shrink-0">Technology:</span>
+                    <span className="text-gray-900">{product?.specs_rental?.technology || "N/A"}</span>
+                  </div>
+                  <div className="flex">
+                    <span className="font-medium text-gray-700 w-32 flex-shrink-0">Sales:</span>
+                    <span className="text-gray-900">{report.sales}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Project Status */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <h2 className="text-xl font-bold text-gray-900">Project Status</h2>
+              <div className="bg-green-500 text-white px-3 py-1 rounded text-sm font-medium">
+                {report.completionPercentage || 100}%
+              </div>
+            </div>
+
+            {/* Attachments/Photos - Always maintain minimum height */}
+            <div className="min-h-[300px]">
+              {report.attachments && report.attachments.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {report.attachments.slice(0, 2).map((attachment, index) => (
+                    <div key={index} className="space-y-2">
+                      <div
+                        className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
+                        onClick={() => attachment.fileUrl && openFullScreen(attachment)}
+                      >
+                        {attachment.fileUrl ? (
+                          <div className="w-full h-full flex flex-col items-center justify-center relative">
+                            {/* Zoom overlay */}
+                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
+                              <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                            </div>
+
+                            {isImageFile(attachment.fileName || "") ? (
+                              <img
+                                src={attachment.fileUrl || "/placeholder.svg"}
+                                alt={attachment.fileName || `Attachment ${index + 1}`}
+                                className="max-w-full max-h-full object-contain rounded"
+                                onError={(e) => {
+                                  // Fallback to icon if image fails to load
+                                  const target = e.target as HTMLImageElement
+                                  target.style.display = "none"
+                                  const parent = target.parentElement
+                                  if (parent) {
+                                    parent.innerHTML = `
+                                      <div class="text-center space-y-2">
+                                        ${getFileIcon(attachment.fileName || "").props.children}
+                                        <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
+                                      </div>
+                                    `
+                                  }
+                                }}
+                              />
+                            ) : isVideoFile(attachment.fileName || "") ? (
+                              <video
+                                src={attachment.fileUrl}
+                                className="max-w-full max-h-full object-contain rounded"
+                                onError={(e) => {
+                                  // Fallback to icon if video fails to load
+                                  const target = e.target as HTMLVideoElement
+                                  target.style.display = "none"
+                                  const parent = target.parentElement
+                                  if (parent) {
+                                    parent.innerHTML = `
+                                      <div class="text-center space-y-2">
+                                        ${getFileIcon(attachment.fileName || "").props.children}
+                                        <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
+                                      </div>
+                                    `
+                                  }
+                                }}
+                              />
+                            ) : (
+                              <div className="text-center space-y-2">
+                                {getFileIcon(attachment.fileName || "")}
+                                <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
+                                <a
+                                  href={attachment.fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-600 hover:text-blue-800 underline"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  Open File
+                                </a>
+                              </div>
+                            )}
+                            {attachment.note && (
+                              <p className="text-xs text-gray-500 italic mt-2 text-center">"{attachment.note}"</p>
+                            )}
+                          </div>
+                        ) : attachment.fileName ? (
+                          <div className="text-center space-y-2">
+                            {getFileIcon(attachment.fileName)}
+                            <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
+                            {attachment.note && <p className="text-xs text-gray-500 italic">"{attachment.note}"</p>}
+                          </div>
+                        ) : (
+                          <div className="text-center space-y-2">
+                            <ImageIcon className="h-12 w-12 text-gray-400" />
+                            <p className="text-sm text-gray-600">Project Photo {index + 1}</p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-600 space-y-1">
+                        <div>
+                          <span className="font-semibold">Date:</span> {formatDate(report.date)}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Time:</span>{" "}
+                          {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Location:</span> {report.location || "N/A"}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-64 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300">
+                  <div className="text-center space-y-2">
+                    <ImageIcon className="h-16 w-16 text-gray-400 mx-auto" />
+                    <p className="text-gray-500 text-lg">No attachments available</p>
+                    <p className="text-gray-400 text-sm">Project photos will appear here when uploaded</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Project Information */}
-        <Card className="shadow-sm">
-          <CardContent className="p-6">
-            <h2 className="text-xl font-bold mb-4 text-gray-900">Project Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
-              <div className="space-y-2">
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Site ID:</span>
-                  <span className="text-gray-900">
-                    {report.siteId} {product?.light?.location || product?.specs_rental?.location || ""}
-                  </span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Job Order:</span>
-                  <span className="text-gray-900">{report.id?.slice(-4).toUpperCase() || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Job Order Date:</span>
-                  <span className="text-gray-900">
+        {/* Fixed Footer Section - Always positioned at bottom */}
+        <div className="mt-auto">
+          {/* Prepared By Section - Always above footer */}
+          <div className="max-w-6xl mx-auto px-6 pb-6">
+            <div className="flex justify-between items-end pt-8 border-t">
+              <div>
+                <h3 className="font-semibold mb-2">Prepared by:</h3>
+                <div className="text-sm text-gray-600">
+                  <div className="text-blue-600">{report.createdByName}</div>
+                  <div>LOGISTICS</div>
+                  <div>
                     {formatDate(
                       report.created && typeof report.created.toDate === "function"
                         ? report.created.toDate().toISOString().split("T")[0]
                         : report.date,
                     )}
-                  </span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Site:</span>
-                  <span className="text-gray-900">{report.siteName}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Size:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.size || product?.light?.size || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Start Date:</span>
-                  <span className="text-gray-900">{formatDate(report.bookingDates.start)}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">End Date:</span>
-                  <span className="text-gray-900">{formatDate(report.bookingDates.end)}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Installation Duration:</span>
-                  <span className="text-gray-900">
-                    {Math.ceil(
-                      (new Date(report.bookingDates.end).getTime() - new Date(report.bookingDates.start).getTime()) /
-                        (1000 * 60 * 60 * 24),
-                    )}{" "}
-                    days
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Content:</span>
-                  <span className="text-gray-900">{product?.content_type || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Material Specs:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.material || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Crew:</span>
-                  <span className="text-gray-900">Team {report.assignedTo || "A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Illumination:</span>
-                  <span className="text-gray-900">{product?.light?.illumination || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Gondola:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.gondola ? "YES" : "NO"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Technology:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.technology || "N/A"}</span>
-                </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Sales:</span>
-                  <span className="text-gray-900">{report.sales}</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Project Status */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-bold text-gray-900">Project Status</h2>
-            <div className="bg-green-500 text-white px-3 py-1 rounded text-sm font-medium">
-              {report.completionPercentage || 100}%
-            </div>
-          </div>
-
-          {/* Attachments/Photos */}
-          {report.attachments && report.attachments.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {report.attachments.slice(0, 2).map((attachment, index) => (
-                <div key={index} className="space-y-2">
-                  <div
-                    className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
-                    onClick={() => attachment.fileUrl && openFullScreen(attachment)}
-                  >
-                    {attachment.fileUrl ? (
-                      <div className="w-full h-full flex flex-col items-center justify-center relative">
-                        {/* Zoom overlay */}
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center">
-                          <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                        </div>
-
-                        {isImageFile(attachment.fileName || "") ? (
-                          <img
-                            src={attachment.fileUrl || "/placeholder.svg"}
-                            alt={attachment.fileName || `Attachment ${index + 1}`}
-                            className="max-w-full max-h-full object-contain rounded"
-                            onError={(e) => {
-                              // Fallback to icon if image fails to load
-                              const target = e.target as HTMLImageElement
-                              target.style.display = "none"
-                              const parent = target.parentElement
-                              if (parent) {
-                                parent.innerHTML = `
-                                  <div class="text-center space-y-2">
-                                    ${getFileIcon(attachment.fileName || "").props.children}
-                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
-                                  </div>
-                                `
-                              }
-                            }}
-                          />
-                        ) : isVideoFile(attachment.fileName || "") ? (
-                          <video
-                            src={attachment.fileUrl}
-                            className="max-w-full max-h-full object-contain rounded"
-                            onError={(e) => {
-                              // Fallback to icon if video fails to load
-                              const target = e.target as HTMLVideoElement
-                              target.style.display = "none"
-                              const parent = target.parentElement
-                              if (parent) {
-                                parent.innerHTML = `
-                                  <div class="text-center space-y-2">
-                                    ${getFileIcon(attachment.fileName || "").props.children}
-                                    <p class="text-sm text-gray-700 font-medium break-all">${attachment.fileName || "Unknown file"}</p>
-                                  </div>
-                                `
-                              }
-                            }}
-                          />
-                        ) : (
-                          <div className="text-center space-y-2">
-                            {getFileIcon(attachment.fileName || "")}
-                            <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
-                            <a
-                              href={attachment.fileUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-blue-600 hover:text-blue-800 underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              Open File
-                            </a>
-                          </div>
-                        )}
-                        {attachment.note && (
-                          <p className="text-xs text-gray-500 italic mt-2 text-center">"{attachment.note}"</p>
-                        )}
-                      </div>
-                    ) : attachment.fileName ? (
-                      <div className="text-center space-y-2">
-                        {getFileIcon(attachment.fileName)}
-                        <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
-                        {attachment.note && <p className="text-xs text-gray-500 italic">"{attachment.note}"</p>}
-                      </div>
-                    ) : (
-                      <div className="text-center space-y-2">
-                        <ImageIcon className="h-12 w-12 text-gray-400" />
-                        <p className="text-sm text-gray-600">Project Photo {index + 1}</p>
-                      </div>
-                    )}
-                  </div>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <div>
-                      <span className="font-semibold">Date:</span> {formatDate(report.date)}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Time:</span>{" "}
-                      {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Location:</span> {report.location || "N/A"}
-                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex justify-between items-end pt-8 border-t">
-          <div>
-            <h3 className="font-semibold mb-2">Prepared by:</h3>
-            <div className="text-sm text-gray-600">
-              <div>{report.createdByName}</div>
-              <div>LOGISTICS</div>
-              <div>
-                {formatDate(
-                  report.created && typeof report.created.toDate === "function"
-                    ? report.created.toDate().toISOString().split("T")[0]
-                    : report.date,
-                )}
+              </div>
+              <div className="text-right text-sm text-gray-500 italic">
+                "All data are based on the latest available records as of{" "}
+                {formatDate(new Date().toISOString().split("T")[0])}."
               </div>
             </div>
           </div>
-          <div className="text-right text-sm text-gray-500 italic">
-            "All data are based on the latest available records as of{" "}
-            {formatDate(new Date().toISOString().split("T")[0])}."
-          </div>
-        </div>
-      </div>
 
-      {/* Angular Footer */}
-      <div className="w-full relative bg-white mt-8">
-        <div className="relative h-16 overflow-hidden">
-          {/* Cyan section on left */}
-          <div className="absolute inset-0 bg-cyan-400"></div>
-          {/* Angular dark blue section pointing left */}
-          <div
-            className="absolute top-0 right-0 h-full bg-blue-900"
-            style={{
-              width: "75%",
-              clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
-            }}
-          ></div>
-          {/* Content overlay */}
-          <div className="relative z-10 h-full flex items-center justify-between px-8">
-            <div className="flex items-center gap-6">
-              <div className="text-white text-lg font-semibold">{""}</div>
-              <div className="text-white text-sm">{""}</div>
-            </div>
-            <div className="text-white text-right flex items-center gap-2">
-              <div className="text-sm font-medium">Smart. Seamless. Scalable</div>
-              <div className="text-2xl font-bold flex items-center">
-                OH!
-                <div className="ml-1 text-cyan-400">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10 2v16M2 10h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
+          {/* Angular Footer */}
+          <div className="w-full relative bg-white">
+            <div className="relative h-16 overflow-hidden">
+              {/* Cyan section on left */}
+              <div className="absolute inset-0 bg-cyan-400"></div>
+              {/* Angular dark blue section pointing left */}
+              <div
+                className="absolute top-0 right-0 h-full bg-blue-900"
+                style={{
+                  width: "75%",
+                  clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
+                }}
+              ></div>
+              {/* Content overlay */}
+              <div className="relative z-10 h-full flex items-center justify-between px-8">
+                <div className="flex items-center gap-6">
+                  <div className="text-white text-lg font-semibold">{""}</div>
+                  <div className="text-white text-sm">{""}</div>
+                </div>
+                <div className="text-white text-right flex items-center gap-2">
+                  <div className="text-sm font-medium">Smart. Seamless. Scalable</div>
+                  <div className="text-2xl font-bold flex items-center">
+                    OH!
+                    <div className="ml-1 text-cyan-400">
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 2v16M2 10h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
