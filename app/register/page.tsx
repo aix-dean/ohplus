@@ -150,6 +150,7 @@ export default function RegisterPage() {
 
     setLoading(true)
     try {
+      console.log("Starting registration from UI")
       await register(
         {
           email,
@@ -166,12 +167,14 @@ export default function RegisterPage() {
         password,
         orgCode || undefined, // Pass the organization code if available
       )
+      console.log("Registration completed from UI")
       setErrorMessage(null)
       const redirectUrl = orgCode
         ? "/admin/dashboard?registered=true&joined_org=true"
         : "/admin/dashboard?registered=true"
       router.push(redirectUrl)
     } catch (error: unknown) {
+      console.error("Registration failed in UI:", error)
       setErrorMessage(getFriendlyErrorMessage(error))
     } finally {
       setLoading(false)

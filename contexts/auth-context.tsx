@@ -324,77 +324,126 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Check invitation code if provided
       if (orgCode) {
         console.log("Processing invitation code:", orgCode)
-        const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
-        const invitationSnapshot = await getDocs(invitationQuery)
+        try {
+          const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
+          const invitationSnapshot = await getDocs(invitationQuery)
 
-        if (!invitationSnapshot.empty) {
-          const invitationData = invitationSnapshot.docs[0].data()
-          licenseKey = invitationData.license_key || licenseKey
-          companyId = invitationData.company_id || null
-          roleToAssign = invitationData.role_id || null
+          console.log("Invitation query completed, found docs:", invitationSnapshot.size)
 
-          // Update invitation code usage
-          await updateDoc(doc(db, "invitation_codes", invitationSnapshot.docs[0].id), {
-            used: true,
-            used_count: (invitationData.used_count || 0) + 1,
-            last_used_at: serverTimestamp(),
-          })
-          console.log("Invitation code updated")
+          if (!invitationSnapshot.empty) {
+            const invitationData = invitationSnapshot.docs[0].data()
+            console.log("Invitation data found:", invitationData)
+
+            licenseKey = invitationData.license_key || licenseKey
+            companyId = invitationData.company_id || null
+            roleToAssign = invitationData.role_id || null
+
+            console.log("Extracted from invitation:", { licenseKey, companyId, roleToAssign })
+
+            // Update invitation code usage
+            try {
+              await updateDoc(doc(db, "invitation_codes", invitationSnapshot.docs[0].id), {
+                used: true,
+                used_count: (invitationData.used_count || 0) + 1,
+                last_used_at: serverTimestamp(),
+              })
+              console.log("Invitation code usage updated")
+            } catch (updateError) {
+              console.error("Error updating invitation code:", updateError)
+              // Don't throw here, continue with registration
+            }
+          } else {
+            console.log("No invitation code found with code:", orgCode)
+          }
+        } catch (invitationError) {
+          console.error("Error processing invitation code:", invitationError)
+          // Don't throw here, continue with registration without invitation benefits
         }
       }
 
       // Create user document
-      console.log("Creating user document")
-      const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
-      await setDoc(userDocRef, {
+      console.log("Creating user document with data:", {
         email: firebaseUser.email,
         uid: firebaseUser.uid,
         license_key: licenseKey,
         company_id: companyId,
         role: "user",
-        permissions: [],
         type: "OHPLUS",
-        created: serverTimestamp(),
-        updated: serverTimestamp(),
         first_name: personalInfo.first_name,
         last_name: personalInfo.last_name,
-        middle_name: personalInfo.middle_name,
-        phone_number: personalInfo.phone_number,
-        gender: personalInfo.gender,
         project_id: orgCode ? null : firebaseUser.uid,
       })
+
+      try {
+        const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
+        await setDoc(userDocRef, {
+          email: firebaseUser.email,
+          uid: firebaseUser.uid,
+          license_key: licenseKey,
+          company_id: companyId,
+          role: "user",
+          permissions: [],
+          type: "OHPLUS",
+          created: serverTimestamp(),
+          updated: serverTimestamp(),
+          first_name: personalInfo.first_name,
+          last_name: personalInfo.last_name,
+          middle_name: personalInfo.middle_name,
+          phone_number: personalInfo.phone_number,
+          gender: personalInfo.gender,
+          project_id: orgCode ? null : firebaseUser.uid,
+        })
+        console.log("User document created successfully")
+      } catch (userDocError) {
+        console.error("Error creating user document:", userDocError)
+        throw userDocError
+      }
 
       // Create project if not using invitation code
       if (!orgCode) {
         console.log("Creating project document")
-        const projectDocRef = doc(db, "projects", firebaseUser.uid)
-        await setDoc(projectDocRef, {
-          company_name: companyInfo.company_name,
-          company_location: companyInfo.company_location,
-          project_name: "My First Project",
-          license_key: licenseKey,
-          created: serverTimestamp(),
-          updated: serverTimestamp(),
-        })
+        try {
+          const projectDocRef = doc(db, "projects", firebaseUser.uid)
+          await setDoc(projectDocRef, {
+            company_name: companyInfo.company_name,
+            company_location: companyInfo.company_location,
+            project_name: "My First Project",
+            license_key: licenseKey,
+            created: serverTimestamp(),
+            updated: serverTimestamp(),
+          })
+          console.log("Project document created successfully")
+        } catch (projectError) {
+          console.error("Error creating project document:", projectError)
+          // Don't throw here, user creation was successful
+        }
       }
 
       // Assign role if provided
       if (roleToAssign) {
         console.log("Assigning role:", roleToAssign)
-        const userRoleRef = doc(db, "user_roles", firebaseUser.uid)
-        await setDoc(userRoleRef, {
-          uid: firebaseUser.uid,
-          role: roleToAssign,
-          assigned_by: "system",
-          assigned_at: serverTimestamp(),
-        })
+        try {
+          const userRoleRef = doc(db, "user_roles", firebaseUser.uid)
+          await setDoc(userRoleRef, {
+            uid: firebaseUser.uid,
+            role: roleToAssign,
+            assigned_by: "system",
+            assigned_at: serverTimestamp(),
+          })
+          console.log("Role assigned successfully")
+        } catch (roleError) {
+          console.error("Error assigning role:", roleError)
+          // Don't throw here, user creation was successful
+        }
       }
 
-      console.log("Registration completed successfully")
+      console.log("Registration completed successfully, setting user state")
 
       // Set user and fetch data
       setUser(firebaseUser)
       await fetchUserData(firebaseUser)
+
+      console.log("User data fetched, registration process complete")
     } catch (error) {
       console.error("Registration error:", error)
       throw error

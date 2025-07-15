@@ -14,24 +14,27 @@ export function formatDate(date: Date): string {
 }
 
 export function generateLicenseKey(): string {
-  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-  let licenseKey = ""
-  for (let i = 0; i < 12; i++) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+  let result = ""
+  for (let i = 0; i < 16; i++) {
     if (i > 0 && i % 4 === 0) {
-      licenseKey += "-"
+      result += "-"
     }
-    licenseKey += characters.charAt(Math.floor(Math.random() * characters.length))
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
   }
-  return licenseKey
+  return result
 }
 
 export function generateInvitationCode(): string {
-  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-  let code = ""
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+  let result = ""
   for (let i = 0; i < 8; i++) {
-    code += characters.charAt(Math.floor(Math.random() * characters.length))
+    if (i === 4) {
+      result += "-"
+    }
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
   }
-  return code
+  return result
 }
 
 export function formatCurrency(amount: number): string {
