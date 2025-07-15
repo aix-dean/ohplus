@@ -292,6 +292,15 @@ export default function LoginPage() {
                 >
                   Join an organization
                 </Button>
+                <div className="flex flex-col items-center mt-4">
+                  <span className="text-sm text-gray-500 mb-2">powered by:</span>
+                  <Image
+                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/viber_image_2025-07-15_14-17-13-347%20%281%29-3VNhEPkGkulXmH71m4tLs6MVORYOno.png"
+                    alt="AIX AI Xynergy Logo"
+                    width={100}
+                    height={50}
+                  />
+                </div>
               </CardFooter>
             </Card>
           </div>
