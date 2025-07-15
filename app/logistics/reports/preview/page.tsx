@@ -444,20 +444,20 @@ export default function ReportPreviewPage() {
       </div>
 
       {/* Main Content Container */}
-      <div className="flex">
-        {/* Left Action Buttons Container */}
-        <div className="w-20 flex-shrink-0 p-4">
-          <div className="sticky top-32 flex flex-col gap-6">
+      <div className="relative">
+        {/* Left Action Buttons Container - Positioned outside report area */}
+        <div className="absolute left-4 top-6 z-10">
+          <div className="flex flex-col gap-4">
             {/* Edit Button */}
             <div className="flex flex-col items-center">
               <Button
                 onClick={handleEdit}
-                className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
                 size="sm"
               >
-                <Edit className="h-6 w-6" />
+                <Edit className="h-5 w-5" />
               </Button>
-              <span className="text-xs text-gray-600 mt-2 font-medium">Edit</span>
+              <span className="text-xs text-gray-600 mt-1 font-medium">Edit</span>
             </div>
 
             {/* Download Button */}
@@ -465,18 +465,18 @@ export default function ReportPreviewPage() {
               <Button
                 onClick={handleDownloadPDF}
                 disabled={isGeneratingPDF}
-                className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
                 size="sm"
               >
-                <Download className="h-6 w-6" />
+                <Download className="h-5 w-5" />
               </Button>
-              <span className="text-xs text-gray-600 mt-2 font-medium">{isGeneratingPDF ? "..." : "Download"}</span>
+              <span className="text-xs text-gray-600 mt-1 font-medium">{isGeneratingPDF ? "..." : "Download"}</span>
             </div>
           </div>
         </div>
 
-        {/* Report Content */}
-        <div className="flex-1 p-6 space-y-6">
+        {/* Report Content with left margin to avoid button overlap */}
+        <div className="ml-24 max-w-6xl mx-auto p-6 space-y-6">
           {/* Report Header */}
           <div className="flex justify-between items-center">
             <div className="flex flex-col">
