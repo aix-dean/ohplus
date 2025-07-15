@@ -158,7 +158,9 @@ export default function LoginPage() {
                 className="mx-auto mb-2"
               />
               <p className="text-xl font-light text-blue-600 leading-tight">
-                Powering Smarter Site Management for Billboard Operators
+                Powering Smarter Site Management
+                <br />
+                for Billboard Operators
               </p>
             </div>
 
