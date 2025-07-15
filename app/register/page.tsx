@@ -216,7 +216,7 @@ export default function RegisterPage() {
                       <strong>Assigned Role:</strong>
                     </span>
                     <Badge
-                      style={{ backgroundColor: `var(--${roleData.color}-100)`, color: `var(--${roleData.color}-800)` }}
+                      className={`bg-${roleData.color}-100 text-${roleData.color}-800 hover:bg-${roleData.color}-200`}
                     >
                       {roleData.name}
                     </Badge>
