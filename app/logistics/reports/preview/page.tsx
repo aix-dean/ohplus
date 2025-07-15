@@ -337,10 +337,16 @@ export default function ReportPreviewPage() {
     return diffDays
   }
 
-  // Helper function to get site location
+  // Helper function to get site location (for Site ID field)
   const getSiteLocation = (product: Product | null) => {
     if (!product) return "N/A"
     return product.specs_rental?.location || product.light?.location || "N/A"
+  }
+
+  // Helper function to get site name (for top navigation and Site field)
+  const getSiteName = (report: ReportData | null) => {
+    if (!report) return "N/A"
+    return report.siteName || "N/A"
   }
 
   // Helper function to get site size
@@ -409,9 +415,7 @@ export default function ReportPreviewPage() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-medium">
-            {getSiteLocation(product)}
-          </div>
+          <div className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-medium">{getSiteName(report)}</div>
         </div>
 
         {/* Action Buttons */}
@@ -526,7 +530,7 @@ export default function ReportPreviewPage() {
                     </div>
                     <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
                       <span className="font-bold text-gray-700 whitespace-nowrap">Site:</span>
-                      <span className="text-gray-900">{report.siteName}</span>
+                      <span className="text-gray-900">{getSiteName(report)}</span>
                     </div>
                     <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
                       <span className="font-bold text-gray-700 whitespace-nowrap">Size:</span>
