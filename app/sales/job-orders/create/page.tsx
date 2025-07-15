@@ -352,6 +352,11 @@ export default function CreateJobOrderPage() {
             : 0
         const contractDuration = totalMonths > 0 ? `(${totalMonths} months)` : "N/A"
 
+        const monthlyRate = item?.price || product.price || 0
+        const totalLease = monthlyRate * totalMonths
+        const productVat = totalLease * 0.12
+        const productTotal = totalLease + productVat
+
         return {
           quotationId: quotation.id,
           joNumber: "JO-AUTO-GEN",
@@ -389,11 +394,11 @@ export default function CreateJobOrderPage() {
           siteType: item?.type || product.type || "N/A",
           siteSize: product.specs_rental?.size || product.light?.size || "N/A",
           siteIllumination: product.light?.illumination || "N/A",
-          leaseRatePerMonth: item?.price || product.price || 0,
+          leaseRatePerMonth: monthlyRate,
           totalMonths: totalMonths,
-          totalLease: item?.price ? item.price * totalMonths : (product.price || 0) * totalMonths,
-          vatAmount: quotation.total_amount ? (quotation.total_amount + (quotation.total_amount * 0.12)) / products.length : 0,
-          totalAmount: quotation.total_amount ? quotation.total_amount / products.length : 0,
+          totalLease: totalLease,
+          vatAmount: productVat,
+          totalAmount: productTotal,
           siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
           missingCompliance: missingCompliance,
           product_id: product.id || "",
@@ -451,8 +456,16 @@ export default function CreateJobOrderPage() {
             (1000 * 60 * 60 * 24 * 30.44),
         )
       : 0
-  const vatAmount = quotation.total_amount ? (quotation.total_amount + (quotation.total_amount * 0.12)) : 0
-  const totalAmountWithVat = (quotation.total_amount || 0) + vatAmount
+
+  // Calculate totals dynamically based on products
+  const subtotal = products.reduce((sum, product, index) => {
+    const item = items?.[index]
+    const price = item?.price || product.price || 0
+    return sum + price * totalMonths
+  }, 0)
+
+  const vatAmount = subtotal * 0.12
+  const totalAmountWithVat = subtotal + vatAmount
 
   return (
     <div className="flex flex-col min-h-screen bg-white p-4 md:p-6">
@@ -531,7 +544,7 @@ export default function CreateJobOrderPage() {
 
             <div className="space-y-0.5 mt-3">
               <p className="text-sm">
-                <span className="font-semibold">Total Lease:</span> {formatCurrency(quotation.price)}
+                <span className="font-semibold">Subtotal:</span> {formatCurrency(subtotal)}
               </p>
               <p className="text-sm">
                 <span className="font-semibold">12% VAT:</span> {formatCurrency(vatAmount)}
