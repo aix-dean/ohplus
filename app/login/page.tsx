@@ -128,172 +128,175 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white p-4">
-      {/* Mobile Header - Only visible on mobile */}
-      <div className="md:hidden w-full mb-6">
-        <div className="flex flex-col items-center text-center">
-          <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={80} height={80} priority />
-          <h2 className="mt-4 text-2xl font-light text-blue-700 leading-tight text-center">
-            Powering Smarter
-            <br />
-            Site Management for
-            <br />
-            Billboard Operators
-          </h2>
-        </div>
-      </div>
-      <div className="flex w-full max-w-4xl bg-white rounded-lg shadow-lg overflow-hidden">
-        {/* Left Section: Logo and Company Name */}
-        <div className="hidden md:flex flex-col items-center justify-evenly p-8 bg-gray-50 w-1/2">
-          <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={120} height={120} priority />
-          <h2 className="text-3xl font-light text-blue-700 leading-tight text-center">
-            Powering Smarter
-            <br />
-            Site Management for
-            <br />
-            Billboard Operators
-          </h2>
-          <div className="flex flex-col items-center">
-            <span className="text-sm text-gray-500 mb-2">powered by:</span>
-            <Image
-              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/viber_image_2025-07-15_14-17-13-347%20%281%29-3VNhEPkGkulXmH71m4tLs6MVORYOno.png"
-              alt="AIX AI Xynergy Logo"
-              width={100}
-              height={50}
-            />
+      <div className="flex flex-col w-full max-w-4xl bg-white rounded-lg shadow-lg overflow-hidden">
+        {/* Mobile Header - Only visible on mobile */}
+        <div className="md:hidden w-full p-6 bg-gray-50 border-b">
+          <div className="flex flex-col items-center text-center">
+            <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={80} height={80} priority />
+            <h2 className="mt-4 text-2xl font-light text-blue-700 leading-tight text-center">
+              Powering Smarter
+              <br />
+              Site Management for
+              <br />
+              Billboard Operators
+            </h2>
           </div>
         </div>
 
-        {/* Right Section: Login Form */}
-        <div className="w-full md:w-1/2 p-8">
-          <Card className="border-none shadow-none">
-            <CardHeader className="text-center md:text-left">
-              <CardTitle className="text-3xl font-bold text-gray-900">Log in to your Account</CardTitle>
-              <CardDescription className="text-gray-600 mt-2">Welcome back! Select method to log in:</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-4 mb-6">
-                <Button
-                  variant="outline"
-                  className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                  onClick={() => handleSocialLogin("Google")}
-                >
-                  <Image
-                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Google_Icons-09-512-xTPWQW6Ebs2IlRYdW10MAg71P4QPDL.webp"
-                    alt="Google"
-                    width={20}
-                    height={20}
-                  />
-                  Google
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                  onClick={() => handleSocialLogin("Facebook")}
-                >
-                  <Image
-                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Facebook_Logo_2023-4SQHsSrZ3kX2dVTojWLhiS3pOKdNbq.png"
-                    alt="Facebook"
-                    width={20}
-                    height={20}
-                  />
-                  Facebook
-                </Button>
-              </div>
+        <div className="flex">
+          {/* Left Section: Logo and Company Name */}
+          <div className="hidden md:flex flex-col items-center justify-evenly p-8 bg-gray-50 w-1/2">
+            <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={120} height={120} priority />
+            <h2 className="text-3xl font-light text-blue-700 leading-tight text-center">
+              Powering Smarter
+              <br />
+              Site Management for
+              <br />
+              Billboard Operators
+            </h2>
+            <div className="flex flex-col items-center">
+              <span className="text-sm text-gray-500 mb-2">powered by:</span>
+              <Image
+                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/viber_image_2025-07-15_14-17-13-347%20%281%29-3VNhEPkGkulXmH71m4tLs6MVORYOno.png"
+                alt="AIX AI Xynergy Logo"
+                width={100}
+                height={50}
+              />
+            </div>
+          </div>
 
-              <div className="relative flex items-center justify-center my-6">
-                <Separator className="absolute w-full" />
-                <span className="relative z-10 bg-white px-4 text-sm text-gray-500">or continue with email</span>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="sr-only">
-                    Email
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="pl-10 pr-4 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+          {/* Right Section: Login Form */}
+          <div className="w-full md:w-1/2 p-8">
+            <Card className="border-none shadow-none">
+              <CardHeader className="text-center md:text-left">
+                <CardTitle className="text-3xl font-bold text-gray-900">Log in to your Account</CardTitle>
+                <CardDescription className="text-gray-600 mt-2">Welcome back! Select method to log in:</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-4 mb-6">
+                  <Button
+                    variant="outline"
+                    className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+                    onClick={() => handleSocialLogin("Google")}
+                  >
+                    <Image
+                      src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Google_Icons-09-512-xTPWQW6Ebs2IlRYdW10MAg71P4QPDL.webp"
+                      alt="Google"
+                      width={20}
+                      height={20}
                     />
-                  </div>
+                    Google
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+                    onClick={() => handleSocialLogin("Facebook")}
+                  >
+                    <Image
+                      src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Facebook_Logo_2023-4SQHsSrZ3kX2dVTojWLhiS3pOKdNbq.png"
+                      alt="Facebook"
+                      width={20}
+                      height={20}
+                    />
+                    Facebook
+                  </Button>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="sr-only">
-                    Password
-                  </Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      className="pl-10 pr-10 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 text-gray-400 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </Button>
-                  </div>
+                <div className="relative flex items-center justify-center my-6">
+                  <Separator className="absolute w-full" />
+                  <span className="relative z-10 bg-white px-4 text-sm text-gray-500">or continue with email</span>
                 </div>
 
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox id="remember-me" />
-                    <Label htmlFor="remember-me" className="text-gray-700">
-                      Remember me
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="sr-only">
+                      Email
                     </Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="pl-10 pr-4 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
                   </div>
-                  <Link href="/forgot-password" className="text-blue-600 hover:underline">
-                    Forgot password?
-                  </Link>
-                </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="sr-only">
+                      Password
+                    </Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="pl-10 pr-10 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 text-gray-400 hover:bg-transparent"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox id="remember-me" />
+                      <Label htmlFor="remember-me" className="text-gray-700">
+                        Remember me
+                      </Label>
+                    </div>
+                    <Link href="/forgot-password" className="text-blue-600 hover:underline">
+                      Forgot password?
+                    </Link>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Logging in..." : "Log in"}
+                  </Button>
+                </form>
+              </CardContent>
+              <CardFooter className="flex flex-col gap-2 text-center">
+                <p className="text-sm text-gray-600">
+                  Don't have an account?{" "}
+                  <Link href="/register" className="text-blue-600 hover:underline">
+                    Create an account
+                  </Link>
+                </p>
                 <Button
-                  type="submit"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md"
-                  disabled={isLoading}
+                  variant="outline"
+                  className="w-full mt-2 bg-transparent"
+                  onClick={() => setShowJoinOrgDialog(true)}
                 >
-                  {isLoading ? "Logging in..." : "Log in"}
+                  Join an organization
                 </Button>
-              </form>
-            </CardContent>
-            <CardFooter className="flex flex-col gap-2 text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{" "}
-                <Link href="/register" className="text-blue-600 hover:underline">
-                  Create an account
-                </Link>
-              </p>
-              <Button
-                variant="outline"
-                className="w-full mt-2 bg-transparent"
-                onClick={() => setShowJoinOrgDialog(true)}
-              >
-                Join an organization
-              </Button>
-            </CardFooter>
-          </Card>
+              </CardFooter>
+            </Card>
+          </div>
         </div>
       </div>
 
