@@ -49,14 +49,14 @@ export default function SalesQuotationsPage() {
       let q
 
       if (direction === "first") {
-        q = query(quotationsRef, where("created_by", "==", user.uid), orderBy("created", "desc"), limit(pageSize + 1))
+        q = query(quotationsRef, where("created_by", "==", user.uid), orderBy("created", "desc"), limit(pageSize))
       } else if (direction === "next" && lastVisible) {
         q = query(
           quotationsRef,
           where("created_by", "==", user.uid),
           orderBy("created", "desc"),
           startAfter(lastVisible),
-          limit(pageSize + 1),
+          limit(pageSize),
         )
       } else if (direction === "prev" && pageHistory.length > 0) {
         const prevDoc = pageHistory[pageHistory.length - 1]
@@ -65,7 +65,7 @@ export default function SalesQuotationsPage() {
           where("created_by", "==", user.uid),
           orderBy("created", "desc"),
           startAfter(prevDoc),
-          limit(pageSize + 1),
+          limit(pageSize),
         )
       } else {
         setLoading(false)
@@ -79,17 +79,10 @@ export default function SalesQuotationsPage() {
         fetchedQuotations.push({ id: doc.id, ...doc.data() })
       })
 
-      // Check if there are more items than pageSize
-      const newHasMore = fetchedQuotations.length > pageSize
-
-      // If we have more than pageSize, remove the extra item
-      if (newHasMore) {
-        fetchedQuotations.pop()
-      }
-
-      const docs = querySnapshot.docs.slice(0, pageSize) // Only take pageSize documents
+      const docs = querySnapshot.docs
       const newLastVisible = docs[docs.length - 1] || null
       const newFirstVisible = docs[0] || null
+      const newHasMore = docs.length === pageSize
 
       setQuotations(fetchedQuotations)
       setLastVisible(newLastVisible)

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
@@ -11,7 +11,6 @@ export default function LogisticsDashboardPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const { user, userData } = useAuth()
   console.log(JSON.stringify(user))
-
   return (
     <div className="flex-1 overflow-auto relative">
       <main className="p-4">
@@ -29,16 +28,6 @@ export default function LogisticsDashboardPage() {
           <AllSitesTab />
         </div>
       </main>
-
-      {/* Report Post Success Dialog */}
-      {showReportSuccessDialog && lastPostedReportId && (
-        <ReportPostSuccessDialog
-          open={showReportSuccessDialog}
-          onOpenChange={setShowReportSuccessDialog}
-          reportId={lastPostedReportId}
-          onViewReport={(id) => router.push(`/logistics/reports/${id}`)}
-        />
-      )}
 
       {/* Floating Action Button */}
       <div className="fixed bottom-8 right-8 z-10">

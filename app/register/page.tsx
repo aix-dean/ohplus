@@ -9,9 +9,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FirebaseError } from "firebase/app"
-import { EyeIcon, EyeOffIcon, CheckCircleIcon, XCircleIcon } from "lucide-react"
-import { z } from "zod" // Import zod for schema validation
-// No longer importing Progress component as we're creating custom bars
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
@@ -23,16 +20,6 @@ export default function RegisterPage() {
   const [phoneNumber, setPhoneNumber] = useState("")
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [passwordCriteria, setPasswordCriteria] = useState({
-    minLength: false,
-    hasLowerCase: false,
-    hasUpperCase: false,
-    hasNumber: false,
-    hasSpecialChar: false,
-  })
-  const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null)
 
   const { register } = useAuth()
   const router = useRouter()
@@ -40,16 +27,6 @@ export default function RegisterPage() {
 
   // Get organization code from URL parameters
   const orgCode = searchParams.get("orgCode")
-
-  const passwordSchema = z
-    .string()
-    .min(8, { message: "Be at least 8 characters long" })
-    .regex(/[a-z]/, { message: "Contain at least one lowercase letter." })
-    .regex(/[A-Z]/, { message: "Contain at least one uppercase letter." })
-    .regex(/[0-9]/, { message: "Contain at least one number." })
-    .regex(/[^a-zA-Z0-9]/, {
-      message: "Contain at least one special character.",
-    })
 
   const getFriendlyErrorMessage = (error: unknown): string => {
     console.error("Raw error during registration:", error)
@@ -72,41 +49,6 @@ export default function RegisterPage() {
     return "An unknown error occurred. Please try again."
   }
 
-  const validatePasswordStrength = (pwd: string) => {
-    const criteria = {
-      minLength: pwd.length >= 8,
-      hasLowerCase: /[a-z]/.test(pwd),
-      hasUpperCase: /[A-Z]/.test(pwd),
-      hasNumber: /[0-9]/.test(pwd),
-      hasSpecialChar: /[^a-zA-Z0-9]/.test(pwd),
-    }
-    setPasswordCriteria(criteria)
-  }
-
-  const getPasswordStrengthScore = () => {
-    let score = 0
-    if (passwordCriteria.minLength) score += 1
-    if (passwordCriteria.hasLowerCase) score += 1
-    if (passwordCriteria.hasUpperCase) score += 1
-    if (passwordCriteria.hasNumber) score += 1
-    if (passwordCriteria.hasSpecialChar) score += 1
-    return score // Score from 0 to 5
-  }
-
-  const getStrengthText = (score: number) => {
-    if (score === 5) return "Strong password"
-    if (score >= 3) return "Moderate password"
-    if (score > 0) return "Weak password"
-    return ""
-  }
-
-  const getBarColorClass = (score: number) => {
-    if (score === 5) return "bg-green-500"
-    if (score >= 3) return "bg-yellow-500"
-    if (score > 0) return "bg-red-500"
-    return "bg-gray-300" // Default for empty password
-  }
-
   const handleRegister = async () => {
     setErrorMessage(null)
 
@@ -117,14 +59,6 @@ export default function RegisterPage() {
 
     if (password !== confirmPassword) {
       setErrorMessage("Passwords do not match.")
-      return
-    }
-
-    // Validate password strength using Zod
-    const passwordValidationResult = passwordSchema.safeParse(password)
-    if (!passwordValidationResult.success) {
-      const errors = passwordValidationResult.error.flatten().errors.map((err) => err.message)
-      setErrorMessage(`Password does not meet requirements: ${errors.join(", ")}`)
       return
     }
 
@@ -157,8 +91,6 @@ export default function RegisterPage() {
       setLoading(false)
     }
   }
-
-  const passwordStrengthScore = getPasswordStrengthScore()
 
   return (
     <div className="flex min-h-screen">
@@ -249,108 +181,23 @@ export default function RegisterPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value)
-                      validatePasswordStrength(e.target.value)
-                      setPasswordsMatch(e.target.value === confirmPassword ? true : confirmPassword ? false : null)
-                    }}
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    disabled={loading}
-                  >
-                    {showPassword ? (
-                      <EyeOffIcon className="h-4 w-4 text-gray-500" />
-                    ) : (
-                      <EyeIcon className="h-4 w-4 text-gray-500" />
-                    )}
-                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
-                  </Button>
-                </div>
-                <div className="mt-2">
-                  <div className="flex gap-1 h-2">
-                    {[...Array(5)].map((_, i) => (
-                      <div
-                        key={i}
-                        className={`flex-1 rounded-full ${
-                          i < passwordStrengthScore ? getBarColorClass(passwordStrengthScore) : "bg-gray-300"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    {getStrengthText(passwordStrengthScore)}
-                  </p>
-                  {passwordStrengthScore < 5 && password.length > 0 && (
-                    <ul className="list-inside text-sm mt-1">
-                      {!passwordCriteria.minLength && (
-                        <li className="text-red-500">Password should be at least 8 characters long</li>
-                      )}
-                      {!passwordCriteria.hasLowerCase && (
-                        <li className="text-red-500">Password should contain at least one lowercase letter</li>
-                      )}
-                      {!passwordCriteria.hasUpperCase && (
-                        <li className="text-red-500">Password should contain at least one uppercase letter</li>
-                      )}
-                      {!passwordCriteria.hasNumber && (
-                        <li className="text-red-500">Password should contain at least one number</li>
-                      )}
-                      {!passwordCriteria.hasSpecialChar && (
-                        <li className="text-red-500">Password should contain at least one special character</li>
-                      )}
-                    </ul>
-                  )}
-                </div>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm password</Label>
-                <div className="relative">
-                  <Input
-                    id="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    value={confirmPassword}
-                    onChange={(e) => {
-                      setConfirmPassword(e.target.value)
-                      setPasswordsMatch(password === e.target.value ? true : e.target.value ? false : null)
-                    }}
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowConfirmPassword((prev) => !prev)}
-                    disabled={loading}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOffIcon className="h-4 w-4 text-gray-500" />
-                    ) : (
-                      <EyeIcon className="h-4 w-4 text-gray-500" />
-                    )}
-                    <span className="sr-only">{showConfirmPassword ? "Hide password" : "Show password"}</span>
-                  </Button>
-                  {passwordsMatch !== null && (
-                    <div className="absolute right-10 top-1/2 -translate-y-1/2">
-                      {passwordsMatch ? (
-                        <CheckCircleIcon className="h-5 w-5 text-green-500" />
-                      ) : (
-                        <XCircleIcon className="h-5 w-5 text-red-500" />
-                      )}
-                    </div>
-                  )}
-                </div>
-                {passwordsMatch === false && <p className="text-red-500 text-sm mt-1">Passwords do not match.</p>}
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                />
               </div>
               <p className="text-center text-xs text-gray-500 dark:text-gray-400">
                 By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}

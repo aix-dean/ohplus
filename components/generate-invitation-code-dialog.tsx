@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -19,11 +19,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { Loader2, Info } from "lucide-react"
+import { subscriptionService } from "@/lib/subscription-service"
+import { Loader2, Info, AlertTriangle, Users } from "lucide-react"
 
 interface GenerateInvitationCodeDialogProps {
   open: boolean
@@ -49,16 +51,38 @@ const AVAILABLE_PERMISSIONS = [
 ]
 
 export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInvitationCodeDialogProps) {
-  const { userData } = useAuth()
+  const { userData, subscriptionData } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [userLimitInfo, setUserLimitInfo] = useState<{
+    canInvite: boolean
+    currentUsers: number
+    maxUsers: number
+  } | null>(null)
   const [formData, setFormData] = useState({
     validityDays: 30,
-    maxUsage: 0, // 0 means unlimited
+    maxUsage: 1, // Default to 1 for single user invitation
     role: "",
     customRole: "",
     permissions: [] as string[],
     description: "",
   })
+
+  // Check user limits when dialog opens
+  useEffect(() => {
+    const checkUserLimits = async () => {
+      if (open && userData?.license_key) {
+        try {
+          const limitInfo = await subscriptionService.checkUserLimit(userData.license_key)
+          setUserLimitInfo(limitInfo)
+        } catch (error) {
+          console.error("Error checking user limits:", error)
+          setUserLimitInfo({ canInvite: false, currentUsers: 0, maxUsers: 0 })
+        }
+      }
+    }
+
+    checkUserLimits()
+  }, [open, userData?.license_key])
 
   const generateRandomCode = () => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -72,8 +96,14 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!userData?.company_id) {
+    if (!userData?.company_id || !userData?.license_key) {
       toast.error("Company information not found")
+      return
+    }
+
+    // Check user limits before generating code
+    if (!userLimitInfo?.canInvite) {
+      toast.error("User limit reached for your subscription plan")
       return
     }
 
@@ -94,8 +124,16 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
         return
       }
 
-      if (formData.maxUsage < 0 || formData.maxUsage > 1000) {
-        toast.error("Usage limit must be between 0 and 1000 (0 = unlimited)")
+      if (formData.maxUsage < 1 || formData.maxUsage > 100) {
+        toast.error("Usage limit must be between 1 and 100")
+        setLoading(false)
+        return
+      }
+
+      // Check if the max usage would exceed the remaining user slots
+      const remainingSlots = userLimitInfo.maxUsers === -1 ? 999 : userLimitInfo.maxUsers - userLimitInfo.currentUsers
+      if (formData.maxUsage > remainingSlots) {
+        toast.error(`Usage limit cannot exceed remaining user slots (${remainingSlots})`)
         setLoading(false)
         return
       }
@@ -114,11 +152,11 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
         status: "active",
         created_by: userData.uid,
         company_id: userData.company_id,
+        license_key: userData.license_key, // Add license key to track subscription limits
         description: formData.description || null,
         used_by: [],
       }
 
-      // Add code to Firestore
       await addDoc(collection(db, "invitation_codes"), codeData)
 
       toast.success("Successfully generated invitation code")
@@ -126,12 +164,16 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
       // Reset form
       setFormData({
         validityDays: 30,
-        maxUsage: 0,
+        maxUsage: 1,
         role: "",
         customRole: "",
         permissions: [],
         description: "",
       })
+
+      // Refresh user limit info
+      const updatedLimitInfo = await subscriptionService.checkUserLimit(userData.license_key)
+      setUserLimitInfo(updatedLimitInfo)
 
       onOpenChange(false)
     } catch (error) {
@@ -151,6 +193,22 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
 
   const selectedRoleData = PREDEFINED_ROLES.find((r) => r.value === formData.role)
 
+  // Don't render if user limits haven't been loaded yet
+  if (open && !userLimitInfo) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Checking subscription limits...</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -160,6 +218,42 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
             Create an invitation code for user registration with specific role and permissions
           </DialogDescription>
         </DialogHeader>
+
+        {/* User Limit Information */}
+        {userLimitInfo && (
+          <Card className="border-l-4 border-l-blue-500">
+            <CardContent className="pt-4">
+              <div className="flex items-center space-x-2 mb-2">
+                <Users className="h-4 w-4 text-blue-500" />
+                <span className="font-medium text-sm">User Limit Status</span>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                <p>
+                  Current Users: <span className="font-medium">{userLimitInfo.currentUsers}</span> /{" "}
+                  <span className="font-medium">
+                    {userLimitInfo.maxUsers === -1 ? "Unlimited" : userLimitInfo.maxUsers}
+                  </span>
+                </p>
+                {userLimitInfo.maxUsers !== -1 && (
+                  <p>
+                    Remaining Slots:{" "}
+                    <span className="font-medium">{userLimitInfo.maxUsers - userLimitInfo.currentUsers}</span>
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Warning if user limit reached */}
+        {userLimitInfo && !userLimitInfo.canInvite && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              You have reached the user limit for your subscription plan. Please upgrade your plan to invite more users.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Settings */}
@@ -181,6 +275,7 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
                       setFormData((prev) => ({ ...prev, validityDays: Number.parseInt(e.target.value) || 30 }))
                     }
                     required
+                    disabled={!userLimitInfo?.canInvite}
                   />
                   <p className="text-xs text-muted-foreground">How long the code remains valid</p>
                 </div>
@@ -189,17 +284,21 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
                   <Input
                     id="maxUsage"
                     type="number"
-                    min="0"
-                    max="1000"
+                    min="1"
+                    max={
+                      userLimitInfo?.maxUsers === -1
+                        ? 100
+                        : Math.min(100, userLimitInfo?.maxUsers - userLimitInfo?.currentUsers || 1)
+                    }
                     value={formData.maxUsage}
                     onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, maxUsage: Number.parseInt(e.target.value) || 0 }))
+                      setFormData((prev) => ({ ...prev, maxUsage: Number.parseInt(e.target.value) || 1 }))
                     }
-                    placeholder="0 for unlimited"
+                    placeholder="Number of users who can use this code"
+                    required
+                    disabled={!userLimitInfo?.canInvite}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Maximum number of times the code can be used (0 = unlimited)
-                  </p>
+                  <p className="text-xs text-muted-foreground">Maximum number of users who can use this code</p>
                 </div>
               </div>
             </CardContent>
@@ -217,6 +316,7 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
                 <Select
                   value={formData.role}
                   onValueChange={(value) => setFormData((prev) => ({ ...prev, role: value }))}
+                  disabled={!userLimitInfo?.canInvite}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a role" />
@@ -249,6 +349,7 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
                     onChange={(e) => setFormData((prev) => ({ ...prev, customRole: e.target.value }))}
                     placeholder="Enter custom role name"
                     required
+                    disabled={!userLimitInfo?.canInvite}
                   />
                 </div>
               )}
@@ -279,6 +380,7 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
                       id={permission.id}
                       checked={formData.permissions.includes(permission.id)}
                       onCheckedChange={(checked) => handlePermissionChange(permission.id, checked as boolean)}
+                      disabled={!userLimitInfo?.canInvite}
                     />
                     <div className="space-y-1">
                       <Label htmlFor={permission.id} className="text-sm font-medium cursor-pointer">
@@ -306,13 +408,14 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
                   onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
                   placeholder="Add a description for this code..."
                   rows={3}
+                  disabled={!userLimitInfo?.canInvite}
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* Summary */}
-          <Card>
+          <Card className="bg-green-50">
             <CardHeader>
               <CardTitle className="text-lg">Summary</CardTitle>
             </CardHeader>
@@ -327,7 +430,7 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
                 <div>
                   <span className="font-medium">Usage limit:</span>
                   <Badge variant="secondary" className="ml-2">
-                    {formData.maxUsage === 0 ? "Unlimited" : formData.maxUsage}
+                    {formData.maxUsage} {formData.maxUsage === 1 ? "user" : "users"}
                   </Badge>
                 </div>
                 <div className="col-span-2">
@@ -361,7 +464,7 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="submit" onClick={handleSubmit} disabled={loading}>
+          <Button type="submit" onClick={handleSubmit} disabled={loading || !userLimitInfo?.canInvite}>
             {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Generate Code
           </Button>

@@ -184,7 +184,7 @@ export function TopNavigation() {
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
-              <h1 className="text-xl font-semibold text-white">{pageTitle == "Admin - Subscriptions" ? "Admin - Plan Profile" : pageTitle}</h1>
+              <h1 className="text-xl font-semibold text-white">{pageTitle}</h1>
             </div>
             <div className="top-nav-links hidden md:flex"></div>
           </div>

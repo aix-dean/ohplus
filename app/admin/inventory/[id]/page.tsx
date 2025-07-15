@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, MapPin, Calendar, Tag, Clock, User, AlertTriangle, Trash2 } from "lucide-react"
+import { ArrowLeft, MapPin, Calendar, Tag, Clock, User, AlertTriangle, Trash2, Edit } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -52,7 +52,7 @@ export default function AdminProductDetailPage() {
   }, [params.id])
 
   const handleBack = () => {
-    router.back()
+    router.push("/admin/inventory")
   }
 
   const handleDelete = async () => {
@@ -139,6 +139,32 @@ export default function AdminProductDetailPage() {
           Back to Inventory
         </Button>
 
+        {/* Header with product name and actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1>
+            <p className="text-gray-600">{product.description}</p>
+          </div>
+          <div className="flex gap-2 mt-4 sm:mt-0">
+            {!product.deleted && (
+              <>
+                <Button onClick={handleEdit} className="flex items-center gap-2">
+                  <Edit className="h-4 w-4" />
+                  Edit Site
+                </Button>
+                <Button
+                  variant="outline"
+                  className="text-destructive hover:bg-destructive/10 bg-transparent"
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
         {product.deleted && (
           <Alert variant="destructive" className="mb-6">
             <AlertTriangle className="h-4 w-4" />
@@ -190,7 +216,7 @@ export default function AdminProductDetailPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm font-medium text-gray-500">ID</p>
-                        <p>{product.id}</p>
+                        <p className="font-mono text-sm">{product.id}</p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-gray-500">Status</p>
@@ -225,10 +251,9 @@ export default function AdminProductDetailPage() {
                       </div>
                     </div>
 
-                    {/* Add price display */}
                     <div>
                       <p className="text-sm font-medium text-gray-500">Price</p>
-                      <p className="mt-1 text-green-700 font-medium">
+                      <p className="mt-1 text-green-700 font-medium text-lg">
                         {product.price ? `₱${Number(product.price).toLocaleString()} per month` : "Price not available"}
                       </p>
                     </div>
@@ -236,7 +261,7 @@ export default function AdminProductDetailPage() {
                     {product.specs_rental?.geopoint && (
                       <div>
                         <p className="text-sm font-medium text-gray-500">Coordinates</p>
-                        <p>
+                        <p className="font-mono text-sm">
                           {product.specs_rental.geopoint[0]}, {product.specs_rental.geopoint[1]}
                         </p>
                       </div>
@@ -250,17 +275,37 @@ export default function AdminProductDetailPage() {
                         <p>{product.type || "Unknown"}</p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-500">Audience Type</p>
-                        <p>{product.specs_rental?.audience_type || "Unknown"}</p>
+                        <p className="text-sm font-medium text-gray-500">Content Type</p>
+                        <p>{product.content_type || "Not specified"}</p>
                       </div>
                     </div>
 
-                    <Separator />
+                    {product.specs_rental?.audience_types && product.specs_rental.audience_types.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Audience Types</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {product.specs_rental.audience_types.map((type, index) => (
+                            <Badge key={index} variant="outline" className="bg-blue-50">
+                              {type}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Description</p>
-                      <p className="mt-1">{product.description || "No description available"}</p>
-                    </div>
+                    {product.category_names && product.category_names.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">Categories</p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {product.category_names.map((category, index) => (
+                            <Badge key={index} variant="outline" className="bg-purple-50">
+                              <Tag className="mr-1 h-3 w-3" />
+                              {category}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     <Separator />
 
@@ -280,23 +325,34 @@ export default function AdminProductDetailPage() {
                       </div>
                     )}
 
-                    {product.content_type && (
+                    {product.specs_rental && (
                       <div>
-                        <p className="text-sm font-medium text-gray-500">Content Type</p>
-                        <p className="mt-1">{product.content_type}</p>
-                      </div>
-                    )}
-
-                    {product.ai_logo_tags && product.ai_logo_tags.length > 0 && (
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Detected Brands</p>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {product.ai_logo_tags.map((tag, index) => (
-                            <Badge key={index} variant="outline" className="bg-gray-50">
-                              <Tag className="mr-1 h-3 w-3" />
-                              {tag}
-                            </Badge>
-                          ))}
+                        <p className="text-sm font-medium text-gray-500">Site Specifications</p>
+                        <div className="grid grid-cols-2 gap-4 mt-2">
+                          {product.specs_rental.height && (
+                            <div>
+                              <p className="text-sm font-medium">Height</p>
+                              <p>{product.specs_rental.height} ft</p>
+                            </div>
+                          )}
+                          {product.specs_rental.width && (
+                            <div>
+                              <p className="text-sm font-medium">Width</p>
+                              <p>{product.specs_rental.width} ft</p>
+                            </div>
+                          )}
+                          {product.specs_rental.elevation && (
+                            <div>
+                              <p className="text-sm font-medium">Elevation</p>
+                              <p>{product.specs_rental.elevation} ft</p>
+                            </div>
+                          )}
+                          {product.specs_rental.traffic_count && (
+                            <div>
+                              <p className="text-sm font-medium">Daily Traffic</p>
+                              <p>{Number(product.specs_rental.traffic_count).toLocaleString()}</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -315,22 +371,41 @@ export default function AdminProductDetailPage() {
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         {product.media.map((item, index) => (
                           <div key={index} className="relative aspect-square rounded-md overflow-hidden border">
-                            <Image
-                              src={item.url || "/placeholder.svg"}
-                              alt={`Media ${index + 1}`}
-                              fill
-                              className="object-cover"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement
-                                target.src = "/abstract-geometric-sculpture.png"
-                                target.className = "object-cover opacity-50"
-                              }}
-                            />
+                            {item.isVideo ? (
+                              <video
+                                src={item.url}
+                                controls
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLVideoElement
+                                  target.style.display = "none"
+                                }}
+                              />
+                            ) : (
+                              <Image
+                                src={item.url || "/placeholder.svg"}
+                                alt={`Media ${index + 1}`}
+                                fill
+                                className="object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  target.src = "/abstract-geometric-sculpture.png"
+                                  target.className = "object-cover opacity-50"
+                                }}
+                              />
+                            )}
                             <div className="absolute bottom-2 right-2">
                               <Badge variant="outline" className="bg-white/80 backdrop-blur-sm">
                                 {item.type}
                               </Badge>
                             </div>
+                            {item.distance && (
+                              <div className="absolute bottom-2 left-2">
+                                <Badge variant="outline" className="bg-white/80 backdrop-blur-sm text-xs">
+                                  {item.distance}
+                                </Badge>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -469,11 +544,12 @@ export default function AdminProductDetailPage() {
                   {!product.deleted && (
                     <>
                       <Button onClick={handleEdit} className="w-full">
+                        <Edit className="mr-2 h-4 w-4" />
                         Edit Site
                       </Button>
                       <Button
                         variant="outline"
-                        className="w-full text-destructive hover:bg-destructive/10"
+                        className="w-full text-destructive hover:bg-destructive/10 bg-transparent"
                         onClick={() => setDeleteDialogOpen(true)}
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
@@ -481,7 +557,7 @@ export default function AdminProductDetailPage() {
                       </Button>
                     </>
                   )}
-                  <Button variant="outline" className="w-full">
+                  <Button variant="outline" className="w-full bg-transparent">
                     View Contract
                   </Button>
                 </div>
@@ -489,6 +565,7 @@ export default function AdminProductDetailPage() {
             </Card>
           </div>
         </div>
+
         {/* Delete Confirmation Dialog */}
         <DeleteConfirmationDialog
           isOpen={deleteDialogOpen}
@@ -522,7 +599,13 @@ function formatDate(dateValue?: string | any): string {
       date = new Date(dateValue)
     }
 
-    return date.toLocaleDateString()
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
   } catch (error) {
     console.error("Error formatting date:", error)
     return String(dateValue)
