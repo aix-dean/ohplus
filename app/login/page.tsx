@@ -120,9 +120,9 @@ export default function LoginPage() {
         {/* Left Section: Logo and Company Name */}
         <div className="hidden md:flex flex-col items-center justify-center p-8 bg-gray-50 w-1/2">
           <div className="flex flex-col items-center space-y-6">
-            {/* OH! Logo */}
+            {/* OH Plus Logo */}
             <div className="text-center">
-              <h1 className="text-4xl font-bold text-blue-600">OH!</h1>
+              <Image src="/ohplus-new-logo.png" alt="OH Plus Logo" width={120} height={120} priority />
             </div>
 
             {/* Main tagline */}
