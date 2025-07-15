@@ -88,6 +88,7 @@ interface AuthContextType {
   refreshSubscriptionData: () => Promise<void>
   assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
   getEffectiveUserId: () => string | null
+  getEffectiveCompanyId: () => string | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -104,6 +105,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Always return the OHPLUS user ID, never the Firebase Auth user ID
     return user?.uid || null
   }, [user])
+
+  // This function returns the effective company ID that should be used for all operations
+  const getEffectiveCompanyId = useCallback((): string | null => {
+    // Return company_id if available, otherwise fall back to user UID
+    return userData?.company_id || user?.uid || null
+  }, [userData, user])
 
   const createOHPlusUser = (firebaseUser: FirebaseUser, ohplusUid: string): OHPlusUser => {
     console.log("Creating OHPlusUser with OHPLUS UID:", ohplusUid, "Firebase Auth UID:", firebaseUser.uid)
@@ -161,7 +168,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       company_id: data.company_id || null,
     }
 
-    console.log("Successfully validated OHPLUS user data with UID:", validatedUserData.uid)
+    console.log(
+      "Successfully validated OHPLUS user data with UID:",
+      validatedUserData.uid,
+      "Company ID:",
+      validatedUserData.company_id,
+    )
     return validatedUserData
   }
 
@@ -563,6 +575,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshSubscriptionData,
     assignLicenseKey,
     getEffectiveUserId,
+    getEffectiveCompanyId,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
