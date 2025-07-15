@@ -93,9 +93,9 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col lg:flex-row">
       {/* Left Panel - Image */}
-      <div className="relative hidden w-[40%] items-center justify-center bg-gray-900 lg:flex">
+      <div className="relative hidden w-full items-center justify-center bg-gray-900 sm:flex lg:w-[40%]">
         <Image
           src="/registration-background.png"
           alt="Background"
@@ -106,8 +106,8 @@ export default function RegisterPage() {
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex w-full items-center justify-center bg-white p-8 dark:bg-gray-950 lg:w-[60%]">
-        <Card className="w-full max-w-md border-none shadow-none">
+      <div className="flex w-full items-center justify-center bg-white p-4 dark:bg-gray-950 sm:p-6 lg:w-[60%] lg:p-8">
+        <Card className="w-full max-w-md border-none shadow-none sm:max-w-lg">
           <CardHeader className="space-y-1 text-left">
             <div className="flex items-center justify-between">
               <CardTitle className="text-3xl font-bold">
@@ -127,7 +127,7 @@ export default function RegisterPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">First Name</Label>
                   <Input
@@ -220,13 +220,7 @@ export default function RegisterPage() {
                 onClick={handleRegister}
                 disabled={loading}
               >
-                {loading
-                  ? orgCode
-                    ? "Joining Organization..."
-                    : "Signing Up..."
-                  : orgCode
-                    ? "Join Organization"
-                    : "Sign Up"}
+                {loading ? (orgCode ? "Joining..." : "Signing Up...") : orgCode ? "Join Organization" : "Sign Up"}
               </Button>
             </div>
 
