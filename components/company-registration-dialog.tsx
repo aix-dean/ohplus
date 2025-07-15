@@ -161,11 +161,15 @@ export function CompanyRegistrationDialog({ isOpen, onClose, onSuccess }: Compan
                 <SelectValue placeholder="Select business type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Operator">Operator</SelectItem>
-                <SelectItem value="Freelance">Freelance</SelectItem>
-                <SelectItem value="Media Buyer">Media Buyer</SelectItem>
-                <SelectItem value="Printing Company">Printing Company</SelectItem>
-                <SelectItem value="Equipment Supplier">Equipment Supplier</SelectItem>
+                <SelectItem value="Advertising Agency">Advertising Agency</SelectItem>
+                <SelectItem value="Media Company">Media Company</SelectItem>
+                <SelectItem value="Technology">Technology</SelectItem>
+                <SelectItem value="Retail">Retail</SelectItem>
+                <SelectItem value="Real Estate">Real Estate</SelectItem>
+                <SelectItem value="Healthcare">Healthcare</SelectItem>
+                <SelectItem value="Education">Education</SelectItem>
+                <SelectItem value="Finance">Finance</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
               </SelectContent>
             </Select>
           </div>

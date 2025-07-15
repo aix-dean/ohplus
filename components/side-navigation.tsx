@@ -52,7 +52,6 @@ const navigationItems = [
       { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
       { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
       { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
-      { title: "Quotations", href: "/sales/quotations-list", icon: FileText }, // Added new item for Quotations
       { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
       { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
       { title: "Clients", href: "/sales/clients", icon: Users },
@@ -94,7 +93,7 @@ const navigationItems = [
     icon: Settings,
     items: [
       { title: "General", href: "/settings", icon: Settings },
-      { title: "Plan Profile", href: "/admin/subscriptions", icon: FileText },
+      { title: "Subscription", href: "/admin/subscriptions", icon: FileText },
     ],
   },
 ]
@@ -115,10 +114,6 @@ export function SideNavigation() {
   }
   if (pathname?.startsWith("/admin")) {
     currentSection = "admin"
-  }
-  if (pathname?.startsWith("/sales/quotations-list")) {
-    // Ensure sales section is active for new quotations page
-    currentSection = "sales"
   }
 
   // Find the navigation item for the current section
@@ -331,7 +326,7 @@ export function SideNavigation() {
                 {[
                   { title: "Service Assignments", href: "/logistics/assignments", icon: FileText },
                   { title: "JOs", href: "/logistics/job-orders", icon: ClipboardList },
-                  { title: "Reports", href: "/logistics/service-reports", icon: BarChart3 },
+                  { title: "Reports", href: "/logistics/reports", icon: BarChart3 },
                   { title: "Teams and Personnel", href: "/logistics/teams", icon: Users },
                   { title: "Settings and Config", href: "/logistics/settings", icon: Cog },
                   { title: "News and Weather", href: "/logistics/weather", icon: CloudRain },
@@ -436,7 +431,7 @@ export function SideNavigation() {
                   { title: "Documents", href: "/admin/documents", icon: FileText },
                   { title: "Inventory", href: "/admin/inventory", icon: Package },
                   { title: "User Management", href: "/admin/user-management", icon: Users },
-                  { title: "Plan Profile", href: "/admin/subscriptions", icon: FileText },
+                  { title: "Subscription", href: "/admin/subscriptions", icon: FileText },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
@@ -567,7 +562,6 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
-                  { title: "Quotations", href: "/sales/quotations-list", icon: FileText }, // Added new item for Quotations
                   { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
                   { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
                   { title: "Clients", href: "/sales/clients", icon: Users },

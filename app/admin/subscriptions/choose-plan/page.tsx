@@ -11,7 +11,6 @@ import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { PromoBanner } from "@/components/promo-banner"
-import { CompanyRegistrationDialog } from "@/components/company-registration-dialog" // Import the dialog
 
 // Move promoEndDate outside the component to ensure it's a stable reference
 const promoEndDate = new Date(2025, 6, 19, 23, 59, 0) // July 19, 2025, 11:59 PM PH time (UTC+8)
@@ -28,8 +27,6 @@ export default function ChoosePlanPage() {
     minutes: number
     seconds: number
   } | null>(null)
-  const [isCompanyRegistrationDialogOpen, setIsCompanyRegistrationDialogOpen] = useState(false) // New state for dialog
-  const [planToUpgradeAfterRegistration, setPlanToUpgradeAfterRegistration] = useState<string | null>(null) // New state to store plan
 
   const plans = getSubscriptionPlans()
 
@@ -74,13 +71,6 @@ export default function ChoosePlanPage() {
         return
       }
 
-      // Check for company_id before proceeding
-      if (!userData?.company_id) {
-        setPlanToUpgradeAfterRegistration(planId) // Store the planId to upgrade after registration
-        setIsCompanyRegistrationDialogOpen(true)
-        return
-      }
-
       setIsUpdating(true)
       setSelectedPlanId(planId)
 
@@ -107,13 +97,6 @@ export default function ChoosePlanPage() {
         const newPlanType: SubscriptionPlanType = selectedPlan.id as SubscriptionPlanType
         const billingCycle: BillingCycle = selectedPlan.billingCycle === "N/A" ? "monthly" : selectedPlan.billingCycle
 
-        // Calculate end date for graphic-expo-event (90 days from now)
-        let customEndDate: Date | null = null
-        if (selectedPlan.id === "graphic-expo-event") {
-          customEndDate = new Date()
-          customEndDate.setDate(customEndDate.getDate() + 90) // 90 days from now
-        }
-
         // Always create a new subscription document
         await subscriptionService.createSubscription(
           userData.license_key,
@@ -121,12 +104,10 @@ export default function ChoosePlanPage() {
           billingCycle,
           user.uid,
           new Date(), // Start date is now
-          customEndDate, // Use custom end date for graphic-expo-event, null for others
+          null, // Let the service calculate end date
           "active", // New subscription is active
           null, // Let the service calculate max products
-          selectedPlan.id === "graphic-expo-event" ? customEndDate : null, // Set trialEndDate for graphic-expo-event
-          userData.company_id || null, // Add company_id parameter
-          null, // Let the service calculate max users
+          selectedPlan.id === "graphic-expo-event" ? promoEndDate : null, // Set trialEndDate for graphic-expo-event
         )
 
         toast({
@@ -154,17 +135,6 @@ export default function ChoosePlanPage() {
   const handlePromoBannerClick = useCallback(() => {
     handleUpgrade("graphic-expo-event")
   }, [handleUpgrade])
-
-  const handleCompanyRegistrationSuccess = useCallback(async () => {
-    setIsCompanyRegistrationDialogOpen(false)
-    // After successful registration, refresh user data to get the new company_id
-    await refreshSubscriptionData() // This also refreshes userData
-    if (planToUpgradeAfterRegistration) {
-      // Re-attempt the upgrade with the stored planId
-      handleUpgrade(planToUpgradeAfterRegistration)
-      setPlanToUpgradeAfterRegistration(null) // Clear the stored plan
-    }
-  }, [refreshSubscriptionData, planToUpgradeAfterRegistration, handleUpgrade])
 
   const currentPlan = subscriptionData?.planType || "None"
   const isGraphicExpoActive = currentPlan === "graphic-expo-event"
@@ -255,12 +225,6 @@ export default function ChoosePlanPage() {
             ))}
         </div>
       </div>
-
-      <CompanyRegistrationDialog
-        isOpen={isCompanyRegistrationDialogOpen}
-        onClose={() => setIsCompanyRegistrationDialogOpen(false)}
-        onSuccess={handleCompanyRegistrationSuccess}
-      />
     </main>
   )
 }

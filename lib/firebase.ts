@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app"
+import { initializeApp, getApps } from "firebase/app"
 import { getAuth } from "firebase/auth"
 import { getFirestore } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
@@ -12,13 +12,27 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 }
 
-const app = initializeApp(firebaseConfig)
+// Initialize Firebase only if it hasn't been initialized already
+let app
+const existingApps = getApps()
+if (existingApps.length === 0) {
+  app = initializeApp(firebaseConfig)
+} else {
+  app = existingApps[0]
+}
 
-export const auth = getAuth(app)
-export const db = getFirestore(app)
-export const storage = getStorage(app)
+// Initialize services only on client side
+let db
+let auth
+let storage
 
-// Configure tenant ID for multi-tenancy
-auth.tenantId = "ohplus-07hsi"
+if (typeof window !== "undefined") {
+  // Client-side initialization
+  db = getFirestore(app)
+  auth = getAuth(app)
+  auth.tenantId = "ohplus-07hsi"
+  storage = getStorage(app)
+}
 
+export { db, auth, storage }
 export default app
