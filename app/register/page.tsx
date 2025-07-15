@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
@@ -10,8 +10,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { FirebaseError } from "firebase/app"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, Users } from "lucide-react"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { getRoleById, type RoleType } from "@/lib/hardcoded-access-service"
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
@@ -25,6 +29,8 @@ export default function RegisterPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [invitationRole, setInvitationRole] = useState<RoleType | null>(null)
+  const [invitationLoading, setInvitationLoading] = useState(false)
 
   const { register } = useAuth()
   const router = useRouter()
@@ -32,6 +38,32 @@ export default function RegisterPage() {
 
   // Get organization code from URL parameters
   const orgCode = searchParams.get("orgCode")
+
+  // Fetch invitation details when orgCode is present
+  useEffect(() => {
+    const fetchInvitationDetails = async () => {
+      if (!orgCode) return
+
+      setInvitationLoading(true)
+      try {
+        const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
+        const invitationSnapshot = await getDocs(invitationQuery)
+
+        if (!invitationSnapshot.empty) {
+          const invitationData = invitationSnapshot.docs[0].data()
+          if (invitationData.role_id) {
+            setInvitationRole(invitationData.role_id as RoleType)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching invitation details:", error)
+      } finally {
+        setInvitationLoading(false)
+      }
+    }
+
+    fetchInvitationDetails()
+  }, [orgCode])
 
   const getFriendlyErrorMessage = (error: unknown): string => {
     console.error("Raw error during registration:", error)
@@ -150,6 +182,8 @@ export default function RegisterPage() {
     }
   }
 
+  const roleData = invitationRole ? getRoleById(invitationRole) : null
+
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       {/* Left Panel - Image */}
@@ -180,6 +214,16 @@ export default function RegisterPage() {
                 <p className="text-sm text-blue-800">
                   <strong>Organization Code:</strong> {orgCode}
                 </p>
+                {invitationLoading && <p className="text-xs text-blue-600 mt-1">Loading invitation details...</p>}
+                {roleData && !invitationLoading && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <Users className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm text-blue-800">You will be assigned the role:</span>
+                    <Badge style={{ backgroundColor: roleData.color, color: "white" }} className="text-xs">
+                      {roleData.name}
+                    </Badge>
+                  </div>
+                )}
               </div>
             )}
           </CardHeader>
@@ -261,6 +305,7 @@ export default function RegisterPage() {
                     ) : (
                       <Eye className="h-4 w-4 text-gray-400" />
                     )}
+                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
                   </button>
                 </div>
                 <div className="mt-2">
@@ -296,8 +341,6 @@ export default function RegisterPage() {
                       )}
                     </ul>
                   )}
-                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
-                  </button>
                 </div>
               </div>
               <div className="space-y-2">
@@ -320,6 +363,7 @@ export default function RegisterPage() {
                     ) : (
                       <Eye className="h-4 w-4 text-gray-400" />
                     )}
+                    <span className="sr-only">{showConfirmPassword ? "Hide password" : "Show password"}</span>
                   </button>
                 </div>
               </div>

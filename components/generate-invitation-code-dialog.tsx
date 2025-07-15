@@ -1,9 +1,7 @@
 "use client"
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -11,343 +9,331 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Copy, Check, Calendar, Users, Shield, FileText } from "lucide-react"
+import { CalendarDays, Users, FileText, Copy, Check } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { useAuth } from "@/contexts/auth-context"
 import { getAllRoles, type RoleType } from "@/lib/hardcoded-access-service"
 
 interface GenerateInvitationCodeDialogProps {
-  isOpen: boolean
-  onClose: () => void
-  onCodeGenerated: (code: string) => void
+  onSuccess?: () => void
 }
 
-export function GenerateInvitationCodeDialog({ isOpen, onClose, onCodeGenerated }: GenerateInvitationCodeDialogProps) {
-  const { userData } = useAuth()
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [generatedCode, setGeneratedCode] = useState("")
-  const [isCopied, setIsCopied] = useState(false)
-
-  // Form states
+export function GenerateInvitationCodeDialog({ onSuccess }: GenerateInvitationCodeDialogProps) {
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [validityDays, setValidityDays] = useState("30")
-  const [maxUses, setMaxUses] = useState("10")
+  const [usageLimit, setUsageLimit] = useState("10")
   const [selectedRole, setSelectedRole] = useState<RoleType | "">("")
   const [description, setDescription] = useState("")
+  const [generatedCode, setGeneratedCode] = useState("")
+  const [copied, setCopied] = useState(false)
 
+  const { userData } = useAuth()
   const roles = getAllRoles()
 
   const generateRandomCode = () => {
-    const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
     let result = ""
     for (let i = 0; i < 8; i++) {
-      result += characters.charAt(Math.floor(Math.random() * characters.length))
+      result += chars.charAt(Math.floor(Math.random() * chars.length))
     }
     return result
   }
 
   const handleGenerate = async () => {
-    if (!userData) return
+    if (!userData || !selectedRole) return
 
-    setIsGenerating(true)
+    setLoading(true)
     try {
       const code = generateRandomCode()
-      const expiresAt = new Date()
-      expiresAt.setDate(expiresAt.getDate() + Number.parseInt(validityDays))
+      const expiryDate = new Date()
+      expiryDate.setDate(expiryDate.getDate() + Number.parseInt(validityDays))
 
       const invitationData = {
         code,
         created_by: userData.uid,
         created_by_name: `${userData.first_name} ${userData.last_name}`,
-        license_key: userData.license_key,
         company_id: userData.company_id,
-        role: selectedRole || null, // Store the selected role
-        expires_at: expiresAt,
-        max_uses: Number.parseInt(maxUses),
-        used_count: 0,
+        license_key: userData.license_key,
+        role_id: selectedRole, // Store the role ID for automatic assignment
+        description: description || `Invitation for ${roles.find((r) => r.id === selectedRole)?.name} role`,
+        validity_days: Number.parseInt(validityDays),
+        usage_limit: Number.parseInt(usageLimit),
+        expiry_date: expiryDate,
         used: false,
-        description:
-          description ||
-          `Invitation code for ${selectedRole ? roles.find((r) => r.id === selectedRole)?.name : "team members"}`,
+        used_count: 0,
+        used_by: [],
         created: serverTimestamp(),
       }
 
       await addDoc(collection(db, "invitation_codes"), invitationData)
-
       setGeneratedCode(code)
-      onCodeGenerated(code)
+      onSuccess?.()
     } catch (error) {
       console.error("Error generating invitation code:", error)
     } finally {
-      setIsGenerating(false)
+      setLoading(false)
     }
   }
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(generatedCode)
-      setIsCopied(true)
-      setTimeout(() => setIsCopied(false), 2000)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     } catch (error) {
       console.error("Failed to copy:", error)
     }
   }
 
   const handleClose = () => {
+    setOpen(false)
     setGeneratedCode("")
-    setValidityDays("30")
-    setMaxUses("10")
     setSelectedRole("")
     setDescription("")
-    setIsCopied(false)
-    onClose()
+    setValidityDays("30")
+    setUsageLimit("10")
+    setCopied(false)
   }
 
   const selectedRoleData = selectedRole ? roles.find((r) => r.id === selectedRole) : null
 
+  if (generatedCode) {
+    return (
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogTrigger asChild>
+          <Button>Generate Invitation Code</Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Invitation Code Generated</DialogTitle>
+            <DialogDescription>
+              Your invitation code has been successfully generated and is ready to share.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <div className="grid flex-1 gap-2">
+                <Label htmlFor="code" className="sr-only">
+                  Invitation Code
+                </Label>
+                <Input
+                  id="code"
+                  value={generatedCode}
+                  readOnly
+                  className="font-mono text-lg text-center tracking-wider"
+                />
+              </div>
+              <Button type="button" size="sm" className="px-3" onClick={handleCopy}>
+                <span className="sr-only">Copy</span>
+                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              </Button>
+            </div>
+            {selectedRoleData && (
+              <div className="text-sm text-muted-foreground">
+                <p>
+                  <strong>Role:</strong> {selectedRoleData.name}
+                </p>
+                <p>
+                  <strong>Valid for:</strong> {validityDays} days
+                </p>
+                <p>
+                  <strong>Usage limit:</strong> {usageLimit} users
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="sm:justify-start">
+            <Button type="button" variant="secondary" onClick={handleClose}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button>Generate Invitation Code</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Generate Invitation Code
-          </DialogTitle>
+          <DialogTitle>Generate Invitation Code</DialogTitle>
           <DialogDescription>
-            Create an invitation code for new team members to join your organization.
+            Create a new invitation code to invite users to join your organization with a specific role.
           </DialogDescription>
         </DialogHeader>
 
-        {!generatedCode ? (
-          <div className="space-y-6">
-            {/* Basic Settings */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Basic Settings
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="validity">Valid for (days)</Label>
-                    <Input
-                      id="validity"
-                      type="number"
-                      value={validityDays}
-                      onChange={(e) => setValidityDays(e.target.value)}
-                      min="1"
-                      max="365"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="maxUses">Maximum uses</Label>
-                    <Input
-                      id="maxUses"
-                      type="number"
-                      value={maxUses}
-                      onChange={(e) => setMaxUses(e.target.value)}
-                      min="1"
-                      max="100"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Role Assignment */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Role Assignment
-                </CardTitle>
-                <CardDescription>
-                  Select the role that will be automatically assigned to users who register with this code.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
+        <div className="space-y-6">
+          {/* Basic Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <CalendarDays className="h-5 w-5" />
+                Basic Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="role">Assign Role</Label>
-                  <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as RoleType)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a role to assign" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roles.map((role) => (
-                        <SelectItem key={role.id} value={role.id}>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant="outline"
-                              className={`w-3 h-3 rounded-full p-0 bg-${role.color}-500 border-${role.color}-500`}
-                            />
-                            {role.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {selectedRoleData && (
-                  <div className="p-3 bg-muted rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge
-                        variant="outline"
-                        className={`bg-${selectedRoleData.color}-100 text-${selectedRoleData.color}-800 border-${selectedRoleData.color}-300`}
-                      >
-                        {selectedRoleData.name}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{selectedRoleData.description}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Description */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Description
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description (optional)</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Add a description for this invitation code..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={3}
+                  <Label htmlFor="validity">Validity (days)</Label>
+                  <Input
+                    id="validity"
+                    type="number"
+                    value={validityDays}
+                    onChange={(e) => setValidityDays(e.target.value)}
+                    min="1"
+                    max="365"
                   />
                 </div>
-              </CardContent>
-            </Card>
+                <div className="space-y-2">
+                  <Label htmlFor="usage">Usage Limit</Label>
+                  <Input
+                    id="usage"
+                    type="number"
+                    value={usageLimit}
+                    onChange={(e) => setUsageLimit(e.target.value)}
+                    min="1"
+                    max="1000"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Summary */}
-            {(validityDays || maxUses || selectedRole) && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="text-sm space-y-1">
-                    <p>
-                      <strong>Valid for:</strong> {validityDays} days
-                    </p>
-                    <p>
-                      <strong>Maximum uses:</strong> {maxUses}
-                    </p>
-                    {selectedRoleData && (
-                      <p className="flex items-center gap-2">
-                        <strong>Assigned role:</strong>
-                        <Badge
-                          variant="outline"
-                          className={`bg-${selectedRoleData.color}-100 text-${selectedRoleData.color}-800 border-${selectedRoleData.color}-300`}
-                        >
-                          {selectedRoleData.name}
+          {/* Role Assignment */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Users className="h-5 w-5" />
+                Role Assignment
+              </CardTitle>
+              <CardDescription>
+                Select the role that will be automatically assigned to users who register with this invitation code.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="role">Select Role</Label>
+                <Select value={selectedRole} onValueChange={(value: RoleType) => setSelectedRole(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a role for invited users" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((role) => (
+                      <SelectItem key={role.id} value={role.id}>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" style={{ borderColor: role.color }}>
+                            {role.name}
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">{role.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {selectedRoleData && (
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge style={{ backgroundColor: selectedRoleData.color, color: "white" }}>
+                      {selectedRoleData.name}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{selectedRoleData.description}</p>
+                  <div className="mt-2">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Module Access:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedRoleData.permissions.map((permission, index) => (
+                        <Badge key={index} variant="secondary" className="text-xs">
+                          {permission.module}
                         </Badge>
-                      </p>
-                    )}
-                    {description && (
-                      <p>
-                        <strong>Description:</strong> {description}
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader className="text-center">
-                <CardTitle className="text-xl text-green-600">Code Generated Successfully!</CardTitle>
-                <CardDescription>
-                  Share this code with team members to invite them to your organization.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-center p-6 bg-gray-50 rounded-lg">
-                  <div className="text-center">
-                    <div className="text-3xl font-mono font-bold tracking-wider text-gray-900 mb-2">
-                      {generatedCode}
+                      ))}
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCopy}
-                      className="flex items-center gap-2 bg-transparent"
-                    >
-                      {isCopied ? (
-                        <>
-                          <Check className="h-4 w-4" />
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4" />
-                          Copy Code
-                        </>
-                      )}
-                    </Button>
                   </div>
                 </div>
+              )}
+            </CardContent>
+          </Card>
 
-                <Separator />
+          {/* Description */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <FileText className="h-5 w-5" />
+                Description
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description (Optional)</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Add a description for this invitation code..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                />
+              </div>
+            </CardContent>
+          </Card>
 
+          {/* Summary */}
+          {selectedRole && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-2 text-sm">
-                  <p>
-                    <strong>Valid for:</strong> {validityDays} days
-                  </p>
-                  <p>
-                    <strong>Maximum uses:</strong> {maxUses}
-                  </p>
-                  {selectedRoleData && (
-                    <p className="flex items-center gap-2">
-                      <strong>Assigned role:</strong>
-                      <Badge
-                        variant="outline"
-                        className={`bg-${selectedRoleData.color}-100 text-${selectedRoleData.color}-800 border-${selectedRoleData.color}-300`}
-                      >
-                        {selectedRoleData.name}
-                      </Badge>
-                    </p>
-                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Role:</span>
+                    <Badge style={{ backgroundColor: selectedRoleData?.color, color: "white" }}>
+                      {selectedRoleData?.name}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Valid for:</span>
+                    <span>{validityDays} days</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Usage limit:</span>
+                    <span>{usageLimit} users</span>
+                  </div>
                   {description && (
-                    <p>
-                      <strong>Description:</strong> {description}
-                    </p>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Description:</span>
+                      <span className="text-right max-w-[200px] truncate">{description}</span>
+                    </div>
                   )}
                 </div>
               </CardContent>
             </Card>
-          </div>
-        )}
+          )}
+        </div>
+
+        <Separator />
 
         <DialogFooter>
-          {!generatedCode ? (
-            <>
-              <Button variant="outline" onClick={handleClose}>
-                Cancel
-              </Button>
-              <Button onClick={handleGenerate} disabled={isGenerating || !selectedRole}>
-                {isGenerating ? "Generating..." : "Generate Code"}
-              </Button>
-            </>
-          ) : (
-            <Button onClick={handleClose}>Close</Button>
-          )}
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleGenerate} disabled={loading || !selectedRole}>
+            {loading ? "Generating..." : "Generate Code"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
