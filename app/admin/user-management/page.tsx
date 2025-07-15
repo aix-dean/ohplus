@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { UserPlus, Settings, Mail, Shield } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
@@ -59,7 +59,10 @@ export default function UserManagementPage() {
         return {
           id: doc.id,
           email: data.email || "",
-          displayName: data.display_name || data.displayName || "Unknown User",
+          displayName:
+            data.first_name && data.last_name
+              ? `${data.first_name} ${data.last_name}`
+              : data.display_name || data.displayName || "Unknown User",
           role: String(data.role || "user"), // Ensure role is always a string
           status: data.active === false ? "inactive" : "active",
           lastLogin: data.lastLogin?.toDate() || null,
@@ -215,10 +218,11 @@ export default function UserManagementPage() {
     <div className="container mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">User Management</h1>
+          <h1 className="text-2xl font-bold">User Management ({users.length})</h1>
           <p className="text-muted-foreground">Manage users and their permissions.</p>
         </div>
         <div className="flex items-center gap-2">
+
           {/* Roles & Permissions Button */}
           <Button
             variant="outline"
@@ -226,7 +230,7 @@ export default function UserManagementPage() {
             onClick={() => handleActionWithCompanyCheck(() => router.push("/admin/access-management"))}
           >
             <Shield className="h-4 w-4" />
-            Roles & Permissions
+            Roles & Access
           </Button>
           {/* Invitation Codes Button */}
           <Button
@@ -235,7 +239,7 @@ export default function UserManagementPage() {
             onClick={() => handleActionWithCompanyCheck(() => router.push("/admin/invitation-codes"))}
           >
             <Mail className="h-4 w-4" />
-            Invitation Codes
+            Generate Codes
           </Button>
           {/* Add User Button */}
           <Button
@@ -256,10 +260,6 @@ export default function UserManagementPage() {
 
       {/* Users Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Organization Users ({users.length})</CardTitle>
-          <CardDescription>Manage users within your organization</CardDescription>
-        </CardHeader>
         <CardContent>
           <ResponsiveTable data={users} columns={columns} keyField="id" />
         </CardContent>
