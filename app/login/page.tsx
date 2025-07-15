@@ -145,7 +145,12 @@ export default function LoginPage() {
                   className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
                   onClick={() => handleSocialLogin("Google")}
                 >
-                  <Image src="/google-logo.png" alt="Google" width={20} height={20} />
+                  <Image
+                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Google_Icons-09-512-xTPWQW6Ebs2IlRYdW10MAg71P4QPDL.webp"
+                    alt="Google"
+                    width={20}
+                    height={20}
+                  />
                   Google
                 </Button>
                 <Button
@@ -153,7 +158,12 @@ export default function LoginPage() {
                   className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
                   onClick={() => handleSocialLogin("Facebook")}
                 >
-                  <Image src="/facebook-logo.png" alt="Facebook" width={20} height={20} />
+                  <Image
+                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Facebook_Logo_2023-4SQHsSrZ3kX2dVTojWLhiS3pOKdNbq.png"
+                    alt="Facebook"
+                    width={20}
+                    height={20}
+                  />
                   Facebook
                 </Button>
               </div>

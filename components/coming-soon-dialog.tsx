@@ -7,29 +7,28 @@ import { Clock, Sparkles } from "lucide-react"
 interface ComingSoonDialogProps {
   isOpen: boolean
   onClose: () => void
-  feature?: string
+  feature: string
 }
 
-export function ComingSoonDialog({ isOpen, onClose, feature = "This feature" }: ComingSoonDialogProps) {
+export function ComingSoonDialog({ isOpen, onClose, feature }: ComingSoonDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md p-8 text-center">
-        <DialogHeader>
-          <div className="flex justify-center mb-4">
+      <DialogContent className="sm:max-w-[400px]">
+        <DialogHeader className="text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
             <div className="relative">
-              <Clock className="h-16 w-16 text-blue-500" />
-              <Sparkles className="h-6 w-6 text-yellow-500 absolute -top-1 -right-1 animate-pulse" />
+              <Clock className="h-8 w-8 text-blue-600" />
+              <Sparkles className="absolute -top-1 -right-1 h-4 w-4 text-yellow-500 animate-pulse" />
             </div>
           </div>
-          <DialogTitle className="text-2xl font-bold text-gray-900">Coming Soon!</DialogTitle>
-          <DialogDescription className="text-lg text-gray-600 mt-2">
-            {feature} is coming soon. Stay tuned for updates!
+          <DialogTitle className="text-xl font-semibold text-gray-900">Coming Soon!</DialogTitle>
+          <DialogDescription className="text-gray-600 mt-2">
+            {feature} is coming soon. We're working hard to bring you this feature.
           </DialogDescription>
         </DialogHeader>
-        <div className="mt-6">
-          <p className="text-sm text-gray-500 mb-4">We're excited to bring you this new feature soon.</p>
-          <Button onClick={onClose} className="w-full bg-blue-600 hover:bg-blue-700">
-            Got it!
+        <div className="flex justify-center mt-6">
+          <Button onClick={onClose} className="bg-blue-600 hover:bg-blue-700 text-white px-6">
+            Got it
           </Button>
         </div>
       </DialogContent>
