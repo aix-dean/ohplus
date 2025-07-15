@@ -251,7 +251,7 @@ export default function AdminInventoryPage() {
   }
 
   const handleViewDetails = (productId: string) => {
-    router.push(`/admin/inventory/${productId}`)
+    router.push(`/admin/products/${productId}`)
   }
 
   const handleAddSiteClick = () => {
@@ -336,7 +336,6 @@ export default function AdminInventoryPage() {
               <Card
                 key={product.id}
                 className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
-                onClick={() => handleViewDetails(product.id)}
               >
                 <div className="h-48 bg-gray-200 relative">
                   <Image
