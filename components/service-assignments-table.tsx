@@ -10,47 +10,22 @@ import { Button } from "@/components/ui/button"
 
 interface ServiceAssignment {
   id: string
-  alarmDate: any
-  alarmTime: string
-  assignedTo: string
-  attachments: any[]
-  company_id: string
-  coveredDateEnd: any
-  coveredDateStart: any
-  created: any
-  crew: string
-  equipmentRequired: string
-  gondola: string
-  illuminationNits: string
-  materialSpecs: string
-  message: string
-  priority: string
-  projectSiteId: string
-  projectSiteLocation: string
+  saNumber: string
   projectSiteName: string
-  project_key: string
-  remarks: string
+  projectSiteLocation: string
+  serviceType: string
+  assignedTo: string
+  jobDescription: string
   requestedBy: {
-    department: string
     id: string
     name: string
+    department: string
   }
-  saNumber: string
-  sales: string
-  serviceCost: {
-    crewFee: string
-    mealAllowance: string
-    otherFees: any[]
-    overtimeFee: string
-    tollFee: string
-    total: number
-    transpo: string
-  }
-  serviceDuration: string
-  serviceType: string
   status: string
-  technology: string
-  updated: any
+  coveredDateStart: any
+  coveredDateEnd: any
+  created: any
+  company_id: string
 }
 
 interface ServiceAssignmentsTableProps {
@@ -113,7 +88,6 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
             <TableHead>Project Site</TableHead>
             <TableHead>Service Type</TableHead>
             <TableHead>Assigned To</TableHead>
-            <TableHead>Requested By</TableHead>
             <TableHead>Covered Date</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Created</TableHead>
@@ -123,7 +97,7 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
         <TableBody>
           {assignments.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+              <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                 No service assignments found. Create your first assignment.
               </TableCell>
             </TableRow>
@@ -139,12 +113,6 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
                 </TableCell>
                 <TableCell>{assignment.serviceType}</TableCell>
                 <TableCell>{assignment.assignedTo}</TableCell>
-                <TableCell>
-                  <div>
-                    <div className="text-sm text-gray-500">Requested By:</div>
-                    <div className="font-medium">{assignment.requestedBy?.name || "Unknown"}</div>
-                  </div>
-                </TableCell>
                 <TableCell>
                   {assignment.coveredDateStart && assignment.coveredDateEnd ? (
                     <>
