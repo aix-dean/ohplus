@@ -446,8 +446,8 @@ export default function CreateJobOrderPage() {
 
           const monthlyRate = quotation.price || 0
           const totalLease = monthlyRate * totalMonths
-          const productVat = totalLease * 0.12
-          const productTotal = totalLease + productVat
+          const productVat = monthlyRate * 0.12
+          const productTotal = monthlyRate + productVat
 
           jobOrdersData = [
             {
