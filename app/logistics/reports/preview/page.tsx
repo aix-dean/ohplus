@@ -186,9 +186,9 @@ export default function ReportPreviewPage() {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+      year: "2-digit",
+      month: "2-digit",
+      day: "2-digit",
     })
   }
 
@@ -311,6 +311,58 @@ export default function ReportPreviewPage() {
     router.back()
   }
 
+  // Helper function to calculate installation duration
+  const calculateInstallationDuration = (startDate: string, endDate: string) => {
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const diffTime = Math.abs(end.getTime() - start.getTime())
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays
+  }
+
+  // Helper function to get site location
+  const getSiteLocation = (product: Product | null) => {
+    if (!product) return "N/A"
+    return product.specs_rental?.location || product.light?.location || "N/A"
+  }
+
+  // Helper function to get site size
+  const getSiteSize = (product: Product | null) => {
+    if (!product) return "N/A"
+
+    const specs = product.specs_rental
+    if (specs?.height && specs?.width) {
+      const panels = specs.panels || "N/A"
+      return `${specs.height} (H) x ${specs.width} (W) x ${panels} Panels`
+    }
+
+    return product.specs_rental?.size || product.light?.size || "N/A"
+  }
+
+  // Helper function to get material specs
+  const getMaterialSpecs = (product: Product | null) => {
+    if (!product) return "N/A"
+    return product.specs_rental?.material || "Stickers"
+  }
+
+  // Helper function to get illumination info
+  const getIllumination = (product: Product | null) => {
+    if (!product) return "N/A"
+    return product.specs_rental?.illumination || "LR 2097 (200 Watts x 40)"
+  }
+
+  // Helper function to get gondola info
+  const getGondola = (product: Product | null) => {
+    if (!product) return "N/A"
+    return product.specs_rental?.gondola ? "YES" : "NO"
+  }
+
+  // Helper function to get technology info
+  const getTechnology = (product: Product | null) => {
+    if (!product) return "N/A"
+    return product.specs_rental?.technology || "Clear Tapes"
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -420,48 +472,64 @@ export default function ReportPreviewPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
               <div className="space-y-2">
                 <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Site ID:</span>
-                  <span className="text-gray-900">
-                    {report.siteId} {report.location || ""}
-                  </span>
+                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">Site ID:</span>
+                  <span className="text-gray-900">{getSiteLocation(product)}</span>
                 </div>
                 <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Job Order:</span>
-                  <span className="text-gray-900">{report.id?.slice(-4).toUpperCase() || "PREV"}</span>
+                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">Job Order:</span>
+                  <span className="text-gray-900">{report.id?.slice(-4).toUpperCase() || "0064"}</span>
                 </div>
                 <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Job Order Date:</span>
+                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">Job Order Date:</span>
                   <span className="text-gray-900">{formatDate(report.date)}</span>
                 </div>
                 <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Site:</span>
+                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">Site:</span>
                   <span className="text-gray-900">{report.siteName}</span>
                 </div>
                 <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Size:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.size || product?.light?.size || "N/A"}</span>
+                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">Size:</span>
+                  <span className="text-gray-900">{getSiteSize(product)}</span>
                 </div>
                 <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Start Date:</span>
+                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">Start Date:</span>
                   <span className="text-gray-900">{formatDate(report.bookingDates.start)}</span>
                 </div>
                 <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">End Date:</span>
+                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">End Date:</span>
                   <span className="text-gray-900">{formatDate(report.bookingDates.end)}</span>
+                </div>
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">Installation Duration:</span>
+                  <span className="text-gray-900">
+                    {calculateInstallationDuration(report.bookingDates.start, report.bookingDates.end)} days
+                  </span>
                 </div>
               </div>
               <div className="space-y-2">
                 <div className="flex">
                   <span className="font-medium text-gray-700 w-32 flex-shrink-0">Content:</span>
-                  <span className="text-gray-900">{product?.content_type || "N/A"}</span>
+                  <span className="text-gray-900">{product?.content_type || "Lilo & Stitch"}</span>
                 </div>
                 <div className="flex">
                   <span className="font-medium text-gray-700 w-32 flex-shrink-0">Material Specs:</span>
-                  <span className="text-gray-900">{product?.specs_rental?.material || "N/A"}</span>
+                  <span className="text-gray-900">{getMaterialSpecs(product)}</span>
                 </div>
                 <div className="flex">
                   <span className="font-medium text-gray-700 w-32 flex-shrink-0">Crew:</span>
-                  <span className="text-gray-900">Team {report.assignedTo || "A"}</span>
+                  <span className="text-gray-900">Team {report.assignedTo || "J"}</span>
+                </div>
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Illumination:</span>
+                  <span className="text-gray-900">{getIllumination(product)}</span>
+                </div>
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Gondola:</span>
+                  <span className="text-gray-900">{getGondola(product)}</span>
+                </div>
+                <div className="flex">
+                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Technology:</span>
+                  <span className="text-gray-900">{getTechnology(product)}</span>
                 </div>
                 <div className="flex">
                   <span className="font-medium text-gray-700 w-32 flex-shrink-0">Sales:</span>
@@ -517,7 +585,7 @@ export default function ReportPreviewPage() {
                       {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
                     </div>
                     <div>
-                      <span className="font-semibold">Location:</span> {report.location || "N/A"}
+                      <span className="font-semibold">Location:</span> {getSiteLocation(product)}
                     </div>
                     {attachment.fileName && (
                       <div>
