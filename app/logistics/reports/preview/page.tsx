@@ -400,14 +400,6 @@ export default function ReportPreviewPage() {
         {/* Action Buttons */}
         <div className="ml-auto flex items-center gap-2">
           <Button
-            onClick={handlePostReport}
-            disabled={posting}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm flex items-center gap-2"
-          >
-            <Send className="h-4 w-4" />
-            {posting ? "Posting..." : "Post Report"}
-          </Button>
-          <Button
             onClick={handleSendReport}
             className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm flex items-center gap-2"
           >
@@ -660,6 +652,17 @@ export default function ReportPreviewPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Floating Post Report Button */}
+      <div className="fixed bottom-8 right-8 z-50">
+        <Button
+          onClick={handlePostReport}
+          disabled={posting}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center gap-2"
+        >
+          {posting ? "Posting..." : "Post Report"}
+        </Button>
       </div>
 
       {/* Send Report Dialog */}
