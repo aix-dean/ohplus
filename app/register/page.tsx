@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
@@ -17,7 +19,7 @@ export default function RegisterPage() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [middleName, setMiddleName] = useState("")
-  const [phoneNumber, setPhoneNumber] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("+63 ")
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -47,6 +49,17 @@ export default function RegisterPage() {
       }
     }
     return "An unknown error occurred. Please try again."
+  }
+
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+
+    // Always ensure it starts with +63
+    if (!value.startsWith("+63 ")) {
+      setPhoneNumber("+63 ")
+    } else {
+      setPhoneNumber(value)
+    }
   }
 
   const handleRegister = async () => {
@@ -164,7 +177,7 @@ export default function RegisterPage() {
                   id="phoneNumber"
                   placeholder="+63 9XX XXX XXXX"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  onChange={handlePhoneNumberChange}
                   required
                 />
               </div>
