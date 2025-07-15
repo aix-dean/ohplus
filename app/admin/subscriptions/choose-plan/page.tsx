@@ -118,6 +118,7 @@ export default function ChoosePlanPage() {
           "active", // New subscription is active
           null, // Let the service calculate max products
           selectedPlan.id === "graphic-expo-event" ? promoEndDate : null, // Set trialEndDate for graphic-expo-event
+          userData.company_id || null, // Add company_id parameter
         )
 
         toast({
