@@ -455,6 +455,18 @@ export default function ReportPreviewPage() {
               </Button>
               <span className="text-xs text-gray-600 mt-1 font-medium">{isGeneratingPDF ? "..." : "Download"}</span>
             </div>
+
+            {/* Send Button */}
+            <div className="flex flex-col items-center">
+              <Button
+                onClick={handleSendReport}
+                className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                size="sm"
+              >
+                <Send className="h-5 w-5" />
+              </Button>
+              <span className="text-xs text-gray-600 mt-1 font-medium">Send</span>
+            </div>
           </div>
         </div>
 
