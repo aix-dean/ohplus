@@ -37,6 +37,22 @@ export default function SubscriptionPage() {
   }, [loading, user, router])
 
   useEffect(() => {
+    const fetchSubscriptionData = async () => {
+      if (!loading && user && userData?.company_id) {
+        try {
+          const subscription = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
+          // Update the subscription data in auth context or local state as needed
+          console.log("Fetched subscription by company ID:", subscription)
+        } catch (error) {
+          console.error("Error fetching subscription by company ID:", error)
+        }
+      }
+    }
+
+    fetchSubscriptionData()
+  }, [loading, user, userData])
+
+  useEffect(() => {
     const calculateTimeLeft = () => {
       const now = new Date().getTime()
       const difference = promoEndDate.getTime() - now
