@@ -148,12 +148,12 @@ export default function LoginPage() {
               <Image
                 src="/ohplus-new-logo.png"
                 alt="OH Plus Logo"
-                width={60}
-                height={60}
+                width={100}
+                height={100}
                 priority
                 className="mx-auto mb-2"
               />
-              <p className="text-lg font-light text-blue-600 leading-tight">
+              <p className="text-xl font-light text-blue-600 leading-tight">
                 Powering Smarter Site Management for Billboard Operators
               </p>
             </div>
