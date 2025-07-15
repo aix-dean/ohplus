@@ -42,13 +42,17 @@ export default function BulletinBoardPage() {
       const userData = userDoc.data()
       const companyId = userData?.company_id || user.uid // fallback to user.uid if no company_id
 
+      console.log("Fetching products for company_id:", companyId)
+
       const result = await getPaginatedUserProducts(companyId, 1000, null, {
         active: true,
         searchTerm: debouncedSearchTerm,
       })
 
+      console.log("Fetched products:", result.items)
+
       // Show all active products for logistics bulletin board
-      const filteredItems = result.items
+      const filteredItems = result.items.filter((product) => product.active !== false)
       setProducts(filteredItems)
     } catch (error) {
       console.error("Error fetching products:", error)
@@ -151,11 +155,30 @@ export default function BulletinBoardPage() {
         </Select>
       </div>
 
+      {/* Debug Info - Remove this after testing */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="mb-4 p-4 bg-gray-100 rounded-md text-sm">
+          <p>Total products loaded: {products.length}</p>
+          <p>Filtered sites: {filteredSites.length}</p>
+          <p>User ID: {user?.uid}</p>
+          {products.length > 0 && (
+            <div>
+              <p>Sample product content_types:</p>
+              {products.slice(0, 3).map((p) => (
+                <div key={p.id}>
+                  {p.id}: {p.content_type} (company_id: {p.company_id})
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Loading State */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-          <p className="text-gray-500">Loading static sites...</p>
+          <p className="text-gray-500">Loading sites...</p>
         </div>
       )}
 
@@ -188,6 +211,9 @@ export default function BulletinBoardPage() {
                     {/* Site Name Header */}
                     <div className={`${getCardHeaderColor(product.name)} text-white px-4 py-3 mx-3 rounded-md mb-3`}>
                       <div className="font-bold text-lg">{product.name}</div>
+                      <div className="text-xs opacity-90">
+                        {product.content_type} • {product.status || "Active"}
+                      </div>
                     </div>
 
                     {/* Location */}
@@ -224,11 +250,11 @@ export default function BulletinBoardPage() {
           <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <AlertCircle size={24} className="text-gray-400" />
           </div>
-          <h3 className="text-lg font-medium mb-2">No static sites found</h3>
+          <h3 className="text-lg font-medium mb-2">No sites found</h3>
           <p className="text-gray-500 mb-4">
             {debouncedSearchTerm
-              ? "No static sites match your search criteria. Try adjusting your search terms."
-              : "You don't have any static sites yet. Contact an administrator to add static sites."}
+              ? "No sites match your search criteria. Try adjusting your search terms."
+              : "You don't have any sites yet. Contact an administrator to add sites."}
           </p>
           {debouncedSearchTerm && (
             <Button variant="outline" onClick={() => setSearchTerm("")}>
