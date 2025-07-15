@@ -298,6 +298,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       let licenseKey = generateLicenseKey()
       let companyId = null
+      let assignedRole: RoleType | null = null
 
       // Handle invitation code logic
       if (orgCode) {
@@ -310,14 +311,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           licenseKey = invitationData.license_key || licenseKey
           companyId = invitationData.company_id || null
-
-          if (invitationData.role) {
-            try {
-              await assignRoleToUser(firebaseUser.uid, invitationData.role as RoleType)
-            } catch (roleError) {
-              console.error("Error assigning role to user:", roleError)
-            }
-          }
+          assignedRole = (invitationData.role as RoleType) || null
 
           const updateData: any = {
             used: true,
@@ -335,14 +329,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Create user document
+      // Create user document FIRST
       const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
       const userData = {
         email: firebaseUser.email,
         uid: firebaseUser.uid,
         license_key: licenseKey,
         company_id: companyId,
-        role: "user",
+        role: assignedRole || "user", // Set the role directly in the document
         permissions: [],
         type: "OHPLUS",
         created: serverTimestamp(),
@@ -356,6 +350,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       await setDoc(userDocRef, userData)
+
+      // Now assign role AFTER the document is created (if needed for additional role logic)
+      if (assignedRole) {
+        try {
+          // Add a small delay to ensure document is fully committed
+          await new Promise((resolve) => setTimeout(resolve, 100))
+          await assignRoleToUser(firebaseUser.uid, assignedRole)
+        } catch (roleError) {
+          console.error("Error assigning role to user:", roleError)
+          // Don't throw here since the user document was created successfully
+        }
+      }
 
       // Create project document if not joining organization
       if (!orgCode) {
