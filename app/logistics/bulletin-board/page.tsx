@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
 import { getPaginatedUserProducts, type Product } from "@/lib/firebase-service"
+import { getDoc, doc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export default function BulletinBoardPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -35,7 +37,12 @@ export default function BulletinBoardPage() {
 
     setLoading(true)
     try {
-      const result = await getPaginatedUserProducts(user.uid, 1000, null, {
+      // Get user's company_id first
+      const userDoc = await getDoc(doc(db, "users", user.uid))
+      const userData = userDoc.data()
+      const companyId = userData?.company_id || user.uid // fallback to user.uid if no company_id
+
+      const result = await getPaginatedUserProducts(companyId, 1000, null, {
         active: true,
         searchTerm: debouncedSearchTerm,
       })
