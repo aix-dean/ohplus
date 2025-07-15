@@ -37,7 +37,10 @@ export default function UserManagementPage() {
         return {
           id: doc.id,
           email: data.email || "",
-          displayName: data.display_name || data.displayName || "Unknown User",
+          displayName:
+            data.first_name && data.last_name
+              ? `${data.first_name} ${data.last_name}`
+              : data.display_name || data.displayName || "Unknown User",
           role: String(data.role || "user"), // Ensure role is always a string
           status: data.active === false ? "inactive" : "active",
           lastLogin: data.lastLogin?.toDate() || null,
