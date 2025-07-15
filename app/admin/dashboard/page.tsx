@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge" // Added missing Badge
 export default function AdminDashboardPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const { user } = useAuth() // Get user data from auth context
+  const { user, userData } = useAuth() // Get user data from auth context
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
 
@@ -49,7 +49,8 @@ export default function AdminDashboardPage() {
     metricLabel?: string
     metricValue?: string
     badgeCount?: number
-    href?: string // Optional link for the card
+    href?: string
+    isAvailable?: boolean
   }
 
   // Department Card Component
@@ -60,41 +61,79 @@ export default function AdminDashboardPage() {
   }) {
     const cardContent = (
       <>
-        <CardHeader className={cn("relative p-4 rounded-t-lg", department.headerColor)}>
-          <CardTitle className="text-white text-lg font-semibold flex justify-between items-center">
+        <CardHeader
+          className={cn(
+            "relative p-4 rounded-t-lg",
+            department.isAvailable !== false ? department.headerColor : "bg-gray-400",
+            department.isAvailable === false && "grayscale",
+          )}
+        >
+          <CardTitle
+            className={cn(
+              "text-white text-lg font-semibold flex justify-between items-center",
+              department.isAvailable === false && "opacity-60",
+            )}
+          >
             {department.name}
             {department.badgeCount !== undefined && (
-              <Badge className="bg-white text-gray-800 rounded-full px-2 py-0.5 text-xs font-bold">
+              <Badge
+                className={cn(
+                  "bg-white text-gray-800 rounded-full px-2 py-0.5 text-xs font-bold",
+                  department.isAvailable === false && "opacity-60",
+                )}
+              >
                 {department.badgeCount}
               </Badge>
             )}
           </CardTitle>
         </CardHeader>
         <CardContent
-          className={cn("p-4 rounded-b-lg flex flex-col justify-between flex-grow", department.contentBgColor)}
+          className={cn(
+            "p-4 rounded-b-lg flex flex-col justify-between flex-grow",
+            department.isAvailable !== false ? department.contentBgColor : "bg-gray-100",
+            department.isAvailable === false && "grayscale",
+          )}
         >
           <div>
             {department.members.map((member, index) => (
-              <p key={index} className="text-sm text-gray-700 flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-green-500" />
+              <p
+                key={index}
+                className={cn(
+                  "text-sm text-gray-700 flex items-center gap-1",
+                  department.isAvailable === false && "opacity-60",
+                )}
+              >
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    department.isAvailable !== false ? "bg-green-500" : "bg-gray-400",
+                  )}
+                />
                 {member}
               </p>
             ))}
             {department.metricLabel && department.metricValue && (
-              <div className="mt-4 text-sm">
+              <div className={cn("mt-4 text-sm", department.isAvailable === false && "opacity-60")}>
                 <p className="text-gray-500">{department.metricLabel}</p>
                 <p className="font-bold text-gray-800">{department.metricValue}</p>
               </div>
             )}
           </div>
-          <Button variant="outline" className="mt-4 w-full bg-transparent">
+          <Button
+            variant="outline"
+            className={cn(
+              "mt-4 w-full bg-transparent",
+              department.isAvailable === false && "opacity-60 cursor-not-allowed",
+            )}
+            disabled={department.isAvailable === false}
+          >
             <Plus className="mr-2 h-4 w-4" /> Add Widget
           </Button>
         </CardContent>
       </>
     )
 
-    if (department.href) {
+    if (department.href && department.isAvailable !== false) {
       return (
         <Link href={department.href} passHref>
           <Card className="h-full flex flex-col overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
@@ -104,7 +143,13 @@ export default function AdminDashboardPage() {
       )
     }
 
-    return <Card className="h-full flex flex-col overflow-hidden">{cardContent}</Card>
+    return (
+      <Card
+        className={cn("h-full flex flex-col overflow-hidden", department.isAvailable === false && "cursor-not-allowed")}
+      >
+        {cardContent}
+      </Card>
+    )
   }
 
   const departmentData: Department[] = [
@@ -118,6 +163,7 @@ export default function AdminDashboardPage() {
       metricValue: "4,000,000",
       badgeCount: 2,
       href: "/sales/dashboard",
+      isAvailable: true,
     },
     {
       id: "logistics",
@@ -129,6 +175,7 @@ export default function AdminDashboardPage() {
       metricValue: "5",
       badgeCount: 1,
       href: "/logistics/dashboard",
+      isAvailable: true,
     },
     {
       id: "accounting",
@@ -136,6 +183,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-accounting-purple",
       contentBgColor: "bg-card-content-accounting",
       members: ["Chairman"],
+      isAvailable: false,
     },
     {
       id: "treasury",
@@ -143,6 +191,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-treasury-green",
       contentBgColor: "bg-card-content-treasury",
       members: ["Juvy"],
+      isAvailable: false,
     },
     {
       id: "it",
@@ -150,6 +199,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-it-teal",
       contentBgColor: "bg-card-content-it",
       members: ["Emmerson"],
+      isAvailable: false,
     },
     {
       id: "fleet",
@@ -157,6 +207,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-fleet-gray",
       contentBgColor: "bg-card-content-fleet",
       members: ["Jonathan"],
+      isAvailable: false,
     },
     {
       id: "creatives",
@@ -164,7 +215,8 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-creatives-orange",
       contentBgColor: "bg-card-content-creatives",
       members: ["Eda"],
-      href: "/cms/dashboard", // Add this line
+      href: "/cms/dashboard",
+      isAvailable: true,
     },
     {
       id: "finance",
@@ -172,6 +224,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-finance-green",
       contentBgColor: "bg-card-content-finance",
       members: ["Juvy"],
+      isAvailable: false,
     },
     {
       id: "media",
@@ -179,6 +232,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-media-lightblue",
       contentBgColor: "bg-card-content-media",
       members: ["Zen"],
+      isAvailable: false,
     },
     {
       id: "businessDev",
@@ -186,6 +240,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-businessdev-darkpurple",
       contentBgColor: "bg-card-content-businessdev",
       members: ["Nikki"],
+      isAvailable: false,
     },
     {
       id: "legal",
@@ -194,6 +249,7 @@ export default function AdminDashboardPage() {
       contentBgColor: "bg-card-content-legal",
       members: ["Chona"],
       badgeCount: 2,
+      isAvailable: false,
     },
     {
       id: "corporate",
@@ -202,6 +258,7 @@ export default function AdminDashboardPage() {
       contentBgColor: "bg-card-content-corporate",
       members: ["Anthony"],
       badgeCount: 1,
+      isAvailable: false,
     },
     {
       id: "hr",
@@ -210,6 +267,7 @@ export default function AdminDashboardPage() {
       contentBgColor: "bg-card-content-hr",
       members: ["Vanessa"],
       badgeCount: 1,
+      isAvailable: false,
     },
     {
       id: "specialTeam",
@@ -217,6 +275,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-specialteam-lightpurple",
       contentBgColor: "bg-card-content-specialteam",
       members: ["Mark"],
+      isAvailable: false,
     },
     {
       id: "marketing",
@@ -224,13 +283,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-marketing-red",
       contentBgColor: "bg-card-content-marketing",
       members: ["John"],
-    },
-    {
-      id: "addDepartment",
-      name: "+ Add New Department",
-      headerColor: "bg-department-add-darkgray",
-      contentBgColor: "bg-card-content-add",
-      members: [], // No members for this card
+      isAvailable: false,
     },
   ]
 
@@ -248,7 +301,11 @@ export default function AdminDashboardPage() {
       <div className="flex flex-col gap-6">
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h1 className="text-xl md:text-2xl font-bold">Ohliver's Dashboard</h1>
+          <h1 className="text-xl md:text-2xl font-bold">
+            {userData?.first_name
+            ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+            : "Dashboard"}
+          </h1>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-grow">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

@@ -231,11 +231,11 @@ function SalesDashboardContent() {
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
-    if (!user?.uid) return
+    if (!userData?.company_id) return
 
     setLoadingCount(true)
     try {
-      const count = await getUserProductsCount(user.uid, { active: true })
+      const count = await getUserProductsCount(userData?.company_id, { active: true })
       setTotalItems(count)
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
@@ -248,12 +248,12 @@ function SalesDashboardContent() {
     } finally {
       setLoadingCount(false)
     }
-  }, [user, toast])
+  }, [userData, toast])
 
   // Fetch products for the current page
   const fetchProducts = useCallback(
     async (page: number) => {
-      if (!user?.uid) return
+      if (!userData?.company_id) return
 
       // Check if we have this page in cache
       if (pageCache.has(page)) {
@@ -277,7 +277,7 @@ function SalesDashboardContent() {
         // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
-        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, { active: true })
+        const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, { active: true })
 
         setProducts(result.items)
         setLastDoc(result.lastDoc)
@@ -315,23 +315,23 @@ function SalesDashboardContent() {
         setLoadingMore(false)
       }
     },
-    [user, lastDoc, pageCache, toast, checkOngoingBookings],
+    [userData, lastDoc, pageCache, toast, checkOngoingBookings],
   )
 
   // Load initial data and count
   useEffect(() => {
-    if (user?.uid) {
+    if (userData?.company_id) {
       fetchProducts(1)
       fetchTotalCount()
     }
-  }, [user, fetchProducts, fetchTotalCount])
+  }, [userData?.company_id, fetchProducts, fetchTotalCount])
 
   // Load data when page changes
   useEffect(() => {
-    if (user?.uid && currentPage > 0) {
+    if (userData?.company_id && currentPage > 0) {
       fetchProducts(currentPage)
     }
-  }, [currentPage, fetchProducts, user])
+  }, [currentPage, fetchProducts, userData?.company_id])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -837,7 +837,9 @@ function SalesDashboardContent() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex flex-col gap-2">
                 <h1 className="text-xl md:text-2xl font-bold">
-                  {userData?.first_name ? `${userData.first_name}'s Dashboard` : "Dashboard"}
+                  {userData?.first_name
+                  ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                  : "Dashboard"}
                 </h1>
                 {/* Conditionally hide the SearchBox when in proposalCreationMode or ceQuoteMode */}
                 {!(proposalCreationMode || ceQuoteMode) && (
