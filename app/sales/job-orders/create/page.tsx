@@ -321,7 +321,7 @@ console.log(showComingSoonDialog)
       siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
       missingCompliance: missingCompliance, // Pass the current compliance status
       product_id: product.id || "",
-      company_id: userData.company_id || ""
+      company_id: userData.company_id || "",
     }
 
     try {
