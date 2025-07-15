@@ -459,7 +459,7 @@ export default function ReportPreviewPage() {
         </div>
 
         {/* Report Container - Contains Header, Content, and Footer with bottom margin */}
-        <div className="ml-24 mb-8 bg-white shadow-lg rounded-lg overflow-hidden">
+        <div className="ml-24 mb-8 bg-white shadow-lg rounded-lg overflow-auto">
           {/* Angular Blue Header */}
           <div className="w-full relative">
             <div className="relative h-16 overflow-hidden">
