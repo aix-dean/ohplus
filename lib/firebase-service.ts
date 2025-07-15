@@ -16,11 +16,8 @@ import {
   serverTimestamp,
   getDoc,
 } from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
-
-// Initialize Firebase Storage
-const storage = getStorage()
+import { db, storage } from "@/lib/firebase" // Import storage from firebase.ts
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 // Product interface
 export interface Product {

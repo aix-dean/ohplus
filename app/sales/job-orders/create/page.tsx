@@ -28,9 +28,6 @@ import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-suc
 
 const joTypes = ["Installation", "Maintenance", "Repair", "Dismantling", "Other"]
 
-// Dummy assignees for now, ideally fetched from user management
-
-
 export default function CreateJobOrderPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -259,8 +256,8 @@ export default function CreateJobOrderPage() {
       joType: joType as JobOrderType,
       deadline: deadline.toISOString(),
       requestedBy: userData?.first_name || "Auto-Generated",
-      remarks: remarks,
       assignTo: assignTo,
+      remarks: remarks,
       attachments: generalAttachments.map((att) => att.url), // Save general attachments
       signedQuotationUrl: signedQuotationUrl, // Save specific document URLs
       poMoUrl: poMoUrl,
@@ -307,7 +304,6 @@ export default function CreateJobOrderPage() {
     // Navigate to the main Job Orders page
     router.push("/sales/job-orders")
   }
-
 
   if (loading) {
     return (
@@ -735,10 +731,13 @@ export default function CreateJobOrderPage() {
                   <SelectValue placeholder="Choose Assignee" className="text-gray-500" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem key={user.uid} value={user.first_name} className="text-sm">
-                      {user.first_name}
+                  {/* Default to current user */}
+                  {userData?.uid && (
+                    <SelectItem key={userData.uid} value={userData.uid} className="text-sm">
+                      {userData.first_name} {userData.last_name} (You)
                     </SelectItem>
-                  ))}
+                  )}
+                  {/* Add other assignees here if fetched from a user list */}
                 </SelectContent>
               </Select>
             </div>
