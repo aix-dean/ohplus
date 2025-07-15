@@ -399,7 +399,7 @@ export default function ReportPreviewPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation Bar */}
-      <div className="bg-white px-4 py-3 flex items-center shadow-sm border-b">
+      <div className="bg-white px-4 py-3 mb-4 flex items-center shadow-sm border-b">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
