@@ -29,7 +29,7 @@ export default function RegisterPage() {
   const [invitationRole, setInvitationRole] = useState<string | null>(null)
   const [loadingInvitation, setLoadingInvitation] = useState(false)
 
-  const { register } = useAuth()
+  const { register, user, userData, loading: authLoading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -73,6 +73,15 @@ export default function RegisterPage() {
 
     fetchInvitationDetails()
   }, [orgCode])
+
+  // Add this useEffect after the existing useEffect for invitation details
+  useEffect(() => {
+    // Redirect to dashboard after successful registration when user and userData are available
+    if (user && userData && !loading) {
+      console.log("User authenticated after registration, redirecting to dashboard...")
+      router.push("/admin/dashboard")
+    }
+  }, [user, userData, loading, router])
 
   const getFriendlyErrorMessage = (error: unknown): string => {
     console.error("Raw error during registration:", error)
@@ -400,7 +409,7 @@ export default function RegisterPage() {
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                 type="submit"
                 onClick={handleRegister}
-                disabled={loading || loadingInvitation}
+                disabled={loading || loadingInvitation || authLoading}
               >
                 {loading ? (orgCode ? "Joining..." : "Signing Up...") : orgCode ? "Join Organization" : "Sign Up"}
               </Button>

@@ -5,7 +5,6 @@ import type React from "react"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import ClientLayout from "./clientLayout"
-import { useEffect } from "react"
 
 interface AuthLayoutProps {
   children: React.ReactNode
@@ -28,13 +27,6 @@ const publicRoutes = [
 export default function AuthLayout({ children }: AuthLayoutProps) {
   const { user, userData, loading } = useAuth()
   const pathname = usePathname()
-
-  // Handle redirect after successful registration
-  useEffect(() => {
-    if (user && userData && pathname === "/register") {
-      window.location.href = "/admin/dashboard"
-    }
-  }, [user, userData, pathname])
 
   const isPublicRoute = publicRoutes.includes(pathname) || pathname?.startsWith("/onboarding") // Handle dynamic onboarding path
   const isPublicProposal = pathname?.startsWith("/proposals/view/")
