@@ -130,15 +130,13 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-white p-4">
       <div className="flex flex-col w-full max-w-4xl bg-white rounded-lg md:shadow-lg overflow-hidden">
         {/* Mobile Header - Only visible on mobile */}
-        <div className="md:hidden w-full p-6 border-b">
+        <div className="md:hidden w-full p-6">
           <div className="flex flex-col items-center text-center">
             <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={80} height={80} priority />
             <h2 className="mt-4 text-2xl font-light text-blue-700 leading-tight text-center">
-              Powering Smarter
+              Powering Smarter Site Management
               <br />
-              Site Management for
-              <br />
-              Billboard Operators
+              for Billboard Operator
             </h2>
           </div>
         </div>
