@@ -169,7 +169,7 @@ export default function UserManagementPage() {
           <Link href="/admin/invitation-codes">
             <Button variant="outline" className="gap-2 bg-transparent">
               <Mail className="h-4 w-4" />
-              Invitation Codes
+              Generate Codes
             </Button>
           </Link>
           <Button className="gap-2">
