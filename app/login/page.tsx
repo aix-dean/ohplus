@@ -139,11 +139,6 @@ export default function LoginPage() {
             <br />
             Billboard Operators
           </h2>
-          <div className="mt-8 flex flex-col items-center">
-            <span className="text-sm text-gray-500">powered by:</span>
-            <Image src="/aix-logo-small.png" alt="AIX AI Xynergy Logo" width={100} height={50} />
-            <span className="text-xs text-gray-600">AI Xynergy</span>
-          </div>
         </div>
 
         {/* Right Section: Login Form */}
