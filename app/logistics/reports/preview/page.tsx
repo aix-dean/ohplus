@@ -466,25 +466,8 @@ export default function ReportPreviewPage() {
           </div>
         </div>
 
-        {/* Right Action Buttons Container - Positioned outside report area */}
-        <div className="absolute right-4 bottom-6 z-10">
-          <div className="flex flex-col items-center">
-            <Button
-              onClick={handlePostReport}
-              disabled={posting}
-              className="bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
-              size="sm"
-            >
-              <Send className="h-5 w-5" />
-            </Button>
-            <span className="text-xs text-white bg-blue-600 px-2 py-1 rounded mt-1 font-medium">
-              {posting ? "Posting..." : "Post Report"}
-            </span>
-          </div>
-        </div>
-
-        {/* Report Container - Contains Header, Content, and Footer with bottom margin */}
-        <div className="ml-24 mb-8 bg-white shadow-lg rounded-lg overflow-auto">
+        {/* Report Container - Contains Header, Content, and Footer with side margins */}
+        <div className="mx-24 mb-8 bg-white shadow-lg rounded-lg overflow-auto">
           {/* Angular Blue Header */}
           <div className="w-full relative">
             <div className="relative h-16 overflow-hidden">
@@ -723,6 +706,17 @@ export default function ReportPreviewPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Floating Post Report Button - Bottom Right */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <Button
+          onClick={handlePostReport}
+          disabled={posting}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 font-medium"
+        >
+          {posting ? "Posting..." : "Post Report"}
+        </Button>
       </div>
 
       {/* Send Report Dialog */}
