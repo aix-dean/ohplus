@@ -274,7 +274,7 @@ export default function LoginPage() {
               </Button>
 
               {/* Add AiX logo at bottom */}
-              <div className="text-center mt-4 pt-4 border-t border-gray-200">
+              <div className="text-center mt-4 pt-4 md:hidden">
                 <p className="text-xs text-gray-500 mb-2">powered by:</p>
                 <Image src="/aix-logo.png" alt="AiX AI Xynergy Logo" width={60} height={45} priority />
               </div>
