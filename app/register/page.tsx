@@ -296,6 +296,8 @@ export default function RegisterPage() {
                       )}
                     </ul>
                   )}
+                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
+                  </button>
                 </div>
               </div>
               <div className="space-y-2">

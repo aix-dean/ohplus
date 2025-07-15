@@ -9,8 +9,9 @@ import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { ResponsiveTable } from "@/components/responsive-table"
-import { useRouter } from "next/navigation" // Import useRouter
-import { CompanyRegistrationDialog } from "@/components/company-registration-dialog" // Import CompanyRegistrationDialog
+import { useRouter } from "next/navigation"
+import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
+import { AddUserDialog } from "@/components/add-user-dialog"
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,14 @@ import {
 } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { toast } from "@/components/ui/use-toast"
+import {
+  getRoles,
+  getUserRoles,
+  assignRoleToUser,
+  removeRoleFromUser,
+  type Role,
+} from "@/lib/access-management-service"
 
 interface User {
   id: string
@@ -33,21 +42,41 @@ interface User {
 }
 
 export default function UserManagementPage() {
-  const { userData, refreshUserData } = useAuth() // Get refreshUserData
+  const { userData, refreshUserData } = useAuth()
   const [users, setUsers] = useState<User[]>([])
+  const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
-  const [isCompanyRegistrationDialogOpen, setIsCompanyRegistrationDialogOpen] = useState(false) // State for dialog
-  const [selectedUser, setSelectedUser] = useState<User | null>(null) // Keep this for Edit Roles dialog
-  const [isEditRolesDialogOpen, setIsEditRolesDialogOpen] = useState(false) // Keep this for Edit Roles dialog
-  const [selectedRoles, setSelectedRoles] = useState<Record<string, boolean>>({}) // Keep this for Edit Roles dialog
+  const [isCompanyRegistrationDialogOpen, setIsCompanyRegistrationDialogOpen] = useState(false)
+  const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [isEditRolesDialogOpen, setIsEditRolesDialogOpen] = useState(false)
+  const [selectedRoles, setSelectedRoles] = useState<Record<string, boolean>>({})
+  const [roleDialogLoading, setRoleDialogLoading] = useState(false)
 
-  const router = useRouter() // Initialize useRouter
+  const router = useRouter()
+
+  // Load roles on component mount
+  useEffect(() => {
+    async function loadRoles() {
+      try {
+        const fetchedRoles = await getRoles()
+        setRoles(fetchedRoles)
+      } catch (error) {
+        console.error("Error loading roles:", error)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load roles. Please try again.",
+        })
+      }
+    }
+
+    loadRoles()
+  }, [])
 
   useEffect(() => {
     if (!userData?.company_id) {
-      // If company_id is missing, don't fetch users yet, and don't set loading to false
-      // The dialog will prompt the user to register the company
-      setLoading(false) // Set loading to false so the UI isn't stuck
+      setLoading(false)
       return
     }
 
@@ -63,7 +92,7 @@ export default function UserManagementPage() {
             data.first_name && data.last_name
               ? `${data.first_name} ${data.last_name}`
               : data.display_name || data.displayName || "Unknown User",
-          role: String(data.role || "user"), // Ensure role is always a string
+          role: String(data.role || "user"),
           status: data.active === false ? "inactive" : "active",
           lastLogin: data.lastLogin?.toDate() || null,
           created: data.created?.toDate() || new Date(),
@@ -76,7 +105,6 @@ export default function UserManagementPage() {
     return () => unsubscribe()
   }, [userData?.company_id])
 
-  // Helper function to check for company_id before executing an action
   const handleActionWithCompanyCheck = (actionCallback: () => void) => {
     if (!userData?.company_id) {
       setIsCompanyRegistrationDialogOpen(true)
@@ -86,7 +114,6 @@ export default function UserManagementPage() {
   }
 
   const getStatusBadge = (status: string) => {
-    // Ensure status is a string
     const statusStr = String(status || "unknown")
 
     switch (statusStr) {
@@ -100,7 +127,6 @@ export default function UserManagementPage() {
   }
 
   const getRoleBadge = (role: string) => {
-    // Ensure role is a string and provide fallback
     const roleStr = String(role || "user").toLowerCase()
 
     const roleColors = {
@@ -117,35 +143,86 @@ export default function UserManagementPage() {
     )
   }
 
-  // Handle editing user roles (now wrapped with company check)
-  const handleEditRoles = (user: User) => {
-    handleActionWithCompanyCheck(() => {
+  const handleEditRoles = async (user: User) => {
+    handleActionWithCompanyCheck(async () => {
       setSelectedUser(user)
-      // Initialize selected roles based on user's current roles
-      const initialSelectedRoles: Record<string, boolean> = {}
-      // This part assumes `roles` and `userRolesMap` are available, which they would be if data loaded
-      // For simplicity, I'm omitting the full role fetching logic here as it's not directly part of the button click
-      // In a real scenario, you'd ensure `roles` and `userRolesMap` are populated before this dialog opens.
-      // For now, I'll use dummy roles if `roles` is not available.
-      const dummyRoles = [
-        { id: "admin", name: "Admin", description: "Administrator" },
-        { id: "user", name: "User", description: "Standard User" },
-      ]
-      dummyRoles.forEach((role) => {
-        // Use dummyRoles or actual roles if available
-        initialSelectedRoles[role.id] = false // Default to false for demonstration
-      })
-      setSelectedRoles(initialSelectedRoles)
-      setIsEditRolesDialogOpen(true)
+      setRoleDialogLoading(true)
+
+      try {
+        // Get user's current roles
+        const userRoles = await getUserRoles(user.id)
+
+        // Initialize selected roles based on user's current roles
+        const initialSelectedRoles: Record<string, boolean> = {}
+        roles.forEach((role) => {
+          initialSelectedRoles[role.id] = userRoles.includes(role.id)
+        })
+
+        setSelectedRoles(initialSelectedRoles)
+        setIsEditRolesDialogOpen(true)
+      } catch (error) {
+        console.error("Error loading user roles:", error)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load user roles. Please try again.",
+        })
+      } finally {
+        setRoleDialogLoading(false)
+      }
     })
   }
 
-  // Placeholder for handleSaveRoles, assuming it's defined elsewhere or will be added
   const handleSaveRoles = async () => {
-    // This function would contain the logic to save roles, similar to the original UserManagement component
-    // For this task, we are only focusing on the initial click check.
-    console.log("Saving roles for", selectedUser?.email)
-    setIsEditRolesDialogOpen(false) // Close dialog after "saving"
+    if (!selectedUser) return
+
+    setRoleDialogLoading(true)
+
+    try {
+      // Get current user roles
+      const currentRoles = await getUserRoles(selectedUser.id)
+
+      // Determine roles to add and remove
+      const rolesToAdd = Object.entries(selectedRoles)
+        .filter(([roleId, isSelected]) => isSelected && !currentRoles.includes(roleId))
+        .map(([roleId]) => roleId)
+
+      const rolesToRemove = Object.entries(selectedRoles)
+        .filter(([roleId, isSelected]) => !isSelected && currentRoles.includes(roleId))
+        .map(([roleId]) => roleId)
+
+      // Add new roles
+      for (const roleId of rolesToAdd) {
+        await assignRoleToUser(selectedUser.id, roleId)
+      }
+
+      // Remove roles
+      for (const roleId of rolesToRemove) {
+        await removeRoleFromUser(selectedUser.id, roleId)
+      }
+
+      toast({
+        title: "Success",
+        description: "User roles updated successfully.",
+      })
+
+      setIsEditRolesDialogOpen(false)
+    } catch (error) {
+      console.error("Error saving user roles:", error)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update user roles. Please try again.",
+      })
+    } finally {
+      setRoleDialogLoading(false)
+    }
+  }
+
+  const handleAddUser = () => {
+    handleActionWithCompanyCheck(() => {
+      setIsAddUserDialogOpen(true)
+    })
   }
 
   const columns = [
@@ -222,8 +299,6 @@ export default function UserManagementPage() {
           <p className="text-muted-foreground">Manage users and their permissions.</p>
         </div>
         <div className="flex items-center gap-2">
-
-          {/* Roles & Permissions Button */}
           <Button
             variant="outline"
             className="gap-2 bg-transparent"
@@ -232,7 +307,6 @@ export default function UserManagementPage() {
             <Shield className="h-4 w-4" />
             Roles & Access
           </Button>
-          {/* Invitation Codes Button */}
           <Button
             variant="outline"
             className="gap-2 bg-transparent"
@@ -241,41 +315,36 @@ export default function UserManagementPage() {
             <Mail className="h-4 w-4" />
             Generate Codes
           </Button>
-          {/* Add User Button */}
-          <Button
-            className="gap-2"
-            onClick={() =>
-              handleActionWithCompanyCheck(() => {
-                // Placeholder for Add User logic, e.g., open a dialog or navigate
-                console.log("Add User clicked, company_id exists. Implement add user dialog/page here.")
-                // Example: router.push("/admin/user-management/add-user");
-              })
-            }
-          >
+          <Button className="gap-2" onClick={handleAddUser}>
             <UserPlus className="h-4 w-4" />
             Add User
           </Button>
         </div>
       </div>
 
-      {/* Users Table */}
       <Card>
         <CardContent>
           <ResponsiveTable data={users} columns={columns} keyField="id" />
         </CardContent>
       </Card>
 
-      {/* Company Registration Dialog */}
       <CompanyRegistrationDialog
         isOpen={isCompanyRegistrationDialogOpen}
         onClose={() => setIsCompanyRegistrationDialogOpen(false)}
         onSuccess={() => {
           setIsCompanyRegistrationDialogOpen(false)
-          refreshUserData() // Refresh user data to get the new company_id
+          refreshUserData()
         }}
       />
 
-      {/* Edit User Roles Dialog (kept for completeness, assuming it's used) */}
+      <AddUserDialog
+        open={isAddUserDialogOpen}
+        onOpenChange={setIsAddUserDialogOpen}
+        onSuccess={() => {
+          console.log("User invitation sent successfully")
+        }}
+      />
+
       <Dialog open={isEditRolesDialogOpen} onOpenChange={setIsEditRolesDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -290,40 +359,51 @@ export default function UserManagementPage() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              {/* This part would dynamically load roles from your `roles` state */}
-              {/* For demonstration, using a placeholder */}
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="role-admin"
-                  checked={selectedRoles["admin"] || false}
-                  onCheckedChange={(checked) => setSelectedRoles((prev) => ({ ...prev, admin: checked === true }))}
-                />
-                <Label htmlFor="role-admin" className="flex-1">
-                  <div>Admin</div>
-                  <div className="text-sm text-muted-foreground">Full access to all features</div>
-                </Label>
+            {roleDialogLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                <span className="ml-2">Loading roles...</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="role-user"
-                  checked={selectedRoles["user"] || false}
-                  onCheckedChange={(checked) => setSelectedRoles((prev) => ({ ...prev, user: checked === true }))}
-                />
-                <Label htmlFor="role-user" className="flex-1">
-                  <div>User</div>
-                  <div className="text-sm text-muted-foreground">Standard user access</div>
-                </Label>
+            ) : (
+              <div className="space-y-2">
+                {roles.length === 0 ? (
+                  <div className="text-center py-4 text-muted-foreground">
+                    No roles available. Create roles in the "Roles & Access" section first.
+                  </div>
+                ) : (
+                  roles.map((role) => (
+                    <div key={role.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`role-${role.id}`}
+                        checked={selectedRoles[role.id] || false}
+                        onCheckedChange={(checked) =>
+                          setSelectedRoles((prev) => ({ ...prev, [role.id]: checked === true }))
+                        }
+                      />
+                      <Label htmlFor={`role-${role.id}`} className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span>{role.name}</span>
+                          {role.isAdmin && (
+                            <Badge variant="secondary" className="text-xs">
+                              Admin
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-muted-foreground">{role.description}</div>
+                      </Label>
+                    </div>
+                  ))
+                )}
               </div>
-            </div>
+            )}
           </div>
 
           <DialogFooter className="sm:justify-end">
             <Button variant="outline" onClick={() => setIsEditRolesDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveRoles} disabled={loading}>
-              {loading ? "Saving..." : "Save Changes"}
+            <Button onClick={handleSaveRoles} disabled={roleDialogLoading || roles.length === 0}>
+              {roleDialogLoading ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
