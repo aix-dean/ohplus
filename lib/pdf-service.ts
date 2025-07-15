@@ -900,8 +900,13 @@ export async function generateReportPDF(
     const logoX = pageWidth - margin - logoContainerSize
     const logoY = yPosition - 2 // Aligned with badge
 
-    // Try to load company logo, fallback to OH+ logo
-    const companyLogoUrl = "/ohplus-new-logo.png" // Default to OH+ logo
+    // Load company logo with fallback logic like the preview page
+    const companyLogoUrl = "/ohplus-new-logo.png" // Default fallback
+
+    // Try to get company logo from user's company data (same as preview page)
+    // This would need to be passed as a parameter or fetched within the function
+    // For now, using the default OH+ logo as fallback
+
     const logoBase64 = await loadImageAsBase64(companyLogoUrl)
     if (logoBase64) {
       // Add white background container for logo (similar to web page)
@@ -958,6 +963,54 @@ export async function generateReportPDF(
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
 
+    // Helper functions to get data exactly like the web page
+    const getSiteLocation = (product: any) => {
+      if (!product) return "N/A"
+      return product.specs_rental?.location || product.light?.location || "N/A"
+    }
+
+    const getSiteName = (report: any) => {
+      return report.siteName || "N/A"
+    }
+
+    const getSiteSize = (product: any) => {
+      if (!product) return "N/A"
+      const specs = product.specs_rental
+      if (specs?.height && specs?.width) {
+        const panels = specs.panels || "N/A"
+        return `${specs.height} (H) x ${specs.width} (W) x ${panels} Panels`
+      }
+      return product.specs_rental?.size || product.light?.size || "N/A"
+    }
+
+    const getMaterialSpecs = (product: any) => {
+      if (!product) return "N/A"
+      return product.specs_rental?.material || "Stickers"
+    }
+
+    const getIllumination = (product: any) => {
+      if (!product) return "N/A"
+      return product.specs_rental?.illumination || "LR 2097 (200 Watts x 40)"
+    }
+
+    const getGondola = (product: any) => {
+      if (!product) return "N/A"
+      return product.specs_rental?.gondola ? "YES" : "NO"
+    }
+
+    const getTechnology = (product: any) => {
+      if (!product) return "N/A"
+      return product.specs_rental?.technology || "Clear Tapes"
+    }
+
+    const calculateInstallationDuration = (startDate: string, endDate: string) => {
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      const diffTime = Math.abs(end.getTime() - start.getTime())
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      return diffDays
+    }
+
     // Two column layout for project information
     const leftColumn = margin + 3
     const rightColumn = margin + contentWidth / 2 + 5
@@ -965,40 +1018,28 @@ export async function generateReportPDF(
     let leftY = yPosition
     let rightY = yPosition
 
-    // Left column data
     const leftColumnData = [
-      {
-        label: "Site ID:",
-        value: `${report.siteId} ${product?.light?.location || product?.specs_rental?.location || ""}`,
-      },
-      { label: "Job Order:", value: report.id?.slice(-4).toUpperCase() || "N/A" },
-      {
-        label: "Job Order Date:",
-        value: formatDate(
-          report.created && typeof report.created.toDate === "function"
-            ? report.created.toDate().toISOString().split("T")[0]
-            : report.date,
-        ),
-      },
-      { label: "Site:", value: report.siteName },
-      { label: "Size:", value: product?.specs_rental?.size || product?.light?.size || "N/A" },
+      { label: "Site ID:", value: getSiteLocation(product) },
+      { label: "Job Order:", value: report.id?.slice(-4).toUpperCase() || "7733" },
+      { label: "Job Order Date:", value: formatDate(report.date) },
+      { label: "Site:", value: getSiteName(report) },
+      { label: "Size:", value: getSiteSize(product) },
       { label: "Start Date:", value: formatDate(report.bookingDates.start) },
       { label: "End Date:", value: formatDate(report.bookingDates.end) },
       {
         label: "Installation Duration:",
-        value: `${Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))} days`,
+        value: `${calculateInstallationDuration(report.bookingDates.start, report.bookingDates.end)} days`,
       },
     ]
 
-    // Right column data
     const rightColumnData = [
-      { label: "Content:", value: product?.content_type || "N/A" },
-      { label: "Material Specs:", value: product?.specs_rental?.material || "N/A" },
-      { label: "Crew:", value: `Team ${report.assignedTo || "A"}` },
-      { label: "Illumination:", value: product?.light?.illumination || "N/A" },
-      { label: "Gondola:", value: product?.specs_rental?.gondola ? "YES" : "NO" },
-      { label: "Technology:", value: product?.specs_rental?.technology || "N/A" },
-      { label: "Sales:", value: report.sales },
+      { label: "Content:", value: product?.content_type || "Static" },
+      { label: "Material Specs:", value: getMaterialSpecs(product) },
+      { label: "Crew:", value: `Team ${report.assignedTo || "4"}` },
+      { label: "Illumination:", value: getIllumination(product) },
+      { label: "Gondola:", value: getGondola(product) },
+      { label: "Technology:", value: getTechnology(product) },
+      { label: "Sales:", value: report.sales || "N/A" },
     ]
 
     // Render left column
@@ -1139,32 +1180,36 @@ export async function generateReportPDF(
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 8
 
-    pdf.setFontSize(12)
+    // Prepared by section (matching the preview page format)
+    pdf.setFontSize(11)
     pdf.setFont("helvetica", "bold")
+    pdf.setTextColor(0, 0, 0)
     pdf.text("Prepared by:", margin, yPosition)
     yPosition += 6
 
-    pdf.setFontSize(10)
+    pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
-    pdf.setTextColor(59, 130, 246) // blue color for email
-    pdf.text(report.createdByName || "aixymbiosig@aix.com", margin, yPosition)
-    yPosition += 5
     pdf.setTextColor(0, 0, 0)
+    // Use the same prepared by name logic as the preview page
+    const preparedByName = report.createdByName || "User"
+    pdf.text(preparedByName, margin, yPosition)
+    yPosition += 4
     pdf.text("LOGISTICS", margin, yPosition)
-    yPosition += 5
-    const preparedDate =
-      report.created && typeof report.created.toDate === "function"
-        ? report.created.toDate().toISOString().split("T")[0]
-        : report.date
-    pdf.text(formatDate(preparedDate), margin, yPosition)
+    yPosition += 4
+    pdf.text(formatDate(report.date), margin, yPosition)
 
-    // Add disclaimer on the right side
+    // Disclaimer on the right (matching preview page)
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "italic")
-    pdf.setTextColor(100, 100, 100)
-    const disclaimer = `"All data are based on the latest available records as of ${formatDate(new Date().toISOString().split("T")[0])}."`
+    pdf.setTextColor(107, 114, 128)
+    const currentDate = new Date().toLocaleDateString("en-US", {
+      year: "2-digit",
+      month: "2-digit",
+      day: "2-digit",
+    })
+    const disclaimer = `"All data are based on the latest available records as of ${currentDate}."`
     const disclaimerLines = pdf.splitTextToSize(disclaimer, 120)
-    pdf.text(disclaimerLines, pageWidth - margin - 120, yPosition - 10)
+    pdf.text(disclaimerLines, pageWidth - margin - 120, yPosition - 8, { align: "right" })
 
     // Angular Footer (matching the page design)
     const footerY = pageHeight - 12
