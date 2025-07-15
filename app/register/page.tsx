@@ -51,8 +51,8 @@ export default function RegisterPage() {
 
         if (!invitationSnapshot.empty) {
           const invitationData = invitationSnapshot.docs[0].data()
-          if (invitationData.role_id) {
-            setInvitationRole(invitationData.role_id as RoleType)
+          if (invitationData.role) {
+            setInvitationRole(invitationData.role as RoleType)
           }
         }
       } catch (error) {

@@ -372,7 +372,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           licenseKey = invitationData.license_key || licenseKey
           companyId = invitationData.company_id || null
-          roleToAssign = invitationData.role_id || null // Get the role from invitation
+          roleToAssign = invitationData.role || null // Get the role from invitation
 
           const updateData: any = {
             used: true,
