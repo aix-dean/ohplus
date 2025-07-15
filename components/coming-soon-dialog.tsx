@@ -23,7 +23,7 @@ export function ComingSoonDialog({ isOpen, onClose, feature }: ComingSoonDialogP
           </div>
           <DialogTitle className="text-xl font-semibold text-gray-900">Coming Soon!</DialogTitle>
           <DialogDescription className="text-gray-600 mt-2">
-            {feature} is coming soon. We're working hard to bring you this feature.
+            {feature} is coming soon. We're working hard to bring you this feature. Stay tuned for updates!
           </DialogDescription>
         </DialogHeader>
         <div className="flex justify-center mt-6">
