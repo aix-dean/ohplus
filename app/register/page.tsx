@@ -236,6 +236,42 @@ export default function RegisterPage() {
                     ) : (
                       <Eye className="h-4 w-4 text-gray-400" />
                     )}
+                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
+                  </Button>
+                </div>
+                <div className="mt-2">
+                  <div className="flex gap-1 h-1">
+                    {[...Array(5)].map((_, i) => (
+                      <div
+                        key={i}
+                        className={`flex-1 ${
+                          i < passwordStrengthScore ? getBarColorClass(passwordStrengthScore) : "bg-gray-300"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    {getStrengthText(passwordStrengthScore)}
+                  </p>
+                  {passwordStrengthScore < 5 && password.length > 0 && (
+                    <ul className="list-inside text-sm mt-1">
+                      {!passwordCriteria.minLength && (
+                        <li className="text-red-500">Password should be at least 8 characters long</li>
+                      )}
+                      {!passwordCriteria.hasLowerCase && (
+                        <li className="text-red-500">Password should contain at least one lowercase letter</li>
+                      )}
+                      {!passwordCriteria.hasUpperCase && (
+                        <li className="text-red-500">Password should contain at least one uppercase letter</li>
+                      )}
+                      {!passwordCriteria.hasNumber && (
+                        <li className="text-red-500">Password should contain at least one number</li>
+                      )}
+                      {!passwordCriteria.hasSpecialChar && (
+                        <li className="text-red-500">Password should contain at least one special character</li>
+                      )}
+                    </ul>
+                  )}
                   </button>
                 </div>
               </div>
@@ -295,6 +331,5 @@ export default function RegisterPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
   )
 }
