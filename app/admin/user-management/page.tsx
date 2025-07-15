@@ -163,7 +163,7 @@ export default function UserManagementPage() {
           <Link href="/admin/access-management">
             <Button variant="outline" className="gap-2 bg-transparent">
               <Shield className="h-4 w-4" />
-              Roles & Permissions
+              Roles & Access
             </Button>
           </Link>
           <Link href="/admin/invitation-codes">
