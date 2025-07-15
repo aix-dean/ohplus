@@ -144,7 +144,7 @@ export default function LoginPage() {
         <div className="w-full md:w-1/2 p-8">
           <Card className="border-none shadow-none">
             {/* Add branding component at the top */}
-            <div className="text-center mb-6">
+            <div className="text-center mb-6 md:hidden">
               <Image
                 src="/ohplus-new-logo.png"
                 alt="OH Plus Logo"
