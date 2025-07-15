@@ -759,7 +759,7 @@ export async function generateReportPDF(
     const pageHeight = pdf.internal.pageSize.getHeight()
     let yPosition = 0
 
-    // Helper function to format date exactly like the web page
+    // Helper function to format date exactly like the web page (MM/DD/YY)
     const formatDate = (dateString: string) => {
       return new Date(dateString).toLocaleDateString("en-US", {
         year: "2-digit",
@@ -1122,36 +1122,50 @@ export async function generateReportPDF(
       yPosition += 18
     }
 
-    // 7. FOOTER SECTION (border-t border-gray-200 pt-4)
+    // 7. FOOTER SECTION - EXACT FORMAT FROM IMAGE
     // Border line
     pdf.setLineWidth(0.5)
     pdf.setDrawColor(229, 231, 235) // gray-200
     pdf.line(containerPadding, yPosition, pageWidth - containerPadding, yPosition)
     yPosition += 8
 
-    // Prepared by section (text-sm)
-    pdf.setFontSize(10)
+    // "Prepared by:" header (bold, black)
+    pdf.setFontSize(11)
     pdf.setFont("helvetica", "bold")
-    pdf.setTextColor(0, 0, 0)
+    pdf.setTextColor(0, 0, 0) // black
     pdf.text("Prepared by:", containerPadding, yPosition)
     yPosition += 6
 
-    pdf.setFontSize(8)
+    // User name/initials (normal weight, black)
+    pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
-    pdf.setTextColor(107, 114, 128) // gray-600
-    pdf.text(report.createdByName || "User", containerPadding, yPosition)
-    yPosition += 3
-    pdf.text("LOGISTICS", containerPadding, yPosition)
-    yPosition += 3
-    pdf.text(formatDate(report.date), containerPadding, yPosition)
+    pdf.setTextColor(0, 0, 0) // black
+    const userName = report.createdByName || "JP" // Default to "JP" as shown in image
+    pdf.text(userName, containerPadding, yPosition)
+    yPosition += 4
 
-    // Disclaimer on the right (text-xs text-gray-500 italic)
-    pdf.setFontSize(7)
+    // "LOGISTICS" (normal weight, black)
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+    pdf.setTextColor(0, 0, 0) // black
+    pdf.text("LOGISTICS", containerPadding, yPosition)
+    yPosition += 4
+
+    // Date in MM/DD/YY format (normal weight, black)
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+    pdf.setTextColor(0, 0, 0) // black
+    const currentDate = formatDate(new Date().toISOString().split("T")[0])
+    pdf.text(currentDate, containerPadding, yPosition)
+
+    // Disclaimer on the right (italic, gray) - positioned to align with the prepared by section
+    pdf.setFontSize(9)
     pdf.setFont("helvetica", "italic")
-    pdf.setTextColor(107, 114, 128)
-    const disclaimer = `"All data are based on the latest available records as of ${formatDate(new Date().toISOString().split("T")[0])}."`
-    const disclaimerLines = pdf.splitTextToSize(disclaimer, 80)
-    pdf.text(disclaimerLines, pageWidth - containerPadding - 80, yPosition - 8, { align: "right" })
+    pdf.setTextColor(107, 114, 128) // gray-600
+    const disclaimer = `"All data are based on the latest available records as of ${currentDate}."`
+    const disclaimerLines = pdf.splitTextToSize(disclaimer, 100)
+    // Position disclaimer to align with the date line
+    pdf.text(disclaimerLines, pageWidth - containerPadding - 100, yPosition, { align: "right" })
 
     // 8. ANGULAR FOOTER (h-16 equivalent)
     const footerY = pageHeight - 16
