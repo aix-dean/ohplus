@@ -262,19 +262,19 @@ export default function AdminInventoryPage() {
     }
 
     if (!userData?.license_key) {
-      setSubscriptionLimitMessage("Grab your first free site - choose a plan now!")
+      setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
     if (!subscriptionData || subscriptionData.status !== "active") {
-      setSubscriptionLimitMessage("Grab your first free site - choose a plan now!")
+      setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
     if (totalItems >= subscriptionData.maxProducts) {
-      setSubscriptionLimitMessage("Grab your first free site - choose a plan now!")
+      setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
     }
@@ -288,19 +288,19 @@ export default function AdminInventoryPage() {
 
     // Check subscription after company registration
     if (!userData?.license_key) {
-      setSubscriptionLimitMessage("Grab your first free site - choose a plan now!")
+      setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
     if (!subscriptionData || subscriptionData.status !== "active") {
-      setSubscriptionLimitMessage("Grab your first free site - choose a plan now!")
+      setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
     if (totalItems >= subscriptionData.maxProducts) {
-      setSubscriptionLimitMessage("Grab your first free site - choose a plan now!")
+      setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
     }
@@ -447,7 +447,7 @@ export default function AdminInventoryPage() {
       <Dialog open={showSubscriptionLimitDialog} onOpenChange={setShowSubscriptionLimitDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Subscription Required</DialogTitle>
+            <DialogTitle>🎯 Let's Get You Started!</DialogTitle>
             <DialogDescription>{subscriptionLimitMessage}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
