@@ -57,7 +57,7 @@ interface AuthContextType {
   subscriptionData: Subscription | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
-  loginWithAccountType: (email: string, password: string, accountUid: string) => Promise<void>
+  loginOHPlusOnly: (email: string, password: string) => Promise<void>
   register: (
     personalInfo: {
       email: string
@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log("Fetching user data for:", firebaseUser.uid)
 
-      // Use specific UID if provided (for account type selection), otherwise use Firebase user UID
+      // Use specific UID if provided, otherwise use Firebase user UID
       const targetUid = specificUid || firebaseUser.uid
 
       // Fetch user data from iboard_users collection
@@ -242,6 +242,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [refreshSubscriptionData],
   )
 
+  const findOHPlusAccount = async (email: string) => {
+    try {
+      // Query for OHPLUS accounts with this email
+      const usersQuery = query(
+        collection(db, "iboard_users"),
+        where("email", "==", email),
+        where("type", "==", "OHPLUS"),
+      )
+      const usersSnapshot = await getDocs(usersQuery)
+
+      if (!usersSnapshot.empty) {
+        // Return the first OHPLUS account found
+        const userDoc = usersSnapshot.docs[0]
+        return userDoc.id
+      }
+
+      return null
+    } catch (error) {
+      console.error("Error finding OHPLUS account:", error)
+      return null
+    }
+  }
+
   const login = async (email: string, password: string) => {
     setLoading(true)
     try {
@@ -256,17 +279,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const loginWithAccountType = async (email: string, password: string, accountUid: string) => {
+  const loginOHPlusOnly = async (email: string, password: string) => {
     setLoading(true)
     try {
-      console.log("Logging in user with specific account type:", email, accountUid)
+      console.log("Logging in OHPLUS user only:", email)
+
+      // First, find the OHPLUS account for this email
+      const ohplusAccountUid = await findOHPlusAccount(email)
+
+      if (!ohplusAccountUid) {
+        throw new Error("OHPLUS_ACCOUNT_NOT_FOUND")
+      }
+
+      // Authenticate with Firebase
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
       setUser(userCredential.user)
 
-      // Fetch user data for the specific account UID
-      await fetchUserData(userCredential.user, accountUid)
+      // Fetch user data for the specific OHPLUS account
+      await fetchUserData(userCredential.user, ohplusAccountUid)
+
+      // Double-check that we loaded an OHPLUS account
+      const userDocRef = doc(db, "iboard_users", ohplusAccountUid)
+      const userDocSnap = await getDoc(userDocRef)
+
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data()
+        if (userData.type !== "OHPLUS") {
+          throw new Error("ACCOUNT_TYPE_NOT_ALLOWED")
+        }
+      } else {
+        throw new Error("OHPLUS_ACCOUNT_NOT_FOUND")
+      }
     } catch (error) {
-      console.error("Login with account type error:", error)
+      console.error("OHPLUS login error:", error)
       setLoading(false)
       throw error
     }
@@ -334,7 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         company_id: companyId,
         role: "user",
         permissions: [],
-        type: "OHPLUS",
+        type: "OHPLUS", // Always create OHPLUS accounts
         created: serverTimestamp(),
         updated: serverTimestamp(),
         first_name: personalInfo.first_name,
@@ -428,7 +473,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (firebaseUser) {
         console.log("Auth state changed: user logged in", firebaseUser.uid)
         setUser(firebaseUser)
-        await fetchUserData(firebaseUser)
+
+        // Check if this is an OHPLUS account
+        const ohplusAccountUid = await findOHPlusAccount(firebaseUser.email || "")
+        if (ohplusAccountUid) {
+          await fetchUserData(firebaseUser, ohplusAccountUid)
+        } else {
+          // If no OHPLUS account found, sign out
+          console.log("No OHPLUS account found, signing out")
+          await signOut(auth)
+        }
       } else {
         console.log("Auth state changed: user logged out")
         setUser(null)
@@ -448,7 +502,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     subscriptionData,
     loading,
     login,
-    loginWithAccountType,
+    loginOHPlusOnly,
     register,
     logout,
     resetPassword,

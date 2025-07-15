@@ -35,11 +35,6 @@ export default function ForgotPasswordPage() {
     setSuccess(false)
 
     // Validate email format
-    if (!email.trim()) {
-      setError("Please enter your email address.")
-      return
-    }
-
     if (!isValidEmail(email)) {
       setError("Please enter a valid email address.")
       return
@@ -48,25 +43,12 @@ export default function ForgotPasswordPage() {
     setIsLoading(true)
 
     try {
-      console.log("Attempting to send password reset email to:", email)
       await resetPassword(email)
       setSuccess(true)
       console.log("Password reset email sent successfully")
     } catch (error: any) {
       console.error("Password reset error:", error)
-
-      // Handle specific Firebase Auth errors
-      if (error.code === "auth/user-not-found") {
-        setError("No account found with this email address. Please check your email or create a new account.")
-      } else if (error.code === "auth/invalid-email") {
-        setError("Please enter a valid email address.")
-      } else if (error.code === "auth/too-many-requests") {
-        setError("Too many password reset attempts. Please try again later.")
-      } else if (error.code === "auth/network-request-failed") {
-        setError("Network error. Please check your internet connection and try again.")
-      } else {
-        setError(error.message || "Failed to send password reset email. Please try again.")
-      }
+      setError(error.message || "Failed to send password reset email. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -86,37 +68,39 @@ export default function ForgotPasswordPage() {
           <div className="w-full md:w-1/2 p-8">
             <Card className="border-none shadow-none">
               <CardHeader className="text-center">
-                <div className="mx-auto mb-4 w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
+                <div className="flex justify-center mb-4">
+                  <CheckCircle className="h-16 w-16 text-green-500" />
                 </div>
-                <CardTitle className="text-2xl font-bold text-gray-900">Check Your Email</CardTitle>
+                <CardTitle className="text-3xl font-bold text-gray-900">Check Your Email</CardTitle>
                 <CardDescription className="text-gray-600 mt-2">
-                  We've sent a password reset link to <strong>{email}</strong>
+                  We've sent a password reset link to your email address.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-center text-sm text-gray-600">
-                  <p>Click the link in the email to reset your password.</p>
-                  <p className="mt-2">If you don't see the email, check your spam folder.</p>
+              <CardContent className="space-y-6">
+                <div className="text-center space-y-4">
+                  <p className="text-sm text-gray-600">
+                    We sent a password reset link to <strong>{email}</strong>
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Click the link in the email to reset your password. If you don't see the email, check your spam
+                    folder.
+                  </p>
                 </div>
 
-                <div className="flex flex-col gap-3">
+                <div className="space-y-4">
                   <Button
-                    onClick={() => router.push("/login")}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    Back to Login
-                  </Button>
-
-                  <Button
-                    variant="outline"
                     onClick={() => {
                       setSuccess(false)
                       setEmail("")
                     }}
+                    variant="outline"
                     className="w-full"
                   >
                     Send Another Email
+                  </Button>
+
+                  <Button onClick={() => router.push("/login")} className="w-full bg-blue-600 hover:bg-blue-700">
+                    Back to Login
                   </Button>
                 </div>
               </CardContent>
@@ -140,17 +124,10 @@ export default function ForgotPasswordPage() {
         <div className="w-full md:w-1/2 p-8">
           <Card className="border-none shadow-none">
             <CardHeader>
-              <div className="flex items-center gap-2 mb-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.push("/login")}
-                  className="p-0 h-auto text-gray-600 hover:text-gray-900"
-                >
-                  <ArrowLeft className="w-4 h-4 mr-1" />
-                  Back to Login
-                </Button>
-              </div>
+              <Link href="/login" className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 mb-4">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Login
+              </Link>
               <CardTitle className="text-3xl font-bold text-gray-900">Reset Password</CardTitle>
               <CardDescription className="text-gray-600 mt-2">
                 Enter your email address and we'll send you a link to reset your password.
@@ -176,7 +153,6 @@ export default function ForgotPasswordPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       className="pl-10 pr-4 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                      disabled={isLoading}
                     />
                   </div>
                 </div>

@@ -14,8 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Mail, Lock, Eye, EyeOff, AlertTriangle } from "lucide-react"
+import { Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
@@ -26,13 +25,10 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showJoinOrgDialog, setShowJoinOrgDialog] = useState(false)
-  const [showAccountTypeDialog, setShowAccountTypeDialog] = useState(false)
-  const [availableAccounts, setAvailableAccounts] = useState<Array<{ uid: string; type: string; name: string }>>([])
-  const [selectedAccountType, setSelectedAccountType] = useState("")
   const [orgCode, setOrgCode] = useState("")
   const [isValidatingCode, setIsValidatingCode] = useState(false)
 
-  const { login, user, loginWithAccountType } = useAuth()
+  const { loginOHPlusOnly, user } = useAuth()
   const router = useRouter()
 
   // Redirect if already logged in
@@ -41,86 +37,6 @@ export default function LoginPage() {
       router.push("/admin/dashboard")
     }
   }, [user, router])
-
-  const checkForMultipleAccounts = async (email: string) => {
-    try {
-      // Query for all accounts with this email
-      const usersQuery = query(collection(db, "iboard_users"), where("email", "==", email))
-      const usersSnapshot = await getDocs(usersQuery)
-
-      if (usersSnapshot.size > 1) {
-        const accounts = usersSnapshot.docs.map((doc) => {
-          const data = doc.data()
-          return {
-            uid: doc.id,
-            type: data.type || "OHPLUS",
-            name: data.first_name && data.last_name ? `${data.first_name} ${data.last_name}` : data.type || "Unknown",
-          }
-        })
-        return accounts
-      }
-      return []
-    } catch (error) {
-      console.error("Error checking for multiple accounts:", error)
-      return []
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    setIsLoading(true)
-
-    try {
-      // First check if there are multiple accounts with this email
-      const accounts = await checkForMultipleAccounts(email)
-
-      if (accounts.length > 1) {
-        setAvailableAccounts(accounts)
-        setShowAccountTypeDialog(true)
-        setIsLoading(false)
-        return
-      }
-
-      // Proceed with normal login if only one account exists
-      await login(email, password)
-      router.push("/admin/dashboard")
-    } catch (error: any) {
-      console.error("Login error:", error)
-
-      // Provide more user-friendly error messages
-      if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
-        setError("Invalid email or password. Please check your credentials.")
-      } else if (error.code === "auth/too-many-requests") {
-        setError("Too many unsuccessful login attempts. Please try again later.")
-      } else if (error.code === "auth/tenant-id-mismatch") {
-        setError("Authentication error: Tenant ID mismatch. Please contact support.")
-      } else {
-        setError(error.message || "Failed to login. Please check your credentials.")
-      }
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleAccountTypeLogin = async () => {
-    if (!selectedAccountType) {
-      setError("Please select an account type.")
-      return
-    }
-
-    setIsLoading(true)
-    try {
-      await loginWithAccountType(email, password, selectedAccountType)
-      router.push("/admin/dashboard")
-    } catch (error: any) {
-      console.error("Account type login error:", error)
-      setError(error.message || "Failed to login with selected account type.")
-    } finally {
-      setIsLoading(false)
-      setShowAccountTypeDialog(false)
-    }
-  }
 
   const validateInvitationCode = async (code: string) => {
     try {
@@ -149,6 +65,36 @@ export default function LoginPage() {
       return true
     } catch (error: any) {
       throw error
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+    setIsLoading(true)
+
+    try {
+      await loginOHPlusOnly(email, password)
+      router.push("/admin/dashboard")
+    } catch (error: any) {
+      console.error("Login error:", error)
+
+      // Provide more user-friendly error messages
+      if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
+        setError("Invalid email or password. Please check your credentials.")
+      } else if (error.code === "auth/too-many-requests") {
+        setError("Too many unsuccessful login attempts. Please try again later.")
+      } else if (error.code === "auth/tenant-id-mismatch") {
+        setError("Authentication error: Tenant ID mismatch. Please contact support.")
+      } else if (error.message === "OHPLUS_ACCOUNT_NOT_FOUND") {
+        setError("No OHPLUS account found with this email address. Only OHPLUS accounts can access this system.")
+      } else if (error.message === "ACCOUNT_TYPE_NOT_ALLOWED") {
+        setError("This account type is not allowed to access this system. Only OHPLUS accounts are permitted.")
+      } else {
+        setError(error.message || "Failed to login. Please check your credentials.")
+      }
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -302,52 +248,6 @@ export default function LoginPage() {
           </Card>
         </div>
       </div>
-
-      {/* Account Type Selection Dialog */}
-      <Dialog open={showAccountTypeDialog} onOpenChange={setShowAccountTypeDialog}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Multiple Accounts Found
-            </DialogTitle>
-            <DialogDescription>
-              We found multiple accounts associated with this email address. Please select which account you want to log
-              into:
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="accountType">Select Account Type</Label>
-              <Select value={selectedAccountType} onValueChange={setSelectedAccountType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose account type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableAccounts.map((account) => (
-                    <SelectItem key={account.uid} value={account.uid}>
-                      {account.type} - {account.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={() => setShowAccountTypeDialog(false)}>
-                Cancel
-              </Button>
-              <Button type="button" onClick={handleAccountTypeLogin} disabled={isLoading}>
-                {isLoading ? "Logging in..." : "Continue"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Join Organization Dialog */}
       <Dialog open={showJoinOrgDialog} onOpenChange={setShowJoinOrgDialog}>
