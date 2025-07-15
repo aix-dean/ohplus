@@ -13,6 +13,7 @@ import {
 import { auth, db } from "@/lib/firebase"
 import { doc, getDoc, setDoc, serverTimestamp, collection, query, where, getDocs, updateDoc } from "firebase/firestore"
 import { assignRoleToUser, type RoleType } from "@/lib/hardcoded-access-service"
+import { generateLicenseKey } from "@/lib/utils"
 
 interface UserData {
   uid: string
@@ -49,9 +50,10 @@ interface SubscriptionData {
 }
 
 interface PersonalInfo {
+  email: string
   first_name: string
   last_name: string
-  middle_name?: string
+  middle_name: string
   phone_number: string
   gender: string
 }
@@ -69,14 +71,7 @@ interface AuthContextType {
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   loginOHPlusOnly: (email: string, password: string) => Promise<void>
-  register: (
-    email: string,
-    password: string,
-    personalInfo: PersonalInfo,
-    companyInfo: CompanyInfo,
-    licenseKey: string,
-    orgCode?: string,
-  ) => Promise<void>
+  register: (personalInfo: PersonalInfo, companyInfo: CompanyInfo, password: string, orgCode?: string) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   refreshUserData: () => Promise<void>
@@ -178,42 +173,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const register = async (
-    email: string,
-    password: string,
-    personalInfo: PersonalInfo,
-    companyInfo: CompanyInfo,
-    licenseKey: string,
-    orgCode?: string,
-  ) => {
+  const register = async (personalInfo: PersonalInfo, companyInfo: CompanyInfo, password: string, orgCode?: string) => {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      const userCredential = await createUserWithEmailAndPassword(auth, personalInfo.email, password)
       const firebaseUser = userCredential.user
 
+      let licenseKey = generateLicenseKey()
       let companyId = orgCode || null
       let assignedRole: RoleType = "admin" // Default role
 
       // If orgCode is provided, find the invitation and get the role
       if (orgCode) {
-        const invitationsQuery = query(
-          collection(db, "invitations"),
-          where("code", "==", orgCode),
-          where("status", "==", "pending"),
-        )
-        const invitationSnapshot = await getDocs(invitationsQuery)
+        const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
+        const invitationSnapshot = await getDocs(invitationQuery)
 
         if (!invitationSnapshot.empty) {
           const invitationDoc = invitationSnapshot.docs[0]
           const invitationData = invitationDoc.data()
-          companyId = invitationData.company_id
-          assignedRole = invitationData.role || "admin"
+
+          licenseKey = invitationData.license_key || licenseKey
+          companyId = invitationData.company_id || null
+          assignedRole = (invitationData.role as RoleType) || "admin"
 
           // Mark invitation as used
-          await updateDoc(invitationDoc.ref, {
-            status: "used",
-            used_by: firebaseUser.uid,
-            used_at: serverTimestamp(),
-          })
+          const updateData: any = {
+            used: true,
+            used_count: (invitationData.used_count || 0) + 1,
+            last_used_at: serverTimestamp(),
+          }
+
+          if (invitationData.used_by && Array.isArray(invitationData.used_by)) {
+            updateData.used_by = [...invitationData.used_by, firebaseUser.uid]
+          } else {
+            updateData.used_by = [firebaseUser.uid]
+          }
+
+          await updateDoc(invitationDoc.ref, updateData)
         }
       }
 
