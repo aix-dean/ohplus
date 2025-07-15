@@ -23,6 +23,7 @@ interface UserData {
   license_key: string | null
   company_id?: string | null
   role: string | null
+  roles?: RoleType[]
   permissions: string[]
   project_id?: string
   first_name?: string
@@ -114,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           displayName: firebaseUser.displayName,
           license_key: data.license_key || null,
           role: data.role || "user",
+          roles: data.roles || [],
           permissions: data.permissions || [],
           project_id: data.project_id,
           first_name: data.first_name,
@@ -136,6 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           license_key: null,
           company_id: null,
           role: "user",
+          roles: [],
           permissions: [],
         }
 
@@ -395,6 +398,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         license_key: licenseKey,
         company_id: companyId,
         role: "user",
+        roles: [],
         permissions: [],
         type: "OHPLUS",
         created: serverTimestamp(),
