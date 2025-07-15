@@ -24,28 +24,28 @@ import { useAuth } from "@/contexts/auth-context"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Loader2, Info } from "lucide-react"
+import { getAllRoles, type RoleType } from "@/lib/hardcoded-access-service"
 
 interface GenerateInvitationCodeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-const PREDEFINED_ROLES = [
-  { value: "user", label: "User", description: "Basic access to the platform" },
-  { value: "editor", label: "Editor", description: "Can create and edit content" },
-  { value: "manager", label: "Manager", description: "Can manage teams and projects" },
-  { value: "admin", label: "Admin", description: "Full administrative access" },
-]
+// Remove the old PREDEFINED_ROLES constant and replace with:
+const PREDEFINED_ROLES = getAllRoles().map((role) => ({
+  value: role.id,
+  label: role.name,
+  description: role.description,
+  color: role.color,
+}))
 
 const AVAILABLE_PERMISSIONS = [
-  { id: "read_proposals", label: "Read Proposals", description: "View proposal documents" },
-  { id: "write_proposals", label: "Write Proposals", description: "Create and edit proposals" },
-  { id: "read_clients", label: "Read Clients", description: "View client information" },
-  { id: "write_clients", label: "Write Clients", description: "Create and edit client data" },
-  { id: "read_inventory", label: "Read Inventory", description: "View inventory items" },
-  { id: "write_inventory", label: "Write Inventory", description: "Manage inventory items" },
-  { id: "read_analytics", label: "Read Analytics", description: "View reports and analytics" },
-  { id: "admin_access", label: "Admin Access", description: "Administrative functions" },
+  { id: "admin", label: "Admin Access", description: "Full administrative access" },
+  { id: "sales", label: "Sales Access", description: "Sales module access" },
+  { id: "logistics", label: "Logistics Access", description: "Logistics operations access" },
+  { id: "cms", label: "CMS Access", description: "Content management access" },
+  { id: "user-management", label: "User Management", description: "Manage users and roles" },
+  { id: "system-settings", label: "System Settings", description: "System configuration" },
 ]
 
 export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInvitationCodeDialogProps) {
@@ -53,8 +53,8 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     validityDays: 30,
-    maxUsage: 0, // 0 means unlimited
-    role: "",
+    maxUsage: 0,
+    role: "" as RoleType | "custom" | "",
     customRole: "",
     permissions: [] as string[],
     description: "",
@@ -84,6 +84,13 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
 
       if (!finalRole) {
         toast.error("Please select or enter a role")
+        setLoading(false)
+        return
+      }
+
+      // Validate that the role exists in our hardcoded roles (unless it's custom)
+      if (formData.role !== "custom" && !PREDEFINED_ROLES.find((r) => r.value === formData.role)) {
+        toast.error("Invalid role selected")
         setLoading(false)
         return
       }
