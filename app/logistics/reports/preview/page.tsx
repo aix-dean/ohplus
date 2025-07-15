@@ -469,71 +469,71 @@ export default function ReportPreviewPage() {
         <Card className="shadow-sm">
           <CardContent className="p-6">
             <h2 className="text-xl font-bold mb-4 text-gray-900">Project Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2">
               <div className="space-y-2">
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">Site ID:</span>
-                  <span className="text-gray-900">{getSiteLocation(product)}</span>
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 min-w-[140px]">Site ID:</span>
+                  <span className="text-gray-900 ml-2">{getSiteLocation(product)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">Job Order:</span>
-                  <span className="text-gray-900">{report.id?.slice(-4).toUpperCase() || "0064"}</span>
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 min-w-[140px]">Job Order:</span>
+                  <span className="text-gray-900 ml-2">{report.id?.slice(-4).toUpperCase() || "0064"}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">Job Order Date:</span>
-                  <span className="text-gray-900">{formatDate(report.date)}</span>
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 min-w-[140px]">Job Order Date:</span>
+                  <span className="text-gray-900 ml-2">{formatDate(report.date)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">Site:</span>
-                  <span className="text-gray-900">{report.siteName}</span>
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 min-w-[140px]">Site:</span>
+                  <span className="text-gray-900 ml-2">{report.siteName}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">Size:</span>
-                  <span className="text-gray-900">{getSiteSize(product)}</span>
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 min-w-[140px]">Size:</span>
+                  <span className="text-gray-900 ml-2">{getSiteSize(product)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">Start Date:</span>
-                  <span className="text-gray-900">{formatDate(report.bookingDates.start)}</span>
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 min-w-[140px]">Start Date:</span>
+                  <span className="text-gray-900 ml-2">{formatDate(report.bookingDates.start)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">End Date:</span>
-                  <span className="text-gray-900">{formatDate(report.bookingDates.end)}</span>
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 min-w-[140px]">End Date:</span>
+                  <span className="text-gray-900 ml-2">{formatDate(report.bookingDates.end)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-40 flex-shrink-0">Installation Duration:</span>
-                  <span className="text-gray-900">
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 min-w-[140px]">Installation Duration:</span>
+                  <span className="text-gray-900 ml-2">
                     {calculateInstallationDuration(report.bookingDates.start, report.bookingDates.end)} days
                   </span>
                 </div>
               </div>
               <div className="space-y-2">
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Content:</span>
-                  <span className="text-gray-900">{product?.content_type || "Lilo & Stitch"}</span>
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 min-w-[120px]">Content:</span>
+                  <span className="text-gray-900 ml-2">{product?.content_type || "Lilo & Stitch"}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Material Specs:</span>
-                  <span className="text-gray-900">{getMaterialSpecs(product)}</span>
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 min-w-[120px]">Material Specs:</span>
+                  <span className="text-gray-900 ml-2">{getMaterialSpecs(product)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Crew:</span>
-                  <span className="text-gray-900">Team {report.assignedTo || "J"}</span>
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 min-w-[120px]">Crew:</span>
+                  <span className="text-gray-900 ml-2">Team {report.assignedTo || "J"}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Illumination:</span>
-                  <span className="text-gray-900">{getIllumination(product)}</span>
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 min-w-[120px]">Illumination:</span>
+                  <span className="text-gray-900 ml-2">{getIllumination(product)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Gondola:</span>
-                  <span className="text-gray-900">{getGondola(product)}</span>
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 min-w-[120px]">Gondola:</span>
+                  <span className="text-gray-900 ml-2">{getGondola(product)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Technology:</span>
-                  <span className="text-gray-900">{getTechnology(product)}</span>
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 min-w-[120px]">Technology:</span>
+                  <span className="text-gray-900 ml-2">{getTechnology(product)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700 w-32 flex-shrink-0">Sales:</span>
-                  <span className="text-gray-900">{report.sales}</span>
+                <div className="flex items-start">
+                  <span className="font-medium text-gray-700 min-w-[120px]">Sales:</span>
+                  <span className="text-gray-900 ml-2">{report.sales}</span>
                 </div>
               </div>
             </div>
