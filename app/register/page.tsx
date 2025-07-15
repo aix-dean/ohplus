@@ -187,11 +187,8 @@ export default function RegisterPage() {
 
       console.log("Registration completed successfully")
       setErrorMessage(null)
-      const redirectUrl = orgCode
-        ? "/admin/dashboard?registered=true&joined_org=true"
-        : "/admin/dashboard?registered=true"
-      console.log("Redirecting to:", redirectUrl)
-      router.push(redirectUrl)
+      console.log("Redirecting to: /admin/dashboard")
+      router.push("/admin/dashboard")
     } catch (error: unknown) {
       console.error("Registration failed:", error)
       setErrorMessage(getFriendlyErrorMessage(error))
