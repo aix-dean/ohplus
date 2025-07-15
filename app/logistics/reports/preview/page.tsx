@@ -398,7 +398,7 @@ export default function ReportPreviewPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top Navigation Bar - Outside Container */}
+      {/* Top Navigation Bar */}
       <div className="bg-white px-4 py-3 flex items-center shadow-sm border-b">
         <div className="flex items-center gap-3">
           <Button
@@ -426,28 +426,11 @@ export default function ReportPreviewPage() {
         </div>
       </div>
 
-      {/* Angular Blue Header - Outside Container */}
-      <div className="w-full relative bg-white">
-        <div className="relative h-16 overflow-hidden">
-          <div className="absolute inset-0 bg-blue-900"></div>
-          <div
-            className="absolute top-0 right-0 h-full bg-cyan-400"
-            style={{
-              width: "40%",
-              clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
-            }}
-          ></div>
-          <div className="relative z-10 h-full flex items-center px-6">
-            <div className="text-white text-lg font-semibold">Logistics</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Container */}
-      <div className="flex min-h-[calc(100vh-200px)]">
-        {/* Left Action Buttons Container */}
-        <div className="w-24 flex-shrink-0 bg-gray-50 p-4 border-r border-gray-200">
-          <div className="sticky top-6 flex flex-col gap-4">
+      {/* Main Content Container */}
+      <div className="relative">
+        {/* Left Action Buttons Container - Positioned outside report area */}
+        <div className="absolute left-4 top-6 z-10">
+          <div className="flex flex-col gap-4">
             {/* Edit Button */}
             <div className="flex flex-col items-center">
               <Button
@@ -475,8 +458,26 @@ export default function ReportPreviewPage() {
           </div>
         </div>
 
-        {/* Report Content Container */}
-        <div className="flex-1 bg-white">
+        {/* Report Container - Contains Header, Content, and Footer */}
+        <div className="ml-24 bg-white shadow-lg rounded-lg overflow-hidden">
+          {/* Angular Blue Header */}
+          <div className="w-full relative">
+            <div className="relative h-16 overflow-hidden">
+              <div className="absolute inset-0 bg-blue-900"></div>
+              <div
+                className="absolute top-0 right-0 h-full bg-cyan-400"
+                style={{
+                  width: "40%",
+                  clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
+                }}
+              ></div>
+              <div className="relative z-10 h-full flex items-center px-6">
+                <div className="text-white text-lg font-semibold">Logistics</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Report Content */}
           <div className="max-w-6xl mx-auto p-6 space-y-6">
             {/* Report Header */}
             <div className="flex justify-between items-center">
@@ -488,7 +489,7 @@ export default function ReportPreviewPage() {
               </div>
               <div className="flex-shrink-0">
                 <div
-                  className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm border"
+                  className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm"
                   style={{ width: "160px", height: "160px" }}
                 >
                   <img
@@ -666,32 +667,32 @@ export default function ReportPreviewPage() {
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Angular Footer - Outside Container */}
-      <div className="w-full relative bg-white mt-8">
-        <div className="relative h-16 overflow-hidden">
-          <div className="absolute inset-0 bg-cyan-400"></div>
-          <div
-            className="absolute top-0 right-0 h-full bg-blue-900"
-            style={{
-              width: "75%",
-              clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
-            }}
-          ></div>
-          <div className="relative z-10 h-full flex items-center justify-between px-8">
-            <div className="flex items-center gap-6">
-              <div className="text-white text-lg font-semibold">{""}</div>
-            </div>
-            <div className="text-white text-right flex items-center gap-2">
-              <div className="text-sm font-medium">Smart. Seamless. Scalable</div>
-              <div className="text-2xl font-bold flex items-center">
-                OH!
-                <div className="ml-1 text-cyan-400">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10 2v16M2 10h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
+          {/* Angular Footer */}
+          <div className="w-full relative">
+            <div className="relative h-16 overflow-hidden">
+              <div className="absolute inset-0 bg-cyan-400"></div>
+              <div
+                className="absolute top-0 right-0 h-full bg-blue-900"
+                style={{
+                  width: "75%",
+                  clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
+                }}
+              ></div>
+              <div className="relative z-10 h-full flex items-center justify-between px-8">
+                <div className="flex items-center gap-6">
+                  <div className="text-white text-lg font-semibold">{""}</div>
+                </div>
+                <div className="text-white text-right flex items-center gap-2">
+                  <div className="text-sm font-medium">Smart. Seamless. Scalable</div>
+                  <div className="text-2xl font-bold flex items-center">
+                    OH!
+                    <div className="ml-1 text-cyan-400">
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 2v16M2 10h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
