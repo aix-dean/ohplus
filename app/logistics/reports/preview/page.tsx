@@ -664,17 +664,17 @@ export default function ReportPreviewPage() {
       </div>
 
       {/* Left Side Floating Buttons */}
-      <div className="fixed left-8 top-1/2 transform -translate-y-1/2 z-50 flex flex-col gap-4">
+      <div className="fixed left-8 top-32 z-50 flex flex-col gap-6">
         {/* Edit Button */}
         <div className="flex flex-col items-center">
           <Button
             onClick={handleEdit}
-            className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+            className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
             size="sm"
           >
-            <Edit className="h-5 w-5" />
+            <Edit className="h-6 w-6" />
           </Button>
-          <span className="text-xs text-gray-600 mt-1 font-medium">Edit</span>
+          <span className="text-xs text-gray-600 mt-2 font-medium">Edit</span>
         </div>
 
         {/* Download Button */}
@@ -682,12 +682,12 @@ export default function ReportPreviewPage() {
           <Button
             onClick={handleDownloadPDF}
             disabled={isGeneratingPDF}
-            className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+            className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
             size="sm"
           >
-            <Download className="h-5 w-5" />
+            <Download className="h-6 w-6" />
           </Button>
-          <span className="text-xs text-gray-600 mt-1 font-medium">{isGeneratingPDF ? "..." : "Download"}</span>
+          <span className="text-xs text-gray-600 mt-2 font-medium">{isGeneratingPDF ? "..." : "Download"}</span>
         </div>
       </div>
 
