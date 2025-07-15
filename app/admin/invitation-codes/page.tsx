@@ -6,12 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Plus, MoreHorizontal, Eye, Mail, Ban, Calendar, Shield, Users, AlertTriangle } from "lucide-react"
+import { Plus, MoreHorizontal, Eye, Mail, Ban, Calendar, Shield } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, onSnapshot, orderBy, doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { subscriptionService } from "@/lib/subscription-service"
 import { GenerateInvitationCodeDialog } from "@/components/generate-invitation-code-dialog"
 import { InvitationCodeDetailsDialog } from "@/components/invitation-code-details-dialog"
 import { SendInvitationEmailDialog } from "@/components/send-invitation-email-dialog"
@@ -29,43 +27,20 @@ interface InvitationCode {
   status: "active" | "inactive" | "expired"
   created_by: string
   company_id: string
-  license_key?: string
   description?: string
   used_by: string[]
 }
 
 export default function InvitationCodesPage() {
-  const { userData, subscriptionData } = useAuth()
+  const { userData } = useAuth()
   const [codes, setCodes] = useState<InvitationCode[]>([])
   const [loading, setLoading] = useState(true)
-  const [userLimitInfo, setUserLimitInfo] = useState<{
-    canInvite: boolean
-    currentUsers: number
-    maxUsers: number
-  } | null>(null)
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false)
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
   const [emailDialogOpen, setEmailDialogOpen] = useState(false)
   const [selectedCode, setSelectedCode] = useState<InvitationCode | null>(null)
 
   console.log("InvitationCodesPage - userData:", userData)
-
-  // Check user limits
-  useEffect(() => {
-    const checkUserLimits = async () => {
-      if (userData?.license_key) {
-        try {
-          const limitInfo = await subscriptionService.checkUserLimit(userData.license_key)
-          setUserLimitInfo(limitInfo)
-        } catch (error) {
-          console.error("Error checking user limits:", error)
-          setUserLimitInfo({ canInvite: false, currentUsers: 0, maxUsers: 0 })
-        }
-      }
-    }
-
-    checkUserLimits()
-  }, [userData?.license_key])
 
   useEffect(() => {
     if (!userData?.company_id) {
@@ -185,14 +160,6 @@ export default function InvitationCodesPage() {
     setEmailDialogOpen(true)
   }
 
-  const handleGenerateCode = () => {
-    if (!userLimitInfo?.canInvite) {
-      toast.error("User limit reached for your subscription plan")
-      return
-    }
-    setGenerateDialogOpen(true)
-  }
-
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -225,49 +192,11 @@ export default function InvitationCodesPage() {
           <h1 className="text-3xl font-bold">Invitation Codes</h1>
           <p className="text-muted-foreground">Manage invitation codes for user registration</p>
         </div>
-        <Button onClick={handleGenerateCode} disabled={!userLimitInfo?.canInvite}>
+        <Button onClick={() => setGenerateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Generate Code
         </Button>
       </div>
-
-      {/* User Limit Information */}
-      {userLimitInfo && (
-        <Card className="border-l-4 border-l-blue-500">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Users className="h-5 w-5 text-blue-500" />
-                <div>
-                  <h3 className="font-medium">User Limit Status</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {userLimitInfo.currentUsers} /{" "}
-                    {userLimitInfo.maxUsers === -1 ? "Unlimited" : userLimitInfo.maxUsers} users
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-medium">
-                  {userLimitInfo.maxUsers === -1
-                    ? "Unlimited"
-                    : `${userLimitInfo.maxUsers - userLimitInfo.currentUsers} slots remaining`}
-                </p>
-                <p className="text-xs text-muted-foreground">Plan: {subscriptionData?.planType || "Unknown"}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Warning if user limit reached */}
-      {userLimitInfo && !userLimitInfo.canInvite && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            You have reached the user limit for your subscription plan. Please upgrade your plan to invite more users.
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* Codes Table */}
       <Card>

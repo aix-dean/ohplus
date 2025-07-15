@@ -67,6 +67,32 @@ async function logProposalPDFGenerated(proposalId: string, userId: string, userN
   return Promise.resolve()
 }
 
+// New helper function to calculate image dimensions for fitting
+async function calculateImageFitDimensions(
+  imageUrl: string,
+  maxWidth: number,
+  maxHeight: number,
+): Promise<{ base64: string | null; width: number; height: number }> {
+  const base64 = await loadImageAsBase64(imageUrl)
+  if (!base64) return { base64: null, width: 0, height: 0 }
+
+  const dimensions = await getImageDimensions(base64)
+  let { width, height } = dimensions
+  const aspectRatio = width / height
+
+  // Scale to fit within max bounds
+  if (width > maxWidth) {
+    width = maxWidth
+    height = width / aspectRatio
+  }
+  if (height > maxHeight) {
+    height = maxHeight
+    width = height * aspectRatio
+  }
+
+  return { base64, width, height }
+}
+
 export async function generateProposalPDF(proposal: Proposal, returnBase64 = false): Promise<string | void> {
   try {
     // Create new PDF document
@@ -107,7 +133,8 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
     const addQRCodeToPage = async () => {
       try {
         const qrSize = 25
-        const qrX = pageWidth - margin - qrSize
+        // Calculate qrX to center the QR code horizontally
+        const qrX = (pageWidth - qrSize) / 2
         const qrY = margin
 
         // Load QR code image and add to PDF
@@ -118,7 +145,9 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
           // Add small text below QR code
           pdf.setFontSize(6)
           pdf.setTextColor(100, 100, 100)
-          pdf.text("Scan to view online", qrX, qrY + qrSize + 3)
+          // Adjust text position to be centered below the QR code
+          const textWidth = pdf.getTextWidth("Scan to view online")
+          pdf.text("Scan to view online", qrX + (qrSize - textWidth) / 2, qrY + qrSize + 3)
           pdf.setTextColor(0, 0, 0)
         }
       } catch (error) {
@@ -129,43 +158,6 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
 
     // Add QR code to first page
     await addQRCodeToPage()
-
-    // Helper function to add image to PDF
-    const addImageToPDF = async (imageUrl: string, x: number, y: number, maxWidth: number, maxHeight: number) => {
-      try {
-        const base64 = await loadImageAsBase64(imageUrl)
-        if (!base64) return { width: 0, height: 0 }
-
-        const dimensions = await getImageDimensions(base64)
-
-        // Calculate scaled dimensions to fit within max bounds
-        let { width, height } = dimensions
-        const aspectRatio = width / height
-
-        // Scale to fill the maximum available space
-        if (width > height) {
-          width = maxWidth
-          height = width / aspectRatio
-          if (height > maxHeight) {
-            height = maxHeight
-            width = height * aspectRatio
-          }
-        } else {
-          height = maxHeight
-          width = height * aspectRatio
-          if (width > maxWidth) {
-            width = maxWidth
-            height = width / aspectRatio
-          }
-        }
-
-        pdf.addImage(base64, "JPEG", x, y, width, height)
-        return { width, height }
-      } catch (error) {
-        console.error("Error adding image to PDF:", error)
-        return { width: 0, height: 0 }
-      }
-    }
 
     // Header (adjusted to avoid QR code area)
     const headerContentWidth = contentWidth - 30 // Leave space for QR code
@@ -360,14 +352,15 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
                 checkNewPage(singleImageHeight + 10)
 
                 try {
-                  const imageDimensions = await addImageToPDF(
+                  const { base64, width, height } = await calculateImageFitDimensions(
                     media.url,
-                    centerX,
-                    yPosition,
                     singleImageWidth,
                     singleImageHeight,
                   )
-                  yPosition += imageDimensions.height + 5
+                  if (base64) {
+                    pdf.addImage(base64, "JPEG", centerX, yPosition, width, height)
+                    yPosition += height + 5
+                  }
                 } catch (error) {
                   console.error("Error adding product image:", error)
                 }
@@ -380,19 +373,20 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
                 }
 
                 try {
-                  const imageDimensions = await addImageToPDF(
+                  const { base64, width, height } = await calculateImageFitDimensions(
                     media.url,
-                    currentX,
-                    yPosition,
                     maxImageWidth,
                     maxImageHeight,
                   )
+                  if (base64) {
+                    pdf.addImage(base64, "JPEG", currentX, yPosition, width, height)
 
-                  if (imageDimensions.height > maxImageHeightInRow) {
-                    maxImageHeightInRow = imageDimensions.height
+                    if (height > maxImageHeightInRow) {
+                      maxImageHeightInRow = height
+                    }
+
+                    currentX += maxImageWidth + imageSpacing
                   }
-
-                  currentX += maxImageWidth + imageSpacing
                 } catch (error) {
                   console.error("Error adding product image:", error)
                 }
@@ -528,7 +522,8 @@ export async function generateCostEstimatePDF(
     const addQRCodeToPage = async () => {
       try {
         const qrSize = 25
-        const qrX = pageWidth - margin - qrSize
+        // Calculate qrX to center the QR code horizontally
+        const qrX = (pageWidth - qrSize) / 2
         const qrY = margin
 
         const qrBase64 = await loadImageAsBase64(qrCodeUrl)
@@ -536,7 +531,9 @@ export async function generateCostEstimatePDF(
           pdf.addImage(qrBase64, "PNG", qrX, qrY, qrSize, qrSize)
           pdf.setFontSize(6)
           pdf.setTextColor(100, 100, 100)
-          pdf.text("Scan to view online", qrX, qrY + qrSize + 3)
+          // Adjust text position to be centered below the QR code
+          const textWidth = pdf.getTextWidth("Scan to view online")
+          pdf.text("Scan to view online", qrX + (qrSize - textWidth) / 2, qrY + qrSize + 3)
           pdf.setTextColor(0, 0, 0)
         }
       } catch (error) {
@@ -768,6 +765,15 @@ export async function generateReportPDF(
     const startDate = safeToDate(report.bookingDates.start)
     const endDate = safeToDate(report.bookingDates.end)
 
+    // Helper function to format date
+    const formatDate = (dateString: string) => {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })
+    }
+
     // Helper function to add text with word wrapping
     const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
       pdf.setFontSize(fontSize)
@@ -778,102 +784,171 @@ export async function generateReportPDF(
 
     // Helper function to check if we need a new page
     const checkNewPage = (requiredHeight: number) => {
-      if (yPosition + requiredHeight > pageHeight - 20) {
-        // Leave space for footer
+      if (yPosition + requiredHeight > pageHeight - 30) {
         pdf.addPage()
         yPosition = 0
-        // Add header to new page
         addHeaderToPage()
       }
     }
 
-    // Helper function to get report type display
-    const getReportTypeDisplay = (type: string) => {
-      return type
-        .split("-")
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ")
+    // Helper function to add image to PDF
+    const addImageToPDF = async (imageUrl: string, x: number, y: number, maxWidth: number, maxHeight: number) => {
+      try {
+        const base64 = await loadImageAsBase64(imageUrl)
+        if (!base64) return { width: 0, height: 0 }
+
+        const dimensions = await getImageDimensions(base64)
+        let { width, height } = dimensions
+        const aspectRatio = width / height
+
+        if (width > height) {
+          width = maxWidth
+          height = width / aspectRatio
+          if (height > maxHeight) {
+            height = maxHeight
+            width = height * aspectRatio
+          }
+        } else {
+          height = maxHeight
+          width = height * aspectRatio
+          if (width > maxWidth) {
+            width = maxWidth
+            height = width / aspectRatio
+          }
+        }
+
+        pdf.addImage(base64, "JPEG", x, y, width, height)
+        return { width, height }
+      } catch (error) {
+        console.error("Error adding image to PDF:", error)
+        return { width: 0, height: 0 }
+      }
     }
 
-    // Helper function to format date
-    const formatDate = (dateString: string) => {
-      return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    }
-
-    // Helper function to create the header section exactly like the preview
+    // Helper function to create the angular header exactly like the page
     const addHeaderToPage = async () => {
       try {
-        const headerBase64 = await loadImageAsBase64("/logistics-header-new.png")
-        if (headerBase64) {
-          // Get the actual dimensions of the header image
-          const headerDimensions = await getImageDimensions(headerBase64)
+        const headerHeight = 16
 
-          // Calculate proper aspect ratio
-          const aspectRatio = headerDimensions.width / headerDimensions.height
+        // Main blue section
+        pdf.setFillColor(30, 58, 138) // blue-900
+        pdf.rect(0, yPosition, pageWidth, headerHeight, "F")
 
-          // Set desired height and calculate width to maintain aspect ratio
-          const headerHeight = 20 // Reduced from 25 to prevent warping
-          const headerWidth = pageWidth // Full page width
+        // Angular cyan section pointing right using polygon
+        const cyanlWidth = pageWidth * 0.4
+        const startX = pageWidth - cyanlWidth + cyanlWidth * 0.25
 
-          // Add the header image with proper dimensions
-          pdf.addImage(headerBase64, "PNG", 0, yPosition, headerWidth, headerHeight)
-          yPosition += headerHeight + 5
-        } else {
-          // Fallback if image fails to load
-          yPosition += 25
-        }
+        // Create the angular shape using triangles
+        pdf.setFillColor(52, 211, 235) // cyan-400
+
+        // First triangle (top part)
+        pdf.triangle(startX, yPosition, pageWidth, yPosition, pageWidth, yPosition + headerHeight / 2, "F")
+
+        // Second triangle (bottom part)
+        pdf.triangle(
+          startX,
+          yPosition,
+          pageWidth,
+          yPosition + headerHeight / 2,
+          pageWidth,
+          yPosition + headerHeight,
+          "F",
+        )
+
+        // Third triangle (left connecting part)
+        pdf.triangle(
+          startX,
+          yPosition,
+          pageWidth,
+          yPosition + headerHeight,
+          pageWidth - cyanlWidth,
+          yPosition + headerHeight,
+          "F",
+        )
+
+        // Add "Logistics" text
+        pdf.setTextColor(255, 255, 255)
+        pdf.setFontSize(12)
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Logistics", margin, yPosition + 10)
+
+        yPosition += headerHeight + 5
+        pdf.setTextColor(0, 0, 0)
       } catch (error) {
-        console.error("Error adding header image:", error)
-        yPosition += 25 // Skip header space if failed
+        console.error("Error adding header:", error)
+        yPosition += 25
       }
     }
 
     // Add header to first page
     await addHeaderToPage()
 
-    // Report Title Section - exactly like the preview
-    pdf.setFontSize(12)
-    pdf.setFont("helvetica", "bold")
-
-    // Create cyan badge for report type
-    pdf.setFillColor(52, 211, 235) // cyan-400
+    // Report Title Section with badge and logo
     const badgeWidth = 50
-
     const badgeHeight = 8
+
+    // Create cyan badge for "Installation Report"
+    pdf.setFillColor(52, 211, 235) // cyan-400
     pdf.rect(margin, yPosition, badgeWidth, badgeHeight, "F")
     pdf.setTextColor(255, 255, 255)
-    pdf.text(getReportTypeDisplay(report.reportType), margin + 2, yPosition + 5)
+    pdf.setFontSize(9)
+    pdf.text("Installation Report", margin + 2, yPosition + 5)
+    pdf.setTextColor(0, 0, 0)
 
-    // Add GTS logo on the right
-    try {
-      const logoBase64 = await loadImageAsBase64("/gts-logo.png")
-      if (logoBase64) {
-        const logoSize = 20
-        pdf.addImage(logoBase64, "PNG", pageWidth - margin - logoSize, yPosition - 5, logoSize, logoSize)
+    // Add company logo on the right (similar to web page - smaller size)
+    const logoContainerSize = 30 // Container size
+    const logoX = pageWidth - margin - logoContainerSize
+    const logoY = yPosition - 2 // Aligned with badge
+
+    // Try to load company logo, fallback to OH+ logo
+    const companyLogoUrl = "/ohplus-new-logo.png" // Default to OH+ logo
+    const logoBase64 = await loadImageAsBase64(companyLogoUrl)
+    if (logoBase64) {
+      // Add white background container for logo (similar to web page)
+      pdf.setFillColor(255, 255, 255)
+      pdf.rect(logoX - 2, logoY, logoContainerSize + 4, logoContainerSize, "F")
+
+      // Calculate actual dimensions to fit within the container while maintaining aspect ratio
+      const { width: actualLogoWidth, height: actualLogoHeight } = await getImageDimensions(logoBase64)
+
+      let finalLogoWidth = logoContainerSize
+      let finalLogoHeight = logoContainerSize
+
+      // Adjust dimensions to fit within the container while maintaining aspect ratio
+      const logoAspectRatio = actualLogoWidth / actualLogoHeight
+      if (logoAspectRatio > 1) {
+        // Wider than tall
+        finalLogoHeight = logoContainerSize / logoAspectRatio
+      } else {
+        // Taller than wide or square
+        finalLogoWidth = logoContainerSize * logoAspectRatio
       }
-    } catch (error) {
-      console.error("Error adding logo:", error)
+
+      // Center the logo within its container
+      const logoOffsetX = (logoContainerSize - finalLogoWidth) / 2
+      const logoOffsetY = (logoContainerSize - finalLogoHeight) / 2
+
+      pdf.addImage(logoBase64, "PNG", logoX + logoOffsetX, logoY + logoOffsetY, finalLogoWidth, finalLogoHeight)
     }
 
     yPosition += badgeHeight + 5
-    pdf.setTextColor(0, 0, 0)
+
+    // "as of" date text
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "italic")
+    pdf.setTextColor(100, 100, 100)
     pdf.text(`as of ${formatDate(report.date)}`, margin, yPosition)
+    pdf.setTextColor(0, 0, 0)
     yPosition += 15
 
-    // Project Information Section - exactly like the preview
+    // Project Information Section
     checkNewPage(70)
     pdf.setFontSize(14)
     pdf.setFont("helvetica", "bold")
     pdf.text("Project Information", margin, yPosition)
     yPosition += 8
 
-    // Draw border around project info - exactly like preview
+    // Draw border around project info table
     pdf.setLineWidth(1)
     pdf.setDrawColor(0, 0, 0)
     const tableHeight = 55
@@ -883,114 +958,85 @@ export async function generateReportPDF(
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
 
-    // Left column
+    // Two column layout for project information
     const leftColumn = margin + 3
     const rightColumn = margin + contentWidth / 2 + 5
 
     let leftY = yPosition
     let rightY = yPosition
 
-    // Left column data - exactly matching the preview layout
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Site ID:", leftColumn, leftY)
-    pdf.setFont("helvetica", "normal")
-    const siteIdText = `${report.siteId} ${product?.light?.location || product?.specs_rental?.location || ""}`
-    pdf.text(siteIdText, leftColumn + 25, leftY)
-    leftY += 5
+    // Left column data
+    const leftColumnData = [
+      {
+        label: "Site ID:",
+        value: `${report.siteId} ${product?.light?.location || product?.specs_rental?.location || ""}`,
+      },
+      { label: "Job Order:", value: report.id?.slice(-4).toUpperCase() || "N/A" },
+      {
+        label: "Job Order Date:",
+        value: formatDate(
+          report.created && typeof report.created.toDate === "function"
+            ? report.created.toDate().toISOString().split("T")[0]
+            : report.date,
+        ),
+      },
+      { label: "Site:", value: report.siteName },
+      { label: "Size:", value: product?.specs_rental?.size || product?.light?.size || "N/A" },
+      { label: "Start Date:", value: formatDate(report.bookingDates.start) },
+      { label: "End Date:", value: formatDate(report.bookingDates.end) },
+      {
+        label: "Installation Duration:",
+        value: `${Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))} days`,
+      },
+    ]
 
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Job Order:", leftColumn, leftY)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(report.id?.slice(-4).toUpperCase() || "N/A", leftColumn + 25, leftY)
-    leftY += 5
+    // Right column data
+    const rightColumnData = [
+      { label: "Content:", value: product?.content_type || "N/A" },
+      { label: "Material Specs:", value: product?.specs_rental?.material || "N/A" },
+      { label: "Crew:", value: `Team ${report.assignedTo || "A"}` },
+      { label: "Illumination:", value: product?.light?.illumination || "N/A" },
+      { label: "Gondola:", value: product?.specs_rental?.gondola ? "YES" : "NO" },
+      { label: "Technology:", value: product?.specs_rental?.technology || "N/A" },
+      { label: "Sales:", value: report.sales },
+    ]
 
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Job Order Date:", leftColumn, leftY)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(formatDate(createdAt.toISOString().split("T")[0]), leftColumn + 35, leftY)
-    leftY += 5
+    // Render left column
+    leftColumnData.forEach((item) => {
+      pdf.setFont("helvetica", "bold")
+      pdf.text(item.label, leftColumn, leftY)
+      pdf.setFont("helvetica", "normal")
+      const labelWidth = item.label === "Job Order Date:" ? 35 : item.label === "Installation Duration:" ? 45 : 25
+      pdf.text(item.value, leftColumn + labelWidth, leftY)
+      leftY += 5
+    })
 
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Site:", leftColumn, leftY)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(report.siteName, leftColumn + 25, leftY)
-    leftY += 5
-
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Size:", leftColumn, leftY)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(product?.specs_rental?.size || product?.light?.size || "N/A", leftColumn + 25, leftY)
-    leftY += 5
-
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Start Date:", leftColumn, leftY)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(formatDate(report.bookingDates.start), leftColumn + 25, leftY)
-    leftY += 5
-
-    pdf.setFont("helvetica", "bold")
-    pdf.text("End Date:", leftColumn, leftY)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(formatDate(report.bookingDates.end), leftColumn + 25, leftY)
-    leftY += 5
-
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Installation Duration:", leftColumn, leftY)
-    pdf.setFont("helvetica", "normal")
-    const duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-    pdf.text(`${duration} days`, leftColumn + 45, leftY)
-
-    // Right column data - exactly matching the preview layout
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Content:", rightColumn, rightY)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(product?.content_type || "N/A", rightColumn + 25, rightY)
-    rightY += 5
-
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Material Specs:", rightColumn, rightY)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(product?.specs_rental?.material || "N/A", rightColumn + 35, rightY)
-    rightY += 5
-
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Crew:", rightColumn, rightY)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(`Team ${report.assignedTo || "A"}`, rightColumn + 25, rightY)
-    rightY += 5
-
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Illumination:", rightColumn, rightY)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(product?.light?.illumination || "N/A", rightColumn + 35, rightY)
-    rightY += 5
-
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Gondola:", rightColumn, rightY)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(product?.specs_rental?.gondola ? "YES" : "NO", rightColumn + 25, rightY)
-    rightY += 5
-
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Technology:", rightColumn, rightY)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(product?.specs_rental?.technology || "N/A", rightColumn + 35, rightY)
-    rightY += 5
-
-    pdf.setFont("helvetica", "bold")
-    pdf.text("Sales:", rightColumn, rightY)
-    pdf.setFont("helvetica", "normal")
-    pdf.text(report.sales, rightColumn + 25, rightY)
+    // Render right column
+    rightColumnData.forEach((item) => {
+      pdf.setFont("helvetica", "bold")
+      pdf.text(item.label, rightColumn, rightY)
+      pdf.setFont("helvetica", "normal")
+      const labelWidth =
+        item.label === "Material Specs:"
+          ? 35
+          : item.label === "Illumination:"
+            ? 35
+            : item.label === "Technology:"
+              ? 35
+              : 25
+      pdf.text(item.value, rightColumn + labelWidth, rightY)
+      rightY += 5
+    })
 
     yPosition += tableHeight + 10
 
-    // Project Status Section - exactly like the preview
+    // Project Status Section
     checkNewPage(30)
     pdf.setFontSize(14)
     pdf.setFont("helvetica", "bold")
     pdf.text("Project Status", margin, yPosition)
 
-    // Status badge - green like in preview
+    // Status badge - green
     pdf.setFillColor(34, 197, 94) // green-500
     const statusBadgeWidth = 25
     const statusBadgeHeight = 6
@@ -1002,25 +1048,21 @@ export async function generateReportPDF(
 
     yPosition += 15
 
-    // Attachments Section - exactly like the preview
+    // Attachments/Photos Section (2 side by side like in the page)
     if (report.attachments && report.attachments.length > 0) {
       checkNewPage(80)
 
       const attachmentsToShow = report.attachments.slice(0, 2)
-      let currentX = margin
-      const imageWidth = (contentWidth - 10) / 2
+      const imageWidth = (contentWidth - 10) / 2 // Space for 2 images side by side
       const imageHeight = 60
 
       for (let i = 0; i < attachmentsToShow.length; i++) {
         const attachment = attachmentsToShow[i]
+        const currentX = i === 0 ? margin : margin + imageWidth + 10
 
-        if (i === 1) {
-          currentX = margin + imageWidth + 10
-        }
-
-        // Draw border for attachment box - exactly like preview
-        pdf.setLineWidth(1)
-        pdf.setDrawColor(0, 0, 0)
+        // Draw border for attachment box
+        pdf.setLineWidth(0.5)
+        pdf.setDrawColor(200, 200, 200)
         pdf.rect(currentX, yPosition, imageWidth, imageHeight)
 
         // Try to add actual image if it's an image file
@@ -1028,9 +1070,16 @@ export async function generateReportPDF(
           const extension = attachment.fileName.toLowerCase().split(".").pop()
           if (["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")) {
             try {
-              const imageBase64 = await loadImageAsBase64(attachment.fileUrl)
-              if (imageBase64) {
-                pdf.addImage(imageBase64, "JPEG", currentX + 2, yPosition + 2, imageWidth - 4, imageHeight - 4)
+              const { base64, width, height } = await calculateImageFitDimensions(
+                attachment.fileUrl,
+                imageWidth - 4, // Max width for the image inside the border
+                imageHeight - 4, // Max height for the image inside the border
+              )
+
+              if (base64) {
+                // Calculate x position to center the image within its container
+                const centeredX = currentX + (imageWidth - width) / 2
+                pdf.addImage(base64, "JPEG", centeredX, yPosition + 2, width, height)
               }
             } catch (error) {
               console.error("Error adding attachment image:", error)
@@ -1043,102 +1092,137 @@ export async function generateReportPDF(
             pdf.setFontSize(8)
             pdf.text(attachment.fileName, currentX + 5, yPosition + imageHeight / 2)
           }
-        }
-
-        // Add attachment info below - exactly like preview
-        pdf.setFontSize(8)
-        pdf.text(`Date: ${formatDate(report.date)}`, currentX, yPosition + imageHeight + 5)
-        pdf.text(
-          `Time: ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`,
-          currentX,
-          yPosition + imageHeight + 9,
-        )
-        pdf.text(`Location: ${report.location || "N/A"}`, currentX, yPosition + imageHeight + 13)
-
-        if (attachment.note) {
-          pdf.text(`Note: ${attachment.note}`, currentX, yPosition + imageHeight + 17)
+        } else {
+          // Placeholder for missing attachment
+          pdf.setFontSize(8)
+          pdf.setTextColor(100, 100, 100)
+          pdf.text(`Project Photo ${i + 1}`, currentX + 5, yPosition + imageHeight / 2)
+          pdf.setTextColor(0, 0, 0)
         }
       }
 
-      yPosition += imageHeight + 25
+      yPosition += imageHeight + 5
+
+      // Add attachment info below images (like in the page)
+      pdf.setFontSize(8)
+      pdf.setFont("helvetica", "normal")
+
+      for (let i = 0; i < attachmentsToShow.length; i++) {
+        const currentX = i === 0 ? margin : margin + imageWidth + 10
+
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Date:", currentX, yPosition)
+        pdf.setFont("helvetica", "normal")
+        pdf.text(formatDate(report.date), currentX + 15, yPosition)
+
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Time:", currentX, yPosition + 4)
+        pdf.setFont("helvetica", "normal")
+        pdf.text(
+          new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+          currentX + 15,
+          yPosition + 4,
+        )
+
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Location:", currentX, yPosition + 8)
+        pdf.setFont("helvetica", "normal")
+        pdf.text(report.location || "N/A", currentX + 25, yPosition + 8)
+      }
+
+      yPosition += 20
     }
 
-    // Footer Section - exactly like the preview
+    // Footer Section
     checkNewPage(40)
     pdf.setLineWidth(0.5)
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 8
 
-    pdf.setFontSize(10)
+    pdf.setFontSize(12)
     pdf.setFont("helvetica", "bold")
     pdf.text("Prepared by:", margin, yPosition)
-    yPosition += 5
+    yPosition += 6
 
-    pdf.setFontSize(9)
+    pdf.setFontSize(10)
     pdf.setFont("helvetica", "normal")
-    pdf.text(report.createdByName, margin, yPosition)
-    yPosition += 4
+    pdf.setTextColor(59, 130, 246) // blue color for email
+    pdf.text(report.createdByName || "aixymbiosig@aix.com", margin, yPosition)
+    yPosition += 5
+    pdf.setTextColor(0, 0, 0)
     pdf.text("LOGISTICS", margin, yPosition)
-    yPosition += 4
-    pdf.text(formatDate(createdAt.toISOString().split("T")[0]), margin, yPosition)
+    yPosition += 5
+    const preparedDate =
+      report.created && typeof report.created.toDate === "function"
+        ? report.created.toDate().toISOString().split("T")[0]
+        : report.date
+    pdf.text(formatDate(preparedDate), margin, yPosition)
 
-    // Add disclaimer - exactly like preview
-    pdf.setFontSize(8)
+    // Add disclaimer on the right side
+    pdf.setFontSize(9)
     pdf.setFont("helvetica", "italic")
     pdf.setTextColor(100, 100, 100)
     const disclaimer = `"All data are based on the latest available records as of ${formatDate(new Date().toISOString().split("T")[0])}."`
-    const disclaimerLines = pdf.splitTextToSize(disclaimer, 80)
-    pdf.text(disclaimerLines, pageWidth - margin - 80, yPosition - 8)
+    const disclaimerLines = pdf.splitTextToSize(disclaimer, 120)
+    pdf.text(disclaimerLines, pageWidth - margin - 120, yPosition - 10)
 
-    yPosition += 15
+    // Angular Footer (matching the page design)
+    const footerY = pageHeight - 12
+    const footerHeight = 12
 
-    // Add bottom footer using the new PNG image - exactly like preview
-    const footerY = pageHeight - 15
-    const footerHeight = 15
+    // Cyan section on left with diagonal cut
+    pdf.setFillColor(52, 211, 235) // cyan-400
+    const cyanWidth = pageWidth * 0.3
+    const diagonalCutWidth = pageWidth * 0.05
 
-    try {
-      const footerBase64 = await loadImageAsBase64("/logistics-footer-new.png")
-      if (footerBase64) {
-        // Use the full width footer image
-        pdf.addImage(footerBase64, "PNG", 0, footerY, pageWidth, footerHeight)
-      } else {
-        // Fallback to original gradient if image fails
-        pdf.setFillColor(52, 211, 235) // Cyan
-        pdf.rect(0, footerY, pageWidth * 0.3, footerHeight, "F")
-        pdf.setFillColor(30, 58, 138) // Dark blue
-        pdf.rect(pageWidth * 0.3, footerY, pageWidth * 0.7, footerHeight, "F")
+    // Draw the main cyan rectangle
+    pdf.rect(0, footerY, cyanWidth - diagonalCutWidth, footerHeight, "F")
 
-        // Add footer text
-        pdf.setTextColor(255, 255, 255)
-        pdf.setFontSize(7)
-        pdf.setFont("helvetica", "normal")
-        pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 50, footerY + 8)
-        pdf.setFont("helvetica", "bold")
-        pdf.text("OH!", pageWidth - margin - 10, footerY + 12)
-      }
-    } catch (error) {
-      console.error("Error adding footer image:", error)
-      // Fallback to original gradient if image fails
-      pdf.setFillColor(52, 211, 235) // Cyan
-      pdf.rect(0, footerY, pageWidth * 0.3, footerHeight, "F")
-      pdf.setFillColor(30, 58, 138) // Dark blue
-      pdf.rect(pageWidth * 0.3, footerY, pageWidth * 0.7, footerHeight, "F")
+    // Draw the diagonal part of cyan section
+    pdf.triangle(
+      cyanWidth - diagonalCutWidth,
+      footerY,
+      cyanWidth,
+      footerY,
+      cyanWidth - diagonalCutWidth,
+      footerY + footerHeight,
+      "F",
+    )
 
-      // Add footer text
-      pdf.setTextColor(255, 255, 255)
-      pdf.setFontSize(7)
-      pdf.setFont("helvetica", "normal")
-      pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 50, footerY + 8)
-      pdf.setFont("helvetica", "bold")
-      pdf.text("OH!", pageWidth - margin - 10, footerY + 12)
-    }
+    // Angular blue section
+    pdf.setFillColor(30, 58, 138) // blue-900
+    pdf.rect(cyanWidth, footerY, pageWidth - cyanWidth, footerHeight, "F")
+
+    // Draw the diagonal connecting part
+    pdf.triangle(
+      cyanWidth - diagonalCutWidth,
+      footerY + footerHeight,
+      cyanWidth,
+      footerY,
+      cyanWidth,
+      footerY + footerHeight,
+      "F",
+    )
+
+    // Add footer text
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
+    pdf.text("Smart. Seamless. Scalable", pageWidth - margin - 65, footerY + 6)
+
+    pdf.setFontSize(14)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("OH!", pageWidth - margin - 15, footerY + 8)
+
+    // Add the "+" symbol
+    pdf.setFontSize(12)
+    pdf.setFont("helvetica", "normal")
+    pdf.text("+", pageWidth - margin - 5, footerY + 8)
 
     if (returnBase64) {
       return pdf.output("datauristring").split(",")[1]
     } else {
-      const fileName = `report-${getReportTypeDisplay(report.reportType)
-        .replace(/[^a-z0-9]/gi, "_")
-        .toLowerCase()}-${Date.now()}.pdf`
+      const fileName = `report-installation-report-${Date.now()}.pdf`
       pdf.save(fileName)
     }
   } catch (error) {

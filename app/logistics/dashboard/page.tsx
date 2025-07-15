@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
@@ -11,6 +11,7 @@ export default function LogisticsDashboardPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const { user, userData } = useAuth()
   console.log(JSON.stringify(user))
+
   return (
     <div className="flex-1 overflow-auto relative">
       <main className="p-4">

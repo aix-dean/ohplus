@@ -331,7 +331,7 @@ export function SideNavigation() {
                 {[
                   { title: "Service Assignments", href: "/logistics/assignments", icon: FileText },
                   { title: "JOs", href: "/logistics/job-orders", icon: ClipboardList },
-                  { title: "Reports", href: "/logistics/reports", icon: BarChart3 },
+                  { title: "Reports", href: "/logistics/service-reports", icon: BarChart3 },
                   { title: "Teams and Personnel", href: "/logistics/teams", icon: Users },
                   { title: "Settings and Config", href: "/logistics/settings", icon: Cog },
                   { title: "News and Weather", href: "/logistics/weather", icon: CloudRain },
