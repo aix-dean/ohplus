@@ -92,58 +92,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [subscriptionData, setSubscriptionData] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchUserData = useCallback(async (firebaseUser: FirebaseUser, specificUid?: string) => {
+  const fetchUserData = useCallback(async (firebaseUser: FirebaseUser, specificUid: string) => {
     try {
-      console.log("Fetching user data for Firebase user:", firebaseUser.uid)
-      console.log("Specific UID requested:", specificUid)
+      console.log("Fetching user data for specific UID:", specificUid)
 
-      // Use specific UID if provided, otherwise use Firebase user UID
-      const targetUid = specificUid || firebaseUser.uid
-
-      // Fetch user data from iboard_users collection
-      const userDocRef = doc(db, "iboard_users", targetUid)
+      // First, validate that the specific UID is an OHPLUS account
+      const userDocRef = doc(db, "iboard_users", specificUid)
       const userDocSnap = await getDoc(userDocRef)
 
-      let fetchedUserData: UserData
-
-      if (userDocSnap.exists()) {
-        const data = userDocSnap.data()
-        console.log("User document data:", data)
-
-        fetchedUserData = {
-          uid: targetUid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          license_key: data.license_key || null,
-          role: data.role || "user",
-          permissions: data.permissions || [],
-          project_id: data.project_id,
-          first_name: data.first_name,
-          last_name: data.last_name,
-          middle_name: data.middle_name,
-          phone_number: data.phone_number,
-          gender: data.gender,
-          type: data.type,
-          created: data.created?.toDate(),
-          updated: data.updated?.toDate(),
-          company_id: data.company_id || null,
-          ...data,
-        }
-      } else {
-        console.log("User document doesn't exist, creating basic one")
-        fetchedUserData = {
-          uid: targetUid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          license_key: null,
-          company_id: null,
-          role: "user",
-          permissions: [],
-        }
-        await setDoc(userDocRef, fetchedUserData, { merge: true })
+      if (!userDocSnap.exists()) {
+        console.log("User document doesn't exist for UID:", specificUid)
+        throw new Error("USER_DOCUMENT_NOT_FOUND")
       }
 
-      console.log("Fetched user data:", fetchedUserData)
+      const data = userDocSnap.data()
+      console.log("User document data:", data)
+
+      // Validate that this is an OHPLUS account
+      if (data.type !== "OHPLUS") {
+        console.log("Account type is not OHPLUS:", data.type)
+        throw new Error("ACCOUNT_TYPE_NOT_OHPLUS")
+      }
+
+      // Validate that the email matches
+      if (data.email !== firebaseUser.email) {
+        console.log("Email mismatch. Document email:", data.email, "Firebase email:", firebaseUser.email)
+        throw new Error("EMAIL_MISMATCH")
+      }
+
+      const fetchedUserData: UserData = {
+        uid: specificUid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName,
+        license_key: data.license_key || null,
+        role: data.role || "user",
+        permissions: data.permissions || [],
+        project_id: data.project_id,
+        first_name: data.first_name,
+        last_name: data.last_name,
+        middle_name: data.middle_name,
+        phone_number: data.phone_number,
+        gender: data.gender,
+        type: data.type,
+        created: data.created?.toDate(),
+        updated: data.updated?.toDate(),
+        company_id: data.company_id || null,
+        ...data,
+      }
+
+      console.log("Successfully validated and fetched OHPLUS user data:", fetchedUserData)
       setUserData(fetchedUserData)
 
       // Fetch project data if project_id exists in user data
@@ -198,14 +195,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserData(null)
       setProjectData(null)
       setSubscriptionData(null)
+      throw error
     }
   }, [])
 
   const refreshUserData = useCallback(async () => {
-    if (user) {
-      await fetchUserData(user)
+    if (user && userData) {
+      await fetchUserData(user, userData.uid)
     }
-  }, [user, fetchUserData])
+  }, [user, userData, fetchUserData])
 
   const refreshSubscriptionData = useCallback(async () => {
     if (userData?.license_key) {
@@ -274,8 +272,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log("Logging in user:", email)
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
+
+      // Find OHPLUS account for this email
+      const ohplusAccountUid = await findOHPlusAccount(email)
+
+      if (!ohplusAccountUid) {
+        console.log("No OHPLUS account found, signing out")
+        await signOut(auth)
+        throw new Error("OHPLUS_ACCOUNT_NOT_FOUND")
+      }
+
       setUser(userCredential.user)
-      await fetchUserData(userCredential.user)
+      await fetchUserData(userCredential.user, ohplusAccountUid)
     } catch (error) {
       console.error("Login error:", error)
       setLoading(false)
@@ -301,19 +309,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Fetch user data for the specific OHPLUS account
       await fetchUserData(userCredential.user, ohplusAccountUid)
-
-      // Double-check that we loaded an OHPLUS account
-      const userDocRef = doc(db, "iboard_users", ohplusAccountUid)
-      const userDocSnap = await getDoc(userDocRef)
-
-      if (userDocSnap.exists()) {
-        const userData = userDocSnap.data()
-        if (userData.type !== "OHPLUS") {
-          throw new Error("ACCOUNT_TYPE_NOT_ALLOWED")
-        }
-      } else {
-        throw new Error("OHPLUS_ACCOUNT_NOT_FOUND")
-      }
     } catch (error) {
       console.error("OHPLUS login error:", error)
       setLoading(false)
@@ -407,7 +402,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       await setDoc(userDocRef, userData)
-      await fetchUserData(firebaseUser)
+      await fetchUserData(firebaseUser, firebaseUser.uid)
       console.log("Registration completed successfully")
     } catch (error) {
       console.error("Error in AuthContext register:", error)
@@ -450,10 +445,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const updateUserData = async (updates: Partial<UserData>) => {
-    if (!user) throw new Error("User not authenticated.")
+    if (!user || !userData) throw new Error("User not authenticated.")
 
     console.log("Updating user data:", updates)
-    const userDocRef = doc(db, "iboard_users", user.uid)
+    const userDocRef = doc(db, "iboard_users", userData.uid)
     const updatedFields = { ...updates, updated: serverTimestamp() }
     await updateDoc(userDocRef, updatedFields)
 
@@ -478,30 +473,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log("Auth state changed: user logged in", firebaseUser.uid)
         setUser(firebaseUser)
 
-        // Always check if this is an OHPLUS account first
-        const ohplusAccountUid = await findOHPlusAccount(firebaseUser.email || "")
-        if (ohplusAccountUid) {
-          console.log("Using OHPLUS account:", ohplusAccountUid)
-          await fetchUserData(firebaseUser, ohplusAccountUid)
-        } else {
-          // If no OHPLUS account found, try to use the Firebase user directly
-          console.log("No OHPLUS account found, checking Firebase user account type")
-          const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
-          const userDocSnap = await getDoc(userDocRef)
-
-          if (userDocSnap.exists()) {
-            const userData = userDocSnap.data()
-            if (userData.type === "OHPLUS") {
-              console.log("Firebase user is OHPLUS, using it")
-              await fetchUserData(firebaseUser)
-            } else {
-              console.log("Firebase user is not OHPLUS, signing out")
-              await signOut(auth)
-            }
+        try {
+          // Always look for OHPLUS account first
+          const ohplusAccountUid = await findOHPlusAccount(firebaseUser.email || "")
+          if (ohplusAccountUid) {
+            console.log("Using OHPLUS account:", ohplusAccountUid)
+            await fetchUserData(firebaseUser, ohplusAccountUid)
           } else {
-            console.log("No user document found, signing out")
+            console.log("No OHPLUS account found, signing out")
             await signOut(auth)
           }
+        } catch (error) {
+          console.error("Error during auth state change:", error)
+          await signOut(auth)
         }
       } else {
         console.log("Auth state changed: user logged out")
