@@ -275,8 +275,8 @@ export default function LoginPage() {
 
               {/* Add AiX logo at bottom */}
               <div className="text-center mt-4 pt-4 md:hidden">
-                <p className="text-xs text-gray-500 mb-2">powered by:</p>
-                <Image src="/aix-logo.png" alt="AiX AI Xynergy Logo" width={60} height={45} priority />
+                <p className="text-sm text-gray-500 mb-3">powered by:</p>
+                <Image src="/aix-logo.png" alt="AiX AI Xynergy Logo" width={80} height={60} priority />
               </div>
             </CardFooter>
           </Card>
