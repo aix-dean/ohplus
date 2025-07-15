@@ -256,8 +256,8 @@ export default function CreateJobOrderPage() {
       joType: joType as JobOrderType,
       deadline: deadline.toISOString(),
       requestedBy: userData?.first_name || "Auto-Generated",
-      assignTo: assignTo,
       remarks: remarks,
+      assignTo: assignTo,
       attachments: generalAttachments.map((att) => att.url), // Save general attachments
       signedQuotationUrl: signedQuotationUrl, // Save specific document URLs
       poMoUrl: poMoUrl,
