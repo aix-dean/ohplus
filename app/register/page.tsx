@@ -159,8 +159,9 @@ export default function RegisterPage() {
 
     try {
       await register(
+        email,
+        password,
         {
-          email,
           first_name: firstName,
           last_name: lastName,
           middle_name: middleName,
@@ -171,7 +172,7 @@ export default function RegisterPage() {
           company_name: "",
           company_location: "",
         },
-        password,
+        "", // licenseKey - empty string for now
         orgCode || undefined,
       )
 
