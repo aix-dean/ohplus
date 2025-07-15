@@ -47,8 +47,8 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      await login(email, password)
-      router.push("/admin/dashboard") // Changed redirect to /admin/dashboard
+      await loginOHPlusOnly(email, password)
+      router.push("/admin/dashboard")
     } catch (error: any) {
       console.error("Login error:", error)
 
@@ -59,6 +59,10 @@ export default function LoginPage() {
         setError("Too many unsuccessful login attempts. Please try again later.")
       } else if (error.code === "auth/tenant-id-mismatch") {
         setError("Authentication error: Tenant ID mismatch. Please contact support.")
+      } else if (error.message === "OHPLUS_ACCOUNT_NOT_FOUND") {
+        setError("No OHPLUS account found with this email address. Only OHPLUS accounts can access this system.")
+      } else if (error.message === "ACCOUNT_TYPE_NOT_ALLOWED") {
+        setError("This account type is not allowed to access this system. Only OHPLUS accounts are permitted.")
       } else {
         setError(error.message || "Failed to login. Please check your credentials.")
       }
@@ -99,36 +103,6 @@ export default function LoginPage() {
       return true
     } catch (error: any) {
       throw error
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    setIsLoading(true)
-
-    try {
-      await loginOHPlusOnly(email, password)
-      router.push("/admin/dashboard")
-    } catch (error: any) {
-      console.error("Login error:", error)
-
-      // Provide more user-friendly error messages
-      if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
-        setError("Invalid email or password. Please check your credentials.")
-      } else if (error.code === "auth/too-many-requests") {
-        setError("Too many unsuccessful login attempts. Please try again later.")
-      } else if (error.code === "auth/tenant-id-mismatch") {
-        setError("Authentication error: Tenant ID mismatch. Please contact support.")
-      } else if (error.message === "OHPLUS_ACCOUNT_NOT_FOUND") {
-        setError("No OHPLUS account found with this email address. Only OHPLUS accounts can access this system.")
-      } else if (error.message === "ACCOUNT_TYPE_NOT_ALLOWED") {
-        setError("This account type is not allowed to access this system. Only OHPLUS accounts are permitted.")
-      } else {
-        setError(error.message || "Failed to login. Please check your credentials.")
-      }
-    } finally {
-      setIsLoading(false)
     }
   }
 
