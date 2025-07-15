@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ComingSoonDialog } from "@/components/coming-soon-dialog"
 import { Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -25,6 +26,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showJoinOrgDialog, setShowJoinOrgDialog] = useState(false)
+  const [showComingSoonDialog, setShowComingSoonDialog] = useState(false)
+  const [comingSoonFeature, setComingSoonFeature] = useState("")
   const [orgCode, setOrgCode] = useState("")
   const [isValidatingCode, setIsValidatingCode] = useState(false)
 
@@ -62,6 +65,11 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleSocialLogin = (provider: string) => {
+    setComingSoonFeature(`${provider} login`)
+    setShowComingSoonDialog(true)
   }
 
   const validateInvitationCode = async (code: string) => {
@@ -135,6 +143,7 @@ export default function LoginPage() {
                 <Button
                   variant="outline"
                   className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+                  onClick={() => handleSocialLogin("Google")}
                 >
                   <Image src="/placeholder.svg?height=20&width=20" alt="Google" width={20} height={20} />
                   Google
@@ -142,6 +151,7 @@ export default function LoginPage() {
                 <Button
                   variant="outline"
                   className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+                  onClick={() => handleSocialLogin("Facebook")}
                 >
                   <Image src="/placeholder.svg?height=20&width=20" alt="Facebook" width={20} height={20} />
                   Facebook
@@ -245,6 +255,7 @@ export default function LoginPage() {
         </div>
       </div>
 
+      {/* Join Organization Dialog */}
       <Dialog open={showJoinOrgDialog} onOpenChange={setShowJoinOrgDialog}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
@@ -280,6 +291,13 @@ export default function LoginPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Coming Soon Dialog */}
+      <ComingSoonDialog
+        isOpen={showComingSoonDialog}
+        onClose={() => setShowComingSoonDialog(false)}
+        feature={comingSoonFeature}
+      />
     </div>
   )
 }
