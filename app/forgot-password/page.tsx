@@ -36,13 +36,8 @@ export default function ForgotPasswordPage() {
     try {
       console.log("Attempting to send password reset email to:", email)
 
-      // Configure actionCodeSettings for better email handling
-      const actionCodeSettings = {
-        url: `${window.location.origin}/login`, // Redirect back to login after reset
-        handleCodeInApp: false, // Handle the reset in the web browser, not the app
-      }
-
-      await sendPasswordResetEmail(auth, email, actionCodeSettings)
+      // Send password reset email without actionCodeSettings to avoid domain whitelist issues
+      await sendPasswordResetEmail(auth, email)
 
       console.log("Password reset email sent successfully")
       setSuccess(`Password reset email sent to ${email}. Please check your inbox and spam folder.`)

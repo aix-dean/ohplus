@@ -377,12 +377,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log("Sending password reset email to:", email)
 
-      const actionCodeSettings = {
-        url: `${window.location.origin}/login`,
-        handleCodeInApp: false,
-      }
-
-      await sendPasswordResetEmail(auth, email, actionCodeSettings)
+      // Send password reset email without actionCodeSettings
+      await sendPasswordResetEmail(auth, email)
       console.log("Password reset email sent successfully")
     } catch (error: any) {
       console.error("Password reset error:", error)
