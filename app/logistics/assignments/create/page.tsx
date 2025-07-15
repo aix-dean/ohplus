@@ -186,7 +186,7 @@ export default function CreateServiceAssignmentPage() {
         created: serverTimestamp(),
         updated: serverTimestamp(),
         project_key: userData?.license_key || "",
-        company_id: userData?.company_id || null, // Add company_id from userData
+        company_id: userData?.company_id || null,
       })
 
       // Show success dialog
