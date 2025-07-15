@@ -19,6 +19,7 @@ import {
   type SubscriptionStatus,
   calculateSubscriptionEndDate,
   getMaxProductsForPlan,
+  getMaxUsersForPlan,
 } from "@/lib/types/subscription"
 import type { SubscriptionPlan } from "./types/subscription"
 
@@ -34,6 +35,7 @@ export const subscriptionService = {
     maxProducts: number | null = null,
     trialEndDate: Date | null = null,
     companyId: string | null = null,
+    maxUsers: number | null = null,
   ): Promise<Subscription> {
     console.log("subscriptionService: Creating subscription for licenseKey:", licenseKey)
 
@@ -52,6 +54,7 @@ export const subscriptionService = {
       endDate: endDate || calculatedEndDate,
       status,
       maxProducts: maxProducts || getMaxProductsForPlan(planType),
+      maxUsers: maxUsers || getMaxUsersForPlan(planType),
       trialEndDate: trialEndDate || calculatedTrialEndDate,
       companyId: companyId,
       createdAt: serverTimestamp(),
@@ -71,6 +74,7 @@ export const subscriptionService = {
       endDate: endDate || calculatedEndDate,
       status,
       maxProducts: maxProducts || getMaxProductsForPlan(planType),
+      maxUsers: maxUsers || getMaxUsersForPlan(planType),
       trialEndDate: trialEndDate || calculatedTrialEndDate,
       companyId: companyId,
       createdAt: new Date(),
@@ -103,6 +107,7 @@ export const subscriptionService = {
       endDate: data.endDate instanceof Timestamp ? data.endDate.toDate() : data.endDate,
       status: data.status,
       maxProducts: data.maxProducts,
+      maxUsers: data.maxUsers || getMaxUsersForPlan(data.planType),
       trialEndDate: data.trialEndDate instanceof Timestamp ? data.trialEndDate.toDate() : data.trialEndDate,
       companyId: data.companyId || null,
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : data.createdAt,
@@ -136,6 +141,7 @@ export const subscriptionService = {
       endDate: data.endDate instanceof Timestamp ? data.endDate.toDate() : data.endDate,
       status: data.status,
       maxProducts: data.maxProducts,
+      maxUsers: data.maxUsers || getMaxUsersForPlan(data.planType),
       trialEndDate: data.trialEndDate instanceof Timestamp ? data.trialEndDate.toDate() : data.trialEndDate,
       companyId: data.companyId || null,
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : data.createdAt,
@@ -188,6 +194,7 @@ export const subscriptionService = {
       updateData.endDate = recalculatedEndDate
       updateData.trialEndDate = recalculatedTrialEndDate
       updateData.maxProducts = getMaxProductsForPlan(newPlanType)
+      updateData.maxUsers = getMaxUsersForPlan(newPlanType)
     }
 
     await updateDoc(docRef, updateData)

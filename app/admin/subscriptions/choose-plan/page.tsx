@@ -126,6 +126,7 @@ export default function ChoosePlanPage() {
           null, // Let the service calculate max products
           selectedPlan.id === "graphic-expo-event" ? customEndDate : null, // Set trialEndDate for graphic-expo-event
           userData.company_id || null, // Add company_id parameter
+          null, // Let the service calculate max users
         )
 
         toast({
