@@ -25,7 +25,6 @@ import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-suc
 
 const joTypes = ["Installation", "Maintenance", "Repair", "Dismantling", "Other"]
 
-
 // Dummy compliance state as per screenshot
 const missingCompliance = {
   signedQuotation: true,
@@ -352,7 +351,7 @@ export default function CreateJobOrderPage() {
                 <p className="text-sm w-36">
                   <span className="font-semibold">Signed Quotation:</span>
                 </p>
-                <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs">
+                <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs bg-transparent">
                   Upload Document
                 </Button>
               </div>
@@ -360,7 +359,7 @@ export default function CreateJobOrderPage() {
                 <p className="text-sm w-36">
                   <span className="font-semibold">PO/MO:</span>
                 </p>
-                <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs">
+                <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs bg-transparent">
                   Upload Document
                 </Button>
               </div>
@@ -368,7 +367,7 @@ export default function CreateJobOrderPage() {
                 <p className="text-sm w-36">
                   <span className="font-semibold">Project FA:</span>
                 </p>
-                <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs">
+                <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs bg-transparent">
                   Upload Document
                 </Button>
               </div>
@@ -486,7 +485,10 @@ export default function CreateJobOrderPage() {
                   className="flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9"
                   required // Add required attribute for native validation
                 />
-                <Button variant="outline" className="h-9 px-3 text-sm text-gray-800 border-gray-300 hover:bg-gray-50">
+                <Button
+                  variant="outline"
+                  className="h-9 px-3 text-sm text-gray-800 border-gray-300 hover:bg-gray-50 bg-transparent"
+                >
                   Timeline
                 </Button>
               </div>
@@ -536,10 +538,9 @@ export default function CreateJobOrderPage() {
                   <SelectValue placeholder="Choose Assignee" className="text-gray-500" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem key={userData.uid} value={userData.first_name} className="text-sm">
-                      {userData.first_name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem key={userData.uid} value={userData.first_name} className="text-sm">
+                    {userData.first_name}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
