@@ -119,8 +119,25 @@ export default function LoginPage() {
       <div className="flex w-full max-w-4xl bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Left Section: Logo and Company Name */}
         <div className="hidden md:flex flex-col items-center justify-center p-8 bg-gray-50 w-1/2">
-          <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={200} height={200} priority />
-          <span className="mt-4 text-2xl font-bold text-gray-800">OH Plus</span>
+          <div className="flex flex-col items-center space-y-6">
+            {/* OH! Logo */}
+            <div className="text-center">
+              <h1 className="text-4xl font-bold text-blue-600">OH!</h1>
+            </div>
+
+            {/* Main tagline */}
+            <div className="text-center max-w-xs">
+              <h2 className="text-xl font-semibold text-blue-600 leading-tight">
+                Powering Smarter Site Management for Billboard Operators
+              </h2>
+            </div>
+
+            {/* Powered by section */}
+            <div className="text-center">
+              <p className="text-sm text-gray-600 mb-2">powered by:</p>
+              <Image src="/aix-logo.png" alt="AiX AI Xynergy Logo" width={120} height={60} priority />
+            </div>
+          </div>
         </div>
 
         {/* Right Section: Login Form */}
