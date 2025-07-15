@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FirebaseError } from "firebase/app"
 import { Eye, EyeOff } from "lucide-react"
+import { query, collection, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
@@ -24,6 +26,8 @@ export default function RegisterPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [invitationRole, setInvitationRole] = useState<string | null>(null)
+  const [loadingInvitation, setLoadingInvitation] = useState(false)
 
   const { register } = useAuth()
   const router = useRouter()
@@ -31,6 +35,44 @@ export default function RegisterPage() {
 
   // Get organization code from URL parameters
   const orgCode = searchParams.get("orgCode")
+
+  // Fetch invitation details when orgCode is present
+  useEffect(() => {
+    const fetchInvitationDetails = async () => {
+      if (!orgCode) return
+
+      console.log("Fetching invitation details for code:", orgCode)
+      setLoadingInvitation(true)
+
+      try {
+        const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
+        const invitationSnapshot = await getDocs(invitationQuery)
+
+        if (!invitationSnapshot.empty) {
+          const invitationDoc = invitationSnapshot.docs[0]
+          const invitationData = invitationDoc.data()
+          console.log("Invitation details loaded:", invitationData)
+
+          if (invitationData.role) {
+            setInvitationRole(invitationData.role)
+            console.log("Role found in invitation:", invitationData.role)
+          } else {
+            console.log("No role specified in invitation")
+          }
+        } else {
+          console.log("No invitation found for code:", orgCode)
+          setErrorMessage("Invalid invitation code.")
+        }
+      } catch (error) {
+        console.error("Error fetching invitation details:", error)
+        setErrorMessage("Error loading invitation details.")
+      } finally {
+        setLoadingInvitation(false)
+      }
+    }
+
+    fetchInvitationDetails()
+  }, [orgCode])
 
   const getFriendlyErrorMessage = (error: unknown): string => {
     console.error("Raw error during registration:", error)
@@ -102,6 +144,9 @@ export default function RegisterPage() {
   }
 
   const handleRegister = async () => {
+    console.log("Starting registration process...")
+    console.log("Form data:", { firstName, lastName, email, phoneNumber, orgCode })
+
     setErrorMessage(null)
 
     if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
@@ -120,6 +165,8 @@ export default function RegisterPage() {
     }
 
     setLoading(true)
+    console.log("Calling register function with orgCode:", orgCode)
+
     try {
       await register(
         {
@@ -138,12 +185,15 @@ export default function RegisterPage() {
         orgCode || undefined, // Pass the organization code if available
       )
 
+      console.log("Registration completed successfully")
       setErrorMessage(null)
       const redirectUrl = orgCode
         ? "/admin/dashboard?registered=true&joined_org=true"
         : "/admin/dashboard?registered=true"
+      console.log("Redirecting to:", redirectUrl)
       router.push(redirectUrl)
     } catch (error: unknown) {
+      console.error("Registration failed:", error)
       setErrorMessage(getFriendlyErrorMessage(error))
     } finally {
       setLoading(false)
@@ -180,6 +230,15 @@ export default function RegisterPage() {
                 <p className="text-sm text-blue-800">
                   <strong>Organization Code:</strong> {orgCode}
                 </p>
+                {loadingInvitation && <p className="text-sm text-blue-600 mt-1">Loading invitation details...</p>}
+                {invitationRole && (
+                  <p className="text-sm text-green-800 mt-1">
+                    <strong>Assigned Role:</strong> {invitationRole}
+                  </p>
+                )}
+                {!loadingInvitation && !invitationRole && orgCode && (
+                  <p className="text-sm text-gray-600 mt-1">No specific role assigned</p>
+                )}
               </div>
             )}
           </CardHeader>
@@ -261,6 +320,7 @@ export default function RegisterPage() {
                     ) : (
                       <Eye className="h-4 w-4 text-gray-400" />
                     )}
+                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
                   </button>
                 </div>
                 <div className="mt-2">
@@ -318,6 +378,7 @@ export default function RegisterPage() {
                     ) : (
                       <Eye className="h-4 w-4 text-gray-400" />
                     )}
+                    <span className="sr-only">{showConfirmPassword ? "Hide password" : "Show password"}</span>
                   </button>
                 </div>
               </div>
@@ -340,7 +401,7 @@ export default function RegisterPage() {
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                 type="submit"
                 onClick={handleRegister}
-                disabled={loading}
+                disabled={loading || loadingInvitation}
               >
                 {loading ? (orgCode ? "Joining..." : "Signing Up...") : orgCode ? "Join Organization" : "Sign Up"}
               </Button>

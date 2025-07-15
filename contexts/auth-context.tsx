@@ -14,6 +14,7 @@ import { auth, db } from "@/lib/firebase"
 import { subscriptionService } from "@/lib/subscription-service"
 import type { Subscription } from "@/lib/types/subscription"
 import { generateLicenseKey } from "@/lib/utils"
+import { assignRoleToUser, type RoleType } from "@/lib/hardcoded-access-service"
 
 interface UserData {
   uid: string
@@ -359,15 +360,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let companyId = null
 
       if (orgCode) {
+        console.log("Processing invitation code:", orgCode)
         const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
         const invitationSnapshot = await getDocs(invitationQuery)
 
         if (!invitationSnapshot.empty) {
           const invitationDoc = invitationSnapshot.docs[0]
           const invitationData = invitationDoc.data()
+          console.log("Invitation data found:", invitationData)
 
           licenseKey = invitationData.license_key || licenseKey
           companyId = invitationData.company_id || null
+
+          // Assign role to user if role exists in invitation
+          if (invitationData.role) {
+            console.log("Assigning role to user:", invitationData.role, "for user:", firebaseUser.uid)
+            try {
+              await assignRoleToUser(firebaseUser.uid, invitationData.role as RoleType)
+              console.log(`Role ${invitationData.role} successfully assigned to user ${firebaseUser.uid}`)
+            } catch (roleError) {
+              console.error("Error assigning role to user:", roleError)
+              // Continue with registration even if role assignment fails
+            }
+          } else {
+            console.log("No role found in invitation data")
+          }
 
           const updateData: any = {
             used: true,
@@ -382,6 +399,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           await updateDoc(doc(db, "invitation_codes", invitationDoc.id), updateData)
+          console.log("Invitation code usage updated")
+        } else {
+          console.log("No invitation found for code:", orgCode)
         }
       }
 
