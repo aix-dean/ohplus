@@ -98,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
   const [subscriptionData, setSubscriptionData] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isRegistering, setIsRegistering] = useState(false) // Track registration state
 
   // This function returns the effective user ID that should be used for all operations
   const getEffectiveUserId = useCallback((): string | null => {
@@ -378,6 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     orgCode?: string,
   ) => {
     setLoading(true)
+    setIsRegistering(true) // Set registration flag
     try {
       console.log("Registering new OHPLUS user:", personalInfo.email)
 
@@ -448,9 +450,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await setDoc(userDocRef, userData)
 
-      // Instead of calling fetchUserData which has strict validation
-      // await fetchUserData(firebaseUser, firebaseUser.uid)
-
       // Set user data directly for new registrations
       const newUserData: UserData = {
         uid: firebaseUser.uid,
@@ -506,6 +505,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Error in AuthContext register:", error)
       setLoading(false)
       throw error
+    } finally {
+      setIsRegistering(false) // Clear registration flag
     }
   }
 
@@ -571,6 +572,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (firebaseUser) {
         console.log("Auth state changed: Firebase user logged in", firebaseUser.uid)
 
+        // Skip the OHPLUS account lookup during registration
+        if (isRegistering) {
+          console.log("Registration in progress, skipping OHPLUS account lookup")
+          setLoading(false)
+          return
+        }
+
         try {
           // Always look for OHPLUS account first
           const ohplusAccountUid = await findOHPlusAccount(firebaseUser.email || "")
@@ -595,7 +603,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })
     return () => unsubscribe()
-  }, [fetchUserData])
+  }, [fetchUserData, isRegistering])
 
   const value = {
     user, // This will always have the OHPLUS UID
