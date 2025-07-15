@@ -128,6 +128,18 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white p-4">
+      {/* Mobile Header - Only visible on mobile */}
+      <div className="md:hidden w-full mb-6">
+        <div className="flex flex-col items-center text-center">
+          <Image
+            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-xr2z7FZhfWcJW9zwhxaxmBlr81zsld.png"
+            alt="OH! Powering Smarter Site Management"
+            width={200}
+            height={120}
+            className="mb-4"
+          />
+        </div>
+      </div>
       <div className="flex w-full max-w-4xl bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Left Section: Logo and Company Name */}
         <div className="hidden md:flex flex-col items-center justify-evenly p-8 bg-gray-50 w-1/2">
