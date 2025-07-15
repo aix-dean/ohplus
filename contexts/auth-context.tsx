@@ -57,7 +57,6 @@ interface AuthContextType {
   projectData: ProjectData | null
   subscriptionData: Subscription | null
   loading: boolean
-  isRegistering: boolean
   login: (email: string, password: string) => Promise<void>
   loginOHPlusOnly: (email: string, password: string) => Promise<void>
   register: (
@@ -93,7 +92,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
   const [subscriptionData, setSubscriptionData] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isRegistering, setIsRegistering] = useState(false) // Add flag to track registration
 
   const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
     try {
@@ -127,31 +125,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ...data,
         }
       } else {
-        fetchedUserData = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          license_key: null,
-          company_id: null,
-          role: "user",
-          permissions: [],
-        }
-
-        // Create the user document with uid field
-        const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
-        await setDoc(
-          userDocRef,
-          {
-            ...fetchedUserData,
-            created: serverTimestamp(),
-            updated: serverTimestamp(),
-          },
-          { merge: true },
-        )
+        // If no user document exists, this might be a non-OHPLUS user
+        // Don't create a document, just return null userData
+        setUserData(null)
+        setProjectData(null)
+        setSubscriptionData(null)
+        return
       }
 
       setUserData(fetchedUserData)
 
+      // Fetch project data if project_id exists
       if (fetchedUserData.project_id) {
         const projectDocRef = doc(db, "projects", fetchedUserData.project_id)
         const projectDocSnap = await getDoc(projectDocRef)
@@ -254,23 +238,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [refreshSubscriptionData],
   )
 
-  const findOHPlusAccount = async (uid: string) => {
-    try {
-      const usersQuery = query(collection(db, "iboard_users"), where("uid", "==", uid), where("type", "==", "OHPLUS"))
-      const usersSnapshot = await getDocs(usersQuery)
-      return !usersSnapshot.empty
-    } catch (error) {
-      console.error("Error finding OHPLUS account:", error)
-      return false
-    }
-  }
-
   const login = async (email: string, password: string) => {
     setLoading(true)
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      setUser(userCredential.user)
-      await fetchUserData(userCredential.user)
+      // Don't manually set user or fetch data here - let onAuthStateChanged handle it
     } catch (error) {
       console.error("Login error:", error)
       setLoading(false)
@@ -283,15 +255,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
 
-      const isOHPlusAccount = await findOHPlusAccount(userCredential.user.uid)
+      // Check if user has OHPLUS account after login
+      const usersQuery = query(
+        collection(db, "iboard_users"),
+        where("uid", "==", userCredential.user.uid),
+        where("type", "==", "OHPLUS"),
+      )
+      const usersSnapshot = await getDocs(usersQuery)
 
-      if (!isOHPlusAccount) {
+      if (usersSnapshot.empty) {
         await signOut(auth)
         throw new Error("OHPLUS_ACCOUNT_NOT_FOUND")
       }
 
-      setUser(userCredential.user)
-      await fetchUserData(userCredential.user)
+      // Let onAuthStateChanged handle the rest
     } catch (error) {
       console.error("OHPLUS login error:", error)
       setLoading(false)
@@ -315,7 +292,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     orgCode?: string,
   ) => {
-    setIsRegistering(true) // Set registration flag
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, personalInfo.email, password)
       const firebaseUser = userCredential.user
@@ -323,6 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let licenseKey = generateLicenseKey()
       let companyId = null
 
+      // Handle invitation code logic
       if (orgCode) {
         const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
         const invitationSnapshot = await getDocs(invitationQuery)
@@ -358,6 +335,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Create user document
       const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
       const userData = {
         email: firebaseUser.email,
@@ -379,6 +357,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await setDoc(userDocRef, userData)
 
+      // Create project document if not joining organization
       if (!orgCode) {
         const projectDocRef = doc(db, "projects", firebaseUser.uid)
         await setDoc(projectDocRef, {
@@ -391,28 +370,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
       }
 
-      // Set user and fetch user data after successful registration
-      setUser(firebaseUser)
-      await fetchUserData(firebaseUser)
+      // Don't manually set user state - let onAuthStateChanged handle it
     } catch (error) {
       console.error("Error in AuthContext register:", error)
       throw error
-    } finally {
-      setIsRegistering(false) // Clear registration flag
     }
   }
 
   const logout = async () => {
-    setLoading(true)
     try {
       await signOut(auth)
-      setUser(null)
-      setUserData(null)
-      setProjectData(null)
-      setSubscriptionData(null)
+      // Don't manually clear state - let onAuthStateChanged handle it
     } catch (error) {
       console.error("Logout error:", error)
-      setLoading(false)
       throw error
     }
   }
@@ -452,33 +422,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProjectData((prev) => (prev ? { ...prev, ...updates } : null))
   }
 
+  // Simplified auth state listener - follows Firebase Auth documentation
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true)
+
       if (firebaseUser) {
         setUser(firebaseUser)
-
-        // Skip OHPLUS check if we're in the middle of registration
-        if (isRegistering) {
-          setLoading(false)
-          return
-        }
-
-        const isOHPlusAccount = await findOHPlusAccount(firebaseUser.uid)
-        if (isOHPlusAccount) {
-          await fetchUserData(firebaseUser)
-        } else {
-          await signOut(auth)
-        }
+        await fetchUserData(firebaseUser)
       } else {
         setUser(null)
         setUserData(null)
         setProjectData(null)
         setSubscriptionData(null)
       }
+
       setLoading(false)
     })
+
     return () => unsubscribe()
-  }, [fetchUserData, isRegistering]) // Add isRegistering to dependencies
+  }, [fetchUserData])
 
   const value = {
     user,
@@ -486,7 +449,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     projectData,
     subscriptionData,
     loading,
-    isRegistering,
     login,
     loginOHPlusOnly,
     register,
