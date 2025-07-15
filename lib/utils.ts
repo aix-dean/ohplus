@@ -24,3 +24,15 @@ export function generateLicenseKey(): string {
   }
   return licenseKey
 }
+
+export function generateInvitationCode(): string {
+  const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+  let code = ""
+  for (let i = 0; i < 8; i++) {
+    if (i === 4) {
+      code += "-"
+    }
+    code += characters.charAt(Math.floor(Math.random() * characters.length))
+  }
+  return code
+}
