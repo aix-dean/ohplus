@@ -15,6 +15,12 @@ import { subscriptionService } from "@/lib/subscription-service"
 import type { Subscription } from "@/lib/types/subscription"
 import { generateLicenseKey } from "@/lib/utils"
 
+// Custom user interface that overrides Firebase user with OHPLUS data
+interface OHPlusUser extends Omit<FirebaseUser, "uid"> {
+  uid: string // This will be the OHPLUS account UID, not Firebase Auth UID
+  firebaseAuthUid: string // Store the original Firebase Auth UID separately
+}
+
 interface UserData {
   uid: string
   email: string | null
@@ -51,7 +57,7 @@ interface ProjectData {
 }
 
 interface AuthContextType {
-  user: FirebaseUser | null
+  user: OHPlusUser | null // This will always have the OHPLUS UID
   userData: UserData | null
   projectData: ProjectData | null
   subscriptionData: Subscription | null
@@ -81,17 +87,45 @@ interface AuthContextType {
   refreshUserData: () => Promise<void>
   refreshSubscriptionData: () => Promise<void>
   assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
+  getEffectiveUserId: () => string | null
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<FirebaseUser | null>(null)
+  const [user, setUser] = useState<OHPlusUser | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
   const [subscriptionData, setSubscriptionData] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isRegistering, setIsRegistering] = useState(false) // Track registration state
 
+  // This function returns the effective user ID that should be used for all operations
+  const getEffectiveUserId = useCallback((): string | null => {
+    // Always return the OHPLUS user ID, never the Firebase Auth user ID
+    return user?.uid || null
+  }, [user])
+
+  const createOHPlusUser = (firebaseUser: FirebaseUser, ohplusUid: string): OHPlusUser => {
+    console.log("Creating OHPlusUser with OHPLUS UID:", ohplusUid, "Firebase Auth UID:", firebaseUser.uid)
+
+    return {
+      ...firebaseUser,
+      uid: ohplusUid, // Override with OHPLUS UID
+      firebaseAuthUid: firebaseUser.uid, // Store original Firebase Auth UID
+    }
+  }
+
+  const validateOHPlusAccount = async (uid: string, email: string): Promise<UserData> => {
+    console.log("Validating OHPLUS account for UID:", uid, "Email:", email)
+
+    const userDocRef = doc(db, "iboard_users", uid)
+    const userDocSnap = await getDoc(userDocRef)
+
+    if (!userDocSnap.exists()) {
+      console.log("User document doesn't exist for UID:", uid)
+      throw new Error("USER_DOCUMENT_NOT_FOUND")
+    }
   const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
     try {
       console.log("Fetching user data for UID:", firebaseUser.uid)
@@ -151,13 +185,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         )
       }
 
-      console.log("Fetched user data:", fetchedUserData)
-      setUserData(fetchedUserData)
+      // Validate and get OHPLUS user data
+      const validatedUserData = await validateOHPlusAccount(ohplusUid, firebaseUser.email || "")
+      setUserData(validatedUserData)
 
       if (fetchedUserData.project_id) {
         console.log("Fetching project data for project_id:", fetchedUserData.project_id)
 
-        const projectDocRef = doc(db, "projects", fetchedUserData.project_id)
+      console.log("Set user with OHPLUS UID:", ohplusUser.uid, "Firebase Auth UID:", ohplusUser.firebaseAuthUid)
+
+      // Fetch project data if project_id exists
+      if (validatedUserData.project_id) {
+        console.log("Fetching project data for project_id:", validatedUserData.project_id)
+
+        const projectDocRef = doc(db, "projects", validatedUserData.project_id)
         const projectDocSnap = await getDoc(projectDocRef)
 
         if (projectDocSnap.exists()) {
@@ -183,7 +224,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log("No project_id found in user data")
         setProjectData(null)
       }
-
       // Fetch subscription data - first try by license_key, then by company_id
       let subscription = null
 
@@ -210,17 +250,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSubscriptionData(subscription)
     } catch (error) {
       console.error("Error fetching user data or subscription:", error)
+      setUser(null)
       setUserData(null)
       setProjectData(null)
       setSubscriptionData(null)
+      throw error
     }
   }, [])
 
   const refreshUserData = useCallback(async () => {
-    if (user) {
-      await fetchUserData(user)
+    if (user && userData) {
+      // Use the original Firebase user but with OHPLUS UID
+      const firebaseUser = {
+        ...user,
+        uid: user.firebaseAuthUid, // Use original Firebase Auth UID for auth operations
+      } as FirebaseUser
+      await fetchUserData(firebaseUser, userData.uid)
     }
-  }, [user, fetchUserData])
+  }, [user, userData, fetchUserData])
 
   const refreshSubscriptionData = useCallback(async () => {
     if (userData?.license_key) {
@@ -257,21 +304,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const assignLicenseKey = useCallback(
     async (uid: string, licenseKey: string) => {
       try {
-        console.log("Assigning license key:", licenseKey, "to user:", uid)
+        console.log("Assigning license key:", licenseKey, "to OHPLUS user:", uid)
 
-        const userDocRef = doc(db, "iboard_users", uid)
+        // Always use the OHPLUS user ID
+        const effectiveUid = userData?.uid || uid
+        const userDocRef = doc(db, "iboard_users", effectiveUid)
         await setDoc(userDocRef, { license_key: licenseKey }, { merge: true })
 
         setUserData((prev) => (prev ? { ...prev, license_key: licenseKey } : null))
         await refreshSubscriptionData()
 
-        console.log("License key assigned successfully")
+        console.log("License key assigned successfully to OHPLUS user:", effectiveUid)
       } catch (error) {
         console.error("Error assigning license key:", error)
         throw error
       }
     },
-    [refreshSubscriptionData],
+    [userData, refreshSubscriptionData],
   )
 
   const findOHPlusAccount = async (uid: string) => {
@@ -297,8 +346,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log("Logging in user with tenant ID:", auth.tenantId)
       const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      setUser(userCredential.user)
-      await fetchUserData(userCredential.user)
+      console.log("Firebase authentication successful for:", userCredential.user.uid)
+
+      // Don't set user here - let fetchUserData handle it with OHPLUS UID
+      await fetchUserData(userCredential.user, ohplusAccountUid)
     } catch (error) {
       console.error("Login error:", error)
       setLoading(false)
@@ -348,12 +399,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     orgCode?: string,
   ) => {
     setLoading(true)
+    setIsRegistering(true) // Set registration flag
     try {
-      console.log("Registering new user with tenant ID:", auth.tenantId)
 
       const userCredential = await createUserWithEmailAndPassword(auth, personalInfo.email, password)
       const firebaseUser = userCredential.user
-      setUser(firebaseUser)
 
       let licenseKey = generateLicenseKey()
       let companyId = null
@@ -385,10 +435,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Create OHPLUS user document using Firebase Auth UID
       const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
       const userData = {
         email: firebaseUser.email,
-        uid: firebaseUser.uid,
+        uid: firebaseUser.uid, // This will be the OHPLUS account UID
         license_key: licenseKey,
         company_id: companyId,
         role: "user",
@@ -423,6 +474,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Error in AuthContext register:", error)
       setLoading(false)
       throw error
+    } finally {
+      setIsRegistering(false) // Clear registration flag
     }
   }
 
@@ -460,10 +513,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const updateUserData = async (updates: Partial<UserData>) => {
-    if (!user) throw new Error("User not authenticated.")
+    if (!user || !userData) throw new Error("User not authenticated.")
 
-    console.log("Updating user data:", updates)
-    const userDocRef = doc(db, "iboard_users", user.uid)
+    console.log("Updating OHPLUS user data:", updates)
+    // Always use the OHPLUS user ID
+    const userDocRef = doc(db, "iboard_users", userData.uid)
     const updatedFields = { ...updates, updated: serverTimestamp() }
     await updateDoc(userDocRef, updatedFields)
 
@@ -485,8 +539,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log("Setting up auth state listener with tenant ID:", auth.tenantId)
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        console.log("Auth state changed: user logged in", firebaseUser.uid)
-        setUser(firebaseUser)
+        console.log("Auth state changed: Firebase user logged in", firebaseUser.uid)
 
         const isOHPlusAccount = await findOHPlusAccount(firebaseUser.uid)
         if (isOHPlusAccount) {
@@ -505,10 +558,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })
     return () => unsubscribe()
-  }, [fetchUserData])
+  }, [fetchUserData, isRegistering])
 
   const value = {
-    user,
+    user, // This will always have the OHPLUS UID
     userData,
     projectData,
     subscriptionData,
@@ -523,6 +576,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUserData,
     refreshSubscriptionData,
     assignLicenseKey,
+    getEffectiveUserId,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

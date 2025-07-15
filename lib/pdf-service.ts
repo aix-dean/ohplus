@@ -768,9 +768,9 @@ export async function generateReportPDF(
     // Helper function to format date
     const formatDate = (dateString: string) => {
       return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
+        year: "2-digit",
+        month: "2-digit",
+        day: "2-digit",
       })
     }
 
@@ -788,40 +788,6 @@ export async function generateReportPDF(
         pdf.addPage()
         yPosition = 0
         addHeaderToPage()
-      }
-    }
-
-    // Helper function to add image to PDF
-    const addImageToPDF = async (imageUrl: string, x: number, y: number, maxWidth: number, maxHeight: number) => {
-      try {
-        const base64 = await loadImageAsBase64(imageUrl)
-        if (!base64) return { width: 0, height: 0 }
-
-        const dimensions = await getImageDimensions(base64)
-        let { width, height } = dimensions
-        const aspectRatio = width / height
-
-        if (width > height) {
-          width = maxWidth
-          height = width / aspectRatio
-          if (height > maxHeight) {
-            height = maxHeight
-            width = height * aspectRatio
-          }
-        } else {
-          height = maxHeight
-          width = height * aspectRatio
-          if (width > maxWidth) {
-            width = maxWidth
-            height = width / aspectRatio
-          }
-        }
-
-        pdf.addImage(base64, "JPEG", x, y, width, height)
-        return { width, height }
-      } catch (error) {
-        console.error("Error adding image to PDF:", error)
-        return { width: 0, height: 0 }
       }
     }
 
@@ -887,12 +853,16 @@ export async function generateReportPDF(
     const badgeWidth = 50
     const badgeHeight = 8
 
-    // Create cyan badge for "Installation Report"
+    // Create cyan badge for report type
     pdf.setFillColor(52, 211, 235) // cyan-400
     pdf.rect(margin, yPosition, badgeWidth, badgeHeight, "F")
     pdf.setTextColor(255, 255, 255)
     pdf.setFontSize(9)
-    pdf.text("Installation Report", margin + 2, yPosition + 5)
+    const reportTypeDisplay = report.reportType
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+    pdf.text(reportTypeDisplay, margin + 2, yPosition + 5)
     pdf.setTextColor(0, 0, 0)
 
     // Add company logo on the right (similar to web page - smaller size)
@@ -948,56 +918,76 @@ export async function generateReportPDF(
     pdf.text("Project Information", margin, yPosition)
     yPosition += 8
 
-    // Draw border around project info table
-    pdf.setLineWidth(1)
-    pdf.setDrawColor(0, 0, 0)
-    const tableHeight = 55
-    pdf.rect(margin, yPosition, contentWidth, tableHeight)
+    // Draw border around project info section (like the card in the web page)
+    pdf.setLineWidth(0.5)
+    pdf.setDrawColor(200, 200, 200)
+    const projectInfoHeight = 55
+    pdf.rect(margin, yPosition, contentWidth, projectInfoHeight)
     yPosition += 5
 
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
 
-    // Two column layout for project information
+    // Two column layout for project information (matching the web page)
     const leftColumn = margin + 3
     const rightColumn = margin + contentWidth / 2 + 5
 
     let leftY = yPosition
     let rightY = yPosition
 
-    // Left column data
+    // Helper functions to get data (matching the web page)
+    const getSiteLocation = (product: any) => {
+      if (!product) return "N/A"
+      return product.specs_rental?.location || product.light?.location || "N/A"
+    }
+
+    const getSiteSize = (product: any) => {
+      if (!product) return "N/A"
+      const specs = product.specs_rental
+      if (specs?.height && specs?.width) {
+        const panels = specs.panels || "N/A"
+        return `${specs.height} (H) x ${specs.width} (W) x ${panels} Panels`
+      }
+      return product.specs_rental?.size || product.light?.size || "N/A"
+    }
+
+    const calculateInstallationDuration = (startDate: string, endDate: string) => {
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      const diffTime = Math.abs(end.getTime() - start.getTime())
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      return diffDays
+    }
+
+    // Left column data (matching the web page layout)
     const leftColumnData = [
       {
         label: "Site ID:",
-        value: `${report.siteId} ${product?.light?.location || product?.specs_rental?.location || ""}`,
+        value: getSiteLocation(product),
       },
       { label: "Job Order:", value: report.id?.slice(-4).toUpperCase() || "N/A" },
       {
         label: "Job Order Date:",
-        value: formatDate(
-          report.created && typeof report.created.toDate === "function"
-            ? report.created.toDate().toISOString().split("T")[0]
-            : report.date,
-        ),
+        value: formatDate(report.date),
       },
       { label: "Site:", value: report.siteName },
-      { label: "Size:", value: product?.specs_rental?.size || product?.light?.size || "N/A" },
+      { label: "Size:", value: getSiteSize(product) },
       { label: "Start Date:", value: formatDate(report.bookingDates.start) },
       { label: "End Date:", value: formatDate(report.bookingDates.end) },
       {
         label: "Installation Duration:",
-        value: `${Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))} days`,
+        value: `${calculateInstallationDuration(report.bookingDates.start, report.bookingDates.end)} days`,
       },
     ]
 
-    // Right column data
+    // Right column data (matching the web page layout)
     const rightColumnData = [
-      { label: "Content:", value: product?.content_type || "N/A" },
-      { label: "Material Specs:", value: product?.specs_rental?.material || "N/A" },
-      { label: "Crew:", value: `Team ${report.assignedTo || "A"}` },
-      { label: "Illumination:", value: product?.light?.illumination || "N/A" },
+      { label: "Content:", value: product?.content_type || "Static" },
+      { label: "Material Specs:", value: product?.specs_rental?.material || "Stickers" },
+      { label: "Crew:", value: `Team ${report.assignedTo || "4"}` },
+      { label: "Illumination:", value: product?.specs_rental?.illumination || "LR 2097 (200 Watts x 40)" },
       { label: "Gondola:", value: product?.specs_rental?.gondola ? "YES" : "NO" },
-      { label: "Technology:", value: product?.specs_rental?.technology || "N/A" },
+      { label: "Technology:", value: product?.specs_rental?.technology || "Clear Tapes" },
       { label: "Sales:", value: report.sales },
     ]
 
@@ -1028,15 +1018,15 @@ export async function generateReportPDF(
       rightY += 5
     })
 
-    yPosition += tableHeight + 10
+    yPosition += projectInfoHeight + 10
 
-    // Project Status Section
+    // Project Status Section (matching the web page)
     checkNewPage(30)
     pdf.setFontSize(14)
     pdf.setFont("helvetica", "bold")
     pdf.text("Project Status", margin, yPosition)
 
-    // Status badge - green
+    // Status badge - green (matching the web page)
     pdf.setFillColor(34, 197, 94) // green-500
     const statusBadgeWidth = 25
     const statusBadgeHeight = 6
@@ -1060,7 +1050,7 @@ export async function generateReportPDF(
         const attachment = attachmentsToShow[i]
         const currentX = i === 0 ? margin : margin + imageWidth + 10
 
-        // Draw border for attachment box
+        // Draw border for attachment box (matching the web page)
         pdf.setLineWidth(0.5)
         pdf.setDrawColor(200, 200, 200)
         pdf.rect(currentX, yPosition, imageWidth, imageHeight)
@@ -1127,13 +1117,27 @@ export async function generateReportPDF(
         pdf.setFont("helvetica", "bold")
         pdf.text("Location:", currentX, yPosition + 8)
         pdf.setFont("helvetica", "normal")
-        pdf.text(report.location || "N/A", currentX + 25, yPosition + 8)
+        pdf.text(getSiteLocation(product), currentX + 25, yPosition + 8)
+
+        if (attachmentsToShow[i].fileName) {
+          pdf.setFont("helvetica", "bold")
+          pdf.text("File:", currentX, yPosition + 12)
+          pdf.setFont("helvetica", "normal")
+          pdf.text(attachmentsToShow[i].fileName, currentX + 15, yPosition + 12)
+        }
+
+        if (attachmentsToShow[i].note) {
+          pdf.setFont("helvetica", "bold")
+          pdf.text("Note:", currentX, yPosition + 16)
+          pdf.setFont("helvetica", "normal")
+          pdf.text(attachmentsToShow[i].note, currentX + 15, yPosition + 16)
+        }
       }
 
       yPosition += 20
     }
 
-    // Footer Section
+    // Footer Section (matching the web page)
     checkNewPage(40)
     pdf.setLineWidth(0.5)
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
@@ -1152,13 +1156,10 @@ export async function generateReportPDF(
     pdf.setTextColor(0, 0, 0)
     pdf.text("LOGISTICS", margin, yPosition)
     yPosition += 5
-    const preparedDate =
-      report.created && typeof report.created.toDate === "function"
-        ? report.created.toDate().toISOString().split("T")[0]
-        : report.date
-    pdf.text(formatDate(preparedDate), margin, yPosition)
+    const preparedDate = formatDate(report.date)
+    pdf.text(preparedDate, margin, yPosition)
 
-    // Add disclaimer on the right side
+    // Add disclaimer on the right side (matching the web page)
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "italic")
     pdf.setTextColor(100, 100, 100)
@@ -1166,7 +1167,7 @@ export async function generateReportPDF(
     const disclaimerLines = pdf.splitTextToSize(disclaimer, 120)
     pdf.text(disclaimerLines, pageWidth - margin - 120, yPosition - 10)
 
-    // Angular Footer (matching the page design)
+    // Angular Footer (matching the page design exactly)
     const footerY = pageHeight - 12
     const footerHeight = 12
 
@@ -1204,7 +1205,7 @@ export async function generateReportPDF(
       "F",
     )
 
-    // Add footer text
+    // Add footer text (matching the web page)
     pdf.setTextColor(255, 255, 255)
     pdf.setFontSize(10)
     pdf.setFont("helvetica", "normal")
@@ -1222,7 +1223,7 @@ export async function generateReportPDF(
     if (returnBase64) {
       return pdf.output("datauristring").split(",")[1]
     } else {
-      const fileName = `report-installation-report-${Date.now()}.pdf`
+      const fileName = `report-${reportTypeDisplay.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}.pdf`
       pdf.save(fileName)
     }
   } catch (error) {

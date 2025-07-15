@@ -398,7 +398,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         id: `preview-${Date.now()}`, // Temporary ID for preview
         siteId: product.id,
         siteName: product.name || "Unknown Site",
-        companyId: projectData?.project_id || userData?.project_id || user.uid,
+        companyId: projectData?.company_id || userData?.company_id || projectData?.project_id || userData?.project_id,
         sellerId: product.seller_id || user.uid,
         client: "Summit Media", // This would come from booking data in real implementation
         clientId: "summit-media-id", // This would come from booking data
