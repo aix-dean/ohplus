@@ -128,7 +128,11 @@ export default function LoginPage() {
             {/* Main tagline */}
             <div className="text-center max-w-xs">
               <h2 className="text-3xl font-light text-blue-600 leading-tight">
-                Powering Smarter Site Management for Billboard Operators
+                Powering Smarter
+                <br />
+                Site Management for
+                <br />
+                Billboard Operators
               </h2>
             </div>
 
