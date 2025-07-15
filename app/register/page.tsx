@@ -28,33 +28,27 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [invitationRole, setInvitationRole] = useState<string | null>(null)
   const [loadingInvitation, setLoadingInvitation] = useState(false)
-  const [registrationComplete, setRegistrationComplete] = useState(false)
 
-  const { register, user, userData, loading: authLoading } = useAuth()
+  const { register, user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
   // Get organization code from URL parameters
   const orgCode = searchParams.get("orgCode")
 
-  // Debug logging for auth state
+  // Redirect if user is already logged in
   useEffect(() => {
-    console.log("Auth state debug:", {
-      user: !!user,
-      userData: !!userData,
-      authLoading,
-      registrationComplete,
-    })
-  }, [user, userData, authLoading, registrationComplete])
+    if (user) {
+      router.push("/admin/dashboard")
+    }
+  }, [user, router])
 
   // Fetch invitation details when orgCode is present
   useEffect(() => {
     const fetchInvitationDetails = async () => {
       if (!orgCode) return
 
-      console.log("Fetching invitation details for code:", orgCode)
       setLoadingInvitation(true)
-
       try {
         const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
         const invitationSnapshot = await getDocs(invitationQuery)
@@ -62,16 +56,11 @@ export default function RegisterPage() {
         if (!invitationSnapshot.empty) {
           const invitationDoc = invitationSnapshot.docs[0]
           const invitationData = invitationDoc.data()
-          console.log("Invitation details loaded:", invitationData)
 
           if (invitationData.role) {
             setInvitationRole(invitationData.role)
-            console.log("Role found in invitation:", invitationData.role)
-          } else {
-            console.log("No role specified in invitation")
           }
         } else {
-          console.log("No invitation found for code:", orgCode)
           setErrorMessage("Invalid invitation code.")
         }
       } catch (error) {
@@ -85,21 +74,7 @@ export default function RegisterPage() {
     fetchInvitationDetails()
   }, [orgCode])
 
-  // Handle redirect after successful registration
-  useEffect(() => {
-    if (registrationComplete && user && userData) {
-      console.log("All conditions met for redirect:", {
-        registrationComplete,
-        user: !!user,
-        userData: !!userData,
-      })
-      console.log("Redirecting to admin dashboard...")
-      router.push("/admin/dashboard")
-    }
-  }, [registrationComplete, user, userData, router])
-
   const getFriendlyErrorMessage = (error: unknown): string => {
-    console.error("Raw error during registration:", error)
     if (error instanceof FirebaseError) {
       switch (error.code) {
         case "auth/email-already-in-use":
@@ -122,16 +97,12 @@ export default function RegisterPage() {
   const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
 
-    // Always ensure it starts with +63
     if (!value.startsWith("+63 ")) {
       setPhoneNumber("+63 ")
       return
     }
 
-    // Extract only the numbers after +63
     const numbersOnly = value.slice(4).replace(/\D/g, "")
-
-    // Limit to 10 digits
     if (numbersOnly.length <= 10) {
       setPhoneNumber("+63 " + numbersOnly)
     }
@@ -142,7 +113,6 @@ export default function RegisterPage() {
     return numbersOnly.length === 10
   }
 
-  // Add these state variables and helper functions for password strength
   const passwordCriteria = {
     minLength: password.length >= 8,
     hasLowerCase: /[a-z]/.test(password),
@@ -168,9 +138,6 @@ export default function RegisterPage() {
   }
 
   const handleRegister = async () => {
-    console.log("Starting registration process...")
-    console.log("Form data:", { firstName, lastName, email, phoneNumber, orgCode })
-
     setErrorMessage(null)
 
     if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
@@ -189,7 +156,6 @@ export default function RegisterPage() {
     }
 
     setLoading(true)
-    console.log("Calling register function with orgCode:", orgCode)
 
     try {
       await register(
@@ -209,34 +175,14 @@ export default function RegisterPage() {
         orgCode || undefined,
       )
 
-      console.log("Registration completed successfully")
-      setErrorMessage(null)
-      setRegistrationComplete(true)
-
-      // Show success message while waiting for redirect
-      console.log("Registration complete, waiting for auth state to update...")
+      // Registration successful - redirect to dashboard
+      router.push("/admin/dashboard")
     } catch (error: unknown) {
       console.error("Registration failed:", error)
       setErrorMessage(getFriendlyErrorMessage(error))
-      setRegistrationComplete(false)
     } finally {
       setLoading(false)
     }
-  }
-
-  // Show success state if registration is complete but still waiting for redirect
-  if (registrationComplete && !userData) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="flex flex-col items-center justify-center p-6">
-            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-blue-600 mb-4"></div>
-            <h2 className="text-xl font-semibold mb-2">Registration Successful!</h2>
-            <p className="text-gray-600 text-center">Setting up your account...</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
   }
 
   return (
@@ -440,7 +386,7 @@ export default function RegisterPage() {
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                 type="submit"
                 onClick={handleRegister}
-                disabled={loading || loadingInvitation || authLoading}
+                disabled={loading || loadingInvitation}
               >
                 {loading ? (orgCode ? "Joining..." : "Signing Up...") : orgCode ? "Join Organization" : "Sign Up"}
               </Button>
