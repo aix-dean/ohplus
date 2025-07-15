@@ -56,6 +56,7 @@ export async function createProposal(
       industry: client.industry || "",
       targetAudience: client.targetAudience || "",
       campaignObjective: client.campaignObjective || "",
+      designation: client.designation || "",
     }
 
     // Clean the products data to ensure no undefined values
