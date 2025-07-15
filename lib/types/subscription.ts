@@ -12,6 +12,7 @@ export interface Subscription {
   endDate: Date | null // When the subscription ends (null for lifetime or ongoing)
   status: SubscriptionStatus
   maxProducts: number // Max products allowed for this subscription
+  maxUsers: number // Max users allowed for this subscription
   trialEndDate: Date | null // End date of the trial period, if applicable
   companyId: string | null // Company ID field
   createdAt: Date // Timestamp of creation
@@ -73,10 +74,30 @@ export function getMaxProductsForPlan(planType: SubscriptionPlanType): number {
     case "enterprise":
       return 99999 // Unlimited for enterprise
     case "trial":
-      return 1 // Example: 1 product for trial
+      return 3 // Example: 1 product for trial
     case "graphic-expo-event":
       return 5 // Example: 5 products for event plan
     default:
       return 0
+  }
+}
+
+// Helper function to get max users for a given plan type
+export function getMaxUsersForPlan(planType: SubscriptionPlanType): number {
+  switch (planType) {
+    case "solo":
+      return 12 // Solo plan allows 3 users
+    case "family":
+      return 12 // Family plan allows 5 users
+    case "membership":
+      return 12 // Membership allows 10 users
+    case "enterprise":
+      return 99999 // Unlimited for enterprise
+    case "trial":
+      return 12 // Trial allows 2 users
+    case "graphic-expo-event":
+      return 12 // Event plan allows 5 users
+    default:
+      return 12 // Default to 12 users
   }
 }
