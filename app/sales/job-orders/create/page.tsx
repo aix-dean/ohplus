@@ -147,6 +147,8 @@ export default function CreateJobOrderPage() {
     if (hasItems) {
       // Multiple products from quotation.items
       return quotationItems.map((item: any) => {
+
+        console.log(JSON.stringify(item))
         const monthlyRate = item.price || 0
         const subtotal = monthlyRate * totalMonths
         const vat = subtotal * 0.12
