@@ -127,7 +127,7 @@ export default function CreateJobOrderPage() {
   const totalMonths = useMemo(() => {
     if (!quotationData?.quotation) return 1
 
-    const { quotation } = quotationData
+    const quotation = quotationData.quotation
     if (quotation.start_date && quotation.end_date) {
       const start = new Date(quotation.start_date)
       const end = new Date(quotation.end_date)
@@ -142,7 +142,7 @@ export default function CreateJobOrderPage() {
   const productTotals = useMemo(() => {
     if (!quotationData) return []
 
-    const { quotation } = quotationData
+    const quotation = quotationData.quotation
 
     if (hasItems) {
       // Multiple products from quotation.items
@@ -370,7 +370,9 @@ export default function CreateJobOrderPage() {
 
       setIsSubmitting(true)
 
-      const { quotation, products, client } = quotationData
+      const quotation = quotationData.quotation
+      const products = quotationData.products
+      const client = quotationData.client
 
       try {
         let jobOrdersData = []
@@ -510,7 +512,6 @@ export default function CreateJobOrderPage() {
       hasItems,
       quotationItems,
       jobOrderForms,
-      products,
       totalMonths,
       signedQuotationUrl,
       poMoUrl,
@@ -610,7 +611,10 @@ export default function CreateJobOrderPage() {
     )
   }
 
-  const { quotation, products, client } = quotationData
+  // Safe access to data after null check
+  const quotation = quotationData.quotation
+  const products = quotationData.products
+  const client = quotationData.client
 
   return (
     <div className="flex flex-col min-h-screen bg-white p-4 md:p-6">
