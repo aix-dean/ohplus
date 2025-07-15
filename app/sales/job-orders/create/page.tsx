@@ -151,7 +151,7 @@ export default function CreateJobOrderPage() {
         console.log(`items ${JSON.stringify(item)}`)
         const monthlyRate = item.price || 0
         console.log(`monthly ${monthlyRate}`)
-        const subtotal = monthlyRate * totalMonths
+        const subtotal = monthlyRate
         console.log(`total months ${totalMonths}`)
         const vat = monthlyRate * 0.12
         const total = subtotal + vat
@@ -168,7 +168,7 @@ export default function CreateJobOrderPage() {
     } else {
       // Single product from quotation object
       const monthlyRate = quotation.price || 0
-      const subtotal = monthlyRate * totalMonths
+      const subtotal = monthlyRate
       const vat = subtotal * 0.12
       const total = subtotal + vat
 
