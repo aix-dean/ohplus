@@ -14,6 +14,7 @@ import { auth, db } from "@/lib/firebase"
 import { subscriptionService } from "@/lib/subscription-service"
 import type { Subscription } from "@/lib/types/subscription"
 import { generateLicenseKey } from "@/lib/utils"
+import { assignRoleToUser, type RoleType } from "@/lib/hardcoded-access-service"
 
 interface UserData {
   uid: string
@@ -357,6 +358,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       let licenseKey = generateLicenseKey()
       let companyId = null
+      let assignedRole: RoleType | null = null
 
       if (orgCode) {
         const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
@@ -368,6 +370,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           licenseKey = invitationData.license_key || licenseKey
           companyId = invitationData.company_id || null
+          assignedRole = invitationData.role_id || null // Get the role from invitation code
 
           const updateData: any = {
             used: true,
@@ -417,6 +420,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       await setDoc(userDocRef, userData)
+
+      // Assign role if specified in invitation code
+      if (assignedRole) {
+        console.log("Assigning role from invitation code:", assignedRole)
+        try {
+          await assignRoleToUser(firebaseUser.uid, assignedRole, "system")
+          console.log("Role assigned successfully during registration")
+        } catch (roleError) {
+          console.error("Error assigning role during registration:", roleError)
+          // Don't fail registration if role assignment fails
+        }
+      }
+
       await fetchUserData(firebaseUser)
       console.log("Registration completed successfully with tenant ID:", auth.tenantId)
     } catch (error) {
