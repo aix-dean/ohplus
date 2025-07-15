@@ -12,6 +12,8 @@ import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export default function ReportPreviewPage() {
   const router = useRouter()
@@ -24,12 +26,52 @@ export default function ReportPreviewPage() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<string>>(new Set())
+  const [preparedByName, setPreparedByName] = useState<string>("")
   const { user } = useAuth()
   const { toast } = useToast()
 
   useEffect(() => {
     loadPreviewData()
   }, [])
+
+  useEffect(() => {
+    if (user?.uid) {
+      fetchPreparedByName()
+    }
+  }, [user?.uid])
+
+  const fetchPreparedByName = async () => {
+    if (!user?.uid) return
+
+    try {
+      const companiesRef = collection(db, "companies")
+      const q = query(companiesRef, where("created_by", "==", user.uid))
+      const querySnapshot = await getDocs(q)
+
+      if (!querySnapshot.empty) {
+        const companyDoc = querySnapshot.docs[0]
+        const companyData = companyDoc.data()
+
+        // Try to get the name from various possible fields
+        const name =
+          companyData.contact_person ||
+          companyData.company_name ||
+          companyData.name ||
+          user.displayName ||
+          user.email?.split("@")[0] ||
+          "User"
+
+        setPreparedByName(name)
+      } else {
+        // Fallback to user display name or email
+        setPreparedByName(user.displayName || user.email?.split("@")[0] || "User")
+      }
+    } catch (error) {
+      console.error("Error fetching prepared by name:", error)
+      // Fallback to user display name or email
+      setPreparedByName(user.displayName || user.email?.split("@")[0] || "User")
+    }
+  }
 
   const loadPreviewData = () => {
     try {
@@ -495,7 +537,7 @@ export default function ReportPreviewPage() {
           <div>
             <h3 className="font-semibold mb-2">Prepared by:</h3>
             <div className="text-sm text-gray-600">
-              <div>{report.createdByName}</div>
+              <div>{preparedByName || "Loading..."}</div>
               <div>LOGISTICS</div>
               <div>{formatDate(report.date)}</div>
             </div>
