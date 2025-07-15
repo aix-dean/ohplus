@@ -77,6 +77,31 @@ export default function RegisterPage() {
     return numbersOnly.length === 10
   }
 
+  // Add these state variables and helper functions for password strength
+  const passwordCriteria = {
+    minLength: password.length >= 8,
+    hasLowerCase: /[a-z]/.test(password),
+    hasUpperCase: /[A-Z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    hasSpecialChar: /[^a-zA-Z0-9]/.test(password),
+  }
+
+  const passwordStrengthScore = Object.values(passwordCriteria).filter(Boolean).length
+
+  const getBarColorClass = (score: number) => {
+    if (score === 0) return "bg-gray-300"
+    if (score <= 2) return "bg-red-500"
+    if (score <= 4) return "bg-yellow-500"
+    return "bg-green-500"
+  }
+
+  const getStrengthText = (score: number) => {
+    if (score === 0) return "Enter a password"
+    if (score <= 2) return "Weak"
+    if (score <= 4) return "Moderate"
+    return "Strong"
+  }
+
   const handleRegister = async () => {
     setErrorMessage(null)
 
@@ -236,6 +261,41 @@ export default function RegisterPage() {
                     ) : (
                       <Eye className="h-4 w-4 text-gray-400" />
                     )}
+                  </button>
+                </div>
+                <div className="mt-2">
+                  <div className="flex gap-1 h-1">
+                    {[...Array(5)].map((_, i) => (
+                      <div
+                        key={i}
+                        className={`flex-1 ${
+                          i < passwordStrengthScore ? getBarColorClass(passwordStrengthScore) : "bg-gray-300"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    {getStrengthText(passwordStrengthScore)}
+                  </p>
+                  {passwordStrengthScore < 5 && password.length > 0 && (
+                    <ul className="list-inside text-sm mt-1">
+                      {!passwordCriteria.minLength && (
+                        <li className="text-red-500">Password should be at least 8 characters long</li>
+                      )}
+                      {!passwordCriteria.hasLowerCase && (
+                        <li className="text-red-500">Password should contain at least one lowercase letter</li>
+                      )}
+                      {!passwordCriteria.hasUpperCase && (
+                        <li className="text-red-500">Password should contain at least one uppercase letter</li>
+                      )}
+                      {!passwordCriteria.hasNumber && (
+                        <li className="text-red-500">Password should contain at least one number</li>
+                      )}
+                      {!passwordCriteria.hasSpecialChar && (
+                        <li className="text-red-500">Password should contain at least one special character</li>
+                      )}
+                    </ul>
+                  )}
                     <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
                   </button>
                 </div>
