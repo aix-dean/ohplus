@@ -29,11 +29,7 @@ import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-suc
 const joTypes = ["Installation", "Maintenance", "Repair", "Dismantling", "Other"]
 
 // Dummy assignees for now, ideally fetched from user management
-const dummyAssignees = [
-  { id: "user1", name: "John Doe" },
-  { id: "user2", name: "Jane Smith" },
-  { id: "user3", name: "Peter Jones" },
-]
+
 
 export default function CreateJobOrderPage() {
   const router = useRouter()
@@ -312,14 +308,6 @@ export default function CreateJobOrderPage() {
     router.push("/sales/job-orders")
   }
 
-  // Combine dummy assignees with current user if not already present
-  const allAssignees = useMemo(() => {
-    const uniqueAssignees = [...dummyAssignees]
-    if (userData && !uniqueAssignees.some((a) => a.id === userData.uid)) {
-      uniqueAssignees.push({ id: userData.uid, name: userData.first_name || "Current User" })
-    }
-    return uniqueAssignees
-  }, [userData])
 
   if (loading) {
     return (
@@ -747,9 +735,8 @@ export default function CreateJobOrderPage() {
                   <SelectValue placeholder="Choose Assignee" className="text-gray-500" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allAssignees.map((assignee) => (
-                    <SelectItem key={assignee.id} value={assignee.id} className="text-sm">
-                      {assignee.name}
+                    <SelectItem key={user.uid} value={user.first_name} className="text-sm">
+                      {user.first_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
