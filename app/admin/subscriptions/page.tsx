@@ -245,36 +245,38 @@ export default function SubscriptionPage() {
                 </CardContent>
               </Card>
 
-              {/* Users Card (Placeholder Data) */}
+              {/* Users Card */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
                   <CardTitle className="text-xl font-bold">Users</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
-                    <p className="text-lg font-semibold text-gray-900">23 users</p>
-                    <p className="text-sm text-gray-600">(Max of 30 users)</p>
+                    <p className="text-lg font-semibold text-gray-900">{userData?.company_users?.length || 0} users</p>
+                    <p className="text-sm text-gray-600">(Max of {subscriptionData?.maxUsers || "Unlimited"} users)</p>
                   </div>
                   <Button variant="outline" className="mt-4 w-full bg-transparent">
-                    Expand
+                    Manage Users
                   </Button>
                 </CardContent>
               </Card>
 
-              {/* Inventory Card (Placeholder Data) */}
+              {/* Inventory Card */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
                   <CardTitle className="text-xl font-bold">Inventory</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
-                    <p className="text-lg font-semibold text-gray-900">100 static sites</p>
-                    <p className="text-lg font-semibold text-gray-900">15 dynamic sites</p>
-                    <p className="text-lg font-semibold text-gray-900">3 developments</p>
-                    <p className="text-sm text-gray-600">(Max of {subscriptionData.maxProducts} sites)</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {subscriptionData?.currentProducts || 0} total sites
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      (Max of {subscriptionData?.maxProducts || "Unlimited"} sites)
+                    </p>
                   </div>
                   <Button variant="outline" className="mt-4 w-full bg-transparent">
-                    Expand
+                    View Inventory
                   </Button>
                 </CardContent>
               </Card>
