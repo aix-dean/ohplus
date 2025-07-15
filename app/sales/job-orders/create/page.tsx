@@ -457,15 +457,26 @@ export default function CreateJobOrderPage() {
         )
       : 0
 
-  // Calculate totals dynamically based on products
-  const subtotal = products.reduce((sum, product, index) => {
+  // Calculate individual product totals for display
+  const productTotals = products.map((product, index) => {
     const item = items?.[index]
-    const price = item?.price || product.price || 0
-    return sum + price * totalMonths
-  }, 0)
+    const monthlyRate = item?.price || product.price || 0
+    const subtotal = monthlyRate * totalMonths
+    const vat = subtotal * 0.12
+    const total = subtotal + vat
 
-  const vatAmount = subtotal * 0.12
-  const totalAmountWithVat = subtotal + vatAmount
+    return {
+      subtotal,
+      vat,
+      total,
+      monthlyRate,
+    }
+  })
+
+  // Calculate overall totals
+  const overallSubtotal = productTotals.reduce((sum, product) => sum + product.subtotal, 0)
+  const overallVat = productTotals.reduce((sum, product) => sum + product.vat, 0)
+  const overallTotal = productTotals.reduce((sum, product) => sum + product.total, 0)
 
   return (
     <div className="flex flex-col min-h-screen bg-white p-4 md:p-6">
@@ -516,6 +527,8 @@ export default function CreateJobOrderPage() {
               <div className="space-y-2">
                 {products.map((product, index) => {
                   const item = items?.[index]
+                  const productTotal = productTotals[index]
+
                   return (
                     <div key={product.id} className="flex items-center gap-2 p-1.5 bg-gray-100 rounded-md">
                       <Image
@@ -534,7 +547,7 @@ export default function CreateJobOrderPage() {
                             "N/A"}
                         </p>
                         <p className="text-xs text-gray-600">{item?.product_name || product.name}</p>
-                        <p className="text-xs text-gray-500">{formatCurrency(item?.price || product.price)}/month</p>
+                        <p className="text-xs text-gray-500">{formatCurrency(productTotal.monthlyRate)}/month</p>
                       </div>
                     </div>
                   )
@@ -542,14 +555,54 @@ export default function CreateJobOrderPage() {
               </div>
             </div>
 
+            {/* Totals Section */}
             <div className="space-y-0.5 mt-3">
-              <p className="text-sm">
-                <span className="font-semibold">Subtotal:</span> {formatCurrency(subtotal)}
-              </p>
-              <p className="text-sm">
-                <span className="font-semibold">12% VAT:</span> {formatCurrency(vatAmount)}
-              </p>
-              <p className="font-bold text-lg mt-1">TOTAL: {formatCurrency(totalAmountWithVat)}</p>
+              {isMultiProduct ? (
+                // Show individual product totals for multiple products
+                <div className="space-y-3">
+                  {products.map((product, index) => {
+                    const item = items?.[index]
+                    const productTotal = productTotals[index]
+
+                    return (
+                      <div key={product.id} className="border-l-2 border-blue-500 pl-3">
+                        <p className="text-xs font-semibold text-gray-700 mb-1">
+                          {item?.site_code || product.site_code || `Site ${index + 1}`}
+                        </p>
+                        <p className="text-xs">
+                          <span className="font-semibold">Subtotal:</span> {formatCurrency(productTotal.subtotal)}
+                        </p>
+                        <p className="text-xs">
+                          <span className="font-semibold">12% VAT:</span> {formatCurrency(productTotal.vat)}
+                        </p>
+                        <p className="text-sm font-bold">Total: {formatCurrency(productTotal.total)}</p>
+                      </div>
+                    )
+                  })}
+
+                  {/* Overall totals */}
+                  <div className="border-t border-gray-300 pt-2 mt-3">
+                    <p className="text-sm">
+                      <span className="font-semibold">Overall Subtotal:</span> {formatCurrency(overallSubtotal)}
+                    </p>
+                    <p className="text-sm">
+                      <span className="font-semibold">Overall 12% VAT:</span> {formatCurrency(overallVat)}
+                    </p>
+                    <p className="font-bold text-lg mt-1">GRAND TOTAL: {formatCurrency(overallTotal)}</p>
+                  </div>
+                </div>
+              ) : (
+                // Show single product totals
+                <div>
+                  <p className="text-sm">
+                    <span className="font-semibold">Subtotal:</span> {formatCurrency(overallSubtotal)}
+                  </p>
+                  <p className="text-sm">
+                    <span className="font-semibold">12% VAT:</span> {formatCurrency(overallVat)}
+                  </p>
+                  <p className="font-bold text-lg mt-1">TOTAL: {formatCurrency(overallTotal)}</p>
+                </div>
+              )}
             </div>
 
             {/* Shared Compliance Documents */}
