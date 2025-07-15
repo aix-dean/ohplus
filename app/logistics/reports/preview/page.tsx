@@ -469,71 +469,74 @@ export default function ReportPreviewPage() {
         <Card className="shadow-sm">
           <CardContent className="p-6">
             <h2 className="text-xl font-bold mb-4 text-gray-900">Project Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-1">
-              <div className="space-y-1">
-                <div className="flex">
-                  <span className="font-medium text-gray-700">Site ID:</span>
-                  <span className="text-gray-900 ml-4">{getSiteLocation(product)}</span>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Left Column */}
+              <div className="space-y-2">
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <span className="font-medium text-gray-700 whitespace-nowrap">Site ID:</span>
+                  <span className="text-gray-900">{getSiteLocation(product)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700">Job Order:</span>
-                  <span className="text-gray-900 ml-4">{report.id?.slice(-4).toUpperCase() || "0031"}</span>
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <span className="font-medium text-gray-700 whitespace-nowrap">Job Order:</span>
+                  <span className="text-gray-900">{report.id?.slice(-4).toUpperCase() || "7733"}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700">Job Order Date:</span>
-                  <span className="text-gray-900 ml-4">{formatDate(report.date)}</span>
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <span className="font-medium text-gray-700 whitespace-nowrap">Job Order Date:</span>
+                  <span className="text-gray-900">{formatDate(report.date)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700">Site:</span>
-                  <span className="text-gray-900 ml-4">{report.siteName}</span>
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <span className="font-medium text-gray-700 whitespace-nowrap">Site:</span>
+                  <span className="text-gray-900">{report.siteName}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700">Size:</span>
-                  <span className="text-gray-900 ml-4">{getSiteSize(product)}</span>
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <span className="font-medium text-gray-700 whitespace-nowrap">Size:</span>
+                  <span className="text-gray-900">{getSiteSize(product)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700">Start Date:</span>
-                  <span className="text-gray-900 ml-4">{formatDate(report.bookingDates.start)}</span>
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <span className="font-medium text-gray-700 whitespace-nowrap">Start Date:</span>
+                  <span className="text-gray-900">{formatDate(report.bookingDates.start)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700">End Date:</span>
-                  <span className="text-gray-900 ml-4">{formatDate(report.bookingDates.end)}</span>
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <span className="font-medium text-gray-700 whitespace-nowrap">End Date:</span>
+                  <span className="text-gray-900">{formatDate(report.bookingDates.end)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700">Installation Duration:</span>
-                  <span className="text-gray-900 ml-4">
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <span className="font-medium text-gray-700 whitespace-nowrap">Installation Duration:</span>
+                  <span className="text-gray-900">
                     {calculateInstallationDuration(report.bookingDates.start, report.bookingDates.end)} days
                   </span>
                 </div>
               </div>
-              <div className="space-y-1">
-                <div className="flex">
-                  <span className="font-medium text-gray-700">Content:</span>
-                  <span className="text-gray-900 ml-4">{product?.content_type || "Static"}</span>
+
+              {/* Right Column */}
+              <div className="space-y-2">
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <span className="font-medium text-gray-700 whitespace-nowrap">Content:</span>
+                  <span className="text-gray-900">{product?.content_type || "Static"}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700">Material Specs:</span>
-                  <span className="text-gray-900 ml-4">{getMaterialSpecs(product)}</span>
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <span className="font-medium text-gray-700 whitespace-nowrap">Material Specs:</span>
+                  <span className="text-gray-900">{getMaterialSpecs(product)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700">Crew:</span>
-                  <span className="text-gray-900 ml-4">Team {report.assignedTo || "4"}</span>
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <span className="font-medium text-gray-700 whitespace-nowrap">Crew:</span>
+                  <span className="text-gray-900">Team {report.assignedTo || "4"}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700">Illumination:</span>
-                  <span className="text-gray-900 ml-4">{getIllumination(product)}</span>
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <span className="font-medium text-gray-700 whitespace-nowrap">Illumination:</span>
+                  <span className="text-gray-900">{getIllumination(product)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700">Gondola:</span>
-                  <span className="text-gray-900 ml-4">{getGondola(product)}</span>
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <span className="font-medium text-gray-700 whitespace-nowrap">Gondola:</span>
+                  <span className="text-gray-900">{getGondola(product)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700">Technology:</span>
-                  <span className="text-gray-900 ml-4">{getTechnology(product)}</span>
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <span className="font-medium text-gray-700 whitespace-nowrap">Technology:</span>
+                  <span className="text-gray-900">{getTechnology(product)}</span>
                 </div>
-                <div className="flex">
-                  <span className="font-medium text-gray-700">Sales:</span>
-                  <span className="text-gray-900 ml-4">{report.sales}</span>
+                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                  <span className="font-medium text-gray-700 whitespace-nowrap">Sales:</span>
+                  <span className="text-gray-900">{report.sales}</span>
                 </div>
               </div>
             </div>
