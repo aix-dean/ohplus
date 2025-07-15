@@ -50,7 +50,6 @@ export async function createProposal(
     const cleanClient: ProposalClient = {
       company: client.company || "",
       contactPerson: client.contactPerson || "",
-      designation: client.designation || "",
       email: client.email || "",
       phone: client.phone || "",
       address: client.address || "",

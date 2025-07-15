@@ -1,140 +1,447 @@
-import { db, storage } from "./firebase"
 import {
   collection,
-  doc,
-  getDoc,
   getDocs,
   addDoc,
-  updateDoc,
-  deleteDoc,
   query,
   where,
-  serverTimestamp,
-  orderBy,
   limit,
   startAfter,
+  orderBy,
+  type DocumentData,
+  type QueryDocumentSnapshot,
   getCountFromServer,
+  type Timestamp,
+  doc,
+  updateDoc,
+  serverTimestamp,
+  getDoc,
 } from "firebase/firestore"
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage"
-import type { Product, ProductType } from "./types/product"
-import type { Client } from "./types/client"
-import type { Proposal } from "./types/proposal"
-import type { CostEstimate } from "./types/cost-estimate"
-import type { Quotation } from "./types/quotation"
-import type { JobOrder } from "./types/job-order"
-import type { Campaign } from "./types/campaign"
-import type { UserData } from "./types/user"
-import type { InvitationCode } from "./types/invitation-code"
-import type { ServiceAssignment } from "./types/service-assignment"
-import type { ServiceReport } from "./types/service-report"
-import type { ChatThread, ChatMessage } from "./types/chat"
+import { db } from "@/lib/firebase"
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
-// --- Firebase Storage Upload Function ---
-export const uploadFileToFirebaseStorage = async (file: File, path: string): Promise<string> => {
-  const storageRef = ref(storage, `${path}${file.name}`)
-  const uploadTask = uploadBytesResumable(storageRef, file)
+// Initialize Firebase Storage
+const storage = getStorage()
 
-  return new Promise((resolve, reject) => {
-    uploadTask.on(
-      "state_changed",
-      (snapshot) => {
-        // Observe state change events such as progress, pause, and resume
-        // Get task progress, including the number of bytes uploaded and the total number of bytes to be uploaded
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-        console.log("Upload is " + progress + "% done")
-        switch (snapshot.state) {
-          case "paused":
-            console.log("Upload is paused")
-            break
-          case "running":
-            console.log("Upload is running")
-            break
-        }
-      },
-      (error) => {
-        // Handle unsuccessful uploads
-        console.error("Firebase upload error:", error)
-        reject(error)
-      },
-      async () => {
-        // Handle successful uploads on complete
-        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
-        resolve(downloadURL)
-      },
-    )
-  })
+// Product interface
+export interface Product {
+  id?: string
+  name: string
+  description: string
+  price: number
+  imageUrl?: string
+  active: boolean
+  deleted: boolean
+  created?: any
+  updated?: any
+  seller_id: string
+  seller_name: string
+  company_id?: string | null
+  position: number
+  media?: Array<{
+    url: string
+    distance: string
+    type: string
+    isVideo: boolean
+  }>
+  categories?: string[]
+  category_names?: string[]
+  content_type?: string
+  cms?: {
+    start_time?: string
+    end_time?: string
+    spot_duration?: number
+    loops_per_day?: number
+    spots_per_loop?: number
+  } | null
+  specs_rental?: {
+    audience_type?: string
+    audience_types?: string[]
+    geopoint?: [number, number]
+    location?: string
+    traffic_count?: number | null
+    elevation?: number | null
+    height?: number | null
+    width?: number | null
+  }
+  type?: string
+  status?: string
+  position?: number
 }
 
-// --- Firebase Firestore Services ---
+// ServiceAssignment interface
+export interface ServiceAssignment {
+  id: string
+  saNumber: string
+  projectSiteId: string
+  projectSiteName: string
+  projectSiteLocation: string
+  serviceType: string
+  assignedTo: string
+  jobDescription: string
+  requestedBy: {
+    id: string
+    name: string
+    department: string
+  }
+  message: string
+  coveredDateStart: Date | null
+  coveredDateEnd: Date | null
+  alarmDate: Date | null
+  alarmTime: string
+  attachments: { name: string; type: string }[]
+  status: string
+  created: any
+  updated: any
+}
 
-// Products
-export const getProducts = async (
-  lastDoc: any = null,
-  limitCount = 10,
-  searchQuery = "",
-  typeFilter: ProductType | "" = "",
-) => {
+// Booking interface
+export interface Booking {
+  id: string
+  product_id: string
+  client_id: string
+  client_name: string
+  seller_id: string
+  start_date: string | Timestamp
+  end_date: string | Timestamp
+  status: string
+  total_amount: number
+  payment_status: string
+  created: string | Timestamp
+  updated: string | Timestamp
+  notes?: string
+  booking_reference?: string
+}
+
+// User interface
+export interface User {
+  id: string
+  name: string
+  email: string
+  company?: string
+  phone?: string
+  role?: string
+  created?: string | Timestamp
+  updated?: string | Timestamp
+}
+
+// QuotationRequest interface
+export interface QuotationRequest {
+  id: string
+  company: string
+  company_address: string
+  contact_number: string
+  created: string | Timestamp
+  deleted: boolean
+  email_address: string
+  end_date: string | Timestamp
+  name: string
+  position: string
+  product_id: string
+  product_ref: string
+  seller_id: string
+  start_date: string | Timestamp
+  status: string
+  user_id: string
+  // Optional fields that might be added later
+  notes?: string
+  total_amount?: number
+  updated?: string | Timestamp
+}
+
+// Quotation interface
+export interface Quotation {
+  id?: string
+  quotation_number: string
+  quotation_request_id?: string
+  product_id: string
+  product_name: string
+  product_location?: string
+  site_code?: string
+  start_date: string
+  end_date: string
+  price: number
+  total_amount: number
+  duration_days: number
+  notes?: string
+  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed"
+  created: any
+  updated?: any
+  created_by?: string
+  created_by_first_name?: string
+  created_by_last_name?: string
+  client_name?: string
+  client_email?: string
+  client_id?: string // Added client_id
+  campaignId?: string
+  proposalId?: string
+  valid_until?: any
+}
+
+// PaginatedResult interface
+export interface PaginatedResult<T> {
+  items: T[]
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null
+  hasMore: boolean
+}
+
+// ProjectData interface
+export interface ProjectData {
+  id: string
+  uid: string
+  license_key: string
+  project_name: string
+  company_name: string
+  company_location: string
+  company_website: string
+  social_media: {
+    facebook: string
+    instagram: string
+    youtube: string
+  }
+  created: string
+  updated: string
+  deleted: boolean
+  tenant_id?: string
+}
+
+// Get a single product by ID
+export async function getProductById(productId: string): Promise<Product | null> {
   try {
-    const productsRef = collection(db, "products")
-    let q
+    const productDoc = await getDoc(doc(db, "products", productId))
 
-    if (searchQuery) {
-      // For simple search, you might need to query based on specific fields
-      // Firebase doesn't support full-text search directly.
-      // For more advanced search, consider Algolia or a similar service.
-      q = query(
-        productsRef,
-        where("name", ">=", searchQuery),
-        where("name", "<=", searchQuery + "\uf8ff"),
-        orderBy("name"),
-        limit(limitCount),
-      )
-    } else if (typeFilter) {
-      q = query(productsRef, where("type", "==", typeFilter), orderBy("created_at", "desc"), limit(limitCount))
-    } else {
-      q = query(productsRef, orderBy("created_at", "desc"), limit(limitCount))
+    if (productDoc.exists()) {
+      return { id: productDoc.id, ...productDoc.data() } as Product
     }
 
+    return null
+  } catch (error) {
+    console.error("Error fetching product:", error)
+    return null
+  }
+}
+
+// Update an existing product
+export async function updateProduct(productId: string, productData: Partial<Product>): Promise<void> {
+  try {
+    const productRef = doc(db, "products", productId)
+
+    // Add updated timestamp
+    const updateData = {
+      ...productData,
+      updated: serverTimestamp(),
+    }
+
+    await updateDoc(productRef, updateData)
+  } catch (error) {
+    console.error("Error updating product:", error)
+    throw error
+  }
+}
+
+// Get all products for a user (legacy method)
+export async function getUserProducts(userId: string): Promise<Product[]> {
+  try {
+    const productsRef = collection(db, "products")
+    const q = query(productsRef, where("company_id", "==", userId), orderBy("name", "asc"))
+    const querySnapshot = await getDocs(q)
+
+    const products: Product[] = []
+    querySnapshot.forEach((doc) => {
+      products.push({ id: doc.id, ...doc.data() } as Product)
+    })
+
+    return products
+  } catch (error) {
+    console.error("Error fetching user products:", error)
+    return []
+  }
+}
+
+// Get paginated products for a user
+export async function getPaginatedUserProducts(
+  userId: string,
+  itemsPerPage = 16,
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
+  options: { searchTerm?: string; active?: boolean; content_type?: string } = {},
+): Promise<PaginatedResult<Product>> {
+  try {
+    const productsRef = collection(db, "products")
+    const { searchTerm = "", active, content_type } = options
+
+    // Start with basic constraints
+    const constraints: any[] = [where("company_id", "==", userId), orderBy("name", "asc"), limit(itemsPerPage)]
+
+    // Add active filter if specified
+    if (active !== undefined) {
+      constraints.unshift(where("active", "==", active))
+    }
+
+    // Add content_type filter if specified (case-insensitive handled client-side due to Firestore limitations)
+    if (content_type) {
+      // Note: Firestore doesn't support case-insensitive queries, so we'll need to handle this client-side
+      // For now, we'll fetch more items and filter client-side
+      constraints[constraints.length - 1] = limit(itemsPerPage * 2) // Fetch more to account for filtering
+    }
+
+    // Create the query with all constraints
+    let q = query(productsRef, ...constraints)
+
+    // If we have a last document, start after it for pagination
     if (lastDoc) {
       q = query(q, startAfter(lastDoc))
     }
 
-    const documentSnapshots = await getDocs(q)
-    const products = documentSnapshots.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as Product),
-    }))
-    const lastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1]
+    const querySnapshot = await getDocs(q)
 
-    return { products, lastVisible }
-  } catch (error) {
-    console.error("Error getting products:", error)
-    throw error
-  }
-}
+    // Get the last visible document for next pagination
+    let lastVisible = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null
 
-export const getProductById = async (id: string): Promise<Product | null> => {
-  try {
-    const docRef = doc(db, "products", id)
-    const docSnap = await getDoc(docRef)
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...(docSnap.data() as Product) }
-    } else {
-      return null
+    // Convert the documents to Product objects and apply filters
+    const products: Product[] = []
+    querySnapshot.forEach((doc) => {
+      const product = { id: doc.id, ...doc.data() } as Product
+
+      // Apply content_type filter (case-insensitive)
+      if (content_type) {
+        const productContentType = (product.content_type || "").toLowerCase()
+        const filterContentType = content_type.toLowerCase()
+        if (productContentType !== filterContentType) {
+          return // Skip this product
+        }
+      }
+
+      // If there's a search term, filter client-side
+      if (searchTerm && typeof searchTerm === "string") {
+        const searchLower = searchTerm.toLowerCase()
+        if (
+          product.name?.toLowerCase().includes(searchLower) ||
+          product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
+          product.description?.toLowerCase().includes(searchLower)
+        ) {
+          products.push(product)
+        }
+      } else {
+        products.push(product)
+      }
+    })
+
+    // If we filtered by content_type, we might have fewer items than requested
+    // Adjust pagination accordingly
+    const actualItems = products.slice(0, itemsPerPage)
+    const hasMore = content_type ? products.length > itemsPerPage : querySnapshot.docs.length === itemsPerPage
+
+    // Update lastVisible if we sliced the results
+    if (content_type && actualItems.length > 0) {
+      // Find the last document that corresponds to our last item
+      const lastItemId = actualItems[actualItems.length - 1].id
+      lastVisible = querySnapshot.docs.find((doc) => doc.id === lastItemId) || lastVisible
+    }
+
+    return {
+      items: actualItems,
+      lastDoc: lastVisible,
+      hasMore,
     }
   } catch (error) {
-    console.error("Error getting product by ID:", error)
-    throw error
+    console.error("Error fetching paginated user products:", error)
+    return {
+      items: [],
+      lastDoc: null,
+      hasMore: false,
+    }
   }
 }
 
-export const createProduct = async (productData: Omit<Product, "id" | "created_at" | "updated_at">) => {
+// Get the total count of products for a user
+export async function getUserProductsCount(
+  userId: string,
+  options: { searchTerm?: string; active?: boolean; deleted?: boolean; content_type?: string } = {},
+): Promise<number> {
   try {
-    const docRef = await addDoc(collection(db, "products"), {
+    console.log("Getting user products count for userId:", userId, "with options:", options)
+
+    const productsRef = collection(db, "products")
+    const { searchTerm = "", active, deleted, content_type } = options
+
+    // Start with basic constraints
+    const constraints: any[] = [where("company_id", "==", userId)]
+
+    // Add active filter if specified
+    if (active !== undefined) {
+      constraints.push(where("active", "==", active))
+    }
+    // Add deleted filter if specified
+    if (deleted !== undefined) {
+      constraints.push(where("deleted", "==", deleted))
+    }
+
+    // Create the query with all constraints
+    const q = query(productsRef, ...constraints)
+
+    // If there's a search term or content_type filter, we need to fetch all documents and filter client-side
+    if ((searchTerm && typeof searchTerm === "string") || content_type) {
+      const querySnapshot = await getDocs(q)
+      const searchLower = searchTerm ? searchTerm.toLowerCase() : ""
+      const contentTypeLower = content_type ? content_type.toLowerCase() : ""
+
+      // Filter documents client-side
+      let count = 0
+      querySnapshot.forEach((doc) => {
+        const product = doc.data() as Product
+
+        // Apply content_type filter if specified
+        if (content_type) {
+          const productContentType = (product.content_type || "").toLowerCase()
+          if (productContentType !== contentTypeLower) {
+            return // Skip this product
+          }
+        }
+
+        // Apply search filter if specified
+        if (searchTerm && typeof searchTerm === "string") {
+          if (
+            product.name?.toLowerCase().includes(searchLower) ||
+            product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
+            product.description?.toLowerCase().includes(searchLower)
+          ) {
+            count++
+          }
+        } else {
+          count++
+        }
+      })
+
+      console.log("User products count (with filters):", count)
+      return count
+    } else {
+      // If no search term or content_type, we can use the more efficient getCountFromServer
+      const snapshot = await getCountFromServer(q)
+      return snapshot.data().count
+    }
+  } catch (error) {
+    console.error("Error getting user products count:", error)
+    return 0
+  }
+}
+
+// Create a new product
+export async function createProduct(productData: Partial<Product>): Promise<string> {
+  try {
+    const newProduct = {
       ...productData,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
-    })
+      status: productData.status || "PENDING",
+      position: productData.position || 0,
+      deleted: productData.deleted !== undefined ? productData.deleted : false,
+      active: productData.active !== undefined ? productData.active : true,
+      created: serverTimestamp(),
+      updated: serverTimestamp(),
+    }
+
+    console.log("Final product data to be saved:", newProduct)
+
+    const docRef = await addDoc(collection(db, "products"), newProduct)
+    console.log("Product created with ID:", docRef.id)
+
     return docRef.id
   } catch (error) {
     console.error("Error creating product:", error)
@@ -142,12 +449,806 @@ export const createProduct = async (productData: Omit<Product, "id" | "created_a
   }
 }
 
-export const updateProduct = async (id: string, productData: Partial<Product>) => {
+// Soft delete a product (mark as deleted)
+export async function softDeleteProduct(productId: string): Promise<void> {
+  try {
+    const productRef = doc(db, "products", productId)
+    await updateDoc(productRef, {
+      deleted: true,
+      date_deleted: serverTimestamp(),
+      updated: serverTimestamp(),
+    })
+  } catch (error) {
+    console.error("Error soft deleting product:", error)
+    throw error
+  }
+}
+
+export async function getAllProducts(): Promise<Product[]> {
+  try {
+    const productsRef = collection(db, "products")
+    const querySnapshot = await getDocs(productsRef)
+
+    const products: Product[] = []
+    querySnapshot.forEach((doc) => {
+      products.push({ id: doc.id, ...doc.data() } as Product)
+    })
+
+    return products
+  } catch (error) {
+    console.error("Error fetching all products:", error)
+    return []
+  }
+}
+
+// Search products by term (for more complex search requirements)
+export async function searchUserProducts(userId: string, searchTerm: string): Promise<Product[]> {
+  try {
+    // For simple searches, we can fetch all user products and filter client-side
+    // For production with large datasets, consider using Algolia, Elasticsearch, or Firestore's array-contains
+    const products = await getUserProducts(userId)
+
+    if (!searchTerm) return products
+
+    const searchLower = searchTerm.toLowerCase()
+    return products.filter(
+      (product) =>
+        product.name?.toLowerCase().includes(searchLower) ||
+        product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
+        product.description?.toLowerCase().includes(searchLower),
+    )
+  } catch (error) {
+    console.error("Error searching user products:", error)
+    return []
+  }
+}
+
+// NEW OPTIMIZED FUNCTIONS
+
+// Get products by content type with pagination and filtering
+export async function getProductsByContentType(
+  contentType: string,
+  itemsPerPage = 16,
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
+  searchTerm = "",
+): Promise<PaginatedResult<Product>> {
+  try {
+    const productsRef = collection(db, "products")
+
+    // Create base query - filter out deleted products
+    const baseQuery = query(productsRef, where("deleted", "==", false), orderBy("name", "asc"))
+
+    // If search term is provided, we need to handle it differently
+    if (searchTerm) {
+      // For search, we need to fetch more items and filter client-side
+      // This is because Firestore doesn't support case-insensitive search
+      const searchQuery = lastDoc
+        ? query(baseQuery, startAfter(lastDoc), limit(itemsPerPage * 3)) // Fetch more to account for filtering
+        : query(baseQuery, limit(itemsPerPage * 3))
+
+      const querySnapshot = await getDocs(searchQuery)
+
+      // Filter client-side for content_type and search term
+      const searchLower = searchTerm.toLowerCase()
+      const contentTypeLower = contentType.toLowerCase()
+
+      const filteredDocs = querySnapshot.docs.filter((doc) => {
+        const product = doc.data() as Product
+        const productContentType = (product.content_type || "").toLowerCase()
+
+        // Check content type match
+        if (productContentType !== contentTypeLower) return false
+
+        // Check search term match
+        return (
+          product.name?.toLowerCase().includes(searchLower) ||
+          product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
+          product.description?.toLowerCase().includes(searchLower)
+        )
+      })
+
+      // Apply pagination to filtered results
+      const paginatedDocs = filteredDocs.slice(0, itemsPerPage)
+      const lastVisible = paginatedDocs.length > 0 ? paginatedDocs[paginatedDocs.length - 1] : null
+
+      // Convert to products
+      const products = paginatedDocs.map((doc) => ({ id: doc.id, ...doc.data() }) as Product)
+
+      return {
+        items: products,
+        lastDoc: lastVisible,
+        hasMore: filteredDocs.length > itemsPerPage,
+      }
+    } else {
+      // If no search term, we can use a more efficient query
+      // Add content_type filter (case insensitive is handled client-side)
+      // Note: For case-insensitive search, consider adding lowercase fields to your documents
+      const paginatedQuery = lastDoc
+        ? query(baseQuery, limit(itemsPerPage * 2), startAfter(lastDoc))
+        : query(baseQuery, limit(itemsPerPage * 2))
+
+      const querySnapshot = await getDocs(paginatedQuery)
+
+      // Filter for content_type (case insensitive)
+      const contentTypeLower = contentType.toLowerCase()
+      const filteredDocs = querySnapshot.docs.filter((doc) => {
+        const product = doc.data() as Product
+        const productContentType = (product.content_type || "").toLowerCase()
+        return productContentType === contentTypeLower
+      })
+
+      // Apply pagination to filtered results
+      const paginatedDocs = filteredDocs.slice(0, itemsPerPage)
+      const lastVisible = paginatedDocs.length > 0 ? paginatedDocs[paginatedDocs.length - 1] : null
+
+      // Convert to products
+      const products = paginatedDocs.map((doc) => ({ id: doc.id, ...doc.data() }) as Product)
+
+      return {
+        items: products,
+        lastDoc: lastVisible,
+        hasMore: filteredDocs.length > itemsPerPage,
+      }
+    }
+  } catch (error) {
+    console.error(`Error fetching products by content type (${contentType}):`, error)
+    return {
+      items: [],
+      lastDoc: null,
+      hasMore: false,
+    }
+  }
+}
+
+// Get count of products by content type
+export async function getProductsCountByContentType(contentType: string, searchTerm = ""): Promise<number> {
+  try {
+    const productsRef = collection(db, "products")
+
+    // Create base query - filter out deleted products
+    const baseQuery = query(productsRef, where("deleted", "==", false))
+
+    const querySnapshot = await getDocs(baseQuery)
+
+    // Filter for content_type and search term
+    const contentTypeLower = contentType.toLowerCase()
+    let count = 0
+
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
+
+      querySnapshot.forEach((doc) => {
+        const product = doc.data() as Product
+        const productContentType = (product.content_type || "").toLowerCase()
+
+        if (productContentType === contentTypeLower) {
+          if (
+            product.name?.toLowerCase().includes(searchLower) ||
+            product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
+            product.description?.toLowerCase().includes(searchLower)
+          ) {
+            count++
+          }
+        }
+      })
+    } else {
+      querySnapshot.forEach((doc) => {
+        const product = doc.data() as Product
+        const productContentType = (product.content_type || "").toLowerCase()
+
+        if (productContentType === contentTypeLower) {
+          count++
+        }
+      })
+    }
+
+    return count
+  } catch (error) {
+    console.error(`Error getting count of products by content type (${contentType}):`, error)
+    return 0
+  }
+}
+
+// Add these functions at the end of the file
+export async function getServiceAssignments(): Promise<ServiceAssignment[]> {
+  try {
+    const assignmentsRef = collection(db, "service_assignments")
+    const querySnapshot = await getDocs(assignmentsRef)
+
+    const assignments: ServiceAssignment[] = []
+    querySnapshot.forEach((doc) => {
+      assignments.push({ id: doc.id, ...doc.data() } as ServiceAssignment)
+    })
+
+    return assignments
+  } catch (error) {
+    console.error("Error fetching service assignments:", error)
+    return []
+  }
+}
+
+export async function getServiceAssignmentById(assignmentId: string): Promise<ServiceAssignment | null> {
+  try {
+    const assignmentDoc = await getDoc(doc(db, "service_assignments", assignmentId))
+
+    if (assignmentDoc.exists()) {
+      return { id: assignmentDoc.id, ...assignmentDoc.data() } as ServiceAssignment
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error fetching service assignment:", error)
+    return null
+  }
+}
+
+export async function updateServiceAssignment(
+  assignmentId: string,
+  assignmentData: Partial<ServiceAssignment>,
+): Promise<void> {
+  try {
+    const assignmentRef = doc(db, "service_assignments", assignmentId)
+
+    // Add updated timestamp
+    const updateData = {
+      ...assignmentData,
+      updated: serverTimestamp(),
+    }
+
+    await updateDoc(assignmentRef, updateData)
+  } catch (error) {
+    console.error("Error updating service assignment:", error)
+    throw error
+  }
+}
+
+// Add this function at the end of the file
+export async function getProductBookings(productId: string): Promise<Booking[]> {
+  try {
+    const bookingsRef = collection(db, "booking")
+    const q = query(bookingsRef, where("product_id", "==", productId), orderBy("created", "desc"))
+
+    const querySnapshot = await getDocs(q)
+
+    const bookings: Booking[] = []
+    querySnapshot.forEach((doc) => {
+      bookings.push({ id: doc.id, ...doc.data() } as Booking)
+    })
+
+    return bookings
+  } catch (error) {
+    console.error("Error fetching product bookings:", error)
+    return []
+  }
+}
+
+// Add this function at the end of the file
+export async function getUserById(userId: string): Promise<User | null> {
+  try {
+    const userDoc = await getDoc(doc(db, "users", userId))
+
+    if (userDoc.exists()) {
+      return { id: userDoc.id, ...userDoc.data() } as User
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error fetching user:", error)
+    return null
+  }
+}
+
+// Update this function to make status filtering case-insensitive
+export async function getServiceAssignmentsByProductId(productId: string): Promise<ServiceAssignment[]> {
+  try {
+    const assignmentsRef = collection(db, "service_assignments")
+
+    // Only filter by productId in the Firestore query
+    const q = query(assignmentsRef, where("projectSiteId", "==", productId))
+
+    const querySnapshot = await getDocs(q)
+
+    // Filter by status case-insensitively on the client side
+    const assignments: ServiceAssignment[] = []
+    querySnapshot.forEach((doc) => {
+      const assignment = { id: doc.id, ...doc.data() } as ServiceAssignment
+
+      // Case-insensitive status check
+      const status = assignment.status?.toLowerCase() || ""
+      if (status === "ongoing" || status === "pending") {
+        assignments.push(assignment)
+      }
+    })
+
+    return assignments
+  } catch (error) {
+    console.error(`Error fetching service assignments for product ${productId}:`, error)
+    return []
+  }
+}
+
+// QUOTATION REQUEST FUNCTIONS
+
+// Get all quotation requests
+export async function getQuotationRequests(): Promise<QuotationRequest[]> {
+  try {
+    const quotationRequestsRef = collection(db, "quotation_request")
+    const q = query(quotationRequestsRef, where("deleted", "==", false), orderBy("created", "desc"))
+    const querySnapshot = await getDocs(q)
+
+    const quotationRequests: QuotationRequest[] = []
+    querySnapshot.forEach((doc) => {
+      quotationRequests.push({ id: doc.id, ...doc.data() } as QuotationRequest)
+    })
+
+    return quotationRequests
+  } catch (error) {
+    console.error("Error fetching quotation requests:", error)
+    return []
+  }
+}
+
+// Get quotation requests by seller ID
+export async function getQuotationRequestsBySellerId(sellerId: string): Promise<QuotationRequest[]> {
+  try {
+    const quotationRequestsRef = collection(db, "quotation_request")
+    const q = query(
+      quotationRequestsRef,
+      where("seller_id", "==", sellerId),
+      where("deleted", "==", false),
+      orderBy("created", "desc"),
+    )
+    const querySnapshot = await getDocs(q)
+
+    const quotationRequests: QuotationRequest[] = []
+    querySnapshot.forEach((doc) => {
+      quotationRequests.push({ id: doc.id, ...doc.data() } as QuotationRequest)
+    })
+
+    return quotationRequests
+  } catch (error) {
+    console.error("Error fetching quotation requests by seller ID:", error)
+    return []
+  }
+}
+
+// Get quotation requests by product ID
+export async function getQuotationRequestsByProductId(productId: string): Promise<QuotationRequest[]> {
+  try {
+    const quotationRequestsRef = collection(db, "quotation_request")
+    const q = query(
+      quotationRequestsRef,
+      where("product_id", "==", productId),
+      where("deleted", "==", false),
+      orderBy("created", "desc"),
+    )
+    const querySnapshot = await getDocs(q)
+
+    const quotationRequests: QuotationRequest[] = []
+    querySnapshot.forEach((doc) => {
+      quotationRequests.push({ id: doc.id, ...doc.data() } as QuotationRequest)
+    })
+
+    return quotationRequests
+  } catch (error) {
+    console.error("Error fetching quotation requests by product ID:", error)
+    return []
+  }
+}
+
+// Get quotation requests with pagination
+export async function getPaginatedQuotationRequests(
+  itemsPerPage = 20,
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
+  options: {
+    sellerId?: string
+    status?: string
+    searchTerm?: string
+  } = {},
+): Promise<PaginatedResult<QuotationRequest>> {
+  try {
+    const quotationRequestsRef = collection(db, "quotation_request")
+    const { sellerId, status, searchTerm = "" } = options
+
+    // Start with basic constraints
+    const constraints: any[] = [where("deleted", "==", false), orderBy("created", "desc"), limit(itemsPerPage)]
+
+    // Add seller filter if specified
+    if (sellerId) {
+      constraints.unshift(where("seller_id", "==", sellerId))
+    }
+
+    // Add status filter if specified
+    if (status && status !== "all") {
+      constraints.unshift(where("status", "==", status.toUpperCase()))
+    }
+
+    // Create the query with all constraints
+    let q = query(quotationRequestsRef, ...constraints)
+
+    // If we have a last document, start after it for pagination
+    if (lastDoc) {
+      q = query(q, startAfter(lastDoc))
+    }
+
+    const querySnapshot = await getDocs(q)
+
+    // Get the last visible document for next pagination
+    const lastVisible = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null
+
+    // Check if there are more documents to fetch
+    const hasMore = querySnapshot.docs.length === itemsPerPage
+
+    // Convert the documents to QuotationRequest objects
+    const quotationRequests: QuotationRequest[] = []
+    querySnapshot.forEach((doc) => {
+      const quotationRequest = { id: doc.id, ...doc.data() } as QuotationRequest
+
+      // If there's a search term, filter client-side
+      if (searchTerm && typeof searchTerm === "string") {
+        const searchLower = searchTerm.toLowerCase()
+        if (
+          quotationRequest.name?.toLowerCase().includes(searchLower) ||
+          quotationRequest.company?.toLowerCase().includes(searchLower) ||
+          quotationRequest.email_address?.toLowerCase().includes(searchLower) ||
+          quotationRequest.contact_number?.includes(searchTerm)
+        ) {
+          quotationRequests.push(quotationRequest)
+        }
+      } else {
+        quotationRequests.push(quotationRequest)
+      }
+    })
+
+    return {
+      items: quotationRequests,
+      lastDoc: lastVisible,
+      hasMore,
+    }
+  } catch (error) {
+    console.error("Error fetching paginated quotation requests:", error)
+    return {
+      items: [],
+      lastDoc: null,
+      hasMore: false,
+    }
+  }
+}
+
+// Get a single quotation request by ID
+export async function getQuotationRequestById(quotationRequestId: string): Promise<QuotationRequest | null> {
+  try {
+    const quotationRequestDoc = await getDoc(doc(db, "quotation_request", quotationRequestId))
+
+    if (quotationRequestDoc.exists()) {
+      return { id: quotationRequestDoc.id, ...quotationRequestDoc.data() } as QuotationRequest
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error fetching quotation request:", error)
+    return null
+  }
+}
+
+// Update a quotation request
+export async function updateQuotationRequest(
+  quotationRequestId: string,
+  quotationRequestData: Partial<QuotationRequest>,
+): Promise<void> {
+  try {
+    const quotationRequestRef = doc(db, "quotation_request", quotationRequestId)
+
+    // Add updated timestamp
+    const updateData = {
+      ...quotationRequestData,
+      updated: serverTimestamp(),
+    }
+
+    await updateDoc(quotationRequestRef, updateData)
+  } catch (error) {
+    console.error("Error updating quotation request:", error)
+    throw error
+  }
+}
+
+// Create a new quotation request
+export async function createQuotationRequest(quotationRequestData: Partial<QuotationRequest>): Promise<string> {
+  try {
+    const newQuotationRequest = {
+      ...quotationRequestData,
+      created: serverTimestamp(),
+      deleted: false,
+      status: quotationRequestData.status || "PENDING",
+    }
+
+    const docRef = await addDoc(collection(db, "quotation_request"), newQuotationRequest)
+    return docRef.id
+  } catch (error) {
+    console.error("Error creating quotation request:", error)
+    throw error
+  }
+}
+
+// Soft delete a quotation request
+export async function softDeleteQuotationRequest(quotationRequestId: string): Promise<void> {
+  try {
+    const quotationRequestRef = doc(db, "quotation_request", quotationRequestId)
+    await updateDoc(quotationRequestRef, {
+      deleted: true,
+      updated: serverTimestamp(),
+    })
+  } catch (error) {
+    console.error("Error soft deleting quotation request:", error)
+    throw error
+  }
+}
+
+// Get quotations by quotation request ID
+export async function getQuotationsByRequestId(quotationRequestId: string): Promise<any[]> {
+  try {
+    const quotationsRef = collection(db, "quotations")
+    const q = query(quotationsRef, where("quotation_request_id", "==", quotationRequestId), orderBy("created", "desc"))
+    const querySnapshot = await getDocs(q)
+
+    const quotations: any[] = []
+    querySnapshot.forEach((doc) => {
+      quotations.push({ id: doc.id, ...doc.data() })
+    })
+
+    return quotations
+  } catch (error) {
+    console.error("Error fetching quotations by request ID:", error)
+    return []
+  }
+}
+
+// Get products by content type and company with pagination and filtering
+export async function getProductsByContentTypeAndCompany(
+  contentType: string,
+  itemsPerPage = 16,
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
+  searchTerm = "",
+): Promise<PaginatedResult<Product>> {
+  try {
+    const productsRef = collection(db, "products")
+
+    // Create base query - filter out deleted products
+    const baseQuery = query(productsRef, where("deleted", "==", false), orderBy("name", "asc"))
+
+    // If search term is provided, we need to handle it differently
+    if (searchTerm) {
+      // For search, we need to fetch more items and filter client-side
+      // This is because Firestore doesn't support case-insensitive search
+      const searchQuery = lastDoc
+        ? query(baseQuery, startAfter(lastDoc), limit(itemsPerPage * 3)) // Fetch more to account for filtering
+        : query(baseQuery, limit(itemsPerPage * 3))
+
+      const querySnapshot = await getDocs(searchQuery)
+
+      // Filter client-side for content_type, company_id and search term
+      const searchLower = searchTerm.toLowerCase()
+      const contentTypeLower = contentType.toLowerCase()
+
+      const filteredDocs = querySnapshot.docs.filter((doc) => {
+        const product = doc.data() as Product
+        const productContentType = (product.content_type || "").toLowerCase()
+
+        // Check content type match
+        if (productContentType !== contentTypeLower) return false
+
+        // Check if product has company_id (filter out products without company_id)
+        if (!product.company_id) return false
+
+        // Check search term match
+        return (
+          product.name?.toLowerCase().includes(searchLower) ||
+          product.light?.location?.toLowerCase().includes(searchLower) ||
+          product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
+          product.description?.toLowerCase().includes(searchLower)
+        )
+      })
+
+      // Apply pagination to filtered results
+      const paginatedDocs = filteredDocs.slice(0, itemsPerPage)
+      const lastVisible = paginatedDocs.length > 0 ? paginatedDocs[paginatedDocs.length - 1] : null
+
+      // Convert to products
+      const products = paginatedDocs.map((doc) => ({ id: doc.id, ...doc.data() }) as Product)
+
+      return {
+        items: products,
+        lastDoc: lastVisible,
+        hasMore: filteredDocs.length > itemsPerPage,
+      }
+    } else {
+      // If no search term, we can use a more efficient query
+      const paginatedQuery = lastDoc
+        ? query(baseQuery, limit(itemsPerPage * 2), startAfter(lastDoc))
+        : query(baseQuery, limit(itemsPerPage * 2))
+
+      const querySnapshot = await getDocs(paginatedQuery)
+
+      // Filter for content_type and company_id (case insensitive)
+      const contentTypeLower = contentType.toLowerCase()
+      const filteredDocs = querySnapshot.docs.filter((doc) => {
+        const product = doc.data() as Product
+        const productContentType = (product.content_type || "").toLowerCase()
+
+        // Check content type match and has company_id
+        return productContentType === contentTypeLower && product.company_id
+      })
+
+      // Apply pagination to filtered results
+      const paginatedDocs = filteredDocs.slice(0, itemsPerPage)
+      const lastVisible = paginatedDocs.length > 0 ? paginatedDocs[paginatedDocs.length - 1] : null
+
+      // Convert to products
+      const products = paginatedDocs.map((doc) => ({ id: doc.id, ...doc.data() }) as Product)
+
+      return {
+        items: products,
+        lastDoc: lastVisible,
+        hasMore: filteredDocs.length > itemsPerPage,
+      }
+    }
+  } catch (error) {
+    console.error(`Error fetching products by content type and company (${contentType}):`, error)
+    return {
+      items: [],
+      lastDoc: null,
+      hasMore: false,
+    }
+  }
+}
+
+// Get count of products by content type and company
+export async function getProductsCountByContentTypeAndCompany(contentType: string, searchTerm = ""): Promise<number> {
+  try {
+    const productsRef = collection(db, "products")
+
+    // Create base query - filter out deleted products
+    const baseQuery = query(productsRef, where("deleted", "==", false))
+
+    const querySnapshot = await getDocs(baseQuery)
+
+    // Filter for content_type, company_id and search term
+    const contentTypeLower = contentType.toLowerCase()
+    let count = 0
+
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
+
+      querySnapshot.forEach((doc) => {
+        const product = doc.data() as Product
+        const productContentType = (product.content_type || "").toLowerCase()
+
+        if (productContentType === contentTypeLower && product.company_id) {
+          if (
+            product.name?.toLowerCase().includes(searchLower) ||
+            product.light?.location?.toLowerCase().includes(searchLower) ||
+            product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
+            product.description?.toLowerCase().includes(searchLower)
+          ) {
+            count++
+          }
+        }
+      })
+    } else {
+      querySnapshot.forEach((doc) => {
+        const product = doc.data() as Product
+        const productContentType = (product.content_type || "").toLowerCase()
+
+        if (productContentType === contentTypeLower && product.company_id) {
+          count++
+        }
+      })
+    }
+
+    return count
+  } catch (error) {
+    console.error(`Error getting count of products by content type and company (${contentType}):`, error)
+    return 0
+  }
+}
+
+/**
+ * Uploads a file to Firebase Storage.
+ * @param file The file to upload.
+ * @param path The path in Firebase Storage (e.g., "company_logos/").
+ * @returns The download URL of the uploaded file.
+ */
+export async function uploadFileToFirebaseStorage(file: File, path: string): Promise<string> {
+  try {
+    const storageRef = ref(storage, `${path}${file.name}`)
+    const snapshot = await uploadBytes(storageRef, file)
+    const downloadURL = await getDownloadURL(snapshot.ref)
+    console.log("File uploaded successfully:", downloadURL)
+    return downloadURL
+  } catch (error) {
+    console.error("Error uploading file to Firebase Storage:", error)
+    throw error
+  }
+}
+
+// Get all products
+export const getProducts = async (): Promise<Product[]> => {
+  try {
+    const productsRef = collection(db, "products")
+    const q = query(productsRef, where("deleted", "==", false), orderBy("created", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const products: Product[] = []
+
+    querySnapshot.forEach((doc) => {
+      products.push({
+        id: doc.id,
+        ...doc.data(),
+      } as Product)
+    })
+
+    return products
+  } catch (error) {
+    console.error("Error getting products:", error)
+    throw error
+  }
+}
+
+// Get products by company
+export const getProductsByCompany = async (companyId: string): Promise<Product[]> => {
+  try {
+    const productsRef = collection(db, "products")
+    const q = query(
+      productsRef,
+      where("company_id", "==", companyId),
+      where("deleted", "==", false),
+      orderBy("created", "desc"),
+    )
+
+    const querySnapshot = await getDocs(q)
+    const products: Product[] = []
+
+    querySnapshot.forEach((doc) => {
+      products.push({
+        id: doc.id,
+        ...doc.data(),
+      } as Product)
+    })
+
+    return products
+  } catch (error) {
+    console.error("Error getting products by company:", error)
+    throw error
+  }
+}
+
+// Get a single product by ID
+export const getProduct = async (id: string): Promise<Product | null> => {
+  try {
+    const docRef = doc(db, "products", id)
+    const docSnap = await getDoc(docRef)
+
+    if (docSnap.exists()) {
+      return {
+        id: docSnap.id,
+        ...docSnap.data(),
+      } as Product
+    } else {
+      return null
+    }
+  } catch (error) {
+    console.error("Error getting product:", error)
+    throw error
+  }
+}
+
+// Update a product
+export const updateProductById = async (id: string, productData: Partial<Product>): Promise<void> => {
   try {
     const docRef = doc(db, "products", id)
     await updateDoc(docRef, {
       ...productData,
-      updated_at: serverTimestamp(),
+      updated: serverTimestamp(),
     })
   } catch (error) {
     console.error("Error updating product:", error)
@@ -155,944 +1256,62 @@ export const updateProduct = async (id: string, productData: Partial<Product>) =
   }
 }
 
-export const deleteProduct = async (id: string) => {
+// Soft delete a product
+export const deleteProductById = async (id: string): Promise<void> => {
   try {
-    await deleteDoc(doc(db, "products", id))
+    const docRef = doc(db, "products", id)
+    await updateDoc(docRef, {
+      deleted: true,
+      updated: serverTimestamp(),
+    })
   } catch (error) {
     console.error("Error deleting product:", error)
     throw error
   }
 }
 
-// Clients
-export const getClients = async (lastDoc: any = null, limitCount = 10, searchQuery = "") => {
+// Get products with pagination
+export const getProductsPaginated = async (limitCount = 10): Promise<Product[]> => {
   try {
-    const clientsRef = collection(db, "clients")
-    let q
+    const productsRef = collection(db, "products")
+    const q = query(productsRef, where("deleted", "==", false), orderBy("created", "desc"), limit(limitCount))
 
-    if (searchQuery) {
-      q = query(
-        clientsRef,
-        where("name", ">=", searchQuery),
-        where("name", "<=", searchQuery + "\uf8ff"),
-        orderBy("name"),
-        limit(limitCount),
-      )
-    } else {
-      q = query(clientsRef, orderBy("created_at", "desc"), limit(limitCount))
-    }
-
-    if (lastDoc) {
-      q = query(q, startAfter(lastDoc))
-    }
-
-    const documentSnapshots = await getDocs(q)
-    const clients = documentSnapshots.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as Client),
-    }))
-    const lastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1]
-
-    return { clients, lastVisible }
-  } catch (error) {
-    console.error("Error getting clients:", error)
-    throw error
-  }
-}
-
-export const getClientById = async (id: string): Promise<Client | null> => {
-  try {
-    const docRef = doc(db, "clients", id)
-    const docSnap = await getDoc(docRef)
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...(docSnap.data() as Client) }
-    } else {
-      return null
-    }
-  } catch (error) {
-    console.error("Error getting client by ID:", error)
-    throw error
-  }
-}
-
-export const createClient = async (clientData: Omit<Client, "id" | "created_at" | "updated_at">) => {
-  try {
-    const docRef = await addDoc(collection(db, "clients"), {
-      ...clientData,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
-    })
-    return docRef.id
-  } catch (error) {
-    console.error("Error creating client:", error)
-    throw error
-  }
-}
-
-export const updateClient = async (id: string, clientData: Partial<Client>) => {
-  try {
-    const docRef = doc(db, "clients", id)
-    await updateDoc(docRef, {
-      ...clientData,
-      updated_at: serverTimestamp(),
-    })
-  } catch (error) {
-    console.error("Error updating client:", error)
-    throw error
-  }
-}
-
-export const deleteClient = async (id: string) => {
-  try {
-    await deleteDoc(doc(db, "clients", id))
-  } catch (error) {
-    console.error("Error deleting client:", error)
-    throw error
-  }
-}
-
-// Proposals
-export const getProposals = async (lastDoc: any = null, limitCount = 10, userId?: string) => {
-  try {
-    const proposalsRef = collection(db, "proposals")
-    let q = query(proposalsRef, orderBy("created_at", "desc"), limit(limitCount))
-
-    if (userId) {
-      q = query(proposalsRef, where("created_by", "==", userId), orderBy("created_at", "desc"), limit(limitCount))
-    }
-
-    if (lastDoc) {
-      q = query(q, startAfter(lastDoc))
-    }
-
-    const documentSnapshots = await getDocs(q)
-    const proposals = documentSnapshots.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as Proposal),
-    }))
-    const lastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1]
-
-    return { proposals, lastVisible }
-  } catch (error) {
-    console.error("Error getting proposals:", error)
-    throw error
-  }
-}
-
-export const getProposalById = async (id: string): Promise<Proposal | null> => {
-  try {
-    const docRef = doc(db, "proposals", id)
-    const docSnap = await getDoc(docRef)
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...(docSnap.data() as Proposal) }
-    } else {
-      return null
-    }
-  } catch (error) {
-    console.error("Error getting proposal by ID:", error)
-    throw error
-  }
-}
-
-export const createProposal = async (proposalData: Omit<Proposal, "id" | "created_at" | "updated_at">) => {
-  try {
-    const docRef = await addDoc(collection(db, "proposals"), {
-      ...proposalData,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
-    })
-    return docRef.id
-  } catch (error) {
-    console.error("Error creating proposal:", error)
-    throw error
-  }
-}
-
-export const updateProposal = async (id: string, proposalData: Partial<Proposal>) => {
-  try {
-    const docRef = doc(db, "proposals", id)
-    await updateDoc(docRef, {
-      ...proposalData,
-      updated_at: serverTimestamp(),
-    })
-  } catch (error) {
-    console.error("Error updating proposal:", error)
-    throw error
-  }
-}
-
-export const deleteProposal = async (id: string) => {
-  try {
-    await deleteDoc(doc(db, "proposals", id))
-  } catch (error) {
-    console.error("Error deleting proposal:", error)
-    throw error
-  }
-}
-
-// Cost Estimates
-export const getCostEstimates = async (lastDoc: any = null, limitCount = 10, userId?: string) => {
-  try {
-    const costEstimatesRef = collection(db, "cost_estimates")
-    let q = query(costEstimatesRef, orderBy("created_at", "desc"), limit(limitCount))
-
-    if (userId) {
-      q = query(costEstimatesRef, where("created_by", "==", userId), orderBy("created_at", "desc"), limit(limitCount))
-    }
-
-    if (lastDoc) {
-      q = query(q, startAfter(lastDoc))
-    }
-
-    const documentSnapshots = await getDocs(q)
-    const costEstimates = documentSnapshots.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as CostEstimate),
-    }))
-    const lastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1]
-
-    return { costEstimates, lastVisible }
-  } catch (error) {
-    console.error("Error getting cost estimates:", error)
-    throw error
-  }
-}
-
-export const getCostEstimateById = async (id: string): Promise<CostEstimate | null> => {
-  try {
-    const docRef = doc(db, "cost_estimates", id)
-    const docSnap = await getDoc(docRef)
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...(docSnap.data() as CostEstimate) }
-    } else {
-      return null
-    }
-  } catch (error) {
-    console.error("Error getting cost estimate by ID:", error)
-    throw error
-  }
-}
-
-export const createCostEstimate = async (costEstimateData: Omit<CostEstimate, "id" | "created_at" | "updated_at">) => {
-  try {
-    const docRef = await addDoc(collection(db, "cost_estimates"), {
-      ...costEstimateData,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
-    })
-    return docRef.id
-  } catch (error) {
-    console.error("Error creating cost estimate:", error)
-    throw error
-  }
-}
-
-export const updateCostEstimate = async (id: string, costEstimateData: Partial<CostEstimate>) => {
-  try {
-    const docRef = doc(db, "cost_estimates", id)
-    await updateDoc(docRef, {
-      ...costEstimateData,
-      updated_at: serverTimestamp(),
-    })
-  } catch (error) {
-    console.error("Error updating cost estimate:", error)
-    throw error
-  }
-}
-
-export const deleteCostEstimate = async (id: string) => {
-  try {
-    await deleteDoc(doc(db, "cost_estimates", id))
-  } catch (error) {
-    console.error("Error deleting cost estimate:", error)
-    throw error
-  }
-}
-
-// Quotations
-export const getQuotations = async (lastDoc: any = null, limitCount = 10, userId?: string) => {
-  try {
-    const quotationsRef = collection(db, "quotations")
-    let q = query(quotationsRef, orderBy("created_at", "desc"), limit(limitCount))
-
-    if (userId) {
-      q = query(quotationsRef, where("created_by", "==", userId), orderBy("created_at", "desc"), limit(limitCount))
-    }
-
-    if (lastDoc) {
-      q = query(q, startAfter(lastDoc))
-    }
-
-    const documentSnapshots = await getDocs(q)
-    const quotations = documentSnapshots.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as Quotation),
-    }))
-    const lastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1]
-
-    return { quotations, lastVisible }
-  } catch (error) {
-    console.error("Error getting quotations:", error)
-    throw error
-  }
-}
-
-export const getQuotationById = async (id: string): Promise<Quotation | null> => {
-  try {
-    const docRef = doc(db, "quotations", id)
-    const docSnap = await getDoc(docRef)
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...(docSnap.data() as Quotation) }
-    } else {
-      return null
-    }
-  } catch (error) {
-    console.error("Error getting quotation by ID:", error)
-    throw error
-  }
-}
-
-export const createQuotation = async (quotationData: Omit<Quotation, "id" | "created_at" | "updated_at">) => {
-  try {
-    const docRef = await addDoc(collection(db, "quotations"), {
-      ...quotationData,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
-    })
-    return docRef.id
-  } catch (error) {
-    console.error("Error creating quotation:", error)
-    throw error
-  }
-}
-
-export const updateQuotation = async (id: string, quotationData: Partial<Quotation>) => {
-  try {
-    const docRef = doc(db, "quotations", id)
-    await updateDoc(docRef, {
-      ...quotationData,
-      updated_at: serverTimestamp(),
-    })
-  } catch (error) {
-    console.error("Error updating quotation:", error)
-    throw error
-  }
-}
-
-export const deleteQuotation = async (id: string) => {
-  try {
-    await deleteDoc(doc(db, "quotations", id))
-  } catch (error) {
-    console.error("Error deleting quotation:", error)
-    throw error
-  }
-}
-
-// Job Orders
-export const getJobOrders = async (lastDoc: any = null, limitCount = 10, userId?: string) => {
-  try {
-    const jobOrdersRef = collection(db, "job_orders")
-    let q = query(jobOrdersRef, orderBy("created_at", "desc"), limit(limitCount))
-
-    if (userId) {
-      q = query(jobOrdersRef, where("created_by", "==", userId), orderBy("created_at", "desc"), limit(limitCount))
-    }
-
-    if (lastDoc) {
-      q = query(q, startAfter(lastDoc))
-    }
-
-    const documentSnapshots = await getDocs(q)
-    const jobOrders = documentSnapshots.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as JobOrder),
-    }))
-    const lastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1]
-
-    return { jobOrders, lastVisible }
-  } catch (error) {
-    console.error("Error getting job orders:", error)
-    throw error
-  }
-}
-
-export const getJobOrderById = async (id: string): Promise<JobOrder | null> => {
-  try {
-    const docRef = doc(db, "job_orders", id)
-    const docSnap = await getDoc(docRef)
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...(docSnap.data() as JobOrder) }
-    } else {
-      return null
-    }
-  } catch (error) {
-    console.error("Error getting job order by ID:", error)
-    throw error
-  }
-}
-
-export const createJobOrder = async (
-  jobOrderData: Omit<JobOrder, "id" | "created_at" | "updated_at" | "created_by" | "status">,
-  userId: string,
-  status: JobOrder["status"],
-) => {
-  try {
-    const docRef = await addDoc(collection(db, "job_orders"), {
-      ...jobOrderData,
-      created_by: userId,
-      status: status,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
-    })
-    return docRef.id
-  } catch (error) {
-    console.error("Error creating job order:", error)
-    throw error
-  }
-}
-
-export const updateJobOrder = async (id: string, jobOrderData: Partial<JobOrder>) => {
-  try {
-    const docRef = doc(db, "job_orders", id)
-    await updateDoc(docRef, {
-      ...jobOrderData,
-      updated_at: serverTimestamp(),
-    })
-  } catch (error) {
-    console.error("Error updating job order:", error)
-    throw error
-  }
-}
-
-export const deleteJobOrder = async (id: string) => {
-  try {
-    await deleteDoc(doc(db, "job_orders", id))
-  } catch (error) {
-    console.error("Error deleting job order:", error)
-    throw error
-  }
-}
-
-// Users
-export const getUserData = async (uid: string): Promise<UserData | null> => {
-  try {
-    const docRef = doc(db, "users", uid)
-    const docSnap = await getDoc(docRef)
-    if (docSnap.exists()) {
-      return { uid: docSnap.id, ...(docSnap.data() as Omit<UserData, "uid">) }
-    } else {
-      return null
-    }
-  } catch (error) {
-    console.error("Error getting user data:", error)
-    throw error
-  }
-}
-
-export const updateUserData = async (uid: string, data: Partial<UserData>) => {
-  try {
-    const userRef = doc(db, "users", uid)
-    await updateDoc(userRef, data)
-  } catch (error) {
-    console.error("Error updating user data:", error)
-    throw error
-  }
-}
-
-export const getAllUsers = async (): Promise<UserData[]> => {
-  try {
-    const usersRef = collection(db, "users")
-    const q = query(usersRef, orderBy("first_name"))
     const querySnapshot = await getDocs(q)
-    return querySnapshot.docs.map((doc) => ({ uid: doc.id, ...(doc.data() as Omit<UserData, "uid">) }))
+    const products: Product[] = []
+
+    querySnapshot.forEach((doc) => {
+      products.push({
+        id: doc.id,
+        ...doc.data(),
+      } as Product)
+    })
+
+    return products
   } catch (error) {
-    console.error("Error getting all users:", error)
+    console.error("Error getting paginated products:", error)
     throw error
   }
 }
 
-// Invitation Codes
-export const getInvitationCodes = async (lastDoc: any = null, limitCount = 10) => {
+// Search products by name
+export const searchProductsByName = async (searchTerm: string): Promise<Product[]> => {
   try {
-    const codesRef = collection(db, "invitation_codes")
-    let q = query(codesRef, orderBy("created_at", "desc"), limit(limitCount))
+    const productsRef = collection(db, "products")
+    const q = query(productsRef, where("deleted", "==", false), orderBy("name"))
 
-    if (lastDoc) {
-      q = query(q, startAfter(lastDoc))
-    }
-
-    const documentSnapshots = await getDocs(q)
-    const codes = documentSnapshots.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as InvitationCode),
-    }))
-    const lastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1]
-
-    return { codes, lastVisible }
-  } catch (error) {
-    console.error("Error getting invitation codes:", error)
-    throw error
-  }
-}
-
-export const getInvitationCodeById = async (id: string): Promise<InvitationCode | null> => {
-  try {
-    const docRef = doc(db, "invitation_codes", id)
-    const docSnap = await getDoc(docRef)
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...(docSnap.data() as InvitationCode) }
-    } else {
-      return null
-    }
-  } catch (error) {
-    console.error("Error getting invitation code by ID:", error)
-    throw error
-  }
-}
-
-export const getInvitationCodeByCode = async (code: string): Promise<InvitationCode | null> => {
-  try {
-    const codesRef = collection(db, "invitation_codes")
-    const q = query(codesRef, where("code", "==", code), limit(1))
     const querySnapshot = await getDocs(q)
-    if (!querySnapshot.empty) {
-      const docSnap = querySnapshot.docs[0]
-      return { id: docSnap.id, ...(docSnap.data() as InvitationCode) }
-    } else {
-      return null
-    }
-  } catch (error) {
-    console.error("Error getting invitation code by code:", error)
-    throw error
-  }
-}
+    const products: Product[] = []
 
-export const createInvitationCode = async (codeData: Omit<InvitationCode, "id" | "created_at" | "updated_at">) => {
-  try {
-    const docRef = await addDoc(collection(db, "invitation_codes"), {
-      ...codeData,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
+    querySnapshot.forEach((doc) => {
+      const product = { id: doc.id, ...doc.data() } as Product
+      if (product.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+        products.push(product)
+      }
     })
-    return docRef.id
+
+    return products
   } catch (error) {
-    console.error("Error creating invitation code:", error)
-    throw error
-  }
-}
-
-export const updateInvitationCode = async (id: string, codeData: Partial<InvitationCode>) => {
-  try {
-    const docRef = doc(db, "invitation_codes", id)
-    await updateDoc(docRef, {
-      ...codeData,
-      updated_at: serverTimestamp(),
-    })
-  } catch (error) {
-    console.error("Error updating invitation code:", error)
-    throw error
-  }
-}
-
-export const deleteInvitationCode = async (id: string) => {
-  try {
-    await deleteDoc(doc(db, "invitation_codes", id))
-  } catch (error) {
-    console.error("Error deleting invitation code:", error)
-    throw error
-  }
-}
-
-// Campaigns
-export const getCampaigns = async (lastDoc: any = null, limitCount = 10, userId?: string) => {
-  try {
-    const campaignsRef = collection(db, "campaigns")
-    let q = query(campaignsRef, orderBy("created_at", "desc"), limit(limitCount))
-
-    if (userId) {
-      q = query(campaignsRef, where("created_by", "==", userId), orderBy("created_at", "desc"), limit(limitCount))
-    }
-
-    if (lastDoc) {
-      q = query(q, startAfter(lastDoc))
-    }
-
-    const documentSnapshots = await getDocs(q)
-    const campaigns = documentSnapshots.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as Campaign),
-    }))
-    const lastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1]
-
-    return { campaigns, lastVisible }
-  } catch (error) {
-    console.error("Error getting campaigns:", error)
-    throw error
-  }
-}
-
-export const getCampaignById = async (id: string): Promise<Campaign | null> => {
-  try {
-    const docRef = doc(db, "campaigns", id)
-    const docSnap = await getDoc(docRef)
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...(docSnap.data() as Campaign) }
-    } else {
-      return null
-    }
-  } catch (error) {
-    console.error("Error getting campaign by ID:", error)
-    throw error
-  }
-}
-
-export const createCampaign = async (campaignData: Omit<Campaign, "id" | "created_at" | "updated_at">) => {
-  try {
-    const docRef = await addDoc(collection(db, "campaigns"), {
-      ...campaignData,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
-    })
-    return docRef.id
-  } catch (error) {
-    console.error("Error creating campaign:", error)
-    throw error
-  }
-}
-
-export const updateCampaign = async (id: string, campaignData: Partial<Campaign>) => {
-  try {
-    const docRef = doc(db, "campaigns", id)
-    await updateDoc(docRef, {
-      ...campaignData,
-      updated_at: serverTimestamp(),
-    })
-  } catch (error) {
-    console.error("Error updating campaign:", error)
-    throw error
-  }
-}
-
-export const deleteCampaign = async (id: string) => {
-  try {
-    await deleteDoc(doc(db, "campaigns", id))
-  } catch (error) {
-    console.error("Error deleting campaign:", error)
-    throw error
-  }
-}
-
-// Service Assignments
-export const getServiceAssignments = async (lastDoc: any = null, limitCount = 10, userId?: string) => {
-  try {
-    const assignmentsRef = collection(db, "service_assignments")
-    let q = query(assignmentsRef, orderBy("created_at", "desc"), limit(limitCount))
-
-    if (userId) {
-      q = query(
-        assignmentsRef,
-        where("assigned_to_uid", "==", userId),
-        orderBy("created_at", "desc"),
-        limit(limitCount),
-      )
-    }
-
-    if (lastDoc) {
-      q = query(q, startAfter(lastDoc))
-    }
-
-    const documentSnapshots = await getDocs(q)
-    const assignments = documentSnapshots.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as ServiceAssignment),
-    }))
-    const lastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1]
-
-    return { assignments, lastVisible }
-  } catch (error) {
-    console.error("Error getting service assignments:", error)
-    throw error
-  }
-}
-
-export const getServiceAssignmentById = async (id: string): Promise<ServiceAssignment | null> => {
-  try {
-    const docRef = doc(db, "service_assignments", id)
-    const docSnap = await getDoc(docRef)
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...(docSnap.data() as ServiceAssignment) }
-    } else {
-      return null
-    }
-  } catch (error) {
-    console.error("Error getting service assignment by ID:", error)
-    throw error
-  }
-}
-
-export const createServiceAssignment = async (
-  assignmentData: Omit<ServiceAssignment, "id" | "created_at" | "updated_at">,
-) => {
-  try {
-    const docRef = await addDoc(collection(db, "service_assignments"), {
-      ...assignmentData,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
-    })
-    return docRef.id
-  } catch (error) {
-    console.error("Error creating service assignment:", error)
-    throw error
-  }
-}
-
-export const updateServiceAssignment = async (id: string, assignmentData: Partial<ServiceAssignment>) => {
-  try {
-    const docRef = doc(db, "service_assignments", id)
-    await updateDoc(docRef, {
-      ...assignmentData,
-      updated_at: serverTimestamp(),
-    })
-  } catch (error) {
-    console.error("Error updating service assignment:", error)
-    throw error
-  }
-}
-
-export const deleteServiceAssignment = async (id: string) => {
-  try {
-    await deleteDoc(doc(db, "service_assignments", id))
-  } catch (error) {
-    console.error("Error deleting service assignment:", error)
-    throw error
-  }
-}
-
-// Service Reports
-export const getServiceReports = async (lastDoc: any = null, limitCount = 10, userId?: string) => {
-  try {
-    const reportsRef = collection(db, "service_reports")
-    let q = query(reportsRef, orderBy("created_at", "desc"), limit(limitCount))
-
-    if (userId) {
-      q = query(reportsRef, where("created_by", "==", userId), orderBy("created_at", "desc"), limit(limitCount))
-    }
-
-    if (lastDoc) {
-      q = query(q, startAfter(lastDoc))
-    }
-
-    const documentSnapshots = await getDocs(q)
-    const reports = documentSnapshots.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as ServiceReport),
-    }))
-    const lastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1]
-
-    return { reports, lastVisible }
-  } catch (error) {
-    console.error("Error getting service reports:", error)
-    throw error
-  }
-}
-
-export const getServiceReportById = async (id: string): Promise<ServiceReport | null> => {
-  try {
-    const docRef = doc(db, "service_reports", id)
-    const docSnap = await getDoc(docRef)
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...(docSnap.data() as ServiceReport) }
-    } else {
-      return null
-    }
-  } catch (error) {
-    console.error("Error getting service report by ID:", error)
-    throw error
-  }
-}
-
-export const createServiceReport = async (reportData: Omit<ServiceReport, "id" | "created_at" | "updated_at">) => {
-  try {
-    const docRef = await addDoc(collection(db, "service_reports"), {
-      ...reportData,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
-    })
-    return docRef.id
-  } catch (error) {
-    console.error("Error creating service report:", error)
-    throw error
-  }
-}
-
-export const updateServiceReport = async (id: string, reportData: Partial<ServiceReport>) => {
-  try {
-    const docRef = doc(db, "service_reports", id)
-    await updateDoc(docRef, {
-      ...reportData,
-      updated_at: serverTimestamp(),
-    })
-  } catch (error) {
-    console.error("Error updating service report:", error)
-    throw error
-  }
-}
-
-export const deleteServiceReport = async (id: string) => {
-  try {
-    await deleteDoc(doc(db, "service_reports", id))
-  } catch (error) {
-    console.error("Error deleting service report:", error)
-    throw error
-  }
-}
-
-// Helper to get quotation details for job order creation
-export const getQuotationDetailsForJobOrder = async (
-  quotationId: string,
-): Promise<{ quotation: Quotation; product: Product; client: Client | null } | null> => {
-  try {
-    const quotation = await getQuotationById(quotationId)
-    if (!quotation || !quotation.product_id) {
-      return null
-    }
-
-    const product = await getProductById(quotation.product_id)
-    if (!product) {
-      return null
-    }
-
-    let client: Client | null = null
-    if (quotation.client_id) {
-      client = await getClientById(quotation.client_id)
-    }
-
-    return { quotation, product, client }
-  } catch (error) {
-    console.error("Error fetching quotation details for job order:", error)
-    throw error
-  }
-}
-
-// Get total count of documents in a collection
-export const getCollectionCount = async (collectionName: string, userId?: string): Promise<number> => {
-  try {
-    let q = collection(db, collectionName)
-    if (userId) {
-      q = query(q, where("created_by", "==", userId))
-    }
-    const snapshot = await getCountFromServer(q)
-    return snapshot.data().count
-  } catch (error) {
-    console.error(`Error getting count for collection ${collectionName}:`, error)
-    throw error
-  }
-}
-
-// Get total count of documents in a collection with a specific status
-export const getCollectionCountByStatus = async (
-  collectionName: string,
-  statusField: string,
-  statusValue: string,
-  userId?: string,
-): Promise<number> => {
-  try {
-    let q = collection(db, collectionName)
-    if (userId) {
-      q = query(q, where("created_by", "==", userId), where(statusField, "==", statusValue))
-    } else {
-      q = query(q, where(statusField, "==", statusValue))
-    }
-    const snapshot = await getCountFromServer(q)
-    return snapshot.data().count
-  } catch (error) {
-    console.error(`Error getting count for collection ${collectionName} with status ${statusValue}:`, error)
-    throw error
-  }
-}
-
-// Chat Threads
-export const getChatThreads = async (userId: string): Promise<ChatThread[]> => {
-  try {
-    const threadsRef = collection(db, "chat_threads")
-    const q = query(threadsRef, where("participants", "array-contains", userId), orderBy("updated_at", "desc"))
-    const querySnapshot = await getDocs(q)
-    return querySnapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as Omit<ChatThread, "id">) }))
-  } catch (error) {
-    console.error("Error getting chat threads:", error)
-    throw error
-  }
-}
-
-export const getChatThreadById = async (threadId: string): Promise<ChatThread | null> => {
-  try {
-    const docRef = doc(db, "chat_threads", threadId)
-    const docSnap = await getDoc(docRef)
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...(docSnap.data() as Omit<ChatThread, "id">) }
-    } else {
-      return null
-    }
-  } catch (error) {
-    console.error("Error getting chat thread by ID:", error)
-    throw error
-  }
-}
-
-export const createChatThread = async (
-  threadData: Omit<ChatThread, "id" | "created_at" | "updated_at">,
-): Promise<string> => {
-  try {
-    const docRef = await addDoc(collection(db, "chat_threads"), {
-      ...threadData,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
-    })
-    return docRef.id
-  } catch (error) {
-    console.error("Error creating chat thread:", error)
-    throw error
-  }
-}
-
-export const updateChatThread = async (threadId: string, threadData: Partial<ChatThread>) => {
-  try {
-    const docRef = doc(db, "chat_threads", threadId)
-    await updateDoc(docRef, {
-      ...threadData,
-      updated_at: serverTimestamp(),
-    })
-  } catch (error) {
-    console.error("Error updating chat thread:", error)
-    throw error
-  }
-}
-
-// Chat Messages
-export const getChatMessages = async (threadId: string): Promise<ChatMessage[]> => {
-  try {
-    const messagesRef = collection(db, "chat_threads", threadId, "messages")
-    const q = query(messagesRef, orderBy("created_at", "asc"))
-    const querySnapshot = await getDocs(q)
-    return querySnapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as Omit<ChatMessage, "id">) }))
-  } catch (error) {
-    console.error("Error getting chat messages:", error)
-    throw error
-  }
-}
-
-export const addChatMessage = async (
-  threadId: string,
-  messageData: Omit<ChatMessage, "id" | "created_at">,
-): Promise<string> => {
-  try {
-    const docRef = await addDoc(collection(db, "chat_threads", threadId, "messages"), {
-      ...messageData,
-      created_at: serverTimestamp(),
-    })
-    return docRef.id
-  } catch (error) {
-    console.error("Error adding chat message:", error)
+    console.error("Error searching products:", error)
     throw error
   }
 }
