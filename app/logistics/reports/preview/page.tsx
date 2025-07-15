@@ -473,35 +473,35 @@ export default function ReportPreviewPage() {
               {/* Left Column */}
               <div className="space-y-2">
                 <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-medium text-gray-700 whitespace-nowrap">Site ID:</span>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">Site ID:</span>
                   <span className="text-gray-900">{getSiteLocation(product)}</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-medium text-gray-700 whitespace-nowrap">Job Order:</span>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">Job Order:</span>
                   <span className="text-gray-900">{report.id?.slice(-4).toUpperCase() || "7733"}</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-medium text-gray-700 whitespace-nowrap">Job Order Date:</span>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">Job Order Date:</span>
                   <span className="text-gray-900">{formatDate(report.date)}</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-medium text-gray-700 whitespace-nowrap">Site:</span>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">Site:</span>
                   <span className="text-gray-900">{report.siteName}</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-medium text-gray-700 whitespace-nowrap">Size:</span>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">Size:</span>
                   <span className="text-gray-900">{getSiteSize(product)}</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-medium text-gray-700 whitespace-nowrap">Start Date:</span>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">Start Date:</span>
                   <span className="text-gray-900">{formatDate(report.bookingDates.start)}</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-medium text-gray-700 whitespace-nowrap">End Date:</span>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">End Date:</span>
                   <span className="text-gray-900">{formatDate(report.bookingDates.end)}</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-medium text-gray-700 whitespace-nowrap">Installation Duration:</span>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">Installation Duration:</span>
                   <span className="text-gray-900">
                     {calculateInstallationDuration(report.bookingDates.start, report.bookingDates.end)} days
                   </span>
@@ -511,31 +511,31 @@ export default function ReportPreviewPage() {
               {/* Right Column */}
               <div className="space-y-2">
                 <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-medium text-gray-700 whitespace-nowrap">Content:</span>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">Content:</span>
                   <span className="text-gray-900">{product?.content_type || "Static"}</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-medium text-gray-700 whitespace-nowrap">Material Specs:</span>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">Material Specs:</span>
                   <span className="text-gray-900">{getMaterialSpecs(product)}</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-medium text-gray-700 whitespace-nowrap">Crew:</span>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">Crew:</span>
                   <span className="text-gray-900">Team {report.assignedTo || "4"}</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-medium text-gray-700 whitespace-nowrap">Illumination:</span>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">Illumination:</span>
                   <span className="text-gray-900">{getIllumination(product)}</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-medium text-gray-700 whitespace-nowrap">Gondola:</span>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">Gondola:</span>
                   <span className="text-gray-900">{getGondola(product)}</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-medium text-gray-700 whitespace-nowrap">Technology:</span>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">Technology:</span>
                   <span className="text-gray-900">{getTechnology(product)}</span>
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-medium text-gray-700 whitespace-nowrap">Sales:</span>
+                  <span className="font-bold text-gray-700 whitespace-nowrap">Sales:</span>
                   <span className="text-gray-900">{report.sales}</span>
                 </div>
               </div>
