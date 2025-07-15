@@ -23,7 +23,7 @@ export default function AccessManagementPage() {
           </TabsTrigger>
           <TabsTrigger value="permissions" className="flex items-center gap-2">
             <Key className="h-4 w-4" />
-            Permissions
+            Access
           </TabsTrigger>
         </TabsList>
 
