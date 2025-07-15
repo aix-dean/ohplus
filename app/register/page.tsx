@@ -182,13 +182,15 @@ export default function RegisterPage() {
           company_location: "",
         },
         password,
-        orgCode || undefined, // Pass the organization code if available
+        orgCode || undefined,
       )
 
       console.log("Registration completed successfully")
       setErrorMessage(null)
-      console.log("Redirecting to: /admin/dashboard")
-      router.push("/admin/dashboard")
+
+      // Don't navigate immediately - let the auth state update handle it
+      // The useEffect in auth context will update the user state
+      // and AuthLayout will handle the navigation
     } catch (error: unknown) {
       console.error("Registration failed:", error)
       setErrorMessage(getFriendlyErrorMessage(error))

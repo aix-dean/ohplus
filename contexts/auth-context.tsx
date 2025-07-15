@@ -438,6 +438,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await setDoc(userDocRef, userData)
       await fetchUserData(firebaseUser)
+      // Navigation will be handled by the component or auth state change
+      // Don't navigate here as it can cause timing issues
       console.log("Registration completed successfully with tenant ID:", auth.tenantId)
     } catch (error) {
       console.error("Error in AuthContext register:", error)
