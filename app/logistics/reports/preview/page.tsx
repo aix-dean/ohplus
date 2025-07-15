@@ -29,6 +29,7 @@ export default function ReportPreviewPage() {
   const [preparedByName, setPreparedByName] = useState<string>("")
   const { user } = useAuth()
   const { toast } = useToast()
+  const [companyLogo, setCompanyLogo] = useState<string>("/ohplus-new-logo.png")
 
   useEffect(() => {
     loadPreviewData()
@@ -62,14 +63,21 @@ export default function ReportPreviewPage() {
           "User"
 
         setPreparedByName(name)
+
+        // Set company logo - fallback to OH+ logo if photo_url is empty or unset
+        const logoUrl =
+          companyData.photo_url && companyData.photo_url.trim() !== "" ? companyData.photo_url : "/ohplus-new-logo.png"
+        setCompanyLogo(logoUrl)
       } else {
         // Fallback to user display name or email
         setPreparedByName(user.displayName || user.email?.split("@")[0] || "User")
+        setCompanyLogo("/ohplus-new-logo.png")
       }
     } catch (error) {
       console.error("Error fetching prepared by name:", error)
       // Fallback to user display name or email
       setPreparedByName(user.displayName || user.email?.split("@")[0] || "User")
+      setCompanyLogo("/ohplus-new-logo.png")
     }
   }
 
@@ -396,7 +404,11 @@ export default function ReportPreviewPage() {
               className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm"
               style={{ width: "160px", height: "160px" }}
             >
-              <img src="/ohplus-new-logo.png" alt="OH+ Logo" className="max-h-full max-w-full object-contain" />
+              <img
+                src={companyLogo || "/placeholder.svg"}
+                alt="Company Logo"
+                className="max-h-full max-w-full object-contain"
+              />
             </div>
           </div>
         </div>
