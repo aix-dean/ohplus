@@ -24,6 +24,7 @@ import type { Product } from "@/lib/firebase-service"
 import type { Client } from "@/lib/client-service"
 import { cn } from "@/lib/utils"
 import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog"
+import { ComingSoonDialog } from "@/components/coming-soon-dialog"
 
 const joTypes = ["Installation", "Maintenance", "Repair", "Dismantling", "Other"]
 
@@ -77,6 +78,9 @@ export default function CreateJobOrderPage() {
   // New state for success dialog
   const [showJobOrderSuccessDialog, setShowJobOrderSuccessDialog] = useState(false)
   const [createdJoId, setCreatedJoId] = useState<string | null>(null)
+
+  // Coming soon dialog state
+  const [showComingSoonDialog, setShowComingSoonDialog] = useState(false)
 
   // Derived compliance state
   const missingCompliance = useMemo(
@@ -705,6 +709,7 @@ export default function CreateJobOrderPage() {
                 <Button
                   variant="outline"
                   className="h-9 px-3 text-sm text-gray-800 border-gray-300 hover:bg-gray-50 bg-transparent"
+                  onClick={() => setShowComingSoonDialog(true)}
                 >
                   Timeline
                 </Button>
@@ -818,6 +823,13 @@ export default function CreateJobOrderPage() {
       <JobOrderCreatedSuccessDialog
         isOpen={showJobOrderSuccessDialog}
         onDismissAndNavigate={handleDismissAndNavigate}
+      />
+
+      {/* Coming Soon Dialog */}
+      <ComingSoonDialog
+        isOpen={showComingSoonDialog}
+        onClose={() => setShowComingSoonDialog(false)}
+        feature="Timeline Feature"
       />
     </div>
   )
