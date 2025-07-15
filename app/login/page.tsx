@@ -131,13 +131,14 @@ export default function LoginPage() {
       {/* Mobile Header - Only visible on mobile */}
       <div className="md:hidden w-full mb-6">
         <div className="flex flex-col items-center text-center">
-          <Image
-            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-xr2z7FZhfWcJW9zwhxaxmBlr81zsld.png"
-            alt="OH! Powering Smarter Site Management"
-            width={200}
-            height={120}
-            className="mb-4"
-          />
+          <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={80} height={80} priority />
+          <h2 className="mt-4 text-2xl font-light text-blue-700 leading-tight text-center">
+            Powering Smarter
+            <br />
+            Site Management for
+            <br />
+            Billboard Operators
+          </h2>
         </div>
       </div>
       <div className="flex w-full max-w-4xl bg-white rounded-lg shadow-lg overflow-hidden">
