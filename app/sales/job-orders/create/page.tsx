@@ -890,7 +890,7 @@ export default function CreateJobOrderPage() {
                               <SelectValue placeholder="Choose Assignee" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value={userData?.uid || ""} className="text-sm">
+                              <SelectItem value={userData?.first_name || ""} className="text-sm">
                                 {userData?.first_name}
                               </SelectItem>
                             </SelectContent>
