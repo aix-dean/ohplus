@@ -10,8 +10,12 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^0.0.52",
+    "@emotion/react": "latest",
+    "@emotion/styled": "latest",
     "@google/generative-ai": "latest",
     "@hookform/resolvers": "latest",
+    "@mui/material": "latest",
+    "@mui/material-pigment-css": "latest",
     "@neondatabase/serverless": "^0.10.1",
     "@next/bundle-analyzer": "^15.0.3",
     "@radix-ui/react-accordion": "latest",
