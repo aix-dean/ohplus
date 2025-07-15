@@ -103,7 +103,7 @@ const ROLES: HardcodedRole[] = [
   },
   {
     id: "sales",
-    name: "Sales Manager",
+    name: "Sales",
     description: "Access to sales modules including proposals, quotations, and client management",
     permissions: [
       "admin.users.read",
@@ -116,7 +116,7 @@ const ROLES: HardcodedRole[] = [
   },
   {
     id: "logistics",
-    name: "Logistics Manager",
+    name: "Logistics",
     description: "Access to logistics modules including sites, reports, and assignments",
     permissions: [
       "admin.users.read",
@@ -128,7 +128,7 @@ const ROLES: HardcodedRole[] = [
   },
   {
     id: "cms",
-    name: "Content Manager",
+    name: "Content",
     description: "Access to content management system",
     permissions: [
       "admin.users.read",
