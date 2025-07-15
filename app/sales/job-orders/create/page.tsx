@@ -451,7 +451,7 @@ export default function CreateJobOrderPage() {
             (1000 * 60 * 60 * 24 * 30.44),
         )
       : 0
-  const vatAmount = quotation.total_amount ? quotation.total_amount * 0.12 : 0
+  const vatAmount = quotation.total_amount ? (quotation.total_amount + (quotation.total_amount * 0.12)) : 0
   const totalAmountWithVat = (quotation.total_amount || 0) + vatAmount
 
   return (
