@@ -18,6 +18,7 @@ interface Product {
   status?: string
   active?: boolean
   company_id?: string
+  seller_id?: string
   specs_rental?: {
     location?: string
   }
@@ -55,31 +56,80 @@ export default function BulletinBoardPage() {
       // Get user's company_id first
       const userDoc = await getDoc(doc(db, "users", user.uid))
       const userData = userDoc.data()
-      const companyId = userData?.company_id || user.uid
+      const userCompanyId = userData?.company_id
 
-      console.log("User company_id:", companyId)
+      console.log("Current user ID:", user.uid)
+      console.log("User company_id from document:", userCompanyId)
 
-      // Query products collection directly
+      // Query products collection - try multiple approaches to find user's products
       const productsRef = collection(db, "products")
-      const productsQuery = query(
-        productsRef,
-        where("company_id", "==", companyId),
-        where("active", "==", true),
-        orderBy("created", "desc"),
-        limit(1000),
-      )
 
-      const querySnapshot = await getDocs(productsQuery)
       const fetchedProducts: Product[] = []
 
-      querySnapshot.forEach((doc) => {
-        const data = doc.data()
-        fetchedProducts.push({
-          id: doc.id,
-          ...data,
-        } as Product)
-      })
+      // First, try querying by company_id if it exists and is different from user ID
+      if (userCompanyId && userCompanyId !== user.uid) {
+        console.log("Querying by company_id:", userCompanyId)
+        const companyQuery = query(
+          productsRef,
+          where("company_id", "==", userCompanyId),
+          where("active", "==", true),
+          orderBy("created", "desc"),
+          limit(1000),
+        )
 
+        const companySnapshot = await getDocs(companyQuery)
+        companySnapshot.forEach((doc) => {
+          const data = doc.data()
+          fetchedProducts.push({
+            id: doc.id,
+            ...data,
+          } as Product)
+        })
+      }
+
+      // If no products found by company_id, try querying by seller_id (user ID)
+      if (fetchedProducts.length === 0) {
+        console.log("Querying by seller_id (user ID):", user.uid)
+        const sellerQuery = query(
+          productsRef,
+          where("seller_id", "==", user.uid),
+          where("active", "==", true),
+          orderBy("created", "desc"),
+          limit(1000),
+        )
+
+        const sellerSnapshot = await getDocs(sellerQuery)
+        sellerSnapshot.forEach((doc) => {
+          const data = doc.data()
+          fetchedProducts.push({
+            id: doc.id,
+            ...data,
+          } as Product)
+        })
+      }
+
+      // If still no products, try querying by company_id = user.uid (fallback)
+      if (fetchedProducts.length === 0) {
+        console.log("Querying by company_id = user.uid:", user.uid)
+        const fallbackQuery = query(
+          productsRef,
+          where("company_id", "==", user.uid),
+          where("active", "==", true),
+          orderBy("created", "desc"),
+          limit(1000),
+        )
+
+        const fallbackSnapshot = await getDocs(fallbackQuery)
+        fallbackSnapshot.forEach((doc) => {
+          const data = doc.data()
+          fetchedProducts.push({
+            id: doc.id,
+            ...data,
+          } as Product)
+        })
+      }
+
+      console.log("Total fetched products:", fetchedProducts.length)
       console.log("Fetched products from Firestore:", fetchedProducts)
 
       // Filter by search term if provided
@@ -210,6 +260,7 @@ export default function BulletinBoardPage() {
                   <div>Name: {p.name}</div>
                   <div>Content Type: {p.content_type}</div>
                   <div>Company ID: {p.company_id}</div>
+                  <div>Seller ID: {p.seller_id}</div>
                   <div>Active: {p.active?.toString()}</div>
                 </div>
               ))}
