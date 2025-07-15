@@ -74,7 +74,7 @@ export function getMaxProductsForPlan(planType: SubscriptionPlanType): number {
     case "enterprise":
       return 99999 // Unlimited for enterprise
     case "trial":
-      return 1 // Example: 1 product for trial
+      return 3 // Example: 1 product for trial
     case "graphic-expo-event":
       return 5 // Example: 5 products for event plan
     default:
@@ -86,17 +86,17 @@ export function getMaxProductsForPlan(planType: SubscriptionPlanType): number {
 export function getMaxUsersForPlan(planType: SubscriptionPlanType): number {
   switch (planType) {
     case "solo":
-      return 3 // Solo plan allows 3 users
+      return 12 // Solo plan allows 3 users
     case "family":
-      return 5 // Family plan allows 5 users
+      return 12 // Family plan allows 5 users
     case "membership":
-      return 10 // Membership allows 10 users
+      return 12 // Membership allows 10 users
     case "enterprise":
       return 99999 // Unlimited for enterprise
     case "trial":
-      return 2 // Trial allows 2 users
+      return 12 // Trial allows 2 users
     case "graphic-expo-event":
-      return 5 // Event plan allows 5 users
+      return 12 // Event plan allows 5 users
     default:
       return 12 // Default to 12 users
   }
