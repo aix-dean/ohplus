@@ -102,14 +102,19 @@ export default function CreateJobOrderPage() {
   const [activeTab, setActiveTab] = useState("0")
 
   // Derived compliance state
-  const missingCompliance = useMemo(
-    () => ({
+  const [missingCompliance, setMissingCompliance] = useState({
+    signedQuotation: true,
+    poMo: true,
+    projectFa: true,
+  })
+
+  useEffect(() => {
+    setMissingCompliance({
       signedQuotation: !signedQuotationUrl,
       poMo: !poMoUrl,
       projectFa: !projectFaUrl,
-    }),
-    [signedQuotationUrl, poMoUrl, projectFaUrl],
-  )
+    })
+  }, [signedQuotationUrl, poMoUrl, projectFaUrl])
 
   useEffect(() => {
     if (!quotationId) {
@@ -130,7 +135,8 @@ export default function CreateJobOrderPage() {
           setQuotationData(data)
 
           // Initialize form data for each product
-          const initialForms: JobOrderFormData[] = data.products.map(() => ({
+          const productCount = data.quotation.items?.length || data.products.length || 1
+          const initialForms: JobOrderFormData[] = Array.from({ length: productCount }, () => ({
             joType: "",
             dateRequested: new Date(),
             deadline: undefined,
@@ -340,71 +346,143 @@ export default function CreateJobOrderPage() {
     const { quotation, products, client, items } = quotationData
 
     try {
-      const jobOrdersData = products.map((product, index) => {
-        const form = jobOrderForms[index]
-        const item = items?.[index]
+      // Handle different data structures
+      const quotationItems = quotation.items || []
+      const isMultipleItems = quotationItems.length > 0
+
+      let jobOrdersData = []
+
+      if (isMultipleItems) {
+        // Multiple products from quotation.items
+        jobOrdersData = quotationItems.map((item: any, index: number) => {
+          const form = jobOrderForms[index]
+          const product = products[index] || {}
+
+          const startDate = quotation.start_date ? new Date(quotation.start_date) : null
+          const endDate = quotation.end_date ? new Date(quotation.end_date) : null
+          const totalMonths =
+            startDate && endDate
+              ? Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44))
+              : quotation.duration_days
+                ? Math.round(quotation.duration_days / 30.44)
+                : 1
+
+          const contractDuration = totalMonths > 0 ? `(${totalMonths} months)` : "N/A"
+
+          const monthlyRate = item.price || 0
+          const totalLease = monthlyRate * totalMonths
+          const productVat = totalLease * 0.12
+          const productTotal = totalLease + productVat
+
+          return {
+            quotationId: quotation.id,
+            joNumber: "JO-AUTO-GEN",
+            dateRequested: form.dateRequested!.toISOString(),
+            joType: form.joType as JobOrderType,
+            deadline: form.deadline!.toISOString(),
+            requestedBy: userData?.first_name || "Auto-Generated",
+            remarks: form.remarks,
+            assignTo: form.assignTo,
+            attachments: form.attachmentUrl
+              ? [
+                  {
+                    url: form.attachmentUrl,
+                    name: form.attachmentFile?.name || "Attachment",
+                    type: form.attachmentFile?.type || "image",
+                  },
+                ]
+              : [],
+            signedQuotationUrl: signedQuotationUrl,
+            poMoUrl: poMoUrl,
+            projectFaUrl: projectFaUrl,
+            quotationNumber: quotation.quotation_number,
+            clientName: client?.name || "N/A",
+            clientCompany: client?.company || "N/A",
+            contractDuration: contractDuration,
+            contractPeriodStart: quotation.start_date || "",
+            contractPeriodEnd: quotation.end_date || "",
+            siteName: item.product_name || product.name || "",
+            siteCode: item.site_code || product.site_code || "N/A",
+            siteType: item.type || product.type || "N/A",
+            siteSize: product.specs_rental?.size || product.light?.size || "N/A",
+            siteIllumination: product.light?.illumination || "N/A",
+            leaseRatePerMonth: monthlyRate,
+            totalMonths: totalMonths,
+            totalLease: totalLease,
+            vatAmount: productVat,
+            totalAmount: productTotal,
+            siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
+            missingCompliance: missingCompliance,
+            product_id: item.product_id || product.id || "",
+            company_id: userData.company_id || "",
+          }
+        })
+      } else {
+        // Single product from quotation object
+        const form = jobOrderForms[0]
+        const product = products[0] || {}
 
         const startDate = quotation.start_date ? new Date(quotation.start_date) : null
         const endDate = quotation.end_date ? new Date(quotation.end_date) : null
         const totalMonths =
           startDate && endDate
             ? Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44))
-            : 0
+            : quotation.duration_days
+              ? Math.round(quotation.duration_days / 30.44)
+              : 1
+
         const contractDuration = totalMonths > 0 ? `(${totalMonths} months)` : "N/A"
 
-        const monthlyRate = item?.price || product.price || 0
+        const monthlyRate = quotation.price || 0
         const totalLease = monthlyRate * totalMonths
         const productVat = totalLease * 0.12
         const productTotal = totalLease + productVat
 
-        return {
-          quotationId: quotation.id,
-          joNumber: "JO-AUTO-GEN",
-          dateRequested: form.dateRequested!.toISOString(),
-          joType: form.joType as JobOrderType,
-          deadline: form.deadline!.toISOString(),
-          requestedBy: userData?.first_name || "Auto-Generated",
-          remarks: form.remarks,
-          assignTo: form.assignTo,
-          attachments: form.attachmentUrl
-            ? [
-                {
-                  url: form.attachmentUrl,
-                  name: form.attachmentFile?.name || "Attachment",
-                  type: form.attachmentFile?.type || "image",
-                },
-              ]
-            : [],
-          signedQuotationUrl: signedQuotationUrl,
-          poMoUrl: poMoUrl,
-          projectFaUrl: projectFaUrl,
-          quotationNumber: quotation.quotation_number,
-          clientName: client?.name || "N/A",
-          clientCompany: client?.company || "N/A",
-          contractDuration: contractDuration,
-          contractPeriodStart: quotation.start_date || "",
-          contractPeriodEnd: quotation.end_date || "",
-          siteName: item?.product_name || product.name || "",
-          siteCode:
-            item?.site_code ||
-            product.site_code ||
-            product.specs_rental?.site_code ||
-            product.light?.site_code ||
-            "N/A",
-          siteType: item?.type || product.type || "N/A",
-          siteSize: product.specs_rental?.size || product.light?.size || "N/A",
-          siteIllumination: product.light?.illumination || "N/A",
-          leaseRatePerMonth: monthlyRate,
-          totalMonths: totalMonths,
-          totalLease: totalLease,
-          vatAmount: productVat,
-          totalAmount: productTotal,
-          siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
-          missingCompliance: missingCompliance,
-          product_id: product.id || "",
-          company_id: userData.company_id || "",
-        }
-      })
+        jobOrdersData = [
+          {
+            quotationId: quotation.id,
+            joNumber: "JO-AUTO-GEN",
+            dateRequested: form.dateRequested!.toISOString(),
+            joType: form.joType as JobOrderType,
+            deadline: form.deadline!.toISOString(),
+            requestedBy: userData?.first_name || "Auto-Generated",
+            remarks: form.remarks,
+            assignTo: form.assignTo,
+            attachments: form.attachmentUrl
+              ? [
+                  {
+                    url: form.attachmentUrl,
+                    name: form.attachmentFile?.name || "Attachment",
+                    type: form.attachmentFile?.type || "image",
+                  },
+                ]
+              : [],
+            signedQuotationUrl: signedQuotationUrl,
+            poMoUrl: poMoUrl,
+            projectFaUrl: projectFaUrl,
+            quotationNumber: quotation.quotation_number,
+            clientName: client?.name || "N/A",
+            clientCompany: client?.company || "N/A",
+            contractDuration: contractDuration,
+            contractPeriodStart: quotation.start_date || "",
+            contractPeriodEnd: quotation.end_date || "",
+            siteName: quotation.product_name || product.name || "",
+            siteCode: quotation.site_code || product.site_code || "N/A",
+            siteType: product.type || "N/A",
+            siteSize: product.specs_rental?.size || product.light?.size || "N/A",
+            siteIllumination: product.light?.illumination || "N/A",
+            leaseRatePerMonth: monthlyRate,
+            totalMonths: totalMonths,
+            totalLease: totalLease,
+            vatAmount: productVat,
+            totalAmount: productTotal,
+            siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
+            missingCompliance: missingCompliance,
+            product_id: quotation.product_id || product.id || "",
+            company_id: userData.company_id || "",
+          },
+        ]
+      }
 
       const joIds = await createMultipleJobOrders(jobOrdersData, user.uid, status)
       setCreatedJoIds(joIds)
@@ -447,31 +525,62 @@ export default function CreateJobOrderPage() {
   }
 
   const { quotation, products, client, items } = quotationData
-  const isMultiProduct = products.length > 1
 
-  const totalMonths =
-    quotation.start_date && quotation.end_date
-      ? Math.round(
-          (new Date(quotation.end_date).getTime() - new Date(quotation.start_date).getTime()) /
-            (1000 * 60 * 60 * 24 * 30.44),
-        )
-      : 0
+  // Determine if we have multiple products
+  const quotationItems = quotation.items || []
+  const isMultiProduct = quotationItems.length > 1
+  const hasItems = quotationItems.length > 0
+
+  // Calculate duration in months
+  const totalMonths = useMemo(() => {
+    if (quotation.start_date && quotation.end_date) {
+      const start = new Date(quotation.start_date)
+      const end = new Date(quotation.end_date)
+      return Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30.44))
+    } else if (quotation.duration_days) {
+      return Math.round(quotation.duration_days / 30.44)
+    }
+    return 1
+  }, [quotation.start_date, quotation.end_date, quotation.duration_days])
 
   // Calculate individual product totals for display
-  const productTotals = products.map((product, index) => {
-    const item = items?.[index]
-    const monthlyRate = item?.price || product.price || 0
-    const subtotal = monthlyRate * totalMonths
-    const vat = subtotal * 0.12
-    const total = subtotal + vat
+  const productTotals = useMemo(() => {
+    if (hasItems) {
+      // Multiple products from quotation.items
+      return quotationItems.map((item: any) => {
+        const monthlyRate = item.price || 0
+        const subtotal = monthlyRate * totalMonths
+        const vat = subtotal * 0.12
+        const total = subtotal + vat
 
-    return {
-      subtotal,
-      vat,
-      total,
-      monthlyRate,
+        return {
+          subtotal,
+          vat,
+          total,
+          monthlyRate,
+          siteCode: item.site_code || "N/A",
+          productName: item.product_name || "N/A",
+        }
+      })
+    } else {
+      // Single product from quotation object
+      const monthlyRate = quotation.price || 0
+      const subtotal = monthlyRate * totalMonths
+      const vat = subtotal * 0.12
+      const total = subtotal + vat
+
+      return [
+        {
+          subtotal,
+          vat,
+          total,
+          monthlyRate,
+          siteCode: quotation.site_code || "N/A",
+          productName: quotation.product_name || "N/A",
+        },
+      ]
     }
-  })
+  }, [quotation, quotationItems, totalMonths, hasItems])
 
   // Calculate overall totals
   const overallSubtotal = productTotals.reduce((sum, product) => sum + product.subtotal, 0)
@@ -488,7 +597,7 @@ export default function CreateJobOrderPage() {
         {isMultiProduct && (
           <Badge variant="secondary">
             <Package className="h-3 w-3 mr-1" />
-            {products.length} Products
+            {quotationItems.length} Products
           </Badge>
         )}
       </div>
@@ -525,28 +634,22 @@ export default function CreateJobOrderPage() {
             <div className="space-y-1 mt-3">
               <p className="text-sm font-semibold">{isMultiProduct ? "Sites:" : "Site:"}</p>
               <div className="space-y-2">
-                {products.map((product, index) => {
-                  const item = items?.[index]
-                  const productTotal = productTotals[index]
+                {productTotals.map((productTotal, index) => {
+                  const item = hasItems ? quotationItems[index] : quotation
+                  const product = products[index] || {}
 
                   return (
-                    <div key={product.id} className="flex items-center gap-2 p-1.5 bg-gray-100 rounded-md">
+                    <div key={index} className="flex items-center gap-2 p-1.5 bg-gray-100 rounded-md">
                       <Image
                         src={product.media?.[0]?.url || "/placeholder.svg?height=40&width=40&query=billboard"}
-                        alt={product.name || "Site image"}
+                        alt={productTotal.productName || "Site image"}
                         width={40}
                         height={40}
                         className="rounded-md object-cover"
                       />
                       <div className="flex-1">
-                        <p className="font-semibold text-sm">
-                          {item?.site_code ||
-                            product.site_code ||
-                            product.specs_rental?.site_code ||
-                            product.light?.site_code ||
-                            "N/A"}
-                        </p>
-                        <p className="text-xs text-gray-600">{item?.product_name || product.name}</p>
+                        <p className="font-semibold text-sm">{productTotal.siteCode}</p>
+                        <p className="text-xs text-gray-600">{productTotal.productName}</p>
                         <p className="text-xs text-gray-500">{formatCurrency(productTotal.monthlyRate)}/month</p>
                       </div>
                     </div>
@@ -560,25 +663,18 @@ export default function CreateJobOrderPage() {
               {isMultiProduct ? (
                 // Show individual product totals for multiple products
                 <div className="space-y-3">
-                  {products.map((product, index) => {
-                    const item = items?.[index]
-                    const productTotal = productTotals[index]
-
-                    return (
-                      <div key={product.id} className="border-l-2 border-blue-500 pl-3">
-                        <p className="text-xs font-semibold text-gray-700 mb-1">
-                          {item?.site_code || product.site_code || `Site ${index + 1}`}
-                        </p>
-                        <p className="text-xs">
-                          <span className="font-semibold">Subtotal:</span> {formatCurrency(productTotal.subtotal)}
-                        </p>
-                        <p className="text-xs">
-                          <span className="font-semibold">12% VAT:</span> {formatCurrency(productTotal.vat)}
-                        </p>
-                        <p className="text-sm font-bold">Total: {formatCurrency(productTotal.total)}</p>
-                      </div>
-                    )
-                  })}
+                  {productTotals.map((productTotal, index) => (
+                    <div key={index} className="border-l-2 border-blue-500 pl-3">
+                      <p className="text-xs font-semibold text-gray-700 mb-1">{productTotal.siteCode}</p>
+                      <p className="text-xs">
+                        <span className="font-semibold">Subtotal:</span> {formatCurrency(productTotal.subtotal)}
+                      </p>
+                      <p className="text-xs">
+                        <span className="font-semibold">12% VAT:</span> {formatCurrency(productTotal.vat)}
+                      </p>
+                      <p className="text-sm font-bold">Total: {formatCurrency(productTotal.total)}</p>
+                    </div>
+                  ))}
 
                   {/* Overall totals */}
                   <div className="border-t border-gray-300 pt-2 mt-3">
@@ -763,25 +859,22 @@ export default function CreateJobOrderPage() {
           ) : null}
 
           <h2 className="text-lg font-bold text-gray-900">
-            Job Order{isMultiProduct ? "s" : ""} ({products.length})
+            Job Order{isMultiProduct ? "s" : ""} ({hasItems ? quotationItems.length : 1})
           </h2>
 
           {isMultiProduct ? (
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {products.map((product, index) => {
-                  const item = items?.[index]
-                  return (
-                    <TabsTrigger key={index} value={index.toString()} className="text-xs">
-                      {item?.site_code || product.site_code || `Site ${index + 1}`}
-                    </TabsTrigger>
-                  )
-                })}
+                {quotationItems.map((item: any, index: number) => (
+                  <TabsTrigger key={index} value={index.toString()} className="text-xs">
+                    {item.site_code || `Site ${index + 1}`}
+                  </TabsTrigger>
+                ))}
               </TabsList>
 
-              {products.map((product, index) => {
+              {quotationItems.map((item: any, index: number) => {
                 const form = jobOrderForms[index]
-                const item = items?.[index]
+                const product = products[index] || {}
 
                 if (!form) return null
 
@@ -792,14 +885,14 @@ export default function CreateJobOrderPage() {
                         <CardTitle className="text-base flex items-center gap-2">
                           <Image
                             src={product.media?.[0]?.url || "/placeholder.svg?height=24&width=24&query=billboard"}
-                            alt={product.name || "Site image"}
+                            alt={item.product_name || "Site image"}
                             width={24}
                             height={24}
                             className="rounded object-cover"
                           />
-                          {item?.product_name || product.name}
+                          {item.product_name}
                           <Badge variant="outline" className="text-xs">
-                            {item?.site_code || product.site_code || `Site ${index + 1}`}
+                            {item.site_code || `Site ${index + 1}`}
                           </Badge>
                         </CardTitle>
                       </CardHeader>
@@ -969,177 +1062,178 @@ export default function CreateJobOrderPage() {
               })}
             </Tabs>
           ) : (
-            // Single product form (existing logic)
+            // Single product form
             <div className="space-y-4">
-              {products.map((product, index) => {
-                const form = jobOrderForms[index]
-                if (!form) return null
+              <Card>
+                <CardContent className="space-y-4 pt-6">
+                  {/* Same form fields as in the tabs, but without the card header */}
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-800">JO #</Label>
+                    <Input value="(Auto-Generated)" disabled className="bg-gray-100 text-gray-600 text-sm h-9" />
+                  </div>
 
-                return (
-                  <Card key={index}>
-                    <CardContent className="space-y-4 pt-6">
-                      {/* Same form fields as in the tabs, but without the card header */}
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-800">JO #</Label>
-                        <Input value="(Auto-Generated)" disabled className="bg-gray-100 text-gray-600 text-sm h-9" />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-800">Date Requested</Label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                                !form.dateRequested && "text-gray-500",
-                                form.dateRequestedError && "border-red-500 focus-visible:ring-red-500",
-                              )}
-                              onClick={() => handleFormUpdate(index, "dateRequestedError", false)}
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                              {form.dateRequested ? format(form.dateRequested, "PPP") : <span>Date</span>}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                            <Calendar
-                              mode="single"
-                              selected={form.dateRequested}
-                              onSelect={(date) => {
-                                handleFormUpdate(index, "dateRequested", date)
-                                handleFormUpdate(index, "dateRequestedError", false)
-                              }}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-800">JO Type</Label>
-                        <Select
-                          onValueChange={(value: JobOrderType) => {
-                            handleFormUpdate(index, "joType", value)
-                            handleFormUpdate(index, "joTypeError", false)
-                          }}
-                          value={form.joType}
-                        >
-                          <SelectTrigger
-                            className={cn(
-                              "bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                              form.joTypeError && "border-red-500 focus-visible:ring-red-500",
-                            )}
-                          >
-                            <SelectValue placeholder="Choose JO Type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {joTypes.map((type) => (
-                              <SelectItem key={type} value={type} className="text-sm">
-                                {type}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-800">Deadline</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            type="date"
-                            value={form.deadline ? format(form.deadline, "yyyy-MM-dd") : ""}
-                            onChange={(e) => {
-                              const date = e.target.value ? new Date(e.target.value) : undefined
-                              handleFormUpdate(index, "deadline", date)
-                            }}
-                            className="flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9"
-                            required
-                          />
-                          <Button
-                            variant="outline"
-                            className="h-9 px-3 text-sm text-gray-800 border-gray-300 hover:bg-gray-50 bg-transparent"
-                            onClick={() => setShowComingSoonDialog(true)}
-                          >
-                            Timeline
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-800">Requested By</Label>
-                        <Input
-                          value={userData?.first_name || "(Auto-Generated)"}
-                          disabled
-                          className="bg-gray-100 text-gray-600 text-sm h-9"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-800">Remarks</Label>
-                        <Textarea
-                          placeholder="Remarks..."
-                          value={form.remarks}
-                          onChange={(e) => handleFormUpdate(index, "remarks", e.target.value)}
-                          className="bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-24"
-                        />
-                      </div>
-
-                      {/* Attachments */}
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-800">Attachments</Label>
-                        <input
-                          type="file"
-                          id={`attachment-upload-${index}`}
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(event) => {
-                            if (event.target.files && event.target.files[0]) {
-                              handleProductAttachmentUpload(index, event.target.files[0])
-                            }
-                          }}
-                        />
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-800">Date Requested</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
                         <Button
-                          variant="outline"
-                          className="w-24 h-24 flex flex-col items-center justify-center text-gray-500 border-dashed border-2 border-gray-300 bg-gray-100 hover:bg-gray-200"
-                          onClick={() => document.getElementById(`attachment-upload-${index}`)?.click()}
-                          disabled={form.uploadingAttachment}
-                        >
-                          {form.uploadingAttachment ? (
-                            <Loader2 className="h-6 w-6 animate-spin" />
-                          ) : (
-                            <Plus className="h-6 w-6" />
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
+                            !jobOrderForms[0]?.dateRequested && "text-gray-500",
+                            jobOrderForms[0]?.dateRequestedError && "border-red-500 focus-visible:ring-red-500",
                           )}
-                          <span className="text-xs mt-1">{form.uploadingAttachment ? "Uploading..." : "Upload"}</span>
-                        </Button>
-                        {form.attachmentFile && !form.uploadingAttachment && (
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <ImageIcon className="h-4 w-4" />
-                            <span>{form.attachmentFile.name}</span>
-                          </div>
-                        )}
-                        {form.attachmentError && <p className="text-xs text-red-500 mt-1">{form.attachmentError}</p>}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label className="text-sm text-gray-800">Assign to</Label>
-                        <Select
-                          onValueChange={(value) => handleFormUpdate(index, "assignTo", value)}
-                          value={form.assignTo}
+                          onClick={() => handleFormUpdate(0, "dateRequestedError", false)}
                         >
-                          <SelectTrigger className="bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9">
-                            <SelectValue placeholder="Choose Assignee" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={userData?.uid || ""} className="text-sm">
-                              {userData?.first_name}
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
+                          <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                          {jobOrderForms[0]?.dateRequested ? (
+                            format(jobOrderForms[0].dateRequested, "PPP")
+                          ) : (
+                            <span>Date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={jobOrderForms[0]?.dateRequested}
+                          onSelect={(date) => {
+                            handleFormUpdate(0, "dateRequested", date)
+                            handleFormUpdate(0, "dateRequestedError", false)
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-800">JO Type</Label>
+                    <Select
+                      onValueChange={(value: JobOrderType) => {
+                        handleFormUpdate(0, "joType", value)
+                        handleFormUpdate(0, "joTypeError", false)
+                      }}
+                      value={jobOrderForms[0]?.joType}
+                    >
+                      <SelectTrigger
+                        className={cn(
+                          "bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
+                          jobOrderForms[0]?.joTypeError && "border-red-500 focus-visible:ring-red-500",
+                        )}
+                      >
+                        <SelectValue placeholder="Choose JO Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {joTypes.map((type) => (
+                          <SelectItem key={type} value={type} className="text-sm">
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-800">Deadline</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="date"
+                        value={jobOrderForms[0]?.deadline ? format(jobOrderForms[0].deadline, "yyyy-MM-dd") : ""}
+                        onChange={(e) => {
+                          const date = e.target.value ? new Date(e.target.value) : undefined
+                          handleFormUpdate(0, "deadline", date)
+                        }}
+                        className="flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9"
+                        required
+                      />
+                      <Button
+                        variant="outline"
+                        className="h-9 px-3 text-sm text-gray-800 border-gray-300 hover:bg-gray-50 bg-transparent"
+                        onClick={() => setShowComingSoonDialog(true)}
+                      >
+                        Timeline
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-800">Requested By</Label>
+                    <Input
+                      value={userData?.first_name || "(Auto-Generated)"}
+                      disabled
+                      className="bg-gray-100 text-gray-600 text-sm h-9"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-800">Remarks</Label>
+                    <Textarea
+                      placeholder="Remarks..."
+                      value={jobOrderForms[0]?.remarks || ""}
+                      onChange={(e) => handleFormUpdate(0, "remarks", e.target.value)}
+                      className="bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-24"
+                    />
+                  </div>
+
+                  {/* Attachments */}
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-800">Attachments</Label>
+                    <input
+                      type="file"
+                      id="attachment-upload-0"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(event) => {
+                        if (event.target.files && event.target.files[0]) {
+                          handleProductAttachmentUpload(0, event.target.files[0])
+                        }
+                      }}
+                    />
+                    <Button
+                      variant="outline"
+                      className="w-24 h-24 flex flex-col items-center justify-center text-gray-500 border-dashed border-2 border-gray-300 bg-gray-100 hover:bg-gray-200"
+                      onClick={() => document.getElementById("attachment-upload-0")?.click()}
+                      disabled={jobOrderForms[0]?.uploadingAttachment}
+                    >
+                      {jobOrderForms[0]?.uploadingAttachment ? (
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                      ) : (
+                        <Plus className="h-6 w-6" />
+                      )}
+                      <span className="text-xs mt-1">
+                        {jobOrderForms[0]?.uploadingAttachment ? "Uploading..." : "Upload"}
+                      </span>
+                    </Button>
+                    {jobOrderForms[0]?.attachmentFile && !jobOrderForms[0]?.uploadingAttachment && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <ImageIcon className="h-4 w-4" />
+                        <span>{jobOrderForms[0].attachmentFile.name}</span>
                       </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
+                    )}
+                    {jobOrderForms[0]?.attachmentError && (
+                      <p className="text-xs text-red-500 mt-1">{jobOrderForms[0].attachmentError}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-800">Assign to</Label>
+                    <Select
+                      onValueChange={(value) => handleFormUpdate(0, "assignTo", value)}
+                      value={jobOrderForms[0]?.assignTo}
+                    >
+                      <SelectTrigger className="bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9">
+                        <SelectValue placeholder="Choose Assignee" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={userData?.uid || ""} className="text-sm">
+                          {userData?.first_name}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
