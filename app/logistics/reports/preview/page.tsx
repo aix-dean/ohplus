@@ -443,192 +443,226 @@ export default function ReportPreviewPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
-        {/* Report Header */}
-        <div className="flex justify-between items-center">
-          <div className="flex flex-col">
-            <div className="bg-cyan-400 text-white px-6 py-3 rounded-lg text-base font-medium inline-block">
-              {getReportTypeDisplay(report.reportType)}
+      {/* Main Content Container */}
+      <div className="flex">
+        {/* Left Action Buttons Container */}
+        <div className="w-20 flex-shrink-0 p-4">
+          <div className="sticky top-32 flex flex-col gap-6">
+            {/* Edit Button */}
+            <div className="flex flex-col items-center">
+              <Button
+                onClick={handleEdit}
+                className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                size="sm"
+              >
+                <Edit className="h-6 w-6" />
+              </Button>
+              <span className="text-xs text-gray-600 mt-2 font-medium">Edit</span>
             </div>
-            <p className="text-gray-600 text-sm mt-2">as of {formatDate(report.date)}</p>
-          </div>
-          <div className="flex-shrink-0">
-            <div
-              className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm"
-              style={{ width: "160px", height: "160px" }}
-            >
-              <img
-                src={companyLogo || "/placeholder.svg"}
-                alt="Company Logo"
-                className="max-h-full max-w-full object-contain"
-              />
+
+            {/* Download Button */}
+            <div className="flex flex-col items-center">
+              <Button
+                onClick={handleDownloadPDF}
+                disabled={isGeneratingPDF}
+                className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+                size="sm"
+              >
+                <Download className="h-6 w-6" />
+              </Button>
+              <span className="text-xs text-gray-600 mt-2 font-medium">{isGeneratingPDF ? "..." : "Download"}</span>
             </div>
           </div>
         </div>
 
-        {/* Project Information */}
-        <Card className="shadow-sm">
-          <CardContent className="p-6">
-            <h2 className="text-xl font-bold mb-4 text-gray-900">Project Information</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Left Column */}
-              <div className="space-y-2">
-                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-bold text-gray-700 whitespace-nowrap">Site ID:</span>
-                  <span className="text-gray-900">{getSiteLocation(product)}</span>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-bold text-gray-700 whitespace-nowrap">Job Order:</span>
-                  <span className="text-gray-900">{report.id?.slice(-4).toUpperCase() || "7733"}</span>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-bold text-gray-700 whitespace-nowrap">Job Order Date:</span>
-                  <span className="text-gray-900">{formatDate(report.date)}</span>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-bold text-gray-700 whitespace-nowrap">Site:</span>
-                  <span className="text-gray-900">{report.siteName}</span>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-bold text-gray-700 whitespace-nowrap">Size:</span>
-                  <span className="text-gray-900">{getSiteSize(product)}</span>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-bold text-gray-700 whitespace-nowrap">Start Date:</span>
-                  <span className="text-gray-900">{formatDate(report.bookingDates.start)}</span>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-bold text-gray-700 whitespace-nowrap">End Date:</span>
-                  <span className="text-gray-900">{formatDate(report.bookingDates.end)}</span>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-bold text-gray-700 whitespace-nowrap">Installation Duration:</span>
-                  <span className="text-gray-900">
-                    {calculateInstallationDuration(report.bookingDates.start, report.bookingDates.end)} days
-                  </span>
-                </div>
+        {/* Report Content */}
+        <div className="flex-1 p-6 space-y-6">
+          {/* Report Header */}
+          <div className="flex justify-between items-center">
+            <div className="flex flex-col">
+              <div className="bg-cyan-400 text-white px-6 py-3 rounded-lg text-base font-medium inline-block">
+                {getReportTypeDisplay(report.reportType)}
               </div>
-
-              {/* Right Column */}
-              <div className="space-y-2">
-                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-bold text-gray-700 whitespace-nowrap">Content:</span>
-                  <span className="text-gray-900">{product?.content_type || "Static"}</span>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-bold text-gray-700 whitespace-nowrap">Material Specs:</span>
-                  <span className="text-gray-900">{getMaterialSpecs(product)}</span>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-bold text-gray-700 whitespace-nowrap">Crew:</span>
-                  <span className="text-gray-900">Team {report.assignedTo || "4"}</span>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-bold text-gray-700 whitespace-nowrap">Illumination:</span>
-                  <span className="text-gray-900">{getIllumination(product)}</span>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-bold text-gray-700 whitespace-nowrap">Gondola:</span>
-                  <span className="text-gray-900">{getGondola(product)}</span>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-bold text-gray-700 whitespace-nowrap">Technology:</span>
-                  <span className="text-gray-900">{getTechnology(product)}</span>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                  <span className="font-bold text-gray-700 whitespace-nowrap">Sales:</span>
-                  <span className="text-gray-900">{report.sales}</span>
-                </div>
-              </div>
+              <p className="text-gray-600 text-sm mt-2">as of {formatDate(report.date)}</p>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Project Status */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-bold text-gray-900">Project Status</h2>
-            <div className="bg-green-500 text-white px-3 py-1 rounded text-sm font-medium">
-              {report.completionPercentage || 100}%
+            <div className="flex-shrink-0">
+              <div
+                className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm"
+                style={{ width: "160px", height: "160px" }}
+              >
+                <img
+                  src={companyLogo || "/placeholder.svg"}
+                  alt="Company Logo"
+                  className="max-h-full max-w-full object-contain"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Attachments/Photos */}
-          {report.attachments && report.attachments.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {report.attachments.slice(0, 2).map((attachment, index) => (
-                <div key={index} className="space-y-2">
-                  <div
-                    className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
-                    onClick={() => attachment.fileUrl && openFullScreen(attachment)}
-                  >
-                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center z-10">
-                      <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                    </div>
-
-                    {attachment.fileUrl && isImageFile(attachment.fileName) ? (
-                      <img
-                        src={attachment.fileUrl || "/placeholder.svg"}
-                        alt={attachment.fileName}
-                        className="max-w-full max-h-full object-contain rounded"
-                        onError={(e) => handleImageError(attachment.fileUrl, attachment.fileName)}
-                      />
-                    ) : (
-                      <div className="text-center space-y-2">
-                        {getFileIcon(attachment.fileName)}
-                        <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
-                      </div>
-                    )}
+          {/* Project Information */}
+          <Card className="shadow-sm">
+            <CardContent className="p-6">
+              <h2 className="text-xl font-bold mb-4 text-gray-900">Project Information</h2>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Left Column */}
+                <div className="space-y-2">
+                  <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                    <span className="font-bold text-gray-700 whitespace-nowrap">Site ID:</span>
+                    <span className="text-gray-900">{getSiteLocation(product)}</span>
                   </div>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <div>
-                      <span className="font-semibold">Date:</span> {formatDate(report.date)}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Time:</span>{" "}
-                      {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                    </div>
-                    <div>
-                      <span className="font-semibold">Location:</span> {getSiteLocation(product)}
-                    </div>
-                    {attachment.fileName && (
-                      <div>
-                        <span className="font-semibold">File:</span> {attachment.fileName}
-                      </div>
-                    )}
-                    {attachment.note && (
-                      <div>
-                        <span className="font-semibold">Note:</span> {attachment.note}
-                      </div>
-                    )}
+                  <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                    <span className="font-bold text-gray-700 whitespace-nowrap">Job Order:</span>
+                    <span className="text-gray-900">{report.id?.slice(-4).toUpperCase() || "7733"}</span>
+                  </div>
+                  <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                    <span className="font-bold text-gray-700 whitespace-nowrap">Job Order Date:</span>
+                    <span className="text-gray-900">{formatDate(report.date)}</span>
+                  </div>
+                  <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                    <span className="font-bold text-gray-700 whitespace-nowrap">Site:</span>
+                    <span className="text-gray-900">{report.siteName}</span>
+                  </div>
+                  <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                    <span className="font-bold text-gray-700 whitespace-nowrap">Size:</span>
+                    <span className="text-gray-900">{getSiteSize(product)}</span>
+                  </div>
+                  <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                    <span className="font-bold text-gray-700 whitespace-nowrap">Start Date:</span>
+                    <span className="text-gray-900">{formatDate(report.bookingDates.start)}</span>
+                  </div>
+                  <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                    <span className="font-bold text-gray-700 whitespace-nowrap">End Date:</span>
+                    <span className="text-gray-900">{formatDate(report.bookingDates.end)}</span>
+                  </div>
+                  <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                    <span className="font-bold text-gray-700 whitespace-nowrap">Installation Duration:</span>
+                    <span className="text-gray-900">
+                      {calculateInstallationDuration(report.bookingDates.start, report.bookingDates.end)} days
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
 
-          {/* Debug info for attachments */}
-          {process.env.NODE_ENV === "development" && report.attachments && (
-            <div className="mt-4 p-4 bg-gray-100 rounded text-xs">
-              <h4 className="font-bold mb-2">Debug - Attachments Data:</h4>
-              <pre className="whitespace-pre-wrap">{JSON.stringify(report.attachments, null, 2)}</pre>
-            </div>
-          )}
-        </div>
+                {/* Right Column */}
+                <div className="space-y-2">
+                  <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                    <span className="font-bold text-gray-700 whitespace-nowrap">Content:</span>
+                    <span className="text-gray-900">{product?.content_type || "Static"}</span>
+                  </div>
+                  <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                    <span className="font-bold text-gray-700 whitespace-nowrap">Material Specs:</span>
+                    <span className="text-gray-900">{getMaterialSpecs(product)}</span>
+                  </div>
+                  <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                    <span className="font-bold text-gray-700 whitespace-nowrap">Crew:</span>
+                    <span className="text-gray-900">Team {report.assignedTo || "4"}</span>
+                  </div>
+                  <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                    <span className="font-bold text-gray-700 whitespace-nowrap">Illumination:</span>
+                    <span className="text-gray-900">{getIllumination(product)}</span>
+                  </div>
+                  <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                    <span className="font-bold text-gray-700 whitespace-nowrap">Gondola:</span>
+                    <span className="text-gray-900">{getGondola(product)}</span>
+                  </div>
+                  <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                    <span className="font-bold text-gray-700 whitespace-nowrap">Technology:</span>
+                    <span className="text-gray-900">{getTechnology(product)}</span>
+                  </div>
+                  <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                    <span className="font-bold text-gray-700 whitespace-nowrap">Sales:</span>
+                    <span className="text-gray-900">{report.sales}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Footer */}
-        <div className="flex justify-between items-end pt-8 border-t">
-          <div>
-            <h3 className="font-semibold mb-2">Prepared by:</h3>
-            <div className="text-sm text-gray-600">
-              <div>{preparedByName || "Loading..."}</div>
-              <div>LOGISTICS</div>
-              <div>{formatDate(report.date)}</div>
+          {/* Project Status */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <h2 className="text-xl font-bold text-gray-900">Project Status</h2>
+              <div className="bg-green-500 text-white px-3 py-1 rounded text-sm font-medium">
+                {report.completionPercentage || 100}%
+              </div>
             </div>
+
+            {/* Attachments/Photos */}
+            {report.attachments && report.attachments.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {report.attachments.slice(0, 2).map((attachment, index) => (
+                  <div key={index} className="space-y-2">
+                    <div
+                      className="bg-gray-200 rounded-lg h-64 flex flex-col items-center justify-center p-4 overflow-hidden cursor-pointer hover:bg-gray-300 transition-colors relative group"
+                      onClick={() => attachment.fileUrl && openFullScreen(attachment)}
+                    >
+                      <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center z-10">
+                        <ZoomIn className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                      </div>
+
+                      {attachment.fileUrl && isImageFile(attachment.fileName) ? (
+                        <img
+                          src={attachment.fileUrl || "/placeholder.svg"}
+                          alt={attachment.fileName}
+                          className="max-w-full max-h-full object-contain rounded"
+                          onError={(e) => handleImageError(attachment.fileUrl, attachment.fileName)}
+                        />
+                      ) : (
+                        <div className="text-center space-y-2">
+                          {getFileIcon(attachment.fileName)}
+                          <p className="text-sm text-gray-700 font-medium break-all">{attachment.fileName}</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <div>
+                        <span className="font-semibold">Date:</span> {formatDate(report.date)}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Time:</span>{" "}
+                        {new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                      <div>
+                        <span className="font-semibold">Location:</span> {getSiteLocation(product)}
+                      </div>
+                      {attachment.fileName && (
+                        <div>
+                          <span className="font-semibold">File:</span> {attachment.fileName}
+                        </div>
+                      )}
+                      {attachment.note && (
+                        <div>
+                          <span className="font-semibold">Note:</span> {attachment.note}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Debug info for attachments */}
+            {process.env.NODE_ENV === "development" && report.attachments && (
+              <div className="mt-4 p-4 bg-gray-100 rounded text-xs">
+                <h4 className="font-bold mb-2">Debug - Attachments Data:</h4>
+                <pre className="whitespace-pre-wrap">{JSON.stringify(report.attachments, null, 2)}</pre>
+              </div>
+            )}
           </div>
-          <div className="text-right text-sm text-gray-500 italic">
-            "All data are based on the latest available records as of{" "}
-            {formatDate(new Date().toISOString().split("T")[0])}."
+
+          {/* Footer */}
+          <div className="flex justify-between items-end pt-8 border-t">
+            <div>
+              <h3 className="font-semibold mb-2">Prepared by:</h3>
+              <div className="text-sm text-gray-600">
+                <div>{preparedByName || "Loading..."}</div>
+                <div>LOGISTICS</div>
+                <div>{formatDate(report.date)}</div>
+              </div>
+            </div>
+            <div className="text-right text-sm text-gray-500 italic">
+              "All data are based on the latest available records as of{" "}
+              {formatDate(new Date().toISOString().split("T")[0])}."
+            </div>
           </div>
         </div>
       </div>
@@ -660,34 +694,6 @@ export default function ReportPreviewPage() {
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Left Side Floating Buttons */}
-      <div className="fixed left-8 top-32 z-50 flex flex-col gap-6">
-        {/* Edit Button */}
-        <div className="flex flex-col items-center">
-          <Button
-            onClick={handleEdit}
-            className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
-            size="sm"
-          >
-            <Edit className="h-6 w-6" />
-          </Button>
-          <span className="text-xs text-gray-600 mt-2 font-medium">Edit</span>
-        </div>
-
-        {/* Download Button */}
-        <div className="flex flex-col items-center">
-          <Button
-            onClick={handleDownloadPDF}
-            disabled={isGeneratingPDF}
-            className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
-            size="sm"
-          >
-            <Download className="h-6 w-6" />
-          </Button>
-          <span className="text-xs text-gray-600 mt-2 font-medium">{isGeneratingPDF ? "..." : "Download"}</span>
         </div>
       </div>
 
