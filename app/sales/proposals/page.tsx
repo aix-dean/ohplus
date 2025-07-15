@@ -33,7 +33,6 @@ import type { Proposal } from "@/lib/types/proposal"
 import { useResponsive } from "@/hooks/use-responsive"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs" // Import Tabs components
 import { CostEstimatesList } from "@/components/cost-estimates-list" // Import CostEstimatesList
-import { ComingSoonDialog } from "@/components/coming-soon-dialog";
 
 function ProposalsPageContent() {
   const [proposals, setProposals] = useState<Proposal[]>([])
@@ -45,7 +44,7 @@ function ProposalsPageContent() {
   const router = useRouter()
   const { isMobile } = useResponsive()
   const [activeTab, setActiveTab] = useState("proposals") // State to manage active tab
-  const [showComingSoonDialog, setShowComingSoonDialog] = useState(false);
+
   useEffect(() => {
     if (user?.uid) {
       loadProposals()
@@ -380,11 +379,6 @@ function ProposalsPageContent() {
         </Tabs>
       </div>
     </div>
-     <ComingSoonDialog
-        isOpen={showComingSoonDialog}
-        onClose={() => setShowComingSoonDialog(false)}
-        feature="Timeline Feature"
-      />
   )
 }
 
