@@ -172,7 +172,7 @@ export default function RegisterPage() {
           company_name: "",
           company_location: "",
         },
-        "", // licenseKey - empty string for now
+        "", // licenseKey - empty string as placeholder
         orgCode || undefined,
       )
 
