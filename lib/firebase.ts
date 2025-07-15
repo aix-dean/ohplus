@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app"
 import { getAuth } from "firebase/auth"
-import { getFirestore } from "firebase/firestore"
+import { getFirestore, serverTimestamp } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
 
 const firebaseConfig = {
@@ -22,3 +22,4 @@ export const storage = getStorage(app)
 auth.tenantId = "ohplus-07hsi"
 
 export default app
+export { serverTimestamp }
