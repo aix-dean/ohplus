@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
@@ -39,14 +38,7 @@ const PREDEFINED_ROLES = getAllRoles().map((role) => ({
   color: role.color,
 }))
 
-const AVAILABLE_PERMISSIONS = [
-  { id: "admin", label: "Admin Access", description: "Full administrative access" },
-  { id: "sales", label: "Sales Access", description: "Sales module access" },
-  { id: "logistics", label: "Logistics Access", description: "Logistics operations access" },
-  { id: "cms", label: "CMS Access", description: "Content management access" },
-  { id: "user-management", label: "User Management", description: "Manage users and roles" },
-  { id: "system-settings", label: "System Settings", description: "System configuration" },
-]
+const AVAILABLE_PERMISSIONS = []
 
 export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInvitationCodeDialogProps) {
   const { userData } = useAuth()
@@ -56,7 +48,6 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
     maxUsage: 0,
     role: "" as RoleType | "custom" | "",
     customRole: "",
-    permissions: [] as string[],
     description: "",
   })
 
@@ -117,7 +108,6 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
         max_usage: formData.maxUsage,
         usage_count: 0,
         role: finalRole,
-        permissions: formData.permissions,
         status: "active",
         created_by: userData.uid,
         company_id: userData.company_id,
@@ -136,7 +126,6 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
         maxUsage: 0,
         role: "",
         customRole: "",
-        permissions: [],
         description: "",
       })
 
@@ -272,33 +261,6 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
             </CardContent>
           </Card>
 
-          {/* Permissions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Permissions</CardTitle>
-              <CardDescription>Select specific permissions for this role</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {AVAILABLE_PERMISSIONS.map((permission) => (
-                  <div key={permission.id} className="flex items-start space-x-3">
-                    <Checkbox
-                      id={permission.id}
-                      checked={formData.permissions.includes(permission.id)}
-                      onCheckedChange={(checked) => handlePermissionChange(permission.id, checked as boolean)}
-                    />
-                    <div className="space-y-1">
-                      <Label htmlFor={permission.id} className="text-sm font-medium cursor-pointer">
-                        {permission.label}
-                      </Label>
-                      <p className="text-xs text-muted-foreground">{permission.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Description */}
           <Card>
             <CardHeader>
@@ -344,22 +306,6 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
                   </Badge>
                 </div>
               </div>
-
-              {formData.permissions.length > 0 && (
-                <div>
-                  <span className="font-medium text-sm">Permissions:</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {formData.permissions.map((permId) => {
-                      const perm = AVAILABLE_PERMISSIONS.find((p) => p.id === permId)
-                      return (
-                        <Badge key={permId} variant="outline" className="text-xs">
-                          {perm?.label}
-                        </Badge>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
         </form>
