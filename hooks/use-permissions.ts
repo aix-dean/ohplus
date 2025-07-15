@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "../contexts/auth-context"
-import { hasPermission, getUserRoles } from "../lib/access-management-service"
+import { hasPermission, getUserRoles, isAdmin, type RoleType } from "../lib/hardcoded-access-service"
 
-export function usePermission(permissionName: string, module: string, action: "view" | "create" | "edit" | "delete") {
+export function usePermission(module: string, action: "view" | "create" | "edit" | "delete") {
   const { user } = useAuth()
   const [hasAccess, setHasAccess] = useState<boolean>(false)
   const [loading, setLoading] = useState<boolean>(true)
@@ -18,7 +18,7 @@ export function usePermission(permissionName: string, module: string, action: "v
       }
 
       try {
-        const permitted = await hasPermission(user.uid, permissionName, module, action)
+        const permitted = await hasPermission(user.uid, module, action)
         setHasAccess(permitted)
       } catch (error) {
         console.error("Error checking permission:", error)
@@ -29,14 +29,14 @@ export function usePermission(permissionName: string, module: string, action: "v
     }
 
     checkPermission()
-  }, [user, permissionName, module, action])
+  }, [user, module, action])
 
   return { hasAccess, loading }
 }
 
 export function useUserRoles() {
   const { user } = useAuth()
-  const [roles, setRoles] = useState<string[]>([])
+  const [roles, setRoles] = useState<RoleType[]>([])
   const [loading, setLoading] = useState<boolean>(true)
 
   useEffect(() => {
@@ -65,16 +65,45 @@ export function useUserRoles() {
 }
 
 export function useIsAdmin() {
-  const { roles, loading } = useUserRoles()
-  const [isAdmin, setIsAdmin] = useState<boolean>(false)
+  const { user } = useAuth()
+  const [isUserAdmin, setIsUserAdmin] = useState<boolean>(false)
+  const [loading, setLoading] = useState<boolean>(true)
 
   useEffect(() => {
-    // This is a simplified check. In a real app, you'd check if the user has the admin role
-    // by comparing role IDs or names from your database
-    if (!loading) {
-      setIsAdmin(roles.some((role) => role === "admin"))
-    }
-  }, [roles, loading])
+    async function checkAdminStatus() {
+      if (!user) {
+        setIsUserAdmin(false)
+        setLoading(false)
+        return
+      }
 
-  return { isAdmin, loading }
+      try {
+        const adminStatus = await isAdmin(user.uid)
+        setIsUserAdmin(adminStatus)
+      } catch (error) {
+        console.error("Error checking admin status:", error)
+        setIsUserAdmin(false)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkAdminStatus()
+  }, [user])
+
+  return { isAdmin: isUserAdmin, loading }
+}
+
+export function useHasRole(requiredRoles: RoleType[]) {
+  const { roles, loading } = useUserRoles()
+  const [hasRequiredRole, setHasRequiredRole] = useState<boolean>(false)
+
+  useEffect(() => {
+    if (!loading) {
+      const hasRole = requiredRoles.some((role) => roles.includes(role))
+      setHasRequiredRole(hasRole)
+    }
+  }, [roles, loading, requiredRoles])
+
+  return { hasRole: hasRequiredRole, loading }
 }

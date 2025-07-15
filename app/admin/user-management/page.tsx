@@ -24,12 +24,13 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { toast } from "@/components/ui/use-toast"
 import {
-  getRoles,
+  getAllRoles,
   getUserRoles,
   assignRoleToUser,
   removeRoleFromUser,
-  type Role,
-} from "@/lib/access-management-service"
+  type RoleType,
+  type HardcodedRole,
+} from "@/lib/hardcoded-access-service"
 
 interface User {
   id: string
@@ -44,35 +45,21 @@ interface User {
 export default function UserManagementPage() {
   const { userData, refreshUserData } = useAuth()
   const [users, setUsers] = useState<User[]>([])
-  const [roles, setRoles] = useState<Role[]>([])
+  const [roles] = useState<HardcodedRole[]>(getAllRoles())
   const [loading, setLoading] = useState(true)
   const [isCompanyRegistrationDialogOpen, setIsCompanyRegistrationDialogOpen] = useState(false)
   const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isEditRolesDialogOpen, setIsEditRolesDialogOpen] = useState(false)
-  const [selectedRoles, setSelectedRoles] = useState<Record<string, boolean>>({})
+  const [selectedRoles, setSelectedRoles] = useState<Record<RoleType, boolean>>({
+    admin: false,
+    sales: false,
+    logistics: false,
+    cms: false,
+  })
   const [roleDialogLoading, setRoleDialogLoading] = useState(false)
 
   const router = useRouter()
-
-  // Load roles on component mount
-  useEffect(() => {
-    async function loadRoles() {
-      try {
-        const fetchedRoles = await getRoles()
-        setRoles(fetchedRoles)
-      } catch (error) {
-        console.error("Error loading roles:", error)
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load roles. Please try again.",
-        })
-      }
-    }
-
-    loadRoles()
-  }, [])
 
   useEffect(() => {
     if (!userData?.company_id) {
@@ -126,21 +113,18 @@ export default function UserManagementPage() {
     }
   }
 
-  const getRoleBadge = (role: string) => {
-    const roleStr = String(role || "user").toLowerCase()
+  const getRoleBadge = (roleId: RoleType) => {
+    const role = roles.find((r) => r.id === roleId)
+    if (!role) return null
 
-    const roleColors = {
+    const colorClasses = {
       admin: "bg-purple-100 text-purple-800 hover:bg-purple-100",
-      manager: "bg-blue-100 text-blue-800 hover:bg-blue-100",
-      editor: "bg-orange-100 text-orange-800 hover:bg-orange-100",
-      user: "bg-gray-100 text-gray-800 hover:bg-gray-100",
+      sales: "bg-green-100 text-green-800 hover:bg-green-100",
+      logistics: "bg-blue-100 text-blue-800 hover:bg-blue-100",
+      cms: "bg-orange-100 text-orange-800 hover:bg-orange-100",
     }
 
-    return (
-      <Badge className={roleColors[roleStr as keyof typeof roleColors] || roleColors.user}>
-        {roleStr.charAt(0).toUpperCase() + roleStr.slice(1)}
-      </Badge>
-    )
+    return <Badge className={colorClasses[roleId]}>{role.name}</Badge>
   }
 
   const handleEditRoles = async (user: User) => {
@@ -153,10 +137,12 @@ export default function UserManagementPage() {
         const userRoles = await getUserRoles(user.id)
 
         // Initialize selected roles based on user's current roles
-        const initialSelectedRoles: Record<string, boolean> = {}
-        roles.forEach((role) => {
-          initialSelectedRoles[role.id] = userRoles.includes(role.id)
-        })
+        const initialSelectedRoles: Record<RoleType, boolean> = {
+          admin: userRoles.includes("admin"),
+          sales: userRoles.includes("sales"),
+          logistics: userRoles.includes("logistics"),
+          cms: userRoles.includes("cms"),
+        }
 
         setSelectedRoles(initialSelectedRoles)
         setIsEditRolesDialogOpen(true)
@@ -183,17 +169,17 @@ export default function UserManagementPage() {
       const currentRoles = await getUserRoles(selectedUser.id)
 
       // Determine roles to add and remove
-      const rolesToAdd = Object.entries(selectedRoles)
+      const rolesToAdd = (Object.entries(selectedRoles) as [RoleType, boolean][])
         .filter(([roleId, isSelected]) => isSelected && !currentRoles.includes(roleId))
         .map(([roleId]) => roleId)
 
-      const rolesToRemove = Object.entries(selectedRoles)
+      const rolesToRemove = (Object.entries(selectedRoles) as [RoleType, boolean][])
         .filter(([roleId, isSelected]) => !isSelected && currentRoles.includes(roleId))
         .map(([roleId]) => roleId)
 
       // Add new roles
       for (const roleId of rolesToAdd) {
-        await assignRoleToUser(selectedUser.id, roleId)
+        await assignRoleToUser(selectedUser.id, roleId, userData?.uid)
       }
 
       // Remove roles
@@ -237,9 +223,9 @@ export default function UserManagementPage() {
       ),
     },
     {
-      key: "role",
-      label: "Role",
-      render: (user: User) => getRoleBadge(user.role),
+      key: "roles",
+      label: "Roles",
+      render: (user: User) => <UserRolesBadges userId={user.id} />,
     },
     {
       key: "status",
@@ -271,6 +257,37 @@ export default function UserManagementPage() {
     },
   ]
 
+  // Component to display user roles
+  function UserRolesBadges({ userId }: { userId: string }) {
+    const [userRoles, setUserRoles] = useState<RoleType[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+      async function loadUserRoles() {
+        try {
+          const roles = await getUserRoles(userId)
+          setUserRoles(roles)
+        } catch (error) {
+          console.error("Error loading user roles:", error)
+        } finally {
+          setLoading(false)
+        }
+      }
+
+      loadUserRoles()
+    }, [userId])
+
+    if (loading) {
+      return <div className="animate-pulse bg-gray-200 h-5 w-16 rounded"></div>
+    }
+
+    if (userRoles.length === 0) {
+      return <span className="text-muted-foreground text-sm">No roles</span>
+    }
+
+    return <div className="flex flex-wrap gap-1">{userRoles.map((roleId) => getRoleBadge(roleId))}</div>
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -296,7 +313,7 @@ export default function UserManagementPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">User Management ({users.length})</h1>
-          <p className="text-muted-foreground">Manage users and their permissions.</p>
+          <p className="text-muted-foreground">Manage users and their roles.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -365,35 +382,28 @@ export default function UserManagementPage() {
                 <span className="ml-2">Loading roles...</span>
               </div>
             ) : (
-              <div className="space-y-2">
-                {roles.length === 0 ? (
-                  <div className="text-center py-4 text-muted-foreground">
-                    No roles available. Create roles in the "Roles & Access" section first.
-                  </div>
-                ) : (
-                  roles.map((role) => (
-                    <div key={role.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`role-${role.id}`}
-                        checked={selectedRoles[role.id] || false}
-                        onCheckedChange={(checked) =>
-                          setSelectedRoles((prev) => ({ ...prev, [role.id]: checked === true }))
-                        }
-                      />
-                      <Label htmlFor={`role-${role.id}`} className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span>{role.name}</span>
-                          {role.isAdmin && (
-                            <Badge variant="secondary" className="text-xs">
-                              Admin
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="text-sm text-muted-foreground">{role.description}</div>
+              <div className="space-y-3">
+                {roles.map((role) => (
+                  <div key={role.id} className="flex items-start space-x-3 p-3 border rounded-lg">
+                    <Checkbox
+                      id={`role-${role.id}`}
+                      checked={selectedRoles[role.id] || false}
+                      onCheckedChange={(checked) =>
+                        setSelectedRoles((prev) => ({ ...prev, [role.id]: checked === true }))
+                      }
+                    />
+                    <div className="flex-1">
+                      <Label htmlFor={`role-${role.id}`} className="flex items-center gap-2 cursor-pointer">
+                        <span className="font-medium">{role.name}</span>
+                        {getRoleBadge(role.id)}
                       </Label>
+                      <div className="text-sm text-muted-foreground mt-1">{role.description}</div>
+                      <div className="text-xs text-muted-foreground mt-2">
+                        <strong>Permissions:</strong> {role.permissions.length} modules
+                      </div>
                     </div>
-                  ))
-                )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -402,7 +412,7 @@ export default function UserManagementPage() {
             <Button variant="outline" onClick={() => setIsEditRolesDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSaveRoles} disabled={roleDialogLoading || roles.length === 0}>
+            <Button onClick={handleSaveRoles} disabled={roleDialogLoading}>
               {roleDialogLoading ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
