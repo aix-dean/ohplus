@@ -12,9 +12,9 @@ import {
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
 import { subscriptionService } from "@/lib/subscription-service"
+import { assignRoleToUser, type RoleType } from "@/lib/hardcoded-access-service"
 import type { Subscription } from "@/lib/types/subscription"
 import { generateLicenseKey } from "@/lib/utils"
-import { assignRoleToUser, type RoleType } from "@/lib/hardcoded-access-service"
 
 interface UserData {
   uid: string
@@ -23,7 +23,6 @@ interface UserData {
   license_key: string | null
   company_id?: string | null
   role: string | null
-  roles?: RoleType[]
   permissions: string[]
   project_id?: string
   first_name?: string
@@ -115,7 +114,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           displayName: firebaseUser.displayName,
           license_key: data.license_key || null,
           role: data.role || "user",
-          roles: data.roles || [],
           permissions: data.permissions || [],
           project_id: data.project_id,
           first_name: data.first_name,
@@ -138,7 +136,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           license_key: null,
           company_id: null,
           role: "user",
-          roles: [],
           permissions: [],
         }
 
@@ -361,7 +358,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       let licenseKey = generateLicenseKey()
       let companyId = null
-      let roleToAssign: RoleType | null = null
+      let assignedRole: RoleType | null = null
 
       if (orgCode) {
         const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
@@ -373,7 +370,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           licenseKey = invitationData.license_key || licenseKey
           companyId = invitationData.company_id || null
-          roleToAssign = invitationData.role || null // Get the role from invitation code
+          assignedRole = invitationData.role || null // Get the role from invitation code
 
           const updateData: any = {
             used: true,
@@ -398,7 +395,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         license_key: licenseKey,
         company_id: companyId,
         role: "user",
-        roles: [],
         permissions: [],
         type: "OHPLUS",
         created: serverTimestamp(),
@@ -426,14 +422,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await setDoc(userDocRef, userData)
 
       // Assign role from invitation code if available
-      if (roleToAssign) {
-        console.log("Assigning role from invitation code:", roleToAssign)
+      if (assignedRole) {
         try {
-          await assignRoleToUser(firebaseUser.uid, roleToAssign, "system")
-          console.log("Role assigned successfully:", roleToAssign)
+          console.log(`Assigning role ${assignedRole} to user ${firebaseUser.uid} from invitation code`)
+          await assignRoleToUser(firebaseUser.uid, assignedRole, "system")
         } catch (roleError) {
           console.error("Error assigning role from invitation code:", roleError)
-          // Don't throw error here, just log it - user registration should still succeed
+          // Don't fail registration if role assignment fails
         }
       }
 
