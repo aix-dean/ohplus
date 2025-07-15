@@ -143,6 +143,14 @@ export default function LoginPage() {
         {/* Right Section: Login Form */}
         <div className="w-full md:w-1/2 p-8">
           <Card className="border-none shadow-none">
+            {/* Add branding component at the top */}
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-semibold text-gray-800 mb-2">OH!</h1>
+              <p className="text-lg font-light text-blue-600 leading-tight">
+                Powering Smarter Site Management for Billboard Operators
+              </p>
+            </div>
+
             <CardHeader className="text-center md:text-left">
               <CardTitle className="text-3xl font-bold text-gray-900">Log in to your Account</CardTitle>
               <CardDescription className="text-gray-600 mt-2">Welcome back! Select method to log in:</CardDescription>
