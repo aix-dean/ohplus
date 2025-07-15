@@ -24,6 +24,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
+import { subscriptionService } from "@/lib/subscription-service"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -58,11 +59,11 @@ export default function AdminInventoryPage() {
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
-    if (!user?.uid) return
+    if (!userData?.company_id) return
 
     setLoadingCount(true)
     try {
-      const count = await getUserProductsCount(user.uid, { active: true })
+      const count = await getUserProductsCount(userData?.company_id, { active: true })
       setTotalItems(count)
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
@@ -75,12 +76,12 @@ export default function AdminInventoryPage() {
     } finally {
       setLoadingCount(false)
     }
-  }, [user, toast])
+  }, [userData, toast])
 
   // Fetch products for the current page
   const fetchProducts = useCallback(
     async (page: number) => {
-      if (!user?.uid) return
+      if (!userData?.company_id) return
 
       // Check if we have this page in cache
       if (pageCache.has(page)) {
@@ -99,7 +100,7 @@ export default function AdminInventoryPage() {
         // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
-        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, { active: true })
+        const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, { active: true })
 
         setProducts(result.items)
         setLastDoc(result.lastDoc)
@@ -126,23 +127,23 @@ export default function AdminInventoryPage() {
         setLoadingMore(false)
       }
     },
-    [user, lastDoc, pageCache, toast],
+    [userData?.company_id, lastDoc, pageCache, toast],
   )
 
   // Load initial data and count
   useEffect(() => {
-    if (user?.uid) {
+    if (userData?.company_id) {
       fetchProducts(1)
       fetchTotalCount()
     }
-  }, [user, fetchProducts, fetchTotalCount])
+  }, [userData?.company_id, fetchProducts, fetchTotalCount])
 
   // Load data when page changes
   useEffect(() => {
-    if (user?.uid && currentPage > 0) {
+    if (userData?.company_id && currentPage > 0) {
       fetchProducts(currentPage)
     }
-  }, [currentPage, fetchProducts, user])
+  }, [currentPage, fetchProducts, userData?.company_id])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -251,34 +252,41 @@ export default function AdminInventoryPage() {
   }
 
   const handleViewDetails = (productId: string) => {
-    router.push(`/admin/products/${productId}`)
+    router.push(`/admin/inventory/${productId}`)
   }
 
-  const handleAddSiteClick = () => {
+  const handleAddSiteClick = async () => {
     // Check if user has company_id first
     if (!userData?.company_id) {
       setShowCompanyDialog(true)
       return
     }
 
+    // Query subscription by company ID instead of using subscriptionData from context
+    let currentSubscription = null
+    try {
+      currentSubscription = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
+    } catch (error) {
+      console.error("Error fetching subscription:", error)
+      setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
+      setShowSubscriptionLimitDialog(true)
+      return
+    }
+
     if (!userData?.license_key) {
-      setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
+      setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
-    if (!subscriptionData || subscriptionData.status !== "active") {
-      setSubscriptionLimitMessage(
-        "Your current subscription is not active. Please activate or upgrade your plan to add more sites.",
-      )
+    if (!currentSubscription || currentSubscription.status !== "active") {
+      setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
-    if (totalItems >= subscriptionData.maxProducts) {
-      setSubscriptionLimitMessage(
-        `You have reached the maximum number of sites allowed by your current plan (${subscriptionData.maxProducts}). Please upgrade your subscription to add more sites.`,
-      )
+    if (totalItems >= currentSubscription.maxProducts) {
+      setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
     }
@@ -290,25 +298,31 @@ export default function AdminInventoryPage() {
     await refreshUserData()
     setShowCompanyDialog(false)
 
+    // Query subscription by company ID after company registration
+    let currentSubscription = null
+    try {
+      if (userData?.company_id) {
+        currentSubscription = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
+      }
+    } catch (error) {
+      console.error("Error fetching subscription:", error)
+    }
+
     // Check subscription after company registration
     if (!userData?.license_key) {
-      setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
+      setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
-    if (!subscriptionData || subscriptionData.status !== "active") {
-      setSubscriptionLimitMessage(
-        "Your current subscription is not active. Please activate or upgrade your plan to add more sites.",
-      )
+    if (!currentSubscription || currentSubscription.status !== "active") {
+      setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
-    if (totalItems >= subscriptionData.maxProducts) {
-      setSubscriptionLimitMessage(
-        `You have reached the maximum number of sites allowed by your current plan (${subscriptionData.maxProducts}). Please upgrade your subscription to add more sites.`,
-      )
+    if (totalItems >= currentSubscription.maxProducts) {
+      setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
     }
@@ -344,6 +358,7 @@ export default function AdminInventoryPage() {
               <Card
                 key={product.id}
                 className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
+                onClick={() => handleViewDetails(product.id)}
               >
                 <div className="h-48 bg-gray-200 relative">
                   <Image
@@ -454,7 +469,7 @@ export default function AdminInventoryPage() {
       <Dialog open={showSubscriptionLimitDialog} onOpenChange={setShowSubscriptionLimitDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Subscription Required</DialogTitle>
+            <DialogTitle>🎯 Let's Get You Started!</DialogTitle>
             <DialogDescription>{subscriptionLimitMessage}</DialogDescription>
           </DialogHeader>
           <DialogFooter>

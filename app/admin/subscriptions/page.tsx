@@ -11,9 +11,11 @@ import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { db } from "@/lib/firebase"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { getUserProductsCount } from "@/lib/firebase-service"
 
-// Move promoEndDate outside the component to ensure it's a stable reference
-const promoEndDate = new Date(2025, 6, 19, 23, 59, 0) // July 19, 2025, 11:59 PM PH time (UTC+8)
+const promoEndDate = new Date(2025, 6, 19, 23, 59, 0)
 
 export default function SubscriptionPage() {
   const { user, userData, subscriptionData, loading, refreshSubscriptionData } = useAuth()
@@ -21,6 +23,10 @@ export default function SubscriptionPage() {
   const router = useRouter()
   const [isUpdating, setIsUpdating] = useState(false)
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null)
+  const [currentUserCount, setCurrentUserCount] = useState<number>(0)
+  const [loadingUserCount, setLoadingUserCount] = useState(true)
+  const [currentInventoryCount, setCurrentInventoryCount] = useState<number>(0)
+  const [loadingInventoryCount, setLoadingInventoryCount] = useState(true)
   const [timeLeft, setTimeLeft] = useState<{
     days: number
     hours: number
@@ -35,6 +41,71 @@ export default function SubscriptionPage() {
       router.push("/login")
     }
   }, [loading, user, router])
+
+  // Fetch current user count using the same logic as user management page
+  useEffect(() => {
+    const fetchUserCount = async () => {
+      if (!userData?.company_id) {
+        setCurrentUserCount(0)
+        setLoadingUserCount(false)
+        return
+      }
+
+      try {
+        setLoadingUserCount(true)
+        const usersRef = collection(db, "iboard_users")
+        const usersQuery = query(usersRef, where("company_id", "==", userData.company_id))
+        const usersSnapshot = await getDocs(usersQuery)
+        setCurrentUserCount(usersSnapshot.size)
+      } catch (error) {
+        console.error("Error fetching user count:", error)
+        setCurrentUserCount(0)
+      } finally {
+        setLoadingUserCount(false)
+      }
+    }
+
+    fetchUserCount()
+  }, [userData?.company_id])
+
+  // Fetch current inventory count
+  useEffect(() => {
+    const fetchInventoryCount = async () => {
+      if (!userData?.company_id) {
+        setCurrentInventoryCount(0)
+        setLoadingInventoryCount(false)
+        return
+      }
+
+      try {
+        setLoadingInventoryCount(true)
+        const count = await getUserProductsCount(userData.company_id, { active: true })
+        setCurrentInventoryCount(count)
+      } catch (error) {
+        console.error("Error fetching inventory count:", error)
+        setCurrentInventoryCount(0)
+      } finally {
+        setLoadingInventoryCount(false)
+      }
+    }
+
+    fetchInventoryCount()
+  }, [userData?.company_id])
+
+  useEffect(() => {
+    const fetchSubscriptionData = async () => {
+      if (!loading && user && userData?.company_id) {
+        try {
+          const subscription = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
+          console.log("Fetched subscription by company ID:", subscription)
+        } catch (error) {
+          console.error("Error fetching subscription by company ID:", error)
+        }
+      }
+    }
+
+    fetchSubscriptionData()
+  }, [loading, user, userData])
 
   useEffect(() => {
     const calculateTimeLeft = () => {
@@ -60,7 +131,6 @@ export default function SubscriptionPage() {
     return () => clearInterval(timer)
   }, [])
 
-  // handleUpgrade is no longer directly used on this page, but kept for context if needed elsewhere
   const handleUpgrade = useCallback(
     async (planId: string) => {
       if (!user || !userData?.license_key) {
@@ -161,7 +231,6 @@ export default function SubscriptionPage() {
   return (
     <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        {/* Current Plan Details Section */}
         {subscriptionData && (
           <div className="mb-12">
             <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl mb-6">
@@ -181,7 +250,6 @@ export default function SubscriptionPage() {
               </span>
             </h2>
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-              {/* Plan Card */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
                   <CardTitle className="text-xl font-bold">Plan</CardTitle>
@@ -211,7 +279,6 @@ export default function SubscriptionPage() {
                 </CardContent>
               </Card>
 
-              {/* Cycle Card */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
                   <CardTitle className="text-xl font-bold">Cycle</CardTitle>
@@ -229,36 +296,58 @@ export default function SubscriptionPage() {
                 </CardContent>
               </Card>
 
-              {/* Users Card (Placeholder Data) */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
                   <CardTitle className="text-xl font-bold">Users</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
-                    <p className="text-lg font-semibold text-gray-900">23 users</p>
-                    <p className="text-sm text-gray-600">(Max of 30 users)</p>
+                    {loadingUserCount ? (
+                      <div className="flex items-center space-x-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <p className="text-sm text-gray-600">Loading...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-lg font-semibold text-gray-900">{currentUserCount} users</p>
+                        <p className="text-sm text-gray-600">
+                          {subscriptionData.maxUsers === -1
+                            ? "(Unlimited users)"
+                            : `(Max of ${subscriptionData.maxUsers} users)`}
+                        </p>
+                      </>
+                    )}
                   </div>
                   <Button variant="outline" className="mt-4 w-full bg-transparent">
-                    Expand
+                    Manage Users
                   </Button>
                 </CardContent>
               </Card>
 
-              {/* Inventory Card (Placeholder Data) */}
               <Card className="flex flex-col rounded-xl border-2 shadow-sm">
                 <CardHeader className="bg-purple-700 text-white p-4 rounded-t-xl">
                   <CardTitle className="text-xl font-bold">Inventory</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-1 flex-col justify-between p-6">
                   <div>
-                    <p className="text-lg font-semibold text-gray-900">100 static sites</p>
-                    <p className="text-lg font-semibold text-gray-900">15 dynamic sites</p>
-                    <p className="text-lg font-semibold text-gray-900">3 developments</p>
-                    <p className="text-sm text-gray-600">(Max of {subscriptionData.maxProducts} sites)</p>
+                    {loadingInventoryCount ? (
+                      <div className="flex items-center space-x-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <p className="text-sm text-gray-600">Loading...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-lg font-semibold text-gray-900">{currentInventoryCount} sites</p>
+                        <p className="text-sm text-gray-600">
+                          {subscriptionData.maxProducts === -1
+                            ? "(Unlimited sites)"
+                            : `(Max of ${subscriptionData.maxProducts} sites)`}
+                        </p>
+                      </>
+                    )}
                   </div>
                   <Button variant="outline" className="mt-4 w-full bg-transparent">
-                    Expand
+                    View Inventory
                   </Button>
                 </CardContent>
               </Card>
