@@ -91,6 +91,7 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     console.log("Starting registration process...")
+    console.log("Form data:", formData)
 
     if (formData.password !== formData.confirmPassword) {
       toast.error("Passwords do not match")
@@ -103,10 +104,9 @@ export default function RegisterPage() {
     }
 
     setLoading(true)
+    console.log("Calling register function with orgCode:", orgCode)
 
     try {
-      console.log("Calling register function with orgCode:", orgCode)
-
       await register(
         {
           email: formData.email,
