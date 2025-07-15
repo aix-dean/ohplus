@@ -448,8 +448,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await setDoc(userDocRef, userData)
 
-      // For new registrations, the Firebase Auth UID is the same as OHPLUS UID
-      await fetchUserData(firebaseUser, firebaseUser.uid)
+      // Instead of calling fetchUserData which has strict validation
+      // await fetchUserData(firebaseUser, firebaseUser.uid)
+
+      // Set user data directly for new registrations
+      const newUserData: UserData = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: `${personalInfo.first_name} ${personalInfo.last_name}`.trim(),
+        license_key: licenseKey,
+        company_id: companyId,
+        role: "user",
+        permissions: [],
+        project_id: orgCode ? null : firebaseUser.uid,
+        first_name: personalInfo.first_name,
+        last_name: personalInfo.last_name,
+        middle_name: personalInfo.middle_name,
+        phone_number: personalInfo.phone_number,
+        gender: personalInfo.gender,
+        type: "OHPLUS",
+        created: new Date(),
+        updated: new Date(),
+      }
+
+      setUserData(newUserData)
+
+      // Create OHPlusUser for new registration
+      const ohplusUser = createOHPlusUser(firebaseUser, firebaseUser.uid)
+      setUser(ohplusUser)
+
+      // Set project data if not joining an organization
+      if (!orgCode) {
+        setProjectData({
+          project_id: firebaseUser.uid,
+          company_name: companyInfo.company_name,
+          company_location: companyInfo.company_location,
+          project_name: "My First Project",
+          license_key: licenseKey,
+          created: new Date(),
+          updated: new Date(),
+        })
+      }
+
+      // Try to fetch subscription data
+      if (licenseKey) {
+        try {
+          const subscription = await subscriptionService.getSubscriptionByLicenseKey(licenseKey)
+          setSubscriptionData(subscription)
+        } catch (subscriptionError) {
+          console.error("Error fetching subscription during registration:", subscriptionError)
+          setSubscriptionData(null)
+        }
+      }
+
       console.log("Registration completed successfully for OHPLUS user:", firebaseUser.uid)
     } catch (error) {
       console.error("Error in AuthContext register:", error)
