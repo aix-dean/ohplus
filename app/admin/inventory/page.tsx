@@ -24,6 +24,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
+import { subscriptionService } from "@/lib/subscription-service"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -254,10 +255,21 @@ export default function AdminInventoryPage() {
     router.push(`/admin/products/${productId}`)
   }
 
-  const handleAddSiteClick = () => {
+  const handleAddSiteClick = async () => {
     // Check if user has company_id first
     if (!userData?.company_id) {
       setShowCompanyDialog(true)
+      return
+    }
+
+    // Query subscription by company ID instead of using subscriptionData from context
+    let currentSubscription = null
+    try {
+      currentSubscription = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
+    } catch (error) {
+      console.error("Error fetching subscription:", error)
+      setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
+      setShowSubscriptionLimitDialog(true)
       return
     }
 
@@ -267,13 +279,13 @@ export default function AdminInventoryPage() {
       return
     }
 
-    if (!subscriptionData || subscriptionData.status !== "active") {
+    if (!currentSubscription || currentSubscription.status !== "active") {
       setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
-    if (totalItems >= subscriptionData.maxProducts) {
+    if (totalItems >= currentSubscription.maxProducts) {
       setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
@@ -286,6 +298,16 @@ export default function AdminInventoryPage() {
     await refreshUserData()
     setShowCompanyDialog(false)
 
+    // Query subscription by company ID after company registration
+    let currentSubscription = null
+    try {
+      if (userData?.company_id) {
+        currentSubscription = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
+      }
+    } catch (error) {
+      console.error("Error fetching subscription:", error)
+    }
+
     // Check subscription after company registration
     if (!userData?.license_key) {
       setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
@@ -293,13 +315,13 @@ export default function AdminInventoryPage() {
       return
     }
 
-    if (!subscriptionData || subscriptionData.status !== "active") {
+    if (!currentSubscription || currentSubscription.status !== "active") {
       setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
-    if (totalItems >= subscriptionData.maxProducts) {
+    if (totalItems >= currentSubscription.maxProducts) {
       setSubscriptionLimitMessage("🚀 Ready to showcase your brand? Get started with your first site today!")
       setShowSubscriptionLimitDialog(true)
       return
