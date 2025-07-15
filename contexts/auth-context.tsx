@@ -423,7 +423,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (roleToAssign) {
         console.log("Assigning role:", roleToAssign)
         try {
-          const userRoleRef = doc(db, "user_roles", firebaseUser.uid)
+          const userRoleRef = doc(db, "user_roles", `${firebaseUser.uid}_${roleToAssign}`)
           await setDoc(userRoleRef, {
             uid: firebaseUser.uid,
             role: roleToAssign,
