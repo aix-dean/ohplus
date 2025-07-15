@@ -5,7 +5,19 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send, ExternalLink } from "lucide-react"
+import {
+  ArrowLeft,
+  FileText,
+  ImageIcon,
+  Video,
+  File,
+  X,
+  Download,
+  ZoomIn,
+  Send,
+  ExternalLink,
+  Edit,
+} from "lucide-react"
 import { postReport, type ReportData } from "@/lib/report-service"
 import type { Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
@@ -311,6 +323,11 @@ export default function ReportPreviewPage() {
     router.back()
   }
 
+  const handleEdit = () => {
+    // Navigate back to the report creation/editing page
+    router.back()
+  }
+
   // Helper function to calculate installation duration
   const calculateInstallationDuration = (startDate: string, endDate: string) => {
     const start = new Date(startDate)
@@ -405,14 +422,6 @@ export default function ReportPreviewPage() {
           >
             <Send className="h-4 w-4" />
             Send
-          </Button>
-          <Button
-            onClick={handleDownloadPDF}
-            disabled={isGeneratingPDF}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            {isGeneratingPDF ? "Generating..." : "Download"}
           </Button>
         </div>
       </div>
@@ -651,6 +660,34 @@ export default function ReportPreviewPage() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Left Side Floating Buttons */}
+      <div className="fixed left-8 top-1/2 transform -translate-y-1/2 z-50 flex flex-col gap-4">
+        {/* Edit Button */}
+        <div className="flex flex-col items-center">
+          <Button
+            onClick={handleEdit}
+            className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+            size="sm"
+          >
+            <Edit className="h-5 w-5" />
+          </Button>
+          <span className="text-xs text-gray-600 mt-1 font-medium">Edit</span>
+        </div>
+
+        {/* Download Button */}
+        <div className="flex flex-col items-center">
+          <Button
+            onClick={handleDownloadPDF}
+            disabled={isGeneratingPDF}
+            className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
+            size="sm"
+          >
+            <Download className="h-5 w-5" />
+          </Button>
+          <span className="text-xs text-gray-600 mt-1 font-medium">{isGeneratingPDF ? "..." : "Download"}</span>
         </div>
       </div>
 
