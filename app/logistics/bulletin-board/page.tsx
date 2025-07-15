@@ -47,8 +47,8 @@ export default function BulletinBoardPage() {
         searchTerm: debouncedSearchTerm,
       })
 
-      // Filter products to only show static content type
-      const filteredItems = result.items.filter((product) => product.content_type?.toLowerCase() === "static")
+      // Show all active products for logistics bulletin board
+      const filteredItems = result.items
       setProducts(filteredItems)
     } catch (error) {
       console.error("Error fetching products:", error)
@@ -69,6 +69,7 @@ export default function BulletinBoardPage() {
   const filteredSites = products.filter((product) => {
     if (selectedSite === "all") return true
     if (selectedSite === "static") return product.content_type?.toLowerCase() === "static"
+    if (selectedSite === "led") return product.content_type?.toLowerCase() === "led"
     return false
   })
 
@@ -145,6 +146,7 @@ export default function BulletinBoardPage() {
           <SelectContent>
             <SelectItem value="all">All Sites</SelectItem>
             <SelectItem value="static">Static Sites</SelectItem>
+            <SelectItem value="led">LED Sites</SelectItem>
           </SelectContent>
         </Select>
       </div>
