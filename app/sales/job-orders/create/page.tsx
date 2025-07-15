@@ -316,6 +316,7 @@ export default function CreateJobOrderPage() {
       totalAmount: quotation.total_amount || 0,
       siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
       missingCompliance: missingCompliance, // Pass the current compliance status
+      product_id: product.id || "",
     }
 
     try {
