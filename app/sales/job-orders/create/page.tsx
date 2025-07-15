@@ -162,7 +162,7 @@ export default function CreateJobOrderPage() {
       return "Invalid Dates"
     }
   }
-
+console.log(showComingSoonDialog)
   const handleFileUpload = useCallback(
     async (
       file: File,
