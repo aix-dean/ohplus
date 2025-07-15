@@ -23,11 +23,11 @@ export function ComingSoonDialog({ isOpen, onClose, feature = "This feature" }: 
           </div>
           <DialogTitle className="text-2xl font-bold text-gray-900">Coming Soon!</DialogTitle>
           <DialogDescription className="text-lg text-gray-600 mt-2">
-            {feature} will be available soon.
+            {feature} is coming soon. Stay tuned for updates!
           </DialogDescription>
         </DialogHeader>
         <div className="mt-6">
-          <p className="text-sm text-gray-500 mb-4">Stay tuned for updates!</p>
+          <p className="text-sm text-gray-500 mb-4">We're excited to bring you this new feature soon.</p>
           <Button onClick={onClose} className="w-full bg-blue-600 hover:bg-blue-700">
             Got it!
           </Button>
