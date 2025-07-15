@@ -120,22 +120,29 @@ export default function LoginPage() {
         {/* Left Section: Logo and Company Name */}
         <div className="hidden md:flex flex-col items-center justify-center p-8 bg-gray-50 w-1/2">
           <div className="flex flex-col items-center space-y-6">
-            {/* OH Plus Logo */}
+            {/* OH! Logo */}
             <div className="text-center">
-              <Image src="/ohplus-new-logo.png" alt="OH Plus Logo" width={120} height={120} priority />
+              <h1 className="text-3xl font-normal text-blue-600">
+                OH!<span className="text-red-500">↗</span>
+              </h1>
             </div>
 
             {/* Main tagline */}
-            <div className="text-center max-w-xs">
-              <h2 className="text-2xl font-semibold text-blue-600 leading-tight">
+            <div className="text-center max-w-sm">
+              <h2 className="text-xl font-light text-blue-600 leading-relaxed">
                 Powering Smarter Site Management for Billboard Operators
               </h2>
             </div>
 
             {/* Powered by section */}
             <div className="text-center">
-              <p className="text-sm text-gray-600 mb-2">powered by:</p>
-              <Image src="/aix-logo.png" alt="AiX AI Xynergy Logo" width={120} height={60} priority />
+              <p className="text-xs text-gray-600 mb-2">powered by:</p>
+              <div className="flex flex-col items-center">
+                <span className="text-lg font-normal bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">
+                  AiX
+                </span>
+                <span className="text-xs text-gray-800 mt-1">AI Xynergy</span>
+              </div>
             </div>
           </div>
         </div>
