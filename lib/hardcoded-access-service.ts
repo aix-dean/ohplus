@@ -240,7 +240,7 @@ export async function assignRoleToUser(userId: string, roleId: RoleType, assigne
       userId,
       roleId,
       assignedAt: Date.now(),
-      assignedBy,
+      ...(assignedBy && { assignedBy }),
     }
 
     await setDoc(doc(db, "user_roles", docId), userRoleData)
