@@ -54,11 +54,33 @@ const maskLicenseKey = (key: string | undefined | null) => {
   return `${firstFour}${maskedPart}${lastFour}`
 }
 
+// Helper function to format location
+const formatLocation = (location: any): string => {
+  if (!location) return ""
+
+  if (typeof location === "string") {
+    return location
+  }
+
+  if (typeof location === "object") {
+    const parts = []
+    if (location.street) parts.push(location.street)
+    if (location.city) parts.push(location.city)
+    if (location.province) parts.push(location.province)
+    return parts.join(", ")
+  }
+
+  return ""
+}
+
 interface CompanyData {
   id: string
   company_name?: string
-  company_location?: string
+  name?: string
+  company_location?: any // Can be string or object
+  address?: any // Can be string or object
   company_website?: string
+  website?: string
   photo_url?: string
   contact_person?: string
   email?: string
@@ -141,7 +163,7 @@ export default function AccountPage() {
 
         setCompanyData(company)
         setCompanyName(company.company_name || "")
-        setCompanyLocation(company.company_location || "")
+        setCompanyLocation(formatLocation(company.company_location))
         setCompanyWebsite(company.company_website || "")
         setFacebook(company.social_media?.facebook || "")
         setInstagram(company.social_media?.instagram || "")
@@ -807,7 +829,7 @@ export default function AccountPage() {
                             {companyData?.company_location && (
                               <div className="flex items-center gap-1.5">
                                 <MapPin size={14} className="text-gray-500" />
-                                <span>{companyData.company_location}</span>
+                                <span>{formatLocation(companyData.company_location)}</span>
                               </div>
                             )}
                             {companyData?.company_website && (
