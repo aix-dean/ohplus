@@ -127,7 +127,7 @@ export default function LoginPage() {
 
             {/* Main tagline */}
             <div className="text-center max-w-xs">
-              <h2 className="text-xl font-semibold text-blue-600 leading-tight">
+              <h2 className="text-2xl font-semibold text-blue-600 leading-tight">
                 Powering Smarter Site Management for Billboard Operators
               </h2>
             </div>
