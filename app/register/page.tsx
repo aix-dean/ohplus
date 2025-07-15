@@ -278,11 +278,11 @@ export default function RegisterPage() {
                   </Button>
                 </div>
                 <div className="mt-2">
-                  <div className="flex gap-1 h-2">
+                  <div className="flex gap-1 h-1">
                     {[...Array(5)].map((_, i) => (
                       <div
                         key={i}
-                        className={`flex-1 rounded-full ${
+                        className={`flex-1 ${
                           i < passwordStrengthScore ? getBarColorClass(passwordStrengthScore) : "bg-gray-300"
                         }`}
                       />
