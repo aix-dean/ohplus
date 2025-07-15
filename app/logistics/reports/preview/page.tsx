@@ -415,15 +415,7 @@ export default function ReportPreviewPage() {
         </div>
 
         {/* Action Buttons */}
-        <div className="ml-auto flex items-center gap-2">
-          <Button
-            onClick={handleSendReport}
-            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm flex items-center gap-2"
-          >
-            <Send className="h-4 w-4" />
-            Send
-          </Button>
-        </div>
+        <div className="ml-auto"></div>
       </div>
 
       {/* Main Content Container */}
