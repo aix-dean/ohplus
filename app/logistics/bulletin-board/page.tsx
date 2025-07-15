@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, MapPin, Calendar, Eye } from "lucide-react"
+import { Search, MapPin, Calendar, Eye, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -31,9 +31,10 @@ interface Product {
 }
 
 export default function LogisticsBulletinBoard() {
-  const { user, userData, loading: authLoading } = useAuth()
+  const { user, userData, loading: authLoading, getEffectiveUserId } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [contentTypeFilter, setContentTypeFilter] = useState("all")
 
@@ -45,20 +46,22 @@ export default function LogisticsBulletinBoard() {
       return
     }
 
+    // Ensure we only proceed if this is an OHPLUS account
+    if (userData.type !== "OHPLUS") {
+      console.log("User is not OHPLUS type, access denied")
+      setError("Access denied: Only OHPLUS accounts can access this page")
+      setProducts([])
+      setLoading(false)
+      return
+    }
+
     try {
+      setError(null)
       console.log("Fetching products for OHPLUS user:", userData.uid)
       console.log("User company_id:", userData.company_id)
       console.log("User type:", userData.type)
 
-      // Ensure we only proceed if this is an OHPLUS account
-      if (userData.type !== "OHPLUS") {
-        console.log("User is not OHPLUS type, not fetching products")
-        setProducts([])
-        setLoading(false)
-        return
-      }
-
-      // Use company_id if available, otherwise fall back to user ID
+      // Use company_id if available, otherwise fall back to OHPLUS user ID
       const queryCompanyId = userData.company_id || userData.uid
       console.log("Querying products with company_id:", queryCompanyId)
 
@@ -83,7 +86,7 @@ export default function LogisticsBulletinBoard() {
           company_id: data.company_id || "",
           seller_id: data.seller_id || "",
           active: data.active || false,
-          location: data.location || "",
+          location: data.location || data.specs_rental?.location || "",
           price: data.price || 0,
           created: data.created,
           media: data.media || [],
@@ -94,6 +97,7 @@ export default function LogisticsBulletinBoard() {
       setProducts(fetchedProducts)
     } catch (error) {
       console.error("Error fetching products:", error)
+      setError("Failed to load sites. Please try again.")
       setProducts([])
     } finally {
       setLoading(false)
@@ -132,6 +136,7 @@ export default function LogisticsBulletinBoard() {
   const getContentTypeColor = (contentType: string) => {
     switch (contentType?.toLowerCase()) {
       case "led":
+      case "dynamic":
         return "bg-blue-500"
       case "static":
         return "bg-purple-500"
@@ -158,9 +163,13 @@ export default function LogisticsBulletinBoard() {
   if (!user || !userData) {
     return (
       <div className="container mx-auto p-6">
-        <div className="text-center">
+        <div className="text-center py-12">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
-          <p className="text-gray-600">Please log in to access the bulletin board.</p>
+          <p className="text-gray-600">Please log in with an OHPLUS account to access the bulletin board.</p>
+          <Button asChild className="mt-4">
+            <Link href="/login">Go to Login</Link>
+          </Button>
         </div>
       </div>
     )
@@ -169,9 +178,27 @@ export default function LogisticsBulletinBoard() {
   if (userData.type !== "OHPLUS") {
     return (
       <div className="container mx-auto p-6">
-        <div className="text-center">
+        <div className="text-center py-12">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
           <p className="text-gray-600">Only OHPLUS accounts can access this page.</p>
+          <p className="text-sm text-gray-500 mt-2">Current account type: {userData.type}</p>
+          <Button asChild className="mt-4">
+            <Link href="/logout">Switch Account</Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-center py-12">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Error</h1>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={fetchProducts}>Try Again</Button>
         </div>
       </div>
     )
@@ -189,7 +216,9 @@ export default function LogisticsBulletinBoard() {
             <p>
               <strong>Debug Info:</strong>
             </p>
-            <p>User ID: {userData.uid}</p>
+            <p>Firebase Auth User ID: {user?.uid}</p>
+            <p>OHPLUS User ID: {userData.uid}</p>
+            <p>Effective User ID: {getEffectiveUserId()}</p>
             <p>User Type: {userData.type}</p>
             <p>Company ID: {userData.company_id || "Not set"}</p>
             <p>Products loaded: {products.length}</p>
@@ -217,6 +246,7 @@ export default function LogisticsBulletinBoard() {
             <SelectItem value="all">All Sites</SelectItem>
             <SelectItem value="static">Static Sites</SelectItem>
             <SelectItem value="led">LED Sites</SelectItem>
+            <SelectItem value="dynamic">Dynamic Sites</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -279,6 +309,11 @@ export default function LogisticsBulletinBoard() {
                       </span>
                     </div>
                   )}
+
+                  <div className="text-xs text-gray-400">
+                    <p>Product ID: {product.id}</p>
+                    <p>Seller ID: {product.seller_id}</p>
+                  </div>
 
                   <div className="flex gap-2 pt-2">
                     <Button asChild size="sm" className="flex-1">
