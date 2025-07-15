@@ -1,20 +1,35 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, getDocs, orderBy, query, where } from "firebase/firestore"
-import { db } from "@/firebase"
+import { collection, query, orderBy, onSnapshot, where } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
+import { format } from "date-fns"
+import { Button } from "@/components/ui/button"
 
 interface ServiceAssignment {
   id: string
-  title: string
-  description: string
+  saNumber: string
+  projectSiteName: string
+  projectSiteLocation: string
+  serviceType: string
+  assignedTo: string
+  jobDescription: string
+  requestedBy: {
+    id: string
+    name: string
+    department: string
+  }
+  status: string
+  coveredDateStart: any
+  coveredDateEnd: any
+  created: any
   company_id: string
-  created_at: any // TODO: Fix type
-  // Add other properties as needed
 }
 
 interface ServiceAssignmentsTableProps {
-  onSelectAssignment: (id: string) => void
+  onSelectAssignment?: (id: string) => void
   companyId?: string
 }
 
@@ -23,45 +38,111 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchAssignments = async () => {
-      try {
-        setLoading(true)
-        const assignmentsRef = collection(db, "service_assignments")
-        let q = query(assignmentsRef, orderBy("created_at", "desc"))
+    let q = query(collection(db, "service_assignments"), orderBy("created", "desc"))
 
-        // Filter by company_id if provided
-        if (companyId) {
-          q = query(assignmentsRef, where("company_id", "==", companyId), orderBy("created_at", "desc"))
-        }
-
-        const snapshot = await getDocs(q)
-        const assignmentsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as ServiceAssignment[]
-
-        setAssignments(assignmentsData)
-      } catch (error) {
-        console.error("Error fetching assignments:", error)
-      } finally {
-        setLoading(false)
-      }
+    // Filter by company_id if provided
+    if (companyId) {
+      q = query(collection(db, "service_assignments"), where("company_id", "==", companyId), orderBy("created", "desc"))
     }
 
-    fetchAssignments()
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const assignmentsData: ServiceAssignment[] = []
+      querySnapshot.forEach((doc) => {
+        assignmentsData.push({
+          id: doc.id,
+          ...doc.data(),
+        } as ServiceAssignment)
+      })
+      setAssignments(assignmentsData)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
   }, [companyId])
 
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "completed":
+        return "bg-green-100 text-green-800"
+      case "in progress":
+        return "bg-blue-100 text-blue-800"
+      case "pending":
+        return "bg-yellow-100 text-yellow-800"
+      case "cancelled":
+        return "bg-red-100 text-red-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
   if (loading) {
-    return <div>Loading assignments...</div>
+    return <div className="flex justify-center p-8">Loading assignments...</div>
   }
 
   return (
-    <div>
-      {assignments.map((assignment) => (
-        <div key={assignment.id} onClick={() => onSelectAssignment(assignment.id)}>
-          {assignment.title}
-        </div>
-      ))}
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>SA#</TableHead>
+            <TableHead>Project Site</TableHead>
+            <TableHead>Service Type</TableHead>
+            <TableHead>Assigned To</TableHead>
+            <TableHead>Covered Date</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Created</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {assignments.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                No service assignments found. Create your first assignment.
+              </TableCell>
+            </TableRow>
+          ) : (
+            assignments.map((assignment) => (
+              <TableRow key={assignment.id} className="cursor-pointer hover:bg-gray-50">
+                <TableCell className="font-medium">{assignment.saNumber}</TableCell>
+                <TableCell>
+                  <div>
+                    <div className="font-medium">{assignment.projectSiteName}</div>
+                    <div className="text-sm text-gray-500">{assignment.projectSiteLocation}</div>
+                  </div>
+                </TableCell>
+                <TableCell>{assignment.serviceType}</TableCell>
+                <TableCell>{assignment.assignedTo}</TableCell>
+                <TableCell>
+                  {assignment.coveredDateStart && assignment.coveredDateEnd ? (
+                    <>
+                      {format(new Date(assignment.coveredDateStart.toDate()), "MMM d, yyyy")} -
+                      {format(new Date(assignment.coveredDateEnd.toDate()), "MMM d, yyyy")}
+                    </>
+                  ) : (
+                    "Not specified"
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Badge className={getStatusColor(assignment.status)}>{assignment.status}</Badge>
+                </TableCell>
+                <TableCell>
+                  {assignment.created ? format(new Date(assignment.created.toDate()), "MMM d, yyyy") : "Unknown"}
+                </TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onSelectAssignment && onSelectAssignment(assignment.id)}
+                  >
+                    View
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
     </div>
   )
 }
