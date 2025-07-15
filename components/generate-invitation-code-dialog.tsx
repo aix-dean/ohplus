@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -9,294 +11,313 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Plus, Calendar, Users, FileText } from "lucide-react"
+import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
-import { addDoc, collection, serverTimestamp } from "firebase/firestore"
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { generateInvitationCode } from "@/lib/utils"
-import { toast } from "@/hooks/use-toast"
+import { Loader2, Info } from "lucide-react"
 import { getAllRoles, type RoleType } from "@/lib/hardcoded-access-service"
 
 interface GenerateInvitationCodeDialogProps {
-  onSuccess?: () => void
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
-export function GenerateInvitationCodeDialog({ onSuccess }: GenerateInvitationCodeDialogProps) {
-  const [open, setOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [validityDays, setValidityDays] = useState("30")
-  const [usageLimit, setUsageLimit] = useState("10")
-  const [selectedRole, setSelectedRole] = useState<RoleType | "">("")
-  const [description, setDescription] = useState("")
-  const [generatedCode, setGeneratedCode] = useState<string | null>(null)
+// Remove the old PREDEFINED_ROLES constant and replace with:
+const PREDEFINED_ROLES = getAllRoles().map((role) => ({
+  value: role.id,
+  label: role.name,
+  description: role.description,
+  color: role.color,
+}))
 
+const AVAILABLE_PERMISSIONS = []
+
+export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInvitationCodeDialogProps) {
   const { userData } = useAuth()
-  const roles = getAllRoles()
+  const [loading, setLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    validityDays: 30,
+    maxUsage: 0,
+    role: "" as RoleType | "custom" | "",
+    customRole: "",
+    description: "",
+  })
 
-  const handleGenerate = async () => {
-    if (!userData?.license_key) {
-      toast({
-        title: "Error",
-        description: "License key not found. Please contact support.",
-        variant: "destructive",
-      })
-      return
+  const generateRandomCode = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    let result = ""
+    for (let i = 0; i < 8; i++) {
+      if (i === 4) result += "-"
+      result += chars.charAt(Math.floor(Math.random() * chars.length))
     }
+    return result
+  }
 
-    if (!selectedRole) {
-      toast({
-        title: "Error",
-        description: "Please select a role for the invitation code.",
-        variant: "destructive",
-      })
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!userData?.company_id) {
+      toast.error("Company information not found")
       return
     }
 
     setLoading(true)
+
     try {
-      const code = generateInvitationCode()
+      const finalRole = formData.role === "custom" ? formData.customRole : formData.role
+
+      if (!finalRole) {
+        toast.error("Please select or enter a role")
+        setLoading(false)
+        return
+      }
+
+      // Validate that the role exists in our hardcoded roles (unless it's custom)
+      if (formData.role !== "custom" && !PREDEFINED_ROLES.find((r) => r.value === formData.role)) {
+        toast.error("Invalid role selected")
+        setLoading(false)
+        return
+      }
+
+      if (formData.validityDays < 1 || formData.validityDays > 365) {
+        toast.error("Validity period must be between 1 and 365 days")
+        setLoading(false)
+        return
+      }
+
+      if (formData.maxUsage < 0 || formData.maxUsage > 1000) {
+        toast.error("Usage limit must be between 0 and 1000 (0 = unlimited)")
+        setLoading(false)
+        return
+      }
+
       const expiresAt = new Date()
-      expiresAt.setDate(expiresAt.getDate() + Number.parseInt(validityDays))
+      expiresAt.setDate(expiresAt.getDate() + formData.validityDays)
 
-      const invitationData = {
-        code,
-        license_key: userData.license_key,
-        company_id: userData.company_id || null,
-        role: selectedRole, // Save the selected role
-        description: description || `Invitation for ${roles.find((r) => r.id === selectedRole)?.name} role`,
-        validity_days: Number.parseInt(validityDays),
-        usage_limit: Number.parseInt(usageLimit),
-        expires_at: expiresAt,
-        used: false,
-        used_count: 0,
-        used_by: [],
-        created_by: userData.uid,
+      const codeData = {
+        code: generateRandomCode(),
         created_at: serverTimestamp(),
+        expires_at: expiresAt,
+        max_usage: formData.maxUsage,
+        usage_count: 0,
+        role: finalRole,
+        status: "active",
+        created_by: userData.uid,
+        company_id: userData.company_id,
+        description: formData.description || null,
+        used_by: [],
       }
 
-      await addDoc(collection(db, "invitation_codes"), invitationData)
+      // Add code to Firestore
+      await addDoc(collection(db, "invitation_codes"), codeData)
 
-      setGeneratedCode(code)
-      toast({
-        title: "Success",
-        description: "Invitation code generated successfully!",
+      toast.success("Successfully generated invitation code")
+
+      // Reset form
+      setFormData({
+        validityDays: 30,
+        maxUsage: 0,
+        role: "",
+        customRole: "",
+        description: "",
       })
 
-      if (onSuccess) {
-        onSuccess()
-      }
+      onOpenChange(false)
     } catch (error) {
-      console.error("Error generating invitation code:", error)
-      toast({
-        title: "Error",
-        description: "Failed to generate invitation code. Please try again.",
-        variant: "destructive",
-      })
+      console.error("Error generating code:", error)
+      toast.error("Failed to generate invitation code")
     } finally {
       setLoading(false)
     }
   }
 
-  const handleCopyCode = () => {
-    if (generatedCode) {
-      const inviteUrl = `${window.location.origin}/register?orgCode=${generatedCode}`
-      navigator.clipboard.writeText(inviteUrl)
-      toast({
-        title: "Copied!",
-        description: "Invitation link copied to clipboard.",
-      })
-    }
+  const handlePermissionChange = (permissionId: string, checked: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      permissions: checked ? [...prev.permissions, permissionId] : prev.permissions.filter((p) => p !== permissionId),
+    }))
   }
 
-  const handleClose = () => {
-    setOpen(false)
-    setGeneratedCode(null)
-    setSelectedRole("")
-    setDescription("")
-    setValidityDays("30")
-    setUsageLimit("10")
-  }
-
-  const selectedRoleData = selectedRole ? roles.find((r) => r.id === selectedRole) : null
+  const selectedRoleData = PREDEFINED_ROLES.find((r) => r.value === formData.role)
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Generate Code
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px]">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Generate Invitation Code</DialogTitle>
-          <DialogDescription>Create a new invitation code to invite users to join your organization.</DialogDescription>
+          <DialogDescription>
+            Create an invitation code for user registration with specific role and permissions
+          </DialogDescription>
         </DialogHeader>
 
-        {!generatedCode ? (
-          <div className="space-y-6">
-            {/* Basic Settings */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="validity">
-                  <Calendar className="inline mr-1 h-4 w-4" />
-                  Validity (Days)
-                </Label>
-                <Input
-                  id="validity"
-                  type="number"
-                  value={validityDays}
-                  onChange={(e) => setValidityDays(e.target.value)}
-                  min="1"
-                  max="365"
-                />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Basic Settings</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="validity">Validity (Days)</Label>
+                  <Input
+                    id="validity"
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={formData.validityDays}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, validityDays: Number.parseInt(e.target.value) || 30 }))
+                    }
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">How long the code remains valid</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="maxUsage">Usage Limit</Label>
+                  <Input
+                    id="maxUsage"
+                    type="number"
+                    min="0"
+                    max="1000"
+                    value={formData.maxUsage}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, maxUsage: Number.parseInt(e.target.value) || 0 }))
+                    }
+                    placeholder="0 for unlimited"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Maximum number of times the code can be used (0 = unlimited)
+                  </p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="usage">
-                  <Users className="inline mr-1 h-4 w-4" />
-                  Usage Limit
-                </Label>
-                <Input
-                  id="usage"
-                  type="number"
-                  value={usageLimit}
-                  onChange={(e) => setUsageLimit(e.target.value)}
-                  min="1"
-                  max="100"
-                />
-              </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Role Assignment */}
-            <div className="space-y-2">
-              <Label htmlFor="role">
-                <Users className="inline mr-1 h-4 w-4" />
-                Assign Role
-              </Label>
-              <Select value={selectedRole} onValueChange={(value: RoleType) => setSelectedRole(value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a role to assign" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roles.map((role) => (
-                    <SelectItem key={role.id} value={role.id}>
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: role.color }} />
-                        <span>{role.name}</span>
+          {/* Role Selection */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Role Assignment</CardTitle>
+              <CardDescription>Select the role for users who register with this code</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="role">Role</Label>
+                <Select
+                  value={formData.role}
+                  onValueChange={(value) => setFormData((prev) => ({ ...prev, role: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PREDEFINED_ROLES.map((role) => (
+                      <SelectItem key={role.value} value={role.value}>
+                        <div>
+                          <div className="font-medium">{role.label}</div>
+                          <div className="text-xs text-muted-foreground">{role.description}</div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="custom">
+                      <div>
+                        <div className="font-medium">Custom Role</div>
+                        <div className="text-xs text-muted-foreground">Define a custom role</div>
                       </div>
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedRoleData && <p className="text-sm text-muted-foreground">{selectedRoleData.description}</p>}
-            </div>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="description">
-                <FileText className="inline mr-1 h-4 w-4" />
-                Description (Optional)
-              </Label>
-              <Textarea
-                id="description"
-                placeholder="Brief description of this invitation..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-              />
-            </div>
+              {formData.role === "custom" && (
+                <div className="space-y-2">
+                  <Label htmlFor="customRole">Custom Role Name</Label>
+                  <Input
+                    id="customRole"
+                    value={formData.customRole}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, customRole: e.target.value }))}
+                    placeholder="Enter custom role name"
+                    required
+                  />
+                </div>
+              )}
 
-            {/* Summary */}
-            {selectedRole && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Invitation Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Role:</span>
-                    <Badge style={{ backgroundColor: selectedRoleData?.color, color: "white" }}>
-                      {selectedRoleData?.name}
-                    </Badge>
+              {selectedRoleData && (
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <Info className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Selected Role: {selectedRoleData.label}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Valid for:</span>
-                    <span>{validityDays} days</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Usage limit:</span>
-                    <span>{usageLimit} users</span>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-green-600">Invitation Code Generated!</CardTitle>
-                <CardDescription>Share this link with users you want to invite to your organization.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Invitation Code</Label>
-                  <div className="flex gap-2">
-                    <Input value={generatedCode} readOnly className="font-mono" />
-                    <Button size="sm" onClick={handleCopyCode}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">{selectedRoleData.description}</p>
                 </div>
-                <div className="space-y-2">
-                  <Label>Invitation Link</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={`${window.location.origin}/register?orgCode=${generatedCode}`}
-                      readOnly
-                      className="font-mono text-xs"
-                    />
-                    <Button size="sm" onClick={handleCopyCode}>
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Description */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Additional Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description (Optional)</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                  placeholder="Add a description for this code..."
+                  rows={3}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">Valid for:</span>
+                  <Badge variant="secondary" className="ml-2">
+                    {formData.validityDays} days
+                  </Badge>
                 </div>
-                {selectedRoleData && (
-                  <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                    <Users className="h-4 w-4" />
-                    <span className="text-sm">Users will be assigned the</span>
-                    <Badge style={{ backgroundColor: selectedRoleData.color, color: "white" }}>
-                      {selectedRoleData.name}
-                    </Badge>
-                    <span className="text-sm">role upon registration</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                <div>
+                  <span className="font-medium">Usage limit:</span>
+                  <Badge variant="secondary" className="ml-2">
+                    {formData.maxUsage === 0 ? "Unlimited" : formData.maxUsage}
+                  </Badge>
+                </div>
+                <div className="col-span-2">
+                  <span className="font-medium">Role:</span>
+                  <Badge variant="outline" className="ml-2">
+                    {formData.role === "custom" ? formData.customRole || "Custom" : formData.role || "Not selected"}
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </form>
 
         <DialogFooter>
-          {!generatedCode ? (
-            <>
-              <Button variant="outline" onClick={handleClose}>
-                Cancel
-              </Button>
-              <Button onClick={handleGenerate} disabled={loading || !selectedRole}>
-                {loading ? "Generating..." : "Generate Code"}
-              </Button>
-            </>
-          ) : (
-            <Button onClick={handleClose}>Done</Button>
-          )}
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" onClick={handleSubmit} disabled={loading}>
+            {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Generate Code
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
