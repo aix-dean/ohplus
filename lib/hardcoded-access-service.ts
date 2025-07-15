@@ -1,21 +1,20 @@
 import { doc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
-export type RoleType = "admin" | "manager" | "user" | "viewer"
+export type RoleType = "admin" | "sales" | "logistics" | "cms"
+
+export interface HardcodedRole {
+  id: RoleType
+  name: string
+  description: string
+  permissions: string[]
+}
 
 export interface Permission {
   id: string
   name: string
   description: string
   category: string
-}
-
-export interface Role {
-  id: string
-  name: string
-  description: string
-  permissions: string[]
-  isSystem: boolean
 }
 
 export interface UserRole {
@@ -49,76 +48,95 @@ const PERMISSIONS: Permission[] = [
     category: "User Management",
   },
 
-  // Role management
-  { id: "admin.roles.create", name: "Create Roles", description: "Can create new roles", category: "Role Management" },
-  { id: "admin.roles.read", name: "View Roles", description: "Can view role information", category: "Role Management" },
+  // Sales permissions
   {
-    id: "admin.roles.update",
-    name: "Update Roles",
-    description: "Can modify role permissions",
-    category: "Role Management",
+    id: "sales.proposals.create",
+    name: "Create Proposals",
+    description: "Can create new proposals",
+    category: "Sales",
   },
-  { id: "admin.roles.delete", name: "Delete Roles", description: "Can delete roles", category: "Role Management" },
-
-  // System settings
+  { id: "sales.proposals.read", name: "View Proposals", description: "Can view proposals", category: "Sales" },
+  { id: "sales.proposals.update", name: "Update Proposals", description: "Can modify proposals", category: "Sales" },
+  { id: "sales.quotations.create", name: "Create Quotations", description: "Can create quotations", category: "Sales" },
   {
-    id: "admin.system.settings",
-    name: "System Settings",
-    description: "Can modify system settings",
-    category: "System",
+    id: "sales.clients.manage",
+    name: "Manage Clients",
+    description: "Can manage client information",
+    category: "Sales",
   },
-  { id: "admin.system.logs", name: "View System Logs", description: "Can view system logs", category: "System" },
 
-  // Content management
-  { id: "content.create", name: "Create Content", description: "Can create new content", category: "Content" },
-  { id: "content.read", name: "View Content", description: "Can view content", category: "Content" },
-  { id: "content.update", name: "Update Content", description: "Can modify content", category: "Content" },
-  { id: "content.delete", name: "Delete Content", description: "Can delete content", category: "Content" },
+  // Logistics permissions
+  { id: "logistics.sites.read", name: "View Sites", description: "Can view site information", category: "Logistics" },
+  {
+    id: "logistics.sites.update",
+    name: "Update Sites",
+    description: "Can modify site information",
+    category: "Logistics",
+  },
+  {
+    id: "logistics.reports.create",
+    name: "Create Reports",
+    description: "Can create logistics reports",
+    category: "Logistics",
+  },
+  {
+    id: "logistics.assignments.manage",
+    name: "Manage Assignments",
+    description: "Can manage service assignments",
+    category: "Logistics",
+  },
 
-  // Analytics
-  { id: "analytics.view", name: "View Analytics", description: "Can view analytics data", category: "Analytics" },
-  { id: "analytics.export", name: "Export Analytics", description: "Can export analytics data", category: "Analytics" },
+  // CMS permissions
+  { id: "cms.content.create", name: "Create Content", description: "Can create new content", category: "CMS" },
+  { id: "cms.content.read", name: "View Content", description: "Can view content", category: "CMS" },
+  { id: "cms.content.update", name: "Update Content", description: "Can modify content", category: "CMS" },
+  { id: "cms.content.delete", name: "Delete Content", description: "Can delete content", category: "CMS" },
 ]
 
 // Hardcoded roles
-const ROLES: Role[] = [
+const ROLES: HardcodedRole[] = [
   {
     id: "admin",
     name: "Administrator",
     description: "Full system access with all permissions",
     permissions: PERMISSIONS.map((p) => p.id),
-    isSystem: true,
   },
   {
-    id: "manager",
-    name: "Manager",
-    description: "Management access with content and user permissions",
+    id: "sales",
+    name: "Sales Manager",
+    description: "Access to sales modules including proposals, quotations, and client management",
     permissions: [
       "admin.users.read",
-      "admin.users.update",
-      "admin.roles.read",
-      "content.create",
-      "content.read",
-      "content.update",
-      "content.delete",
-      "analytics.view",
-      "analytics.export",
+      "sales.proposals.create",
+      "sales.proposals.read",
+      "sales.proposals.update",
+      "sales.quotations.create",
+      "sales.clients.manage",
     ],
-    isSystem: true,
   },
   {
-    id: "user",
-    name: "User",
-    description: "Standard user access with content permissions",
-    permissions: ["content.create", "content.read", "content.update", "analytics.view"],
-    isSystem: true,
+    id: "logistics",
+    name: "Logistics Manager",
+    description: "Access to logistics modules including sites, reports, and assignments",
+    permissions: [
+      "admin.users.read",
+      "logistics.sites.read",
+      "logistics.sites.update",
+      "logistics.reports.create",
+      "logistics.assignments.manage",
+    ],
   },
   {
-    id: "viewer",
-    name: "Viewer",
-    description: "Read-only access to content and analytics",
-    permissions: ["content.read", "analytics.view"],
-    isSystem: true,
+    id: "cms",
+    name: "Content Manager",
+    description: "Access to content management system",
+    permissions: [
+      "admin.users.read",
+      "cms.content.create",
+      "cms.content.read",
+      "cms.content.update",
+      "cms.content.delete",
+    ],
   },
 ]
 
@@ -137,50 +155,16 @@ export class HardcodedAccessService {
   }
 
   // Role methods
-  async getAllRoles(): Promise<Role[]> {
+  async getAllRoles(): Promise<HardcodedRole[]> {
     return ROLES
   }
 
-  async getRoleById(id: string): Promise<Role | null> {
+  async getRoleById(id: RoleType): Promise<HardcodedRole | null> {
     return ROLES.find((r) => r.id === id) || null
   }
 
-  async createCustomRole(role: Omit<Role, "id" | "isSystem">): Promise<Role> {
-    const newRole: Role = {
-      ...role,
-      id: `custom_${Date.now()}`,
-      isSystem: false,
-    }
-
-    // Save to Firestore
-    const roleDocRef = doc(db, "custom_roles", newRole.id)
-    await setDoc(roleDocRef, {
-      ...newRole,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
-
-    return newRole
-  }
-
-  async updateCustomRole(roleId: string, updates: Partial<Role>): Promise<void> {
-    const roleDocRef = doc(db, "custom_roles", roleId)
-    await updateDoc(roleDocRef, {
-      ...updates,
-      updatedAt: serverTimestamp(),
-    })
-  }
-
-  async deleteCustomRole(roleId: string): Promise<void> {
-    const roleDocRef = doc(db, "custom_roles", roleId)
-    await updateDoc(roleDocRef, {
-      isActive: false,
-      deletedAt: serverTimestamp(),
-    })
-  }
-
   // User role assignment methods
-  async assignRoleToUser(userId: string, roleId: string, assignedBy = "system"): Promise<void> {
+  async assignRoleToUser(userId: string, roleId: RoleType, assignedBy = "system"): Promise<void> {
     const userRole: UserRole = {
       userId,
       roleId,
@@ -220,7 +204,7 @@ export class HardcodedAccessService {
     })
   }
 
-  async getUserRoles(userId: string): Promise<UserRole[]> {
+  async getUserRoles(userId: string): Promise<RoleType[]> {
     const userRolesQuery = query(
       collection(db, "user_roles"),
       where("userId", "==", userId),
@@ -228,18 +212,15 @@ export class HardcodedAccessService {
     )
 
     const snapshot = await getDocs(userRolesQuery)
-    return snapshot.docs.map((doc) => ({
-      ...doc.data(),
-      assignedAt: doc.data().assignedAt?.toDate() || new Date(),
-    })) as UserRole[]
+    return snapshot.docs.map((doc) => doc.data().roleId as RoleType)
   }
 
   async getUserPermissions(userId: string): Promise<string[]> {
     const userRoles = await this.getUserRoles(userId)
     const permissions = new Set<string>()
 
-    for (const userRole of userRoles) {
-      const role = await this.getRoleById(userRole.roleId)
+    for (const roleId of userRoles) {
+      const role = await this.getRoleById(roleId)
       if (role) {
         role.permissions.forEach((permission) => permissions.add(permission))
       }
@@ -253,13 +234,13 @@ export class HardcodedAccessService {
     return userPermissions.includes(permission)
   }
 
-  async hasRole(userId: string, roleId: string): Promise<boolean> {
+  async hasRole(userId: string, roleId: RoleType): Promise<boolean> {
     const userRoles = await this.getUserRoles(userId)
-    return userRoles.some((ur) => ur.roleId === roleId)
+    return userRoles.includes(roleId)
   }
 
   // Utility methods
-  async getRolePermissions(roleId: string): Promise<Permission[]> {
+  async getRolePermissions(roleId: RoleType): Promise<Permission[]> {
     const role = await this.getRoleById(roleId)
     if (!role) return []
 
@@ -276,13 +257,17 @@ export class HardcodedAccessService {
 export const accessService = new HardcodedAccessService()
 
 // Convenience functions
+export const getAllRoles = () => ROLES
+
 export const assignRoleToUser = (userId: string, roleId: RoleType, assignedBy = "system") =>
   accessService.assignRoleToUser(userId, roleId, assignedBy)
 
 export const removeRoleFromUser = (userId: string, roleId: string) => accessService.removeRoleFromUser(userId, roleId)
 
+export const getUserRoles = (userId: string) => accessService.getUserRoles(userId)
+
 export const getUserPermissions = (userId: string) => accessService.getUserPermissions(userId)
 
 export const hasPermission = (userId: string, permission: string) => accessService.hasPermission(userId, permission)
 
-export const hasRole = (userId: string, roleId: string) => accessService.hasRole(userId, roleId)
+export const hasRole = (userId: string, roleId: string) => accessService.hasRole(userId, roleId as RoleType)
