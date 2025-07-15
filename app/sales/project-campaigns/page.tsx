@@ -176,14 +176,6 @@ function CampaignsPageContent() {
                 Track and manage your project campaigns from proposal to completion
               </p>
             </div>
-            <Button
-              onClick={() => router.push("/sales/dashboard")}
-              className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all duration-200 px-6 py-3"
-              size="lg"
-            >
-              <Plus className="mr-2 h-5 w-5" />
-              Create New Project Campaign
-            </Button>
           </div>
 
           {/* Enhanced Stats Cards */}
