@@ -58,7 +58,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   const [delayDays, setDelayDays] = useState("")
 
   const { toast } = useToast()
-  const { user, userData, projectData, getEffectiveUserId, getEffectiveCompanyId } = useAuth()
+  const { user, userData, projectData } = useAuth()
   const router = useRouter()
 
   // Fetch product data when dialog opens
@@ -393,23 +393,13 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
     setLoading(true)
     try {
-      // Get the effective company ID and user ID
-      const effectiveCompanyId = getEffectiveCompanyId()
-      const effectiveUserId = getEffectiveUserId()
-
-      console.log("Creating report with:")
-      console.log("- Effective Company ID:", effectiveCompanyId)
-      console.log("- Effective User ID:", effectiveUserId)
-      console.log("- User Data Company ID:", userData?.company_id)
-      console.log("- User UID:", user.uid)
-
       // Build the report data for preview (without saving to Firebase)
       const reportData: any = {
         id: `preview-${Date.now()}`, // Temporary ID for preview
         siteId: product.id,
         siteName: product.name || "Unknown Site",
-        companyId: effectiveCompanyId || effectiveUserId, // Use company_id if available, fallback to user ID
-        sellerId: effectiveUserId || user.uid, // Use OHPLUS user ID
+        companyId: projectData?.company_id || userData?.company_id || projectData?.project_id || userData?.project_id,
+        sellerId: product.seller_id || user.uid,
         client: "Summit Media", // This would come from booking data in real implementation
         clientId: "summit-media-id", // This would come from booking data
         bookingDates: {
@@ -417,7 +407,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
           end: "2025-06-20",
         },
         breakdate: "2025-05-20",
-        sales: user.displayName || userData?.displayName || user.email || "Unknown User",
+        sales: user.displayName || user.email || "Unknown User",
         reportType,
         date,
         attachments: attachments
@@ -429,8 +419,8 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             fileUrl: att.fileUrl, // This is the crucial field for the report display
           })),
         status: "draft",
-        createdBy: effectiveUserId || user.uid, // Use OHPLUS user ID
-        createdByName: user.displayName || userData?.displayName || user.email || "Unknown User",
+        createdBy: user.uid,
+        createdByName: user.displayName || user.email || "Unknown User",
         category: "logistics",
         subcategory: product.content_type || "general",
         priority: "medium",
@@ -475,9 +465,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       }
 
       console.log("Generated report data with attachments:", reportData.attachments)
-      console.log("Report companyId:", reportData.companyId)
-      console.log("Report sellerId:", reportData.sellerId)
-      console.log("Report createdBy:", reportData.createdBy)
 
       // Store the report data in sessionStorage for the preview page
       sessionStorage.setItem("previewReportData", JSON.stringify(reportData))
@@ -529,19 +516,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
           </DialogHeader>
 
           <div className="max-h-[70vh] overflow-y-auto scrollbar-hide space-y-3 px-1">
-            {/* Debug Info - Remove in production */}
-            {process.env.NODE_ENV === "development" && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs">
-                <div>
-                  <strong>Debug Info:</strong>
-                </div>
-                <div>User UID: {user?.uid}</div>
-                <div>User Company ID: {userData?.company_id}</div>
-                <div>Effective Company ID: {getEffectiveCompanyId()}</div>
-                <div>Effective User ID: {getEffectiveUserId()}</div>
-              </div>
-            )}
-
             {/* Booking Information Section */}
             <div className="bg-gray-100 p-3 rounded-lg space-y-1">
               <div className="text-base">
