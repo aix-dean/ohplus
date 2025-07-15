@@ -13,6 +13,7 @@ export interface Subscription {
   status: SubscriptionStatus
   maxProducts: number // Max products allowed for this subscription
   trialEndDate: Date | null // End date of the trial period, if applicable
+  companyId: string | null // Company ID field
   createdAt: Date // Timestamp of creation
   updatedAt: Date // Last updated timestamp
 }
@@ -44,7 +45,7 @@ export function calculateSubscriptionEndDate(
     endDate = trialEndDate // Trial ends, subscription ends
   } else if (planType === "graphic-expo-event") {
     endDate = new Date(start)
-    endDate.setDate(start.getDate() + 30) // Example: 30 days for event plan
+    endDate.setDate(start.getDate() + 90) // 90 days for graphic expo event plan
   } else if (planType === "enterprise") {
     endDate = null // Enterprise has no fixed end date, or handled separately
   } else {

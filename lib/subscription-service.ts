@@ -33,6 +33,7 @@ export const subscriptionService = {
     status: SubscriptionStatus = "active",
     maxProducts: number | null = null,
     trialEndDate: Date | null = null,
+    companyId: string | null = null,
   ): Promise<Subscription> {
     console.log("subscriptionService: Creating subscription for licenseKey:", licenseKey)
 
@@ -52,6 +53,7 @@ export const subscriptionService = {
       status,
       maxProducts: maxProducts || getMaxProductsForPlan(planType),
       trialEndDate: trialEndDate || calculatedTrialEndDate,
+      companyId: companyId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }
@@ -70,6 +72,7 @@ export const subscriptionService = {
       status,
       maxProducts: maxProducts || getMaxProductsForPlan(planType),
       trialEndDate: trialEndDate || calculatedTrialEndDate,
+      companyId: companyId,
       createdAt: new Date(),
       updatedAt: new Date(),
     }
@@ -101,6 +104,7 @@ export const subscriptionService = {
       status: data.status,
       maxProducts: data.maxProducts,
       trialEndDate: data.trialEndDate instanceof Timestamp ? data.trialEndDate.toDate() : data.trialEndDate,
+      companyId: data.companyId || null,
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : data.createdAt,
       updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : data.updatedAt,
     }
@@ -133,6 +137,7 @@ export const subscriptionService = {
       status: data.status,
       maxProducts: data.maxProducts,
       trialEndDate: data.trialEndDate instanceof Timestamp ? data.trialEndDate.toDate() : data.trialEndDate,
+      companyId: data.companyId || null,
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : data.createdAt,
       updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : data.updatedAt,
     }
