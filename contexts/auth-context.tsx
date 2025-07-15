@@ -360,18 +360,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let companyId = null
       let assignedRole: RoleType | null = null
 
+      // Check if using invitation code
       if (orgCode) {
+        console.log("Processing invitation code:", orgCode)
         const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
         const invitationSnapshot = await getDocs(invitationQuery)
 
         if (!invitationSnapshot.empty) {
           const invitationDoc = invitationSnapshot.docs[0]
           const invitationData = invitationDoc.data()
+          console.log("Invitation data:", invitationData)
 
           licenseKey = invitationData.license_key || licenseKey
           companyId = invitationData.company_id || null
           assignedRole = invitationData.role_id || null // Get the role from invitation code
 
+          // Update invitation code usage
           const updateData: any = {
             used: true,
             used_count: (invitationData.used_count || 0) + 1,
@@ -385,9 +389,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           await updateDoc(doc(db, "invitation_codes", invitationDoc.id), updateData)
+          console.log("Invitation code updated successfully")
+        } else {
+          console.log("Invitation code not found")
         }
       }
 
+      // Create user document
       const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
       const userData = {
         email: firebaseUser.email,
@@ -407,7 +415,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         project_id: orgCode ? null : firebaseUser.uid,
       }
 
+      console.log("Creating user document with data:", userData)
+      await setDoc(userDocRef, userData)
+
+      // Create project if not using invitation code
       if (!orgCode) {
+        console.log("Creating project document")
         const projectDocRef = doc(db, "projects", firebaseUser.uid)
         await setDoc(projectDocRef, {
           company_name: companyInfo.company_name,
@@ -418,8 +431,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           updated: serverTimestamp(),
         })
       }
-
-      await setDoc(userDocRef, userData)
 
       // Assign role if specified in invitation code
       if (assignedRole) {
@@ -433,8 +444,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Fetch user data to complete the registration process
       await fetchUserData(firebaseUser)
-      console.log("Registration completed successfully with tenant ID:", auth.tenantId)
+      console.log("Registration completed successfully")
     } catch (error) {
       console.error("Error in AuthContext register:", error)
       setLoading(false)

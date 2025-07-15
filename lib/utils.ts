@@ -26,43 +26,42 @@ export function generateInvitationCode(): string {
   return result
 }
 
-export function formatDate(date: Date | string | number): string {
-  const d = new Date(date)
-  return d.toLocaleDateString("en-US", {
+export function formatDate(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
-    month: "short",
+    month: "long",
     day: "numeric",
-  })
+  }).format(date)
 }
 
-export function formatDateTime(date: Date | string | number): string {
-  const d = new Date(date)
-  return d.toLocaleDateString("en-US", {
+export function formatDateTime(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
-    month: "short",
+    month: "long",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  })
+  }).format(date)
 }
 
-export function formatCurrency(amount: number, currency = "PHP"): string {
+export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("en-PH", {
     style: "currency",
-    currency: currency,
+    currency: "PHP",
   }).format(amount)
 }
 
 export function slugify(text: string): string {
   return text
     .toLowerCase()
-    .replace(/[^\w ]+/g, "")
-    .replace(/ +/g, "-")
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
 }
 
-export function truncate(text: string, length: number): string {
-  if (text.length <= length) return text
-  return text.substring(0, length) + "..."
+export function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text
+  return text.slice(0, maxLength) + "..."
 }
 
 export function debounce<T extends (...args: any[]) => any>(func: T, wait: number): (...args: Parameters<T>) => void {
@@ -79,7 +78,7 @@ export function getInitials(name: string): string {
     .map((n) => n[0])
     .join("")
     .toUpperCase()
-    .substring(0, 2)
+    .slice(0, 2)
 }
 
 export function isValidEmail(email: string): boolean {
@@ -88,16 +87,16 @@ export function isValidEmail(email: string): boolean {
 }
 
 export function isValidPhoneNumber(phone: string): boolean {
-  const phoneRegex = /^(\+63|0)?[0-9]{10}$/
-  return phoneRegex.test(phone.replace(/\s/g, ""))
+  const phoneRegex = /^\+63\s9\d{9}$/
+  return phoneRegex.test(phone)
 }
 
 export function generateRandomId(): string {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+  return Math.random().toString(36).substr(2, 9)
 }
 
-export function capitalizeFirst(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1)
+export function capitalizeFirst(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1)
 }
 
 export function removeHtmlTags(html: string): string {
@@ -380,4 +379,14 @@ export function createEventEmitter<T extends Record<string, any>>() {
       listeners[event]!.forEach((listener) => listener(data))
     },
   }
+}
+
+export function removeEmptyFields(obj: Record<string, any>): Record<string, any> {
+  const cleaned: Record<string, any> = {}
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== null && value !== undefined && value !== "") {
+      cleaned[key] = value
+    }
+  }
+  return cleaned
 }
