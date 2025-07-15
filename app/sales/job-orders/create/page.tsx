@@ -62,6 +62,7 @@ export default function CreateJobOrderPage() {
   const { user, userData } = useAuth()
   const { toast } = useToast()
 
+  // All state declarations first
   const [loading, setLoading] = useState(true)
   const [quotationData, setQuotationData] = useState<{
     quotation: Quotation
@@ -101,85 +102,105 @@ export default function CreateJobOrderPage() {
   // Active tab for multi-product forms
   const [activeTab, setActiveTab] = useState("0")
 
-  // Derived compliance state
-  const [missingCompliance, setMissingCompliance] = useState({
-    signedQuotation: true,
-    poMo: true,
-    projectFa: true,
-  })
+  // Calculate derived values using useMemo - these will always be called
+  const quotationItems = useMemo(() => {
+    return quotationData?.quotation?.items || []
+  }, [quotationData])
 
-  useEffect(() => {
-    setMissingCompliance({
+  const isMultiProduct = useMemo(() => {
+    return quotationItems.length > 1
+  }, [quotationItems])
+
+  const hasItems = useMemo(() => {
+    return quotationItems.length > 0
+  }, [quotationItems])
+
+  const missingCompliance = useMemo(() => {
+    return {
       signedQuotation: !signedQuotationUrl,
       poMo: !poMoUrl,
       projectFa: !projectFaUrl,
-    })
+    }
   }, [signedQuotationUrl, poMoUrl, projectFaUrl])
 
-  useEffect(() => {
-    if (!quotationId) {
-      toast({
-        title: "Error",
-        description: "No quotation ID provided.",
-        variant: "destructive",
-      })
-      router.push("/sales/job-orders/select-quotation")
-      return
+  // Calculate duration in months
+  const totalMonths = useMemo(() => {
+    if (!quotationData?.quotation) return 1
+
+    const { quotation } = quotationData
+    if (quotation.start_date && quotation.end_date) {
+      const start = new Date(quotation.start_date)
+      const end = new Date(quotation.end_date)
+      return Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30.44))
+    } else if (quotation.duration_days) {
+      return Math.round(quotation.duration_days / 30.44)
     }
+    return 1
+  }, [quotationData])
 
-    const fetchDetails = async () => {
-      setLoading(true)
-      try {
-        const data = await getQuotationDetailsForJobOrder(quotationId)
-        if (data) {
-          setQuotationData(data)
+  // Calculate individual product totals for display
+  const productTotals = useMemo(() => {
+    if (!quotationData) return []
 
-          // Initialize form data for each product
-          const productCount = data.quotation.items?.length || data.products.length || 1
-          const initialForms: JobOrderFormData[] = Array.from({ length: productCount }, () => ({
-            joType: "",
-            dateRequested: new Date(),
-            deadline: undefined,
-            remarks: "",
-            assignTo: userData?.uid || "",
-            attachmentFile: null,
-            attachmentUrl: null,
-            uploadingAttachment: false,
-            attachmentError: null,
-            joTypeError: false,
-            dateRequestedError: false,
-          }))
-          setJobOrderForms(initialForms)
-        } else {
-          toast({
-            title: "Error",
-            description: "Quotation or Product details not found. Please ensure they exist.",
-            variant: "destructive",
-          })
-          router.push("/sales/job-orders/select-quotation")
+    const { quotation } = quotationData
+
+    if (hasItems) {
+      // Multiple products from quotation.items
+      return quotationItems.map((item: any) => {
+        const monthlyRate = item.price || 0
+        const subtotal = monthlyRate * totalMonths
+        const vat = subtotal * 0.12
+        const total = subtotal + vat
+
+        return {
+          subtotal,
+          vat,
+          total,
+          monthlyRate,
+          siteCode: item.site_code || "N/A",
+          productName: item.product_name || "N/A",
         }
-      } catch (error) {
-        console.error("Failed to fetch quotation details:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load quotation details. Please try again.",
-          variant: "destructive",
-        })
-        router.push("/sales/job-orders/select-quotation")
-      } finally {
-        setLoading(false)
-      }
+      })
+    } else {
+      // Single product from quotation object
+      const monthlyRate = quotation.price || 0
+      const subtotal = monthlyRate * totalMonths
+      const vat = subtotal * 0.12
+      const total = subtotal + vat
+
+      return [
+        {
+          subtotal,
+          vat,
+          total,
+          monthlyRate,
+          siteCode: quotation.site_code || "N/A",
+          productName: quotation.product_name || "N/A",
+        },
+      ]
     }
+  }, [quotationData, quotationItems, totalMonths, hasItems])
 
-    fetchDetails()
-  }, [quotationId, router, toast, userData?.uid])
+  // Calculate overall totals
+  const overallSubtotal = useMemo(() => {
+    return productTotals.reduce((sum, product) => sum + product.subtotal, 0)
+  }, [productTotals])
 
-  const formatCurrency = (amount: number | undefined) => {
+  const overallVat = useMemo(() => {
+    return productTotals.reduce((sum, product) => sum + product.vat, 0)
+  }, [productTotals])
+
+  const overallTotal = useMemo(() => {
+    return productTotals.reduce((sum, product) => sum + product.total, 0)
+  }, [productTotals])
+
+  // All useCallback hooks
+  const formatCurrency = useCallback((amount: number | undefined) => {
     if (amount === undefined || amount === null) return "₱0.00"
     return `₱${Number(amount).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  }
+  }, [])
 
-  const formatPeriod = (startDate: string | undefined, endDate: string | undefined) => {
+  const formatPeriod = useCallback((startDate: string | undefined, endDate: string | undefined) => {
     if (!startDate || !endDate) return "N/A"
     try {
       const start = new Date(startDate)
@@ -195,7 +216,7 @@ export default function CreateJobOrderPage() {
       console.error("Error formatting period:", e)
       return "Invalid Dates"
     }
-  }
+  }, [])
 
   const handleFileUpload = useCallback(
     async (
@@ -262,41 +283,46 @@ export default function CreateJobOrderPage() {
     [toast],
   )
 
-  const handleFormUpdate = (productIndex: number, field: keyof JobOrderFormData, value: any) => {
+  const handleFormUpdate = useCallback((productIndex: number, field: keyof JobOrderFormData, value: any) => {
     setJobOrderForms((prev) => {
       const updated = [...prev]
-      updated[productIndex] = { ...updated[productIndex], [field]: value }
+      if (updated[productIndex]) {
+        updated[productIndex] = { ...updated[productIndex], [field]: value }
+      }
       return updated
     })
-  }
+  }, [])
 
-  const handleProductAttachmentUpload = async (productIndex: number, file: File) => {
-    handleFormUpdate(productIndex, "uploadingAttachment", true)
-    handleFormUpdate(productIndex, "attachmentError", null)
-    handleFormUpdate(productIndex, "attachmentUrl", null)
+  const handleProductAttachmentUpload = useCallback(
+    async (productIndex: number, file: File) => {
+      handleFormUpdate(productIndex, "uploadingAttachment", true)
+      handleFormUpdate(productIndex, "attachmentError", null)
+      handleFormUpdate(productIndex, "attachmentUrl", null)
 
-    try {
-      const downloadURL = await uploadFileToFirebaseStorage(file, `attachments/job-orders/product-${productIndex}/`)
-      handleFormUpdate(productIndex, "attachmentUrl", downloadURL)
-      handleFormUpdate(productIndex, "attachmentFile", file)
-      toast({
-        title: "Upload Successful",
-        description: `${file.name} uploaded successfully.`,
-      })
-    } catch (error: any) {
-      console.error("Upload failed:", error)
-      handleFormUpdate(productIndex, "attachmentError", `Upload failed: ${error.message || "Unknown error"}`)
-      toast({
-        title: "Upload Failed",
-        description: `Could not upload ${file.name}. ${error.message || "Please try again."}`,
-        variant: "destructive",
-      })
-    } finally {
-      handleFormUpdate(productIndex, "uploadingAttachment", false)
-    }
-  }
+      try {
+        const downloadURL = await uploadFileToFirebaseStorage(file, `attachments/job-orders/product-${productIndex}/`)
+        handleFormUpdate(productIndex, "attachmentUrl", downloadURL)
+        handleFormUpdate(productIndex, "attachmentFile", file)
+        toast({
+          title: "Upload Successful",
+          description: `${file.name} uploaded successfully.`,
+        })
+      } catch (error: any) {
+        console.error("Upload failed:", error)
+        handleFormUpdate(productIndex, "attachmentError", `Upload failed: ${error.message || "Unknown error"}`)
+        toast({
+          title: "Upload Failed",
+          description: `Could not upload ${file.name}. ${error.message || "Please try again."}`,
+          variant: "destructive",
+        })
+      } finally {
+        handleFormUpdate(productIndex, "uploadingAttachment", false)
+      }
+    },
+    [handleFormUpdate, toast],
+  )
 
-  const validateForms = (): boolean => {
+  const validateForms = useCallback((): boolean => {
     let hasError = false
 
     jobOrderForms.forEach((form, index) => {
@@ -320,190 +346,250 @@ export default function CreateJobOrderPage() {
     })
 
     return !hasError
-  }
+  }, [jobOrderForms, handleFormUpdate])
 
-  const handleCreateJobOrders = async (status: JobOrderStatus) => {
-    if (!quotationData || !user?.uid) {
-      toast({
-        title: "Missing Information",
-        description: "Cannot create Job Orders due to missing data or user authentication.",
-        variant: "destructive",
-      })
-      return
-    }
+  const handleCreateJobOrders = useCallback(
+    async (status: JobOrderStatus) => {
+      if (!quotationData || !user?.uid) {
+        toast({
+          title: "Missing Information",
+          description: "Cannot create Job Orders due to missing data or user authentication.",
+          variant: "destructive",
+        })
+        return
+      }
 
-    if (!validateForms()) {
-      toast({
-        title: "Missing Fields",
-        description: "Please fill in all required fields for all Job Orders.",
-        variant: "destructive",
-      })
-      return
-    }
+      if (!validateForms()) {
+        toast({
+          title: "Missing Fields",
+          description: "Please fill in all required fields for all Job Orders.",
+          variant: "destructive",
+        })
+        return
+      }
 
-    setIsSubmitting(true)
+      setIsSubmitting(true)
 
-    const { quotation, products, client, items } = quotationData
+      const { quotation, products, client } = quotationData
 
-    try {
-      // Handle different data structures
-      const quotationItems = quotation.items || []
-      const isMultipleItems = quotationItems.length > 0
+      try {
+        let jobOrdersData = []
 
-      let jobOrdersData = []
+        if (hasItems) {
+          // Multiple products from quotation.items
+          jobOrdersData = quotationItems.map((item: any, index: number) => {
+            const form = jobOrderForms[index]
+            const product = products[index] || {}
 
-      if (isMultipleItems) {
-        // Multiple products from quotation.items
-        jobOrdersData = quotationItems.map((item: any, index: number) => {
-          const form = jobOrderForms[index]
-          const product = products[index] || {}
+            const contractDuration = totalMonths > 0 ? `(${totalMonths} months)` : "N/A"
 
-          const startDate = quotation.start_date ? new Date(quotation.start_date) : null
-          const endDate = quotation.end_date ? new Date(quotation.end_date) : null
-          const totalMonths =
-            startDate && endDate
-              ? Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44))
-              : quotation.duration_days
-                ? Math.round(quotation.duration_days / 30.44)
-                : 1
+            const monthlyRate = item.price || 0
+            const totalLease = monthlyRate * totalMonths
+            const productVat = totalLease * 0.12
+            const productTotal = totalLease + productVat
+
+            return {
+              quotationId: quotation.id,
+              joNumber: "JO-AUTO-GEN",
+              dateRequested: form.dateRequested!.toISOString(),
+              joType: form.joType as JobOrderType,
+              deadline: form.deadline!.toISOString(),
+              requestedBy: userData?.first_name || "Auto-Generated",
+              remarks: form.remarks,
+              assignTo: form.assignTo,
+              attachments: form.attachmentUrl
+                ? [
+                    {
+                      url: form.attachmentUrl,
+                      name: form.attachmentFile?.name || "Attachment",
+                      type: form.attachmentFile?.type || "image",
+                    },
+                  ]
+                : [],
+              signedQuotationUrl: signedQuotationUrl,
+              poMoUrl: poMoUrl,
+              projectFaUrl: projectFaUrl,
+              quotationNumber: quotation.quotation_number,
+              clientName: client?.name || "N/A",
+              clientCompany: client?.company || "N/A",
+              contractDuration: contractDuration,
+              contractPeriodStart: quotation.start_date || "",
+              contractPeriodEnd: quotation.end_date || "",
+              siteName: item.product_name || product.name || "",
+              siteCode: item.site_code || product.site_code || "N/A",
+              siteType: item.type || product.type || "N/A",
+              siteSize: product.specs_rental?.size || product.light?.size || "N/A",
+              siteIllumination: product.light?.illumination || "N/A",
+              leaseRatePerMonth: monthlyRate,
+              totalMonths: totalMonths,
+              totalLease: totalLease,
+              vatAmount: productVat,
+              totalAmount: productTotal,
+              siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
+              missingCompliance: missingCompliance,
+              product_id: item.product_id || product.id || "",
+              company_id: userData?.company_id || "",
+            }
+          })
+        } else {
+          // Single product from quotation object
+          const form = jobOrderForms[0]
+          const product = products[0] || {}
 
           const contractDuration = totalMonths > 0 ? `(${totalMonths} months)` : "N/A"
 
-          const monthlyRate = item.price || 0
+          const monthlyRate = quotation.price || 0
           const totalLease = monthlyRate * totalMonths
           const productVat = totalLease * 0.12
           const productTotal = totalLease + productVat
 
-          return {
-            quotationId: quotation.id,
-            joNumber: "JO-AUTO-GEN",
-            dateRequested: form.dateRequested!.toISOString(),
-            joType: form.joType as JobOrderType,
-            deadline: form.deadline!.toISOString(),
-            requestedBy: userData?.first_name || "Auto-Generated",
-            remarks: form.remarks,
-            assignTo: form.assignTo,
-            attachments: form.attachmentUrl
-              ? [
-                  {
-                    url: form.attachmentUrl,
-                    name: form.attachmentFile?.name || "Attachment",
-                    type: form.attachmentFile?.type || "image",
-                  },
-                ]
-              : [],
-            signedQuotationUrl: signedQuotationUrl,
-            poMoUrl: poMoUrl,
-            projectFaUrl: projectFaUrl,
-            quotationNumber: quotation.quotation_number,
-            clientName: client?.name || "N/A",
-            clientCompany: client?.company || "N/A",
-            contractDuration: contractDuration,
-            contractPeriodStart: quotation.start_date || "",
-            contractPeriodEnd: quotation.end_date || "",
-            siteName: item.product_name || product.name || "",
-            siteCode: item.site_code || product.site_code || "N/A",
-            siteType: item.type || product.type || "N/A",
-            siteSize: product.specs_rental?.size || product.light?.size || "N/A",
-            siteIllumination: product.light?.illumination || "N/A",
-            leaseRatePerMonth: monthlyRate,
-            totalMonths: totalMonths,
-            totalLease: totalLease,
-            vatAmount: productVat,
-            totalAmount: productTotal,
-            siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
-            missingCompliance: missingCompliance,
-            product_id: item.product_id || product.id || "",
-            company_id: userData.company_id || "",
-          }
+          jobOrdersData = [
+            {
+              quotationId: quotation.id,
+              joNumber: "JO-AUTO-GEN",
+              dateRequested: form.dateRequested!.toISOString(),
+              joType: form.joType as JobOrderType,
+              deadline: form.deadline!.toISOString(),
+              requestedBy: userData?.first_name || "Auto-Generated",
+              remarks: form.remarks,
+              assignTo: form.assignTo,
+              attachments: form.attachmentUrl
+                ? [
+                    {
+                      url: form.attachmentUrl,
+                      name: form.attachmentFile?.name || "Attachment",
+                      type: form.attachmentFile?.type || "image",
+                    },
+                  ]
+                : [],
+              signedQuotationUrl: signedQuotationUrl,
+              poMoUrl: poMoUrl,
+              projectFaUrl: projectFaUrl,
+              quotationNumber: quotation.quotation_number,
+              clientName: client?.name || "N/A",
+              clientCompany: client?.company || "N/A",
+              contractDuration: contractDuration,
+              contractPeriodStart: quotation.start_date || "",
+              contractPeriodEnd: quotation.end_date || "",
+              siteName: quotation.product_name || product.name || "",
+              siteCode: quotation.site_code || product.site_code || "N/A",
+              siteType: product.type || "N/A",
+              siteSize: product.specs_rental?.size || product.light?.size || "N/A",
+              siteIllumination: product.light?.illumination || "N/A",
+              leaseRatePerMonth: monthlyRate,
+              totalMonths: totalMonths,
+              totalLease: totalLease,
+              vatAmount: productVat,
+              totalAmount: productTotal,
+              siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
+              missingCompliance: missingCompliance,
+              product_id: quotation.product_id || product.id || "",
+              company_id: userData?.company_id || "",
+            },
+          ]
+        }
+
+        const joIds = await createMultipleJobOrders(jobOrdersData, user.uid, status)
+        setCreatedJoIds(joIds)
+        setShowJobOrderSuccessDialog(true)
+      } catch (error: any) {
+        console.error("Error creating job orders:", error)
+        toast({
+          title: "Error",
+          description: `Failed to create Job Orders: ${error.message || "Unknown error"}. Please try again.`,
+          variant: "destructive",
         })
-      } else {
-        // Single product from quotation object
-        const form = jobOrderForms[0]
-        const product = products[0] || {}
-
-        const startDate = quotation.start_date ? new Date(quotation.start_date) : null
-        const endDate = quotation.end_date ? new Date(quotation.end_date) : null
-        const totalMonths =
-          startDate && endDate
-            ? Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30.44))
-            : quotation.duration_days
-              ? Math.round(quotation.duration_days / 30.44)
-              : 1
-
-        const contractDuration = totalMonths > 0 ? `(${totalMonths} months)` : "N/A"
-
-        const monthlyRate = quotation.price || 0
-        const totalLease = monthlyRate * totalMonths
-        const productVat = totalLease * 0.12
-        const productTotal = totalLease + productVat
-
-        jobOrdersData = [
-          {
-            quotationId: quotation.id,
-            joNumber: "JO-AUTO-GEN",
-            dateRequested: form.dateRequested!.toISOString(),
-            joType: form.joType as JobOrderType,
-            deadline: form.deadline!.toISOString(),
-            requestedBy: userData?.first_name || "Auto-Generated",
-            remarks: form.remarks,
-            assignTo: form.assignTo,
-            attachments: form.attachmentUrl
-              ? [
-                  {
-                    url: form.attachmentUrl,
-                    name: form.attachmentFile?.name || "Attachment",
-                    type: form.attachmentFile?.type || "image",
-                  },
-                ]
-              : [],
-            signedQuotationUrl: signedQuotationUrl,
-            poMoUrl: poMoUrl,
-            projectFaUrl: projectFaUrl,
-            quotationNumber: quotation.quotation_number,
-            clientName: client?.name || "N/A",
-            clientCompany: client?.company || "N/A",
-            contractDuration: contractDuration,
-            contractPeriodStart: quotation.start_date || "",
-            contractPeriodEnd: quotation.end_date || "",
-            siteName: quotation.product_name || product.name || "",
-            siteCode: quotation.site_code || product.site_code || "N/A",
-            siteType: product.type || "N/A",
-            siteSize: product.specs_rental?.size || product.light?.size || "N/A",
-            siteIllumination: product.light?.illumination || "N/A",
-            leaseRatePerMonth: monthlyRate,
-            totalMonths: totalMonths,
-            totalLease: totalLease,
-            vatAmount: productVat,
-            totalAmount: productTotal,
-            siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
-            missingCompliance: missingCompliance,
-            product_id: quotation.product_id || product.id || "",
-            company_id: userData.company_id || "",
-          },
-        ]
+      } finally {
+        setIsSubmitting(false)
       }
+    },
+    [
+      quotationData,
+      user,
+      validateForms,
+      hasItems,
+      quotationItems,
+      jobOrderForms,
+      products,
+      totalMonths,
+      signedQuotationUrl,
+      poMoUrl,
+      projectFaUrl,
+      missingCompliance,
+      userData,
+      toast,
+    ],
+  )
 
-      const joIds = await createMultipleJobOrders(jobOrdersData, user.uid, status)
-      setCreatedJoIds(joIds)
-      setShowJobOrderSuccessDialog(true)
-    } catch (error: any) {
-      console.error("Error creating job orders:", error)
-      toast({
-        title: "Error",
-        description: `Failed to create Job Orders: ${error.message || "Unknown error"}. Please try again.`,
-        variant: "destructive",
-      })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const handleDismissAndNavigate = () => {
+  const handleDismissAndNavigate = useCallback(() => {
     setShowJobOrderSuccessDialog(false)
     router.push("/sales/job-orders")
-  }
+  }, [router])
 
+  // useEffect hooks
+  useEffect(() => {
+    if (!quotationId) {
+      toast({
+        title: "Error",
+        description: "No quotation ID provided.",
+        variant: "destructive",
+      })
+      router.push("/sales/job-orders/select-quotation")
+      return
+    }
+
+    const fetchDetails = async () => {
+      setLoading(true)
+      try {
+        const data = await getQuotationDetailsForJobOrder(quotationId)
+        if (data) {
+          setQuotationData(data)
+        } else {
+          toast({
+            title: "Error",
+            description: "Quotation or Product details not found. Please ensure they exist.",
+            variant: "destructive",
+          })
+          router.push("/sales/job-orders/select-quotation")
+        }
+      } catch (error) {
+        console.error("Failed to fetch quotation details:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load quotation details. Please try again.",
+          variant: "destructive",
+        })
+        router.push("/sales/job-orders/select-quotation")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchDetails()
+  }, [quotationId, router, toast])
+
+  // Initialize forms when quotation data changes
+  useEffect(() => {
+    if (quotationData && userData?.uid) {
+      const productCount = hasItems ? quotationItems.length : 1
+      const initialForms: JobOrderFormData[] = Array.from({ length: productCount }, () => ({
+        joType: "",
+        dateRequested: new Date(),
+        deadline: undefined,
+        remarks: "",
+        assignTo: userData.uid,
+        attachmentFile: null,
+        attachmentUrl: null,
+        uploadingAttachment: false,
+        attachmentError: null,
+        joTypeError: false,
+        dateRequestedError: false,
+      }))
+      setJobOrderForms(initialForms)
+    }
+  }, [quotationData, userData?.uid, hasItems, quotationItems.length])
+
+  // Early returns after all hooks
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
@@ -524,68 +610,7 @@ export default function CreateJobOrderPage() {
     )
   }
 
-  const { quotation, products, client, items } = quotationData
-
-  // Determine if we have multiple products
-  const quotationItems = quotation.items || []
-  const isMultiProduct = quotationItems.length > 1
-  const hasItems = quotationItems.length > 0
-
-  // Calculate duration in months
-  const totalMonths = useMemo(() => {
-    if (quotation.start_date && quotation.end_date) {
-      const start = new Date(quotation.start_date)
-      const end = new Date(quotation.end_date)
-      return Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30.44))
-    } else if (quotation.duration_days) {
-      return Math.round(quotation.duration_days / 30.44)
-    }
-    return 1
-  }, [quotation.start_date, quotation.end_date, quotation.duration_days])
-
-  // Calculate individual product totals for display
-  const productTotals = useMemo(() => {
-    if (hasItems) {
-      // Multiple products from quotation.items
-      return quotationItems.map((item: any) => {
-        const monthlyRate = item.price || 0
-        const subtotal = monthlyRate * totalMonths
-        const vat = subtotal * 0.12
-        const total = subtotal + vat
-
-        return {
-          subtotal,
-          vat,
-          total,
-          monthlyRate,
-          siteCode: item.site_code || "N/A",
-          productName: item.product_name || "N/A",
-        }
-      })
-    } else {
-      // Single product from quotation object
-      const monthlyRate = quotation.price || 0
-      const subtotal = monthlyRate * totalMonths
-      const vat = subtotal * 0.12
-      const total = subtotal + vat
-
-      return [
-        {
-          subtotal,
-          vat,
-          total,
-          monthlyRate,
-          siteCode: quotation.site_code || "N/A",
-          productName: quotation.product_name || "N/A",
-        },
-      ]
-    }
-  }, [quotation, quotationItems, totalMonths, hasItems])
-
-  // Calculate overall totals
-  const overallSubtotal = productTotals.reduce((sum, product) => sum + product.subtotal, 0)
-  const overallVat = productTotals.reduce((sum, product) => sum + product.vat, 0)
-  const overallTotal = productTotals.reduce((sum, product) => sum + product.total, 0)
+  const { quotation, products, client } = quotationData
 
   return (
     <div className="flex flex-col min-h-screen bg-white p-4 md:p-6">
