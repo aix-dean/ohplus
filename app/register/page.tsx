@@ -57,9 +57,21 @@ export default function RegisterPage() {
     // Always ensure it starts with +63
     if (!value.startsWith("+63 ")) {
       setPhoneNumber("+63 ")
-    } else {
-      setPhoneNumber(value)
+      return
     }
+
+    // Extract only the numbers after +63
+    const numbersOnly = value.slice(4).replace(/\D/g, "")
+
+    // Limit to 10 digits
+    if (numbersOnly.length <= 10) {
+      setPhoneNumber("+63 " + numbersOnly)
+    }
+  }
+
+  const isPhoneNumberValid = () => {
+    const numbersOnly = phoneNumber.slice(4).replace(/\D/g, "")
+    return numbersOnly.length === 10
   }
 
   const handleRegister = async () => {
@@ -67,6 +79,11 @@ export default function RegisterPage() {
 
     if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
       setErrorMessage("Please fill in all required fields.")
+      return
+    }
+
+    if (!isPhoneNumberValid()) {
+      setErrorMessage("Phone number must be exactly 10 digits after +63.")
       return
     }
 
@@ -175,11 +192,15 @@ export default function RegisterPage() {
                 <Label htmlFor="phoneNumber">Cellphone number</Label>
                 <Input
                   id="phoneNumber"
-                  placeholder="+63 9XX XXX XXXX"
+                  placeholder="+63 9XXXXXXXXX"
                   value={phoneNumber}
                   onChange={handlePhoneNumberChange}
+                  className={!isPhoneNumberValid() && phoneNumber.length > 4 ? "border-red-500" : ""}
                   required
                 />
+                {!isPhoneNumberValid() && phoneNumber.length > 4 && (
+                  <p className="text-xs text-red-500">Phone number must be exactly 10 digits after +63</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
