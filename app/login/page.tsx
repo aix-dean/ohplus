@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ComingSoonDialog } from "@/components/coming-soon-dialog"
 import { Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -25,16 +26,18 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showJoinOrgDialog, setShowJoinOrgDialog] = useState(false)
+  const [showComingSoonDialog, setShowComingSoonDialog] = useState(false)
+  const [comingSoonFeature, setComingSoonFeature] = useState("")
   const [orgCode, setOrgCode] = useState("")
   const [isValidatingCode, setIsValidatingCode] = useState(false)
 
-  const { login, user } = useAuth()
+  const { loginOHPlusOnly, user } = useAuth()
   const router = useRouter()
 
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      router.push("/admin/dashboard") // Changed redirect to /admin/dashboard
+      router.push("/admin/dashboard")
     }
   }, [user, router])
 
@@ -44,8 +47,8 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      await login(email, password)
-      router.push("/admin/dashboard") // Changed redirect to /admin/dashboard
+      await loginOHPlusOnly(email, password)
+      router.push("/admin/dashboard")
     } catch (error: any) {
       console.error("Login error:", error)
 
@@ -56,12 +59,21 @@ export default function LoginPage() {
         setError("Too many unsuccessful login attempts. Please try again later.")
       } else if (error.code === "auth/tenant-id-mismatch") {
         setError("Authentication error: Tenant ID mismatch. Please contact support.")
+      } else if (error.message === "OHPLUS_ACCOUNT_NOT_FOUND") {
+        setError("No OHPLUS account found with this email address. Only OHPLUS accounts can access this system.")
+      } else if (error.message === "ACCOUNT_TYPE_NOT_ALLOWED") {
+        setError("This account type is not allowed to access this system. Only OHPLUS accounts are permitted.")
       } else {
         setError(error.message || "Failed to login. Please check your credentials.")
       }
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handleSocialLogin = (provider: string) => {
+    setComingSoonFeature(`${provider} login`)
+    setShowComingSoonDialog(true)
   }
 
   const validateInvitationCode = async (code: string) => {
@@ -135,15 +147,27 @@ export default function LoginPage() {
                 <Button
                   variant="outline"
                   className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+                  onClick={() => handleSocialLogin("Google")}
                 >
-                  <Image src="/placeholder.svg?height=20&width=20" alt="Google" width={20} height={20} />
+                  <Image
+                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Google_Icons-09-512-xTPWQW6Ebs2IlRYdW10MAg71P4QPDL.webp"
+                    alt="Google"
+                    width={20}
+                    height={20}
+                  />
                   Google
                 </Button>
                 <Button
                   variant="outline"
                   className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+                  onClick={() => handleSocialLogin("Facebook")}
                 >
-                  <Image src="/placeholder.svg?height=20&width=20" alt="Facebook" width={20} height={20} />
+                  <Image
+                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Facebook_Logo_2023-4SQHsSrZ3kX2dVTojWLhiS3pOKdNbq.png"
+                    alt="Facebook"
+                    width={20}
+                    height={20}
+                  />
                   Facebook
                 </Button>
               </div>
@@ -245,6 +269,7 @@ export default function LoginPage() {
         </div>
       </div>
 
+      {/* Join Organization Dialog */}
       <Dialog open={showJoinOrgDialog} onOpenChange={setShowJoinOrgDialog}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
@@ -280,6 +305,13 @@ export default function LoginPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Coming Soon Dialog */}
+      <ComingSoonDialog
+        isOpen={showComingSoonDialog}
+        onClose={() => setShowComingSoonDialog(false)}
+        feature={comingSoonFeature}
+      />
     </div>
   )
 }

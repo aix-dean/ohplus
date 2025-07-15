@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
@@ -9,9 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FirebaseError } from "firebase/app"
-import { EyeIcon, EyeOffIcon, CheckCircleIcon, XCircleIcon } from "lucide-react"
-import { z } from "zod" // Import zod for schema validation
-// No longer importing Progress component as we're creating custom bars
+import { Eye, EyeOff } from "lucide-react"
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
@@ -20,19 +20,11 @@ export default function RegisterPage() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [middleName, setMiddleName] = useState("")
-  const [phoneNumber, setPhoneNumber] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("+63 ")
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [passwordCriteria, setPasswordCriteria] = useState({
-    minLength: false,
-    hasLowerCase: false,
-    hasUpperCase: false,
-    hasNumber: false,
-    hasSpecialChar: false,
-  })
-  const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null)
 
   const { register } = useAuth()
   const router = useRouter()
@@ -40,16 +32,6 @@ export default function RegisterPage() {
 
   // Get organization code from URL parameters
   const orgCode = searchParams.get("orgCode")
-
-  const passwordSchema = z
-    .string()
-    .min(8, { message: "Be at least 8 characters long" })
-    .regex(/[a-z]/, { message: "Contain at least one lowercase letter." })
-    .regex(/[A-Z]/, { message: "Contain at least one uppercase letter." })
-    .regex(/[0-9]/, { message: "Contain at least one number." })
-    .regex(/[^a-zA-Z0-9]/, {
-      message: "Contain at least one special character.",
-    })
 
   const getFriendlyErrorMessage = (error: unknown): string => {
     console.error("Raw error during registration:", error)
@@ -72,39 +54,27 @@ export default function RegisterPage() {
     return "An unknown error occurred. Please try again."
   }
 
-  const validatePasswordStrength = (pwd: string) => {
-    const criteria = {
-      minLength: pwd.length >= 8,
-      hasLowerCase: /[a-z]/.test(pwd),
-      hasUpperCase: /[A-Z]/.test(pwd),
-      hasNumber: /[0-9]/.test(pwd),
-      hasSpecialChar: /[^a-zA-Z0-9]/.test(pwd),
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+
+    // Always ensure it starts with +63
+    if (!value.startsWith("+63 ")) {
+      setPhoneNumber("+63 ")
+      return
     }
-    setPasswordCriteria(criteria)
+
+    // Extract only the numbers after +63
+    const numbersOnly = value.slice(4).replace(/\D/g, "")
+
+    // Limit to 10 digits
+    if (numbersOnly.length <= 10) {
+      setPhoneNumber("+63 " + numbersOnly)
+    }
   }
 
-  const getPasswordStrengthScore = () => {
-    let score = 0
-    if (passwordCriteria.minLength) score += 1
-    if (passwordCriteria.hasLowerCase) score += 1
-    if (passwordCriteria.hasUpperCase) score += 1
-    if (passwordCriteria.hasNumber) score += 1
-    if (passwordCriteria.hasSpecialChar) score += 1
-    return score // Score from 0 to 5
-  }
-
-  const getStrengthText = (score: number) => {
-    if (score === 5) return "Strong password"
-    if (score >= 3) return "Moderate password"
-    if (score > 0) return "Weak password"
-    return ""
-  }
-
-  const getBarColorClass = (score: number) => {
-    if (score === 5) return "bg-green-500"
-    if (score >= 3) return "bg-yellow-500"
-    if (score > 0) return "bg-red-500"
-    return "bg-gray-300" // Default for empty password
+  const isPhoneNumberValid = () => {
+    const numbersOnly = phoneNumber.slice(4).replace(/\D/g, "")
+    return numbersOnly.length === 10
   }
 
   const handleRegister = async () => {
@@ -115,16 +85,13 @@ export default function RegisterPage() {
       return
     }
 
-    if (password !== confirmPassword) {
-      setErrorMessage("Passwords do not match.")
+    if (!isPhoneNumberValid()) {
+      setErrorMessage("Phone number must be exactly 10 digits after +63.")
       return
     }
 
-    // Validate password strength using Zod
-    const passwordValidationResult = passwordSchema.safeParse(password)
-    if (!passwordValidationResult.success) {
-      const errors = passwordValidationResult.error.flatten().errors.map((err) => err.message)
-      setErrorMessage(`Password does not meet requirements: ${errors.join(", ")}`)
+    if (password !== confirmPassword) {
+      setErrorMessage("Passwords do not match.")
       return
     }
 
@@ -158,12 +125,10 @@ export default function RegisterPage() {
     }
   }
 
-  const passwordStrengthScore = getPasswordStrengthScore()
-
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col lg:flex-row">
       {/* Left Panel - Image */}
-      <div className="relative hidden w-[40%] items-center justify-center bg-gray-900 lg:flex">
+      <div className="relative hidden w-full items-center justify-center bg-gray-900 sm:flex lg:w-[40%]">
         <Image
           src="/registration-background.png"
           alt="Background"
@@ -174,8 +139,8 @@ export default function RegisterPage() {
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex w-full items-center justify-center bg-white p-8 dark:bg-gray-950 lg:w-[60%]">
-        <Card className="w-full max-w-md border-none shadow-none">
+      <div className="flex w-full items-center justify-center bg-white p-4 dark:bg-gray-950 sm:p-6 lg:w-[60%] lg:p-8">
+        <Card className="w-full max-w-md border-none shadow-none sm:max-w-lg">
           <CardHeader className="space-y-1 text-left">
             <div className="flex items-center justify-between">
               <CardTitle className="text-3xl font-bold">
@@ -195,7 +160,7 @@ export default function RegisterPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">First Name</Label>
                   <Input
@@ -230,11 +195,15 @@ export default function RegisterPage() {
                 <Label htmlFor="phoneNumber">Cellphone number</Label>
                 <Input
                   id="phoneNumber"
-                  placeholder="+63 9XX XXX XXXX"
+                  placeholder="+63 9XXXXXXXXX"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  onChange={handlePhoneNumberChange}
+                  className={!isPhoneNumberValid() && phoneNumber.length > 4 ? "border-red-500" : ""}
                   required
                 />
+                {!isPhoneNumberValid() && phoneNumber.length > 4 && (
+                  <p className="text-xs text-red-500">Phone number must be exactly 10 digits after +63</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
@@ -254,25 +223,18 @@ export default function RegisterPage() {
                     id="password"
                     type={showPassword ? "text" : "password"}
                     value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value)
-                      validatePasswordStrength(e.target.value)
-                      setPasswordsMatch(e.target.value === confirmPassword ? true : confirmPassword ? false : null)
-                    }}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
                   />
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    disabled={loading}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? (
-                      <EyeOffIcon className="h-4 w-4 text-gray-500" />
+                      <EyeOff className="h-4 w-4 text-gray-400" />
                     ) : (
-                      <EyeIcon className="h-4 w-4 text-gray-500" />
+                      <Eye className="h-4 w-4 text-gray-400" />
                     )}
                     <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
                   </Button>
@@ -310,6 +272,7 @@ export default function RegisterPage() {
                       )}
                     </ul>
                   )}
+                  </button>
                 </div>
               </div>
               <div className="space-y-2">
@@ -319,38 +282,21 @@ export default function RegisterPage() {
                     id="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
-                    onChange={(e) => {
-                      setConfirmPassword(e.target.value)
-                      setPasswordsMatch(password === e.target.value ? true : e.target.value ? false : null)
-                    }}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
                     required
                   />
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowConfirmPassword((prev) => !prev)}
-                    disabled={loading}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
                     {showConfirmPassword ? (
-                      <EyeOffIcon className="h-4 w-4 text-gray-500" />
+                      <EyeOff className="h-4 w-4 text-gray-400" />
                     ) : (
-                      <EyeIcon className="h-4 w-4 text-gray-500" />
+                      <Eye className="h-4 w-4 text-gray-400" />
                     )}
-                    <span className="sr-only">{showConfirmPassword ? "Hide password" : "Show password"}</span>
-                  </Button>
-                  {passwordsMatch !== null && (
-                    <div className="absolute right-10 top-1/2 -translate-y-1/2">
-                      {passwordsMatch ? (
-                        <CheckCircleIcon className="h-5 w-5 text-green-500" />
-                      ) : (
-                        <XCircleIcon className="h-5 w-5 text-red-500" />
-                      )}
-                    </div>
-                  )}
+                  </button>
                 </div>
-                {passwordsMatch === false && <p className="text-red-500 text-sm mt-1">Passwords do not match.</p>}
               </div>
               <p className="text-center text-xs text-gray-500 dark:text-gray-400">
                 By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
@@ -373,13 +319,7 @@ export default function RegisterPage() {
                 onClick={handleRegister}
                 disabled={loading}
               >
-                {loading
-                  ? orgCode
-                    ? "Joining Organization..."
-                    : "Signing Up..."
-                  : orgCode
-                    ? "Join Organization"
-                    : "Sign Up"}
+                {loading ? (orgCode ? "Joining..." : "Signing Up...") : orgCode ? "Join Organization" : "Sign Up"}
               </Button>
             </div>
 
