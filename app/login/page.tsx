@@ -145,7 +145,14 @@ export default function LoginPage() {
           <Card className="border-none shadow-none">
             {/* Add branding component at the top */}
             <div className="text-center mb-6">
-              <h1 className="text-2xl font-semibold text-gray-800 mb-2">OH!</h1>
+              <Image
+                src="/ohplus-new-logo.png"
+                alt="OH Plus Logo"
+                width={60}
+                height={60}
+                priority
+                className="mx-auto mb-2"
+              />
               <p className="text-lg font-light text-blue-600 leading-tight">
                 Powering Smarter Site Management for Billboard Operators
               </p>
