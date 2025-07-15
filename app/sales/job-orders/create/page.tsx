@@ -24,11 +24,7 @@ import { cn } from "@/lib/utils"
 import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog" // New import
 
 const joTypes = ["Installation", "Maintenance", "Repair", "Dismantling", "Other"]
-const assignees = [
-  { id: "user1", name: "John Doe" },
-  { id: "user2", name: "Jane Smith" },
-  { id: "user3", name: "Peter Jones" },
-]
+
 
 // Dummy compliance state as per screenshot
 const missingCompliance = {
@@ -540,9 +536,8 @@ export default function CreateJobOrderPage() {
                   <SelectValue placeholder="Choose Assignee" className="text-gray-500" />
                 </SelectTrigger>
                 <SelectContent>
-                  {assignees.map((assignee) => (
-                    <SelectItem key={assignee.id} value={assignee.id} className="text-sm">
-                      {assignee.name}
+                    <SelectItem key={userData.uid} value={userData.first_name} className="text-sm">
+                      {userData.first_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
