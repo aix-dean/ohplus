@@ -14,7 +14,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ComingSoonDialog } from "@/components/coming-soon-dialog"
 import { Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -26,18 +25,16 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showJoinOrgDialog, setShowJoinOrgDialog] = useState(false)
-  const [showComingSoonDialog, setShowComingSoonDialog] = useState(false)
-  const [comingSoonFeature, setComingSoonFeature] = useState("")
   const [orgCode, setOrgCode] = useState("")
   const [isValidatingCode, setIsValidatingCode] = useState(false)
 
-  const { loginOHPlusOnly, user } = useAuth()
+  const { login, user } = useAuth()
   const router = useRouter()
 
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      router.push("/admin/dashboard")
+      router.push("/admin/dashboard") // Changed redirect to /admin/dashboard
     }
   }, [user, router])
 
@@ -47,8 +44,8 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      await loginOHPlusOnly(email, password)
-      router.push("/admin/dashboard")
+      await login(email, password)
+      router.push("/admin/dashboard") // Changed redirect to /admin/dashboard
     } catch (error: any) {
       console.error("Login error:", error)
 
@@ -59,21 +56,12 @@ export default function LoginPage() {
         setError("Too many unsuccessful login attempts. Please try again later.")
       } else if (error.code === "auth/tenant-id-mismatch") {
         setError("Authentication error: Tenant ID mismatch. Please contact support.")
-      } else if (error.message === "OHPLUS_ACCOUNT_NOT_FOUND") {
-        setError("No OHPLUS account found with this email address. Only OHPLUS accounts can access this system.")
-      } else if (error.message === "ACCOUNT_TYPE_NOT_ALLOWED") {
-        setError("This account type is not allowed to access this system. Only OHPLUS accounts are permitted.")
       } else {
         setError(error.message || "Failed to login. Please check your credentials.")
       }
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const handleSocialLogin = (provider: string) => {
-    setComingSoonFeature(`${provider} login`)
-    setShowComingSoonDialog(true)
   }
 
   const validateInvitationCode = async (code: string) => {
@@ -128,16 +116,54 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white p-4">
-      <div className="flex w-full max-w-4xl bg-white rounded-lg shadow-lg overflow-hidden">
+      <div className="flex w-full max-w-4xl bg-white rounded-lg overflow-hidden">
         {/* Left Section: Logo and Company Name */}
         <div className="hidden md:flex flex-col items-center justify-center p-8 bg-gray-50 w-1/2">
-          <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={200} height={200} priority />
-          <span className="mt-4 text-2xl font-bold text-gray-800">OH Plus</span>
+          <div className="flex flex-col items-center space-y-6">
+            {/* OH Plus Logo */}
+            <div className="text-center">
+              <Image src="/ohplus-new-logo.png" alt="OH Plus Logo" width={80} height={80} priority />
+            </div>
+
+            {/* Main tagline */}
+            <div className="text-center max-w-xs">
+              <h2 className="text-3xl font-light text-blue-600 leading-tight">
+                Powering Smarter
+                <br />
+                Site Management for
+                <br />
+                Billboard Operators
+              </h2>
+            </div>
+
+            {/* Powered by section */}
+            <div className="text-center">
+              <p className="text-sm text-gray-600 mb-2">powered by:</p>
+              <Image src="/aix-logo.png" alt="AiX AI Xynergy Logo" width={80} height={60} priority />
+            </div>
+          </div>
         </div>
 
         {/* Right Section: Login Form */}
         <div className="w-full md:w-1/2 p-8">
           <Card className="border-none shadow-none">
+            {/* Add branding component at the top */}
+            <div className="text-center mb-6 md:hidden">
+              <Image
+                src="/ohplus-new-logo.png"
+                alt="OH Plus Logo"
+                width={100}
+                height={100}
+                priority
+                className="mx-auto mb-2"
+              />
+              <p className="text-xl font-light text-blue-600 leading-tight">
+                Powering Smarter Site Management
+                <br />
+                for Billboard Operators
+              </p>
+            </div>
+
             <CardHeader className="text-center md:text-left">
               <CardTitle className="text-3xl font-bold text-gray-900">Log in to your Account</CardTitle>
               <CardDescription className="text-gray-600 mt-2">Welcome back! Select method to log in:</CardDescription>
@@ -147,27 +173,15 @@ export default function LoginPage() {
                 <Button
                   variant="outline"
                   className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                  onClick={() => handleSocialLogin("Google")}
                 >
-                  <Image
-                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Google_Icons-09-512-xTPWQW6Ebs2IlRYdW10MAg71P4QPDL.webp"
-                    alt="Google"
-                    width={20}
-                    height={20}
-                  />
+                  <Image src="/placeholder.svg?height=20&width=20" alt="Google" width={20} height={20} />
                   Google
                 </Button>
                 <Button
                   variant="outline"
                   className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
-                  onClick={() => handleSocialLogin("Facebook")}
                 >
-                  <Image
-                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Facebook_Logo_2023-4SQHsSrZ3kX2dVTojWLhiS3pOKdNbq.png"
-                    alt="Facebook"
-                    width={20}
-                    height={20}
-                  />
+                  <Image src="/placeholder.svg?height=20&width=20" alt="Facebook" width={20} height={20} />
                   Facebook
                 </Button>
               </div>
@@ -264,12 +278,17 @@ export default function LoginPage() {
               >
                 Join an organization
               </Button>
+
+              {/* Add AiX logo at bottom */}
+              <div className="text-center mt-4 pt-4 md:hidden">
+                <p className="text-sm text-gray-500 mb-3">powered by:</p>
+                <Image src="/aix-logo.png" alt="AiX AI Xynergy Logo" width={80} height={60} priority />
+              </div>
             </CardFooter>
           </Card>
         </div>
       </div>
 
-      {/* Join Organization Dialog */}
       <Dialog open={showJoinOrgDialog} onOpenChange={setShowJoinOrgDialog}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
@@ -305,13 +324,6 @@ export default function LoginPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Coming Soon Dialog */}
-      <ComingSoonDialog
-        isOpen={showComingSoonDialog}
-        onClose={() => setShowComingSoonDialog(false)}
-        feature={comingSoonFeature}
-      />
     </div>
   )
 }

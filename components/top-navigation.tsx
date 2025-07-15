@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, X, Settings, LogOut, User, Bell, ArrowLeft } from "lucide-react"
+import { Menu, X, Settings, LogOut, User, Bell } from "lucide-react"
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
@@ -177,14 +177,7 @@ export function TopNavigation() {
         <div className="top-nav-content">
           <div className="top-nav-left">
             <div className="top-nav-logo flex items-center">
-              <button
-                onClick={() => router.back()}
-                className="mr-3 p-2 rounded-full text-white hover:text-gray-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
-                aria-label="Go back"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-              <h1 className="text-xl font-semibold text-white">{pageTitle == "Admin - Subscriptions" ? "Admin - Plan Profile" : pageTitle}</h1>
+              <h1 className="text-xl font-semibold text-white">{pageTitle}</h1>
             </div>
             <div className="top-nav-links hidden md:flex"></div>
           </div>

@@ -9,8 +9,8 @@ import {
   serverTimestamp,
   Timestamp,
   updateDoc,
-  orderBy,
-  limit,
+  orderBy, // Import orderBy
+  limit, // Import limit
 } from "firebase/firestore"
 import {
   type Subscription,
@@ -19,7 +19,6 @@ import {
   type SubscriptionStatus,
   calculateSubscriptionEndDate,
   getMaxProductsForPlan,
-  getMaxUsersForPlan,
 } from "@/lib/types/subscription"
 import type { SubscriptionPlan } from "./types/subscription"
 
@@ -34,8 +33,6 @@ export const subscriptionService = {
     status: SubscriptionStatus = "active",
     maxProducts: number | null = null,
     trialEndDate: Date | null = null,
-    companyId: string | null = null,
-    maxUsers: number | null = null,
   ): Promise<Subscription> {
     console.log("subscriptionService: Creating subscription for licenseKey:", licenseKey)
 
@@ -50,20 +47,20 @@ export const subscriptionService = {
       planType,
       billingCycle,
       uid,
-      startDate: startDate,
-      endDate: endDate || calculatedEndDate,
+      startDate: startDate, // Store as Date object, Firestore will convert to Timestamp
+      endDate: endDate || calculatedEndDate, // Use provided or calculated
       status,
       maxProducts: maxProducts || getMaxProductsForPlan(planType),
-      maxUsers: maxUsers || getMaxUsersForPlan(planType),
-      trialEndDate: trialEndDate || calculatedTrialEndDate,
-      companyId: companyId,
+      trialEndDate: trialEndDate || calculatedTrialEndDate, // Use provided or calculated
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }
 
+    // Use addDoc to let Firestore generate the document ID
     const docRef = await addDoc(collection(db, "subscriptions"), subscriptionData)
     console.log("subscriptionService: Subscription created with ID:", docRef.id)
 
+    // Return the created subscription with the Firestore ID and converted dates
     const newSubscription: Subscription = {
       id: docRef.id,
       licenseKey,
@@ -74,11 +71,9 @@ export const subscriptionService = {
       endDate: endDate || calculatedEndDate,
       status,
       maxProducts: maxProducts || getMaxProductsForPlan(planType),
-      maxUsers: maxUsers || getMaxUsersForPlan(planType),
       trialEndDate: trialEndDate || calculatedTrialEndDate,
-      companyId: companyId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: new Date(), // Approximate, will be updated on next fetch
+      updatedAt: new Date(), // Approximate, will be updated on next fetch
     }
     return newSubscription
   },
@@ -86,6 +81,7 @@ export const subscriptionService = {
   async getSubscriptionByLicenseKey(licenseKey: string): Promise<Subscription | null> {
     console.log("subscriptionService: Fetching subscription for licenseKey:", licenseKey)
     const subscriptionsRef = collection(db, "subscriptions")
+    // Query for the license key, order by createdAt descending, and limit to 1 to get the latest
     const q = query(subscriptionsRef, where("licenseKey", "==", licenseKey), orderBy("createdAt", "desc"), limit(1))
     const querySnapshot = await getDocs(q)
 
@@ -97,6 +93,7 @@ export const subscriptionService = {
     const docSnap = querySnapshot.docs[0]
     const data = docSnap.data()
 
+    // Convert Firestore Timestamps to JavaScript Date objects
     const subscription: Subscription = {
       id: docSnap.id,
       licenseKey: data.licenseKey,
@@ -107,47 +104,11 @@ export const subscriptionService = {
       endDate: data.endDate instanceof Timestamp ? data.endDate.toDate() : data.endDate,
       status: data.status,
       maxProducts: data.maxProducts,
-      maxUsers: data.maxUsers || getMaxUsersForPlan(data.planType),
       trialEndDate: data.trialEndDate instanceof Timestamp ? data.trialEndDate.toDate() : data.trialEndDate,
-      companyId: data.companyId || null,
       createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : data.createdAt,
       updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : data.updatedAt,
     }
     console.log("subscriptionService: Found subscription:", subscription)
-    return subscription
-  },
-
-  async getSubscriptionByCompanyId(companyId: string): Promise<Subscription | null> {
-    console.log("subscriptionService: Fetching subscription for companyId:", companyId)
-    const subscriptionsRef = collection(db, "subscriptions")
-    const q = query(subscriptionsRef, where("companyId", "==", companyId), orderBy("createdAt", "desc"), limit(1))
-    const querySnapshot = await getDocs(q)
-
-    if (querySnapshot.empty) {
-      console.log("subscriptionService: No subscription found for companyId:", companyId)
-      return null
-    }
-
-    const docSnap = querySnapshot.docs[0]
-    const data = docSnap.data()
-
-    const subscription: Subscription = {
-      id: docSnap.id,
-      licenseKey: data.licenseKey,
-      planType: data.planType,
-      billingCycle: data.billingCycle,
-      uid: data.uid,
-      startDate: data.startDate instanceof Timestamp ? data.startDate.toDate() : data.startDate,
-      endDate: data.endDate instanceof Timestamp ? data.endDate.toDate() : data.endDate,
-      status: data.status,
-      maxProducts: data.maxProducts,
-      maxUsers: data.maxUsers || getMaxUsersForPlan(data.planType),
-      trialEndDate: data.trialEndDate instanceof Timestamp ? data.trialEndDate.toDate() : data.trialEndDate,
-      companyId: data.companyId || null,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : data.createdAt,
-      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : data.updatedAt,
-    }
-    console.log("subscriptionService: Found subscription by companyId:", subscription)
     return subscription
   },
 
@@ -159,11 +120,13 @@ export const subscriptionService = {
 
     if (querySnapshot.empty) {
       console.error("subscriptionService: No subscription found to update for licenseKey:", licenseKey)
+      // Throw an error that can be caught by the caller to handle creation fallback
       throw new Error("Subscription document not found for update.")
     }
 
     const docRef = doc(db, "subscriptions", querySnapshot.docs[0].id)
 
+    // Prepare updates, converting Date objects to serverTimestamp if present
     const updateData: { [key: string]: any } = { ...updates }
     if (updateData.startDate instanceof Date) {
       updateData.startDate = updateData.startDate
@@ -180,6 +143,7 @@ export const subscriptionService = {
     }
     updateData.updatedAt = serverTimestamp()
 
+    // Recalculate endDate and trialEndDate if planType or billingCycle changes
     if (updates.planType || updates.billingCycle || updates.startDate) {
       const currentSubscription = querySnapshot.docs[0].data() as Subscription
       const newPlanType = updates.planType || currentSubscription.planType
@@ -194,7 +158,6 @@ export const subscriptionService = {
       updateData.endDate = recalculatedEndDate
       updateData.trialEndDate = recalculatedTrialEndDate
       updateData.maxProducts = getMaxProductsForPlan(newPlanType)
-      updateData.maxUsers = getMaxUsersForPlan(newPlanType)
     }
 
     await updateDoc(docRef, updateData)
@@ -209,10 +172,12 @@ export const subscriptionService = {
     const trialEnd = new Date(subscription.trialEndDate)
     const diffTime = trialEnd.getTime() - today.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return Math.max(0, diffDays)
+    return Math.max(0, diffDays) // Ensure it doesn't return negative days
   },
 }
 
+// This function provides the list of available plans.
+// In a real-world scenario, these might come from a database or a payment provider.
 export const getSubscriptionPlans = (): SubscriptionPlan[] => {
   return [
     {
@@ -262,7 +227,7 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
       id: "enterprise",
       name: "Enterprise",
       description: "Tailored for large companies with extensive needs.",
-      price: 0,
+      price: 0, // Indicates "Contact Us"
       billingCycle: "N/A",
       features: [
         "Flexible Pricing",
@@ -273,6 +238,7 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
       ],
       buttonText: "Let's Talk",
     },
+    // Retaining existing plans for compatibility if needed, though they might be removed later
     {
       id: "trial",
       name: "Trial Plan",

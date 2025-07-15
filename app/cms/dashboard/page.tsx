@@ -8,6 +8,7 @@ import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import {
+  Plus,
   MoreVertical,
   FileText,
   LayoutGrid,
@@ -30,6 +31,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
 import { getPaginatedUserProducts, getUserProductsCount, softDeleteProduct, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 
@@ -87,23 +89,38 @@ export default function CMSDashboardPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingCount, setLoadingCount] = useState(false)
 
-  const { user, userData } = useAuth()
+  const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
 
   // Navigation handlers for analytics cards
+  const handleNavigateToActiveScreens = () => {
+    // Navigate to active screens page (you can change this to the appropriate route)
+    router.push("/cms/screens/active")
+  }
 
-  // Fetch total count of dynamic products
+  const handleNavigateToInactiveScreens = () => {
+    // Navigate to inactive screens page
+    router.push("/cms/screens/inactive")
+  }
+
+  const handleNavigateToWarnings = () => {
+    // Navigate to warnings page
+    router.push("/cms/warnings")
+  }
+
+  const handleNavigateToOrders = () => {
+    // Navigate to orders page
+    router.push("/cms/orders")
+  }
+
+  // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
-    if (!userData?.company_id) return
+    if (!user?.uid) return
 
     setLoadingCount(true)
     try {
-      const count = await getUserProductsCount(userData?.company_id, {
-        active: true,
-        content_type: "dynamic",
-        searchTerm,
-      })
+      const count = await getUserProductsCount(user.uid, searchTerm)
       setTotalItems(count)
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
@@ -116,12 +133,12 @@ export default function CMSDashboardPage() {
     } finally {
       setLoadingCount(false)
     }
-  }, [userData, toast, searchTerm])
+  }, [user, toast, searchTerm])
 
-  // Fetch dynamic products for the current page
+  // Fetch products for the current page
   const fetchProducts = useCallback(
     async (page: number) => {
-      if (!userData?.company_id) return
+      if (!user?.uid) return
 
       // Check if we have this page in cache
       const cacheKey = `${page}-${searchTerm}`
@@ -141,11 +158,7 @@ export default function CMSDashboardPage() {
         // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
-        const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, {
-          active: true,
-          content_type: "dynamic",
-          searchTerm,
-        })
+        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, searchTerm)
 
         setProducts(result.items)
         setLastDoc(result.lastDoc)
@@ -172,7 +185,7 @@ export default function CMSDashboardPage() {
         setLoadingMore(false)
       }
     },
-    [userData, lastDoc, pageCache, toast, searchTerm],
+    [user, lastDoc, pageCache, toast, searchTerm],
   )
 
   // Store products in localStorage for use in breadcrumbs
@@ -193,18 +206,18 @@ export default function CMSDashboardPage() {
 
   // Load initial data and count
   useEffect(() => {
-    if (userData?.company_id) {
+    if (user?.uid) {
       fetchProducts(1)
       fetchTotalCount()
     }
-  }, [userData?.company_id, fetchProducts, fetchTotalCount])
+  }, [user, fetchProducts, fetchTotalCount])
 
   // Load data when page changes
   useEffect(() => {
-    if (userData?.company_id && currentPage > 0) {
+    if (user?.uid && currentPage > 0) {
       fetchProducts(currentPage)
     }
-  }, [currentPage, fetchProducts, userData?.company_id])
+  }, [currentPage, fetchProducts, user])
 
   // Handle search
   const handleSearch = (e: React.FormEvent) => {
@@ -323,30 +336,24 @@ export default function CMSDashboardPage() {
   // Handle edit click
   const handleEditClick = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation()
-    // Store the complete product data for the site page
-    localStorage.setItem(`cms-product-${product.id}`, JSON.stringify(product))
-    router.push(`/cms/content/edit/${product.id}`)
+    router.push(`/cms/details/${product.id}`)
   }
 
-  // Handle view site details click - Updated to use new site page
-  const handleViewSite = (productId: string) => {
-    // Find the product data to pass along
-    const productData = products.find((p) => p.id === productId)
-    if (productData) {
-      // Store the complete product data for the site page
-      localStorage.setItem(`cms-product-${productId}`, JSON.stringify(productData))
-    }
-    router.push(`/cms/site/${productId}`)
+  // Handle view details click
+  const handleViewDetails = (productId: string) => {
+    router.push(`/cms/details/${productId}`)
   }
+
+  // Handle add new c
 
   // Use mock data if no products are available from Firebase
   const [useMockData, setUseMockData] = useState(false)
 
   useEffect(() => {
-    if (!loading && products.length === 0 && !userData?.company_id) {
+    if (!loading && products.length === 0 && !user?.uid) {
       setUseMockData(true)
     }
-  }, [loading, products, userData])
+  }, [loading, products, user])
 
   // Mock data for demonstration when no Firebase data is available
   const mockContent = [
@@ -480,274 +487,203 @@ export default function CMSDashboardPage() {
       <div className="flex flex-col gap-3">
         {/* Header with title and actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <h1 className="text-2xl font-bold">
-            {userData?.first_name
-              ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
-              : "Dashboard"}
-          </h1>
-          <p className="text-muted-foreground">Manage your digital billboard content and campaigns</p>
+          <h1 className="text-2xl font-bold">Content Management</h1>
         </div>
 
-        {/* Analytics Cards */}
+        {/* Screen Analytics Monitoring */}
+        {!loading && (
+          <>
+            <Separator className="my-3" />
+          </>
+        )}
 
-        {/* Search and View Toggle */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <Input
-              placeholder="Search content..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full sm:w-80"
-            />
-            <Button type="submit" variant="outline" size="icon">
-              <Search className="h-4 w-4" />
-            </Button>
-          </form>
-
-          <div className="flex items-center gap-2">
-            <Button variant={viewMode === "grid" ? "default" : "outline"} size="sm" onClick={() => setViewMode("grid")}>
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button variant={viewMode === "list" ? "default" : "outline"} size="sm" onClick={() => setViewMode("list")}>
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Content Display */}
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
-        ) : content.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
-            <h3 className="mb-2 text-lg font-semibold">No content found</h3>
-            <p className="text-muted-foreground">
-              {searchTerm ? "No content matches your search criteria." : "No content available."}
-            </p>
-          </div>
-        ) : viewMode === "grid" ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {content.map((item) => (
-              <Card key={item.id} className="group cursor-pointer transition-all hover:shadow-md">
-                <div
-                  onClick={() => {
-                    // Store the original product data, not the mapped content
-                    const originalProduct = products.find((p) => p.id === item.id)
-                    if (originalProduct) {
-                      localStorage.setItem(`cms-product-${item.id}`, JSON.stringify(originalProduct))
-                    }
-                    handleViewSite(item.id)
-                  }}
+        {/* Search and controls */}
+        {!loading && !useMockData && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
+            <form onSubmit={handleSearch} className="flex w-full sm:w-auto items-center space-x-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search content..."
+                  className="pl-8 w-full sm:w-[250px]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <Button type="submit" size="sm">
+                Search
+              </Button>
+            </form>
+            <div className="flex items-center gap-3">
+              <div className="border rounded-md p-1 flex">
+                <Button
+                  variant={viewMode === "grid" ? "default" : "ghost"}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setViewMode("grid")}
                 >
-                  <div className="relative aspect-video overflow-hidden rounded-t-lg">
-                    <Image
-                      src={item.thumbnail || "/placeholder.svg"}
-                      alt={item.title}
-                      fill
-                      className="object-cover transition-transform group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/10" />
-                    <div className="absolute right-2 top-2">
-                      <Badge variant={item.status === "Published" ? "default" : "secondary"}>{item.status}</Badge>
-                    </div>
-                  </div>
-                  <CardContent className="p-4">
-                    <div className="mb-2 flex items-start justify-between">
-                      <h3 className="font-semibold leading-tight">{item.title}</h3>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => handleEditClick(item as any, e)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => handleDeleteClick(item as any, e)}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">ID:</span>
-                        <span>{item.productId}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Location:</span>
-                        <span className="truncate">{item.location}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Operation:</span>
-                        <span className="truncate">{item.operation}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Display:</span>
-                        <Badge variant={item.displayHealth === "ON" ? "default" : "secondary"} className="text-xs">
-                          {item.displayHealth}
-                        </Badge>
-                      </div>
-                      {item.cms && (
-                        <div className="mt-3 space-y-1 border-t pt-2">
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-3 w-3" />
-                            <span className="text-xs">
-                              {item.cms.start_time} - {item.cms.end_time}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Play className="h-3 w-3" />
-                            <span className="text-xs">{item.cms.spot_duration}s duration</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Repeat className="h-3 w-3" />
-                            <span className="text-xs">
-                              {item.cms.loops_per_day} loops/day, {item.cms.spots_per_loop} spots/loop
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </div>
-              </Card>
+                  <LayoutGrid size={18} />
+                </Button>
+                <Button
+                  variant={viewMode === "list" ? "default" : "ghost"}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setViewMode("list")}
+                >
+                  <List size={18} />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading state */}
+        {loading && (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2 text-lg">Loading content...</span>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!loading && content.length === 0 && (
+          <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed">
+            <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <FileText size={24} className="text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">No content yet</h3>
+            <p className="text-gray-500 mb-4">Add your first content item to get started</p>
+            <Button>
+              <Plus size={16} className="mr-2" />
+              Add Content
+            </Button>
+          </div>
+        )}
+
+        {/* Grid View */}
+        {!loading && content.length > 0 && viewMode === "grid" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {content.map((item) => (
+              <ContentCard
+                key={item.id}
+                content={item}
+                onView={() => handleViewDetails(item.id)}
+                onEdit={(e) => handleEditClick(useMockData ? item : products.find((p) => p.id === item.id)!, e)}
+                onDelete={(e) => handleDeleteClick(useMockData ? item : products.find((p) => p.id === item.id)!, e)}
+              />
             ))}
           </div>
-        ) : (
-          <Card>
+        )}
+
+        {/* List View */}
+        {!loading && content.length > 0 && viewMode === "list" && (
+          <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Content</TableHead>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Operation</TableHead>
+                  <TableHead className="w-[80px]">Thumbnail</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Display</TableHead>
-                  <TableHead>Schedule</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead>Last Modified</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {content.map((item) => (
                   <TableRow
                     key={item.id}
-                    className="cursor-pointer"
-                    onClick={() => {
-                      // Store the original product data, not the mapped content
-                      const originalProduct = products.find((p) => p.id === item.id)
-                      if (originalProduct) {
-                        localStorage.setItem(`cms-product-${item.id}`, JSON.stringify(originalProduct))
-                      }
-                      handleViewSite(item.id)
-                    }}
+                    className="cursor-pointer hover:bg-gray-50"
+                    onClick={() => handleViewDetails(item.id)}
                   >
                     <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="relative h-12 w-16 overflow-hidden rounded">
-                          <Image
-                            src={item.thumbnail || "/placeholder.svg"}
-                            alt={item.title}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                        <div>
-                          <div className="font-medium">{item.title}</div>
-                          <div className="text-sm text-muted-foreground">{item.type}</div>
-                        </div>
+                      <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
+                        <Image
+                          src={item.thumbnail || "/placeholder.svg"}
+                          alt={item.title || "Content thumbnail"}
+                          width={48}
+                          height={48}
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = "/abstract-geometric-sculpture.png"
+                            target.className = "opacity-50"
+                          }}
+                        />
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-sm">{item.productId}</TableCell>
-                    <TableCell>{item.location}</TableCell>
-                    <TableCell>{item.operation}</TableCell>
+                    <TableCell className="font-medium">{item.title}</TableCell>
+                    <TableCell>{item.type}</TableCell>
                     <TableCell>
-                      <Badge variant={item.status === "Published" ? "default" : "secondary"}>{item.status}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={item.displayHealth === "ON" ? "default" : "secondary"}>
-                        {item.displayHealth}
+                      <Badge
+                        variant="outline"
+                        className={`${
+                          item.status === "Published"
+                            ? "bg-green-50 text-green-700 border-green-200"
+                            : item.status === "Draft"
+                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                        }`}
+                      >
+                        {item.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      {item.cms ? (
-                        <div className="text-sm">
-                          <div>
-                            {item.cms.start_time} - {item.cms.end_time}
-                          </div>
-                          <div className="text-muted-foreground">
-                            {item.cms.spot_duration}s, {item.cms.loops_per_day} loops
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">Not scheduled</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleViewSite(item.id)
-                            }}
-                          >
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Site
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => handleEditClick(item as any, e)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => handleDeleteClick(item as any, e)}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    <TableCell>{item.dateModified}</TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={(e) =>
+                            handleEditClick(useMockData ? item : products.find((p) => p.id === item.id)!, e)
+                          }
+                        >
+                          <Edit size={16} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={(e) =>
+                            handleDeleteClick(useMockData ? item : products.find((p) => p.id === item.id)!, e)
+                          }
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </Card>
+          </div>
         )}
 
-        {/* Pagination */}
-        {!loading && content.length > 0 && totalPages > 1 && (
-          <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
-            <div className="text-sm text-muted-foreground">
+        {/* Loading More Indicator */}
+        {loadingMore && (
+          <div className="flex justify-center my-4">
+            <div className="flex items-center gap-2">
+              <Loader2 size={18} className="animate-spin" />
+              <span>Loading more...</span>
+            </div>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {!loading && content.length > 0 && (
+          <div className="flex flex-col sm:flex-row justify-between items-center mt-3 gap-4">
+            <div className="text-sm text-gray-500 flex items-center">
               {loadingCount ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading count...
+                <div className="flex items-center">
+                  <Loader2 size={14} className="animate-spin mr-2" />
+                  <span>Calculating pages...</span>
                 </div>
               ) : (
-                `Showing ${(currentPage - 1) * ITEMS_PER_PAGE + 1} to ${Math.min(
-                  currentPage * ITEMS_PER_PAGE,
-                  totalItems,
-                )} of ${totalItems} items`
+                <span>
+                  Page {currentPage} of {totalPages} ({totalItems} items)
+                </span>
               )}
             </div>
 
@@ -756,40 +692,41 @@ export default function CMSDashboardPage() {
                 variant="outline"
                 size="sm"
                 onClick={goToPreviousPage}
-                disabled={currentPage === 1 || loadingMore}
+                disabled={currentPage === 1}
+                className="h-8 w-8 p-0 bg-transparent"
               >
-                <ChevronLeft className="h-4 w-4" />
-                Previous
+                <ChevronLeft size={16} />
               </Button>
 
+              {/* Page numbers */}
               <div className="flex items-center gap-1">
-                {getPageNumbers().map((pageNum, index) => (
-                  <div key={index}>
-                    {pageNum === "..." ? (
-                      <span className="px-2 py-1 text-sm text-muted-foreground">...</span>
-                    ) : (
-                      <Button
-                        variant={currentPage === pageNum ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => goToPage(pageNum as number)}
-                        disabled={loadingMore}
-                        className="h-8 w-8 p-0"
-                      >
-                        {pageNum}
-                      </Button>
-                    )}
-                  </div>
-                ))}
+                {getPageNumbers().map((page, index) =>
+                  page === "..." ? (
+                    <span key={`ellipsis-${index}`} className="px-2">
+                      ...
+                    </span>
+                  ) : (
+                    <Button
+                      key={`page-${page}`}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => goToPage(page as number)}
+                      className="h-8 w-8 p-0"
+                    >
+                      {page}
+                    </Button>
+                  ),
+                )}
               </div>
 
               <Button
                 variant="outline"
                 size="sm"
                 onClick={goToNextPage}
-                disabled={currentPage === totalPages || loadingMore}
+                disabled={currentPage >= totalPages}
+                className="h-8 w-8 p-0"
               >
-                {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : <ChevronRight className="h-4 w-4" />}
-                Next
+                <ChevronRight size={16} />
               </Button>
             </div>
           </div>
@@ -798,11 +735,12 @@ export default function CMSDashboardPage() {
 
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleDeleteConfirm}
         title="Delete Content"
-        description={`Are you sure you want to delete "${productToDelete?.name}"? This action cannot be undone.`}
+        description="This content will be permanently removed. This action cannot be undone."
+        itemName={productToDelete?.name}
       />
     </div>
   )
@@ -868,7 +806,7 @@ function ContentCard({
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={onView}>
                 <Eye className="mr-2 h-4 w-4" />
-                View Site
+                View Details
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onEdit}>
                 <Edit className="mr-2 h-4 w-4" />
@@ -885,6 +823,7 @@ function ContentCard({
 
       <CardContent className="p-3">
         <div className="flex flex-col space-y-2">
+
           {/* Title/Location */}
           <h3 className="text-base font-semibold text-gray-900">{content.title}</h3>
 

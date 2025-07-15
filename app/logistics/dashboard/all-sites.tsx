@@ -1,18 +1,18 @@
 "use client"
 
 import type React from "react"
+
 import { useState, useEffect, useCallback } from "react"
-import { useAuth } from "@/contexts/auth-context"
-import { useToast } from "@/hooks/use-toast"
-import { getPaginatedUserProducts, getUserProductsCount, type Product } from "@/lib/firebase-service"
-import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
+import { LayoutGrid, List, AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-react"
+import Image from "next/image"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Loader2, LayoutGrid, List, AlertCircle, Search } from "lucide-react"
-import Image from "next/image"
-import { useRouter } from "next/navigation"
+import { getPaginatedUserProducts, getUserProductsCount, type Product } from "@/lib/firebase-service"
+import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
+import { useToast } from "@/hooks/use-toast"
 import { CreateReportDialog } from "@/components/create-report-dialog"
+import { useAuth } from "@/contexts/auth-context"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
@@ -42,8 +42,7 @@ export default function AllSitesTab() {
   const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
   const { toast } = useToast()
-  const { userData } = useAuth()
-  const router = useRouter()
+  const { user, projectData } = useAuth()
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     year: "numeric",
@@ -76,11 +75,11 @@ export default function AllSitesTab() {
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
-    if (!userData?.company_id) return
+    if (!user?.uid) return
 
     setLoadingCount(true)
     try {
-      const count = await getUserProductsCount(userData?.company_id, {
+      const count = await getUserProductsCount(user.uid, {
         active: true,
         searchTerm: debouncedSearchTerm,
       })
@@ -92,12 +91,12 @@ export default function AllSitesTab() {
     } finally {
       setLoadingCount(false)
     }
-  }, [userData?.company_id, debouncedSearchTerm])
+  }, [user?.uid, debouncedSearchTerm])
 
   // Fetch products for the current page
   const fetchProducts = useCallback(
     async (page: number, forceRefresh = false) => {
-      if (!userData?.company_id) return
+      if (!user?.uid) return
 
       // Check if we have this page in cache and not forcing refresh
       if (!forceRefresh && pageCache.has(page)) {
@@ -116,7 +115,7 @@ export default function AllSitesTab() {
         // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
-        const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, {
+        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, {
           active: true,
           searchTerm: debouncedSearchTerm,
         })
@@ -142,23 +141,23 @@ export default function AllSitesTab() {
         setLoadingMore(false)
       }
     },
-    [userData?.company_id, lastDoc, pageCache, debouncedSearchTerm],
+    [user?.uid, lastDoc, pageCache, debouncedSearchTerm],
   )
 
   // Load initial data and count
   useEffect(() => {
-    if (userData?.company_id) {
+    if (user?.uid) {
       fetchProducts(1)
       fetchTotalCount()
     }
-  }, [userData?.company_id, fetchProducts, fetchTotalCount])
+  }, [user?.uid, fetchProducts, fetchTotalCount])
 
   // Load data when page changes
   useEffect(() => {
-    if (currentPage > 0 && userData?.company_id) {
+    if (currentPage > 0 && user?.uid) {
       fetchProducts(currentPage)
     }
-  }, [currentPage, fetchProducts, userData?.company_id])
+  }, [currentPage, fetchProducts, user?.uid])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -285,7 +284,7 @@ export default function AllSitesTab() {
   }
 
   // Show loading if no user
-  if (!userData?.company_id) {
+  if (!user) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />

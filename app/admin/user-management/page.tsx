@@ -2,25 +2,14 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { UserPlus, Settings, Mail, Shield } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { ResponsiveTable } from "@/components/responsive-table"
-import { useRouter } from "next/navigation"
-import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
+import Link from "next/link"
 
 interface User {
   id: string
@@ -33,21 +22,12 @@ interface User {
 }
 
 export default function UserManagementPage() {
-  const { userData, refreshUserData } = useAuth()
+  const { userData } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
-  const [isCompanyRegistrationDialogOpen, setIsCompanyRegistrationDialogOpen] = useState(false)
-  const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  const [isEditRolesDialogOpen, setIsEditRolesDialogOpen] = useState(false)
-  const [selectedRoles, setSelectedRoles] = useState<Record<string, boolean>>({})
-
-  const router = useRouter()
 
   useEffect(() => {
-    if (!userData?.company_id) {
-      setLoading(false)
-      return
-    }
+    if (!userData?.company_id) return
 
     const q = query(collection(db, "iboard_users"), where("company_id", "==", userData.company_id))
 
@@ -57,11 +37,8 @@ export default function UserManagementPage() {
         return {
           id: doc.id,
           email: data.email || "",
-          displayName:
-            data.first_name && data.last_name
-              ? `${data.first_name} ${data.last_name}`
-              : data.display_name || data.displayName || "Unknown User",
-          role: String(data.role || "user"),
+          displayName: data.display_name || data.displayName || "Unknown User",
+          role: String(data.role || "user"), // Ensure role is always a string
           status: data.active === false ? "inactive" : "active",
           lastLogin: data.lastLogin?.toDate() || null,
           created: data.created?.toDate() || new Date(),
@@ -74,15 +51,8 @@ export default function UserManagementPage() {
     return () => unsubscribe()
   }, [userData?.company_id])
 
-  const handleActionWithCompanyCheck = (actionCallback: () => void) => {
-    if (!userData?.company_id) {
-      setIsCompanyRegistrationDialogOpen(true)
-    } else {
-      actionCallback()
-    }
-  }
-
   const getStatusBadge = (status: string) => {
+    // Ensure status is a string
     const statusStr = String(status || "unknown")
 
     switch (statusStr) {
@@ -96,6 +66,7 @@ export default function UserManagementPage() {
   }
 
   const getRoleBadge = (role: string) => {
+    // Ensure role is a string and provide fallback
     const roleStr = String(role || "user").toLowerCase()
 
     const roleColors = {
@@ -110,27 +81,6 @@ export default function UserManagementPage() {
         {roleStr.charAt(0).toUpperCase() + roleStr.slice(1)}
       </Badge>
     )
-  }
-
-  const handleEditRoles = (user: User) => {
-    handleActionWithCompanyCheck(() => {
-      setSelectedUser(user)
-      const initialSelectedRoles: Record<string, boolean> = {}
-      const dummyRoles = [
-        { id: "admin", name: "Admin", description: "Administrator" },
-        { id: "user", name: "User", description: "Standard User" },
-      ]
-      dummyRoles.forEach((role) => {
-        initialSelectedRoles[role.id] = false
-      })
-      setSelectedRoles(initialSelectedRoles)
-      setIsEditRolesDialogOpen(true)
-    })
-  }
-
-  const handleSaveRoles = async () => {
-    console.log("Saving roles for", selectedUser?.email)
-    setIsEditRolesDialogOpen(false)
   }
 
   const columns = [
@@ -171,7 +121,7 @@ export default function UserManagementPage() {
       label: "Actions",
       render: (user: User) => (
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => handleEditRoles(user)}>
+          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
             <Settings className="h-4 w-4" />
           </Button>
         </div>
@@ -203,105 +153,39 @@ export default function UserManagementPage() {
     <div className="container mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">User Management ({users.length})</h1>
+          <h1 className="text-2xl font-bold">User Management</h1>
           <p className="text-muted-foreground">Manage users and their permissions.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            className="gap-2 bg-transparent"
-            onClick={() => handleActionWithCompanyCheck(() => router.push("/admin/access-management"))}
-          >
-            <Shield className="h-4 w-4" />
-            Roles & Access
-          </Button>
-          <Button
-            variant="outline"
-            className="gap-2 bg-transparent"
-            onClick={() => handleActionWithCompanyCheck(() => router.push("/admin/invitation-codes"))}
-          >
-            <Mail className="h-4 w-4" />
-            Generate Codes
-          </Button>
-          <Button
-            className="gap-2"
-            onClick={() =>
-              handleActionWithCompanyCheck(() => {
-                console.log("Add User clicked, company_id exists. Implement add user dialog/page here.")
-              })
-            }
-          >
+          <Link href="/admin/access-management">
+            <Button variant="outline" className="gap-2 bg-transparent">
+              <Shield className="h-4 w-4" />
+              Roles & Permissions
+            </Button>
+          </Link>
+          <Link href="/admin/invitation-codes">
+            <Button variant="outline" className="gap-2 bg-transparent">
+              <Mail className="h-4 w-4" />
+              Invitation Codes
+            </Button>
+          </Link>
+          <Button className="gap-2">
             <UserPlus className="h-4 w-4" />
             Add User
           </Button>
         </div>
       </div>
 
+      {/* Users Table */}
       <Card>
+        <CardHeader>
+          <CardTitle>Organization Users ({users.length})</CardTitle>
+          <CardDescription>Manage users within your organization</CardDescription>
+        </CardHeader>
         <CardContent>
           <ResponsiveTable data={users} columns={columns} keyField="id" />
         </CardContent>
       </Card>
-
-      <CompanyRegistrationDialog
-        isOpen={isCompanyRegistrationDialogOpen}
-        onClose={() => setIsCompanyRegistrationDialogOpen(false)}
-        onSuccess={() => {
-          setIsCompanyRegistrationDialogOpen(false)
-          refreshUserData()
-        }}
-      />
-
-      <Dialog open={isEditRolesDialogOpen} onOpenChange={setIsEditRolesDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit User Roles</DialogTitle>
-            <DialogDescription>
-              {selectedUser && (
-                <span>
-                  Manage roles for <strong>{selectedUser.displayName || selectedUser.email}</strong>
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="role-admin"
-                  checked={selectedRoles["admin"] || false}
-                  onCheckedChange={(checked) => setSelectedRoles((prev) => ({ ...prev, admin: checked === true }))}
-                />
-                <Label htmlFor="role-admin" className="flex-1">
-                  <div>Admin</div>
-                  <div className="text-sm text-muted-foreground">Full access to all features</div>
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="role-user"
-                  checked={selectedRoles["user"] || false}
-                  onCheckedChange={(checked) => setSelectedRoles((prev) => ({ ...prev, user: checked === true }))}
-                />
-                <Label htmlFor="role-user" className="flex-1">
-                  <div>User</div>
-                  <div className="text-sm text-muted-foreground">Standard user access</div>
-                </Label>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="sm:justify-end">
-            <Button variant="outline" onClick={() => setIsEditRolesDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveRoles} disabled={loading}>
-              {loading ? "Saving..." : "Save Changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
