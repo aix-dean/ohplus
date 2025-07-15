@@ -28,6 +28,7 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [invitationRole, setInvitationRole] = useState<string | null>(null)
   const [loadingInvitation, setLoadingInvitation] = useState(false)
+  const [registrationComplete, setRegistrationComplete] = useState(false)
 
   const { register, user, userData, loading: authLoading } = useAuth()
   const router = useRouter()
@@ -35,6 +36,16 @@ export default function RegisterPage() {
 
   // Get organization code from URL parameters
   const orgCode = searchParams.get("orgCode")
+
+  // Debug logging for auth state
+  useEffect(() => {
+    console.log("Auth state debug:", {
+      user: !!user,
+      userData: !!userData,
+      authLoading,
+      registrationComplete,
+    })
+  }, [user, userData, authLoading, registrationComplete])
 
   // Fetch invitation details when orgCode is present
   useEffect(() => {
@@ -74,14 +85,18 @@ export default function RegisterPage() {
     fetchInvitationDetails()
   }, [orgCode])
 
-  // Add this useEffect after the existing useEffect for invitation details
+  // Handle redirect after successful registration
   useEffect(() => {
-    // Redirect to dashboard after successful registration when user and userData are available
-    if (user && userData && !loading) {
-      console.log("User authenticated after registration, redirecting to dashboard...")
+    if (registrationComplete && user && userData) {
+      console.log("All conditions met for redirect:", {
+        registrationComplete,
+        user: !!user,
+        userData: !!userData,
+      })
+      console.log("Redirecting to admin dashboard...")
       router.push("/admin/dashboard")
     }
-  }, [user, userData, loading, router])
+  }, [registrationComplete, user, userData, router])
 
   const getFriendlyErrorMessage = (error: unknown): string => {
     console.error("Raw error during registration:", error)
@@ -196,16 +211,32 @@ export default function RegisterPage() {
 
       console.log("Registration completed successfully")
       setErrorMessage(null)
+      setRegistrationComplete(true)
 
-      // Don't navigate immediately - let the auth state update handle it
-      // The useEffect in auth context will update the user state
-      // and AuthLayout will handle the navigation
+      // Show success message while waiting for redirect
+      console.log("Registration complete, waiting for auth state to update...")
     } catch (error: unknown) {
       console.error("Registration failed:", error)
       setErrorMessage(getFriendlyErrorMessage(error))
+      setRegistrationComplete(false)
     } finally {
       setLoading(false)
     }
+  }
+
+  // Show success state if registration is complete but still waiting for redirect
+  if (registrationComplete && !userData) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center justify-center p-6">
+            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-blue-600 mb-4"></div>
+            <h2 className="text-xl font-semibold mb-2">Registration Successful!</h2>
+            <p className="text-gray-600 text-center">Setting up your account...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (

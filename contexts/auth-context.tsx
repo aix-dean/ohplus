@@ -354,6 +354,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const userCredential = await createUserWithEmailAndPassword(auth, personalInfo.email, password)
       const firebaseUser = userCredential.user
+      console.log("Firebase user created:", firebaseUser.uid)
       setUser(firebaseUser)
 
       let licenseKey = generateLicenseKey()
@@ -424,8 +425,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         project_id: orgCode ? null : firebaseUser.uid,
       }
 
+      console.log("Creating user document:", userData)
+      await setDoc(userDocRef, userData)
+
       if (!orgCode) {
         const projectDocRef = doc(db, "projects", firebaseUser.uid)
+        console.log("Creating project document for user:", firebaseUser.uid)
         await setDoc(projectDocRef, {
           company_name: companyInfo.company_name,
           company_location: companyInfo.company_location,
@@ -436,15 +441,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
       }
 
-      await setDoc(userDocRef, userData)
+      console.log("Fetching user data after registration...")
       await fetchUserData(firebaseUser)
-      // Navigation will be handled by the component or auth state change
-      // Don't navigate here as it can cause timing issues
       console.log("Registration completed successfully with tenant ID:", auth.tenantId)
     } catch (error) {
       console.error("Error in AuthContext register:", error)
       setLoading(false)
       throw error
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -506,12 +511,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     console.log("Setting up auth state listener with tenant ID:", auth.tenantId)
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      console.log("Auth state changed:", firebaseUser ? `user logged in: ${firebaseUser.uid}` : "user logged out")
+
       if (firebaseUser) {
-        console.log("Auth state changed: user logged in", firebaseUser.uid)
         setUser(firebaseUser)
 
         const isOHPlusAccount = await findOHPlusAccount(firebaseUser.uid)
         if (isOHPlusAccount) {
+          console.log("OHPLUS account found, fetching user data...")
           await fetchUserData(firebaseUser)
         } else {
           console.log("No OHPLUS account found, signing out")
