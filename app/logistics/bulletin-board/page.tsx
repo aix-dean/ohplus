@@ -57,12 +57,13 @@ export default function LogisticsBulletinBoard() {
 
     try {
       setError(null)
-      console.log("Fetching products for OHPLUS user:", userData.uid)
+      console.log("Fetching products for OHPLUS user:", user.uid) // This should now be the OHPLUS UID
       console.log("User company_id:", userData.company_id)
       console.log("User type:", userData.type)
+      console.log("Effective User ID:", getEffectiveUserId())
 
       // Use company_id if available, otherwise fall back to OHPLUS user ID
-      const queryCompanyId = userData.company_id || userData.uid
+      const queryCompanyId = userData.company_id || user.uid // user.uid is now the OHPLUS UID
       console.log("Querying products with company_id:", queryCompanyId)
 
       // Query products collection directly
@@ -216,13 +217,19 @@ export default function LogisticsBulletinBoard() {
             <p>
               <strong>Debug Info:</strong>
             </p>
-            <p>Firebase Auth User ID: {user?.uid}</p>
-            <p>OHPLUS User ID: {userData.uid}</p>
+            <p>User UID (should be OHPLUS): {user?.uid}</p>
+            <p>Firebase Auth UID: {(user as any)?.firebaseAuthUid}</p>
+            <p>UserData UID: {userData.uid}</p>
             <p>Effective User ID: {getEffectiveUserId()}</p>
             <p>User Type: {userData.type}</p>
             <p>Company ID: {userData.company_id || "Not set"}</p>
             <p>Products loaded: {products.length}</p>
             <p>Filtered products: {filteredProducts.length}</p>
+            <p>
+              <strong>UID Verification:</strong>
+            </p>
+            <p>✅ user.uid === userData.uid: {user.uid === userData.uid ? "TRUE" : "FALSE"}</p>
+            <p>✅ user.uid === getEffectiveUserId(): {user.uid === getEffectiveUserId() ? "TRUE" : "FALSE"}</p>
           </div>
         )}
       </div>
@@ -313,6 +320,7 @@ export default function LogisticsBulletinBoard() {
                   <div className="text-xs text-gray-400">
                     <p>Product ID: {product.id}</p>
                     <p>Seller ID: {product.seller_id}</p>
+                    <p>Company ID: {product.company_id}</p>
                   </div>
 
                   <div className="flex gap-2 pt-2">
