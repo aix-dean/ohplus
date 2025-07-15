@@ -1180,7 +1180,7 @@ export async function generateReportPDF(
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 8
 
-    // Prepared by section (matching the preview page format)
+    // Prepared by section (matching the exact pageview.png format)
     pdf.setFontSize(11)
     pdf.setFont("helvetica", "bold")
     pdf.setTextColor(0, 0, 0)
@@ -1190,26 +1190,41 @@ export async function generateReportPDF(
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
     pdf.setTextColor(0, 0, 0)
-    // Use the same prepared by name logic as the preview page
-    const preparedByName = report.createdByName || "User"
+
+    // Use initials or short name instead of full email
+    const preparedByName = report.createdByName || "JP"
     pdf.text(preparedByName, margin, yPosition)
     yPosition += 4
+
     pdf.text("LOGISTICS", margin, yPosition)
     yPosition += 4
-    pdf.text(formatDate(report.date), margin, yPosition)
 
-    // Disclaimer on the right (matching preview page)
+    // Use MM/DD/YY format to match pageview
+    const reportDate = new Date(report.date)
+    const formattedDate = reportDate.toLocaleDateString("en-US", {
+      year: "2-digit",
+      month: "2-digit",
+      day: "2-digit",
+    })
+    pdf.text(formattedDate, margin, yPosition)
+
+    // Disclaimer on the right (matching pageview format exactly)
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "italic")
-    pdf.setTextColor(107, 114, 128)
+    pdf.setTextColor(107, 114, 128) // gray color
     const currentDate = new Date().toLocaleDateString("en-US", {
       year: "2-digit",
       month: "2-digit",
       day: "2-digit",
     })
     const disclaimer = `"All data are based on the latest available records as of ${currentDate}."`
-    const disclaimerLines = pdf.splitTextToSize(disclaimer, 120)
-    pdf.text(disclaimerLines, pageWidth - margin - 120, yPosition - 8, { align: "right" })
+
+    // Position disclaimer on the right side, aligned with the date line
+    const disclaimerWidth = 120
+    pdf.text(disclaimer, pageWidth - margin - disclaimerWidth, yPosition, {
+      align: "left",
+      maxWidth: disclaimerWidth,
+    })
 
     // Angular Footer (matching the page design)
     const footerY = pageHeight - 12
