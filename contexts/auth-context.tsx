@@ -357,7 +357,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       let licenseKey = generateLicenseKey()
       let companyId = null
-      let userRole = "user" // Default role
 
       if (orgCode) {
         const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
@@ -369,7 +368,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           licenseKey = invitationData.license_key || licenseKey
           companyId = invitationData.company_id || null
-          userRole = invitationData.role || "user" // Get role from invitation code
 
           const updateData: any = {
             used: true,
@@ -393,7 +391,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         uid: firebaseUser.uid,
         license_key: licenseKey,
         company_id: companyId,
-        role: userRole, // Use the role from invitation code or default
+        role: "user",
         permissions: [],
         type: "OHPLUS",
         created: serverTimestamp(),
