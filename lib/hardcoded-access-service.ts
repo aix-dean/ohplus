@@ -1,85 +1,188 @@
 import { db } from "@/lib/firebase"
-import { collection, doc, getDocs, query, where, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore"
+import { collection, doc, getDocs, query, where, setDoc, deleteDoc } from "firebase/firestore"
 
+// Hardcoded role definitions
 export type RoleType = "admin" | "sales" | "logistics" | "cms"
 
-export interface Role {
+export interface HardcodedRole {
   id: RoleType
   name: string
   description: string
+  permissions: Permission[]
   color: string
-  permissions: string[]
+}
+
+export interface Permission {
+  module: string
+  actions: ("view" | "create" | "edit" | "delete")[]
+  description: string
 }
 
 export interface UserRole {
-  uid: string
-  role: RoleType
-  assigned_by: string
-  assigned_at: any
-  updated_at: any
+  userId: string
+  roleId: RoleType
+  assignedAt: number
+  assignedBy?: string
 }
 
-export interface HardcodedRole extends Role {}
-
 // Hardcoded roles with their permissions
-export const HARDCODED_ROLES: Record<RoleType, Role> = {
+export const HARDCODED_ROLES: Record<RoleType, HardcodedRole> = {
   admin: {
     id: "admin",
-    name: "Admin",
-    description: "Full system access and user management",
-    color: "red",
+    name: "Administrator",
+    description: "Full system access with all administrative privileges",
+    color: "purple",
     permissions: [
-      "admin.dashboard",
-      "admin.users",
-      "admin.access",
-      "admin.subscriptions",
-      "admin.invitations",
-      "admin.documents",
-      "admin.inventory",
-      "admin.products",
-      "sales.*",
-      "logistics.*",
-      "cms.*",
+      {
+        module: "admin",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Full admin panel access",
+      },
+      {
+        module: "sales",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Full sales module access",
+      },
+      {
+        module: "logistics",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Full logistics module access",
+      },
+      {
+        module: "cms",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Full CMS module access",
+      },
+      {
+        module: "user-management",
+        actions: ["view", "create", "edit", "delete"],
+        description: "User and role management",
+      },
+      {
+        module: "system-settings",
+        actions: ["view", "create", "edit", "delete"],
+        description: "System configuration and settings",
+      },
     ],
   },
   sales: {
     id: "sales",
-    name: "Sales",
-    description: "Client management, proposals, and quotations",
-    color: "blue",
+    name: "Sales Team",
+    description: "Access to sales module and client management",
+    color: "green",
     permissions: [
-      "sales.dashboard",
-      "sales.clients",
-      "sales.proposals",
-      "sales.quotations",
-      "sales.bookings",
-      "sales.products",
-      "sales.campaigns",
-      "sales.chat",
-      "sales.planner",
+      {
+        module: "sales",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Full sales module access",
+      },
+      {
+        module: "clients",
+        actions: ["view", "create", "edit"],
+        description: "Client management (no delete)",
+      },
+      {
+        module: "proposals",
+        actions: ["view", "create", "edit"],
+        description: "Proposal management",
+      },
+      {
+        module: "quotations",
+        actions: ["view", "create", "edit"],
+        description: "Quotation management",
+      },
+      {
+        module: "bookings",
+        actions: ["view", "create", "edit"],
+        description: "Booking management",
+      },
+      {
+        module: "products",
+        actions: ["view"],
+        description: "Product catalog viewing",
+      },
+      {
+        module: "chat",
+        actions: ["view", "create"],
+        description: "Customer chat access",
+      },
     ],
   },
   logistics: {
     id: "logistics",
-    name: "Logistics",
-    description: "Site management, assignments, and reports",
-    color: "green",
+    name: "Logistics Team",
+    description: "Access to logistics operations and site management",
+    color: "blue",
     permissions: [
-      "logistics.dashboard",
-      "logistics.sites",
-      "logistics.assignments",
-      "logistics.reports",
-      "logistics.alerts",
-      "logistics.planner",
-      "logistics.bulletin",
+      {
+        module: "logistics",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Full logistics module access",
+      },
+      {
+        module: "sites",
+        actions: ["view", "create", "edit"],
+        description: "Site management",
+      },
+      {
+        module: "assignments",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Service assignment management",
+      },
+      {
+        module: "reports",
+        actions: ["view", "create", "edit"],
+        description: "Report management",
+      },
+      {
+        module: "alerts",
+        actions: ["view", "create", "edit"],
+        description: "Alert management",
+      },
+      {
+        module: "planner",
+        actions: ["view", "create", "edit"],
+        description: "Logistics planning",
+      },
+      {
+        module: "weather",
+        actions: ["view"],
+        description: "Weather data access",
+      },
     ],
   },
   cms: {
     id: "cms",
-    name: "CMS",
-    description: "Content creation and media management",
-    color: "purple",
-    permissions: ["cms.dashboard", "cms.content", "cms.media", "cms.planner", "cms.orders", "cms.sites"],
+    name: "Content Management",
+    description: "Access to content creation and management",
+    color: "orange",
+    permissions: [
+      {
+        module: "cms",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Full CMS module access",
+      },
+      {
+        module: "content",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Content creation and editing",
+      },
+      {
+        module: "orders",
+        actions: ["view", "create", "edit"],
+        description: "Content order management",
+      },
+      {
+        module: "planner",
+        actions: ["view", "create", "edit"],
+        description: "Content planning",
+      },
+      {
+        module: "media",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Media asset management",
+      },
+    ],
   },
 }
 
@@ -89,7 +192,7 @@ export function getAllRoles(): HardcodedRole[] {
 }
 
 // Get role by ID
-export function getRoleById(roleId: RoleType): Role | null {
+export function getRoleById(roleId: RoleType): HardcodedRole | null {
   return HARDCODED_ROLES[roleId] || null
 }
 
@@ -97,14 +200,14 @@ export function getRoleById(roleId: RoleType): Role | null {
 export async function getUserRoles(userId: string): Promise<RoleType[]> {
   try {
     const userRolesCollection = collection(db, "user_roles")
-    const userRolesQuery = query(userRolesCollection, where("uid", "==", userId))
+    const userRolesQuery = query(userRolesCollection, where("userId", "==", userId))
     const userRolesSnapshot = await getDocs(userRolesQuery)
 
     const roles: RoleType[] = []
     userRolesSnapshot.forEach((doc) => {
       const data = doc.data()
-      if (data.role && HARDCODED_ROLES[data.role as RoleType]) {
-        roles.push(data.role as RoleType)
+      if (data.roleId && HARDCODED_ROLES[data.roleId as RoleType]) {
+        roles.push(data.roleId as RoleType)
       }
     })
 
@@ -116,21 +219,35 @@ export async function getUserRoles(userId: string): Promise<RoleType[]> {
 }
 
 // Assign role to user
-export async function assignRoleToUser(uid: string, roleId: RoleType, assignedBy: string): Promise<void> {
+export async function assignRoleToUser(userId: string, roleId: RoleType, assignedBy?: string): Promise<void> {
   try {
-    const userRoleRef = doc(db, "user_roles", `${uid}_${roleId}`)
-    await setDoc(userRoleRef, {
-      uid,
-      role: roleId,
-      assigned_by: assignedBy,
-      assigned_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
-    })
+    // Check if role exists
+    if (!HARDCODED_ROLES[roleId]) {
+      throw new Error(`Role ${roleId} does not exist`)
+    }
 
-    console.log(`Role ${roleId} assigned to user ${uid}`)
+    // Check if user already has this role
+    const existingRoles = await getUserRoles(userId)
+    if (existingRoles.includes(roleId)) {
+      console.log(`User ${userId} already has role ${roleId}`)
+      return
+    }
+
+    // Create a unique document ID
+    const docId = `${userId}_${roleId}`
+
+    const userRoleData: UserRole = {
+      userId,
+      roleId,
+      assignedAt: Date.now(),
+      assignedBy,
+    }
+
+    await setDoc(doc(db, "user_roles", docId), userRoleData)
+    console.log(`Role ${roleId} assigned to user ${userId}`)
   } catch (error) {
-    console.error("Error assigning role:", error)
-    throw error
+    console.error("Error assigning role to user:", error)
+    throw new Error("Failed to assign role to user")
   }
 }
 
@@ -147,7 +264,11 @@ export async function removeRoleFromUser(userId: string, roleId: RoleType): Prom
 }
 
 // Check if user has permission
-export async function hasPermission(userId: string, module: string, action: string): Promise<boolean> {
+export async function hasPermission(
+  userId: string,
+  module: string,
+  action: "view" | "create" | "edit" | "delete",
+): Promise<boolean> {
   try {
     const userRoles = await getUserRoles(userId)
 
@@ -161,8 +282,8 @@ export async function hasPermission(userId: string, module: string, action: stri
       if (!role) continue
 
       // Check if role has permission for this module and action
-      const permission = role.permissions.find((p) => p === `${module}.${action}` || p === `${module}.*`)
-      if (permission) {
+      const permission = role.permissions.find((p) => p.module === module)
+      if (permission && permission.actions.includes(action)) {
         return true
       }
     }
@@ -194,12 +315,12 @@ export async function isAdmin(userId: string): Promise<boolean> {
 export async function getUsersWithRole(roleId: RoleType): Promise<string[]> {
   try {
     const userRolesCollection = collection(db, "user_roles")
-    const roleQuery = query(userRolesCollection, where("role", "==", roleId))
+    const roleQuery = query(userRolesCollection, where("roleId", "==", roleId))
     const roleSnapshot = await getDocs(roleQuery)
 
     const userIds: string[] = []
     roleSnapshot.forEach((doc) => {
-      userIds.push(doc.data().uid)
+      userIds.push(doc.data().userId)
     })
 
     return userIds
@@ -228,21 +349,35 @@ export async function getAllUserRoleAssignments(): Promise<UserRole[]> {
 }
 
 // Get user's effective permissions (combined from all roles)
-export async function getUserPermissions(userId: string): Promise<string[]> {
+export async function getUserPermissions(userId: string): Promise<Permission[]> {
   try {
     const userRoles = await getUserRoles(userId)
-    const allPermissions: string[] = []
+    const allPermissions: Permission[] = []
+    const permissionMap = new Map<string, Permission>()
 
     // Collect all permissions from user's roles
     for (const roleId of userRoles) {
       const role = HARDCODED_ROLES[roleId]
       if (role) {
-        allPermissions.push(...role.permissions)
+        for (const permission of role.permissions) {
+          const key = permission.module
+          const existing = permissionMap.get(key)
+
+          if (!existing) {
+            permissionMap.set(key, { ...permission })
+          } else {
+            // Merge actions (union of all actions)
+            const mergedActions = Array.from(new Set([...existing.actions, ...permission.actions]))
+            permissionMap.set(key, {
+              ...existing,
+              actions: mergedActions as ("view" | "create" | "edit" | "delete")[],
+            })
+          }
+        }
       }
     }
 
-    // Remove duplicates
-    return Array.from(new Set(allPermissions))
+    return Array.from(permissionMap.values())
   } catch (error) {
     console.error("Error getting user permissions:", error)
     return []

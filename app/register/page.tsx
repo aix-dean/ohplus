@@ -2,427 +2,360 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import Image from "next/image"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
-import { useAuth } from "@/contexts/auth-context"
-import { toast } from "@/components/ui/use-toast"
-import { Eye, EyeOff, User, Building, Lock, CheckCircle } from "lucide-react"
-import Link from "next/link"
-import { collection, query, where, getDocs } from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import { getRoleById, type RoleType } from "@/lib/hardcoded-access-service"
+import { FirebaseError } from "firebase/app"
+import { Eye, EyeOff } from "lucide-react"
 
 export default function RegisterPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { register, loading } = useAuth()
-
-  const [step, setStep] = useState(1)
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  // Form data
-  const [personalInfo, setPersonalInfo] = useState({
-    email: "",
-    first_name: "",
-    last_name: "",
-    middle_name: "",
-    phone_number: "",
-    gender: "",
-  })
-
-  const [companyInfo, setCompanyInfo] = useState({
-    company_name: "",
-    company_location: "",
-  })
-
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [orgCode, setOrgCode] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [middleName, setMiddleName] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("+63 ")
+  const [loading, setLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
-  // Invitation code data
-  const [invitationData, setInvitationData] = useState<{
-    company_name?: string
-    role_id?: RoleType
-    role_name?: string
-  } | null>(null)
+  const { register } = useAuth()
+  const router = useRouter()
+  const searchParams = useSearchParams()
 
-  // Get org code from URL params
-  useEffect(() => {
-    const code = searchParams.get("code")
-    if (code) {
-      setOrgCode(code)
-      checkInvitationCode(code)
-    }
-  }, [searchParams])
+  // Get organization code from URL parameters
+  const orgCode = searchParams.get("orgCode")
 
-  const checkInvitationCode = async (code: string) => {
-    if (!code) return
-
-    try {
-      const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", code))
-      const invitationSnapshot = await getDocs(invitationQuery)
-
-      if (!invitationSnapshot.empty) {
-        const data = invitationSnapshot.docs[0].data()
-        const role = data.role_id ? getRoleById(data.role_id) : null
-
-        setInvitationData({
-          company_name: data.company_name,
-          role_id: data.role_id,
-          role_name: role?.name,
-        })
+  const getFriendlyErrorMessage = (error: unknown): string => {
+    console.error("Raw error during registration:", error)
+    if (error instanceof FirebaseError) {
+      switch (error.code) {
+        case "auth/email-already-in-use":
+          return "This email address is already in use. Please use a different email or log in."
+        case "auth/invalid-email":
+          return "The email address is not valid. Please check the format."
+        case "auth/weak-password":
+          return "The password is too weak. Please choose a stronger password (at least 6 characters)."
+        case "auth/operation-not-allowed":
+          return "Email/password accounts are not enabled. Please contact support."
+        case "auth/network-request-failed":
+          return "Network error. Please check your internet connection and try again."
+        default:
+          return "An unexpected error occurred during registration. Please try again."
       }
-    } catch (error) {
-      console.error("Error checking invitation code:", error)
     }
+    return "An unknown error occurred. Please try again."
   }
 
-  const validateStep1 = () => {
-    const { email, first_name, last_name, phone_number, gender } = personalInfo
-    return email && first_name && last_name && phone_number && gender
-  }
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
 
-  const validateStep2 = () => {
-    if (invitationData) return true // Skip company info if using invitation
-    const { company_name, company_location } = companyInfo
-    return company_name && company_location
-  }
-
-  const validateStep3 = () => {
-    return password && confirmPassword && password === confirmPassword && password.length >= 6
-  }
-
-  const handleNext = () => {
-    if (step === 1 && validateStep1()) {
-      setStep(2)
-    } else if (step === 2 && validateStep2()) {
-      setStep(3)
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!validateStep3()) {
-      toast({
-        variant: "destructive",
-        title: "Validation Error",
-        description: "Please check your password entries.",
-      })
+    // Always ensure it starts with +63
+    if (!value.startsWith("+63 ")) {
+      setPhoneNumber("+63 ")
       return
     }
 
-    setIsSubmitting(true)
+    // Extract only the numbers after +63
+    const numbersOnly = value.slice(4).replace(/\D/g, "")
 
+    // Limit to 10 digits
+    if (numbersOnly.length <= 10) {
+      setPhoneNumber("+63 " + numbersOnly)
+    }
+  }
+
+  const isPhoneNumberValid = () => {
+    const numbersOnly = phoneNumber.slice(4).replace(/\D/g, "")
+    return numbersOnly.length === 10
+  }
+
+  // Add these state variables and helper functions for password strength
+  const passwordCriteria = {
+    minLength: password.length >= 8,
+    hasLowerCase: /[a-z]/.test(password),
+    hasUpperCase: /[A-Z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    hasSpecialChar: /[^a-zA-Z0-9]/.test(password),
+  }
+
+  const passwordStrengthScore = Object.values(passwordCriteria).filter(Boolean).length
+
+  const getBarColorClass = (score: number) => {
+    if (score === 0) return "bg-gray-300"
+    if (score <= 2) return "bg-red-500"
+    if (score <= 4) return "bg-yellow-500"
+    return "bg-green-500"
+  }
+
+  const getStrengthText = (score: number) => {
+    if (score === 0) return "Enter a password"
+    if (score <= 2) return "Weak"
+    if (score <= 4) return "Moderate"
+    return "Strong"
+  }
+
+  const handleRegister = async () => {
+    setErrorMessage(null)
+
+    if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
+      setErrorMessage("Please fill in all required fields.")
+      return
+    }
+
+    if (!isPhoneNumberValid()) {
+      setErrorMessage("Phone number must be exactly 10 digits after +63.")
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setErrorMessage("Passwords do not match.")
+      return
+    }
+
+    setLoading(true)
     try {
-      await register(personalInfo, companyInfo, password, orgCode || undefined)
-
-      toast({
-        title: "Registration Successful",
-        description: "Welcome! Your account has been created successfully.",
-      })
-
-      router.push("/dashboard")
-    } catch (error: any) {
-      console.error("Registration error:", error)
-
-      let errorMessage = "Registration failed. Please try again."
-
-      if (error.code === "auth/email-already-in-use") {
-        errorMessage = "An account with this email already exists."
-      } else if (error.code === "auth/weak-password") {
-        errorMessage = "Password should be at least 6 characters."
-      } else if (error.code === "auth/invalid-email") {
-        errorMessage = "Please enter a valid email address."
-      }
-
-      toast({
-        variant: "destructive",
-        title: "Registration Failed",
-        description: errorMessage,
-      })
+      await register(
+        {
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          middle_name: middleName,
+          phone_number: phoneNumber,
+          gender: "",
+        },
+        {
+          company_name: "",
+          company_location: "",
+        },
+        password,
+        orgCode || undefined, // Pass the organization code if available
+      )
+      setErrorMessage(null)
+      const redirectUrl = orgCode
+        ? "/admin/dashboard?registered=true&joined_org=true"
+        : "/admin/dashboard?registered=true"
+      router.push(redirectUrl)
+    } catch (error: unknown) {
+      setErrorMessage(getFriendlyErrorMessage(error))
     } finally {
-      setIsSubmitting(false)
+      setLoading(false)
     }
-  }
-
-  const getRoleBadge = (roleId: RoleType) => {
-    const colorClasses = {
-      admin: "bg-purple-100 text-purple-800",
-      sales: "bg-green-100 text-green-800",
-      logistics: "bg-blue-100 text-blue-800",
-      cms: "bg-orange-100 text-orange-800",
-    }
-
-    return <Badge className={colorClasses[roleId]}>{invitationData?.role_name}</Badge>
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-          <CardDescription>
-            {invitationData ? (
+    <div className="flex min-h-screen flex-col lg:flex-row">
+      {/* Left Panel - Image */}
+      <div className="relative hidden w-full items-center justify-center bg-gray-900 sm:flex lg:w-[40%]">
+        <Image
+          src="/registration-background.png"
+          alt="Background"
+          layout="fill"
+          objectFit="cover"
+          className="absolute inset-0 z-0 opacity-50"
+        />
+      </div>
+
+      {/* Right Panel - Form */}
+      <div className="flex w-full items-center justify-center bg-white p-4 dark:bg-gray-950 sm:p-6 lg:w-[60%] lg:p-8">
+        <Card className="w-full max-w-md border-none shadow-none sm:max-w-lg">
+          <CardHeader className="space-y-1 text-left">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-3xl font-bold">
+                {orgCode ? "Join Organization" : "Create an Account"}
+              </CardTitle>
+            </div>
+            <CardDescription className="text-gray-600 dark:text-gray-400">
+              {orgCode ? "Complete your registration to join the organization!" : "It's free to create one!"}
+            </CardDescription>
+            {orgCode && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mt-2">
+                <p className="text-sm text-blue-800">
+                  <strong>Organization Code:</strong> {orgCode}
+                </p>
+              </div>
+            )}
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    placeholder="John"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    placeholder="Doe"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
               <div className="space-y-2">
-                <div>{"You're joining"}</div>
-                <div className="font-semibold text-foreground">{invitationData.company_name}</div>
-                {invitationData.role_id && (
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="text-sm">as</span>
-                    {getRoleBadge(invitationData.role_id)}
-                  </div>
+                <Label htmlFor="middleName">Middle Name (Optional)</Label>
+                <Input
+                  id="middleName"
+                  placeholder=""
+                  value={middleName}
+                  onChange={(e) => setMiddleName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phoneNumber">Cellphone number</Label>
+                <Input
+                  id="phoneNumber"
+                  placeholder="+63 9XXXXXXXXX"
+                  value={phoneNumber}
+                  onChange={handlePhoneNumberChange}
+                  className={!isPhoneNumberValid() && phoneNumber.length > 4 ? "border-red-500" : ""}
+                  required
+                />
+                {!isPhoneNumberValid() && phoneNumber.length > 4 && (
+                  <p className="text-xs text-red-500">Phone number must be exactly 10 digits after +63</p>
                 )}
               </div>
-            ) : (
-              "Join thousands of businesses using our platform"
-            )}
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Step 1: Personal Information */}
-            {step === 1 && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <User className="h-4 w-4" />
-                  Personal Information
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="first_name">First Name</Label>
-                    <Input
-                      id="first_name"
-                      value={personalInfo.first_name}
-                      onChange={(e) => setPersonalInfo({ ...personalInfo, first_name: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="last_name">Last Name</Label>
-                    <Input
-                      id="last_name"
-                      value={personalInfo.last_name}
-                      onChange={(e) => setPersonalInfo({ ...personalInfo, last_name: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="middle_name">Middle Name (Optional)</Label>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="m@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
                   <Input
-                    id="middle_name"
-                    value={personalInfo.middle_name}
-                    onChange={(e) => setPersonalInfo({ ...personalInfo, middle_name: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={personalInfo.email}
-                    onChange={(e) => setPersonalInfo({ ...personalInfo, email: e.target.value })}
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     required
                   />
-                </div>
-
-                <div>
-                  <Label htmlFor="phone_number">Phone Number</Label>
-                  <Input
-                    id="phone_number"
-                    value={personalInfo.phone_number}
-                    onChange={(e) => setPersonalInfo({ ...personalInfo, phone_number: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="gender">Gender</Label>
-                  <Select
-                    value={personalInfo.gender}
-                    onValueChange={(value) => setPersonalInfo({ ...personalInfo, gender: value })}
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                      <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
                 </div>
-
-                <Button type="button" onClick={handleNext} disabled={!validateStep1()} className="w-full">
-                  Continue
-                </Button>
-              </div>
-            )}
-
-            {/* Step 2: Company Information */}
-            {step === 2 && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <Building className="h-4 w-4" />
-                  {invitationData ? "Confirm Details" : "Company Information"}
-                </div>
-
-                {invitationData ? (
-                  <div className="space-y-3 p-4 bg-green-50 rounded-lg border border-green-200">
-                    <div className="flex items-center gap-2 text-green-800">
-                      <CheckCircle className="h-4 w-4" />
-                      <span className="font-medium">Invitation Details</span>
-                    </div>
-                    <div className="text-sm text-green-700">
-                      <div>
-                        <strong>Company:</strong> {invitationData.company_name}
-                      </div>
-                      {invitationData.role_id && (
-                        <div className="flex items-center gap-2 mt-2">
-                          <strong>Role:</strong>
-                          {getRoleBadge(invitationData.role_id)}
-                        </div>
+                <div className="mt-2">
+                  <div className="flex gap-1 h-1">
+                    {[...Array(5)].map((_, i) => (
+                      <div
+                        key={i}
+                        className={`flex-1 ${
+                          i < passwordStrengthScore ? getBarColorClass(passwordStrengthScore) : "bg-gray-300"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    {getStrengthText(passwordStrengthScore)}
+                  </p>
+                  {passwordStrengthScore < 5 && password.length > 0 && (
+                    <ul className="list-inside text-sm mt-1">
+                      {!passwordCriteria.minLength && (
+                        <li className="text-red-500">Password should be at least 8 characters long</li>
                       )}
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <Label htmlFor="company_name">Company Name</Label>
-                      <Input
-                        id="company_name"
-                        value={companyInfo.company_name}
-                        onChange={(e) => setCompanyInfo({ ...companyInfo, company_name: e.target.value })}
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="company_location">Company Location</Label>
-                      <Input
-                        id="company_location"
-                        value={companyInfo.company_location}
-                        onChange={(e) => setCompanyInfo({ ...companyInfo, company_location: e.target.value })}
-                        required
-                      />
-                    </div>
-                  </>
-                )}
-
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={() => setStep(1)} className="flex-1">
-                    Back
-                  </Button>
-                  <Button type="button" onClick={handleNext} disabled={!validateStep2()} className="flex-1">
-                    Continue
-                  </Button>
+                      {!passwordCriteria.hasLowerCase && (
+                        <li className="text-red-500">Password should contain at least one lowercase letter</li>
+                      )}
+                      {!passwordCriteria.hasUpperCase && (
+                        <li className="text-red-500">Password should contain at least one uppercase letter</li>
+                      )}
+                      {!passwordCriteria.hasNumber && (
+                        <li className="text-red-500">Password should contain at least one number</li>
+                      )}
+                      {!passwordCriteria.hasSpecialChar && (
+                        <li className="text-red-500">Password should contain at least one special character</li>
+                      )}
+                    </ul>
+                  )}
+                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
+                  </button>
                 </div>
               </div>
-            )}
-
-            {/* Step 3: Password */}
-            {step === 3 && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                  <Lock className="h-4 w-4" />
-                  Create Password
-                </div>
-
-                <div>
-                  <Label htmlFor="password">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      minLength={6}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="confirmPassword"
-                      type={showConfirmPassword ? "text" : "password"}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
-                      minLength={6}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-
-                {password && confirmPassword && password !== confirmPassword && (
-                  <p className="text-sm text-red-600">Passwords do not match</p>
-                )}
-
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={() => setStep(2)} className="flex-1">
-                    Back
-                  </Button>
-                  <Button type="submit" disabled={!validateStep3() || isSubmitting} className="flex-1">
-                    {isSubmitting ? "Creating Account..." : "Create Account"}
-                  </Button>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm password</Label>
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
                 </div>
               </div>
+              <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+                By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
+                <a href="#" className="text-blue-600 hover:underline">
+                  Terms and Conditions
+                </a>
+                ,{" "}
+                <a href="#" className="text-blue-600 hover:underline">
+                  Privacy Policy
+                </a>
+                , and all platform{" "}
+                <a href="#" className="text-blue-600 hover:underline">
+                  rules and regulations
+                </a>{" "}
+                set by OH!Plus.
+              </p>
+              <Button
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                type="submit"
+                onClick={handleRegister}
+                disabled={loading}
+              >
+                {loading ? (orgCode ? "Joining..." : "Signing Up...") : orgCode ? "Join Organization" : "Sign Up"}
+              </Button>
+            </div>
+
+            {errorMessage && (
+              <div className="text-red-500 text-sm mt-4 text-center" role="alert">
+                {errorMessage}
+              </div>
             )}
-          </form>
-
-          <Separator className="my-6" />
-
-          <div className="text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link href="/login" className="text-primary hover:underline">
-              Sign in
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

@@ -6,120 +6,115 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Copy, Plus, Users, Calendar, Shield } from "lucide-react"
-import { toast } from "sonner"
-import { generateInvitationCode } from "@/lib/utils"
-import { useAuth } from "@/contexts/auth-context"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Copy, Check, Calendar, Users, Shield, FileText } from "lucide-react"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { useAuth } from "@/contexts/auth-context"
 import { getAllRoles, type RoleType } from "@/lib/hardcoded-access-service"
 
 interface GenerateInvitationCodeDialogProps {
-  onCodeGenerated?: () => void
+  isOpen: boolean
+  onClose: () => void
+  onSuccess?: (code: string) => void
 }
 
-export function GenerateInvitationCodeDialog({ onCodeGenerated }: GenerateInvitationCodeDialogProps) {
-  const [open, setOpen] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [generatedCode, setGeneratedCode] = useState<string | null>(null)
+export function GenerateInvitationCodeDialog({ isOpen, onClose, onSuccess }: GenerateInvitationCodeDialogProps) {
+  const { userData } = useAuth()
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generatedCode, setGeneratedCode] = useState("")
+  const [copied, setCopied] = useState(false)
 
   // Form state
   const [validityDays, setValidityDays] = useState("30")
-  const [usageLimit, setUsageLimit] = useState("1")
+  const [maxUses, setMaxUses] = useState("10")
   const [selectedRole, setSelectedRole] = useState<RoleType | "">("")
   const [description, setDescription] = useState("")
 
-  const { userData } = useAuth()
   const roles = getAllRoles()
 
-  const handleGenerateCode = async () => {
-    if (!userData?.license_key || !userData?.company_id) {
-      toast.error("Missing license key or company information")
-      return
+  const generateRandomCode = () => {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    let result = ""
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length))
     }
+    return result
+  }
 
+  const handleGenerate = async () => {
     if (!selectedRole) {
-      toast.error("Please select a role for this invitation")
+      alert("Please select a role for the invitation code")
       return
     }
 
-    setLoading(true)
+    setIsGenerating(true)
     try {
-      const code = generateInvitationCode()
-      const expiryDate = new Date()
-      expiryDate.setDate(expiryDate.getDate() + Number.parseInt(validityDays))
+      const code = generateRandomCode()
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + Number.parseInt(validityDays))
 
       const invitationData = {
         code,
-        license_key: userData.license_key,
-        company_id: userData.company_id,
-        role_id: selectedRole,
-        description: description || `Invitation for ${selectedRole} role`,
-        created_by: userData.uid,
-        created_at: serverTimestamp(),
-        expires_at: expiryDate,
-        usage_limit: Number.parseInt(usageLimit),
+        role: selectedRole,
+        description: description || `Invitation for ${roles.find((r) => r.id === selectedRole)?.name} role`,
+        max_uses: Number.parseInt(maxUses),
         used_count: 0,
         used: false,
-        active: true,
+        expires_at: expiresAt,
+        created_by: userData?.uid,
+        created_by_name: `${userData?.first_name || ""} ${userData?.last_name || ""}`.trim(),
+        license_key: userData?.license_key,
+        company_id: userData?.company_id,
+        created: serverTimestamp(),
       }
 
       await addDoc(collection(db, "invitation_codes"), invitationData)
-
       setGeneratedCode(code)
-      toast.success("Invitation code generated successfully!")
-      onCodeGenerated?.()
+      onSuccess?.(code)
     } catch (error) {
       console.error("Error generating invitation code:", error)
-      toast.error("Failed to generate invitation code")
+      alert("Failed to generate invitation code. Please try again.")
     } finally {
-      setLoading(false)
+      setIsGenerating(false)
     }
   }
 
-  const copyToClipboard = async (text: string) => {
+  const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(text)
-      toast.success("Copied to clipboard!")
+      await navigator.clipboard.writeText(generatedCode)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     } catch (error) {
-      toast.error("Failed to copy to clipboard")
+      console.error("Failed to copy:", error)
     }
   }
 
   const handleClose = () => {
-    setOpen(false)
-    setGeneratedCode(null)
+    setGeneratedCode("")
     setValidityDays("30")
-    setUsageLimit("1")
+    setMaxUses("10")
     setSelectedRole("")
     setDescription("")
+    setCopied(false)
+    onClose()
   }
 
-  const selectedRoleData = selectedRole ? roles.find((role) => role.id === selectedRole) : null
+  const selectedRoleData = selectedRole ? roles.find((r) => r.id === selectedRole) : null
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Generate Code
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Generate Invitation Code</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Generate Invitation Code
+          </DialogTitle>
           <DialogDescription>
-            Create a new invitation code to invite users to your organization with a specific role.
+            Create an invitation code for new team members to join your organization with a specific role.
           </DialogDescription>
         </DialogHeader>
 
@@ -129,14 +124,15 @@ export function GenerateInvitationCodeDialog({ onCodeGenerated }: GenerateInvita
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  <Calendar className="h-5 w-5" />
+                  <Calendar className="h-4 w-4" />
                   Basic Settings
                 </CardTitle>
+                <CardDescription>Configure the invitation code validity and usage limits</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="validity">Validity (days)</Label>
+                    <Label htmlFor="validity">Valid for (days)</Label>
                     <Input
                       id="validity"
                       type="number"
@@ -144,17 +140,19 @@ export function GenerateInvitationCodeDialog({ onCodeGenerated }: GenerateInvita
                       max="365"
                       value={validityDays}
                       onChange={(e) => setValidityDays(e.target.value)}
+                      placeholder="30"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="usage">Usage Limit</Label>
+                    <Label htmlFor="maxUses">Maximum uses</Label>
                     <Input
-                      id="usage"
+                      id="maxUses"
                       type="number"
                       min="1"
                       max="100"
-                      value={usageLimit}
-                      onChange={(e) => setUsageLimit(e.target.value)}
+                      value={maxUses}
+                      onChange={(e) => setMaxUses(e.target.value)}
+                      placeholder="10"
                     />
                   </div>
                 </div>
@@ -165,26 +163,28 @@ export function GenerateInvitationCodeDialog({ onCodeGenerated }: GenerateInvita
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  <Shield className="h-5 w-5" />
+                  <Users className="h-4 w-4" />
                   Role Assignment
                 </CardTitle>
                 <CardDescription>
-                  Select the role that will be automatically assigned to users who register with this code.
+                  Select the role that will be assigned to users who register with this code
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="role">Assign Role</Label>
-                  <Select value={selectedRole} onValueChange={(value: RoleType) => setSelectedRole(value)}>
+                  <Label htmlFor="role">Role</Label>
+                  <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as RoleType)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a role to assign" />
+                      <SelectValue placeholder="Select a role" />
                     </SelectTrigger>
                     <SelectContent>
                       {roles.map((role) => (
                         <SelectItem key={role.id} value={role.id}>
                           <div className="flex items-center gap-2">
-                            <div className={`w-3 h-3 rounded-full bg-${role.color}-500`} />
-                            <span>{role.name}</span>
+                            <Badge variant="outline" style={{ borderColor: role.color, color: role.color }}>
+                              {role.name}
+                            </Badge>
+                            <span className="text-sm text-muted-foreground">{role.description}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -193,13 +193,16 @@ export function GenerateInvitationCodeDialog({ onCodeGenerated }: GenerateInvita
                 </div>
 
                 {selectedRoleData && (
-                  <div className="p-3 bg-gray-50 rounded-lg">
+                  <div className="p-3 bg-muted rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
-                      <Badge className={`bg-${selectedRoleData.color}-100 text-${selectedRoleData.color}-800`}>
+                      <Badge style={{ backgroundColor: selectedRoleData.color, color: "white" }}>
                         {selectedRoleData.name}
                       </Badge>
                     </div>
-                    <p className="text-sm text-gray-600">{selectedRoleData.description}</p>
+                    <p className="text-sm text-muted-foreground mb-2">{selectedRoleData.description}</p>
+                    <div className="text-xs text-muted-foreground">
+                      <strong>Modules:</strong> {selectedRoleData.permissions.map((p) => p.module).join(", ")}
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -209,119 +212,112 @@ export function GenerateInvitationCodeDialog({ onCodeGenerated }: GenerateInvita
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  <Users className="h-5 w-5" />
+                  <FileText className="h-4 w-4" />
                   Description
                 </CardTitle>
+                <CardDescription>Optional description for this invitation code</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description (Optional)</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Add a description for this invitation code..."
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    rows={3}
-                  />
-                </div>
+                <Textarea
+                  placeholder="e.g., Invitation for new sales team members"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                />
               </CardContent>
             </Card>
 
             {/* Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm">
+            {selectedRole && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Validity:</span>
+                    <span className="text-muted-foreground">Role:</span>
+                    <Badge style={{ backgroundColor: selectedRoleData?.color, color: "white" }}>
+                      {selectedRoleData?.name}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Valid for:</span>
                     <span>{validityDays} days</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Usage Limit:</span>
+                    <span className="text-muted-foreground">Max uses:</span>
+                    <span>{maxUses} times</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Expires on:</span>
                     <span>
-                      {usageLimit} use{Number.parseInt(usageLimit) > 1 ? "s" : ""}
+                      {new Date(Date.now() + Number.parseInt(validityDays) * 24 * 60 * 60 * 1000).toLocaleDateString()}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Assigned Role:</span>
-                    <span>{selectedRoleData ? selectedRoleData.name : "None selected"}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Description:</span>
-                    <span className="text-right max-w-[200px] truncate">{description || "No description"}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button onClick={handleGenerateCode} disabled={loading || !selectedRole}>
-                {loading ? "Generating..." : "Generate Code"}
+              <Button onClick={handleGenerate} disabled={isGenerating || !selectedRole}>
+                {isGenerating ? "Generating..." : "Generate Code"}
               </Button>
             </div>
           </div>
         ) : (
           <div className="space-y-6">
+            <Alert>
+              <Check className="h-4 w-4" />
+              <AlertDescription>Invitation code generated successfully!</AlertDescription>
+            </Alert>
+
             <Card>
               <CardHeader>
-                <CardTitle className="text-center text-green-600">Code Generated Successfully!</CardTitle>
-                <CardDescription className="text-center">
-                  Share this code with users you want to invite to your organization.
-                </CardDescription>
+                <CardTitle>Your Invitation Code</CardTitle>
+                <CardDescription>Share this code with the people you want to invite</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-center p-6 bg-gray-50 rounded-lg">
-                  <div className="text-center">
-                    <div className="text-3xl font-mono font-bold text-gray-900 mb-2">{generatedCode}</div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(generatedCode)}
-                      className="gap-2"
-                    >
-                      <Copy className="h-4 w-4" />
-                      Copy Code
-                    </Button>
-                  </div>
+              <CardContent>
+                <div className="flex items-center gap-2 p-4 bg-muted rounded-lg">
+                  <code className="flex-1 text-2xl font-mono font-bold tracking-wider">{generatedCode}</code>
+                  <Button size="sm" variant="outline" onClick={handleCopy}>
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  </Button>
                 </div>
+              </CardContent>
+            </Card>
 
-                <div className="space-y-2">
-                  <h4 className="font-medium">Registration URL:</h4>
-                  <div className="p-3 bg-gray-50 rounded border">
-                    <code className="text-sm break-all">
-                      {typeof window !== "undefined" ? window.location.origin : ""}/register?orgCode={generatedCode}
-                    </code>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        copyToClipboard(
-                          `${typeof window !== "undefined" ? window.location.origin : ""}/register?orgCode=${generatedCode}`,
-                        )
-                      }
-                      className="ml-2 h-6 w-6 p-0"
-                    >
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Code Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Role:</span>
+                  <Badge style={{ backgroundColor: selectedRoleData?.color, color: "white" }}>
+                    {selectedRoleData?.name}
+                  </Badge>
                 </div>
-
-                {selectedRoleData && (
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-blue-800">Assigned Role:</span>
-                      <Badge className={`bg-${selectedRoleData.color}-100 text-${selectedRoleData.color}-800`}>
-                        {selectedRoleData.name}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-blue-600">
-                      Users who register with this code will automatically be assigned the {selectedRoleData.name} role.
-                    </p>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Valid for:</span>
+                  <span>{validityDays} days</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Max uses:</span>
+                  <span>{maxUses} times</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Expires on:</span>
+                  <span>
+                    {new Date(Date.now() + Number.parseInt(validityDays) * 24 * 60 * 60 * 1000).toLocaleDateString()}
+                  </span>
+                </div>
+                {description && (
+                  <div className="pt-2">
+                    <span className="text-muted-foreground">Description:</span>
+                    <p className="mt-1 text-sm">{description}</p>
                   </div>
                 )}
               </CardContent>
