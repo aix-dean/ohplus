@@ -9,8 +9,8 @@ import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { ResponsiveTable } from "@/components/responsive-table"
-import { useRouter } from "next/navigation" // Import useRouter
-import { CompanyRegistrationDialog } from "@/components/company-registration-dialog" // Import CompanyRegistrationDialog
+import { useRouter } from "next/navigation"
+import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
 import {
   Dialog,
   DialogContent,
@@ -33,21 +33,19 @@ interface User {
 }
 
 export default function UserManagementPage() {
-  const { userData, refreshUserData } = useAuth() // Get refreshUserData
+  const { userData, refreshUserData } = useAuth()
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
-  const [isCompanyRegistrationDialogOpen, setIsCompanyRegistrationDialogOpen] = useState(false) // State for dialog
-  const [selectedUser, setSelectedUser] = useState<User | null>(null) // Keep this for Edit Roles dialog
-  const [isEditRolesDialogOpen, setIsEditRolesDialogOpen] = useState(false) // Keep this for Edit Roles dialog
-  const [selectedRoles, setSelectedRoles] = useState<Record<string, boolean>>({}) // Keep this for Edit Roles dialog
+  const [isCompanyRegistrationDialogOpen, setIsCompanyRegistrationDialogOpen] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [isEditRolesDialogOpen, setIsEditRolesDialogOpen] = useState(false)
+  const [selectedRoles, setSelectedRoles] = useState<Record<string, boolean>>({})
 
-  const router = useRouter() // Initialize useRouter
+  const router = useRouter()
 
   useEffect(() => {
     if (!userData?.company_id) {
-      // If company_id is missing, don't fetch users yet, and don't set loading to false
-      // The dialog will prompt the user to register the company
-      setLoading(false) // Set loading to false so the UI isn't stuck
+      setLoading(false)
       return
     }
 
@@ -63,7 +61,7 @@ export default function UserManagementPage() {
             data.first_name && data.last_name
               ? `${data.first_name} ${data.last_name}`
               : data.display_name || data.displayName || "Unknown User",
-          role: String(data.role || "user"), // Ensure role is always a string
+          role: String(data.role || "user"),
           status: data.active === false ? "inactive" : "active",
           lastLogin: data.lastLogin?.toDate() || null,
           created: data.created?.toDate() || new Date(),
@@ -76,7 +74,6 @@ export default function UserManagementPage() {
     return () => unsubscribe()
   }, [userData?.company_id])
 
-  // Helper function to check for company_id before executing an action
   const handleActionWithCompanyCheck = (actionCallback: () => void) => {
     if (!userData?.company_id) {
       setIsCompanyRegistrationDialogOpen(true)
@@ -86,7 +83,6 @@ export default function UserManagementPage() {
   }
 
   const getStatusBadge = (status: string) => {
-    // Ensure status is a string
     const statusStr = String(status || "unknown")
 
     switch (statusStr) {
@@ -100,7 +96,6 @@ export default function UserManagementPage() {
   }
 
   const getRoleBadge = (role: string) => {
-    // Ensure role is a string and provide fallback
     const roleStr = String(role || "user").toLowerCase()
 
     const roleColors = {
@@ -117,35 +112,25 @@ export default function UserManagementPage() {
     )
   }
 
-  // Handle editing user roles (now wrapped with company check)
   const handleEditRoles = (user: User) => {
     handleActionWithCompanyCheck(() => {
       setSelectedUser(user)
-      // Initialize selected roles based on user's current roles
       const initialSelectedRoles: Record<string, boolean> = {}
-      // This part assumes `roles` and `userRolesMap` are available, which they would be if data loaded
-      // For simplicity, I'm omitting the full role fetching logic here as it's not directly part of the button click
-      // In a real scenario, you'd ensure `roles` and `userRolesMap` are populated before this dialog opens.
-      // For now, I'll use dummy roles if `roles` is not available.
       const dummyRoles = [
         { id: "admin", name: "Admin", description: "Administrator" },
         { id: "user", name: "User", description: "Standard User" },
       ]
       dummyRoles.forEach((role) => {
-        // Use dummyRoles or actual roles if available
-        initialSelectedRoles[role.id] = false // Default to false for demonstration
+        initialSelectedRoles[role.id] = false
       })
       setSelectedRoles(initialSelectedRoles)
       setIsEditRolesDialogOpen(true)
     })
   }
 
-  // Placeholder for handleSaveRoles, assuming it's defined elsewhere or will be added
   const handleSaveRoles = async () => {
-    // This function would contain the logic to save roles, similar to the original UserManagement component
-    // For this task, we are only focusing on the initial click check.
     console.log("Saving roles for", selectedUser?.email)
-    setIsEditRolesDialogOpen(false) // Close dialog after "saving"
+    setIsEditRolesDialogOpen(false)
   }
 
   const columns = [
@@ -222,8 +207,6 @@ export default function UserManagementPage() {
           <p className="text-muted-foreground">Manage users and their permissions.</p>
         </div>
         <div className="flex items-center gap-2">
-
-          {/* Roles & Permissions Button */}
           <Button
             variant="outline"
             className="gap-2 bg-transparent"
@@ -232,7 +215,6 @@ export default function UserManagementPage() {
             <Shield className="h-4 w-4" />
             Roles & Access
           </Button>
-          {/* Invitation Codes Button */}
           <Button
             variant="outline"
             className="gap-2 bg-transparent"
@@ -241,14 +223,11 @@ export default function UserManagementPage() {
             <Mail className="h-4 w-4" />
             Generate Codes
           </Button>
-          {/* Add User Button */}
           <Button
             className="gap-2"
             onClick={() =>
               handleActionWithCompanyCheck(() => {
-                // Placeholder for Add User logic, e.g., open a dialog or navigate
                 console.log("Add User clicked, company_id exists. Implement add user dialog/page here.")
-                // Example: router.push("/admin/user-management/add-user");
               })
             }
           >
@@ -258,24 +237,21 @@ export default function UserManagementPage() {
         </div>
       </div>
 
-      {/* Users Table */}
       <Card>
         <CardContent>
           <ResponsiveTable data={users} columns={columns} keyField="id" />
         </CardContent>
       </Card>
 
-      {/* Company Registration Dialog */}
       <CompanyRegistrationDialog
         isOpen={isCompanyRegistrationDialogOpen}
         onClose={() => setIsCompanyRegistrationDialogOpen(false)}
         onSuccess={() => {
           setIsCompanyRegistrationDialogOpen(false)
-          refreshUserData() // Refresh user data to get the new company_id
+          refreshUserData()
         }}
       />
 
-      {/* Edit User Roles Dialog (kept for completeness, assuming it's used) */}
       <Dialog open={isEditRolesDialogOpen} onOpenChange={setIsEditRolesDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -291,8 +267,6 @@ export default function UserManagementPage() {
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              {/* This part would dynamically load roles from your `roles` state */}
-              {/* For demonstration, using a placeholder */}
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="role-admin"
