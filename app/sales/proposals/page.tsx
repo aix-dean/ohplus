@@ -380,6 +380,11 @@ function ProposalsPageContent() {
         </Tabs>
       </div>
     </div>
+     <ComingSoonDialog
+        isOpen={showComingSoonDialog}
+        onClose={() => setShowComingSoonDialog(false)}
+        feature="Timeline Feature"
+      />
   )
 }
 
