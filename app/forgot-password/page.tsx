@@ -25,13 +25,55 @@ export default function ForgotPasswordPage() {
     setSuccess("")
     setIsLoading(true)
 
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email address.")
+      setIsLoading(false)
+      return
+    }
+
     try {
-      await sendPasswordResetEmail(auth, email)
-      setSuccess("Password reset email sent. Check your inbox.")
+      console.log("Attempting to send password reset email to:", email)
+
+      // Configure actionCodeSettings for better email handling
+      const actionCodeSettings = {
+        url: `${window.location.origin}/login`, // Redirect back to login after reset
+        handleCodeInApp: false, // Handle the reset in the web browser, not the app
+      }
+
+      await sendPasswordResetEmail(auth, email, actionCodeSettings)
+
+      console.log("Password reset email sent successfully")
+      setSuccess(`Password reset email sent to ${email}. Please check your inbox and spam folder.`)
       setEmail("")
     } catch (error: any) {
       console.error("Password reset error:", error)
-      setError(error.message || "Failed to send password reset email.")
+
+      // More specific error handling
+      let errorMessage = "Failed to send password reset email."
+
+      switch (error.code) {
+        case "auth/user-not-found":
+          errorMessage = "No account found with this email address."
+          break
+        case "auth/invalid-email":
+          errorMessage = "Invalid email address format."
+          break
+        case "auth/too-many-requests":
+          errorMessage = "Too many requests. Please try again later."
+          break
+        case "auth/network-request-failed":
+          errorMessage = "Network error. Please check your internet connection."
+          break
+        case "auth/configuration-not-found":
+          errorMessage = "Email configuration not found. Please contact support."
+          break
+        default:
+          errorMessage = error.message || "Failed to send password reset email."
+      }
+
+      setError(errorMessage)
     } finally {
       setIsLoading(false)
     }

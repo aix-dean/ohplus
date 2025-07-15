@@ -376,10 +376,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resetPassword = async (email: string) => {
     try {
       console.log("Sending password reset email to:", email)
-      await sendPasswordResetEmail(auth, email)
-    } catch (error) {
+
+      const actionCodeSettings = {
+        url: `${window.location.origin}/login`,
+        handleCodeInApp: false,
+      }
+
+      await sendPasswordResetEmail(auth, email, actionCodeSettings)
+      console.log("Password reset email sent successfully")
+    } catch (error: any) {
       console.error("Password reset error:", error)
-      throw error
+
+      // Re-throw with more context
+      const errorMessage =
+        error.code === "auth/user-not-found"
+          ? "No account found with this email address."
+          : error.message || "Failed to send password reset email."
+
+      throw new Error(errorMessage)
     }
   }
 
