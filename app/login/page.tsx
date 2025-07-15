@@ -130,22 +130,22 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-white p-4">
       <div className="flex w-full max-w-4xl bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Left Section: Logo and Company Name */}
-        <div className="hidden md:flex flex-col items-center justify-center p-8 bg-gray-50 w-1/2">
-          <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={150} height={150} priority />
-          <h2 className="mt-8 text-3xl font-light text-blue-700 leading-tight text-center">
+        <div className="hidden md:flex flex-col items-center justify-evenly p-8 bg-gray-50 w-1/2">
+          <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={120} height={120} priority />
+          <h2 className="text-3xl font-light text-blue-700 leading-tight text-center">
             Powering Smarter
             <br />
             Site Management for
             <br />
             Billboard Operators
           </h2>
-          <div className="mt-6 flex flex-col items-center">
+          <div className="flex flex-col items-center">
             <span className="text-sm text-gray-500 mb-2">powered by:</span>
             <Image
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/viber_image_2025-07-15_14-17-13-347%20%281%29-3VNhEPkGkulXmH71m4tLs6MVORYOno.png"
               alt="AIX AI Xynergy Logo"
-              width={120}
-              height={60}
+              width={100}
+              height={50}
             />
           </div>
         </div>
