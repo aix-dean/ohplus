@@ -392,7 +392,7 @@ export default function CreateJobOrderPage() {
           leaseRatePerMonth: item?.price || product.price || 0,
           totalMonths: totalMonths,
           totalLease: item?.price ? item.price * totalMonths : (product.price || 0) * totalMonths,
-          vatAmount: quotation.total_amount ? (quotation.total_amount * 0.12) / products.length : 0,
+          vatAmount: quotation.total_amount ? (quotation.total_amount + (quotation.total_amount * 0.12)) / products.length : 0,
           totalAmount: quotation.total_amount ? quotation.total_amount / products.length : 0,
           siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
           missingCompliance: missingCompliance,
