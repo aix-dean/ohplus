@@ -11,6 +11,7 @@ import { db } from "@/lib/firebase"
 import { ResponsiveTable } from "@/components/responsive-table"
 import { useRouter } from "next/navigation"
 import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
+import { AddUserDialog } from "@/components/add-user-dialog"
 import {
   Dialog,
   DialogContent,
@@ -37,6 +38,7 @@ export default function UserManagementPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [isCompanyRegistrationDialogOpen, setIsCompanyRegistrationDialogOpen] = useState(false)
+  const [isAddUserDialogOpen, setIsAddUserDialogOpen] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isEditRolesDialogOpen, setIsEditRolesDialogOpen] = useState(false)
   const [selectedRoles, setSelectedRoles] = useState<Record<string, boolean>>({})
@@ -133,6 +135,12 @@ export default function UserManagementPage() {
     setIsEditRolesDialogOpen(false)
   }
 
+  const handleAddUser = () => {
+    handleActionWithCompanyCheck(() => {
+      setIsAddUserDialogOpen(true)
+    })
+  }
+
   const columns = [
     {
       key: "user",
@@ -223,14 +231,7 @@ export default function UserManagementPage() {
             <Mail className="h-4 w-4" />
             Generate Codes
           </Button>
-          <Button
-            className="gap-2"
-            onClick={() =>
-              handleActionWithCompanyCheck(() => {
-                console.log("Add User clicked, company_id exists. Implement add user dialog/page here.")
-              })
-            }
-          >
+          <Button className="gap-2" onClick={handleAddUser}>
             <UserPlus className="h-4 w-4" />
             Add User
           </Button>
@@ -249,6 +250,15 @@ export default function UserManagementPage() {
         onSuccess={() => {
           setIsCompanyRegistrationDialogOpen(false)
           refreshUserData()
+        }}
+      />
+
+      <AddUserDialog
+        open={isAddUserDialogOpen}
+        onOpenChange={setIsAddUserDialogOpen}
+        onSuccess={() => {
+          // Optionally refresh the users list or show a success message
+          console.log("User invitation sent successfully")
         }}
       />
 
