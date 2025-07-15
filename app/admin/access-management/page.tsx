@@ -11,7 +11,7 @@ export default function AccessManagementPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">Access Management</h1>
-          <p className="text-muted-foreground">Manage roles and permissions for your organization.</p>
+          <p className="text-muted-foreground">Manage roles and access for your organization.</p>
         </div>
       </div>
 
