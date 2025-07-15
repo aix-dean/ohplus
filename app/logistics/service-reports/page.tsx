@@ -25,7 +25,7 @@ export default function ServiceReportsPage() {
   const [postedReportId, setPostedReportId] = useState<string>("")
 
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const { toast } = useToast()
 
   useEffect(() => {
@@ -67,6 +67,11 @@ export default function ServiceReportsPage() {
 
   const filterReports = () => {
     let filtered = [...reports]
+
+    // Filter by company ID - only show reports from the same company
+    if (userData?.company_id) {
+      filtered = filtered.filter((report) => report.companyId === userData.company_id)
+    }
 
     // Filter by tab (department)
     if (activeTab === "From Sales") {
