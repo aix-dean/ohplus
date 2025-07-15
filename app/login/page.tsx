@@ -145,7 +145,7 @@ export default function LoginPage() {
                   className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
                   onClick={() => handleSocialLogin("Google")}
                 >
-                  <Image src="/placeholder.svg?height=20&width=20" alt="Google" width={20} height={20} />
+                  <Image src="/google-logo.png" alt="Google" width={20} height={20} />
                   Google
                 </Button>
                 <Button
@@ -153,7 +153,7 @@ export default function LoginPage() {
                   className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
                   onClick={() => handleSocialLogin("Facebook")}
                 >
-                  <Image src="/placeholder.svg?height=20&width=20" alt="Facebook" width={20} height={20} />
+                  <Image src="/facebook-logo.png" alt="Facebook" width={20} height={20} />
                   Facebook
                 </Button>
               </div>
