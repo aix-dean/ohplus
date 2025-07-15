@@ -14,7 +14,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Mail, Lock, Eye, EyeOff } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Mail, Lock, Eye, EyeOff, AlertTriangle } from "lucide-react"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
@@ -25,18 +26,45 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showJoinOrgDialog, setShowJoinOrgDialog] = useState(false)
+  const [showAccountTypeDialog, setShowAccountTypeDialog] = useState(false)
+  const [availableAccounts, setAvailableAccounts] = useState<Array<{ uid: string; type: string; name: string }>>([])
+  const [selectedAccountType, setSelectedAccountType] = useState("")
   const [orgCode, setOrgCode] = useState("")
   const [isValidatingCode, setIsValidatingCode] = useState(false)
 
-  const { login, user } = useAuth()
+  const { login, user, loginWithAccountType } = useAuth()
   const router = useRouter()
 
   // Redirect if already logged in
   useEffect(() => {
     if (user) {
-      router.push("/admin/dashboard") // Changed redirect to /admin/dashboard
+      router.push("/admin/dashboard")
     }
   }, [user, router])
+
+  const checkForMultipleAccounts = async (email: string) => {
+    try {
+      // Query for all accounts with this email
+      const usersQuery = query(collection(db, "iboard_users"), where("email", "==", email))
+      const usersSnapshot = await getDocs(usersQuery)
+
+      if (usersSnapshot.size > 1) {
+        const accounts = usersSnapshot.docs.map((doc) => {
+          const data = doc.data()
+          return {
+            uid: doc.id,
+            type: data.type || "OHPLUS",
+            name: data.first_name && data.last_name ? `${data.first_name} ${data.last_name}` : data.type || "Unknown",
+          }
+        })
+        return accounts
+      }
+      return []
+    } catch (error) {
+      console.error("Error checking for multiple accounts:", error)
+      return []
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,8 +72,19 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
+      // First check if there are multiple accounts with this email
+      const accounts = await checkForMultipleAccounts(email)
+
+      if (accounts.length > 1) {
+        setAvailableAccounts(accounts)
+        setShowAccountTypeDialog(true)
+        setIsLoading(false)
+        return
+      }
+
+      // Proceed with normal login if only one account exists
       await login(email, password)
-      router.push("/admin/dashboard") // Changed redirect to /admin/dashboard
+      router.push("/admin/dashboard")
     } catch (error: any) {
       console.error("Login error:", error)
 
@@ -61,6 +100,25 @@ export default function LoginPage() {
       }
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleAccountTypeLogin = async () => {
+    if (!selectedAccountType) {
+      setError("Please select an account type.")
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      await loginWithAccountType(email, password, selectedAccountType)
+      router.push("/admin/dashboard")
+    } catch (error: any) {
+      console.error("Account type login error:", error)
+      setError(error.message || "Failed to login with selected account type.")
+    } finally {
+      setIsLoading(false)
+      setShowAccountTypeDialog(false)
     }
   }
 
@@ -245,6 +303,53 @@ export default function LoginPage() {
         </div>
       </div>
 
+      {/* Account Type Selection Dialog */}
+      <Dialog open={showAccountTypeDialog} onOpenChange={setShowAccountTypeDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Multiple Accounts Found
+            </DialogTitle>
+            <DialogDescription>
+              We found multiple accounts associated with this email address. Please select which account you want to log
+              into:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="accountType">Select Account Type</Label>
+              <Select value={selectedAccountType} onValueChange={setSelectedAccountType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose account type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableAccounts.map((account) => (
+                    <SelectItem key={account.uid} value={account.uid}>
+                      {account.type} - {account.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button type="button" variant="outline" onClick={() => setShowAccountTypeDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleAccountTypeLogin} disabled={isLoading}>
+                {isLoading ? "Logging in..." : "Continue"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Join Organization Dialog */}
       <Dialog open={showJoinOrgDialog} onOpenChange={setShowJoinOrgDialog}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
