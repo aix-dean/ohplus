@@ -2,7 +2,16 @@
 
 import { useState, useEffect } from "react"
 import { collection, getDocs, orderBy, query, where } from "firebase/firestore"
-import { db } from "../firebase"
+import { db } from "@/firebase"
+
+interface ServiceAssignment {
+  id: string
+  title: string
+  description: string
+  company_id: string
+  created_at: any // TODO: Fix type
+  // Add other properties as needed
+}
 
 interface ServiceAssignmentsTableProps {
   onSelectAssignment: (id: string) => void
@@ -10,22 +19,27 @@ interface ServiceAssignmentsTableProps {
 }
 
 export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: ServiceAssignmentsTableProps) {
-  const [assignments, setAssignments] = useState<any[]>([])
+  const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchAssignments = async () => {
-      if (!companyId) return // Don't fetch if no companyId
-
       try {
         setLoading(true)
         const assignmentsRef = collection(db, "service_assignments")
-        const q = query(assignmentsRef, where("company_id", "==", companyId), orderBy("created_at", "desc"))
+        let q = query(assignmentsRef, orderBy("created_at", "desc"))
+
+        // Filter by company_id if provided
+        if (companyId) {
+          q = query(assignmentsRef, where("company_id", "==", companyId), orderBy("created_at", "desc"))
+        }
+
         const snapshot = await getDocs(q)
         const assignmentsData = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-        }))
+        })) as ServiceAssignment[]
+
         setAssignments(assignmentsData)
       } catch (error) {
         console.error("Error fetching assignments:", error)
@@ -38,34 +52,16 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
   }, [companyId])
 
   if (loading) {
-    return <div>Loading...</div>
+    return <div>Loading assignments...</div>
   }
 
   return (
     <div>
-      <h2>Service Assignments</h2>
-      {assignments.length === 0 ? (
-        <div>No assignments found.</div>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Assignment ID</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {assignments.map((assignment) => (
-              <tr key={assignment.id}>
-                <td>{assignment.id}</td>
-                <td>
-                  <button onClick={() => onSelectAssignment(assignment.id)}>Select</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      {assignments.map((assignment) => (
+        <div key={assignment.id} onClick={() => onSelectAssignment(assignment.id)}>
+          {assignment.title}
+        </div>
+      ))}
     </div>
   )
 }
