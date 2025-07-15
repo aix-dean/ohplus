@@ -261,6 +261,7 @@ export default function RegisterPage() {
                     ) : (
                       <Eye className="h-4 w-4 text-gray-400" />
                     )}
+                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
                   </button>
                 </div>
                 <div className="mt-2">
@@ -296,8 +297,6 @@ export default function RegisterPage() {
                       )}
                     </ul>
                   )}
-                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
-                  </button>
                 </div>
               </div>
               <div className="space-y-2">
@@ -320,6 +319,7 @@ export default function RegisterPage() {
                     ) : (
                       <Eye className="h-4 w-4 text-gray-400" />
                     )}
+                    <span className="sr-only">{showConfirmPassword ? "Hide password" : "Show password"}</span>
                   </button>
                 </div>
               </div>
