@@ -84,6 +84,11 @@ export default function AccountPage() {
   const [instagram, setInstagram] = useState("")
   const [youtube, setYoutube] = useState("")
 
+  const [companyLogoFile, setCompanyLogoFile] = useState<File | null>(null)
+  const [companyLogoPreviewUrl, setCompanyLogoPreviewUrl] = useState<string | null>(null)
+  const [isUploadingCompanyLogo, setIsUploadingCompanyLogo] = useState(false)
+  const companyLogoInputRef = useRef<HTMLInputElement>(null)
+
   const router = useRouter()
 
   const handleLogout = async () => {
@@ -126,6 +131,7 @@ export default function AccountPage() {
       setFacebook(projectData.social_media?.facebook || "")
       setInstagram(projectData.social_media?.instagram || "")
       setYoutube(projectData.social_media?.youtube || "")
+      setCompanyLogoPreviewUrl(projectData?.photo_url || null)
     }
   }, [user, userData, projectData, loading, router])
 
@@ -246,6 +252,46 @@ export default function AccountPage() {
       setIsUploading(false)
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
+      }
+    }
+  }
+
+  const handleCompanyLogoClick = () => {
+    if (companyLogoInputRef.current) {
+      companyLogoInputRef.current.click()
+    }
+  }
+
+  const handleCompanyLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user) return
+
+    setIsUploadingCompanyLogo(true)
+
+    try {
+      const storageRef = ref(storage, `company_logos/${user.uid}/${Date.now()}_${file.name}`)
+      const snapshot = await uploadBytes(storageRef, file)
+      const downloadURL = await getDownloadURL(snapshot.ref)
+
+      // Update the project data with the new logo URL
+      await updateProjectData({ photo_url: downloadURL })
+
+      setCompanyLogoPreviewUrl(downloadURL)
+      toast({
+        title: "Success",
+        description: "Company logo updated successfully!",
+      })
+    } catch (error: any) {
+      console.error("Company logo upload error:", error)
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload company logo.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingCompanyLogo(false)
+      if (companyLogoInputRef.current) {
+        companyLogoInputRef.current.value = ""
       }
     }
   }
@@ -612,8 +658,39 @@ export default function AccountPage() {
                 </CardHeader>
                 <CardContent className="p-5">
                   <div className="mb-5 flex flex-col items-center gap-5 sm:flex-row sm:items-start">
-                    <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-100 shadow-sm">
-                      <Building size={40} className="text-gray-400" />
+                    <div className="relative group flex-shrink-0">
+                      <div
+                        className="flex h-24 w-24 items-center justify-center rounded-lg border border-gray-200 bg-gray-100 shadow-sm cursor-pointer hover:bg-gray-200 transition-colors overflow-hidden"
+                        onClick={handleCompanyLogoClick}
+                      >
+                        {isUploadingCompanyLogo ? (
+                          <Loader2 size={40} className="animate-spin text-primary" />
+                        ) : companyLogoPreviewUrl || projectData?.photo_url ? (
+                          <img
+                            src={companyLogoPreviewUrl || projectData?.photo_url || "/placeholder.svg"}
+                            alt="Company Logo"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <Building size={40} className="text-gray-400" />
+                        )}
+                      </div>
+                      <button
+                        className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary p-1.5 text-white shadow-md transition-colors duration-200 hover:bg-primary/90"
+                        onClick={handleCompanyLogoClick}
+                        disabled={isUploadingCompanyLogo || !isEditing}
+                        aria-label="Change company logo"
+                      >
+                        <Camera size={16} />
+                      </button>
+                      <input
+                        type="file"
+                        ref={companyLogoInputRef}
+                        className="hidden"
+                        accept="image/*"
+                        onChange={handleCompanyLogoChange}
+                        disabled={isUploadingCompanyLogo || !isEditing}
+                      />
                     </div>
 
                     <div className="flex-1 text-center sm:text-left">
