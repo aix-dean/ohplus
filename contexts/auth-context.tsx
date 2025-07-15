@@ -376,7 +376,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (invitationData.role) {
             console.log("Assigning role to user:", invitationData.role, "for user:", firebaseUser.uid)
             try {
-              await assignRoleToUser(firebaseUser.uid, invitationData.role as RoleType)
+              await assignRoleToUser(firebaseUser.uid, invitationData.role as RoleType, "system")
               console.log(`Role ${invitationData.role} successfully assigned to user ${firebaseUser.uid}`)
             } catch (roleError) {
               console.error("Error assigning role to user:", roleError)
