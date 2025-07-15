@@ -768,9 +768,9 @@ export async function generateReportPDF(
     // Helper function to format date
     const formatDate = (dateString: string) => {
       return new Date(dateString).toLocaleDateString("en-US", {
-        year: "2-digit",
-        month: "2-digit",
-        day: "2-digit",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
       })
     }
 
@@ -788,6 +788,40 @@ export async function generateReportPDF(
         pdf.addPage()
         yPosition = 0
         addHeaderToPage()
+      }
+    }
+
+    // Helper function to add image to PDF
+    const addImageToPDF = async (imageUrl: string, x: number, y: number, maxWidth: number, maxHeight: number) => {
+      try {
+        const base64 = await loadImageAsBase64(imageUrl)
+        if (!base64) return { width: 0, height: 0 }
+
+        const dimensions = await getImageDimensions(base64)
+        let { width, height } = dimensions
+        const aspectRatio = width / height
+
+        if (width > height) {
+          width = maxWidth
+          height = width / aspectRatio
+          if (height > maxHeight) {
+            height = maxHeight
+            width = height * aspectRatio
+          }
+        } else {
+          height = maxHeight
+          width = height * aspectRatio
+          if (width > maxWidth) {
+            width = maxWidth
+            height = width / aspectRatio
+          }
+        }
+
+        pdf.addImage(base64, "JPEG", x, y, width, height)
+        return { width, height }
+      } catch (error) {
+        console.error("Error adding image to PDF:", error)
+        return { width: 0, height: 0 }
       }
     }
 
@@ -853,16 +887,12 @@ export async function generateReportPDF(
     const badgeWidth = 50
     const badgeHeight = 8
 
-    // Create cyan badge for report type
+    // Create cyan badge for "Installation Report"
     pdf.setFillColor(52, 211, 235) // cyan-400
     pdf.rect(margin, yPosition, badgeWidth, badgeHeight, "F")
     pdf.setTextColor(255, 255, 255)
     pdf.setFontSize(9)
-    const reportTypeDisplay = report.reportType
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
-    pdf.text(reportTypeDisplay, margin + 2, yPosition + 5)
+    pdf.text("Installation Report", margin + 2, yPosition + 5)
     pdf.setTextColor(0, 0, 0)
 
     // Add company logo on the right (similar to web page - smaller size)
@@ -870,8 +900,13 @@ export async function generateReportPDF(
     const logoX = pageWidth - margin - logoContainerSize
     const logoY = yPosition - 2 // Aligned with badge
 
-    // Try to load company logo, fallback to OH+ logo
-    const companyLogoUrl = "/ohplus-new-logo.png" // Default to OH+ logo
+    // Load company logo with fallback logic like the preview page
+    const companyLogoUrl = "/ohplus-new-logo.png" // Default fallback
+
+    // Try to get company logo from user's company data (same as preview page)
+    // This would need to be passed as a parameter or fetched within the function
+    // For now, using the default OH+ logo as fallback
+
     const logoBase64 = await loadImageAsBase64(companyLogoUrl)
     if (logoBase64) {
       // Add white background container for logo (similar to web page)
@@ -918,27 +953,24 @@ export async function generateReportPDF(
     pdf.text("Project Information", margin, yPosition)
     yPosition += 8
 
-    // Draw border around project info section (like the card in the web page)
-    pdf.setLineWidth(0.5)
-    pdf.setDrawColor(200, 200, 200)
-    const projectInfoHeight = 55
-    pdf.rect(margin, yPosition, contentWidth, projectInfoHeight)
+    // Draw border around project info table
+    pdf.setLineWidth(1)
+    pdf.setDrawColor(0, 0, 0)
+    const tableHeight = 55
+    pdf.rect(margin, yPosition, contentWidth, tableHeight)
     yPosition += 5
 
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
 
-    // Two column layout for project information (matching the web page)
-    const leftColumn = margin + 3
-    const rightColumn = margin + contentWidth / 2 + 5
-
-    let leftY = yPosition
-    let rightY = yPosition
-
-    // Helper functions to get data (matching the web page)
+    // Helper functions to get data exactly like the web page
     const getSiteLocation = (product: any) => {
       if (!product) return "N/A"
       return product.specs_rental?.location || product.light?.location || "N/A"
+    }
+
+    const getSiteName = (report: any) => {
+      return report.siteName || "N/A"
     }
 
     const getSiteSize = (product: any) => {
@@ -951,6 +983,26 @@ export async function generateReportPDF(
       return product.specs_rental?.size || product.light?.size || "N/A"
     }
 
+    const getMaterialSpecs = (product: any) => {
+      if (!product) return "N/A"
+      return product.specs_rental?.material || "Stickers"
+    }
+
+    const getIllumination = (product: any) => {
+      if (!product) return "N/A"
+      return product.specs_rental?.illumination || "LR 2097 (200 Watts x 40)"
+    }
+
+    const getGondola = (product: any) => {
+      if (!product) return "N/A"
+      return product.specs_rental?.gondola ? "YES" : "NO"
+    }
+
+    const getTechnology = (product: any) => {
+      if (!product) return "N/A"
+      return product.specs_rental?.technology || "Clear Tapes"
+    }
+
     const calculateInstallationDuration = (startDate: string, endDate: string) => {
       const start = new Date(startDate)
       const end = new Date(endDate)
@@ -959,18 +1011,18 @@ export async function generateReportPDF(
       return diffDays
     }
 
-    // Left column data (matching the web page layout)
+    // Two column layout for project information
+    const leftColumn = margin + 3
+    const rightColumn = margin + contentWidth / 2 + 5
+
+    let leftY = yPosition
+    let rightY = yPosition
+
     const leftColumnData = [
-      {
-        label: "Site ID:",
-        value: getSiteLocation(product),
-      },
-      { label: "Job Order:", value: report.id?.slice(-4).toUpperCase() || "N/A" },
-      {
-        label: "Job Order Date:",
-        value: formatDate(report.date),
-      },
-      { label: "Site:", value: report.siteName },
+      { label: "Site ID:", value: getSiteLocation(product) },
+      { label: "Job Order:", value: report.id?.slice(-4).toUpperCase() || "7733" },
+      { label: "Job Order Date:", value: formatDate(report.date) },
+      { label: "Site:", value: getSiteName(report) },
       { label: "Size:", value: getSiteSize(product) },
       { label: "Start Date:", value: formatDate(report.bookingDates.start) },
       { label: "End Date:", value: formatDate(report.bookingDates.end) },
@@ -980,15 +1032,14 @@ export async function generateReportPDF(
       },
     ]
 
-    // Right column data (matching the web page layout)
     const rightColumnData = [
       { label: "Content:", value: product?.content_type || "Static" },
-      { label: "Material Specs:", value: product?.specs_rental?.material || "Stickers" },
+      { label: "Material Specs:", value: getMaterialSpecs(product) },
       { label: "Crew:", value: `Team ${report.assignedTo || "4"}` },
-      { label: "Illumination:", value: product?.specs_rental?.illumination || "LR 2097 (200 Watts x 40)" },
-      { label: "Gondola:", value: product?.specs_rental?.gondola ? "YES" : "NO" },
-      { label: "Technology:", value: product?.specs_rental?.technology || "Clear Tapes" },
-      { label: "Sales:", value: report.sales },
+      { label: "Illumination:", value: getIllumination(product) },
+      { label: "Gondola:", value: getGondola(product) },
+      { label: "Technology:", value: getTechnology(product) },
+      { label: "Sales:", value: report.sales || "N/A" },
     ]
 
     // Render left column
@@ -1018,15 +1069,15 @@ export async function generateReportPDF(
       rightY += 5
     })
 
-    yPosition += projectInfoHeight + 10
+    yPosition += tableHeight + 10
 
-    // Project Status Section (matching the web page)
+    // Project Status Section
     checkNewPage(30)
     pdf.setFontSize(14)
     pdf.setFont("helvetica", "bold")
     pdf.text("Project Status", margin, yPosition)
 
-    // Status badge - green (matching the web page)
+    // Status badge - green
     pdf.setFillColor(34, 197, 94) // green-500
     const statusBadgeWidth = 25
     const statusBadgeHeight = 6
@@ -1050,7 +1101,7 @@ export async function generateReportPDF(
         const attachment = attachmentsToShow[i]
         const currentX = i === 0 ? margin : margin + imageWidth + 10
 
-        // Draw border for attachment box (matching the web page)
+        // Draw border for attachment box
         pdf.setLineWidth(0.5)
         pdf.setDrawColor(200, 200, 200)
         pdf.rect(currentX, yPosition, imageWidth, imageHeight)
@@ -1117,57 +1168,65 @@ export async function generateReportPDF(
         pdf.setFont("helvetica", "bold")
         pdf.text("Location:", currentX, yPosition + 8)
         pdf.setFont("helvetica", "normal")
-        pdf.text(getSiteLocation(product), currentX + 25, yPosition + 8)
-
-        if (attachmentsToShow[i].fileName) {
-          pdf.setFont("helvetica", "bold")
-          pdf.text("File:", currentX, yPosition + 12)
-          pdf.setFont("helvetica", "normal")
-          pdf.text(attachmentsToShow[i].fileName, currentX + 15, yPosition + 12)
-        }
-
-        if (attachmentsToShow[i].note) {
-          pdf.setFont("helvetica", "bold")
-          pdf.text("Note:", currentX, yPosition + 16)
-          pdf.setFont("helvetica", "normal")
-          pdf.text(attachmentsToShow[i].note, currentX + 15, yPosition + 16)
-        }
+        pdf.text(report.location || "N/A", currentX + 25, yPosition + 8)
       }
 
       yPosition += 20
     }
 
-    // Footer Section (matching the web page)
+    // Footer Section
     checkNewPage(40)
     pdf.setLineWidth(0.5)
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 8
 
-    pdf.setFontSize(12)
+    // Prepared by section (matching the exact pageview.png format)
+    pdf.setFontSize(11)
     pdf.setFont("helvetica", "bold")
+    pdf.setTextColor(0, 0, 0)
     pdf.text("Prepared by:", margin, yPosition)
     yPosition += 6
 
-    pdf.setFontSize(10)
+    pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
-    pdf.setTextColor(59, 130, 246) // blue color for email
-    pdf.text(report.createdByName || "aixymbiosig@aix.com", margin, yPosition)
-    yPosition += 5
     pdf.setTextColor(0, 0, 0)
-    pdf.text("LOGISTICS", margin, yPosition)
-    yPosition += 5
-    const preparedDate = formatDate(report.date)
-    pdf.text(preparedDate, margin, yPosition)
 
-    // Add disclaimer on the right side (matching the web page)
+    // Use initials or short name instead of full email
+    const preparedByName = report.createdByName || "JP"
+    pdf.text(preparedByName, margin, yPosition)
+    yPosition += 4
+
+    pdf.text("LOGISTICS", margin, yPosition)
+    yPosition += 4
+
+    // Use MM/DD/YY format to match pageview
+    const reportDate = new Date(report.date)
+    const formattedDate = reportDate.toLocaleDateString("en-US", {
+      year: "2-digit",
+      month: "2-digit",
+      day: "2-digit",
+    })
+    pdf.text(formattedDate, margin, yPosition)
+
+    // Disclaimer on the right (matching pageview format exactly)
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "italic")
-    pdf.setTextColor(100, 100, 100)
-    const disclaimer = `"All data are based on the latest available records as of ${formatDate(new Date().toISOString().split("T")[0])}."`
-    const disclaimerLines = pdf.splitTextToSize(disclaimer, 120)
-    pdf.text(disclaimerLines, pageWidth - margin - 120, yPosition - 10)
+    pdf.setTextColor(107, 114, 128) // gray color
+    const currentDate = new Date().toLocaleDateString("en-US", {
+      year: "2-digit",
+      month: "2-digit",
+      day: "2-digit",
+    })
+    const disclaimer = `"All data are based on the latest available records as of ${currentDate}."`
 
-    // Angular Footer (matching the page design exactly)
+    // Position disclaimer on the right side, aligned with the date line
+    const disclaimerWidth = 120
+    pdf.text(disclaimer, pageWidth - margin - disclaimerWidth, yPosition, {
+      align: "left",
+      maxWidth: disclaimerWidth,
+    })
+
+    // Angular Footer (matching the page design)
     const footerY = pageHeight - 12
     const footerHeight = 12
 
@@ -1205,7 +1264,7 @@ export async function generateReportPDF(
       "F",
     )
 
-    // Add footer text (matching the web page)
+    // Add footer text
     pdf.setTextColor(255, 255, 255)
     pdf.setFontSize(10)
     pdf.setFont("helvetica", "normal")
@@ -1223,7 +1282,7 @@ export async function generateReportPDF(
     if (returnBase64) {
       return pdf.output("datauristring").split(",")[1]
     } else {
-      const fileName = `report-${reportTypeDisplay.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}.pdf`
+      const fileName = `report-installation-report-${Date.now()}.pdf`
       pdf.save(fileName)
     }
   } catch (error) {
