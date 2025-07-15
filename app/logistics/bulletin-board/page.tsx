@@ -1,13 +1,18 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, Filter } from "lucide-react"
+import { Search, Filter, Plus, MapPin, Eye, FileText } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/contexts/auth-context"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
+import Link from "next/link"
 
 interface Product {
   id: string
@@ -83,7 +88,7 @@ export default function BulletinBoardPage() {
         collection(db, "products"),
         where("company_id", "==", queryCompanyId),
         where("active", "==", true),
-        orderBy("created", "desc")
+        orderBy("created", "desc"),
       )
 
       const querySnapshot = await getDocs(productsQuery)
@@ -107,12 +112,13 @@ export default function BulletinBoardPage() {
   }
 
   const filteredProducts = products.filter((product) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch =
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (product.location && product.location.toLowerCase().includes(searchTerm.toLowerCase()))
-    
-    const matchesContentType = selectedContentType === "all" || 
-      product.content_type?.toLowerCase() === selectedContentType.toLowerCase()
-    
+
+    const matchesContentType =
+      selectedContentType === "all" || product.content_type?.toLowerCase() === selectedContentType.toLowerCase()
+
     return matchesSearch && matchesContentType
   })
 
@@ -185,14 +191,26 @@ export default function BulletinBoardPage() {
             <h3 className="font-bold text-yellow-800 mb-2">Debug Information:</h3>
             <div className="grid grid-cols-2 gap-4 text-sm text-yellow-700">
               <div>
-                <div><strong>Firebase Auth UID:</strong> {user?.firebaseAuthUid || "N/A"}</div>
-                <div><strong>Effective User ID:</strong> {getEffectiveUserId()}</div>
-                <div><strong>User Type:</strong> {userData?.type}</div>
+                <div>
+                  <strong>Firebase Auth UID:</strong> {user?.firebaseAuthUid || "N/A"}
+                </div>
+                <div>
+                  <strong>Effective User ID:</strong> {getEffectiveUserId()}
+                </div>
+                <div>
+                  <strong>User Type:</strong> {userData?.type}
+                </div>
               </div>
               <div>
-                <div><strong>User Company ID:</strong> {userData?.company_id || "N/A"}</div>
-                <div><strong>Effective Company ID:</strong> {getEffectiveCompanyId()}</div>
-                <div><strong>Products Count:</strong> {products.length}</div>
+                <div>
+                  <strong>User Company ID:</strong> {userData?.company_id || "N/A"}
+                </div>
+                <div>
+                  <strong>Effective Company ID:</strong> {getEffectiveCompanyId()}
+                </div>
+                <div>
+                  <strong>Products Count:</strong> {products.length}
+                </div>
               </div>
             </div>
           </div>
@@ -237,4 +255,84 @@ export default function BulletinBoardPage() {
           </div>
         ) : filteredProducts.length === 0 ? (
           <div className="text-center py-12">
-            \
+            <div className="text-gray-500 mb-4">
+              {products.length === 0 ? "No sites found" : "No sites match your search criteria"}
+            </div>
+            {products.length === 0 && (
+              <p className="text-sm text-gray-400">Sites will appear here once they are added to your account</p>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredProducts.map((product) => (
+              <Card key={product.id} className="hover:shadow-lg transition-shadow">
+                <CardContent className="p-4">
+                  {/* Site Image */}
+                  <div className="aspect-video bg-gray-200 rounded-lg mb-4 overflow-hidden">
+                    {product.media && product.media.length > 0 ? (
+                      <img
+                        src={product.media[0].url || "/placeholder.svg"}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <FileText className="h-12 w-12" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Site Info */}
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="font-semibold text-lg text-gray-900 mb-1">{product.name}</h3>
+                      {(product.light?.location || product.specs_rental?.location) && (
+                        <div className="flex items-center text-sm text-gray-600">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          {product.light?.location || product.specs_rental?.location}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Badges */}
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className={getContentTypeColor(product.content_type)}>
+                        {product.content_type || "Unknown"}
+                      </Badge>
+                      <Badge variant="outline" className="flex items-center gap-1">
+                        <div className={`w-2 h-2 rounded-full ${getStatusColor(product.status)}`} />
+                        {product.status || "Unknown"}
+                      </Badge>
+                      {product.site_code && <Badge variant="secondary">{product.site_code}</Badge>}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-2">
+                      <Link href={`/logistics/sites/${product.id}`} className="flex-1">
+                        <Button variant="outline" size="sm" className="w-full bg-transparent">
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </Button>
+                      </Link>
+                      <Button
+                        onClick={() => handleCreateReport(product.id)}
+                        size="sm"
+                        className="flex-1 bg-blue-600 hover:bg-blue-700"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Report
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Create Report Dialog */}
+      <CreateReportDialog open={createReportOpen} onOpenChange={setCreateReportOpen} siteId={selectedSiteId} />
+    </div>
+  )
+}
