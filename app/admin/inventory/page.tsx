@@ -262,23 +262,19 @@ export default function AdminInventoryPage() {
     }
 
     if (!userData?.license_key) {
-      setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
+      setSubscriptionLimitMessage("Grab your first free site - choose a plan now!")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
     if (!subscriptionData || subscriptionData.status !== "active") {
-      setSubscriptionLimitMessage(
-        "Your current subscription is not active. Please activate or upgrade your plan to add more sites.",
-      )
+      setSubscriptionLimitMessage("Grab your first free site - choose a plan now!")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
     if (totalItems >= subscriptionData.maxProducts) {
-      setSubscriptionLimitMessage(
-        `You have reached the maximum number of sites allowed by your current plan (${subscriptionData.maxProducts}). Please upgrade your subscription to add more sites.`,
-      )
+      setSubscriptionLimitMessage("Grab your first free site - choose a plan now!")
       setShowSubscriptionLimitDialog(true)
       return
     }
@@ -292,23 +288,19 @@ export default function AdminInventoryPage() {
 
     // Check subscription after company registration
     if (!userData?.license_key) {
-      setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
+      setSubscriptionLimitMessage("Grab your first free site - choose a plan now!")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
     if (!subscriptionData || subscriptionData.status !== "active") {
-      setSubscriptionLimitMessage(
-        "Your current subscription is not active. Please activate or upgrade your plan to add more sites.",
-      )
+      setSubscriptionLimitMessage("Grab your first free site - choose a plan now!")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
     if (totalItems >= subscriptionData.maxProducts) {
-      setSubscriptionLimitMessage(
-        `You have reached the maximum number of sites allowed by your current plan (${subscriptionData.maxProducts}). Please upgrade your subscription to add more sites.`,
-      )
+      setSubscriptionLimitMessage("Grab your first free site - choose a plan now!")
       setShowSubscriptionLimitDialog(true)
       return
     }
