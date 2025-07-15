@@ -131,7 +131,13 @@ export default function LoginPage() {
       <div className="flex w-full max-w-4xl bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Left Section: Logo and Company Name */}
         <div className="hidden md:flex flex-col items-center justify-center p-8 bg-gray-50 w-1/2">
-          <Image src="/aix-logo.png" alt="AIX Logo" width={200} height={200} priority />
+          <Image
+            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-K7tByuCvUXrspqTAaOZm8IvQg3oa5F.png"
+            alt="AIX Logo"
+            width={200}
+            height={200}
+            priority
+          />
           <span className="mt-4 text-2xl font-bold text-gray-800">AIX</span>
         </div>
 
