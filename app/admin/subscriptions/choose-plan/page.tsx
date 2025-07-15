@@ -107,6 +107,13 @@ export default function ChoosePlanPage() {
         const newPlanType: SubscriptionPlanType = selectedPlan.id as SubscriptionPlanType
         const billingCycle: BillingCycle = selectedPlan.billingCycle === "N/A" ? "monthly" : selectedPlan.billingCycle
 
+        // Calculate end date for graphic-expo-event (90 days from now)
+        let customEndDate: Date | null = null
+        if (selectedPlan.id === "graphic-expo-event") {
+          customEndDate = new Date()
+          customEndDate.setDate(customEndDate.getDate() + 90) // 90 days from now
+        }
+
         // Always create a new subscription document
         await subscriptionService.createSubscription(
           userData.license_key,
@@ -114,10 +121,12 @@ export default function ChoosePlanPage() {
           billingCycle,
           user.uid,
           new Date(), // Start date is now
-          null, // Let the service calculate end date
+          customEndDate, // Use custom end date for graphic-expo-event, null for others
           "active", // New subscription is active
           null, // Let the service calculate max products
-          selectedPlan.id === "graphic-expo-event" ? promoEndDate : null, // Set trialEndDate for graphic-expo-event
+          selectedPlan.id === "graphic-expo-event" ? customEndDate : null, // Set trialEndDate for graphic-expo-event
+          userData.company_id || null, // Add company_id parameter
+          null, // Let the service calculate max users
         )
 
         toast({

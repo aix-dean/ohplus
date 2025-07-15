@@ -53,6 +53,7 @@ export type Proposal = {
   client: ProposalClient
   products: ProposalProduct[]
   totalAmount: number
+  designation: string
   validUntil: Date
   notes?: string
   customMessage?: string

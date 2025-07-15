@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ComingSoonDialog } from "@/components/coming-soon-dialog"
 import { Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -25,6 +26,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showJoinOrgDialog, setShowJoinOrgDialog] = useState(false)
+  const [showComingSoonDialog, setShowComingSoonDialog] = useState(false)
+  const [comingSoonFeature, setComingSoonFeature] = useState("")
   const [orgCode, setOrgCode] = useState("")
   const [isValidatingCode, setIsValidatingCode] = useState(false)
 
@@ -37,36 +40,6 @@ export default function LoginPage() {
       router.push("/admin/dashboard")
     }
   }, [user, router])
-
-  const validateInvitationCode = async (code: string) => {
-    try {
-      // Query invitation_codes collection by the 'code' field
-      const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", code))
-      const invitationSnapshot = await getDocs(invitationQuery)
-
-      if (invitationSnapshot.empty) {
-        throw new Error("Invalid invitation code.")
-      }
-
-      // Get the first matching document
-      const invitationDoc = invitationSnapshot.docs[0]
-      const invitationData = invitationDoc.data()
-
-      // Check if code has expired
-      if (invitationData.expires_at && invitationData.expires_at.toDate() < new Date()) {
-        throw new Error("Invitation code has expired.")
-      }
-
-      // Check if code has reached maximum uses
-      if (invitationData.max_uses && invitationData.used_count >= invitationData.max_uses) {
-        throw new Error("Invitation code has reached its maximum number of uses.")
-      }
-
-      return true
-    } catch (error: any) {
-      throw error
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -95,6 +68,41 @@ export default function LoginPage() {
       }
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleSocialLogin = (provider: string) => {
+    setComingSoonFeature(`${provider} login`)
+    setShowComingSoonDialog(true)
+  }
+
+  const validateInvitationCode = async (code: string) => {
+    try {
+      // Query invitation_codes collection by the 'code' field
+      const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", code))
+      const invitationSnapshot = await getDocs(invitationQuery)
+
+      if (invitationSnapshot.empty) {
+        throw new Error("Invalid invitation code.")
+      }
+
+      // Get the first matching document
+      const invitationDoc = invitationSnapshot.docs[0]
+      const invitationData = invitationDoc.data()
+
+      // Check if code has expired
+      if (invitationData.expires_at && invitationData.expires_at.toDate() < new Date()) {
+        throw new Error("Invitation code has expired.")
+      }
+
+      // Check if code has reached maximum uses
+      if (invitationData.max_uses && invitationData.used_count >= invitationData.max_uses) {
+        throw new Error("Invitation code has reached its maximum number of uses.")
+      }
+
+      return true
+    } catch (error: any) {
+      throw error
     }
   }
 
@@ -139,15 +147,27 @@ export default function LoginPage() {
                 <Button
                   variant="outline"
                   className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+                  onClick={() => handleSocialLogin("Google")}
                 >
-                  <Image src="/placeholder.svg?height=20&width=20" alt="Google" width={20} height={20} />
+                  <Image
+                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Google_Icons-09-512-xTPWQW6Ebs2IlRYdW10MAg71P4QPDL.webp"
+                    alt="Google"
+                    width={20}
+                    height={20}
+                  />
                   Google
                 </Button>
                 <Button
                   variant="outline"
                   className="flex-1 flex items-center gap-2 py-2 px-4 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 bg-transparent"
+                  onClick={() => handleSocialLogin("Facebook")}
                 >
-                  <Image src="/placeholder.svg?height=20&width=20" alt="Facebook" width={20} height={20} />
+                  <Image
+                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Facebook_Logo_2023-4SQHsSrZ3kX2dVTojWLhiS3pOKdNbq.png"
+                    alt="Facebook"
+                    width={20}
+                    height={20}
+                  />
                   Facebook
                 </Button>
               </div>
@@ -285,6 +305,13 @@ export default function LoginPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Coming Soon Dialog */}
+      <ComingSoonDialog
+        isOpen={showComingSoonDialog}
+        onClose={() => setShowComingSoonDialog(false)}
+        feature={comingSoonFeature}
+      />
     </div>
   )
 }

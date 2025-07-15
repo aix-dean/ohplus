@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import type React from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
-import { ArrowLeft, CalendarIcon, Plus, Loader2, AlertCircle, XCircle } from "lucide-react"
+import { ArrowLeft, CalendarIcon, Plus, Loader2, AlertCircle, FileText, ImageIcon, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,26 +17,16 @@ import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { getQuotationDetailsForJobOrder, createJobOrder } from "@/lib/job-order-service"
+import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import type { JobOrderType, JobOrderStatus } from "@/lib/types/job-order"
 import type { Quotation } from "@/lib/types/quotation"
 import type { Product } from "@/lib/firebase-service"
 import type { Client } from "@/lib/client-service"
 import { cn } from "@/lib/utils"
-import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog" // New import
+import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog"
+import { ComingSoonDialog } from "@/components/coming-soon-dialog"
 
 const joTypes = ["Installation", "Maintenance", "Repair", "Dismantling", "Other"]
-const assignees = [
-  { id: "user1", name: "John Doe" },
-  { id: "user2", name: "Jane Smith" },
-  { id: "user3", name: "Peter Jones" },
-]
-
-// Dummy compliance state as per screenshot
-const missingCompliance = {
-  signedQuotation: true,
-  poMo: true,
-  projectFa: true,
-}
 
 export default function CreateJobOrderPage() {
   const router = useRouter()
@@ -54,10 +45,31 @@ export default function CreateJobOrderPage() {
   // Form states
   const [joType, setJoType] = useState<JobOrderType | "">("")
   const [dateRequested, setDateRequested] = useState<Date | undefined>(new Date())
-  const [deadline, setDeadline] = useState<Date | undefined>(undefined) // Keep as Date | undefined
+  const [deadline, setDeadline] = useState<Date | undefined>(undefined)
   const [remarks, setRemarks] = useState("")
   const [assignTo, setAssignTo] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // File upload states
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
+  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null)
+  const [uploadingAttachment, setUploadingAttachment] = useState(false)
+  const [attachmentError, setAttachmentError] = useState<string | null>(null)
+
+  const [signedQuotationFile, setSignedQuotationFile] = useState<File | null>(null)
+  const [signedQuotationUrl, setSignedQuotationUrl] = useState<string | null>(null)
+  const [uploadingSignedQuotation, setUploadingSignedQuotation] = useState(false)
+  const [signedQuotationError, setSignedQuotationError] = useState<string | null>(null)
+
+  const [poMoFile, setPoMoFile] = useState<File | null>(null)
+  const [poMoUrl, setPoMoUrl] = useState<string | null>(null)
+  const [uploadingPoMo, setUploadingPoMo] = useState(false)
+  const [poMoError, setPoMoError] = useState<string | null>(null)
+
+  const [projectFaFile, setProjectFaFile] = useState<File | null>(null)
+  const [projectFaUrl, setProjectFaUrl] = useState<string | null>(null)
+  const [uploadingProjectFa, setUploadingProjectFa] = useState(false)
+  const [projectFaError, setProjectFaError] = useState<string | null>(null)
 
   // Validation states
   const [joTypeError, setJoTypeError] = useState(false)
@@ -66,6 +78,19 @@ export default function CreateJobOrderPage() {
   // New state for success dialog
   const [showJobOrderSuccessDialog, setShowJobOrderSuccessDialog] = useState(false)
   const [createdJoId, setCreatedJoId] = useState<string | null>(null)
+
+  // Coming soon dialog state
+  const [showComingSoonDialog, setShowComingSoonDialog] = useState(false)
+
+  // Derived compliance state
+  const missingCompliance = useMemo(
+    () => ({
+      signedQuotation: !signedQuotationUrl,
+      poMo: !poMoUrl,
+      projectFa: !projectFaUrl,
+    }),
+    [signedQuotationUrl, poMoUrl, projectFaUrl],
+  )
 
   useEffect(() => {
     if (!quotationId) {
@@ -108,6 +133,13 @@ export default function CreateJobOrderPage() {
     fetchDetails()
   }, [quotationId, router, toast])
 
+  // Set default assignee to current user
+  useEffect(() => {
+    if (userData?.uid) {
+      setAssignTo(userData.uid)
+    }
+  }, [userData])
+
   const formatCurrency = (amount: number | undefined) => {
     if (amount === undefined || amount === null) return "₱0.00"
     return `₱${Number(amount).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -130,6 +162,71 @@ export default function CreateJobOrderPage() {
       return "Invalid Dates"
     }
   }
+console.log(showComingSoonDialog)
+  const handleFileUpload = useCallback(
+    async (
+      file: File,
+      type: "image" | "document",
+      setFileState: React.Dispatch<React.SetStateAction<File | null>>,
+      setUrlState: React.Dispatch<React.SetStateAction<string | null>>,
+      setUploadingState: React.Dispatch<React.SetStateAction<boolean>>,
+      setErrorState: React.Dispatch<React.SetStateAction<string | null>>,
+      path: string,
+    ) => {
+      setUploadingState(true)
+      setErrorState(null)
+      setUrlState(null) // Clear previous URL
+
+      const allowedImageTypes = ["image/jpeg", "image/png", "image/gif"]
+      const allowedDocumentTypes = [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      ]
+      const maxSize = 5 * 1024 * 1024 // 5MB
+
+      if (file.size > maxSize) {
+        setErrorState("File size exceeds 5MB limit.")
+        setUploadingState(false)
+        return
+      }
+
+      if (type === "image" && !allowedImageTypes.includes(file.type)) {
+        setErrorState("Invalid image file type. Only JPG, PNG, GIF are allowed.")
+        setUploadingState(false)
+        return
+      }
+
+      if (type === "document" && !allowedDocumentTypes.includes(file.type)) {
+        setErrorState("Invalid document file type. Only PDF, DOC, DOCX, XLS, XLSX are allowed.")
+        setUploadingState(false)
+        return
+      }
+
+      try {
+        const downloadURL = await uploadFileToFirebaseStorage(file, path)
+        setUrlState(downloadURL)
+        setFileState(file) // Keep the file object for display name
+        toast({
+          title: "Upload Successful",
+          description: `${file.name} uploaded successfully.`,
+        })
+      } catch (error: any) {
+        console.error("Upload failed:", error)
+        setErrorState(`Upload failed: ${error.message || "Unknown error"}`)
+        toast({
+          title: "Upload Failed",
+          description: `Could not upload ${file.name}. ${error.message || "Please try again."}`,
+          variant: "destructive",
+        })
+      } finally {
+        setUploadingState(false)
+      }
+    },
+    [toast],
+  )
 
   const handleCreateJobOrder = async (status: JobOrderStatus) => {
     if (!quotationData || !user?.uid) {
@@ -193,7 +290,18 @@ export default function CreateJobOrderPage() {
       requestedBy: userData?.first_name || "Auto-Generated",
       remarks: remarks,
       assignTo: assignTo,
-      attachments: [], // Placeholder for attachments
+      attachments: attachmentUrl
+        ? [
+            {
+              url: attachmentUrl,
+              name: attachmentFile?.name || "Attachment",
+              type: attachmentFile?.type || "image",
+            },
+          ]
+        : [],
+      signedQuotationUrl: signedQuotationUrl,
+      poMoUrl: poMoUrl,
+      projectFaUrl: projectFaUrl,
       quotationNumber: quotation.quotation_number,
       clientName: client?.name || "N/A",
       clientCompany: client?.company || "N/A",
@@ -212,6 +320,8 @@ export default function CreateJobOrderPage() {
       totalAmount: quotation.total_amount || 0,
       siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
       missingCompliance: missingCompliance, // Pass the current compliance status
+      product_id: product.id || "",
+      company_id: userData.company_id || "",
     }
 
     try {
@@ -352,29 +462,136 @@ export default function CreateJobOrderPage() {
               <p className="font-bold text-lg mt-1">TOTAL: {formatCurrency(totalAmountWithVat)}</p>
             </div>
             <div className="space-y-1.5 pt-4 border-t border-gray-200 mt-6">
-              <div className="flex items-center">
-                <p className="text-sm w-36">
+              {/* Signed Quotation Upload */}
+              <div className="flex items-center gap-2">
+                <Label htmlFor="signed-quotation-upload" className="text-sm w-36">
                   <span className="font-semibold">Signed Quotation:</span>
-                </p>
-                <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs">
-                  Upload Document
+                </Label>
+                <input
+                  type="file"
+                  id="signed-quotation-upload"
+                  accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className="hidden"
+                  onChange={(event) => {
+                    if (event.target.files && event.target.files[0]) {
+                      handleFileUpload(
+                        event.target.files[0],
+                        "document",
+                        setSignedQuotationFile,
+                        setSignedQuotationUrl,
+                        setUploadingSignedQuotation,
+                        setSignedQuotationError,
+                        "documents/signed-quotations/",
+                      )
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs bg-transparent"
+                  onClick={() => document.getElementById("signed-quotation-upload")?.click()}
+                  disabled={uploadingSignedQuotation}
+                >
+                  {uploadingSignedQuotation ? (
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  ) : (
+                    <FileText className="mr-1 h-3 w-3" />
+                  )}
+                  {uploadingSignedQuotation ? "Uploading..." : "Upload Document"}
                 </Button>
+                {signedQuotationFile && !uploadingSignedQuotation && (
+                  <span className="text-xs text-gray-600 truncate max-w-[150px]">{signedQuotationFile.name}</span>
+                )}
+                {signedQuotationError && <span className="text-xs text-red-500 ml-2">{signedQuotationError}</span>}
               </div>
-              <div className="flex items-center">
-                <p className="text-sm w-36">
+
+              {/* PO/MO Upload */}
+              <div className="flex items-center gap-2">
+                <Label htmlFor="po-mo-upload" className="text-sm w-36">
                   <span className="font-semibold">PO/MO:</span>
-                </p>
-                <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs">
-                  Upload Document
+                </Label>
+                <input
+                  type="file"
+                  id="po-mo-upload"
+                  accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className="hidden"
+                  onChange={(event) => {
+                    if (event.target.files && event.target.files[0]) {
+                      handleFileUpload(
+                        event.target.files[0],
+                        "document",
+                        setPoMoFile,
+                        setPoMoUrl,
+                        setUploadingPoMo,
+                        setPoMoError,
+                        "documents/po-mo/",
+                      )
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs bg-transparent"
+                  onClick={() => document.getElementById("po-mo-upload")?.click()}
+                  disabled={uploadingPoMo}
+                >
+                  {uploadingPoMo ? (
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  ) : (
+                    <FileText className="mr-1 h-3 w-3" />
+                  )}
+                  {uploadingPoMo ? "Uploading..." : "Upload Document"}
                 </Button>
+                {poMoFile && !uploadingPoMo && (
+                  <span className="text-xs text-gray-600 truncate max-w-[150px]">{poMoFile.name}</span>
+                )}
+                {poMoError && <span className="text-xs text-red-500 ml-2">{poMoError}</span>}
               </div>
-              <div className="flex items-center">
-                <p className="text-sm w-36">
+
+              {/* Project FA Upload */}
+              <div className="flex items-center gap-2">
+                <Label htmlFor="project-fa-upload" className="text-sm w-36">
                   <span className="font-semibold">Project FA:</span>
-                </p>
-                <Button variant="outline" size="sm" className="h-7 px-2.5 text-xs">
-                  Upload Document
+                </Label>
+                <input
+                  type="file"
+                  id="project-fa-upload"
+                  accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className="hidden"
+                  onChange={(event) => {
+                    if (event.target.files && event.target.files[0]) {
+                      handleFileUpload(
+                        event.target.files[0],
+                        "document",
+                        setProjectFaFile,
+                        setProjectFaUrl,
+                        setUploadingProjectFa,
+                        setProjectFaError,
+                        "documents/project-fa/",
+                      )
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs bg-transparent"
+                  onClick={() => document.getElementById("project-fa-upload")?.click()}
+                  disabled={uploadingProjectFa}
+                >
+                  {uploadingProjectFa ? (
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  ) : (
+                    <FileText className="mr-1 h-3 w-3" />
+                  )}
+                  {uploadingProjectFa ? "Uploading..." : "Upload Document"}
                 </Button>
+                {projectFaFile && !uploadingProjectFa && (
+                  <span className="text-xs text-gray-600 truncate max-w-[150px]">{projectFaFile.name}</span>
+                )}
+                {projectFaError && <span className="text-xs text-red-500 ml-2">{projectFaError}</span>}
               </div>
             </div>
           </div>
@@ -490,7 +707,11 @@ export default function CreateJobOrderPage() {
                   className="flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9"
                   required // Add required attribute for native validation
                 />
-                <Button variant="outline" className="h-9 px-3 text-sm text-gray-800 border-gray-300 hover:bg-gray-50">
+                <Button
+                  variant="outline"
+                  className="h-9 px-3 text-sm text-gray-800 border-gray-300 hover:bg-gray-50 bg-transparent"
+                  onClick={() => setShowComingSoonDialog(true)}
+                >
                   Timeline
                 </Button>
               </div>
@@ -518,16 +739,47 @@ export default function CreateJobOrderPage() {
                 className="bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-24"
               />
             </div>
+
+            {/* Attachments */}
             <div className="space-y-2">
               <Label className="text-sm text-gray-800">Attachments</Label>
+              <input
+                type="file"
+                id="attachment-upload"
+                accept="image/*"
+                className="hidden"
+                onChange={(event) => {
+                  if (event.target.files && event.target.files[0]) {
+                    handleFileUpload(
+                      event.target.files[0],
+                      "image",
+                      setAttachmentFile,
+                      setAttachmentUrl,
+                      setUploadingAttachment,
+                      setAttachmentError,
+                      "attachments/job-orders/",
+                    )
+                  }
+                }}
+              />
               <Button
                 variant="outline"
                 className="w-24 h-24 flex flex-col items-center justify-center text-gray-500 border-dashed border-2 border-gray-300 bg-gray-100 hover:bg-gray-200"
+                onClick={() => document.getElementById("attachment-upload")?.click()}
+                disabled={uploadingAttachment}
               >
-                <Plus className="h-6 w-6" />
-                <span className="text-xs mt-1">Upload</span>
+                {uploadingAttachment ? <Loader2 className="h-6 w-6 animate-spin" /> : <Plus className="h-6 w-6" />}
+                <span className="text-xs mt-1">{uploadingAttachment ? "Uploading..." : "Upload"}</span>
               </Button>
+              {attachmentFile && !uploadingAttachment && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <ImageIcon className="h-4 w-4" />
+                  <span>{attachmentFile.name}</span>
+                </div>
+              )}
+              {attachmentError && <p className="text-xs text-red-500 mt-1">{attachmentError}</p>}
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="assign-to" className="text-sm text-gray-800">
                 Assign to
@@ -540,11 +792,9 @@ export default function CreateJobOrderPage() {
                   <SelectValue placeholder="Choose Assignee" className="text-gray-500" />
                 </SelectTrigger>
                 <SelectContent>
-                  {assignees.map((assignee) => (
-                    <SelectItem key={assignee.id} value={assignee.id} className="text-sm">
-                      {assignee.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem key={userData?.uid} value={userData?.first_name || ""} className="text-sm">
+                    {userData?.first_name}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -574,6 +824,13 @@ export default function CreateJobOrderPage() {
       <JobOrderCreatedSuccessDialog
         isOpen={showJobOrderSuccessDialog}
         onDismissAndNavigate={handleDismissAndNavigate}
+      />
+
+      {/* Coming Soon Dialog */}
+      <ComingSoonDialog
+        isOpen={showComingSoonDialog}
+        onClose={() => setShowComingSoonDialog(false)}
+        feature="Timeline Feature"
       />
     </div>
   )

@@ -24,6 +24,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
+import { subscriptionService } from "@/lib/subscription-service"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -251,70 +252,133 @@ export default function AdminInventoryPage() {
   }
 
   const handleViewDetails = (productId: string) => {
-    router.push(`/admin/products/${productId}`)
+    router.push(`/admin/inventory/${productId}`)
   }
 
-  const handleAddSiteClick = () => {
+  const handleAddSiteClick = async () => {
+    console.log("handleAddSiteClick: Starting subscription check")
+    console.log("userData:", { company_id: userData?.company_id, license_key: userData?.license_key })
+
     // Check if user has company_id first
     if (!userData?.company_id) {
+      console.log("No company_id found, showing company registration dialog")
       setShowCompanyDialog(true)
       return
     }
 
+    // Query subscription by company ID
+    let currentSubscription = null
+    try {
+      console.log("Fetching subscription for company_id:", userData.company_id)
+      currentSubscription = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
+      console.log("Current subscription:", currentSubscription)
+    } catch (error) {
+      console.error("Error fetching subscription:", error)
+      setSubscriptionLimitMessage("Error fetching subscription data. Please try again or contact support.")
+      setShowSubscriptionLimitDialog(true)
+      return
+    }
+
+    // Check if user has license key
     if (!userData?.license_key) {
-      setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
+      console.log("No license key found")
+      setSubscriptionLimitMessage("No active license found. Please choose a subscription plan to get started.")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
-    if (!subscriptionData || subscriptionData.status !== "active") {
+    // Check if subscription exists and is active
+    if (!currentSubscription) {
+      console.log("No subscription found")
+      setSubscriptionLimitMessage("No active subscription found. Please choose a plan to start adding sites.")
+      setShowSubscriptionLimitDialog(true)
+      return
+    }
+
+    if (currentSubscription.status !== "active") {
+      console.log("Subscription not active, status:", currentSubscription.status)
       setSubscriptionLimitMessage(
-        "Your current subscription is not active. Please activate or upgrade your plan to add more sites.",
+        `Your subscription is ${currentSubscription.status}. Please activate your subscription to continue.`,
       )
       setShowSubscriptionLimitDialog(true)
       return
     }
 
-    if (totalItems >= subscriptionData.maxProducts) {
+    // Check product limit
+    console.log("Checking product limit:", { totalItems, maxProducts: currentSubscription.maxProducts })
+    if (totalItems >= currentSubscription.maxProducts) {
+      console.log("Product limit reached")
       setSubscriptionLimitMessage(
-        `You have reached the maximum number of sites allowed by your current plan (${subscriptionData.maxProducts}). Please upgrade your subscription to add more sites.`,
+        `You've reached your plan limit of ${currentSubscription.maxProducts} sites. Upgrade your plan to add more sites.`,
       )
       setShowSubscriptionLimitDialog(true)
       return
     }
 
+    console.log("All checks passed, redirecting to create product")
     router.push("/admin/products/create")
   }
 
   const handleCompanyRegistrationSuccess = async () => {
+    console.log("Company registration successful, refreshing user data")
     await refreshUserData()
     setShowCompanyDialog(false)
 
-    // Check subscription after company registration
-    if (!userData?.license_key) {
-      setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
-      setShowSubscriptionLimitDialog(true)
-      return
-    }
+    // Wait a bit for userData to update
+    setTimeout(async () => {
+      // Query subscription by company ID after company registration
+      let currentSubscription = null
+      try {
+        if (userData?.company_id) {
+          console.log("Fetching subscription after company registration for company_id:", userData.company_id)
+          currentSubscription = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
+          console.log("Subscription after company registration:", currentSubscription)
+        }
+      } catch (error) {
+        console.error("Error fetching subscription after company registration:", error)
+      }
 
-    if (!subscriptionData || subscriptionData.status !== "active") {
-      setSubscriptionLimitMessage(
-        "Your current subscription is not active. Please activate or upgrade your plan to add more sites.",
-      )
-      setShowSubscriptionLimitDialog(true)
-      return
-    }
+      // Check subscription after company registration
+      if (!userData?.license_key) {
+        console.log("No license key after company registration")
+        setSubscriptionLimitMessage(
+          "Company registered successfully! Now choose a subscription plan to start adding sites.",
+        )
+        setShowSubscriptionLimitDialog(true)
+        return
+      }
 
-    if (totalItems >= subscriptionData.maxProducts) {
-      setSubscriptionLimitMessage(
-        `You have reached the maximum number of sites allowed by your current plan (${subscriptionData.maxProducts}). Please upgrade your subscription to add more sites.`,
-      )
-      setShowSubscriptionLimitDialog(true)
-      return
-    }
+      if (!currentSubscription) {
+        console.log("No subscription found after company registration")
+        setSubscriptionLimitMessage(
+          "Company registered successfully! Please choose a subscription plan to start adding sites.",
+        )
+        setShowSubscriptionLimitDialog(true)
+        return
+      }
 
-    // Only redirect if all subscription checks pass
-    router.push("/admin/products/create")
+      if (currentSubscription.status !== "active") {
+        console.log("Subscription not active after company registration, status:", currentSubscription.status)
+        setSubscriptionLimitMessage(
+          `Company registered successfully! Your subscription is ${currentSubscription.status}. Please activate it to continue.`,
+        )
+        setShowSubscriptionLimitDialog(true)
+        return
+      }
+
+      if (totalItems >= currentSubscription.maxProducts) {
+        console.log("Product limit reached after company registration")
+        setSubscriptionLimitMessage(
+          `Company registered successfully! You've reached your plan limit of ${currentSubscription.maxProducts} sites. Upgrade your plan to add more sites.`,
+        )
+        setShowSubscriptionLimitDialog(true)
+        return
+      }
+
+      // Only redirect if all subscription checks pass
+      console.log("All checks passed after company registration, redirecting to create product")
+      router.push("/admin/products/create")
+    }, 1000) // Wait 1 second for userData to refresh
   }
 
   return (
@@ -344,6 +408,7 @@ export default function AdminInventoryPage() {
               <Card
                 key={product.id}
                 className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
+                onClick={() => handleViewDetails(product.id)}
               >
                 <div className="h-48 bg-gray-200 relative">
                   <Image
@@ -454,7 +519,7 @@ export default function AdminInventoryPage() {
       <Dialog open={showSubscriptionLimitDialog} onOpenChange={setShowSubscriptionLimitDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Subscription Required</DialogTitle>
+            <DialogTitle>🎯 Let's Get You Started!</DialogTitle>
             <DialogDescription>{subscriptionLimitMessage}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
