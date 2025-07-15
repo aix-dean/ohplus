@@ -57,6 +57,7 @@ interface AuthContextType {
   projectData: ProjectData | null
   subscriptionData: Subscription | null
   loading: boolean
+  isRegistering: boolean
   login: (email: string, password: string) => Promise<void>
   loginOHPlusOnly: (email: string, password: string) => Promise<void>
   register: (
@@ -92,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
   const [subscriptionData, setSubscriptionData] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isRegistering, setIsRegistering] = useState(false) // Add flag to track registration
 
   const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
     try {
@@ -313,6 +315,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     orgCode?: string,
   ) => {
+    setIsRegistering(true) // Set registration flag
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, personalInfo.email, password)
       const firebaseUser = userCredential.user
@@ -388,11 +391,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
       }
 
-      // Set user immediately after successful registration
+      // Set user and fetch user data after successful registration
       setUser(firebaseUser)
+      await fetchUserData(firebaseUser)
     } catch (error) {
       console.error("Error in AuthContext register:", error)
       throw error
+    } finally {
+      setIsRegistering(false) // Clear registration flag
     }
   }
 
@@ -451,6 +457,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (firebaseUser) {
         setUser(firebaseUser)
 
+        // Skip OHPLUS check if we're in the middle of registration
+        if (isRegistering) {
+          setLoading(false)
+          return
+        }
+
         const isOHPlusAccount = await findOHPlusAccount(firebaseUser.uid)
         if (isOHPlusAccount) {
           await fetchUserData(firebaseUser)
@@ -466,7 +478,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })
     return () => unsubscribe()
-  }, [fetchUserData])
+  }, [fetchUserData, isRegistering]) // Add isRegistering to dependencies
 
   const value = {
     user,
@@ -474,6 +486,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     projectData,
     subscriptionData,
     loading,
+    isRegistering,
     login,
     loginOHPlusOnly,
     register,
