@@ -8,9 +8,24 @@ import { Search, ArrowLeft, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
-import { getPaginatedUserProducts, type Product } from "@/lib/firebase-service"
-import { getDoc, doc } from "firebase/firestore"
+import { collection, query, where, getDocs, getDoc, doc, orderBy, limit } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+
+interface Product {
+  id: string
+  name: string
+  content_type?: string
+  status?: string
+  active?: boolean
+  company_id?: string
+  specs_rental?: {
+    location?: string
+  }
+  light?: {
+    location?: string
+  }
+  [key: string]: any
+}
 
 export default function BulletinBoardPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -31,7 +46,7 @@ export default function BulletinBoardPage() {
     return () => clearTimeout(timer)
   }, [searchTerm])
 
-  // Fetch products
+  // Fetch products directly from Firestore
   const fetchProducts = useCallback(async () => {
     if (!user?.uid) return
 
@@ -40,20 +55,45 @@ export default function BulletinBoardPage() {
       // Get user's company_id first
       const userDoc = await getDoc(doc(db, "users", user.uid))
       const userData = userDoc.data()
-      const companyId = userData?.company_id || user.uid // fallback to user.uid if no company_id
+      const companyId = userData?.company_id || user.uid
 
-      console.log("Fetching products for company_id:", companyId)
+      console.log("User company_id:", companyId)
 
-      const result = await getPaginatedUserProducts(companyId, 1000, null, {
-        active: true,
-        searchTerm: debouncedSearchTerm,
+      // Query products collection directly
+      const productsRef = collection(db, "products")
+      const productsQuery = query(
+        productsRef,
+        where("company_id", "==", companyId),
+        where("active", "==", true),
+        orderBy("created", "desc"),
+        limit(1000),
+      )
+
+      const querySnapshot = await getDocs(productsQuery)
+      const fetchedProducts: Product[] = []
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        fetchedProducts.push({
+          id: doc.id,
+          ...data,
+        } as Product)
       })
 
-      console.log("Fetched products:", result.items)
+      console.log("Fetched products from Firestore:", fetchedProducts)
 
-      // Show all active products for logistics bulletin board
-      const filteredItems = result.items.filter((product) => product.active !== false)
-      setProducts(filteredItems)
+      // Filter by search term if provided
+      let filteredProducts = fetchedProducts
+      if (debouncedSearchTerm) {
+        filteredProducts = fetchedProducts.filter(
+          (product) =>
+            product.name?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+            product.specs_rental?.location?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+            product.light?.location?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()),
+        )
+      }
+
+      setProducts(filteredProducts)
     } catch (error) {
       console.error("Error fetching products:", error)
       setError("Failed to load sites. Please try again.")
@@ -163,10 +203,14 @@ export default function BulletinBoardPage() {
           <p>User ID: {user?.uid}</p>
           {products.length > 0 && (
             <div>
-              <p>Sample product content_types:</p>
+              <p>Sample product details:</p>
               {products.slice(0, 3).map((p) => (
-                <div key={p.id}>
-                  {p.id}: {p.content_type} (company_id: {p.company_id})
+                <div key={p.id} className="border-l-2 border-blue-500 pl-2 my-1">
+                  <div>ID: {p.id}</div>
+                  <div>Name: {p.name}</div>
+                  <div>Content Type: {p.content_type}</div>
+                  <div>Company ID: {p.company_id}</div>
+                  <div>Active: {p.active?.toString()}</div>
                 </div>
               ))}
             </div>
