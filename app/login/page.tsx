@@ -132,13 +132,22 @@ export default function LoginPage() {
         {/* Left Section: Logo and Company Name */}
         <div className="hidden md:flex flex-col items-center justify-center p-8 bg-gray-50 w-1/2">
           <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={150} height={150} priority />
-          <h2 className="mt-8 text-3xl font-semibold text-blue-700 leading-tight text-center">
+          <h2 className="mt-8 text-3xl font-light text-blue-700 leading-tight text-center">
             Powering Smarter
             <br />
             Site Management for
             <br />
             Billboard Operators
           </h2>
+          <div className="mt-6 flex flex-col items-center">
+            <span className="text-sm text-gray-500 mb-2">powered by:</span>
+            <Image
+              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-rtc0SA22JOy0rY9kZZCVbFIGfjA5H7.png"
+              alt="AIX AI Xynergy Logo"
+              width={120}
+              height={60}
+            />
+          </div>
         </div>
 
         {/* Right Section: Login Form */}
