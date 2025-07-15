@@ -13,7 +13,7 @@ import { FirebaseError } from "firebase/app"
 import { Eye, EyeOff } from "lucide-react"
 import { assignRoleToUser, type RoleType } from "@/lib/hardcoded-access-service"
 import { query, collection, where, getDocs, serverTimestamp, updateDoc, doc } from "firebase/firestore"
-import { db } from "@/firebase/config"
+import { db } from "@/lib/firebase"
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
