@@ -761,11 +761,7 @@ export async function generateReportPDF(
     const contentWidth = pageWidth - margin * 2
     let yPosition = 0
 
-    const createdAt = safeToDate(report.created || report.date)
-    const startDate = safeToDate(report.bookingDates.start)
-    const endDate = safeToDate(report.bookingDates.end)
-
-    // Helper function to format date
+    // Helper function to format date exactly like the web page
     const formatDate = (dateString: string) => {
       return new Date(dateString).toLocaleDateString("en-US", {
         year: "2-digit",
@@ -800,7 +796,7 @@ export async function generateReportPDF(
         pdf.setFillColor(30, 58, 138) // blue-900
         pdf.rect(0, yPosition, pageWidth, headerHeight, "F")
 
-        // Angular cyan section pointing right using polygon
+        // Angular cyan section pointing right
         const cyanlWidth = pageWidth * 0.4
         const startX = pageWidth - cyanlWidth + cyanlWidth * 0.25
 
@@ -865,40 +861,16 @@ export async function generateReportPDF(
     pdf.text(reportTypeDisplay, margin + 2, yPosition + 5)
     pdf.setTextColor(0, 0, 0)
 
-    // Add company logo on the right (similar to web page - smaller size)
-    const logoContainerSize = 30 // Container size
-    const logoX = pageWidth - margin - logoContainerSize
-    const logoY = yPosition - 2 // Aligned with badge
+    // Add company logo on the right
+    const logoSize = 20
+    const logoX = pageWidth - margin - logoSize
+    const logoY = yPosition - 2
 
     // Try to load company logo, fallback to OH+ logo
-    const companyLogoUrl = "/ohplus-new-logo.png" // Default to OH+ logo
+    const companyLogoUrl = "/ohplus-new-logo.png"
     const logoBase64 = await loadImageAsBase64(companyLogoUrl)
     if (logoBase64) {
-      // Add white background container for logo (similar to web page)
-      pdf.setFillColor(255, 255, 255)
-      pdf.rect(logoX - 2, logoY, logoContainerSize + 4, logoContainerSize, "F")
-
-      // Calculate actual dimensions to fit within the container while maintaining aspect ratio
-      const { width: actualLogoWidth, height: actualLogoHeight } = await getImageDimensions(logoBase64)
-
-      let finalLogoWidth = logoContainerSize
-      let finalLogoHeight = logoContainerSize
-
-      // Adjust dimensions to fit within the container while maintaining aspect ratio
-      const logoAspectRatio = actualLogoWidth / actualLogoHeight
-      if (logoAspectRatio > 1) {
-        // Wider than tall
-        finalLogoHeight = logoContainerSize / logoAspectRatio
-      } else {
-        // Taller than wide or square
-        finalLogoWidth = logoContainerSize * logoAspectRatio
-      }
-
-      // Center the logo within its container
-      const logoOffsetX = (logoContainerSize - finalLogoWidth) / 2
-      const logoOffsetY = (logoContainerSize - finalLogoHeight) / 2
-
-      pdf.addImage(logoBase64, "PNG", logoX + logoOffsetX, logoY + logoOffsetY, finalLogoWidth, finalLogoHeight)
+      pdf.addImage(logoBase64, "PNG", logoX, logoY, logoSize, logoSize)
     }
 
     yPosition += badgeHeight + 5
@@ -918,24 +890,17 @@ export async function generateReportPDF(
     pdf.text("Project Information", margin, yPosition)
     yPosition += 8
 
-    // Draw border around project info section (like the card in the web page)
-    pdf.setLineWidth(0.5)
-    pdf.setDrawColor(200, 200, 200)
-    const projectInfoHeight = 55
-    pdf.rect(margin, yPosition, contentWidth, projectInfoHeight)
-    yPosition += 5
+    // Draw border around project info table (exactly like the web page)
+    pdf.setLineWidth(1)
+    pdf.setDrawColor(0, 0, 0)
+    const tableHeight = 55
+    pdf.rect(margin, yPosition, contentWidth, tableHeight)
 
-    pdf.setFontSize(9)
-    pdf.setFont("helvetica", "normal")
+    // Create table structure with vertical line in the middle
+    const middleX = margin + contentWidth / 2
+    pdf.line(middleX, yPosition, middleX, yPosition + tableHeight)
 
-    // Two column layout for project information (matching the web page)
-    const leftColumn = margin + 3
-    const rightColumn = margin + contentWidth / 2 + 5
-
-    let leftY = yPosition
-    let rightY = yPosition
-
-    // Helper functions to get data (matching the web page)
+    // Helper functions to get data
     const getSiteLocation = (product: any) => {
       if (!product) return "N/A"
       return product.specs_rental?.location || product.light?.location || "N/A"
@@ -959,74 +924,80 @@ export async function generateReportPDF(
       return diffDays
     }
 
-    // Left column data (matching the web page layout)
-    const leftColumnData = [
-      {
-        label: "Site ID:",
-        value: getSiteLocation(product),
-      },
-      { label: "Job Order:", value: report.id?.slice(-4).toUpperCase() || "N/A" },
-      {
-        label: "Job Order Date:",
-        value: formatDate(report.date),
-      },
-      { label: "Site:", value: report.siteName },
-      { label: "Size:", value: getSiteSize(product) },
-      { label: "Start Date:", value: formatDate(report.bookingDates.start) },
-      { label: "End Date:", value: formatDate(report.bookingDates.end) },
-      {
-        label: "Installation Duration:",
-        value: `${calculateInstallationDuration(report.bookingDates.start, report.bookingDates.end)} days`,
-      },
+    // Table data exactly matching the web page
+    const tableData = [
+      [
+        { label: "Site ID:", value: getSiteLocation(product) },
+        { label: "Content:", value: product?.content_type || "Static" },
+      ],
+      [
+        { label: "Job Order:", value: report.id?.slice(-4).toUpperCase() || "8020" },
+        { label: "Material Specs:", value: product?.specs_rental?.material || "Stickers" },
+      ],
+      [
+        { label: "Job Order Date:", value: formatDate(report.date) },
+        { label: "Crew:", value: `Team ${report.assignedTo || "4"}` },
+      ],
+      [
+        { label: "Site:", value: report.siteName },
+        { label: "Illumination:", value: product?.specs_rental?.illumination || "LR 2097 (200 Watts x 40)" },
+      ],
+      [
+        { label: "Size:", value: getSiteSize(product) },
+        { label: "Gondola:", value: product?.specs_rental?.gondola ? "YES" : "NO" },
+      ],
+      [
+        { label: "Start Date:", value: formatDate(report.bookingDates.start) },
+        { label: "Technology:", value: product?.specs_rental?.technology || "Clear Tapes" },
+      ],
+      [
+        { label: "End Date:", value: formatDate(report.bookingDates.end) },
+        { label: "Sales:", value: report.sales || "AJX" },
+      ],
+      [
+        {
+          label: "Installation Duration:",
+          value: `${calculateInstallationDuration(report.bookingDates.start, report.bookingDates.end)} days`,
+        },
+        { label: "", value: "" },
+      ],
     ]
 
-    // Right column data (matching the web page layout)
-    const rightColumnData = [
-      { label: "Content:", value: product?.content_type || "Static" },
-      { label: "Material Specs:", value: product?.specs_rental?.material || "Stickers" },
-      { label: "Crew:", value: `Team ${report.assignedTo || "4"}` },
-      { label: "Illumination:", value: product?.specs_rental?.illumination || "LR 2097 (200 Watts x 40)" },
-      { label: "Gondola:", value: product?.specs_rental?.gondola ? "YES" : "NO" },
-      { label: "Technology:", value: product?.specs_rental?.technology || "Clear Tapes" },
-      { label: "Sales:", value: report.sales },
-    ]
+    // Render table data
+    pdf.setFontSize(9)
+    let currentY = yPosition + 6
+    const rowHeight = 6
 
-    // Render left column
-    leftColumnData.forEach((item) => {
+    tableData.forEach((row, index) => {
+      const leftItem = row[0]
+      const rightItem = row[1]
+
+      // Left column
       pdf.setFont("helvetica", "bold")
-      pdf.text(item.label, leftColumn, leftY)
+      pdf.text(leftItem.label, margin + 3, currentY)
       pdf.setFont("helvetica", "normal")
-      const labelWidth = item.label === "Job Order Date:" ? 35 : item.label === "Installation Duration:" ? 45 : 25
-      pdf.text(item.value, leftColumn + labelWidth, leftY)
-      leftY += 5
+      pdf.text(leftItem.value, margin + 35, currentY)
+
+      // Right column (if exists)
+      if (rightItem.label) {
+        pdf.setFont("helvetica", "bold")
+        pdf.text(rightItem.label, middleX + 3, currentY)
+        pdf.setFont("helvetica", "normal")
+        pdf.text(rightItem.value, middleX + 35, currentY)
+      }
+
+      currentY += rowHeight
     })
 
-    // Render right column
-    rightColumnData.forEach((item) => {
-      pdf.setFont("helvetica", "bold")
-      pdf.text(item.label, rightColumn, rightY)
-      pdf.setFont("helvetica", "normal")
-      const labelWidth =
-        item.label === "Material Specs:"
-          ? 35
-          : item.label === "Illumination:"
-            ? 35
-            : item.label === "Technology:"
-              ? 35
-              : 25
-      pdf.text(item.value, rightColumn + labelWidth, rightY)
-      rightY += 5
-    })
+    yPosition += tableHeight + 10
 
-    yPosition += projectInfoHeight + 10
-
-    // Project Status Section (matching the web page)
+    // Project Status Section
     checkNewPage(30)
     pdf.setFontSize(14)
     pdf.setFont("helvetica", "bold")
     pdf.text("Project Status", margin, yPosition)
 
-    // Status badge - green (matching the web page)
+    // Status badge - green
     pdf.setFillColor(34, 197, 94) // green-500
     const statusBadgeWidth = 25
     const statusBadgeHeight = 6
@@ -1038,106 +1009,82 @@ export async function generateReportPDF(
 
     yPosition += 15
 
-    // Attachments/Photos Section (2 side by side like in the page)
+    // Single Image Section (matching the web page layout)
     if (report.attachments && report.attachments.length > 0) {
       checkNewPage(80)
 
-      const attachmentsToShow = report.attachments.slice(0, 2)
-      const imageWidth = (contentWidth - 10) / 2 // Space for 2 images side by side
+      const attachment = report.attachments[0] // Show only the first image like in the web page
+      const imageWidth = contentWidth * 0.6 // Make it similar to web page size
       const imageHeight = 60
 
-      for (let i = 0; i < attachmentsToShow.length; i++) {
-        const attachment = attachmentsToShow[i]
-        const currentX = i === 0 ? margin : margin + imageWidth + 10
+      // Draw border for attachment box
+      pdf.setLineWidth(0.5)
+      pdf.setDrawColor(200, 200, 200)
+      pdf.rect(margin, yPosition, imageWidth, imageHeight)
 
-        // Draw border for attachment box (matching the web page)
-        pdf.setLineWidth(0.5)
-        pdf.setDrawColor(200, 200, 200)
-        pdf.rect(currentX, yPosition, imageWidth, imageHeight)
+      // Try to add actual image if it's an image file
+      if (attachment.fileUrl && attachment.fileName) {
+        const extension = attachment.fileName.toLowerCase().split(".").pop()
+        if (["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")) {
+          try {
+            const { base64, width, height } = await calculateImageFitDimensions(
+              attachment.fileUrl,
+              imageWidth - 4,
+              imageHeight - 4,
+            )
 
-        // Try to add actual image if it's an image file
-        if (attachment.fileUrl && attachment.fileName) {
-          const extension = attachment.fileName.toLowerCase().split(".").pop()
-          if (["jpg", "jpeg", "png", "gif", "webp"].includes(extension || "")) {
-            try {
-              const { base64, width, height } = await calculateImageFitDimensions(
-                attachment.fileUrl,
-                imageWidth - 4, // Max width for the image inside the border
-                imageHeight - 4, // Max height for the image inside the border
-              )
-
-              if (base64) {
-                // Calculate x position to center the image within its container
-                const centeredX = currentX + (imageWidth - width) / 2
-                pdf.addImage(base64, "JPEG", centeredX, yPosition + 2, width, height)
-              }
-            } catch (error) {
-              console.error("Error adding attachment image:", error)
-              // Add placeholder text
-              pdf.setFontSize(8)
-              pdf.text(attachment.fileName, currentX + 5, yPosition + imageHeight / 2)
+            if (base64) {
+              const centeredX = margin + (imageWidth - width) / 2
+              pdf.addImage(base64, "JPEG", centeredX, yPosition + 2, width, height)
             }
-          } else {
-            // Add file name for non-image files
+          } catch (error) {
+            console.error("Error adding attachment image:", error)
             pdf.setFontSize(8)
-            pdf.text(attachment.fileName, currentX + 5, yPosition + imageHeight / 2)
+            pdf.text(attachment.fileName, margin + 5, yPosition + imageHeight / 2)
           }
         } else {
-          // Placeholder for missing attachment
           pdf.setFontSize(8)
-          pdf.setTextColor(100, 100, 100)
-          pdf.text(`Project Photo ${i + 1}`, currentX + 5, yPosition + imageHeight / 2)
-          pdf.setTextColor(0, 0, 0)
+          pdf.text(attachment.fileName, margin + 5, yPosition + imageHeight / 2)
         }
+      } else {
+        pdf.setFontSize(8)
+        pdf.setTextColor(100, 100, 100)
+        pdf.text("Project Photo", margin + 5, yPosition + imageHeight / 2)
+        pdf.setTextColor(0, 0, 0)
       }
 
       yPosition += imageHeight + 5
 
-      // Add attachment info below images (like in the page)
+      // Add attachment info below image (exactly like the web page)
       pdf.setFontSize(8)
       pdf.setFont("helvetica", "normal")
 
-      for (let i = 0; i < attachmentsToShow.length; i++) {
-        const currentX = i === 0 ? margin : margin + imageWidth + 10
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Date:", margin, yPosition)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(formatDate(report.date), margin + 15, yPosition)
 
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Time:", margin, yPosition + 4)
+      pdf.setFont("helvetica", "normal")
+      pdf.text("04:17 PM", margin + 15, yPosition + 4) // Static time like in the web page
+
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Location:", margin, yPosition + 8)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(getSiteLocation(product), margin + 25, yPosition + 8)
+
+      if (attachment.fileName) {
         pdf.setFont("helvetica", "bold")
-        pdf.text("Date:", currentX, yPosition)
+        pdf.text("File:", margin, yPosition + 12)
         pdf.setFont("helvetica", "normal")
-        pdf.text(formatDate(report.date), currentX + 15, yPosition)
-
-        pdf.setFont("helvetica", "bold")
-        pdf.text("Time:", currentX, yPosition + 4)
-        pdf.setFont("helvetica", "normal")
-        pdf.text(
-          new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-          currentX + 15,
-          yPosition + 4,
-        )
-
-        pdf.setFont("helvetica", "bold")
-        pdf.text("Location:", currentX, yPosition + 8)
-        pdf.setFont("helvetica", "normal")
-        pdf.text(getSiteLocation(product), currentX + 25, yPosition + 8)
-
-        if (attachmentsToShow[i].fileName) {
-          pdf.setFont("helvetica", "bold")
-          pdf.text("File:", currentX, yPosition + 12)
-          pdf.setFont("helvetica", "normal")
-          pdf.text(attachmentsToShow[i].fileName, currentX + 15, yPosition + 12)
-        }
-
-        if (attachmentsToShow[i].note) {
-          pdf.setFont("helvetica", "bold")
-          pdf.text("Note:", currentX, yPosition + 16)
-          pdf.setFont("helvetica", "normal")
-          pdf.text(attachmentsToShow[i].note, currentX + 15, yPosition + 16)
-        }
+        pdf.text(attachment.fileName, margin + 15, yPosition + 12)
       }
 
       yPosition += 20
     }
 
-    // Footer Section (matching the web page)
+    // Footer Section
     checkNewPage(40)
     pdf.setLineWidth(0.5)
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
@@ -1150,16 +1097,15 @@ export async function generateReportPDF(
 
     pdf.setFontSize(10)
     pdf.setFont("helvetica", "normal")
-    pdf.setTextColor(59, 130, 246) // blue color for email
-    pdf.text(report.createdByName || "aixymbiosig@aix.com", margin, yPosition)
+    pdf.setTextColor(59, 130, 246) // blue color for name
+    pdf.text(report.createdByName || "AJX", margin, yPosition)
     yPosition += 5
     pdf.setTextColor(0, 0, 0)
     pdf.text("LOGISTICS", margin, yPosition)
     yPosition += 5
-    const preparedDate = formatDate(report.date)
-    pdf.text(preparedDate, margin, yPosition)
+    pdf.text(formatDate(report.date), margin, yPosition)
 
-    // Add disclaimer on the right side (matching the web page)
+    // Add disclaimer on the right side
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "italic")
     pdf.setTextColor(100, 100, 100)
@@ -1205,7 +1151,7 @@ export async function generateReportPDF(
       "F",
     )
 
-    // Add footer text (matching the web page)
+    // Add footer text
     pdf.setTextColor(255, 255, 255)
     pdf.setFontSize(10)
     pdf.setFont("helvetica", "normal")
