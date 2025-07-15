@@ -11,9 +11,6 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FirebaseError } from "firebase/app"
 import { Eye, EyeOff } from "lucide-react"
-import { assignRoleToUser, type RoleType } from "@/lib/hardcoded-access-service"
-import { query, collection, where, getDocs, serverTimestamp, updateDoc, doc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
@@ -123,10 +120,8 @@ export default function RegisterPage() {
     }
 
     setLoading(true)
-    let licenseKey = ""
-    let companyId = null
     try {
-      const { user: firebaseUser } = await register(
+      await register(
         {
           email,
           first_name: firstName,
@@ -143,43 +138,6 @@ export default function RegisterPage() {
         orgCode || undefined, // Pass the organization code if available
       )
 
-      if (orgCode) {
-        const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
-        const invitationSnapshot = await getDocs(invitationQuery)
-
-        if (!invitationSnapshot.empty) {
-          const invitationDoc = invitationSnapshot.docs[0]
-          const invitationData = invitationDoc.data()
-
-          licenseKey = invitationData.license_key || licenseKey
-          companyId = invitationData.company_id || null
-
-          // Assign role to user if role exists in invitation
-          if (invitationData.role) {
-            try {
-              await assignRoleToUser(firebaseUser.uid, invitationData.role as RoleType)
-              console.log(`Role ${invitationData.role} assigned to user ${firebaseUser.uid}`)
-            } catch (roleError) {
-              console.error("Error assigning role to user:", roleError)
-              // Continue with registration even if role assignment fails
-            }
-          }
-
-          const updateData: any = {
-            used: true,
-            used_count: (invitationData.used_count || 0) + 1,
-            last_used_at: serverTimestamp(),
-          }
-
-          if (invitationData.used_by && Array.isArray(invitationData.used_by)) {
-            updateData.used_by = [...invitationData.used_by, firebaseUser.uid]
-          } else {
-            updateData.used_by = [firebaseUser.uid]
-          }
-
-          await updateDoc(doc(db, "invitation_codes", invitationDoc.id), updateData)
-        }
-      }
       setErrorMessage(null)
       const redirectUrl = orgCode
         ? "/admin/dashboard?registered=true&joined_org=true"
