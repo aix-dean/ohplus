@@ -113,6 +113,7 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
             <TableHead>Project Site</TableHead>
             <TableHead>Service Type</TableHead>
             <TableHead>Assigned To</TableHead>
+            <TableHead>Requested By</TableHead>
             <TableHead>Covered Date</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Created</TableHead>
@@ -122,7 +123,7 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
         <TableBody>
           {assignments.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+              <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                 No service assignments found. Create your first assignment.
               </TableCell>
             </TableRow>
@@ -138,6 +139,7 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
                 </TableCell>
                 <TableCell>{assignment.serviceType}</TableCell>
                 <TableCell>{assignment.assignedTo}</TableCell>
+                <TableCell>{assignment.requestedBy?.name || "Unknown"}</TableCell>
                 <TableCell>
                   {assignment.coveredDateStart && assignment.coveredDateEnd ? (
                     <>
