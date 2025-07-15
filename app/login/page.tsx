@@ -131,14 +131,19 @@ export default function LoginPage() {
       <div className="flex w-full max-w-4xl bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Left Section: Logo and Company Name */}
         <div className="hidden md:flex flex-col items-center justify-center p-8 bg-gray-50 w-1/2">
-          <Image
-            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-K7tByuCvUXrspqTAaOZm8IvQg3oa5F.png"
-            alt="AIX Logo"
-            width={200}
-            height={200}
-            priority
-          />
-          <span className="mt-4 text-2xl font-bold text-gray-800">AIX</span>
+          <Image src="/ohplus-new-logo.png" alt="OH! Plus Logo" width={150} height={150} priority />
+          <h2 className="mt-8 text-3xl font-bold text-blue-700 leading-tight text-center">
+            Powering Smarter
+            <br />
+            Site Management for
+            <br />
+            Billboard Operators
+          </h2>
+          <div className="mt-8 flex flex-col items-center">
+            <span className="text-sm text-gray-500">powered by:</span>
+            <Image src="/aix-logo-small.png" alt="AIX AI Xynergy Logo" width={100} height={50} />
+            <span className="text-xs text-gray-600">AI Xynergy</span>
+          </div>
         </div>
 
         {/* Right Section: Login Form */}
