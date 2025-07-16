@@ -29,7 +29,7 @@ export default function RegisterPage() {
   const [invitationRole, setInvitationRole] = useState<string | null>(null)
   const [loadingInvitation, setLoadingInvitation] = useState(false)
 
-  const { register, user } = useAuth()
+  const { register, user, userData, getRoleDashboardPath } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -175,8 +175,8 @@ export default function RegisterPage() {
         orgCode || undefined,
       )
 
-      // Registration successful - redirect to dashboard
-      router.push("/admin/dashboard")
+      // Registration successful - redirect will be handled by useEffect
+      // The redirect logic will be handled after userData is loaded
     } catch (error: unknown) {
       console.error("Registration failed:", error)
       setErrorMessage(getFriendlyErrorMessage(error))
@@ -184,6 +184,42 @@ export default function RegisterPage() {
       setLoading(false)
     }
   }
+
+  // Role-based navigation after registration
+  useEffect(() => {
+    console.log("Register navigation useEffect triggered")
+    console.log("user:", !!user)
+    console.log("userData:", userData)
+    console.log("loading:", loading)
+
+    if (user && userData && !loading) {
+      console.log("userData.roles:", userData.roles)
+
+      // Check if user is in onboarding
+      if (userData.onboarding) {
+        console.log("User is in onboarding, redirecting to onboarding flow")
+        router.push("/register/select-subscription")
+        return
+      }
+
+      // Only use the roles array from user_roles collection
+      if (userData.roles && userData.roles.length > 0) {
+        console.log("Using roles from user_roles collection:", userData.roles)
+        const dashboardPath = getRoleDashboardPath(userData.roles)
+
+        if (dashboardPath) {
+          console.log("Navigating to:", dashboardPath)
+          router.push(dashboardPath)
+        } else {
+          console.log("No dashboard path found for roles, redirecting to unauthorized")
+          router.push("/unauthorized")
+        }
+      } else {
+        console.log("No roles found in user_roles collection, redirecting to unauthorized")
+        router.push("/unauthorized")
+      }
+    }
+  }, [user, userData, loading, router, getRoleDashboardPath])
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">

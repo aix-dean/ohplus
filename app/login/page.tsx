@@ -31,15 +31,15 @@ export default function LoginPage() {
   const [orgCode, setOrgCode] = useState("")
   const [isValidatingCode, setIsValidatingCode] = useState(false)
 
-  const { loginOHPlusOnly, user } = useAuth()
+  const { loginOHPlusOnly, user, userData, getRoleDashboardPath } = useAuth()
   const router = useRouter()
 
   // Redirect if already logged in
-  useEffect(() => {
-    if (user) {
-      router.push("/admin/dashboard")
-    }
-  }, [user, router])
+  // useEffect(() => {
+  //   if (user) {
+  //     router.push("/admin/dashboard")
+  //   }
+  // }, [user, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,7 +48,7 @@ export default function LoginPage() {
 
     try {
       await loginOHPlusOnly(email, password)
-      router.push("/admin/dashboard")
+      // The redirect will be handled by the useEffect below after userData is loaded
     } catch (error: any) {
       console.error("Login error:", error)
 
@@ -125,6 +125,42 @@ export default function LoginPage() {
       setIsValidatingCode(false)
     }
   }
+
+  // Role-based navigation after login
+  useEffect(() => {
+    console.log("Login navigation useEffect triggered")
+    console.log("user:", !!user)
+    console.log("userData:", userData)
+    console.log("isLoading:", isLoading)
+
+    if (user && userData && !isLoading) {
+      console.log("userData.roles:", userData.roles)
+
+      // Check if user is in onboarding
+      if (userData.onboarding) {
+        console.log("User is in onboarding, redirecting to onboarding flow")
+        router.push("/register/select-subscription")
+        return
+      }
+
+      // Only use the roles array from user_roles collection
+      if (userData.roles && userData.roles.length > 0) {
+        console.log("Using roles from user_roles collection:", userData.roles)
+        const dashboardPath = getRoleDashboardPath(userData.roles)
+
+        if (dashboardPath) {
+          console.log("Navigating to:", dashboardPath)
+          router.push(dashboardPath)
+        } else {
+          console.log("No dashboard path found for roles, redirecting to unauthorized")
+          router.push("/unauthorized")
+        }
+      } else {
+        console.log("No roles found in user_roles collection, redirecting to unauthorized")
+        router.push("/unauthorized")
+      }
+    }
+  }, [user, userData, isLoading, router, getRoleDashboardPath])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white p-4">

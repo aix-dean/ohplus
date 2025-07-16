@@ -22,13 +22,17 @@ const publicRoutes = [
   "/forgot-password",
   "/register/select-subscription",
   "/onboarding", // New public route for the multi-step onboarding
+  "/unauthorized", // Add unauthorized page to public routes
 ]
 
 export default function AuthLayout({ children }: AuthLayoutProps) {
   const { user, userData, loading } = useAuth() // Get userData here
   const pathname = usePathname()
 
-  const isPublicRoute = publicRoutes.includes(pathname) || pathname?.startsWith("/onboarding") // Handle dynamic onboarding path
+  const isPublicRoute =
+    publicRoutes.includes(pathname) ||
+    pathname?.startsWith("/onboarding") || // Handle dynamic onboarding path
+    pathname?.startsWith("/unauthorized") // Handle unauthorized path
   const isPublicProposal = pathname?.startsWith("/proposals/view/")
 
   // If it's a public proposal view, render without navigation and without auth check
@@ -63,6 +67,14 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
     if (pathname !== "/register/select-subscription" && !pathname.startsWith("/onboarding")) {
       window.location.href = "/register/select-subscription"
       return null // Prevent rendering anything else
+    }
+  }
+
+  // If user has no roles, redirect to unauthorized page
+  if (user && userData && (!userData.roles || userData.roles.length === 0)) {
+    if (pathname !== "/unauthorized") {
+      window.location.href = "/unauthorized"
+      return null
     }
   }
 

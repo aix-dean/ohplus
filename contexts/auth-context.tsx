@@ -14,7 +14,7 @@ import { auth, db } from "@/lib/firebase"
 import { subscriptionService } from "@/lib/subscription-service"
 import type { Subscription } from "@/lib/types/subscription"
 import { generateLicenseKey } from "@/lib/utils"
-import { assignRoleToUser, type RoleType } from "@/lib/hardcoded-access-service"
+import { assignRoleToUser, getUserRoles, type RoleType } from "@/lib/hardcoded-access-service"
 
 interface UserData {
   uid: string
@@ -23,6 +23,7 @@ interface UserData {
   license_key: string | null
   company_id?: string | null
   role: string | null
+  roles: RoleType[] // Add roles array from user_roles collection
   permissions: string[]
   project_id?: string
   first_name?: string
@@ -33,6 +34,7 @@ interface UserData {
   type?: string
   created?: Date
   updated?: Date
+  onboarding?: boolean
 }
 
 interface ProjectData {
@@ -82,6 +84,8 @@ interface AuthContextType {
   refreshUserData: () => Promise<void>
   refreshSubscriptionData: () => Promise<void>
   assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
+  getRoleDashboardPath: (roles: RoleType[]) => string | null
+  hasRole: (requiredRoles: RoleType | RoleType[]) => boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -109,12 +113,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = userDoc.data()
         console.log("User document data:", data)
 
+        // Fetch roles from user_roles collection
+        const userRoles = await getUserRoles(firebaseUser.uid)
+        console.log("User roles from user_roles collection:", userRoles)
+
         fetchedUserData = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
           license_key: data.license_key || null,
-          role: data.role || "user",
+          role: userRoles.length > 0 ? userRoles[0] : null, // Set role based on first role from user_roles
+          roles: userRoles, // Add the roles array from user_roles collection
           permissions: data.permissions || [],
           project_id: data.project_id,
           first_name: data.first_name,
@@ -126,18 +135,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           created: data.created?.toDate(),
           updated: data.updated?.toDate(),
           company_id: data.company_id || null,
+          onboarding: data.onboarding || false,
           ...data,
         }
       } else {
         console.log("User document doesn't exist, creating basic one")
+
+        // Fetch roles from user_roles collection even if user doc doesn't exist
+        const userRoles = await getUserRoles(firebaseUser.uid)
+        console.log("User roles from user_roles collection:", userRoles)
+
         fetchedUserData = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
           license_key: null,
           company_id: null,
-          role: "user",
+          role: userRoles.length > 0 ? userRoles[0] : null,
+          roles: userRoles,
           permissions: [],
+          onboarding: true, // New users need to complete onboarding
         }
 
         // Create the user document with uid field
@@ -153,7 +170,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         )
       }
 
-      console.log("Fetched user data:", fetchedUserData)
+      console.log("Final fetchedUserData with roles:", fetchedUserData)
+      console.log("Roles array:", fetchedUserData.roles)
+      console.log("Primary role:", fetchedUserData.role)
+
       setUserData(fetchedUserData)
 
       if (fetchedUserData.project_id) {
@@ -424,6 +444,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         phone_number: personalInfo.phone_number,
         gender: personalInfo.gender,
         project_id: orgCode ? null : firebaseUser.uid,
+        onboarding: true, // New users need to complete onboarding
       }
 
       await setDoc(userDocRef, userData)
@@ -555,6 +576,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe()
   }, [fetchUserData, isRegistering])
 
+  // Function to check if user has a specific role or any of the roles in an array
+  const hasRole = useCallback(
+    (requiredRoles: RoleType | RoleType[]): boolean => {
+      if (!userData || !userData.roles || userData.roles.length === 0) {
+        return false
+      }
+
+      if (Array.isArray(requiredRoles)) {
+        return requiredRoles.some((role) => userData.roles.includes(role))
+      }
+
+      return userData.roles.includes(requiredRoles)
+    },
+    [userData],
+  )
+
+  const getRoleDashboardPath = useCallback((roles: RoleType[]): string | null => {
+    console.log("getRoleDashboardPath called with roles:", roles)
+
+    if (!roles || roles.length === 0) {
+      console.log("No roles found, returning null")
+      return null
+    }
+
+    // Priority order: admin > sales > logistics > cms
+    if (roles.includes("admin")) {
+      console.log("Admin role found, redirecting to admin dashboard")
+      return "/admin/dashboard"
+    }
+    if (roles.includes("sales")) {
+      console.log("Sales role found, redirecting to sales dashboard")
+      return "/sales/dashboard"
+    }
+    if (roles.includes("logistics")) {
+      console.log("Logistics role found, redirecting to logistics dashboard")
+      return "/logistics/dashboard"
+    }
+    if (roles.includes("cms")) {
+      console.log("CMS role found, redirecting to cms dashboard")
+      return "/cms/dashboard"
+    }
+
+    console.log("No matching roles found, returning null")
+    return null
+  }, [])
+
   const value = {
     user,
     userData,
@@ -571,6 +638,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUserData,
     refreshSubscriptionData,
     assignLicenseKey,
+    getRoleDashboardPath,
+    hasRole,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
