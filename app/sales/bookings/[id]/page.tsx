@@ -74,8 +74,12 @@ export default function BookingDetailsPage() {
       if (typeof date === "string") {
         return format(new Date(date), "MMM d, yyyy")
       }
+      if (date instanceof Date) {
+        return format(date, "MMM d, yyyy")
+      }
       return "Invalid date"
     } catch (error) {
+      console.error("Error formatting date:", error)
       return "Invalid date"
     }
   }
@@ -180,6 +184,18 @@ export default function BookingDetailsPage() {
       .join("")
       .toUpperCase()
       .substring(0, 2) || "CL"
+
+  // Format currency safely
+  const formatCurrency = (amount: any) => {
+    if (!amount && amount !== 0) return "N/A"
+    try {
+      const numAmount = typeof amount === "number" ? amount : Number.parseFloat(amount.toString())
+      if (isNaN(numAmount)) return "N/A"
+      return `₱${numAmount.toLocaleString()}`
+    } catch (error) {
+      return "N/A"
+    }
+  }
 
   return (
     <div className="container mx-auto p-6">
@@ -307,7 +323,7 @@ export default function BookingDetailsPage() {
               <Button
                 onClick={handleChatWithCustomer}
                 disabled={chatLoading || !booking?.user_id}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 bg-transparent"
                 variant="outline"
               >
                 <MessageCircle className="h-4 w-4" />
@@ -351,7 +367,7 @@ export default function BookingDetailsPage() {
 
               <div>
                 <p className="text-sm text-gray-600">Total Amount:</p>
-                <p className="font-medium">₱{booking.total_cost?.toLocaleString() || "N/A"}</p>
+                <p className="font-medium">{formatCurrency(booking.total_cost)}</p>
               </div>
 
               <div>
