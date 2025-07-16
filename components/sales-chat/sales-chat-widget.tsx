@@ -299,12 +299,12 @@ export function SalesChatWidget({
                                   <p className="text-sm font-medium truncate">{thread.receiver_name}</p>
                                   <div className="flex items-center gap-1 shrink-0 max-w-[40%] text-right">
                                     {thread.priority && (
-                                      <Badge variant={getPriorityColor(thread.priority) as any} className="text-xs">
+                                      <Badge variant={getPriorityColor(thread.priority) as any} className="text-xs whitespace-nowrap">
                                         {thread.priority}
                                       </Badge>
                                     )}
                                     {lastMessageTime && (
-                                      <span className="text-xs text-muted-foreground">
+                                      <span className="text-xs text-muted-foreground whitespace-nowrap truncate">
                                         {formatDistanceToNow(lastMessageTime, { addSuffix: true })}
                                       </span>
                                     )}
