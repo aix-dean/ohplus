@@ -23,11 +23,9 @@ import {
   PlusCircle,
   Calculator,
   FileText,
-  TrendingUp,
-  Users,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
@@ -1526,78 +1524,10 @@ export default function SalesDashboardPage() {
 
   return (
     <RouteProtection requiredRoles="sales">
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Sales Dashboard</h1>
-          <p className="text-muted-foreground">Manage your sales activities, clients, and proposals.</p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Leads</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">89</div>
-              <p className="text-xs text-muted-foreground">+12% from last week</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Proposals Sent</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">23</div>
-              <p className="text-xs text-muted-foreground">+5% from last week</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">34.5%</div>
-              <p className="text-xs text-muted-foreground">+2.1% from last week</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Meetings Today</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">4</div>
-              <p className="text-xs text-muted-foreground">2 confirmed, 2 pending</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Sales Team Access</CardTitle>
-            <CardDescription>
-              Your role provides access to sales-related features and client management.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">Client Management</Badge>
-              <Badge variant="secondary">Proposals</Badge>
-              <Badge variant="secondary">Quotations</Badge>
-              <Badge variant="secondary">Bookings</Badge>
-              <Badge variant="secondary">Product Catalog</Badge>
-              <Badge variant="secondary">Customer Chat</Badge>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
       <div>
+        <SalesDashboardContent />
+
+        {/* Render SalesChatWidget without the floating button */}
         <SalesChatWidget />
       </div>
     </RouteProtection>

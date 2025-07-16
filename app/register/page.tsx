@@ -3,167 +3,89 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import {
-  createUserWithEmailAndPassword,
-  signInWithPopup,
-  GoogleAuthProvider,
-  FacebookAuthProvider,
-} from "firebase/auth"
-import { doc, setDoc, serverTimestamp } from "firebase/firestore"
-import { auth, db } from "@/lib/firebase"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Separator } from "@/components/ui/separator"
-import { Eye, EyeOff, Mail, Lock, User, Building } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
 import Link from "next/link"
-import Image from "next/image"
-import { useAuth } from "@/contexts/auth-context"
 
 export default function RegisterPage() {
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
+  const [personalInfo, setPersonalInfo] = useState({
     email: "",
-    password: "",
-    confirmPassword: "",
-    companyName: "",
-    position: "",
+    first_name: "",
+    last_name: "",
+    middle_name: "",
+    phone_number: "",
+    gender: "",
   })
+  const [companyInfo, setCompanyInfo] = useState({
+    company_name: "",
+    company_location: "",
+  })
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const { register, user, userData, loading, getRoleDashboardPath } = useAuth()
   const router = useRouter()
-  const { user, userData, loading: authLoading, getRoleDashboardPath } = useAuth()
+  const searchParams = useSearchParams()
+  const orgCode = searchParams.get("code")
 
-  // Redirect if already logged in
   useEffect(() => {
-    if (!authLoading && user && userData) {
-      const dashboardPath = getRoleDashboardPath()
-      if (dashboardPath) {
-        router.push(dashboardPath)
+    if (!loading && user && userData) {
+      console.log("User registered, checking roles:", userData.roles)
+
+      if (userData.roles && userData.roles.length > 0) {
+        const dashboardPath = getRoleDashboardPath(userData.roles)
+        if (dashboardPath) {
+          console.log("Redirecting to:", dashboardPath)
+          router.push(dashboardPath)
+        } else {
+          console.log("No dashboard path found, redirecting to unauthorized")
+          router.push("/unauthorized")
+        }
       } else {
-        // User has no roles
+        console.log("No roles found, redirecting to unauthorized")
         router.push("/unauthorized")
       }
     }
-  }, [user, userData, authLoading, router, getRoleDashboardPath])
+  }, [user, userData, loading, router, getRoleDashboardPath])
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
-  }
-
-  const handleEmailRegister = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError("")
 
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
+    if (password !== confirmPassword) {
       setError("Passwords do not match")
-      setLoading(false)
       return
     }
 
-    if (formData.password.length < 6) {
+    if (password.length < 6) {
       setError("Password must be at least 6 characters long")
-      setLoading(false)
       return
     }
+
+    setIsLoading(true)
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password)
-      const user = userCredential.user
-
-      // Save user data to Firestore
-      await setDoc(doc(db, "iboard_users", user.uid), {
-        uid: user.uid,
-        email: user.email,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        companyName: formData.companyName,
-        position: formData.position,
-        createdAt: serverTimestamp(),
-        role: "user", // Default role for backward compatibility
-      })
-
-      // Wait a moment for the auth context to update
-      setTimeout(() => {
-        // The useEffect above will handle the redirect
-      }, 1000)
+      await register(personalInfo, companyInfo, password, orgCode || undefined)
+      // Redirect will be handled by useEffect above
     } catch (error: any) {
       console.error("Registration error:", error)
-      setError(error.message || "Failed to create account")
+      setError(error.message || "Failed to create account. Please try again.")
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
-  const handleGoogleRegister = async () => {
-    setLoading(true)
-    setError("")
-
-    try {
-      const provider = new GoogleAuthProvider()
-      const result = await signInWithPopup(auth, provider)
-      const user = result.user
-
-      // Save user data to Firestore
-      await setDoc(doc(db, "iboard_users", user.uid), {
-        uid: user.uid,
-        email: user.email,
-        firstName: user.displayName?.split(" ")[0] || "",
-        lastName: user.displayName?.split(" ").slice(1).join(" ") || "",
-        createdAt: serverTimestamp(),
-        role: "user", // Default role for backward compatibility
-      })
-
-      // The useEffect above will handle the redirect
-    } catch (error: any) {
-      console.error("Google registration error:", error)
-      setError(error.message || "Failed to register with Google")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleFacebookRegister = async () => {
-    setLoading(true)
-    setError("")
-
-    try {
-      const provider = new FacebookAuthProvider()
-      const result = await signInWithPopup(auth, provider)
-      const user = result.user
-
-      // Save user data to Firestore
-      await setDoc(doc(db, "iboard_users", user.uid), {
-        uid: user.uid,
-        email: user.email,
-        firstName: user.displayName?.split(" ")[0] || "",
-        lastName: user.displayName?.split(" ").slice(1).join(" ") || "",
-        createdAt: serverTimestamp(),
-        role: "user", // Default role for backward compatibility
-      })
-
-      // The useEffect above will handle the redirect
-    } catch (error: any) {
-      console.error("Facebook registration error:", error)
-      setError(error.message || "Failed to register with Facebook")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Show loading state while checking auth
-  if (authLoading) {
+  if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-gray-900"></div>
@@ -172,182 +94,205 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4">
-            <Image src="/ooh-shop-logo.png" alt="OOH Shop Logo" width={120} height={40} className="mx-auto" />
-          </div>
-          <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-          <CardDescription>Sign up to get started with OOH Shop</CardDescription>
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+      <Card className="w-full max-w-2xl">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-bold text-center">Create Account</CardTitle>
+          <CardDescription className="text-center">
+            {orgCode ? "Join an existing organization" : "Create your account and organization"}
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <form onSubmit={handleEmailRegister} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Personal Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Personal Information</h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="first_name">First Name</Label>
                   <Input
-                    id="firstName"
-                    name="firstName"
+                    id="first_name"
                     type="text"
-                    placeholder="First name"
-                    value={formData.firstName}
-                    onChange={handleInputChange}
-                    className="pl-10"
+                    placeholder="Enter your first name"
+                    value={personalInfo.first_name}
+                    onChange={(e) => setPersonalInfo({ ...personalInfo, first_name: e.target.value })}
                     required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="last_name">Last Name</Label>
+                  <Input
+                    id="last_name"
+                    type="text"
+                    placeholder="Enter your last name"
+                    value={personalInfo.last_name}
+                    onChange={(e) => setPersonalInfo({ ...personalInfo, last_name: e.target.value })}
+                    required
+                    disabled={isLoading}
                   />
                 </div>
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Label htmlFor="middle_name">Middle Name</Label>
+                <Input
+                  id="middle_name"
+                  type="text"
+                  placeholder="Enter your middle name"
+                  value={personalInfo.middle_name}
+                  onChange={(e) => setPersonalInfo({ ...personalInfo, middle_name: e.target.value })}
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
                   <Input
-                    id="lastName"
-                    name="lastName"
-                    type="text"
-                    placeholder="Last name"
-                    value={formData.lastName}
-                    onChange={handleInputChange}
-                    className="pl-10"
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={personalInfo.email}
+                    onChange={(e) => setPersonalInfo({ ...personalInfo, email: e.target.value })}
                     required
+                    disabled={isLoading}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone_number">Phone Number</Label>
+                  <Input
+                    id="phone_number"
+                    type="tel"
+                    placeholder="Enter your phone number"
+                    value={personalInfo.phone_number}
+                    onChange={(e) => setPersonalInfo({ ...personalInfo, phone_number: e.target.value })}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="gender">Gender</Label>
+                <Select
+                  value={personalInfo.gender}
+                  onValueChange={(value) => setPersonalInfo({ ...personalInfo, gender: value })}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select your gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Company Information - only show if not joining an organization */}
+            {!orgCode && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Company Information</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="company_name">Company Name</Label>
+                  <Input
+                    id="company_name"
+                    type="text"
+                    placeholder="Enter your company name"
+                    value={companyInfo.company_name}
+                    onChange={(e) => setCompanyInfo({ ...companyInfo, company_name: e.target.value })}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company_location">Company Location</Label>
+                  <Input
+                    id="company_location"
+                    type="text"
+                    placeholder="Enter your company location"
+                    value={companyInfo.company_location}
+                    onChange={(e) => setCompanyInfo({ ...companyInfo, company_location: e.target.value })}
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Password */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Security</h3>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={isLoading}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm_password">Confirm Password</Label>
+                <div className="relative">
+                  <Input
+                    id="confirm_password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm your password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    disabled={isLoading}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="pl-10"
-                  required
-                />
-              </div>
-            </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-            <div className="space-y-2">
-              <Label htmlFor="companyName">Company Name</Label>
-              <div className="relative">
-                <Building className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="companyName"
-                  name="companyName"
-                  type="text"
-                  placeholder="Your company name"
-                  value={formData.companyName}
-                  onChange={handleInputChange}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="position">Position</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="position"
-                  name="position"
-                  type="text"
-                  placeholder="Your position"
-                  value={formData.position}
-                  onChange={handleInputChange}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Create a password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="pl-10 pr-10"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  placeholder="Confirm your password"
-                  value={formData.confirmPassword}
-                  onChange={handleInputChange}
-                  className="pl-10 pr-10"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                >
-                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account..." : "Create Account"}
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating account...
+                </>
+              ) : (
+                "Create Account"
+              )}
             </Button>
           </form>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <Separator className="w-full" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-gray-500">Or continue with</span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Button variant="outline" onClick={handleGoogleRegister} disabled={loading}>
-              <Image src="/google-logo.png" alt="Google" width={16} height={16} className="mr-2" />
-              Google
-            </Button>
-            <Button variant="outline" onClick={handleFacebookRegister} disabled={loading}>
-              <Image src="/facebook-logo.png" alt="Facebook" width={16} height={16} className="mr-2" />
-              Facebook
-            </Button>
-          </div>
-
-          <div className="text-center text-sm">
+          <div className="mt-4 text-center text-sm">
             Already have an account?{" "}
             <Link href="/login" className="text-blue-600 hover:underline">
               Sign in
