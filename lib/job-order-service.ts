@@ -199,7 +199,6 @@ export async function getQuotationsForSelection(userId: string): Promise<Quotati
     const q = query(
       quotationsRef,
       where("created_by", "==", userId),
-      where("status", "==", "accepted"),
       orderBy("created", "desc"),
     )
 
