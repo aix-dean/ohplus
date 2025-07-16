@@ -24,7 +24,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/contexts/auth-context"
-import { getJobOrdersByCompanyId } from "@/lib/job-order-service"
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 import type { JobOrder } from "@/lib/types/job-order"
 
 export default function JobOrdersPage() {
@@ -59,13 +60,51 @@ export default function JobOrdersPage() {
 
         console.log("DEBUG: Fetching job orders for company_id:", userData.company_id)
 
-        const { jobOrders: fetchedJobOrders } = await getJobOrdersByCompanyId(userData.company_id)
+        // Fetch job orders directly from Firestore - same approach as sales might be using
+        const jobOrdersRef = collection(db, "jobOrders")
+        const q = query(jobOrdersRef, where("companyId", "==", userData.company_id), orderBy("dateRequested", "desc"))
+
+        const querySnapshot = await getDocs(q)
+        const fetchedJobOrders: JobOrder[] = []
+
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          fetchedJobOrders.push({
+            id: doc.id,
+            ...data,
+          } as JobOrder)
+        })
 
         console.log("DEBUG: Fetched job orders:", fetchedJobOrders)
         setJobOrders(fetchedJobOrders || [])
       } catch (err) {
         console.error("DEBUG: Error fetching job orders:", err)
         setError("Failed to load job orders. Please try again.")
+
+        // Fallback: try without orderBy in case there's an index issue
+        try {
+          console.log("DEBUG: Trying fallback query without orderBy")
+          const jobOrdersRef = collection(db, "jobOrders")
+          const fallbackQuery = query(jobOrdersRef, where("companyId", "==", userData.company_id))
+
+          const fallbackSnapshot = await getDocs(fallbackQuery)
+          const fallbackJobOrders: JobOrder[] = []
+
+          fallbackSnapshot.forEach((doc) => {
+            const data = doc.data()
+            fallbackJobOrders.push({
+              id: doc.id,
+              ...data,
+            } as JobOrder)
+          })
+
+          console.log("DEBUG: Fallback fetched job orders:", fallbackJobOrders)
+          setJobOrders(fallbackJobOrders || [])
+          setError(null) // Clear error if fallback works
+        } catch (fallbackErr) {
+          console.error("DEBUG: Fallback query also failed:", fallbackErr)
+          // Keep the original error
+        }
       } finally {
         setLoading(false)
       }
@@ -168,6 +207,7 @@ export default function JobOrdersPage() {
             <p>User ID: {user?.uid || "N/A"}</p>
             <p>Company ID: {userData?.company_id || "N/A"}</p>
             <p>User Data: {userData ? "✓ Available" : "✗ Not available"}</p>
+            <p>Job Orders Count: {(jobOrders || []).length}</p>
           </div>
         )}
       </div>
