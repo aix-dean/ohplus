@@ -1,273 +1,385 @@
-import { doc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { collection, doc, getDocs, query, where, setDoc, deleteDoc } from "firebase/firestore"
 
+// Hardcoded role definitions
 export type RoleType = "admin" | "sales" | "logistics" | "cms"
 
 export interface HardcodedRole {
   id: RoleType
   name: string
   description: string
-  permissions: string[]
+  permissions: Permission[]
+  color: string
 }
 
 export interface Permission {
-  id: string
-  name: string
+  module: string
+  actions: ("view" | "create" | "edit" | "delete")[]
   description: string
-  category: string
 }
 
 export interface UserRole {
   userId: string
-  roleId: string
-  assignedBy: string
-  assignedAt: Date
-  isActive: boolean
+  roleId: RoleType
+  assignedAt: number
+  assignedBy?: string
 }
 
-// Hardcoded permissions
-const PERMISSIONS: Permission[] = [
-  // Admin permissions
-  {
-    id: "admin.users.create",
-    name: "Create Users",
-    description: "Can create new user accounts",
-    category: "User Management",
-  },
-  { id: "admin.users.read", name: "View Users", description: "Can view user information", category: "User Management" },
-  {
-    id: "admin.users.update",
-    name: "Update Users",
-    description: "Can modify user information",
-    category: "User Management",
-  },
-  {
-    id: "admin.users.delete",
-    name: "Delete Users",
-    description: "Can delete user accounts",
-    category: "User Management",
-  },
-
-  // Sales permissions
-  {
-    id: "sales.proposals.create",
-    name: "Create Proposals",
-    description: "Can create new proposals",
-    category: "Sales",
-  },
-  { id: "sales.proposals.read", name: "View Proposals", description: "Can view proposals", category: "Sales" },
-  { id: "sales.proposals.update", name: "Update Proposals", description: "Can modify proposals", category: "Sales" },
-  { id: "sales.quotations.create", name: "Create Quotations", description: "Can create quotations", category: "Sales" },
-  {
-    id: "sales.clients.manage",
-    name: "Manage Clients",
-    description: "Can manage client information",
-    category: "Sales",
-  },
-
-  // Logistics permissions
-  { id: "logistics.sites.read", name: "View Sites", description: "Can view site information", category: "Logistics" },
-  {
-    id: "logistics.sites.update",
-    name: "Update Sites",
-    description: "Can modify site information",
-    category: "Logistics",
-  },
-  {
-    id: "logistics.reports.create",
-    name: "Create Reports",
-    description: "Can create logistics reports",
-    category: "Logistics",
-  },
-  {
-    id: "logistics.assignments.manage",
-    name: "Manage Assignments",
-    description: "Can manage service assignments",
-    category: "Logistics",
-  },
-
-  // CMS permissions
-  { id: "cms.content.create", name: "Create Content", description: "Can create new content", category: "CMS" },
-  { id: "cms.content.read", name: "View Content", description: "Can view content", category: "CMS" },
-  { id: "cms.content.update", name: "Update Content", description: "Can modify content", category: "CMS" },
-  { id: "cms.content.delete", name: "Delete Content", description: "Can delete content", category: "CMS" },
-]
-
-// Hardcoded roles
-const ROLES: HardcodedRole[] = [
-  {
+// Hardcoded roles with their permissions
+export const HARDCODED_ROLES: Record<RoleType, HardcodedRole> = {
+  admin: {
     id: "admin",
     name: "Administrator",
-    description: "Full system access with all permissions",
-    permissions: PERMISSIONS.map((p) => p.id),
+    description: "Full system access with all administrative privileges",
+    color: "purple",
+    permissions: [
+      {
+        module: "admin",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Full admin panel access",
+      },
+      {
+        module: "sales",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Full sales module access",
+      },
+      {
+        module: "logistics",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Full logistics module access",
+      },
+      {
+        module: "cms",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Full CMS module access",
+      },
+      {
+        module: "user-management",
+        actions: ["view", "create", "edit", "delete"],
+        description: "User and role management",
+      },
+      {
+        module: "system-settings",
+        actions: ["view", "create", "edit", "delete"],
+        description: "System configuration and settings",
+      },
+    ],
   },
-  {
+  sales: {
     id: "sales",
-    name: "Sales",
-    description: "Access to sales modules including proposals, quotations, and client management",
+    name: "Sales Team",
+    description: "Access to sales module and client management",
+    color: "green",
     permissions: [
-      "admin.users.read",
-      "sales.proposals.create",
-      "sales.proposals.read",
-      "sales.proposals.update",
-      "sales.quotations.create",
-      "sales.clients.manage",
+      {
+        module: "sales",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Full sales module access",
+      },
+      {
+        module: "clients",
+        actions: ["view", "create", "edit"],
+        description: "Client management (no delete)",
+      },
+      {
+        module: "proposals",
+        actions: ["view", "create", "edit"],
+        description: "Proposal management",
+      },
+      {
+        module: "quotations",
+        actions: ["view", "create", "edit"],
+        description: "Quotation management",
+      },
+      {
+        module: "bookings",
+        actions: ["view", "create", "edit"],
+        description: "Booking management",
+      },
+      {
+        module: "products",
+        actions: ["view"],
+        description: "Product catalog viewing",
+      },
+      {
+        module: "chat",
+        actions: ["view", "create"],
+        description: "Customer chat access",
+      },
     ],
   },
-  {
+  logistics: {
     id: "logistics",
-    name: "Logistics",
-    description: "Access to logistics modules including sites, reports, and assignments",
+    name: "Logistics Team",
+    description: "Access to logistics operations and site management",
+    color: "blue",
     permissions: [
-      "admin.users.read",
-      "logistics.sites.read",
-      "logistics.sites.update",
-      "logistics.reports.create",
-      "logistics.assignments.manage",
+      {
+        module: "logistics",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Full logistics module access",
+      },
+      {
+        module: "sites",
+        actions: ["view", "create", "edit"],
+        description: "Site management",
+      },
+      {
+        module: "assignments",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Service assignment management",
+      },
+      {
+        module: "reports",
+        actions: ["view", "create", "edit"],
+        description: "Report management",
+      },
+      {
+        module: "alerts",
+        actions: ["view", "create", "edit"],
+        description: "Alert management",
+      },
+      {
+        module: "planner",
+        actions: ["view", "create", "edit"],
+        description: "Logistics planning",
+      },
+      {
+        module: "weather",
+        actions: ["view"],
+        description: "Weather data access",
+      },
     ],
   },
-  {
+  cms: {
     id: "cms",
-    name: "Content",
-    description: "Access to content management system",
+    name: "Content Management",
+    description: "Access to content creation and management",
+    color: "orange",
     permissions: [
-      "admin.users.read",
-      "cms.content.create",
-      "cms.content.read",
-      "cms.content.update",
-      "cms.content.delete",
+      {
+        module: "cms",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Full CMS module access",
+      },
+      {
+        module: "content",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Content creation and editing",
+      },
+      {
+        module: "orders",
+        actions: ["view", "create", "edit"],
+        description: "Content order management",
+      },
+      {
+        module: "planner",
+        actions: ["view", "create", "edit"],
+        description: "Content planning",
+      },
+      {
+        module: "media",
+        actions: ["view", "create", "edit", "delete"],
+        description: "Media asset management",
+      },
     ],
   },
-]
+}
 
-export class HardcodedAccessService {
-  // Permission methods
-  async getAllPermissions(): Promise<Permission[]> {
-    return PERMISSIONS
+// Get all available roles
+export function getAllRoles(): HardcodedRole[] {
+  return Object.values(HARDCODED_ROLES)
+}
+
+// Get role by ID
+export function getRoleById(roleId: RoleType): HardcodedRole | null {
+  return HARDCODED_ROLES[roleId] || null
+}
+
+// Get user roles from Firestore
+export async function getUserRoles(userId: string): Promise<RoleType[]> {
+  try {
+    const userRolesCollection = collection(db, "user_roles")
+    const userRolesQuery = query(userRolesCollection, where("userId", "==", userId))
+    const userRolesSnapshot = await getDocs(userRolesQuery)
+
+    const roles: RoleType[] = []
+    userRolesSnapshot.forEach((doc) => {
+      const data = doc.data()
+      if (data.roleId && HARDCODED_ROLES[data.roleId as RoleType]) {
+        roles.push(data.roleId as RoleType)
+      }
+    })
+
+    return roles
+  } catch (error) {
+    console.error("Error getting user roles:", error)
+    return []
   }
+}
 
-  async getPermissionById(id: string): Promise<Permission | null> {
-    return PERMISSIONS.find((p) => p.id === id) || null
-  }
-
-  async getPermissionsByCategory(category: string): Promise<Permission[]> {
-    return PERMISSIONS.filter((p) => p.category === category)
-  }
-
-  // Role methods
-  async getAllRoles(): Promise<HardcodedRole[]> {
-    return ROLES
-  }
-
-  async getRoleById(id: RoleType): Promise<HardcodedRole | null> {
-    return ROLES.find((r) => r.id === id) || null
-  }
-
-  // User role assignment methods
-  async assignRoleToUser(userId: string, roleId: RoleType, assignedBy = "system"): Promise<void> {
-    const userRole: UserRole = {
-      userId,
-      roleId,
-      assignedBy,
-      assignedAt: new Date(),
-      isActive: true,
+// Assign role to user
+export async function assignRoleToUser(userId: string, roleId: RoleType, assignedBy?: string): Promise<void> {
+  try {
+    // Check if role exists
+    if (!HARDCODED_ROLES[roleId]) {
+      throw new Error(`Role ${roleId} does not exist`)
     }
 
-    // Save to Firestore
-    const userRoleDocRef = doc(db, "user_roles", `${userId}_${roleId}`)
-    await setDoc(userRoleDocRef, {
-      ...userRole,
-      assignedAt: serverTimestamp(),
-      createdAt: serverTimestamp(),
-    })
+    // Check if user already has this role
+    const existingRoles = await getUserRoles(userId)
+    if (existingRoles.includes(roleId)) {
+      console.log(`User ${userId} already has role ${roleId}`)
+      return
+    }
 
-    // Update user document with role
-    const userDocRef = doc(db, "iboard_users", userId)
-    await updateDoc(userDocRef, {
-      role: roleId,
-      updatedAt: serverTimestamp(),
-    })
+    // Create a unique document ID
+    const docId = `${userId}_${roleId}`
+
+    const userRoleData: UserRole = {
+      userId,
+      roleId,
+      assignedAt: Date.now(),
+      assignedBy,
+    }
+
+    await setDoc(doc(db, "user_roles", docId), userRoleData)
+    console.log(`Role ${roleId} assigned to user ${userId}`)
+  } catch (error) {
+    console.error("Error assigning role to user:", error)
+    throw new Error("Failed to assign role to user")
   }
+}
 
-  async removeRoleFromUser(userId: string, roleId: string): Promise<void> {
-    const userRoleDocRef = doc(db, "user_roles", `${userId}_${roleId}`)
-    await updateDoc(userRoleDocRef, {
-      isActive: false,
-      removedAt: serverTimestamp(),
-    })
-
-    // Update user document to remove role
-    const userDocRef = doc(db, "iboard_users", userId)
-    await updateDoc(userDocRef, {
-      role: "user", // Default role
-      updatedAt: serverTimestamp(),
-    })
+// Remove role from user
+export async function removeRoleFromUser(userId: string, roleId: RoleType): Promise<void> {
+  try {
+    const docId = `${userId}_${roleId}`
+    await deleteDoc(doc(db, "user_roles", docId))
+    console.log(`Role ${roleId} removed from user ${userId}`)
+  } catch (error) {
+    console.error("Error removing role from user:", error)
+    throw new Error("Failed to remove role from user")
   }
+}
 
-  async getUserRoles(userId: string): Promise<RoleType[]> {
-    const userRolesQuery = query(
-      collection(db, "user_roles"),
-      where("userId", "==", userId),
-      where("isActive", "==", true),
-    )
+// Check if user has permission
+export async function hasPermission(
+  userId: string,
+  module: string,
+  action: "view" | "create" | "edit" | "delete",
+): Promise<boolean> {
+  try {
+    const userRoles = await getUserRoles(userId)
 
-    const snapshot = await getDocs(userRolesQuery)
-    return snapshot.docs.map((doc) => doc.data().roleId as RoleType)
-  }
+    if (userRoles.length === 0) {
+      return false
+    }
 
-  async getUserPermissions(userId: string): Promise<string[]> {
-    const userRoles = await this.getUserRoles(userId)
-    const permissions = new Set<string>()
-
+    // Check each role for the permission
     for (const roleId of userRoles) {
-      const role = await this.getRoleById(roleId)
-      if (role) {
-        role.permissions.forEach((permission) => permissions.add(permission))
+      const role = HARDCODED_ROLES[roleId]
+      if (!role) continue
+
+      // Check if role has permission for this module and action
+      const permission = role.permissions.find((p) => p.module === module)
+      if (permission && permission.actions.includes(action)) {
+        return true
       }
     }
 
-    return Array.from(permissions)
-  }
-
-  async hasPermission(userId: string, permission: string): Promise<boolean> {
-    const userPermissions = await this.getUserPermissions(userId)
-    return userPermissions.includes(permission)
-  }
-
-  async hasRole(userId: string, roleId: RoleType): Promise<boolean> {
-    const userRoles = await this.getUserRoles(userId)
-    return userRoles.includes(roleId)
-  }
-
-  // Utility methods
-  async getRolePermissions(roleId: RoleType): Promise<Permission[]> {
-    const role = await this.getRoleById(roleId)
-    if (!role) return []
-
-    return PERMISSIONS.filter((p) => role.permissions.includes(p.id))
-  }
-
-  async getPermissionCategories(): Promise<string[]> {
-    const categories = new Set(PERMISSIONS.map((p) => p.category))
-    return Array.from(categories)
+    return false
+  } catch (error) {
+    console.error("Error checking permission:", error)
+    return false
   }
 }
 
-// Export singleton instance
-export const accessService = new HardcodedAccessService()
+// Check if user has any of the specified roles
+export async function hasRole(userId: string, roles: RoleType[]): Promise<boolean> {
+  try {
+    const userRoles = await getUserRoles(userId)
+    return roles.some((role) => userRoles.includes(role))
+  } catch (error) {
+    console.error("Error checking user role:", error)
+    return false
+  }
+}
 
-// Convenience functions
-export const getAllRoles = () => ROLES
+// Check if user is admin
+export async function isAdmin(userId: string): Promise<boolean> {
+  return hasRole(userId, ["admin"])
+}
 
-export const assignRoleToUser = (userId: string, roleId: RoleType, assignedBy = "system") =>
-  accessService.assignRoleToUser(userId, roleId, assignedBy)
+// Get users with specific role
+export async function getUsersWithRole(roleId: RoleType): Promise<string[]> {
+  try {
+    const userRolesCollection = collection(db, "user_roles")
+    const roleQuery = query(userRolesCollection, where("roleId", "==", roleId))
+    const roleSnapshot = await getDocs(roleQuery)
 
-export const removeRoleFromUser = (userId: string, roleId: string) => accessService.removeRoleFromUser(userId, roleId)
+    const userIds: string[] = []
+    roleSnapshot.forEach((doc) => {
+      userIds.push(doc.data().userId)
+    })
 
-export const getUserRoles = (userId: string) => accessService.getUserRoles(userId)
+    return userIds
+  } catch (error) {
+    console.error("Error getting users with role:", error)
+    return []
+  }
+}
 
-export const getUserPermissions = (userId: string) => accessService.getUserPermissions(userId)
+// Get all user role assignments (for admin purposes)
+export async function getAllUserRoleAssignments(): Promise<UserRole[]> {
+  try {
+    const userRolesCollection = collection(db, "user_roles")
+    const snapshot = await getDocs(userRolesCollection)
 
-export const hasPermission = (userId: string, permission: string) => accessService.hasPermission(userId, permission)
+    const assignments: UserRole[] = []
+    snapshot.forEach((doc) => {
+      assignments.push(doc.data() as UserRole)
+    })
 
-export const hasRole = (userId: string, roleId: string) => accessService.hasRole(userId, roleId as RoleType)
+    return assignments
+  } catch (error) {
+    console.error("Error getting all user role assignments:", error)
+    return []
+  }
+}
+
+// Get user's effective permissions (combined from all roles)
+export async function getUserPermissions(userId: string): Promise<Permission[]> {
+  try {
+    const userRoles = await getUserRoles(userId)
+    const allPermissions: Permission[] = []
+    const permissionMap = new Map<string, Permission>()
+
+    // Collect all permissions from user's roles
+    for (const roleId of userRoles) {
+      const role = HARDCODED_ROLES[roleId]
+      if (role) {
+        for (const permission of role.permissions) {
+          const key = permission.module
+          const existing = permissionMap.get(key)
+
+          if (!existing) {
+            permissionMap.set(key, { ...permission })
+          } else {
+            // Merge actions (union of all actions)
+            const mergedActions = Array.from(new Set([...existing.actions, ...permission.actions]))
+            permissionMap.set(key, {
+              ...existing,
+              actions: mergedActions as ("view" | "create" | "edit" | "delete")[],
+            })
+          }
+        }
+      }
+    }
+
+    return Array.from(permissionMap.values())
+  } catch (error) {
+    console.error("Error getting user permissions:", error)
+    return []
+  }
+}

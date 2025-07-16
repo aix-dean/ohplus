@@ -1,7 +1,8 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+
+import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
@@ -11,8 +12,6 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FirebaseError } from "firebase/app"
 import { Eye, EyeOff } from "lucide-react"
-import { query, collection, where, getDocs } from "firebase/firestore"
-import { db } from "@/lib/firebase"
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
@@ -26,55 +25,16 @@ export default function RegisterPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [invitationRole, setInvitationRole] = useState<string | null>(null)
-  const [loadingInvitation, setLoadingInvitation] = useState(false)
 
-  const { register, user } = useAuth()
+  const { register } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
   // Get organization code from URL parameters
   const orgCode = searchParams.get("orgCode")
 
-  // Redirect if user is already logged in
-  useEffect(() => {
-    if (user) {
-      router.push("/admin/dashboard")
-    }
-  }, [user, router])
-
-  // Fetch invitation details when orgCode is present
-  useEffect(() => {
-    const fetchInvitationDetails = async () => {
-      if (!orgCode) return
-
-      setLoadingInvitation(true)
-      try {
-        const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
-        const invitationSnapshot = await getDocs(invitationQuery)
-
-        if (!invitationSnapshot.empty) {
-          const invitationDoc = invitationSnapshot.docs[0]
-          const invitationData = invitationDoc.data()
-
-          if (invitationData.role) {
-            setInvitationRole(invitationData.role)
-          }
-        } else {
-          setErrorMessage("Invalid invitation code.")
-        }
-      } catch (error) {
-        console.error("Error fetching invitation details:", error)
-        setErrorMessage("Error loading invitation details.")
-      } finally {
-        setLoadingInvitation(false)
-      }
-    }
-
-    fetchInvitationDetails()
-  }, [orgCode])
-
   const getFriendlyErrorMessage = (error: unknown): string => {
+    console.error("Raw error during registration:", error)
     if (error instanceof FirebaseError) {
       switch (error.code) {
         case "auth/email-already-in-use":
@@ -97,12 +57,16 @@ export default function RegisterPage() {
   const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
 
+    // Always ensure it starts with +63
     if (!value.startsWith("+63 ")) {
       setPhoneNumber("+63 ")
       return
     }
 
+    // Extract only the numbers after +63
     const numbersOnly = value.slice(4).replace(/\D/g, "")
+
+    // Limit to 10 digits
     if (numbersOnly.length <= 10) {
       setPhoneNumber("+63 " + numbersOnly)
     }
@@ -113,6 +77,7 @@ export default function RegisterPage() {
     return numbersOnly.length === 10
   }
 
+  // Add these state variables and helper functions for password strength
   const passwordCriteria = {
     minLength: password.length >= 8,
     hasLowerCase: /[a-z]/.test(password),
@@ -156,12 +121,10 @@ export default function RegisterPage() {
     }
 
     setLoading(true)
-
     try {
       await register(
-        email,
-        password,
         {
+          email,
           first_name: firstName,
           last_name: lastName,
           middle_name: middleName,
@@ -172,14 +135,15 @@ export default function RegisterPage() {
           company_name: "",
           company_location: "",
         },
-        "", // licenseKey - empty string as placeholder
-        orgCode || undefined,
+        password,
+        orgCode || undefined, // Pass the organization code if available
       )
-
-      // Registration successful - redirect to dashboard
-      router.push("/admin/dashboard")
+      setErrorMessage(null)
+      const redirectUrl = orgCode
+        ? "/admin/dashboard?registered=true&joined_org=true"
+        : "/admin/dashboard?registered=true"
+      router.push(redirectUrl)
     } catch (error: unknown) {
-      console.error("Registration failed:", error)
       setErrorMessage(getFriendlyErrorMessage(error))
     } finally {
       setLoading(false)
@@ -216,15 +180,6 @@ export default function RegisterPage() {
                 <p className="text-sm text-blue-800">
                   <strong>Organization Code:</strong> {orgCode}
                 </p>
-                {loadingInvitation && <p className="text-sm text-blue-600 mt-1">Loading invitation details...</p>}
-                {invitationRole && (
-                  <p className="text-sm text-green-800 mt-1">
-                    <strong>Assigned Role:</strong> {invitationRole}
-                  </p>
-                )}
-                {!loadingInvitation && !invitationRole && orgCode && (
-                  <p className="text-sm text-gray-600 mt-1">No specific role assigned</p>
-                )}
               </div>
             )}
           </CardHeader>
@@ -306,7 +261,6 @@ export default function RegisterPage() {
                     ) : (
                       <Eye className="h-4 w-4 text-gray-400" />
                     )}
-                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
                   </button>
                 </div>
                 <div className="mt-2">
@@ -342,6 +296,8 @@ export default function RegisterPage() {
                       )}
                     </ul>
                   )}
+                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
+                  </button>
                 </div>
               </div>
               <div className="space-y-2">
@@ -364,7 +320,6 @@ export default function RegisterPage() {
                     ) : (
                       <Eye className="h-4 w-4 text-gray-400" />
                     )}
-                    <span className="sr-only">{showConfirmPassword ? "Hide password" : "Show password"}</span>
                   </button>
                 </div>
               </div>
@@ -387,7 +342,7 @@ export default function RegisterPage() {
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                 type="submit"
                 onClick={handleRegister}
-                disabled={loading || loadingInvitation}
+                disabled={loading}
               >
                 {loading ? (orgCode ? "Joining..." : "Signing Up...") : orgCode ? "Join Organization" : "Sign Up"}
               </Button>

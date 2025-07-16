@@ -25,7 +25,7 @@ const publicRoutes = [
 ]
 
 export default function AuthLayout({ children }: AuthLayoutProps) {
-  const { user, userData, loading } = useAuth()
+  const { user, userData, loading } = useAuth() // Get userData here
   const pathname = usePathname()
 
   const isPublicRoute = publicRoutes.includes(pathname) || pathname?.startsWith("/onboarding") // Handle dynamic onboarding path
