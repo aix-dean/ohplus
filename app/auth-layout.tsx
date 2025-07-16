@@ -59,17 +59,6 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
     return <RedirectToLogin />
   }
 
-  // User is logged in. Now, check onboarding status.
-  // If userData is loaded, and onboarding is true, and they are NOT on an allowed onboarding-related public route, redirect them.
-  if (user && userData && userData.onboarding) {
-    // If they are logged in, onboarding is true, and they are trying to access a non-onboarding protected route
-    // Redirect them to the first step of the onboarding flow (select-subscription)
-    if (pathname !== "/register/select-subscription" && !pathname.startsWith("/onboarding")) {
-      window.location.href = "/register/select-subscription"
-      return null // Prevent rendering anything else
-    }
-  }
-
   // If user has no roles, redirect to unauthorized page
   if (user && userData && (!userData.roles || userData.roles.length === 0)) {
     if (pathname !== "/unauthorized") {

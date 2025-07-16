@@ -198,7 +198,6 @@ export default function RegisterPage() {
       // Check if user is in onboarding
       if (userData.onboarding) {
         console.log("User is in onboarding, redirecting to onboarding flow")
-        router.push("/register/select-subscription")
         return
       }
 
