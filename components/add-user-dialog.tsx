@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Loader2, UserPlus, Send } from "lucide-react"
+import { getAllRoles, type HardcodedRole } from "@/lib/hardcoded-access-service"
 
 interface AddUserDialogProps {
   open: boolean
@@ -30,20 +31,14 @@ interface AddUserDialogProps {
   onSuccess?: () => void
 }
 
-const PREDEFINED_ROLES = [
-  { value: "user", label: "User", description: "Basic access to the platform" },
-  { value: "editor", label: "Editor", description: "Can create and edit content" },
-  { value: "manager", label: "Manager", description: "Can manage teams and projects" },
-  { value: "admin", label: "Admin", description: "Full administrative access" },
-]
-
 export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogProps) {
   const { userData } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [roles] = useState<HardcodedRole[]>(getAllRoles())
   const [formData, setFormData] = useState({
     recipientEmail: "",
     recipientName: "",
-    role: "user",
+    role: "admin", // Change default to admin since that's one of the hardcoded roles
     subject: `Invitation to join ${userData?.companyName || "our organization"}`,
     message: `You've been invited to join our organization. Use the invitation code below to register your account and start collaborating with our team.`,
     validityDays: 30,
@@ -130,7 +125,7 @@ export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogPr
       setFormData({
         recipientEmail: "",
         recipientName: "",
-        role: "user",
+        role: "admin",
         subject: `Invitation to join ${userData?.companyName || "our organization"}`,
         message: `You've been invited to join our organization. Use the invitation code below to register your account and start collaborating with our team.`,
         validityDays: 30,
@@ -146,7 +141,7 @@ export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogPr
     }
   }
 
-  const selectedRoleData = PREDEFINED_ROLES.find((r) => r.value === formData.role)
+  const selectedRoleData = roles.find((r) => r.id === formData.role)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -202,10 +197,10 @@ export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogPr
                     <SelectValue placeholder="Select a role" />
                   </SelectTrigger>
                   <SelectContent>
-                    {PREDEFINED_ROLES.map((role) => (
-                      <SelectItem key={role.value} value={role.value}>
+                    {roles.map((role) => (
+                      <SelectItem key={role.id} value={role.id}>
                         <div>
-                          <div className="font-medium">{role.label}</div>
+                          <div className="font-medium">{role.name}</div>
                           <div className="text-xs text-muted-foreground">{role.description}</div>
                         </div>
                       </SelectItem>
@@ -216,7 +211,7 @@ export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogPr
                 {selectedRoleData && (
                   <div className="p-3 bg-muted rounded-lg">
                     <div className="flex items-center space-x-2">
-                      <Badge variant="outline">{selectedRoleData.label}</Badge>
+                      <Badge variant="outline">{selectedRoleData.name}</Badge>
                       <span className="text-sm text-muted-foreground">{selectedRoleData.description}</span>
                     </div>
                   </div>
@@ -289,7 +284,7 @@ export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogPr
                 <div>
                   <span className="font-medium">Role:</span>
                   <Badge variant="outline" className="ml-2">
-                    {selectedRoleData?.label || formData.role}
+                    {selectedRoleData?.name || formData.role}
                   </Badge>
                 </div>
                 <div>
@@ -316,8 +311,7 @@ export function AddUserDialog({ open, onOpenChange, onSuccess }: AddUserDialogPr
                   <br />
                   3. They can click the link to register with the pre-filled invitation code
                   <br />
-                  4. Once registered, they'll have {selectedRoleData?.label || formData.role} access to your
-                  organization
+                  4. Once registered, they'll have {selectedRoleData?.name || formData.role} access to your organization
                 </p>
               </div>
             </CardContent>
