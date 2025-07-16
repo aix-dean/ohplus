@@ -157,12 +157,12 @@ export function SalesChatWidget({
     }
   }
 
-const getUnreadCount = () => {
-  return threads.reduce((count, thread) => {
-    const unreadInThread = thread.unreadCount || 0  // or derive from messages
-    return count + unreadInThread
-  }, 0)
-}
+  const getUnreadCount = () => {
+    return threads.reduce((count, thread) => {
+      // This is a simplified count - in real implementation, you'd track unread messages per thread
+      return count
+    }, 0)
+  }
 
   const filteredThreads = threads.filter((thread) => {
     // Get the other participant (not the current user)

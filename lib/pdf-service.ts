@@ -1,60 +1,7 @@
 import jsPDF from "jspdf"
-import QRCode from "qrcode"
+import type { Proposal } from "@/lib/types/proposal"
+import type { CostEstimate } from "@/lib/types/cost-estimate"
 import type { ReportData } from "@/lib/report-service"
-
-interface ProposalData {
-  id: string
-  client_name: string
-  client_email: string
-  client_phone: string
-  client_company: string
-  client_industry: string
-  client_designation?: string
-  products: Array<{
-    id: string
-    name: string
-    site_code: string
-    type: string
-    specs_rental: {
-      width: number
-      height: number
-      location: string
-      price_per_month: number
-    }
-    media?: Array<{ url: string }>
-  }>
-  total_amount: number
-  created_at: any
-  valid_until: any
-  proposal_number?: string
-}
-
-interface CostEstimateData {
-  id: string
-  client_name: string
-  client_email: string
-  client_phone: string
-  client_company: string
-  client_industry: string
-  client_designation?: string
-  products: Array<{
-    id: string
-    name: string
-    site_code: string
-    type: string
-    specs_rental: {
-      width: number
-      height: number
-      location: string
-      price_per_month: number
-    }
-    media?: Array<{ url: string }>
-  }>
-  total_amount: number
-  created_at: any
-  valid_until: any
-  estimate_number?: string
-}
 
 // Helper function to load image and convert to base64
 export async function loadImageAsBase64(url: string): Promise<string | null> {
@@ -146,993 +93,729 @@ async function calculateImageFitDimensions(
   return { base64, width, height }
 }
 
-// Helper function to format currency without +/- symbols
-const formatCurrency = (amount: any): string => {
-  if (!amount && amount !== 0) return "0"
+// Helper function to format currency without +/- signs
+function formatCurrency(amount: number | string): string {
+  // Convert to number and ensure it's positive
+  const numAmount = typeof amount === "string" ? Number.parseFloat(amount.replace(/[^\d.-]/g, "")) : amount
+  const cleanAmount = Math.abs(Number(numAmount) || 0)
+  return `PHP${cleanAmount.toLocaleString()}`
+}
 
+export async function generateProposalPDF(proposal: Proposal, returnBase64 = false): Promise<string | void> {
   try {
-    // Convert to string and remove any non-numeric characters except decimal point
-    const cleanAmount = amount.toString().replace(/[^\d.-]/g, "")
-    const numAmount = Number.parseFloat(cleanAmount)
-
-    if (isNaN(numAmount)) return "0"
-
-    // Use absolute value to ensure no negative signs
-    return Math.abs(numAmount).toLocaleString("en-US", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    })
-  } catch (error) {
-    console.error("Error formatting currency:", error)
-    return "0"
-  }
-}
-
-export class PDFService {
-  private formatCurrency(amount: any): string {
-    if (!amount && amount !== 0) return "0"
-
-    try {
-      let numAmount: number
-
-      if (typeof amount === "number") {
-        numAmount = amount
-      } else if (typeof amount === "string") {
-        // Remove any non-numeric characters including ± symbols
-        const cleanAmount = amount.replace(/[^\d.-]/g, "")
-        numAmount = Number.parseFloat(cleanAmount)
-      } else {
-        return "0"
-      }
-
-      if (isNaN(numAmount)) return "0"
-
-      // Use absolute value to remove any negative signs or ± symbols
-      const absAmount = Math.abs(numAmount)
-      return absAmount.toLocaleString()
-    } catch (error) {
-      console.error("Error formatting currency:", error)
-      return "0"
-    }
-  }
-
-  private formatDate(date: any): string {
-    if (!date) return "N/A"
-
-    try {
-      let dateObj: Date
-
-      if (date && typeof date.toDate === "function") {
-        dateObj = date.toDate()
-      } else if (typeof date === "string") {
-        dateObj = new Date(date)
-      } else if (date instanceof Date) {
-        dateObj = date
-      } else {
-        return "N/A"
-      }
-
-      if (isNaN(dateObj.getTime())) {
-        return "N/A"
-      }
-
-      return dateObj.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "numeric",
-        day: "numeric",
-      })
-    } catch (error) {
-      return "N/A"
-    }
-  }
-
-  async generateProposalPDF(data: ProposalData): Promise<Uint8Array> {
-    const doc = new jsPDF()
-    const margin = 20
-    const pageWidth = doc.internal.pageSize.width
+    // Create new PDF document
+    const pdf = new jsPDF("p", "mm", "a4")
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 15
     const contentWidth = pageWidth - margin * 2
+    let yPosition = margin
+    let isFirstPage = true // Track if we're on the first page
 
-    // Generate QR code
-    const qrCodeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/proposals/view/${data.id}`
-    const qrCodeDataUrl = await QRCode.toDataURL(qrCodeUrl, { width: 80 })
+    // Safely convert dates
+    const createdAt = safeToDate(proposal.createdAt)
+    const validUntil = safeToDate(proposal.validUntil)
 
-    // Header with QR code
-    doc.setFontSize(24)
-    doc.setFont("helvetica", "bold")
-    doc.text("PROPOSAL", margin, 30)
+    // Generate QR Code for proposal view URL
+    const proposalViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/proposals/view/${proposal.id}`
+    const qrCodeUrl = await generateQRCode(proposalViewUrl)
 
-    // Add QR code with proper spacing
-    const qrSize = 20
-    const qrX = pageWidth - margin - qrSize
-    const qrY = 15
-    doc.addImage(qrCodeDataUrl, "PNG", qrX, qrY, qrSize, qrSize)
-
-    // Subtitle with better spacing from QR code
-    doc.setFontSize(12)
-    doc.setFont("helvetica", "normal")
-    const subtitleWidth = contentWidth - qrSize - 25 // 25mm buffer from QR code
-    const subtitle = `Proposal for ${data.client_company} - ${this.formatDate(data.created_at)}`
-    doc.text(subtitle, margin, 45, { maxWidth: subtitleWidth })
-
-    // Date information
-    doc.setFontSize(10)
-    doc.setTextColor(100, 100, 100)
-    doc.text(`Created: ${this.formatDate(data.created_at)}`, margin, 55)
-    doc.text(`Valid Until: ${this.formatDate(data.valid_until)}`, margin, 62)
-
-    // QR code label
-    doc.setFontSize(8)
-    doc.text("Scan to view online", qrX, qrY + qrSize + 5)
-
-    // Reset text color
-    doc.setTextColor(0, 0, 0)
-
-    // Client Information Section
-    let yPos = 80
-    doc.setFontSize(14)
-    doc.setFont("helvetica", "bold")
-    doc.text("CLIENT INFORMATION", margin, yPos)
-
-    // Draw line under section header
-    doc.setLineWidth(0.5)
-    doc.line(margin, yPos + 2, pageWidth - margin, yPos + 2)
-
-    yPos += 15
-    doc.setFontSize(10)
-    doc.setFont("helvetica", "normal")
-
-    // Client details in two columns
-    const leftColX = margin
-    const rightColX = margin + contentWidth / 2
-
-    doc.setFont("helvetica", "bold")
-    doc.text("Company:", leftColX, yPos)
-    doc.setFont("helvetica", "normal")
-    doc.text(data.client_company || "N/A", leftColX + 25, yPos)
-
-    doc.setFont("helvetica", "bold")
-    doc.text("Contact Person:", rightColX, yPos)
-    doc.setFont("helvetica", "normal")
-    doc.text(data.client_name || "N/A", rightColX + 35, yPos)
-
-    yPos += 10
-    doc.setFont("helvetica", "bold")
-    doc.text("Email:", leftColX, yPos)
-    doc.setFont("helvetica", "normal")
-    doc.text(data.client_email || "N/A", leftColX + 25, yPos)
-
-    doc.setFont("helvetica", "bold")
-    doc.text("Phone:", rightColX, yPos)
-    doc.setFont("helvetica", "normal")
-    doc.text(data.client_phone || "N/A", rightColX + 35, yPos)
-
-    yPos += 10
-    doc.setFont("helvetica", "bold")
-    doc.text("Industry:", leftColX, yPos)
-    doc.setFont("helvetica", "normal")
-    doc.text(data.client_industry || "N/A", leftColX + 25, yPos)
-
-    // Add designation if available
-    if (data.client_designation) {
-      doc.setFont("helvetica", "bold")
-      doc.text("Designation:", rightColX, yPos)
-      doc.setFont("helvetica", "normal")
-      doc.text(data.client_designation, rightColX + 35, yPos)
+    // Helper function to add text with word wrapping
+    const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
+      pdf.setFontSize(fontSize)
+      const lines = pdf.splitTextToSize(text, maxWidth)
+      pdf.text(lines, x, y)
+      return y + lines.length * fontSize * 0.3
     }
 
-    // Products & Services Section
-    yPos += 25
-    doc.setFontSize(14)
-    doc.setFont("helvetica", "bold")
-    doc.text("PRODUCTS & SERVICES", margin, yPos)
-
-    doc.setLineWidth(0.5)
-    doc.line(margin, yPos + 2, pageWidth - margin, yPos + 2)
-
-    yPos += 15
-
-    // Product details
-    data.products.forEach(async (product, index) => {
-      // Check if we need a new page
-      if (yPos > 250) {
-        doc.addPage()
-        yPos = 30
+    // Helper function to check if we need a new page
+    const checkNewPage = (requiredHeight: number) => {
+      if (yPosition + requiredHeight > pageHeight - margin - 20) {
+        pdf.addPage()
+        yPosition = margin
+        isFirstPage = false // Mark that we're no longer on the first page
+        // DO NOT add QR code to subsequent pages
       }
+    }
 
-      doc.setFontSize(12)
-      doc.setFont("helvetica", "bold")
-      doc.text(`${index + 1}. ${product.name}`, margin, yPos)
+    // Helper function to add QR code ONLY to the first page
+    const addQRCodeToFirstPage = async () => {
+      if (!isFirstPage) return // Only add QR code to first page
 
-      // Price aligned to the right
-      const priceText = `₱${this.formatCurrency(product.specs_rental.price_per_month)}`
-      const priceWidth = doc.getTextWidth(priceText)
-      doc.text(priceText, pageWidth - margin - priceWidth, yPos)
+      try {
+        const qrSize = 18
+        const qrX = pageWidth - margin - qrSize
+        const qrY = margin
 
-      yPos += 8
-      doc.setFontSize(10)
-      doc.setFont("helvetica", "normal")
-
-      const details = [
-        `Rental: N/A`,
-        `Site Code: ${product.site_code || "N/A"}`,
-        `Dimensions: ${product.specs_rental.width || "N/A"}ft x ${product.specs_rental.height || "N/A"}ft`,
-        `Location: ${product.specs_rental.location || "N/A"}`,
-      ]
-
-      details.forEach((detail) => {
-        doc.text(detail, margin + 5, yPos)
-        yPos += 6
-      })
-
-      // Product images
-      if (product.media && product.media.length > 0) {
-        yPos += 5
-        doc.setFont("helvetica", "bold")
-        doc.text("Product Images:", margin + 5, yPos)
-        yPos += 10
-
-        const imageWidth = 60
-        const imageHeight = 40
-        const imagesPerRow = 2
-        let imageX = margin + 10
-
-        for (let i = 0; i < Math.min(product.media.length, 4); i++) {
-          try {
-            if (i > 0 && i % imagesPerRow === 0) {
-              yPos += imageHeight + 10
-              imageX = margin + 10
-            }
-
-            // Check if we need a new page for images
-            if (yPos + imageHeight > 280) {
-              doc.addPage()
-              yPos = 30
-              imageX = margin + 10
-            }
-
-            const response = await fetch(`/api/proxy-image?url=${encodeURIComponent(product.media[i].url)}`)
-            if (response.ok) {
-              const blob = await response.blob()
-              const reader = new FileReader()
-
-              await new Promise((resolve) => {
-                reader.onload = () => {
-                  try {
-                    doc.addImage(reader.result as string, "JPEG", imageX, yPos, imageWidth, imageHeight)
-                  } catch (error) {
-                    console.error("Error adding image to PDF:", error)
-                  }
-                  resolve(null)
-                }
-                reader.readAsDataURL(blob)
-              })
-            }
-
-            imageX += imageWidth + 10
-          } catch (error) {
-            console.error("Error processing image:", error)
-          }
+        // Ensure QR code stays within margins
+        if (qrX < margin) {
+          return // Skip QR code if it doesn't fit
         }
 
-        yPos += imageHeight + 15
-      } else {
-        yPos += 15
+        // Load QR code image and add to PDF
+        const qrBase64 = await loadImageAsBase64(qrCodeUrl)
+        if (qrBase64) {
+          pdf.addImage(qrBase64, "PNG", qrX, qrY, qrSize, qrSize)
+
+          // Add small text below QR code
+          pdf.setFontSize(6)
+          pdf.setTextColor(100, 100, 100)
+          const textWidth = pdf.getTextWidth("Scan to view online")
+          const textX = qrX + (qrSize - textWidth) / 2
+
+          // Ensure text stays within margins
+          if (textX >= margin && textX + textWidth <= pageWidth - margin) {
+            pdf.text("Scan to view online", textX, qrY + qrSize + 3)
+          }
+          pdf.setTextColor(0, 0, 0)
+        }
+      } catch (error) {
+        console.error("Error adding QR code to PDF:", error)
+        // Continue without QR code if it fails
       }
-    })
-
-    // Proposal Summary
-    yPos += 10
-
-    // Check if we need a new page for summary
-    if (yPos > 250) {
-      doc.addPage()
-      yPos = 30
     }
 
-    doc.setLineWidth(0.5)
-    doc.line(margin, yPos, pageWidth - margin, yPos)
+    // Add QR code to first page only
+    await addQRCodeToFirstPage()
 
-    yPos += 15
-    doc.setFontSize(14)
-    doc.setFont("helvetica", "bold")
-    doc.text("PROPOSAL SUMMARY", margin, yPos)
+    // Header with better spacing from QR code
+    const headerContentWidth = contentWidth - 22
+    pdf.setFontSize(24)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("PROPOSAL", margin, yPosition)
+    yPosition += 12
 
-    yPos += 15
-    doc.setFontSize(10)
-    doc.setFont("helvetica", "normal")
-    doc.text(`Total Products: ${data.products.length}`, margin + 5, yPos)
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "normal")
+    const titleLines = pdf.splitTextToSize(proposal.title || "Untitled Proposal", headerContentWidth)
+    pdf.text(titleLines, margin, yPosition)
+    yPosition += titleLines.length * 6 + 3
 
-    yPos += 15
-
-    // Total amount box
-    doc.setFillColor(240, 240, 240)
-    doc.rect(margin, yPos - 5, contentWidth, 15, "F")
-
-    doc.setFontSize(12)
-    doc.setFont("helvetica", "bold")
-    const totalText = `TOTAL AMOUNT: ₱${this.formatCurrency(data.total_amount)}`
-    doc.text(totalText, margin + 5, yPos + 5)
-
-    return doc.output("arraybuffer")
-  }
-
-  async generateCostEstimatePDF(data: CostEstimateData): Promise<Uint8Array> {
-    const doc = new jsPDF()
-    const margin = 20
-    const pageWidth = doc.internal.pageSize.width
-    const contentWidth = pageWidth - margin * 2
-
-    // Generate QR code
-    const qrCodeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/view/${data.id}`
-    const qrCodeDataUrl = await QRCode.toDataURL(qrCodeUrl, { width: 80 })
-
-    // Header with QR code
-    doc.setFontSize(24)
-    doc.setFont("helvetica", "bold")
-    doc.text("COST ESTIMATE", margin, 30)
-
-    // Add QR code with proper spacing
-    const qrSize = 20
-    const qrX = pageWidth - margin - qrSize
-    const qrY = 15
-    doc.addImage(qrCodeDataUrl, "PNG", qrX, qrY, qrSize, qrSize)
-
-    // Subtitle with better spacing from QR code
-    doc.setFontSize(12)
-    doc.setFont("helvetica", "normal")
-    const subtitleWidth = contentWidth - qrSize - 25 // 25mm buffer from QR code
-    const subtitle = `Cost Estimate for ${data.client_company} - ${this.formatDate(data.created_at)}`
-    doc.text(subtitle, margin, 45, { maxWidth: subtitleWidth })
-
-    // Date information
-    doc.setFontSize(10)
-    doc.setTextColor(100, 100, 100)
-    doc.text(`Created: ${this.formatDate(data.created_at)}`, margin, 55)
-    doc.text(`Valid Until: ${this.formatDate(data.valid_until)}`, margin, 62)
-
-    // QR code label
-    doc.setFontSize(8)
-    doc.text("Scan to view online", qrX, qrY + qrSize + 5)
+    // Date and validity with better formatting
+    pdf.setFontSize(10)
+    pdf.setTextColor(100, 100, 100)
+    pdf.text(`Created: ${createdAt.toLocaleDateString()}`, margin, yPosition)
+    pdf.text(`Valid Until: ${validUntil.toLocaleDateString()}`, margin, yPosition + 5)
+    yPosition += 15
 
     // Reset text color
-    doc.setTextColor(0, 0, 0)
+    pdf.setTextColor(0, 0, 0)
 
     // Client Information Section
-    let yPos = 80
-    doc.setFontSize(14)
-    doc.setFont("helvetica", "bold")
-    doc.text("CLIENT INFORMATION", margin, yPos)
+    checkNewPage(40)
+    pdf.setFontSize(14)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("CLIENT INFORMATION", margin, yPosition)
+    yPosition += 6
 
     // Draw line under section header
-    doc.setLineWidth(0.5)
-    doc.line(margin, yPos + 2, pageWidth - margin, yPos + 2)
-
-    yPos += 15
-    doc.setFontSize(10)
-    doc.setFont("helvetica", "normal")
-
-    // Client details in two columns
-    const leftColX = margin
-    const rightColX = margin + contentWidth / 2
-
-    doc.setFont("helvetica", "bold")
-    doc.text("Company:", leftColX, yPos)
-    doc.setFont("helvetica", "normal")
-    doc.text(data.client_company || "N/A", leftColX + 25, yPos)
-
-    doc.setFont("helvetica", "bold")
-    doc.text("Contact Person:", rightColX, yPos)
-    doc.setFont("helvetica", "normal")
-    doc.text(data.client_name || "N/A", rightColX + 35, yPos)
-
-    yPos += 10
-    doc.setFont("helvetica", "bold")
-    doc.text("Email:", leftColX, yPos)
-    doc.setFont("helvetica", "normal")
-    doc.text(data.client_email || "N/A", leftColX + 25, yPos)
-
-    doc.setFont("helvetica", "bold")
-    doc.text("Phone:", rightColX, yPos)
-    doc.setFont("helvetica", "normal")
-    doc.text(data.client_phone || "N/A", rightColX + 35, yPos)
-
-    yPos += 10
-    doc.setFont("helvetica", "bold")
-    doc.text("Industry:", leftColX, yPos)
-    doc.setFont("helvetica", "normal")
-    doc.text(data.client_industry || "N/A", leftColX + 25, yPos)
-
-    // Add designation if available
-    if (data.client_designation) {
-      doc.setFont("helvetica", "bold")
-      doc.text("Designation:", rightColX, yPos)
-      doc.setFont("helvetica", "normal")
-      doc.text(data.client_designation, rightColX + 35, yPos)
-    }
-
-    // Products & Services Section
-    yPos += 25
-    doc.setFontSize(14)
-    doc.setFont("helvetica", "bold")
-    doc.text("PRODUCTS & SERVICES", margin, yPos)
-
-    doc.setLineWidth(0.5)
-    doc.line(margin, yPos + 2, pageWidth - margin, yPos + 2)
-
-    yPos += 15
-
-    // Product details
-    data.products.forEach(async (product, index) => {
-      // Check if we need a new page
-      if (yPos > 250) {
-        doc.addPage()
-        yPos = 30
-      }
-
-      doc.setFontSize(12)
-      doc.setFont("helvetica", "bold")
-      doc.text(`${index + 1}. ${product.name}`, margin, yPos)
-
-      // Price aligned to the right
-      const priceText = `₱${this.formatCurrency(product.specs_rental.price_per_month)}`
-      const priceWidth = doc.getTextWidth(priceText)
-      doc.text(priceText, pageWidth - margin - priceWidth, yPos)
-
-      yPos += 8
-      doc.setFontSize(10)
-      doc.setFont("helvetica", "normal")
-
-      const details = [
-        `Rental: N/A`,
-        `Site Code: ${product.site_code || "N/A"}`,
-        `Dimensions: ${product.specs_rental.width || "N/A"}ft x ${product.specs_rental.height || "N/A"}ft`,
-        `Location: ${product.specs_rental.location || "N/A"}`,
-      ]
-
-      details.forEach((detail) => {
-        doc.text(detail, margin + 5, yPos)
-        yPos += 6
-      })
-
-      // Product images
-      if (product.media && product.media.length > 0) {
-        yPos += 5
-        doc.setFont("helvetica", "bold")
-        doc.text("Product Images:", margin + 5, yPos)
-        yPos += 10
-
-        const imageWidth = 60
-        const imageHeight = 40
-        const imagesPerRow = 2
-        let imageX = margin + 10
-
-        for (let i = 0; i < Math.min(product.media.length, 4); i++) {
-          try {
-            if (i > 0 && i % imagesPerRow === 0) {
-              yPos += imageHeight + 10
-              imageX = margin + 10
-            }
-
-            // Check if we need a new page for images
-            if (yPos + imageHeight > 280) {
-              doc.addPage()
-              yPos = 30
-              imageX = margin + 10
-            }
-
-            const response = await fetch(`/api/proxy-image?url=${encodeURIComponent(product.media[i].url)}`)
-            if (response.ok) {
-              const blob = await response.blob()
-              const reader = new FileReader()
-
-              await new Promise((resolve) => {
-                reader.onload = () => {
-                  try {
-                    doc.addImage(reader.result as string, "JPEG", imageX, yPos, imageWidth, imageHeight)
-                  } catch (error) {
-                    console.error("Error adding image to PDF:", error)
-                  }
-                  resolve(null)
-                }
-                reader.readAsDataURL(blob)
-              })
-            }
-
-            imageX += imageWidth + 10
-          } catch (error) {
-            console.error("Error processing image:", error)
-          }
-        }
-
-        yPos += imageHeight + 15
-      } else {
-        yPos += 15
-      }
-    })
-
-    // Cost Estimate Summary
-    yPos += 10
-
-    // Check if we need a new page for summary
-    if (yPos > 250) {
-      doc.addPage()
-      yPos = 30
-    }
-
-    doc.setLineWidth(0.5)
-    doc.line(margin, yPos, pageWidth - margin, yPos)
-
-    yPos += 15
-    doc.setFontSize(14)
-    doc.setFont("helvetica", "bold")
-    doc.text("COST ESTIMATE SUMMARY", margin, yPos)
-
-    yPos += 15
-    doc.setFontSize(10)
-    doc.setFont("helvetica", "normal")
-    doc.text(`Total Products: ${data.products.length}`, margin + 5, yPos)
-
-    yPos += 15
-
-    // Total amount box
-    doc.setFillColor(240, 240, 240)
-    doc.rect(margin, yPos - 5, contentWidth, 15, "F")
-
-    doc.setFontSize(12)
-    doc.setFont("helvetica", "bold")
-    const totalText = `TOTAL AMOUNT: ₱${this.formatCurrency(data.total_amount)}`
-    doc.text(totalText, margin + 5, yPos + 5)
-
-    return doc.output("arraybuffer")
-  }
-}
-
-export const pdfService = new PDFService()
-
-export const generateProposalPDF = async (proposal: any, products: any[]) => {
-  const doc = new jsPDF()
-  const margin = 20
-  const pageWidth = doc.internal.pageSize.width
-  const pageHeight = doc.internal.pageSize.height
-  const contentWidth = pageWidth - margin * 2
-
-  let yPosition = margin
-
-  // Generate QR Code
-  const proposalUrl = `${process.env.NEXT_PUBLIC_APP_URL}/proposals/view/${proposal.id}`
-  const qrCodeDataUrl = await QRCode.toDataURL(proposalUrl, { width: 100 })
-
-  // Header Section with improved spacing
-  doc.setFontSize(24)
-  doc.setFont("helvetica", "bold")
-  doc.text("PROPOSAL", margin, yPosition)
-
-  // Position QR code with proper spacing from title
-  const qrSize = 20
-  const qrX = pageWidth - margin - qrSize
-  const qrY = yPosition - 5
-  doc.addImage(qrCodeDataUrl, "PNG", qrX, qrY, qrSize, qrSize)
-
-  yPosition += 15
-
-  // Proposal subtitle
-  doc.setFontSize(12)
-  doc.setFont("helvetica", "normal")
-  const proposalTitle = `Proposal for ${proposal.clientName} - ${new Date(proposal.created?.toDate?.() || proposal.created).toLocaleDateString()}`
-  doc.text(proposalTitle, margin, yPosition)
-  yPosition += 8
-
-  // Created and Valid Until dates
-  doc.setFontSize(10)
-  doc.setTextColor(100, 100, 100)
-  doc.text(
-    `Created: ${new Date(proposal.created?.toDate?.() || proposal.created).toLocaleDateString()}`,
-    margin,
-    yPosition,
-  )
-  yPosition += 5
-  doc.text(
-    `Valid Until: ${new Date(proposal.validUntil?.toDate?.() || proposal.validUntil).toLocaleDateString()}`,
-    margin,
-    yPosition,
-  )
-  yPosition += 15
-
-  // Reset text color
-  doc.setTextColor(0, 0, 0)
-
-  // Client Information Section
-  doc.setFontSize(14)
-  doc.setFont("helvetica", "bold")
-  doc.text("CLIENT INFORMATION", margin, yPosition)
-  yPosition += 5
-
-  // Draw line under section header
-  doc.setLineWidth(0.5)
-  doc.line(margin, yPosition, pageWidth - margin, yPosition)
-  yPosition += 10
-
-  // Client details in two columns
-  doc.setFontSize(10)
-  doc.setFont("helvetica", "bold")
-
-  const leftColumnX = margin
-  const rightColumnX = pageWidth / 2 + 10
-
-  // Left column
-  doc.text("Company:", leftColumnX, yPosition)
-  doc.setFont("helvetica", "normal")
-  doc.text(proposal.clientCompany || "N/A", leftColumnX + 25, yPosition)
-
-  doc.setFont("helvetica", "bold")
-  doc.text("Email:", leftColumnX, yPosition + 8)
-  doc.setFont("helvetica", "normal")
-  doc.text(proposal.clientEmail || "N/A", leftColumnX + 25, yPosition + 8)
-
-  doc.setFont("helvetica", "bold")
-  doc.text("Industry:", leftColumnX, yPosition + 16)
-  doc.setFont("helvetica", "normal")
-  doc.text(proposal.clientIndustry || "N/A", leftColumnX + 25, yPosition + 16)
-
-  // Add designation field
-  doc.setFont("helvetica", "bold")
-  doc.text("Designation:", leftColumnX, yPosition + 24)
-  doc.setFont("helvetica", "normal")
-  doc.text(proposal.clientDesignation || "N/A", leftColumnX + 25, yPosition + 24)
-
-  // Right column
-  doc.setFont("helvetica", "bold")
-  doc.text("Contact Person:", rightColumnX, yPosition)
-  doc.setFont("helvetica", "normal")
-  doc.text(proposal.clientName || "N/A", rightColumnX + 35, yPosition)
-
-  doc.setFont("helvetica", "bold")
-  doc.text("Phone:", rightColumnX, yPosition + 8)
-  doc.setFont("helvetica", "normal")
-  doc.text(proposal.clientPhone || "N/A", rightColumnX + 35, yPosition + 8)
-
-  yPosition += 40
-
-  // Products & Services Section
-  doc.setFontSize(14)
-  doc.setFont("helvetica", "bold")
-  doc.text("PRODUCTS & SERVICES", margin, yPosition)
-  yPosition += 10
-
-  // Process each product
-  products.forEach((product, index) => {
-    // Check if we need a new page
-    if (yPosition > pageHeight - 80) {
-      doc.addPage()
-      yPosition = margin
-    }
-
-    // Product header with price
-    doc.setFontSize(12)
-    doc.setFont("helvetica", "bold")
-    const productTitle = `${index + 1}. ${product.name || "Unnamed Product"}`
-    doc.text(productTitle, margin, yPosition)
-
-    // Price on the right side - using formatCurrency to remove ± symbols
-    const price = formatCurrency(product.price || 0)
-    doc.text(`₱${price}`, pageWidth - margin - 30, yPosition)
+    pdf.setLineWidth(0.5)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 8
 
-    // Product details
-    doc.setFontSize(10)
-    doc.setFont("helvetica", "normal")
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
 
-    if (product.content_type) {
-      doc.text(`Type: ${product.content_type}`, margin + 5, yPosition)
-      yPosition += 5
+    // Client details in two columns with better spacing
+    const leftColumn = margin
+    const rightColumn = margin + contentWidth / 2
+
+    // Left column
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Company:", leftColumn, yPosition)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(proposal.client?.company || "N/A", leftColumn + 25, yPosition)
+
+    // Right column
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Contact Person:", rightColumn, yPosition)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(proposal.client?.contactPerson || "N/A", rightColumn + 35, yPosition)
+    yPosition += 6
+
+    // Second row
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Email:", leftColumn, yPosition)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(proposal.client?.email || "N/A", leftColumn + 25, yPosition)
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Phone:", rightColumn, yPosition)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(proposal.client?.phone || "N/A", rightColumn + 35, yPosition)
+    yPosition += 6
+
+    // Third row - Industry and Designation
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Industry:", leftColumn, yPosition)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(proposal.client?.industry || "N/A", leftColumn + 25, yPosition)
+
+    // Add designation field
+    if (proposal.client?.designation) {
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Designation:", rightColumn, yPosition)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(proposal.client.designation, rightColumn + 35, yPosition)
+    }
+    yPosition += 6
+
+    // Address (full width if present)
+    if (proposal.client?.address) {
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Address:", leftColumn, yPosition)
+      pdf.setFont("helvetica", "normal")
+      yPosition = addText(proposal.client.address, leftColumn + 25, yPosition, contentWidth - 25)
+      yPosition += 3
     }
 
-    if (product.site_code) {
-      doc.text(`Site Code: ${product.site_code}`, margin + 5, yPosition)
-      yPosition += 5
+    yPosition += 8
+
+    // Products Section
+    checkNewPage(40)
+    pdf.setFontSize(14)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("PRODUCTS & SERVICES", margin, yPosition)
+    yPosition += 6
+
+    pdf.setLineWidth(0.5)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 8
+
+    // Products with better formatting
+    if (proposal.products && proposal.products.length > 0) {
+      for (let index = 0; index < proposal.products.length; index++) {
+        const product = proposal.products[index]
+
+        // Calculate required space more accurately
+        let requiredHeight = 25
+
+        // Add height for images if they exist
+        if (product.media && product.media.length > 0) {
+          requiredHeight += 80
+        }
+
+        checkNewPage(requiredHeight)
+
+        // Product header with better formatting
+        pdf.setFontSize(12)
+        pdf.setFont("helvetica", "bold")
+        pdf.text(`${index + 1}. ${product.name || "Unnamed Product"}`, margin, yPosition)
+        yPosition += 5
+        // Price on the right without +/- signs
+        const price =
+          typeof product.price === "string"
+            ? Number.parseFloat(product.price.replace(/[^\d.-]/g, ""))
+            : product.price || 0
+        const priceText = formatCurrency(price)
+        const priceWidth = pdf.getTextWidth(priceText)
+        const width = pageWidth - (margin - priceWidth)
+        pdf.text(priceText, pageWidth - margin - priceWidth, yPosition)
+        yPosition += 5
+
+        pdf.setFontSize(9)
+        pdf.setFont("helvetica", "normal")
+        pdf.setTextColor(100, 100, 100)
+        pdf.text(product.type || "N/A", margin + 5, yPosition)
+        yPosition += 4
+
+        pdf.setTextColor(0, 0, 0)
+
+        // Product details with better spacing
+        pdf.text(`Location: ${product.location || "N/A"}`, margin + 5, yPosition)
+        yPosition += 4
+
+        if (product.site_code) {
+          pdf.text(`Site Code: ${product.site_code}`, margin + 5, yPosition)
+          yPosition += 4
+        }
+
+        if (product.specs_rental) {
+          if (product.specs_rental.traffic_count) {
+            pdf.text(`Traffic Count: ${product.specs_rental.traffic_count.toLocaleString()}/day`, margin + 5, yPosition)
+            yPosition += 4
+          }
+          if (product.specs_rental.height && product.specs_rental.width) {
+            pdf.text(
+              `Dimensions: ${product.specs_rental.height}m × ${product.specs_rental.width}m`,
+              margin + 5,
+              yPosition,
+            )
+            yPosition += 4
+          }
+          if (product.specs_rental.audience_type) {
+            pdf.text(`Audience: ${product.specs_rental.audience_type}`, margin + 5, yPosition)
+            yPosition += 4
+          }
+        }
+
+        if (product.description) {
+          pdf.setFont("helvetica", "italic")
+          yPosition = addText(product.description, margin + 5, yPosition, contentWidth - 10, 9)
+          pdf.setFont("helvetica", "normal")
+          yPosition += 3
+        }
+
+        // Add product images with UNIFORM sizing and proper margin handling
+        if (product.media && product.media.length > 0) {
+          yPosition += 5
+          pdf.setFont("helvetica", "bold")
+          pdf.setFontSize(10)
+          pdf.text("Product Images:", margin + 5, yPosition)
+          yPosition += 8
+
+          // Filter out video files
+          const imagesToShow = product.media.filter((media) => !media.isVideo)
+
+          if (imagesToShow.length > 0) {
+            // FIXED UNIFORM IMAGE DIMENSIONS
+            const uniformImageWidth = 55 // Fixed width for ALL images
+            const uniformImageHeight = 40 // Fixed height for ALL images
+            const imageSpacing = 8
+            const imagesPerRow = 3 // Maximum 3 images per row
+            const totalRowWidth = uniformImageWidth * imagesPerRow + imageSpacing * (imagesPerRow - 1)
+
+            // Ensure images fit within content width
+            let finalImageWidth = uniformImageWidth
+            let finalImageHeight = uniformImageHeight
+
+            if (totalRowWidth > contentWidth) {
+              // Adjust for smaller images if needed but keep them uniform
+              const adjustedImageWidth = (contentWidth - imageSpacing * (imagesPerRow - 1)) / imagesPerRow
+              finalImageWidth = Math.min(adjustedImageWidth, uniformImageWidth)
+              // Maintain aspect ratio
+              finalImageHeight = (finalImageWidth / uniformImageWidth) * uniformImageHeight
+            }
+
+            let currentRow = 0
+            let currentCol = 0
+            let rowStartY = yPosition
+
+            for (let imgIndex = 0; imgIndex < imagesToShow.length; imgIndex++) {
+              const media = imagesToShow[imgIndex]
+
+              // Calculate position for current image
+              const imageX = margin + 5 + currentCol * (finalImageWidth + imageSpacing)
+              const imageY = rowStartY
+
+              // Check if we need a new page for this row
+              if (currentCol === 0) {
+                checkNewPage(finalImageHeight + 15)
+                rowStartY = yPosition
+              }
+
+              // Ensure image doesn't exceed right margin
+              if (imageX + finalImageWidth > pageWidth - margin) {
+                // Start new row if image would exceed margin
+                currentRow++
+                currentCol = 0
+                yPosition = rowStartY + finalImageHeight + imageSpacing
+                rowStartY = yPosition
+
+                // Check if we need a new page for the new row
+                checkNewPage(finalImageHeight + 15)
+                rowStartY = yPosition
+
+                // Recalculate position for new row
+                const newImageX = margin + 5 + currentCol * (finalImageWidth + imageSpacing)
+                const newImageY = rowStartY
+
+                if (media.url) {
+                  try {
+                    const base64 = await loadImageAsBase64(media.url)
+                    if (base64) {
+                      // Use UNIFORM dimensions for ALL images - no aspect ratio calculation
+                      pdf.addImage(base64, "JPEG", newImageX, newImageY, finalImageWidth, finalImageHeight)
+                    }
+                  } catch (error) {
+                    console.error("Error adding product image:", error)
+                  }
+                }
+              } else {
+                // Add image at current position with UNIFORM dimensions
+                if (media.url) {
+                  try {
+                    const base64 = await loadImageAsBase64(media.url)
+                    if (base64) {
+                      // Use UNIFORM dimensions for ALL images - no aspect ratio calculation
+                      pdf.addImage(base64, "JPEG", imageX, imageY, finalImageWidth, finalImageHeight)
+                    }
+                  } catch (error) {
+                    console.error("Error adding product image:", error)
+                  }
+                }
+              }
+
+              // Move to next column
+              currentCol++
+
+              // Check if we need to start a new row
+              if (currentCol >= imagesPerRow) {
+                currentRow++
+                currentCol = 0
+                yPosition = rowStartY + finalImageHeight + imageSpacing
+                rowStartY = yPosition
+              }
+            }
+
+            // Add final spacing after all images
+            if (currentCol > 0) {
+              yPosition = rowStartY + finalImageHeight + imageSpacing
+            }
+          }
+        }
+
+        yPosition += 12
+      }
     }
 
-    if (product.specs_rental?.width && product.specs_rental?.height) {
-      doc.text(`Dimensions: ${product.specs_rental.width}ft x ${product.specs_rental.height}ft`, margin + 5, yPosition)
-      yPosition += 5
-    }
-
-    if (product.specs_rental?.location) {
-      const locationText = `Location: ${product.specs_rental.location}`
-      const splitLocation = doc.splitTextToSize(locationText, contentWidth - 10)
-      doc.text(splitLocation, margin + 5, yPosition)
-      yPosition += splitLocation.length * 5
-    }
-
+    // Summary Section with better formatting
+    checkNewPage(30)
     yPosition += 5
+    pdf.setLineWidth(0.5)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 8
 
-    // Product Images
-    if (product.media && product.media.length > 0) {
-      doc.setFont("helvetica", "bold")
-      doc.text("Product Images:", margin + 5, yPosition)
+    pdf.setFontSize(14)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("PROPOSAL SUMMARY", margin, yPosition)
+    yPosition += 6
+
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(`Total Products: ${proposal.products?.length || 0}`, margin, yPosition)
+    yPosition += 6
+
+    // Total amount without +/- signs and better formatting
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "bold")
+    const totalAmount = proposal.totalAmount || 0
+    const totalText = `TOTAL AMOUNT: ${formatCurrency(totalAmount)}`
+    pdf.setFillColor(245, 245, 245)
+    pdf.rect(margin, yPosition - 4, contentWidth, 12, "F")
+    pdf.text(totalText, margin + 5, yPosition + 3)
+    yPosition += 15
+
+    // Notes and Custom Message
+    if (proposal.notes || proposal.customMessage) {
+      checkNewPage(25)
+      pdf.setFontSize(14)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("ADDITIONAL INFORMATION", margin, yPosition)
+      yPosition += 6
+
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
       yPosition += 8
 
-      const imageWidth = 60
-      const imageHeight = 45
-      const imagesPerRow = 2
-      const imageSpacing = 10
+      pdf.setFontSize(10)
+      pdf.setFont("helvetica", "normal")
 
-      for (let i = 0; i < Math.min(product.media.length, 4); i++) {
-        const media = product.media[i]
-        if (media.url) {
-          try {
-            const row = Math.floor(i / imagesPerRow)
-            const col = i % imagesPerRow
-            const imageX = margin + 10 + col * (imageWidth + imageSpacing)
-            const imageY = yPosition + row * (imageHeight + imageSpacing)
-
-            // Check if we need a new page for images
-            if (imageY + imageHeight > pageHeight - margin) {
-              doc.addPage()
-              yPosition = margin
-              const newImageY = yPosition + row * (imageHeight + imageSpacing)
-              doc.addImage(media.url, "JPEG", imageX, newImageY, imageWidth, imageHeight)
-            } else {
-              doc.addImage(media.url, "JPEG", imageX, imageY, imageWidth, imageHeight)
-            }
-          } catch (error) {
-            console.error("Error adding image to PDF:", error)
-          }
-        }
+      if (proposal.notes) {
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Notes:", margin, yPosition)
+        pdf.setFont("helvetica", "normal")
+        yPosition += 4
+        yPosition = addText(proposal.notes, margin, yPosition, contentWidth)
+        yPosition += 5
       }
 
-      // Adjust yPosition based on number of image rows
-      const imageRows = Math.ceil(Math.min(product.media.length, 4) / imagesPerRow)
-      yPosition += imageRows * (imageHeight + imageSpacing) + 10
+      if (proposal.customMessage) {
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Custom Message:", margin, yPosition)
+        pdf.setFont("helvetica", "normal")
+        yPosition += 4
+        yPosition = addText(proposal.customMessage, margin, yPosition, contentWidth)
+      }
     }
 
-    yPosition += 10
-  })
+    // Footer
+    const footerY = pageHeight - 15
+    pdf.setFontSize(8)
+    pdf.setTextColor(100, 100, 100)
+    pdf.text("Generated by OH Plus Platform", margin, footerY)
+    pdf.text(`Generated on ${new Date().toLocaleDateString()}`, pageWidth - margin - 50, footerY)
 
-  // Proposal Summary Section
-  if (yPosition > pageHeight - 60) {
-    doc.addPage()
-    yPosition = margin
+    if (returnBase64) {
+      // Return base64 string for email attachment
+      return pdf.output("datauristring").split(",")[1]
+    } else {
+      // Save the PDF for download
+      const fileName = `proposal-${(proposal.title || "proposal").replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
+      pdf.save(fileName)
+    }
+  } catch (error) {
+    console.error("Error generating PDF:", error)
+    throw new Error("Failed to generate PDF")
   }
-
-  // Add some space before summary
-  yPosition += 10
-
-  // Draw separator line
-  doc.setLineWidth(0.5)
-  doc.line(margin, yPosition, pageWidth - margin, yPosition)
-  yPosition += 15
-
-  doc.setFontSize(14)
-  doc.setFont("helvetica", "bold")
-  doc.text("PROPOSAL SUMMARY", margin, yPosition)
-  yPosition += 10
-
-  doc.setFontSize(11)
-  doc.setFont("helvetica", "normal")
-  doc.text(`Total Products: ${products.length}`, margin + 5, yPosition)
-  yPosition += 15
-
-  // Total Amount - highlighted box without ± symbols
-  const totalAmount = products.reduce((sum, product) => {
-    const price = Number.parseFloat(product.price?.toString().replace(/[^\d.-]/g, "") || "0")
-    return sum + (isNaN(price) ? 0 : Math.abs(price))
-  }, 0)
-
-  doc.setFillColor(240, 240, 240)
-  doc.rect(margin, yPosition - 5, contentWidth, 15, "F")
-
-  doc.setFontSize(14)
-  doc.setFont("helvetica", "bold")
-  doc.text(`TOTAL AMOUNT: ₱${formatCurrency(totalAmount)}`, margin + 10, yPosition + 5)
-
-  // Add "Scan to view online" text under QR code on first page
-  doc.setPage(1)
-  doc.setFontSize(8)
-  doc.setFont("helvetica", "normal")
-  doc.setTextColor(100, 100, 100)
-  doc.text("Scan to view online", qrX - 5, qrY + qrSize + 5)
-
-  return doc
 }
 
-export const generateCostEstimatePDF = async (costEstimate: any, products: any[]) => {
-  const doc = new jsPDF()
-  const margin = 20
-  const pageWidth = doc.internal.pageSize.width
-  const pageHeight = doc.internal.pageSize.height
-  const contentWidth = pageWidth - margin * 2
+export async function generateCostEstimatePDF(
+  costEstimate: CostEstimate,
+  returnBase64 = false,
+): Promise<string | void> {
+  try {
+    const pdf = new jsPDF("p", "mm", "a4")
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 20 // Increased margin
+    const contentWidth = pageWidth - margin * 2
+    let yPosition = margin
 
-  let yPosition = margin
+    const createdAt = safeToDate(costEstimate.createdAt)
+    const validUntil = safeToDate(costEstimate.validUntil)
+    const startDate = costEstimate.startDate ? safeToDate(costEstimate.startDate) : null
+    const endDate = costEstimate.endDate ? safeToDate(costEstimate.endDate) : null
 
-  // Generate QR Code
-  const costEstimateUrl = `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/view/${costEstimate.id}`
-  const qrCodeDataUrl = await QRCode.toDataURL(costEstimateUrl, { width: 100 })
+    const costEstimateViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/view/${costEstimate.id}`
+    const qrCodeUrl = await generateQRCode(costEstimateViewUrl)
 
-  // Header Section
-  doc.setFontSize(24)
-  doc.setFont("helvetica", "bold")
-  doc.text("COST ESTIMATE", margin, yPosition)
-
-  // Position QR code with proper spacing
-  const qrSize = 20
-  const qrX = pageWidth - margin - qrSize
-  const qrY = yPosition - 5
-  doc.addImage(qrCodeDataUrl, "PNG", qrX, qrY, qrSize, qrSize)
-
-  yPosition += 15
-
-  // Cost Estimate subtitle
-  doc.setFontSize(12)
-  doc.setFont("helvetica", "normal")
-  const costEstimateTitle = `Cost Estimate for ${costEstimate.clientName} - ${new Date(costEstimate.created?.toDate?.() || costEstimate.created).toLocaleDateString()}`
-  doc.text(costEstimateTitle, margin, yPosition)
-  yPosition += 8
-
-  // Created date
-  doc.setFontSize(10)
-  doc.setTextColor(100, 100, 100)
-  doc.text(
-    `Created: ${new Date(costEstimate.created?.toDate?.() || costEstimate.created).toLocaleDateString()}`,
-    margin,
-    yPosition,
-  )
-  yPosition += 15
-
-  // Reset text color
-  doc.setTextColor(0, 0, 0)
-
-  // Client Information Section
-  doc.setFontSize(14)
-  doc.setFont("helvetica", "bold")
-  doc.text("CLIENT INFORMATION", margin, yPosition)
-  yPosition += 5
-
-  // Draw line under section header
-  doc.setLineWidth(0.5)
-  doc.line(margin, yPosition, pageWidth - margin, yPosition)
-  yPosition += 10
-
-  // Client details in two columns
-  doc.setFontSize(10)
-  doc.setFont("helvetica", "bold")
-
-  const leftColumnX = margin
-  const rightColumnX = pageWidth / 2 + 10
-
-  // Left column
-  doc.text("Company:", leftColumnX, yPosition)
-  doc.setFont("helvetica", "normal")
-  doc.text(costEstimate.clientCompany || "N/A", leftColumnX + 25, yPosition)
-
-  doc.setFont("helvetica", "bold")
-  doc.text("Email:", leftColumnX, yPosition + 8)
-  doc.setFont("helvetica", "normal")
-  doc.text(costEstimate.clientEmail || "N/A", leftColumnX + 25, yPosition + 8)
-
-  doc.setFont("helvetica", "bold")
-  doc.text("Industry:", leftColumnX, yPosition + 16)
-  doc.setFont("helvetica", "normal")
-  doc.text(costEstimate.clientIndustry || "N/A", leftColumnX + 25, yPosition + 16)
-
-  // Add designation field
-  doc.setFont("helvetica", "bold")
-  doc.text("Designation:", leftColumnX, yPosition + 24)
-  doc.setFont("helvetica", "normal")
-  doc.text(costEstimate.clientDesignation || "N/A", leftColumnX + 25, yPosition + 24)
-
-  // Right column
-  doc.setFont("helvetica", "bold")
-  doc.text("Contact Person:", rightColumnX, yPosition)
-  doc.setFont("helvetica", "normal")
-  doc.text(costEstimate.clientName || "N/A", rightColumnX + 35, yPosition)
-
-  doc.setFont("helvetica", "bold")
-  doc.text("Phone:", rightColumnX, yPosition + 8)
-  doc.setFont("helvetica", "normal")
-  doc.text(costEstimate.clientPhone || "N/A", rightColumnX + 35, yPosition + 8)
-
-  yPosition += 40
-
-  // Products & Services Section
-  doc.setFontSize(14)
-  doc.setFont("helvetica", "bold")
-  doc.text("PRODUCTS & SERVICES", margin, yPosition)
-  yPosition += 10
-
-  // Process each product
-  products.forEach((product, index) => {
-    // Check if we need a new page
-    if (yPosition > pageHeight - 80) {
-      doc.addPage()
-      yPosition = margin
+    const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
+      pdf.setFontSize(fontSize)
+      const lines = pdf.splitTextToSize(text, maxWidth)
+      pdf.text(lines, x, y)
+      return y + lines.length * fontSize * 0.3
     }
 
-    // Product header with price - using formatCurrency to remove ± symbols
-    doc.setFontSize(12)
-    doc.setFont("helvetica", "bold")
-    const productTitle = `${index + 1}. ${product.name || "Unnamed Product"}`
-    doc.text(productTitle, margin, yPosition)
+    const checkNewPage = (requiredHeight: number) => {
+      if (yPosition + requiredHeight > pageHeight - margin) {
+        pdf.addPage()
+        yPosition = margin
+        addQRCodeToPage()
+      }
+    }
 
-    // Price on the right side
-    const price = formatCurrency(product.price || 0)
-    doc.text(`₱${price}`, pageWidth - margin - 30, yPosition)
+    const addQRCodeToPage = async () => {
+      try {
+        const qrSize = 20
+        const qrX = pageWidth - margin - qrSize
+        const qrY = margin
+
+        const qrBase64 = await loadImageAsBase64(qrCodeUrl)
+        if (qrBase64) {
+          pdf.addImage(qrBase64, "PNG", qrX, qrY, qrSize, qrSize)
+          pdf.setFontSize(6)
+          pdf.setTextColor(100, 100, 100)
+          const textWidth = pdf.getTextWidth("Scan to view online")
+          pdf.text("Scan to view online", qrX + (qrSize - textWidth) / 2, qrY + qrSize + 3)
+          pdf.setTextColor(0, 0, 0)
+        }
+      } catch (error) {
+        console.error("Error adding QR code to PDF:", error)
+      }
+    }
+
+    await addQRCodeToPage()
+
+    // Header
+    const headerContentWidth = contentWidth - 25
+    pdf.setFontSize(24)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("COST ESTIMATE", margin, yPosition)
+    yPosition += 12
+
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "normal")
+    const titleLines = pdf.splitTextToSize(costEstimate.title || "Untitled Cost Estimate", headerContentWidth)
+    pdf.text(titleLines, margin, yPosition)
+    yPosition += titleLines.length * 6 + 3
+
+    // Date and validity
+    pdf.setFontSize(10)
+    pdf.setTextColor(100, 100, 100)
+    pdf.text(`Created: ${createdAt.toLocaleDateString()}`, margin, yPosition)
+    pdf.text(`Valid Until: ${validUntil.toLocaleDateString()}`, margin, yPosition + 5)
+    yPosition += 15
+
+    // Reset text color
+    pdf.setTextColor(0, 0, 0)
+
+    // Client Information Section
+    checkNewPage(40)
+    pdf.setFontSize(14)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("CLIENT INFORMATION", margin, yPosition)
+    yPosition += 6
+
+    pdf.setLineWidth(0.5)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 8
 
-    // Product details
-    doc.setFontSize(10)
-    doc.setFont("helvetica", "normal")
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
 
-    if (product.content_type) {
-      doc.text(`Type: ${product.content_type}`, margin + 5, yPosition)
-      yPosition += 5
+    const leftColumn = margin
+    const rightColumn = margin + contentWidth / 2
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Company:", leftColumn, yPosition)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(costEstimate.client?.company || "N/A", leftColumn + 25, yPosition)
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Contact Person:", rightColumn, yPosition)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(costEstimate.client?.contactPerson || "N/A", rightColumn + 35, yPosition)
+    yPosition += 6
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Email:", leftColumn, yPosition)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(costEstimate.client?.email || "N/A", leftColumn + 25, yPosition)
+
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Phone:", rightColumn, yPosition)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(costEstimate.client?.phone || "N/A", rightColumn + 35, yPosition)
+    yPosition += 6
+
+    // Add designation for cost estimate too
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Industry:", leftColumn, yPosition)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(costEstimate.client?.industry || "N/A", leftColumn + 25, yPosition)
+
+    if (costEstimate.client?.designation) {
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Designation:", rightColumn, yPosition)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(costEstimate.client.designation, rightColumn + 35, yPosition)
+    }
+    yPosition += 6
+
+    if (costEstimate.client?.address) {
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Address:", leftColumn, yPosition)
+      pdf.setFont("helvetica", "normal")
+      yPosition = addText(costEstimate.client.address, leftColumn + 25, yPosition, contentWidth - 25)
+      yPosition += 3
     }
 
-    if (product.site_code) {
-      doc.text(`Site Code: ${product.site_code}`, margin + 5, yPosition)
-      yPosition += 5
+    if (startDate) {
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Start Date:", leftColumn, yPosition)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(startDate.toLocaleDateString(), leftColumn + 25, yPosition)
+      yPosition += 6
     }
 
-    if (product.specs_rental?.width && product.specs_rental?.height) {
-      doc.text(`Dimensions: ${product.specs_rental.width}ft x ${product.specs_rental.height}ft`, margin + 5, yPosition)
-      yPosition += 5
+    if (endDate) {
+      pdf.setFont("helvetica", "bold")
+      pdf.text("End Date:", rightColumn, yPosition)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(endDate.toLocaleDateString(), rightColumn + 35, yPosition)
+      yPosition += 6
     }
 
-    if (product.specs_rental?.location) {
-      const locationText = `Location: ${product.specs_rental.location}`
-      const splitLocation = doc.splitTextToSize(locationText, contentWidth - 10)
-      doc.text(splitLocation, margin + 5, yPosition)
-      yPosition += splitLocation.length * 5
+    yPosition += 8
+
+    // Cost Breakdown Section
+    checkNewPage(40)
+    pdf.setFontSize(14)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("COST BREAKDOWN", margin, yPosition)
+    yPosition += 6
+
+    pdf.setLineWidth(0.5)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 8
+
+    // Table Headers
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Description", margin, yPosition)
+    pdf.text("Qty", margin + contentWidth * 0.5, yPosition, { align: "right" })
+    pdf.text("Unit Price", margin + contentWidth * 0.75, yPosition, { align: "right" })
+    pdf.text("Total", pageWidth - margin, yPosition, { align: "right" })
+    yPosition += 6
+    pdf.setLineWidth(0.2)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 5
+
+    // Line Items
+    pdf.setFont("helvetica", "normal")
+    costEstimate.lineItems.forEach((item) => {
+      checkNewPage(12)
+      pdf.setFontSize(10)
+      pdf.text(item.description, margin, yPosition)
+      pdf.text(item.quantity.toString(), margin + contentWidth * 0.5, yPosition, { align: "right" })
+      pdf.text(formatCurrency(item.unitPrice), margin + contentWidth * 0.75, yPosition, { align: "right" })
+      pdf.text(formatCurrency(item.total), pageWidth - margin, yPosition, { align: "right" })
+      yPosition += 6
+      if (item.notes) {
+        pdf.setFontSize(8)
+        pdf.setTextColor(100, 100, 100)
+        yPosition = addText(item.notes, margin + 3, yPosition, contentWidth - 3, 8)
+        pdf.setTextColor(0, 0, 0)
+      }
+      yPosition += 4
+    })
+
+    // Total Amount
+    checkNewPage(20)
+    yPosition += 5
+    pdf.setLineWidth(0.5)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 8
+
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "bold")
+    const totalText = `TOTAL ESTIMATED COST: ${formatCurrency(costEstimate.totalAmount)}`
+    pdf.setFillColor(245, 245, 245)
+    pdf.rect(margin, yPosition - 4, contentWidth, 12, "F")
+    pdf.text(totalText, margin + 5, yPosition + 3)
+    yPosition += 15
+
+    // Notes and Custom Message
+    if (costEstimate.notes || costEstimate.customMessage) {
+      checkNewPage(25)
+      pdf.setFontSize(14)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("ADDITIONAL INFORMATION", margin, yPosition)
+      yPosition += 6
+
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 8
+
+      pdf.setFontSize(10)
+      pdf.setFont("helvetica", "normal")
+
+      if (costEstimate.notes) {
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Internal Notes:", margin, yPosition)
+        pdf.setFont("helvetica", "normal")
+        yPosition += 4
+        yPosition = addText(costEstimate.notes, margin, yPosition, contentWidth)
+        yPosition += 5
+      }
+
+      if (costEstimate.customMessage) {
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Custom Message:", margin, yPosition)
+        pdf.setFont("helvetica", "normal")
+        yPosition += 4
+        yPosition = addText(costEstimate.customMessage, margin, yPosition, contentWidth)
+      }
     }
 
-    yPosition += 10
-  })
+    // Footer
+    const footerY = pageHeight - 15
+    pdf.setFontSize(8)
+    pdf.setTextColor(100, 100, 100)
+    pdf.text("Generated by OH Plus Platform", margin, footerY)
+    pdf.text(`Generated on ${new Date().toLocaleDateString()}`, pageWidth - margin - 50, footerY)
 
-  // Cost Estimate Summary Section
-  if (yPosition > pageHeight - 60) {
-    doc.addPage()
-    yPosition = margin
+    if (returnBase64) {
+      return pdf.output("datauristring").split(",")[1]
+    } else {
+      const fileName = `cost-estimate-${(costEstimate.title || "cost-estimate").replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
+      pdf.save(fileName)
+    }
+  } catch (error) {
+    console.error("Error generating Cost Estimate PDF:", error)
+    throw new Error("Failed to generate Cost Estimate PDF")
   }
-
-  // Add some space before summary
-  yPosition += 10
-
-  // Draw separator line
-  doc.setLineWidth(0.5)
-  doc.line(margin, yPosition, pageWidth - margin, yPosition)
-  yPosition += 15
-
-  doc.setFontSize(14)
-  doc.setFont("helvetica", "bold")
-  doc.text("COST ESTIMATE SUMMARY", margin, yPosition)
-  yPosition += 10
-
-  doc.setFontSize(11)
-  doc.setFont("helvetica", "normal")
-  doc.text(`Total Products: ${products.length}`, margin + 5, yPosition)
-  yPosition += 15
-
-  // Total Amount - highlighted box without ± symbols
-  const totalAmount = products.reduce((sum, product) => {
-    const price = Number.parseFloat(product.price?.toString().replace(/[^\d.-]/g, "") || "0")
-    return sum + (isNaN(price) ? 0 : Math.abs(price))
-  }, 0)
-
-  doc.setFillColor(240, 240, 240)
-  doc.rect(margin, yPosition - 5, contentWidth, 15, "F")
-
-  doc.setFontSize(14)
-  doc.setFont("helvetica", "bold")
-  doc.text(`TOTAL AMOUNT: ₱${formatCurrency(totalAmount)}`, margin + 10, yPosition + 5)
-
-  // Add "Scan to view online" text under QR code on first page
-  doc.setPage(1)
-  doc.setFontSize(8)
-  doc.setFont("helvetica", "normal")
-  doc.setTextColor(100, 100, 100)
-  doc.text("Scan to view online", qrX - 5, qrY + qrSize + 5)
-
-  return doc
 }
 
 export async function generateReportPDF(
@@ -1197,7 +880,7 @@ export async function generateReportPDF(
           }
         } else {
           height = maxHeight
-          width = height * aspectRatio
+          width = height / aspectRatio
           if (width > maxWidth) {
             width = maxWidth
             height = height / aspectRatio

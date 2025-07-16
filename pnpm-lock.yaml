@@ -156,7 +156,7 @@ importers:
         specifier: latest
         version: 0.4.6(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       qrcode:
-        specifier: latest
+        specifier: ^1.5.4
         version: 1.5.4
       react:
         specifier: ^19
