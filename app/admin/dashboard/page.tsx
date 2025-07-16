@@ -158,7 +158,7 @@ export default function AdminDashboardPage() {
       name: "Sales",
       headerColor: "bg-department-sales-red",
       contentBgColor: "bg-card-content-sales",
-      members: ["Noemi", "Matthew"],
+      members: [],
       metricLabel: "Monthly Revenue",
       metricValue: "4,000,000",
       badgeCount: 2,
@@ -170,7 +170,7 @@ export default function AdminDashboardPage() {
       name: "Logistics/ Operations",
       headerColor: "bg-department-logistics-blue",
       contentBgColor: "bg-card-content-logistics",
-      members: ["Chona", "May"],
+      members: [],
       metricLabel: "Total Service Assignments",
       metricValue: "5",
       badgeCount: 1,
@@ -182,7 +182,7 @@ export default function AdminDashboardPage() {
       name: "Accounting",
       headerColor: "bg-department-accounting-purple",
       contentBgColor: "bg-card-content-accounting",
-      members: ["Chairman"],
+      members: [],
       isAvailable: false,
     },
     {
@@ -190,7 +190,7 @@ export default function AdminDashboardPage() {
       name: "Treasury",
       headerColor: "bg-department-treasury-green",
       contentBgColor: "bg-card-content-treasury",
-      members: ["Juvy"],
+      members: [],
       isAvailable: false,
     },
     {
@@ -198,7 +198,7 @@ export default function AdminDashboardPage() {
       name: "I.T.",
       headerColor: "bg-department-it-teal",
       contentBgColor: "bg-card-content-it",
-      members: ["Emmerson"],
+      members: [],
       isAvailable: false,
     },
     {
@@ -206,7 +206,7 @@ export default function AdminDashboardPage() {
       name: "Fleet",
       headerColor: "bg-department-fleet-gray",
       contentBgColor: "bg-card-content-fleet",
-      members: ["Jonathan"],
+      members: [],
       isAvailable: false,
     },
     {
@@ -214,7 +214,7 @@ export default function AdminDashboardPage() {
       name: "Creatives/Contents",
       headerColor: "bg-department-creatives-orange",
       contentBgColor: "bg-card-content-creatives",
-      members: ["Eda"],
+      members: [],
       href: "/cms/dashboard",
       isAvailable: true,
     },
@@ -223,7 +223,7 @@ export default function AdminDashboardPage() {
       name: "Finance",
       headerColor: "bg-department-finance-green",
       contentBgColor: "bg-card-content-finance",
-      members: ["Juvy"],
+      members: [],
       isAvailable: false,
     },
     {
@@ -231,7 +231,7 @@ export default function AdminDashboardPage() {
       name: "Media/ Procurement",
       headerColor: "bg-department-media-lightblue",
       contentBgColor: "bg-card-content-media",
-      members: ["Zen"],
+      members: [],
       isAvailable: false,
     },
     {
@@ -239,7 +239,7 @@ export default function AdminDashboardPage() {
       name: "Business Dev.",
       headerColor: "bg-department-businessdev-darkpurple",
       contentBgColor: "bg-card-content-businessdev",
-      members: ["Nikki"],
+      members: [],
       isAvailable: false,
     },
     {
@@ -247,7 +247,7 @@ export default function AdminDashboardPage() {
       name: "Legal",
       headerColor: "bg-department-legal-darkred",
       contentBgColor: "bg-card-content-legal",
-      members: ["Chona"],
+      members: [],
       badgeCount: 2,
       isAvailable: false,
     },
@@ -256,7 +256,7 @@ export default function AdminDashboardPage() {
       name: "Corporate",
       headerColor: "bg-department-corporate-lightblue",
       contentBgColor: "bg-card-content-corporate",
-      members: ["Anthony"],
+      members: [],
       badgeCount: 1,
       isAvailable: false,
     },
@@ -265,7 +265,7 @@ export default function AdminDashboardPage() {
       name: "Human Resources",
       headerColor: "bg-department-hr-pink",
       contentBgColor: "bg-card-content-hr",
-      members: ["Vanessa"],
+      members: [],
       badgeCount: 1,
       isAvailable: false,
     },
@@ -274,7 +274,7 @@ export default function AdminDashboardPage() {
       name: "Special Team",
       headerColor: "bg-department-specialteam-lightpurple",
       contentBgColor: "bg-card-content-specialteam",
-      members: ["Mark"],
+      members: [],
       isAvailable: false,
     },
     {
@@ -282,7 +282,7 @@ export default function AdminDashboardPage() {
       name: "Marketing",
       headerColor: "bg-department-marketing-red",
       contentBgColor: "bg-card-content-marketing",
-      members: ["John"],
+      members: [],
       isAvailable: false,
     },
   ]
@@ -303,8 +303,8 @@ export default function AdminDashboardPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h1 className="text-xl md:text-2xl font-bold">
             {userData?.first_name
-            ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
-            : "Dashboard"}
+              ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+              : "Dashboard"}
           </h1>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-grow">
