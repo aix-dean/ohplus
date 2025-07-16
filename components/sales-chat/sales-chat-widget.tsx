@@ -279,49 +279,60 @@ export function SalesChatWidget({
                         const lastMessageText = getLastMessageText(thread)
 
                         return (
-                                      <div key={thread.id}
-                              className={`p-3 rounded-lg cursor-pointer hover:bg-accent transition-colors ${
-                                activeThread?.id === thread.id ? "bg-accent" : ""
-                              }`}
-                              onClick={() => {
-                                setActiveThread(thread)
-                                setView("chat")
-                              }}>
+                          <div
+                            key={thread.id}
+                            className={`p-3 rounded-lg cursor-pointer hover:bg-accent transition-colors ${
+                              activeThread?.id === thread.id ? "bg-accent" : ""
+                            }`}
+                            onClick={() => {
+                              setActiveThread(thread)
+                              setView("chat")
+                            }}
+                          >
                             <div className="flex items-start space-x-3">
-                              <Avatar className="h-8 w-8">
+                              <Avatar className="h-8 w-8 flex-shrink-0">
                                 <AvatarImage src={thread.receiver_photo_url || "/placeholder.svg"} />
                                 <AvatarFallback>{thread.receiver_name?.charAt(0) || "C"}</AvatarFallback>
                               </Avatar>
 
-                              {/* Main content container */}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between gap-2">
-                                  {/* Name */}
+                              {/* Main content container with proper overflow handling */}
+                              <div className="flex-1 min-w-0 overflow-hidden">
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  {/* Name container with proper text handling */}
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium truncate">{thread.receiver_name}</p>
+                                    <p className="text-sm font-medium text-foreground leading-tight break-words line-clamp-1">
+                                      {thread.receiver_name || "Customer"}
+                                    </p>
                                   </div>
 
-                                  {/* Time & Priority */}
-                                  <div className="flex items-center gap-1 shrink-0 text-right">
-                                    {thread.priority && (
-                                      <Badge variant={getPriorityColor(thread.priority) as any} className="text-xs whitespace-nowrap">
-                                        {thread.priority}
-                                      </Badge>
-                                    )}
+                                  {/* Time & Priority container */}
+                                  <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
                                     {lastMessageTime && (
                                       <span className="text-xs text-muted-foreground whitespace-nowrap">
                                         {formatDistanceToNow(lastMessageTime, { addSuffix: true })}
                                       </span>
                                     )}
+                                    {thread.priority && (
+                                      <Badge
+                                        variant={getPriorityColor(thread.priority) as any}
+                                        className="text-xs h-4 px-1"
+                                      >
+                                        {thread.priority}
+                                      </Badge>
+                                    )}
                                   </div>
                                 </div>
 
-                                {/* Last message */}
-                                <p className="text-xs text-muted-foreground truncate">{lastMessageText}</p>
+                                {/* Last message with proper truncation */}
+                                <p className="text-xs text-muted-foreground line-clamp-1 break-words">
+                                  {lastMessageText}
+                                </p>
                               </div>
                             </div>
                           </div>
-
+                        )
+                      })}
+                    </div>
                   )}
                 </ScrollArea>
               )}
@@ -336,15 +347,17 @@ export function SalesChatWidget({
                         onClick={() => handleStartChat(customer)}
                       >
                         <div className="flex items-center space-x-3">
-                          <Avatar className="h-8 w-8">
+                          <Avatar className="h-8 w-8 flex-shrink-0">
                             <AvatarImage src={customer.photoUrl || "/placeholder.svg"} />
                             <AvatarFallback>{customer.name.charAt(0)}</AvatarFallback>
                           </Avatar>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{customer.name}</p>
-                            <p className="text-xs text-muted-foreground">{customer.role || "Customer"}</p>
+                          <div className="flex-1 min-w-0 overflow-hidden">
+                            <p className="text-sm font-medium line-clamp-1 break-words">{customer.name}</p>
+                            <p className="text-xs text-muted-foreground line-clamp-1 break-words">
+                              {customer.role || "Customer"}
+                            </p>
                           </div>
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 flex-shrink-0">
                             <div className="h-2 w-2 bg-green-400 rounded-full" />
                             <span className="text-xs text-muted-foreground">Online</span>
                           </div>
@@ -359,22 +372,22 @@ export function SalesChatWidget({
                 <div className="h-full flex flex-col">
                   {/* Chat Header */}
                   <div className="p-3 border-b flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Button variant="ghost" size="sm" onClick={() => setView("threads")}>
+                    <div className="flex items-center space-x-2 min-w-0 flex-1">
+                      <Button variant="ghost" size="sm" onClick={() => setView("threads")} className="flex-shrink-0">
                         ←
                       </Button>
-                      <Avatar className="h-6 w-6">
+                      <Avatar className="h-6 w-6 flex-shrink-0">
                         <AvatarImage src={activeThread.receiver_photo_url || "/placeholder.svg"} />
                         <AvatarFallback>{activeThread.receiver_name?.charAt(0) || "C"}</AvatarFallback>
                       </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">{activeThread.receiver_name}</p>
+                      <div className="min-w-0 flex-1 overflow-hidden">
+                        <p className="text-sm font-medium line-clamp-1 break-words">{activeThread.receiver_name}</p>
                         <p className="text-xs text-muted-foreground">Customer</p>
                       </div>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" className="flex-shrink-0">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
