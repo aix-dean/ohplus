@@ -22,10 +22,11 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { getJobOrderById } from "@/lib/job-order-service"
+import { getJobOrders } from "@/lib/job-order-service"
 import { generateJobOrderPDF } from "@/lib/pdf-service"
 import type { JobOrder } from "@/lib/types/job-order"
 import { toast } from "sonner"
+import { auth } from "@/lib/firebase"
 
 export default function JobOrderDetailPage() {
   const params = useParams()
@@ -41,7 +42,16 @@ export default function JobOrderDetailPage() {
     const fetchJobOrder = async () => {
       try {
         setLoading(true)
-        const fetchedJobOrder = await getJobOrderById(jobOrderId)
+        // Get current user from auth context
+        const user = auth.currentUser
+        if (!user) {
+          setError("User not authenticated.")
+          return
+        }
+
+        const allJobOrders = await getJobOrders(user.uid)
+        const fetchedJobOrder = allJobOrders.find((jo) => jo.id === jobOrderId)
+
         if (fetchedJobOrder) {
           setJobOrder(fetchedJobOrder)
         } else {

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { collection, getDocs, query, where } from "firebase/firestore"
+import { collection, getDocs, query, where, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
@@ -27,6 +27,9 @@ type ServiceAssignment = {
   location: string
   notes: string
   assignedTo: string
+  assignedToName?: string
+  createdAt?: Date
+  updatedAt?: Date
 }
 
 type CalendarViewType = "month" | "week" | "day" | "hour" | "minute"
@@ -60,20 +63,27 @@ export default function LogisticsPlannerPage() {
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [serviceAssignmentDialogOpen, setServiceAssignmentDialogOpen] = useState(false)
 
-  // Fetch service assignments
+  // Fetch service assignments with actual data
   const fetchAssignments = useCallback(async () => {
     if (!userData?.license_key) return
 
     try {
       setLoading(true)
+      console.log("Fetching service assignments for license_key:", userData.license_key)
+
+      // Query service assignments from Firestore
       const assignmentsRef = collection(db, "service_assignments")
-      const q = query(assignmentsRef, where("project_key", "==", userData.license_key))
+      const q = query(assignmentsRef, where("project_key", "==", userData.license_key), orderBy("createdAt", "desc"))
+
       const querySnapshot = await getDocs(q)
+      console.log("Found", querySnapshot.size, "service assignments")
 
       const fetchedAssignments: ServiceAssignment[] = []
       querySnapshot.forEach((doc) => {
         const data = doc.data()
-        // Convert Firestore timestamps to Date objects
+        console.log("Processing assignment:", doc.id, data)
+
+        // Convert Firestore timestamps to Date objects with proper handling
         const coveredDateStart = data.coveredDateStart?.toDate
           ? data.coveredDateStart.toDate()
           : data.coveredDateStart
@@ -86,24 +96,86 @@ export default function LogisticsPlannerPage() {
             ? new Date(data.coveredDateEnd)
             : null
 
-        fetchedAssignments.push({
+        const createdAt = data.createdAt?.toDate
+          ? data.createdAt.toDate()
+          : data.createdAt
+            ? new Date(data.createdAt)
+            : new Date()
+
+        const updatedAt = data.updatedAt?.toDate
+          ? data.updatedAt.toDate()
+          : data.updatedAt
+            ? new Date(data.updatedAt)
+            : new Date()
+
+        const assignment: ServiceAssignment = {
           id: doc.id,
-          saNumber: data.saNumber || "",
-          projectSiteId: data.projectSiteId || "",
-          projectSiteName: data.projectSiteName || "",
-          serviceType: data.serviceType || "",
+          saNumber: data.saNumber || `SA-${doc.id.slice(-6)}`,
+          projectSiteId: data.projectSiteId || data.siteId || "",
+          projectSiteName: data.projectSiteName || data.siteName || data.location || "Unknown Site",
+          serviceType: data.serviceType || data.type || "General Service",
           coveredDateStart,
           coveredDateEnd,
-          status: data.status || "",
-          location: data.location || "",
-          notes: data.notes || "",
-          assignedTo: data.assignedTo || "",
-        })
+          status: data.status || "SCHEDULED",
+          location: data.location || data.address || "",
+          notes: data.notes || data.description || "",
+          assignedTo: data.assignedTo || data.assignedToId || "",
+          assignedToName: data.assignedToName || data.assignedTo || "Unassigned",
+          createdAt,
+          updatedAt,
+        }
+
+        fetchedAssignments.push(assignment)
       })
 
+      console.log("Processed assignments:", fetchedAssignments)
       setAssignments(fetchedAssignments)
     } catch (error) {
       console.error("Error fetching service assignments:", error)
+      // Fallback query without orderBy in case of index issues
+      try {
+        const assignmentsRef = collection(db, "service_assignments")
+        const fallbackQuery = query(assignmentsRef, where("project_key", "==", userData.license_key))
+        const fallbackSnapshot = await getDocs(fallbackQuery)
+
+        const fallbackAssignments: ServiceAssignment[] = []
+        fallbackSnapshot.forEach((doc) => {
+          const data = doc.data()
+
+          const coveredDateStart = data.coveredDateStart?.toDate
+            ? data.coveredDateStart.toDate()
+            : data.coveredDateStart
+              ? new Date(data.coveredDateStart)
+              : null
+
+          const coveredDateEnd = data.coveredDateEnd?.toDate
+            ? data.coveredDateEnd.toDate()
+            : data.coveredDateEnd
+              ? new Date(data.coveredDateEnd)
+              : null
+
+          fallbackAssignments.push({
+            id: doc.id,
+            saNumber: data.saNumber || `SA-${doc.id.slice(-6)}`,
+            projectSiteId: data.projectSiteId || data.siteId || "",
+            projectSiteName: data.projectSiteName || data.siteName || data.location || "Unknown Site",
+            serviceType: data.serviceType || data.type || "General Service",
+            coveredDateStart,
+            coveredDateEnd,
+            status: data.status || "SCHEDULED",
+            location: data.location || data.address || "",
+            notes: data.notes || data.description || "",
+            assignedTo: data.assignedTo || data.assignedToId || "",
+            assignedToName: data.assignedToName || data.assignedTo || "Unassigned",
+          })
+        })
+
+        console.log("Fallback assignments:", fallbackAssignments)
+        setAssignments(fallbackAssignments)
+      } catch (fallbackError) {
+        console.error("Fallback query also failed:", fallbackError)
+        setAssignments([])
+      }
     } finally {
       setLoading(false)
     }
@@ -205,9 +277,9 @@ export default function LogisticsPlannerPage() {
     return currentDate.toLocaleDateString([], options)
   }
 
-  // Filter assignments based on current view
+  // Filter assignments based on current view and search term
   const getFilteredAssignments = () => {
-    if (!assignments.length) return []
+    if (!assignments || assignments.length === 0) return []
 
     let filtered = [...assignments]
 
@@ -220,19 +292,24 @@ export default function LogisticsPlannerPage() {
           assignment.saNumber.toLowerCase().includes(term) ||
           assignment.serviceType.toLowerCase().includes(term) ||
           assignment.location?.toLowerCase().includes(term) ||
-          assignment.assignedTo?.toLowerCase().includes(term),
+          assignment.assignedToName?.toLowerCase().includes(term) ||
+          assignment.notes?.toLowerCase().includes(term),
       )
     }
 
-    // Filter based on current view
+    // Filter based on current view and date range
     switch (view) {
       case "month":
-        return filtered.filter(
-          (assignment) =>
-            assignment.coveredDateEnd &&
-            assignment.coveredDateEnd.getMonth() === currentDate.getMonth() &&
-            assignment.coveredDateEnd.getFullYear() === currentDate.getFullYear(),
-        )
+        return filtered.filter((assignment) => {
+          if (!assignment.coveredDateEnd && !assignment.coveredDateStart) return false
+
+          const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
+          return (
+            assignmentDate &&
+            assignmentDate.getMonth() === currentDate.getMonth() &&
+            assignmentDate.getFullYear() === currentDate.getFullYear()
+          )
+        })
       case "week":
         const weekStart = new Date(currentDate)
         weekStart.setDate(currentDate.getDate() - currentDate.getDay())
@@ -242,10 +319,12 @@ export default function LogisticsPlannerPage() {
         weekEnd.setDate(weekStart.getDate() + 7)
         weekEnd.setHours(23, 59, 59, 999)
 
-        return filtered.filter(
-          (assignment) =>
-            assignment.coveredDateEnd && assignment.coveredDateEnd >= weekStart && assignment.coveredDateEnd < weekEnd,
-        )
+        return filtered.filter((assignment) => {
+          if (!assignment.coveredDateEnd && !assignment.coveredDateStart) return false
+
+          const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
+          return assignmentDate && assignmentDate >= weekStart && assignmentDate < weekEnd
+        })
       case "day":
         const dayStart = new Date(currentDate)
         dayStart.setHours(0, 0, 0, 0)
@@ -253,10 +332,12 @@ export default function LogisticsPlannerPage() {
         const dayEnd = new Date(currentDate)
         dayEnd.setHours(23, 59, 59, 999)
 
-        return filtered.filter(
-          (assignment) =>
-            assignment.coveredDateEnd && assignment.coveredDateEnd >= dayStart && assignment.coveredDateEnd < dayEnd,
-        )
+        return filtered.filter((assignment) => {
+          if (!assignment.coveredDateEnd && !assignment.coveredDateStart) return false
+
+          const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
+          return assignmentDate && assignmentDate >= dayStart && assignmentDate < dayEnd
+        })
       case "hour":
         const hourStart = new Date(currentDate)
         hourStart.setMinutes(0, 0, 0)
@@ -264,14 +345,19 @@ export default function LogisticsPlannerPage() {
         const hourEnd = new Date(hourStart)
         hourEnd.setHours(hourStart.getHours() + 1)
 
-        return filtered.filter(
-          (assignment) =>
-            assignment.coveredDateEnd &&
-            ((assignment.coveredDateEnd >= hourStart && assignment.coveredDateEnd < hourEnd) ||
+        return filtered.filter((assignment) => {
+          if (!assignment.coveredDateEnd && !assignment.coveredDateStart) return false
+
+          const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
+          return (
+            assignmentDate &&
+            ((assignmentDate >= hourStart && assignmentDate < hourEnd) ||
               (assignment.coveredDateStart &&
                 assignment.coveredDateStart < hourStart &&
-                assignment.coveredDateEnd > hourStart)),
-        )
+                assignment.coveredDateEnd &&
+                assignment.coveredDateEnd > hourStart))
+          )
+        })
       case "minute":
         const minuteStart = new Date(currentDate)
         minuteStart.setSeconds(0, 0)
@@ -279,18 +365,22 @@ export default function LogisticsPlannerPage() {
         const minuteEnd = new Date(minuteStart)
         minuteEnd.setMinutes(minuteStart.getMinutes() + 15)
 
-        return filtered.filter(
-          (assignment) =>
-            assignment.coveredDateEnd &&
-            ((assignment.coveredDateEnd >= minuteStart && assignment.coveredDateEnd < minuteEnd) ||
+        return filtered.filter((assignment) => {
+          if (!assignment.coveredDateEnd && !assignment.coveredDateStart) return false
+
+          const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
+          return (
+            assignmentDate &&
+            ((assignmentDate >= minuteStart && assignmentDate < minuteEnd) ||
               (assignment.coveredDateStart &&
                 assignment.coveredDateStart < minuteStart &&
-                assignment.coveredDateEnd > minuteStart)),
-        )
+                assignment.coveredDateEnd &&
+                assignment.coveredDateEnd > minuteStart))
+          )
+        })
     }
 
-    // Default return empty array if no match (should never reach here)
-    return []
+    return filtered
   }
 
   // Get status color based on assignment status
@@ -299,11 +389,14 @@ export default function LogisticsPlannerPage() {
       case "SCHEDULED":
         return "bg-blue-100 text-blue-800 border-blue-200"
       case "IN_PROGRESS":
+      case "IN PROGRESS":
         return "bg-yellow-100 text-yellow-800 border-yellow-200"
       case "COMPLETED":
         return "bg-green-100 text-green-800 border-green-200"
       case "CANCELLED":
         return "bg-red-100 text-red-800 border-red-200"
+      case "PENDING":
+        return "bg-orange-100 text-orange-800 border-orange-200"
       default:
         return "bg-gray-100 text-gray-800 border-gray-200"
     }
@@ -330,6 +423,8 @@ export default function LogisticsPlannerPage() {
         return "bg-blue-50 border-blue-200"
       case "inspection":
         return "bg-purple-50 border-purple-200"
+      case "dismantling":
+        return "bg-red-50 border-red-200"
       default:
         return "bg-gray-50 border-gray-200"
     }
@@ -346,6 +441,18 @@ export default function LogisticsPlannerPage() {
         return "🛠️"
       case "inspection":
         return "🔍"
+      case "dismantling":
+        return "🔻"
+      case "roll up":
+        return "⬆️"
+      case "roll down":
+        return "⬇️"
+      case "change material":
+        return "🔄"
+      case "monitoring":
+        return "👁️"
+      case "spot booking":
+        return "📍"
       default:
         return "📋"
     }
@@ -369,7 +476,7 @@ export default function LogisticsPlannerPage() {
     }
   }
 
-  // Month view renderer
+  // Month view renderer with actual assignment data
   const renderMonthView = (assignments: ServiceAssignment[]) => {
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth()
@@ -384,8 +491,10 @@ export default function LogisticsPlannerPage() {
     // Group assignments by day
     const assignmentsByDay: { [key: number]: ServiceAssignment[] } = {}
     assignments.forEach((assignment) => {
-      if (!assignment.coveredDateEnd) return
-      const day = assignment.coveredDateEnd.getDate()
+      const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
+      if (!assignmentDate) return
+
+      const day = assignmentDate.getDate()
       if (!assignmentsByDay[day]) assignmentsByDay[day] = []
       assignmentsByDay[day].push(assignment)
     })
@@ -393,7 +502,7 @@ export default function LogisticsPlannerPage() {
     return (
       <div className="grid grid-cols-7 gap-1 mt-4">
         {/* Day headers */}
-        {["S", "M", "T", "W", "T", "F", "S"].map((day, i) => (
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, i) => (
           <div key={`header-${i}`} className="text-center font-medium p-1 sm:p-2 text-gray-500 text-xs sm:text-sm">
             {day}
           </div>
@@ -419,7 +528,7 @@ export default function LogisticsPlannerPage() {
                     {day}
                   </div>
                   <div className="overflow-y-auto max-h-[50px] sm:max-h-[80px]">
-                    {dayAssignments.slice(0, 2).map((assignment, j) => (
+                    {dayAssignments.slice(0, 3).map((assignment, j) => (
                       <div
                         key={`assignment-${day}-${j}`}
                         className={`text-[10px] sm:text-xs p-1 mb-1 rounded border truncate cursor-pointer hover:bg-gray-100 ${getServiceTypeColor(assignment.serviceType)}`}
@@ -427,16 +536,33 @@ export default function LogisticsPlannerPage() {
                           e.stopPropagation()
                           router.push(`/logistics/service-assignments/${assignment.id}`)
                         }}
+                        title={`${assignment.saNumber} - ${assignment.projectSiteName} (${assignment.serviceType})`}
                       >
                         <div className="flex items-center gap-1">
                           <span>{getTypeIcon(assignment.serviceType)}</span>
-                          <span className="truncate">SA#{assignment.saNumber}</span>
+                          <span className="truncate font-medium">{assignment.saNumber}</span>
+                        </div>
+                        <div className="text-[8px] sm:text-[10px] text-gray-600 truncate mt-0.5">
+                          {assignment.projectSiteName}
+                        </div>
+                        <div className="flex items-center justify-between mt-0.5">
+                          <Badge
+                            variant="outline"
+                            className={`${getStatusColor(assignment.status)} text-[6px] sm:text-[8px] px-1 py-0`}
+                          >
+                            {assignment.status}
+                          </Badge>
+                          {assignment.coveredDateEnd && (
+                            <span className="text-[6px] sm:text-[8px] text-gray-500">
+                              {formatTime(assignment.coveredDateEnd)}
+                            </span>
+                          )}
                         </div>
                       </div>
                     ))}
-                    {dayAssignments.length > 2 && (
-                      <div className="text-[10px] sm:text-xs text-center text-blue-600 font-medium">
-                        +{dayAssignments.length - 2} more
+                    {dayAssignments.length > 3 && (
+                      <div className="text-[10px] sm:text-xs text-center text-blue-600 font-medium cursor-pointer hover:underline">
+                        +{dayAssignments.length - 3} more
                       </div>
                     )}
                   </div>
@@ -449,7 +575,7 @@ export default function LogisticsPlannerPage() {
     )
   }
 
-  // Week view renderer
+  // Week view renderer with actual assignment data
   const renderWeekView = (assignments: ServiceAssignment[]) => {
     const weekStart = new Date(currentDate)
     weekStart.setDate(currentDate.getDate() - currentDate.getDay())
@@ -466,8 +592,10 @@ export default function LogisticsPlannerPage() {
     // Group assignments by day
     const assignmentsByDay: { [key: string]: ServiceAssignment[] } = {}
     assignments.forEach((assignment) => {
-      if (!assignment.coveredDateEnd) return
-      const day = assignment.coveredDateEnd.toDateString()
+      const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
+      if (!assignmentDate) return
+
+      const day = assignmentDate.toDateString()
       if (!assignmentsByDay[day]) assignmentsByDay[day] = []
       assignmentsByDay[day].push(assignment)
     })
@@ -483,7 +611,7 @@ export default function LogisticsPlannerPage() {
               key={`header-${i}`}
               className={`text-center p-1 sm:p-2 ${isToday ? "font-bold text-blue-600" : "text-gray-700"}`}
             >
-              <div className="text-[10px] sm:text-sm">{day.toLocaleDateString([], { weekday: "short" }).charAt(0)}</div>
+              <div className="text-[10px] sm:text-sm">{day.toLocaleDateString([], { weekday: "short" })}</div>
               <div
                 className={`text-sm sm:text-lg ${isToday ? "bg-blue-100 rounded-full w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center mx-auto" : ""}`}
               >
@@ -512,9 +640,18 @@ export default function LogisticsPlannerPage() {
                       e.stopPropagation()
                       router.push(`/logistics/service-assignments/${assignment.id}`)
                     }}
+                    title={`${assignment.saNumber} - ${assignment.projectSiteName}`}
                   >
-                    <div className="font-medium truncate">SA#{assignment.saNumber}</div>
-                    <div className="text-[8px] sm:text-xs text-gray-500 mt-1">{assignment.projectSiteName}</div>
+                    <div className="font-medium truncate flex items-center gap-1">
+                      <span>{getTypeIcon(assignment.serviceType)}</span>
+                      <span>{assignment.saNumber}</span>
+                    </div>
+                    <div className="text-[8px] sm:text-xs text-gray-600 mt-1 truncate">
+                      {assignment.projectSiteName}
+                    </div>
+                    <div className="text-[8px] sm:text-xs text-gray-500 mt-1 truncate">
+                      {assignment.assignedToName || "Unassigned"}
+                    </div>
                     <div className="flex items-center justify-between mt-1 sm:mt-2">
                       <Badge
                         variant="outline"
@@ -526,11 +663,18 @@ export default function LogisticsPlannerPage() {
                         {assignment.serviceType}
                       </span>
                     </div>
+                    {(assignment.coveredDateStart || assignment.coveredDateEnd) && (
+                      <div className="text-[8px] sm:text-xs text-gray-500 mt-1">
+                        {assignment.coveredDateStart && formatTime(assignment.coveredDateStart)}
+                        {assignment.coveredDateStart && assignment.coveredDateEnd && " - "}
+                        {assignment.coveredDateEnd && formatTime(assignment.coveredDateEnd)}
+                      </div>
+                    )}
                   </div>
                 ))}
                 {dayAssignments.length === 0 && (
                   <div className="h-full flex items-center justify-center text-gray-400 text-[10px] sm:text-sm">
-                    No assignments scheduled
+                    No assignments
                   </div>
                 )}
               </div>
@@ -541,7 +685,7 @@ export default function LogisticsPlannerPage() {
     )
   }
 
-  // Day view renderer
+  // Day view renderer with actual assignment data
   const renderDayView = (assignments: ServiceAssignment[]) => {
     // Create array of hours
     const hours = Array(24)
@@ -551,8 +695,10 @@ export default function LogisticsPlannerPage() {
     // Group assignments by hour
     const assignmentsByHour: { [key: number]: ServiceAssignment[] } = {}
     assignments.forEach((assignment) => {
-      if (!assignment.coveredDateEnd) return
-      const hour = assignment.coveredDateEnd.getHours()
+      const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
+      if (!assignmentDate) return
+
+      const hour = assignmentDate.getHours()
       if (!assignmentsByHour[hour]) assignmentsByHour[hour] = []
       assignmentsByHour[hour].push(assignment)
     })
@@ -588,33 +734,45 @@ export default function LogisticsPlannerPage() {
                   key={`content-${hour}`}
                   className={`h-16 sm:h-20 border-b border-gray-200 p-1 relative ${isCurrentHour ? "bg-blue-50" : ""}`}
                 >
-                  {hourAssignments.map((assignment, i) => (
-                    <div
-                      key={`assignment-${hour}-${i}`}
-                      className={`absolute left-1 right-1 p-1 rounded border shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50 ${getServiceTypeColor(assignment.serviceType)}`}
-                      style={{
-                        top: `${(assignment.coveredDateEnd?.getMinutes() || 0 / 60) * 100}%`,
-                        height: "40%",
-                        maxHeight: "95%",
-                        zIndex: i + 1,
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        router.push(`/logistics/service-assignments/${assignment.id}`)
-                      }}
-                    >
-                      <div className="font-medium truncate">SA#{assignment.saNumber}</div>
-                      <div className="flex items-center justify-between mt-0 sm:mt-1">
-                        <Badge
-                          variant="outline"
-                          className={`${getStatusColor(assignment.status)} text-[8px] sm:text-[10px] px-1`}
-                        >
-                          {assignment.status}
-                        </Badge>
-                        <span className="text-[8px] sm:text-[10px]">{getTypeIcon(assignment.serviceType)}</span>
+                  {hourAssignments.map((assignment, i) => {
+                    const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
+                    const topPosition = assignmentDate ? (assignmentDate.getMinutes() / 60) * 100 : 0
+
+                    return (
+                      <div
+                        key={`assignment-${hour}-${i}`}
+                        className={`absolute left-1 right-1 p-1 rounded border shadow-sm text-[8px] sm:text-xs cursor-pointer hover:bg-gray-50 ${getServiceTypeColor(assignment.serviceType)}`}
+                        style={{
+                          top: `${topPosition}%`,
+                          height: "40%",
+                          maxHeight: "95%",
+                          zIndex: i + 1,
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          router.push(`/logistics/service-assignments/${assignment.id}`)
+                        }}
+                        title={`${assignment.saNumber} - ${assignment.projectSiteName} (${assignment.serviceType})`}
+                      >
+                        <div className="font-medium truncate flex items-center gap-1">
+                          <span>{getTypeIcon(assignment.serviceType)}</span>
+                          <span>{assignment.saNumber}</span>
+                        </div>
+                        <div className="text-[6px] sm:text-[8px] text-gray-600 truncate">
+                          {assignment.projectSiteName}
+                        </div>
+                        <div className="flex items-center justify-between mt-0 sm:mt-1">
+                          <Badge
+                            variant="outline"
+                            className={`${getStatusColor(assignment.status)} text-[6px] sm:text-[8px] px-1`}
+                          >
+                            {assignment.status}
+                          </Badge>
+                          <span className="text-[6px] sm:text-[8px]">{assignment.assignedToName || "Unassigned"}</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )
             })}
@@ -624,7 +782,7 @@ export default function LogisticsPlannerPage() {
     )
   }
 
-  // Hour view renderer
+  // Hour view renderer with actual assignment data
   const renderHourView = (assignments: ServiceAssignment[]) => {
     // Create array of 5-minute intervals
     const intervals = Array(12)
@@ -658,14 +816,17 @@ export default function LogisticsPlannerPage() {
               time.setMinutes(interval, 0, 0)
 
               const intervalAssignments = assignments.filter((assignment) => {
-                if (!assignment.coveredDateEnd) return false
+                const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
+                if (!assignmentDate) return false
+
                 const intervalEnd = new Date(time)
                 intervalEnd.setMinutes(time.getMinutes() + 5)
 
                 return (
-                  (assignment.coveredDateEnd >= time && assignment.coveredDateEnd < intervalEnd) ||
+                  (assignmentDate >= time && assignmentDate < intervalEnd) ||
                   (assignment.coveredDateStart &&
                     assignment.coveredDateStart < time &&
+                    assignment.coveredDateEnd &&
                     assignment.coveredDateEnd > time)
                 )
               })
@@ -691,22 +852,29 @@ export default function LogisticsPlannerPage() {
                           e.stopPropagation()
                           router.push(`/logistics/service-assignments/${assignment.id}`)
                         }}
+                        title={`${assignment.saNumber} - ${assignment.projectSiteName}`}
                       >
-                        <div className="font-medium truncate">SA#{assignment.saNumber}</div>
+                        <div className="font-medium truncate flex items-center gap-1">
+                          <span>{getTypeIcon(assignment.serviceType)}</span>
+                          <span>{assignment.saNumber}</span>
+                        </div>
+                        <div className="text-[6px] sm:text-[8px] text-gray-600 truncate">
+                          {assignment.projectSiteName}
+                        </div>
                         <div className="flex items-center justify-between mt-0 sm:mt-1">
                           <Badge
                             variant="outline"
-                            className={`${getStatusColor(assignment.status)} text-[8px] sm:text-[10px] px-1`}
+                            className={`${getStatusColor(assignment.status)} text-[6px] sm:text-[8px] px-1`}
                           >
                             {assignment.status}
                           </Badge>
-                          <span className="text-[8px] sm:text-[10px]">{assignment.serviceType}</span>
+                          <span className="text-[6px] sm:text-[8px] truncate">{assignment.serviceType}</span>
                         </div>
                       </div>
                     ))}
                     {intervalAssignments.length === 0 && (
                       <div className="w-full h-full flex items-center justify-center text-gray-400 text-[8px] sm:text-xs">
-                        No assignments in this time slot
+                        No assignments
                       </div>
                     )}
                   </div>
@@ -719,7 +887,7 @@ export default function LogisticsPlannerPage() {
     )
   }
 
-  // Minute view renderer
+  // Minute view renderer with actual assignment data
   const renderMinuteView = (assignments: ServiceAssignment[]) => {
     // Create array of 1-minute intervals for a 15-minute window
     const baseMinute = Math.floor(currentDate.getMinutes() / 15) * 15
@@ -754,14 +922,17 @@ export default function LogisticsPlannerPage() {
               time.setMinutes(minute, 0, 0)
 
               const minuteAssignments = assignments.filter((assignment) => {
-                if (!assignment.coveredDateEnd) return false
+                const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
+                if (!assignmentDate) return false
+
                 const minuteEnd = new Date(time)
                 minuteEnd.setMinutes(time.getMinutes() + 1)
 
                 return (
-                  (assignment.coveredDateEnd >= time && assignment.coveredDateEnd < minuteEnd) ||
+                  (assignmentDate >= time && assignmentDate < minuteEnd) ||
                   (assignment.coveredDateStart &&
                     assignment.coveredDateStart < time &&
+                    assignment.coveredDateEnd &&
                     assignment.coveredDateEnd > time)
                 )
               })
@@ -787,8 +958,15 @@ export default function LogisticsPlannerPage() {
                           e.stopPropagation()
                           router.push(`/logistics/service-assignments/${assignment.id}`)
                         }}
+                        title={`${assignment.saNumber} - ${assignment.projectSiteName}`}
                       >
-                        <div className="font-medium truncate">SA#{assignment.saNumber}</div>
+                        <div className="font-medium truncate flex items-center gap-1">
+                          <span>{getTypeIcon(assignment.serviceType)}</span>
+                          <span>{assignment.saNumber}</span>
+                        </div>
+                        <div className="text-[6px] sm:text-[8px] text-gray-600 truncate">
+                          {assignment.projectSiteName}
+                        </div>
                         <div className="flex items-center justify-between">
                           <Badge
                             variant="outline"
@@ -796,13 +974,13 @@ export default function LogisticsPlannerPage() {
                           >
                             {assignment.status}
                           </Badge>
-                          <span className="text-[6px] sm:text-[8px]">{assignment.serviceType}</span>
+                          <span className="text-[6px] sm:text-[8px] truncate">{assignment.serviceType}</span>
                         </div>
                       </div>
                     ))}
                     {minuteAssignments.length === 0 && (
                       <div className="w-full h-full flex items-center justify-center text-gray-400 text-[8px] sm:text-[10px]">
-                        No assignments at this time
+                        No assignments
                       </div>
                     )}
                   </div>
@@ -821,6 +999,7 @@ export default function LogisticsPlannerPage() {
         {/* Header with title and actions */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h1 className="text-2xl font-bold">Logistics Calendar</h1>
+          <div className="text-sm text-gray-500">{assignments.length} service assignments loaded</div>
         </div>
 
         {/* Calendar controls */}
@@ -868,6 +1047,7 @@ export default function LogisticsPlannerPage() {
                       <DropdownMenuItem>Maintenance</DropdownMenuItem>
                       <DropdownMenuItem>Repair</DropdownMenuItem>
                       <DropdownMenuItem>Inspection</DropdownMenuItem>
+                      <DropdownMenuItem>Dismantling</DropdownMenuItem>
                       <DropdownMenuItem>Scheduled</DropdownMenuItem>
                       <DropdownMenuItem>In Progress</DropdownMenuItem>
                       <DropdownMenuItem>Completed</DropdownMenuItem>
@@ -969,6 +1149,7 @@ export default function LogisticsPlannerPage() {
             <div className="min-w-[640px]">{renderCalendar()}</div>
           )}
         </div>
+
         <ServiceAssignmentDialog
           open={serviceAssignmentDialogOpen}
           onOpenChange={setServiceAssignmentDialogOpen}
