@@ -29,7 +29,7 @@ export default function RegisterPage() {
   const [invitationRole, setInvitationRole] = useState<string | null>(null)
   const [loadingInvitation, setLoadingInvitation] = useState(false)
 
-  const { register, user, userData, getRoleDashboardPath } = useAuth()
+  const { register, user, userData } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -188,16 +188,36 @@ export default function RegisterPage() {
   // Role-based navigation after registration
   useEffect(() => {
     if (user && userData && !loading) {
-      console.log("Registration navigation - userData:", userData)
-      console.log("Registration navigation - roles:", userData.roles)
+      // Use the roles array from user_roles collection instead of the legacy role field
+      const userRoles = userData.roles || []
 
-      // Use the roles array from user_roles collection
-      const dashboardPath = getRoleDashboardPath(userData.roles || [])
-      console.log("Registration navigation - redirecting to:", dashboardPath)
+      console.log("User roles for navigation after registration:", userRoles)
 
-      router.push(dashboardPath)
+      if (userRoles.length === 0) {
+        console.log("No roles found, redirecting to admin dashboard")
+        router.push("/admin/dashboard")
+        return
+      }
+
+      // Priority order: admin > sales > logistics > cms
+      if (userRoles.includes("admin")) {
+        console.log("Admin role found, redirecting to admin dashboard")
+        router.push("/admin/dashboard")
+      } else if (userRoles.includes("sales")) {
+        console.log("Sales role found, redirecting to sales dashboard")
+        router.push("/sales/dashboard")
+      } else if (userRoles.includes("logistics")) {
+        console.log("Logistics role found, redirecting to logistics dashboard")
+        router.push("/logistics/dashboard")
+      } else if (userRoles.includes("cms")) {
+        console.log("CMS role found, redirecting to cms dashboard")
+        router.push("/cms/dashboard")
+      } else {
+        console.log("Unknown roles, redirecting to admin dashboard")
+        router.push("/admin/dashboard")
+      }
     }
-  }, [user, userData, loading, router, getRoleDashboardPath])
+  }, [user, userData, loading, router])
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">

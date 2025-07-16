@@ -31,7 +31,7 @@ export default function LoginPage() {
   const [orgCode, setOrgCode] = useState("")
   const [isValidatingCode, setIsValidatingCode] = useState(false)
 
-  const { loginOHPlusOnly, user, userData, getRoleDashboardPath } = useAuth()
+  const { loginOHPlusOnly, user, userData } = useAuth()
   const router = useRouter()
 
   // Redirect if already logged in
@@ -129,16 +129,36 @@ export default function LoginPage() {
   // Role-based navigation after login
   useEffect(() => {
     if (user && userData && !isLoading) {
-      console.log("Login navigation - userData:", userData)
-      console.log("Login navigation - roles:", userData.roles)
+      // Use the roles array from user_roles collection instead of the legacy role field
+      const userRoles = userData.roles || []
 
-      // Use the roles array from user_roles collection
-      const dashboardPath = getRoleDashboardPath(userData.roles || [])
-      console.log("Login navigation - redirecting to:", dashboardPath)
+      console.log("User roles for navigation:", userRoles)
 
-      router.push(dashboardPath)
+      if (userRoles.length === 0) {
+        console.log("No roles found, redirecting to admin dashboard")
+        router.push("/admin/dashboard")
+        return
+      }
+
+      // Priority order: admin > sales > logistics > cms
+      if (userRoles.includes("admin")) {
+        console.log("Admin role found, redirecting to admin dashboard")
+        router.push("/admin/dashboard")
+      } else if (userRoles.includes("sales")) {
+        console.log("Sales role found, redirecting to sales dashboard")
+        router.push("/sales/dashboard")
+      } else if (userRoles.includes("logistics")) {
+        console.log("Logistics role found, redirecting to logistics dashboard")
+        router.push("/logistics/dashboard")
+      } else if (userRoles.includes("cms")) {
+        console.log("CMS role found, redirecting to cms dashboard")
+        router.push("/cms/dashboard")
+      } else {
+        console.log("Unknown roles, redirecting to admin dashboard")
+        router.push("/admin/dashboard")
+      }
     }
-  }, [user, userData, isLoading, router, getRoleDashboardPath])
+  }, [user, userData, isLoading, router])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white p-4">
