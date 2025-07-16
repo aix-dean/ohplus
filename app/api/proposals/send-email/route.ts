@@ -297,7 +297,7 @@ export async function POST(request: NextRequest) {
 
     // Prepare email data with optional PDF attachment
     const emailData: any = {
-      from: "OH Plus <noreply@resend.dev>",
+      from: "OH Plus <noreply@ohplus.ph>",
       to: [clientEmail],
       subject: finalSubject, // Use the final subject
       html: finalBody, // Use the final body
