@@ -14,6 +14,7 @@ import { auth, db } from "@/lib/firebase"
 import { subscriptionService } from "@/lib/subscription-service"
 import type { Subscription } from "@/lib/types/subscription"
 import { generateLicenseKey } from "@/lib/utils"
+import { assignRoleToUser, type RoleType } from "@/lib/hardcoded-access-service"
 
 interface UserData {
   uid: string
@@ -358,7 +359,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       let licenseKey = generateLicenseKey()
       let companyId = null
-      let assignedRole = "admin" // Default to admin for new org creators
+      let assignedRole: RoleType = "admin" // Default to admin for new org creators
 
       if (orgCode) {
         console.log("Processing invitation code:", orgCode)
@@ -372,7 +373,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           licenseKey = invitationData.license_key || licenseKey
           companyId = invitationData.company_id || null
-          assignedRole = invitationData.role || "user" // Assign role from invitation, default to user
+
+          // Validate and assign role from invitation
+          const invitationRole = invitationData.role
+          if (invitationRole && ["admin", "sales", "logistics", "cms"].includes(invitationRole)) {
+            assignedRole = invitationRole as RoleType
+          } else {
+            assignedRole = "sales" // Default fallback for invited users
+          }
 
           console.log("Assigned role from invitation:", assignedRole)
 
@@ -392,6 +400,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log("Invitation code marked as used")
         } else {
           console.log("No invitation found for code:", orgCode)
+          assignedRole = "sales" // Default for invalid invitation codes
         }
       }
 
@@ -419,6 +428,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await setDoc(userDocRef, userData)
       console.log("User document created in iboard_users collection")
+
+      // Also assign the role to the user_roles collection
+      try {
+        await assignRoleToUser(firebaseUser.uid, assignedRole, firebaseUser.uid)
+        console.log("Role assigned to user_roles collection:", assignedRole)
+      } catch (roleError) {
+        console.error("Error assigning role to user_roles collection:", roleError)
+        // Don't fail registration if role assignment fails
+      }
 
       // Create project if not joining an organization
       if (!orgCode) {
