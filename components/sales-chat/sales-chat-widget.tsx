@@ -164,14 +164,50 @@ export function SalesChatWidget({
     }, 0)
   }
 
+  // Helper function to safely get last message text
+  const getLastMessageText = (thread: SalesThread): string => {
+    if (!thread.lastMessage) return "No messages yet"
+
+    // Handle case where lastMessage might be an object or string
+    if (typeof thread.lastMessage === "string") {
+      return thread.lastMessage
+    }
+
+    if (typeof thread.lastMessage === "object" && thread.lastMessage.text) {
+      return thread.lastMessage.text || "No messages yet"
+    }
+
+    return "No messages yet"
+  }
+
+  // Helper function to safely get last message timestamp
+  const getLastMessageTime = (thread: SalesThread): Date | null => {
+    if (!thread.lastMessage) return null
+
+    // Handle case where lastMessage might be an object
+    if (typeof thread.lastMessage === "object" && thread.lastMessage.timestamp) {
+      if (thread.lastMessage.timestamp.toDate) {
+        return thread.lastMessage.timestamp.toDate()
+      }
+    }
+
+    // Fallback to thread creation time
+    if (thread.createdAt && thread.createdAt.toDate) {
+      return thread.createdAt.toDate()
+    }
+
+    return null
+  }
+
   const filteredThreads = threads.filter((thread) => {
     // Get the other participant (not the current user)
     const otherParticipant = thread.participants.find((p) => p !== user?.uid)
     const displayName = thread.receiver_name || "Customer"
+    const lastMessageText = getLastMessageText(thread)
 
     return (
       displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      thread.lastMessage?.toLowerCase().includes(searchTerm.toLowerCase())
+      lastMessageText.toLowerCase().includes(searchTerm.toLowerCase())
     )
   })
 
@@ -238,43 +274,48 @@ export function SalesChatWidget({
                     </div>
                   ) : (
                     <div className="space-y-1 p-2">
-                      {filteredThreads.map((thread) => (
-                        <div
-                          key={thread.id}
-                          className={`p-3 rounded-lg cursor-pointer hover:bg-accent transition-colors ${
-                            activeThread?.id === thread.id ? "bg-accent" : ""
-                          }`}
-                          onClick={() => {
-                            setActiveThread(thread)
-                            setView("chat")
-                          }}
-                        >
-                          <div className="flex items-start space-x-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={thread.receiver_photo_url || "/placeholder.svg"} />
-                              <AvatarFallback>{thread.receiver_name?.charAt(0) || "C"}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between">
-                                <p className="text-sm font-medium truncate">{thread.receiver_name}</p>
-                                <div className="flex items-center space-x-1">
-                                  {thread.priority && (
-                                    <Badge variant={getPriorityColor(thread.priority) as any} className="text-xs">
-                                      {thread.priority}
-                                    </Badge>
-                                  )}
-                                  {thread.lastMessageTimestamp && thread.lastMessageTimestamp.toDate && (
-                                    <span className="text-xs text-muted-foreground">
-                                      {formatDistanceToNow(thread.lastMessageTimestamp.toDate(), { addSuffix: true })}
-                                    </span>
-                                  )}
+                      {filteredThreads.map((thread) => {
+                        const lastMessageTime = getLastMessageTime(thread)
+                        const lastMessageText = getLastMessageText(thread)
+
+                        return (
+                          <div
+                            key={thread.id}
+                            className={`p-3 rounded-lg cursor-pointer hover:bg-accent transition-colors ${
+                              activeThread?.id === thread.id ? "bg-accent" : ""
+                            }`}
+                            onClick={() => {
+                              setActiveThread(thread)
+                              setView("chat")
+                            }}
+                          >
+                            <div className="flex items-start space-x-3">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage src={thread.receiver_photo_url || "/placeholder.svg"} />
+                                <AvatarFallback>{thread.receiver_name?.charAt(0) || "C"}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-sm font-medium truncate">{thread.receiver_name}</p>
+                                  <div className="flex items-center space-x-1">
+                                    {thread.priority && (
+                                      <Badge variant={getPriorityColor(thread.priority) as any} className="text-xs">
+                                        {thread.priority}
+                                      </Badge>
+                                    )}
+                                    {lastMessageTime && (
+                                      <span className="text-xs text-muted-foreground">
+                                        {formatDistanceToNow(lastMessageTime, { addSuffix: true })}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
+                                <p className="text-xs text-muted-foreground truncate">{lastMessageText}</p>
                               </div>
-                              <p className="text-xs text-muted-foreground truncate">{thread.lastMessage}</p>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )}
                 </ScrollArea>
