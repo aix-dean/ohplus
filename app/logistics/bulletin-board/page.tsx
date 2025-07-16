@@ -21,9 +21,16 @@ export default function LogisticsBulletinBoard() {
               The Logistics Bulletin Board is currently under development. We're working hard to bring you this feature
               soon!
             </p>
-            <Button asChild className="w-full">
-              <Link href="/logistics/dashboard">
-                <ArrowLeft className="h-4 w-4 mr-2" />
+            <Button
+              asChild
+              variant="ghost"
+              className="w-full group hover:bg-gray-50 border border-gray-200 rounded-lg py-3 px-4 transition-all duration-200"
+            >
+              <Link
+                href="/logistics/dashboard"
+                className="flex items-center justify-center gap-2 text-gray-700 font-medium"
+              >
+                <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform duration-200" />
                 Back to Dashboard
               </Link>
             </Button>
