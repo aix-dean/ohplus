@@ -664,10 +664,10 @@ function SalesDashboardContent() {
 
   // Callback from DateRangeCalendarDialog - NOW CREATES THE DOCUMENT
   const handleDatesSelected = async (startDate: Date, endDate: Date) => {
-    if (!user?.uid || !selectedClientForProposal || selectedSites.length === 0) {
+    if (!user?.uid || !selectedClientForProposal || selectedSites.length === 0 || !userData?.company_id) {
       toast({
         title: "Missing Information",
-        description: "Client, sites, or user information is missing. Cannot create document.",
+        description: "Client, sites, user information, or company information is missing. Cannot create document.",
         variant: "destructive",
       })
       return
@@ -741,6 +741,9 @@ function SalesDashboardContent() {
           client_name: selectedClientForProposal.contactPerson,
           client_email: selectedClientForProposal.email,
           client_id: selectedClientForProposal.id, // ADDED THIS LINE
+          client_company: selectedClientForProposal.company, // Add client company name
+          seller_id: user.uid, // Add seller_id for pagination
+          company_id: userData.company_id, // Add user's company_id
           // campaignId and proposalId can be added if applicable, but not directly from this flow
         }
 

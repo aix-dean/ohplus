@@ -42,10 +42,12 @@ export interface Quotation {
   client_name?: string
   client_email?: string
   client_id?: string // Added client_id
+  client_company?: string // Add client company name
   campaignId?: string // Add campaign ID field
   proposalId?: string // Add proposal ID field
   valid_until?: any // Added valid_until field
   seller_id?: string // Added seller_id field for pagination
+  company_id?: string // Add user's company_id
 }
 
 // Create a new quotation
@@ -365,6 +367,10 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   }
   if (quotation.campaignId) {
     pdf.text(`Related Campaign ID: ${safeString(quotation.campaignId)}`, margin, yPosition)
+    yPosition += 5
+  }
+  if (quotation.client_company) {
+    pdf.text(`Client Company: ${safeString(quotation.client_company)}`, margin, yPosition)
     yPosition += 5
   }
   yPosition += 5
