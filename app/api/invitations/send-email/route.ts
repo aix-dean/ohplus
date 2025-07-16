@@ -218,7 +218,7 @@ If you didn't expect this invitation, you can safely ignore this email.
 
     // Send email using Resend
     const { data, error } = await resend.emails.send({
-      from: `${senderName} <noreply@resend.dev>`,
+      from: `${senderName} <noreply@ohplus.ph>`,
       to: [recipientEmail],
       subject: subject,
       html: htmlContent,
