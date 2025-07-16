@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase"
-import { collection, doc, getDocs, query, where, setDoc, deleteDoc } from "firebase/firestore"
+import { collection, getDocs, query, where, deleteDoc, addDoc, serverTimestamp } from "firebase/firestore"
 
 // Hardcoded role definitions
 export type RoleType = "admin" | "sales" | "logistics" | "cms"
@@ -23,6 +23,7 @@ export interface UserRole {
   roleId: RoleType
   assignedAt: number
   assignedBy?: string
+  createdAt: any
 }
 
 // Hardcoded roles with their permissions
@@ -233,17 +234,15 @@ export async function assignRoleToUser(userId: string, roleId: RoleType, assigne
       return
     }
 
-    // Create a unique document ID
-    const docId = `${userId}_${roleId}`
-
     const userRoleData: UserRole = {
       userId,
       roleId,
       assignedAt: Date.now(),
       assignedBy,
+      createdAt: serverTimestamp(),
     }
 
-    await setDoc(doc(db, "user_roles", docId), userRoleData)
+    await addDoc(collection(db, "user_roles"), userRoleData)
     console.log(`Role ${roleId} assigned to user ${userId}`)
   } catch (error) {
     console.error("Error assigning role to user:", error)
@@ -254,8 +253,13 @@ export async function assignRoleToUser(userId: string, roleId: RoleType, assigne
 // Remove role from user
 export async function removeRoleFromUser(userId: string, roleId: RoleType): Promise<void> {
   try {
-    const docId = `${userId}_${roleId}`
-    await deleteDoc(doc(db, "user_roles", docId))
+    const userRolesCollection = collection(db, "user_roles")
+    const userRolesQuery = query(userRolesCollection, where("userId", "==", userId), where("roleId", "==", roleId))
+    const userRolesSnapshot = await getDocs(userRolesQuery)
+
+    const deletePromises = userRolesSnapshot.docs.map((doc) => deleteDoc(doc.ref))
+    await Promise.all(deletePromises)
+
     console.log(`Role ${roleId} removed from user ${userId}`)
   } catch (error) {
     console.error("Error removing role from user:", error)
