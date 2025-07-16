@@ -1,5 +1,5 @@
 "use client"
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { ArrowLeft, CalendarIcon, Plus, Loader2, FileText, ImageIcon, Package } from "lucide-react"
@@ -47,6 +47,8 @@ export default function CreateJobOrderPage() {
   const [jobDescription, setJobDescription] = useState("")
   const [siteNameError, setSiteNameError] = useState(false)
   const [jobDescriptionError, setJobDescriptionError] = useState(false)
+
+  const [availableUsers, setAvailableUsers] = useState<Array<{ id: string; name: string }>>([])
 
   const [jobOrderForm, setJobOrderForm] = useState<JobOrderFormData>({
     joType: "",
@@ -215,6 +217,25 @@ export default function CreateJobOrderPage() {
       setIsSubmitting(false)
     }
   }, [user, userData, validateForm, jobOrderForm, siteName, siteLocation, jobDescription, toast, router])
+
+  const fetchCompanyUsers = useCallback(async () => {
+    if (!userData?.company_id) return
+
+    try {
+      // For now, we'll just add the current user. In a real app, you'd fetch all company users
+      const currentUser = {
+        id: userData.uid || "",
+        name: userData.first_name || "Current User",
+      }
+      setAvailableUsers([currentUser])
+    } catch (error) {
+      console.error("Error fetching company users:", error)
+    }
+  }, [userData])
+
+  useEffect(() => {
+    fetchCompanyUsers()
+  }, [fetchCompanyUsers])
 
   return (
     <div className="flex flex-col min-h-screen bg-white p-4 md:p-6">
@@ -404,7 +425,7 @@ export default function CreateJobOrderPage() {
               <div className="space-y-2">
                 <Label className="text-sm text-gray-800">Requested By</Label>
                 <Input
-                  value={userData?.first_name || "(Auto-Generated)"}
+                  value={userData?.first_name || userData?.name || "(Auto-Generated)"}
                   disabled
                   className="bg-gray-100 text-gray-600 text-sm h-9"
                 />
@@ -465,9 +486,11 @@ export default function CreateJobOrderPage() {
                     <SelectValue placeholder="Choose Assignee" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={userData?.uid || ""} className="text-sm">
-                      {userData?.first_name}
-                    </SelectItem>
+                    {availableUsers.map((user) => (
+                      <SelectItem key={user.id} value={user.id} className="text-sm">
+                        {user.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
