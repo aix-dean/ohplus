@@ -1,5 +1,5 @@
 import type React from "react"
-import RouteProtection from "@/components/auth/RouteProtection"
+import { RouteProtection } from "@/components/route-protection"
 
 export default function CMSLayout({
   children,

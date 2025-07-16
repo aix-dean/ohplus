@@ -1,10 +1,12 @@
-import type { ReactNode } from "react"
-import RouteProtection from "@/components/auth/RouteProtection"
+"use client"
 
-interface LogisticsLayoutProps {
-  children: ReactNode
-}
+import type React from "react"
+import { RouteProtection } from "@/components/route-protection"
 
-export default function LogisticsLayout({ children }: LogisticsLayoutProps) {
+export default function LogisticsLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return <RouteProtection requiredRoles={["admin", "logistics"]}>{children}</RouteProtection>
 }
