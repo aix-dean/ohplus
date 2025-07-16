@@ -136,13 +136,6 @@ export default function LoginPage() {
     if (user && userData && !isLoading) {
       console.log("userData.roles:", userData.roles)
 
-      // Check if user is in onboarding
-      if (userData.onboarding) {
-        console.log("User is in onboarding, redirecting to onboarding flow")
-        router.push("/register/select-subscription")
-        return
-      }
-
       // Only use the roles array from user_roles collection
       if (userData.roles && userData.roles.length > 0) {
         console.log("Using roles from user_roles collection:", userData.roles)
