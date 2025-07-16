@@ -57,7 +57,7 @@ export function SendInvitationEmailDialog({ open, onOpenChange, code }: SendInvi
     setLoading(true)
 
     try {
-      const registrationUrl = `${window.location.origin}/register?code=${code.code}`
+      const registrationUrl = `${window.location.origin}/register?orgCode=${code.code}`
 
       const response = await fetch("/api/invitations/send-email", {
         method: "POST",
