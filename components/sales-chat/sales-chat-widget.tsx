@@ -297,7 +297,7 @@ export function SalesChatWidget({
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center justify-between">
                                   <p className="text-sm font-medium truncate">{thread.receiver_name}</p>
-                                  <div className="flex items-center space-x-1">
+                                  <div className="flex items-center">
                                     {thread.priority && (
                                       <Badge variant={getPriorityColor(thread.priority) as any} className="text-xs">
                                         {thread.priority}
