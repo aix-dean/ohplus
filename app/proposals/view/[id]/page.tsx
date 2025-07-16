@@ -8,7 +8,7 @@ import { Eye, CheckCircle, XCircle, Mail, Phone, Download, AlertCircle } from "l
 import type { Proposal } from "@/lib/types/proposal"
 import Image from "next/image"
 import { initializeApp, getApps } from "firebase/app"
-import { getFirestore } from "firebase/firestore"
+import { getFirestore, doc, getDoc } from "firebase/firestore"
 import { generateProposalPDF } from "@/lib/pdf-service"
 import { logProposalPDFGenerated } from "@/lib/proposal-activity-service"
 import { updateProposalStatus } from "@/lib/proposal-service"
@@ -62,9 +62,17 @@ async function generatePublicProposalPDF(proposal: Proposal) {
   }
 }
 
+// Interface for user data
+interface UserData {
+  email: string
+  phone_number: string
+  name?: string
+}
+
 export default function PublicProposalViewPage() {
   const params = useParams()
   const [proposal, setProposal] = useState<Proposal | null>(null)
+  const [creatorUser, setCreatorUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
@@ -79,7 +87,7 @@ export default function PublicProposalViewPage() {
       setError(`Firebase initialization failed: ${firebaseInit.error}`)
     }
 
-    async function fetchProposal() {
+    async function fetchProposalAndCreator() {
       if (!params.id) {
         setError("Proposal ID is missing.")
         setLoading(false)
@@ -87,6 +95,7 @@ export default function PublicProposalViewPage() {
       }
 
       try {
+        // Fetch proposal
         const response = await fetch(`/api/proposals/public/${params.id}`)
         if (!response.ok) {
           const errorData = await response.json()
@@ -94,12 +103,45 @@ export default function PublicProposalViewPage() {
         }
         const data = await response.json()
         if (data.success && data.proposal) {
-          setProposal({
+          const proposalData = {
             ...data.proposal,
             createdAt: new Date(data.proposal.createdAt),
             updatedAt: new Date(data.proposal.updatedAt),
             validUntil: new Date(data.proposal.validUntil),
-          })
+          }
+          setProposal(proposalData)
+
+          // Fetch creator user data from iboard_users collection
+          if (proposalData.createdBy) {
+            try {
+              const firebaseInit = initializeFirebaseIfNeeded()
+              if (firebaseInit.success && firebaseInit.db) {
+                const userDoc = await getDoc(doc(firebaseInit.db, "iboard_users", proposalData.createdBy))
+                if (userDoc.exists()) {
+                  const userData = userDoc.data()
+                  setCreatorUser({
+                    email: userData.email || "",
+                    phone_number: userData.phone_number || "",
+                    name: userData.name || userData.displayName || "",
+                  })
+                } else {
+                  console.warn("Creator user not found in iboard_users collection")
+                  // Set fallback contact info
+                  setCreatorUser({
+                    email: "sales@oohoperator.com",
+                    phone_number: "+63 123 456 7890",
+                  })
+                }
+              }
+            } catch (userError) {
+              console.error("Error fetching creator user:", userError)
+              // Set fallback contact info
+              setCreatorUser({
+                email: "sales@oohoperator.com",
+                phone_number: "+63 123 456 7890",
+              })
+            }
+          }
         } else {
           setError("Proposal not found or invalid data.")
         }
@@ -111,7 +153,7 @@ export default function PublicProposalViewPage() {
       }
     }
 
-    fetchProposal()
+    fetchProposalAndCreator()
   }, [params.id])
 
   const handleDownloadPDF = async () => {
@@ -182,6 +224,7 @@ export default function PublicProposalViewPage() {
   }
 
   const handleContactSales = () => {
+    const contactEmail = creatorUser?.email || "sales@oohoperator.com"
     const subject = encodeURIComponent(`Inquiry about Proposal: ${proposal?.title || "Proposal"}`)
     const body = encodeURIComponent(`Hello,
 
@@ -192,7 +235,7 @@ Please contact me at your earliest convenience.
 Best regards,
 ${proposal?.client.contactPerson || "Client"}`)
 
-    window.location.href = `mailto:sales@oohoperator.com?subject=${subject}&body=${body}`
+    window.location.href = `mailto:${contactEmail}?subject=${subject}&body=${body}`
   }
 
   const handleImageClick = (media: { url: string; isVideo: boolean }) => {
@@ -680,17 +723,24 @@ ${proposal?.client.contactPerson || "Client"}`)
                   <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-gray-900">Email</p>
-                    <p className="text-sm text-blue-600 break-all">sales@oohoperator.com</p>
+                    <p className="text-sm text-blue-600 break-all">{creatorUser?.email || "sales@oohoperator.com"}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
                   <Phone className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-gray-900">Phone</p>
-                    <p className="text-sm text-blue-600">+63 123 456 7890</p>
+                    <p className="text-sm text-blue-600">{creatorUser?.phone_number || "+63 123 456 7890"}</p>
                   </div>
                 </div>
               </div>
+              {creatorUser?.name && (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <p className="text-sm text-gray-600">
+                    Your sales representative: <span className="font-medium text-gray-900">{creatorUser.name}</span>
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
