@@ -6,7 +6,19 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { format } from "date-fns"
 import Image from "next/image"
-import { ArrowLeft, Calendar, User, Clock, FileText, AlertCircle, Package, Edit, UserCheck, RefreshCw, Printer } from 'lucide-react'
+import {
+  ArrowLeft,
+  Calendar,
+  User,
+  Clock,
+  FileText,
+  AlertCircle,
+  Package,
+  Edit,
+  UserCheck,
+  RefreshCw,
+  Printer,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -36,10 +48,10 @@ export default function JobOrderDetailPage() {
           setError("User not authenticated.")
           return
         }
-        
+
         const allJobOrders = await getJobOrders(user.uid)
-        const fetchedJobOrder = allJobOrders.find(jo => jo.id === jobOrderId)
-        
+        const fetchedJobOrder = allJobOrders.find((jo) => jo.id === jobOrderId)
+
         if (fetchedJobOrder) {
           setJobOrder(fetchedJobOrder)
         } else {
@@ -361,5 +373,5 @@ export default function JobOrderDetailPage() {
 }
 
 function Label({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <label={className}>{children}</label>
+  return <label className={className}>{children}</label>
 }
