@@ -17,12 +17,15 @@ import {
   Edit,
   UserCheck,
   RefreshCw,
+  Printer,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getJobOrderById } from "@/lib/job-order-service"
+import { generateJobOrderPDF } from "@/lib/pdf-service"
 import type { JobOrder } from "@/lib/types/job-order"
+import { toast } from "sonner"
 
 export default function JobOrderDetailPage() {
   const params = useParams()
@@ -30,6 +33,7 @@ export default function JobOrderDetailPage() {
   const [jobOrder, setJobOrder] = useState<JobOrder | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [generatingPDF, setGeneratingPDF] = useState(false)
 
   const jobOrderId = params.id as string
 
@@ -55,6 +59,24 @@ export default function JobOrderDetailPage() {
       fetchJobOrder()
     }
   }, [jobOrderId])
+
+  const handlePrintPDF = async () => {
+    if (!jobOrder) return
+
+    try {
+      setGeneratingPDF(true)
+      toast.info("Generating PDF...")
+
+      await generateJobOrderPDF(jobOrder, false)
+
+      toast.success("PDF generated successfully!")
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+      toast.error("Failed to generate PDF. Please try again.")
+    } finally {
+      setGeneratingPDF(false)
+    }
+  }
 
   const getJoTypeColor = (joType: string) => {
     switch (joType?.toLowerCase()) {
@@ -119,6 +141,25 @@ export default function JobOrderDetailPage() {
           <Package className="h-3 w-3 mr-1" />
           Logistics
         </Badge>
+        <div className="ml-auto">
+          <Button
+            onClick={handlePrintPDF}
+            disabled={generatingPDF}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {generatingPDF ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Generating...
+              </>
+            ) : (
+              <>
+                <Printer className="h-4 w-4 mr-2" />
+                Print PDF
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto w-full">
@@ -141,7 +182,8 @@ export default function JobOrderDetailPage() {
                 <span className="font-semibold">Site Name:</span> {jobOrder.siteName}
               </p>
               <p className="text-sm">
-                <span className="font-semibold">Site Location:</span> {jobOrder.siteLocation || "N/A"}
+                <span className="font-semibold">Site Location:</span>{" "}
+                {jobOrder.siteLocation || jobOrder.siteCode || "N/A"}
               </p>
               <p className="text-sm">
                 <span className="font-semibold">JO Type:</span>{" "}
@@ -156,7 +198,7 @@ export default function JobOrderDetailPage() {
               <p className="text-sm font-semibold">Site Preview:</p>
               <div className="flex items-center gap-2 p-3 bg-gray-100 rounded-md">
                 <Image
-                  src="/placeholder.svg?height=48&width=48"
+                  src={jobOrder.siteImageUrl || "/placeholder.svg?height=48&width=48"}
                   alt="Site preview"
                   width={48}
                   height={48}
@@ -164,7 +206,9 @@ export default function JobOrderDetailPage() {
                 />
                 <div className="flex-1">
                   <p className="font-semibold text-sm">{jobOrder.siteName}</p>
-                  <p className="text-xs text-gray-600">{jobOrder.siteLocation || "Location not specified"}</p>
+                  <p className="text-xs text-gray-600">
+                    {jobOrder.siteLocation || jobOrder.siteCode || "Location not specified"}
+                  </p>
                   <p className="text-xs text-gray-500">{jobOrder.joType} Job</p>
                 </div>
               </div>
@@ -253,6 +297,30 @@ export default function JobOrderDetailPage() {
                   {jobOrder.assignTo || "Unassigned"}
                 </div>
               </div>
+
+              {/* Client Information */}
+              {(jobOrder.clientCompany || jobOrder.clientName) && (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-800">Client Company</Label>
+                    <div className="p-2 bg-gray-50 rounded text-sm">{jobOrder.clientCompany || "N/A"}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-800">Client Name</Label>
+                    <div className="p-2 bg-gray-50 rounded text-sm">{jobOrder.clientName || "N/A"}</div>
+                  </div>
+                </>
+              )}
+
+              {/* Financial Information */}
+              {jobOrder.totalAmount && (
+                <div className="space-y-2">
+                  <Label className="text-sm text-gray-800">Total Amount</Label>
+                  <div className="p-2 bg-green-50 rounded text-sm font-semibold text-green-800">
+                    PHP {jobOrder.totalAmount.toLocaleString()}
+                  </div>
+                </div>
+              )}
 
               {/* Attachments */}
               {jobOrder.attachments && jobOrder.attachments.length > 0 && (
