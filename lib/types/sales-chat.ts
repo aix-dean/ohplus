@@ -7,10 +7,8 @@ export interface SalesThread {
   receiver_name?: string // Name from iboard_users collection
   receiver_photo_url?: string // Photo URL from iboard_users
   seller_photo?: string // Seller's photo URL
-  lastMessage?: {
-    text: string
-    timestamp: Timestamp
-  } // Last message with text and timestamp
+  lastMessage?: string // Last message text as string
+  lastMessageTimestamp?: Timestamp // Separate timestamp field
   createdAt: Timestamp // When the thread was created
   productId?: string // Optional: if chat is about a specific product/project
   productName?: string // Optional: product/project name for context
