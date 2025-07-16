@@ -195,15 +195,28 @@ export default function RegisterPage() {
     if (user && userData && !loading) {
       console.log("userData.roles:", userData.roles)
 
+      // Check if user is in onboarding
+      if (userData.onboarding) {
+        console.log("User is in onboarding, redirecting to onboarding flow")
+        router.push("/register/select-subscription")
+        return
+      }
+
       // Only use the roles array from user_roles collection
       if (userData.roles && userData.roles.length > 0) {
         console.log("Using roles from user_roles collection:", userData.roles)
         const dashboardPath = getRoleDashboardPath(userData.roles)
-        console.log("Navigating to:", dashboardPath)
-        router.push(dashboardPath)
+
+        if (dashboardPath) {
+          console.log("Navigating to:", dashboardPath)
+          router.push(dashboardPath)
+        } else {
+          console.log("No dashboard path found for roles, redirecting to unauthorized")
+          router.push("/unauthorized")
+        }
       } else {
-        console.log("No roles found in user_roles collection, defaulting to admin dashboard")
-        router.push("/admin/dashboard")
+        console.log("No roles found in user_roles collection, redirecting to unauthorized")
+        router.push("/unauthorized")
       }
     }
   }, [user, userData, loading, router, getRoleDashboardPath])

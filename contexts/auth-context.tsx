@@ -34,6 +34,7 @@ interface UserData {
   type?: string
   created?: Date
   updated?: Date
+  onboarding?: boolean
 }
 
 interface ProjectData {
@@ -83,7 +84,8 @@ interface AuthContextType {
   refreshUserData: () => Promise<void>
   refreshSubscriptionData: () => Promise<void>
   assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
-  getRoleDashboardPath: (roles: RoleType[]) => string
+  getRoleDashboardPath: (roles: RoleType[]) => string | null
+  hasRole: (requiredRoles: RoleType | RoleType[]) => boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -120,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
           license_key: data.license_key || null,
-          role: userRoles.length > 0 ? userRoles[0] : "user", // Set role based on first role from user_roles
+          role: userRoles.length > 0 ? userRoles[0] : null, // Set role based on first role from user_roles
           roles: userRoles, // Add the roles array from user_roles collection
           permissions: data.permissions || [],
           project_id: data.project_id,
@@ -133,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           created: data.created?.toDate(),
           updated: data.updated?.toDate(),
           company_id: data.company_id || null,
+          onboarding: data.onboarding || false,
           ...data,
         }
       } else {
@@ -148,9 +151,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           displayName: firebaseUser.displayName,
           license_key: null,
           company_id: null,
-          role: userRoles.length > 0 ? userRoles[0] : "user",
+          role: userRoles.length > 0 ? userRoles[0] : null,
           roles: userRoles,
           permissions: [],
+          onboarding: true, // New users need to complete onboarding
         }
 
         // Create the user document with uid field
@@ -440,6 +444,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         phone_number: personalInfo.phone_number,
         gender: personalInfo.gender,
         project_id: orgCode ? null : firebaseUser.uid,
+        onboarding: true, // New users need to complete onboarding
       }
 
       await setDoc(userDocRef, userData)
@@ -571,12 +576,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe()
   }, [fetchUserData, isRegistering])
 
-  const getRoleDashboardPath = useCallback((roles: RoleType[]): string => {
+  // Function to check if user has a specific role or any of the roles in an array
+  const hasRole = useCallback(
+    (requiredRoles: RoleType | RoleType[]): boolean => {
+      if (!userData || !userData.roles || userData.roles.length === 0) {
+        return false
+      }
+
+      if (Array.isArray(requiredRoles)) {
+        return requiredRoles.some((role) => userData.roles.includes(role))
+      }
+
+      return userData.roles.includes(requiredRoles)
+    },
+    [userData],
+  )
+
+  const getRoleDashboardPath = useCallback((roles: RoleType[]): string | null => {
     console.log("getRoleDashboardPath called with roles:", roles)
 
     if (!roles || roles.length === 0) {
-      console.log("No roles found, defaulting to admin dashboard")
-      return "/admin/dashboard"
+      console.log("No roles found, returning null")
+      return null
     }
 
     // Priority order: admin > sales > logistics > cms
@@ -597,8 +618,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return "/cms/dashboard"
     }
 
-    console.log("No matching roles found, defaulting to admin dashboard")
-    return "/admin/dashboard"
+    console.log("No matching roles found, returning null")
+    return null
   }, [])
 
   const value = {
@@ -618,6 +639,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshSubscriptionData,
     assignLicenseKey,
     getRoleDashboardPath,
+    hasRole,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

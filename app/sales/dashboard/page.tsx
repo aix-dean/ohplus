@@ -58,6 +58,7 @@ import { createDirectCostEstimate } from "@/lib/cost-estimate-service" // Import
 import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service" // Imports for Quotation creation
 import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
+import { RouteProtection } from "@/components/route-protection"
 // Removed: import { SelectQuotationDialog } from "@/components/select-quotation-dialog"
 
 // Number of items to display per page
@@ -1518,16 +1519,18 @@ function SalesDashboardContent() {
   )
 }
 
-export default function SalesDashboard() {
+export default function SalesDashboardPage() {
   const { user } = useAuth()
 
   return (
-    <div>
-      <SalesDashboardContent />
+    <RouteProtection requiredRoles="sales">
+      <div>
+        <SalesDashboardContent />
 
-      {/* Render SalesChatWidget without the floating button */}
-      <SalesChatWidget />
-    </div>
+        {/* Render SalesChatWidget without the floating button */}
+        <SalesChatWidget />
+      </div>
+    </RouteProtection>
   )
 }
 

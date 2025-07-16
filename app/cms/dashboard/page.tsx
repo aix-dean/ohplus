@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-
+import { RouteProtection } from "@/components/route-protection"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
@@ -476,174 +476,71 @@ export default function CMSDashboardPage() {
   const content = useMockData ? mockContent : products.map(mapProductToContent)
 
   return (
-    <div className="flex-1 p-4">
-      <div className="flex flex-col gap-3">
-        {/* Header with title and actions */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <h1 className="text-2xl font-bold">
-            {userData?.first_name
-              ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
-              : "Dashboard"}
-          </h1>
-          <p className="text-muted-foreground">Manage your digital billboard content and campaigns</p>
-        </div>
-
-        {/* Analytics Cards */}
-
-        {/* Search and View Toggle */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <Input
-              placeholder="Search content..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full sm:w-80"
-            />
-            <Button type="submit" variant="outline" size="icon">
-              <Search className="h-4 w-4" />
-            </Button>
-          </form>
-
-          <div className="flex items-center gap-2">
-            <Button variant={viewMode === "grid" ? "default" : "outline"} size="sm" onClick={() => setViewMode("grid")}>
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button variant={viewMode === "list" ? "default" : "outline"} size="sm" onClick={() => setViewMode("list")}>
-              <List className="h-4 w-4" />
-            </Button>
+    <RouteProtection requiredRoles="cms">
+      <div className="flex-1 p-4">
+        <div className="flex flex-col gap-3">
+          {/* Header with title and actions */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <h1 className="text-2xl font-bold">
+              {userData?.first_name
+                ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                : "Dashboard"}
+            </h1>
+            <p className="text-muted-foreground">Manage your digital billboard content and campaigns</p>
           </div>
-        </div>
 
-        {/* Content Display */}
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin" />
+          {/* Analytics Cards */}
+
+          {/* Search and View Toggle */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <form onSubmit={handleSearch} className="flex gap-2">
+              <Input
+                placeholder="Search content..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full sm:w-80"
+              />
+              <Button type="submit" variant="outline" size="icon">
+                <Search className="h-4 w-4" />
+              </Button>
+            </form>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant={viewMode === "grid" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("grid")}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === "list" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("list")}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        ) : content.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
-            <h3 className="mb-2 text-lg font-semibold">No content found</h3>
-            <p className="text-muted-foreground">
-              {searchTerm ? "No content matches your search criteria." : "No content available."}
-            </p>
-          </div>
-        ) : viewMode === "grid" ? (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {content.map((item) => (
-              <Card key={item.id} className="group cursor-pointer transition-all hover:shadow-md">
-                <div
-                  onClick={() => {
-                    // Store the original product data, not the mapped content
-                    const originalProduct = products.find((p) => p.id === item.id)
-                    if (originalProduct) {
-                      localStorage.setItem(`cms-product-${item.id}`, JSON.stringify(originalProduct))
-                    }
-                    handleViewSite(item.id)
-                  }}
-                >
-                  <div className="relative aspect-video overflow-hidden rounded-t-lg">
-                    <Image
-                      src={item.thumbnail || "/placeholder.svg"}
-                      alt={item.title}
-                      fill
-                      className="object-cover transition-transform group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/10" />
-                    <div className="absolute right-2 top-2">
-                      <Badge variant={item.status === "Published" ? "default" : "secondary"}>{item.status}</Badge>
-                    </div>
-                  </div>
-                  <CardContent className="p-4">
-                    <div className="mb-2 flex items-start justify-between">
-                      <h3 className="font-semibold leading-tight">{item.title}</h3>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => handleEditClick(item as any, e)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => handleDeleteClick(item as any, e)}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">ID:</span>
-                        <span>{item.productId}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Location:</span>
-                        <span className="truncate">{item.location}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Operation:</span>
-                        <span className="truncate">{item.operation}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Display:</span>
-                        <Badge variant={item.displayHealth === "ON" ? "default" : "secondary"} className="text-xs">
-                          {item.displayHealth}
-                        </Badge>
-                      </div>
-                      {item.cms && (
-                        <div className="mt-3 space-y-1 border-t pt-2">
-                          <div className="flex items-center gap-2">
-                            <Clock className="h-3 w-3" />
-                            <span className="text-xs">
-                              {item.cms.start_time} - {item.cms.end_time}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Play className="h-3 w-3" />
-                            <span className="text-xs">{item.cms.spot_duration}s duration</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Repeat className="h-3 w-3" />
-                            <span className="text-xs">
-                              {item.cms.loops_per_day} loops/day, {item.cms.spots_per_loop} spots/loop
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </div>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Content</TableHead>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Operation</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Display</TableHead>
-                  <TableHead>Schedule</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {content.map((item) => (
-                  <TableRow
-                    key={item.id}
-                    className="cursor-pointer"
+
+          {/* Content Display */}
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : content.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
+              <h3 className="mb-2 text-lg font-semibold">No content found</h3>
+              <p className="text-muted-foreground">
+                {searchTerm ? "No content matches your search criteria." : "No content available."}
+              </p>
+            </div>
+          ) : viewMode === "grid" ? (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {content.map((item) => (
+                <Card key={item.id} className="group cursor-pointer transition-all hover:shadow-md">
+                  <div
                     onClick={() => {
                       // Store the original product data, not the mapped content
                       const originalProduct = products.find((p) => p.id === item.id)
@@ -653,158 +550,271 @@ export default function CMSDashboardPage() {
                       handleViewSite(item.id)
                     }}
                   >
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="relative h-12 w-16 overflow-hidden rounded">
-                          <Image
-                            src={item.thumbnail || "/placeholder.svg"}
-                            alt={item.title}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
-                        <div>
-                          <div className="font-medium">{item.title}</div>
-                          <div className="text-sm text-muted-foreground">{item.type}</div>
-                        </div>
+                    <div className="relative aspect-video overflow-hidden rounded-t-lg">
+                      <Image
+                        src={item.thumbnail || "/placeholder.svg"}
+                        alt={item.title}
+                        fill
+                        className="object-cover transition-transform group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/10" />
+                      <div className="absolute right-2 top-2">
+                        <Badge variant={item.status === "Published" ? "default" : "secondary"}>{item.status}</Badge>
                       </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">{item.productId}</TableCell>
-                    <TableCell>{item.location}</TableCell>
-                    <TableCell>{item.operation}</TableCell>
-                    <TableCell>
-                      <Badge variant={item.status === "Published" ? "default" : "secondary"}>{item.status}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={item.displayHealth === "ON" ? "default" : "secondary"}>
-                        {item.displayHealth}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {item.cms ? (
-                        <div className="text-sm">
-                          <div>
-                            {item.cms.start_time} - {item.cms.end_time}
+                    </div>
+                    <CardContent className="p-4">
+                      <div className="mb-2 flex items-start justify-between">
+                        <h3 className="font-semibold leading-tight">{item.title}</h3>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={(e) => handleEditClick(item as any, e)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => handleDeleteClick(item as any, e)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <div className="space-y-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">ID:</span>
+                          <span>{item.productId}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Location:</span>
+                          <span className="truncate">{item.location}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Operation:</span>
+                          <span className="truncate">{item.operation}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Display:</span>
+                          <Badge variant={item.displayHealth === "ON" ? "default" : "secondary"} className="text-xs">
+                            {item.displayHealth}
+                          </Badge>
+                        </div>
+                        {item.cms && (
+                          <div className="mt-3 space-y-1 border-t pt-2">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-3 w-3" />
+                              <span className="text-xs">
+                                {item.cms.start_time} - {item.cms.end_time}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Play className="h-3 w-3" />
+                              <span className="text-xs">{item.cms.spot_duration}s duration</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Repeat className="h-3 w-3" />
+                              <span className="text-xs">
+                                {item.cms.loops_per_day} loops/day, {item.cms.spots_per_loop} spots/loop
+                              </span>
+                            </div>
                           </div>
-                          <div className="text-muted-foreground">
-                            {item.cms.spot_duration}s, {item.cms.loops_per_day} loops
+                        )}
+                      </div>
+                    </CardContent>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Content</TableHead>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Operation</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Display</TableHead>
+                    <TableHead>Schedule</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {content.map((item) => (
+                    <TableRow
+                      key={item.id}
+                      className="cursor-pointer"
+                      onClick={() => {
+                        // Store the original product data, not the mapped content
+                        const originalProduct = products.find((p) => p.id === item.id)
+                        if (originalProduct) {
+                          localStorage.setItem(`cms-product-${item.id}`, JSON.stringify(originalProduct))
+                        }
+                        handleViewSite(item.id)
+                      }}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="relative h-12 w-16 overflow-hidden rounded">
+                            <Image
+                              src={item.thumbnail || "/placeholder.svg"}
+                              alt={item.title}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div>
+                            <div className="font-medium">{item.title}</div>
+                            <div className="text-sm text-muted-foreground">{item.type}</div>
                           </div>
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground">Not scheduled</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleViewSite(item.id)
-                            }}
-                          >
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Site
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => handleEditClick(item as any, e)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => handleDeleteClick(item as any, e)}>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        )}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{item.productId}</TableCell>
+                      <TableCell>{item.location}</TableCell>
+                      <TableCell>{item.operation}</TableCell>
+                      <TableCell>
+                        <Badge variant={item.status === "Published" ? "default" : "secondary"}>{item.status}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={item.displayHealth === "ON" ? "default" : "secondary"}>
+                          {item.displayHealth}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {item.cms ? (
+                          <div className="text-sm">
+                            <div>
+                              {item.cms.start_time} - {item.cms.end_time}
+                            </div>
+                            <div className="text-muted-foreground">
+                              {item.cms.spot_duration}s, {item.cms.loops_per_day} loops
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Not scheduled</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleViewSite(item.id)
+                              }}
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Site
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => handleEditClick(item as any, e)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => handleDeleteClick(item as any, e)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
 
-        {/* Pagination */}
-        {!loading && content.length > 0 && totalPages > 1 && (
-          <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
-            <div className="text-sm text-muted-foreground">
-              {loadingCount ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading count...
-                </div>
-              ) : (
-                `Showing ${(currentPage - 1) * ITEMS_PER_PAGE + 1} to ${Math.min(
-                  currentPage * ITEMS_PER_PAGE,
-                  totalItems,
-                )} of ${totalItems} items`
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToPreviousPage}
-                disabled={currentPage === 1 || loadingMore}
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Previous
-              </Button>
-
-              <div className="flex items-center gap-1">
-                {getPageNumbers().map((pageNum, index) => (
-                  <div key={index}>
-                    {pageNum === "..." ? (
-                      <span className="px-2 py-1 text-sm text-muted-foreground">...</span>
-                    ) : (
-                      <Button
-                        variant={currentPage === pageNum ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => goToPage(pageNum as number)}
-                        disabled={loadingMore}
-                        className="h-8 w-8 p-0"
-                      >
-                        {pageNum}
-                      </Button>
-                    )}
+          {/* Pagination */}
+          {!loading && content.length > 0 && totalPages > 1 && (
+            <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+              <div className="text-sm text-muted-foreground">
+                {loadingCount ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading count...
                   </div>
-                ))}
+                ) : (
+                  `Showing ${(currentPage - 1) * ITEMS_PER_PAGE + 1} to ${Math.min(
+                    currentPage * ITEMS_PER_PAGE,
+                    totalItems,
+                  )} of ${totalItems} items`
+                )}
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToNextPage}
-                disabled={currentPage === totalPages || loadingMore}
-              >
-                {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : <ChevronRight className="h-4 w-4" />}
-                Next
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPreviousPage}
+                  disabled={currentPage === 1 || loadingMore}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
 
-      {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        onConfirm={handleDeleteConfirm}
-        title="Delete Content"
-        description={`Are you sure you want to delete "${productToDelete?.name}"? This action cannot be undone.`}
-      />
-    </div>
+                <div className="flex items-center gap-1">
+                  {getPageNumbers().map((pageNum, index) => (
+                    <div key={index}>
+                      {pageNum === "..." ? (
+                        <span className="px-2 py-1 text-sm text-muted-foreground">...</span>
+                      ) : (
+                        <Button
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => goToPage(pageNum as number)}
+                          disabled={loadingMore}
+                          className="h-8 w-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages || loadingMore}
+                >
+                  {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : <ChevronRight className="h-4 w-4" />}
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Content"
+          description={`Are you sure you want to delete "${productToDelete?.name}"? This action cannot be undone.`}
+        />
+      </div>
+    </RouteProtection>
   )
 }
 
