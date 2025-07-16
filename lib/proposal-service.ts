@@ -38,6 +38,7 @@ export async function createProposal(
     validUntil?: Date
     // Removed sendEmail option
     campaignId?: string // Add optional campaign ID parameter
+    companyId?: string // Add optional company ID parameter
   } = {},
 ): Promise<string> {
   try {
@@ -56,7 +57,7 @@ export async function createProposal(
       industry: client.industry || "",
       targetAudience: client.targetAudience || "",
       campaignObjective: client.campaignObjective || "",
-      designation: client.designation || "",
+      designation: client.designation || "", // Include designation
     }
 
     // Clean the products data to ensure no undefined values
@@ -103,6 +104,7 @@ export async function createProposal(
       notes: options.notes || "",
       customMessage: options.customMessage || "",
       createdBy: userId,
+      companyId: options.companyId || null, // Add company_id to proposal data
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       status: "draft" as const, // Always set to draft now
