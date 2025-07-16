@@ -2,6 +2,60 @@ import jsPDF from "jspdf"
 import QRCode from "qrcode"
 import type { ReportData } from "@/lib/report-service"
 
+interface ProposalData {
+  id: string
+  client_name: string
+  client_email: string
+  client_phone: string
+  client_company: string
+  client_industry: string
+  client_designation?: string
+  products: Array<{
+    id: string
+    name: string
+    site_code: string
+    type: string
+    specs_rental: {
+      width: number
+      height: number
+      location: string
+      price_per_month: number
+    }
+    media?: Array<{ url: string }>
+  }>
+  total_amount: number
+  created_at: any
+  valid_until: any
+  proposal_number?: string
+}
+
+interface CostEstimateData {
+  id: string
+  client_name: string
+  client_email: string
+  client_phone: string
+  client_company: string
+  client_industry: string
+  client_designation?: string
+  products: Array<{
+    id: string
+    name: string
+    site_code: string
+    type: string
+    specs_rental: {
+      width: number
+      height: number
+      location: string
+      price_per_month: number
+    }
+    media?: Array<{ url: string }>
+  }>
+  total_amount: number
+  created_at: any
+  valid_until: any
+  estimate_number?: string
+}
+
 // Helper function to load image and convert to base64
 export async function loadImageAsBase64(url: string): Promise<string | null> {
   try {
@@ -113,6 +167,527 @@ const formatCurrency = (amount: any): string => {
     return "0"
   }
 }
+
+export class PDFService {
+  private formatCurrency(amount: any): string {
+    if (!amount && amount !== 0) return "0"
+
+    try {
+      let numAmount: number
+
+      if (typeof amount === "number") {
+        numAmount = amount
+      } else if (typeof amount === "string") {
+        // Remove any non-numeric characters including ± symbols
+        const cleanAmount = amount.replace(/[^\d.-]/g, "")
+        numAmount = Number.parseFloat(cleanAmount)
+      } else {
+        return "0"
+      }
+
+      if (isNaN(numAmount)) return "0"
+
+      // Use absolute value to remove any negative signs or ± symbols
+      const absAmount = Math.abs(numAmount)
+      return absAmount.toLocaleString()
+    } catch (error) {
+      console.error("Error formatting currency:", error)
+      return "0"
+    }
+  }
+
+  private formatDate(date: any): string {
+    if (!date) return "N/A"
+
+    try {
+      let dateObj: Date
+
+      if (date && typeof date.toDate === "function") {
+        dateObj = date.toDate()
+      } else if (typeof date === "string") {
+        dateObj = new Date(date)
+      } else if (date instanceof Date) {
+        dateObj = date
+      } else {
+        return "N/A"
+      }
+
+      if (isNaN(dateObj.getTime())) {
+        return "N/A"
+      }
+
+      return dateObj.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+      })
+    } catch (error) {
+      return "N/A"
+    }
+  }
+
+  async generateProposalPDF(data: ProposalData): Promise<Uint8Array> {
+    const doc = new jsPDF()
+    const margin = 20
+    const pageWidth = doc.internal.pageSize.width
+    const contentWidth = pageWidth - margin * 2
+
+    // Generate QR code
+    const qrCodeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/proposals/view/${data.id}`
+    const qrCodeDataUrl = await QRCode.toDataURL(qrCodeUrl, { width: 80 })
+
+    // Header with QR code
+    doc.setFontSize(24)
+    doc.setFont("helvetica", "bold")
+    doc.text("PROPOSAL", margin, 30)
+
+    // Add QR code with proper spacing
+    const qrSize = 20
+    const qrX = pageWidth - margin - qrSize
+    const qrY = 15
+    doc.addImage(qrCodeDataUrl, "PNG", qrX, qrY, qrSize, qrSize)
+
+    // Subtitle with better spacing from QR code
+    doc.setFontSize(12)
+    doc.setFont("helvetica", "normal")
+    const subtitleWidth = contentWidth - qrSize - 25 // 25mm buffer from QR code
+    const subtitle = `Proposal for ${data.client_company} - ${this.formatDate(data.created_at)}`
+    doc.text(subtitle, margin, 45, { maxWidth: subtitleWidth })
+
+    // Date information
+    doc.setFontSize(10)
+    doc.setTextColor(100, 100, 100)
+    doc.text(`Created: ${this.formatDate(data.created_at)}`, margin, 55)
+    doc.text(`Valid Until: ${this.formatDate(data.valid_until)}`, margin, 62)
+
+    // QR code label
+    doc.setFontSize(8)
+    doc.text("Scan to view online", qrX, qrY + qrSize + 5)
+
+    // Reset text color
+    doc.setTextColor(0, 0, 0)
+
+    // Client Information Section
+    let yPos = 80
+    doc.setFontSize(14)
+    doc.setFont("helvetica", "bold")
+    doc.text("CLIENT INFORMATION", margin, yPos)
+
+    // Draw line under section header
+    doc.setLineWidth(0.5)
+    doc.line(margin, yPos + 2, pageWidth - margin, yPos + 2)
+
+    yPos += 15
+    doc.setFontSize(10)
+    doc.setFont("helvetica", "normal")
+
+    // Client details in two columns
+    const leftColX = margin
+    const rightColX = margin + contentWidth / 2
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Company:", leftColX, yPos)
+    doc.setFont("helvetica", "normal")
+    doc.text(data.client_company || "N/A", leftColX + 25, yPos)
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Contact Person:", rightColX, yPos)
+    doc.setFont("helvetica", "normal")
+    doc.text(data.client_name || "N/A", rightColX + 35, yPos)
+
+    yPos += 10
+    doc.setFont("helvetica", "bold")
+    doc.text("Email:", leftColX, yPos)
+    doc.setFont("helvetica", "normal")
+    doc.text(data.client_email || "N/A", leftColX + 25, yPos)
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Phone:", rightColX, yPos)
+    doc.setFont("helvetica", "normal")
+    doc.text(data.client_phone || "N/A", rightColX + 35, yPos)
+
+    yPos += 10
+    doc.setFont("helvetica", "bold")
+    doc.text("Industry:", leftColX, yPos)
+    doc.setFont("helvetica", "normal")
+    doc.text(data.client_industry || "N/A", leftColX + 25, yPos)
+
+    // Add designation if available
+    if (data.client_designation) {
+      doc.setFont("helvetica", "bold")
+      doc.text("Designation:", rightColX, yPos)
+      doc.setFont("helvetica", "normal")
+      doc.text(data.client_designation, rightColX + 35, yPos)
+    }
+
+    // Products & Services Section
+    yPos += 25
+    doc.setFontSize(14)
+    doc.setFont("helvetica", "bold")
+    doc.text("PRODUCTS & SERVICES", margin, yPos)
+
+    doc.setLineWidth(0.5)
+    doc.line(margin, yPos + 2, pageWidth - margin, yPos + 2)
+
+    yPos += 15
+
+    // Product details
+    data.products.forEach(async (product, index) => {
+      // Check if we need a new page
+      if (yPos > 250) {
+        doc.addPage()
+        yPos = 30
+      }
+
+      doc.setFontSize(12)
+      doc.setFont("helvetica", "bold")
+      doc.text(`${index + 1}. ${product.name}`, margin, yPos)
+
+      // Price aligned to the right
+      const priceText = `₱${this.formatCurrency(product.specs_rental.price_per_month)}`
+      const priceWidth = doc.getTextWidth(priceText)
+      doc.text(priceText, pageWidth - margin - priceWidth, yPos)
+
+      yPos += 8
+      doc.setFontSize(10)
+      doc.setFont("helvetica", "normal")
+
+      const details = [
+        `Rental: N/A`,
+        `Site Code: ${product.site_code || "N/A"}`,
+        `Dimensions: ${product.specs_rental.width || "N/A"}ft x ${product.specs_rental.height || "N/A"}ft`,
+        `Location: ${product.specs_rental.location || "N/A"}`,
+      ]
+
+      details.forEach((detail) => {
+        doc.text(detail, margin + 5, yPos)
+        yPos += 6
+      })
+
+      // Product images
+      if (product.media && product.media.length > 0) {
+        yPos += 5
+        doc.setFont("helvetica", "bold")
+        doc.text("Product Images:", margin + 5, yPos)
+        yPos += 10
+
+        const imageWidth = 60
+        const imageHeight = 40
+        const imagesPerRow = 2
+        let imageX = margin + 10
+
+        for (let i = 0; i < Math.min(product.media.length, 4); i++) {
+          try {
+            if (i > 0 && i % imagesPerRow === 0) {
+              yPos += imageHeight + 10
+              imageX = margin + 10
+            }
+
+            // Check if we need a new page for images
+            if (yPos + imageHeight > 280) {
+              doc.addPage()
+              yPos = 30
+              imageX = margin + 10
+            }
+
+            const response = await fetch(`/api/proxy-image?url=${encodeURIComponent(product.media[i].url)}`)
+            if (response.ok) {
+              const blob = await response.blob()
+              const reader = new FileReader()
+
+              await new Promise((resolve) => {
+                reader.onload = () => {
+                  try {
+                    doc.addImage(reader.result as string, "JPEG", imageX, yPos, imageWidth, imageHeight)
+                  } catch (error) {
+                    console.error("Error adding image to PDF:", error)
+                  }
+                  resolve(null)
+                }
+                reader.readAsDataURL(blob)
+              })
+            }
+
+            imageX += imageWidth + 10
+          } catch (error) {
+            console.error("Error processing image:", error)
+          }
+        }
+
+        yPos += imageHeight + 15
+      } else {
+        yPos += 15
+      }
+    })
+
+    // Proposal Summary
+    yPos += 10
+
+    // Check if we need a new page for summary
+    if (yPos > 250) {
+      doc.addPage()
+      yPos = 30
+    }
+
+    doc.setLineWidth(0.5)
+    doc.line(margin, yPos, pageWidth - margin, yPos)
+
+    yPos += 15
+    doc.setFontSize(14)
+    doc.setFont("helvetica", "bold")
+    doc.text("PROPOSAL SUMMARY", margin, yPos)
+
+    yPos += 15
+    doc.setFontSize(10)
+    doc.setFont("helvetica", "normal")
+    doc.text(`Total Products: ${data.products.length}`, margin + 5, yPos)
+
+    yPos += 15
+
+    // Total amount box
+    doc.setFillColor(240, 240, 240)
+    doc.rect(margin, yPos - 5, contentWidth, 15, "F")
+
+    doc.setFontSize(12)
+    doc.setFont("helvetica", "bold")
+    const totalText = `TOTAL AMOUNT: ₱${this.formatCurrency(data.total_amount)}`
+    doc.text(totalText, margin + 5, yPos + 5)
+
+    return doc.output("arraybuffer")
+  }
+
+  async generateCostEstimatePDF(data: CostEstimateData): Promise<Uint8Array> {
+    const doc = new jsPDF()
+    const margin = 20
+    const pageWidth = doc.internal.pageSize.width
+    const contentWidth = pageWidth - margin * 2
+
+    // Generate QR code
+    const qrCodeUrl = `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/view/${data.id}`
+    const qrCodeDataUrl = await QRCode.toDataURL(qrCodeUrl, { width: 80 })
+
+    // Header with QR code
+    doc.setFontSize(24)
+    doc.setFont("helvetica", "bold")
+    doc.text("COST ESTIMATE", margin, 30)
+
+    // Add QR code with proper spacing
+    const qrSize = 20
+    const qrX = pageWidth - margin - qrSize
+    const qrY = 15
+    doc.addImage(qrCodeDataUrl, "PNG", qrX, qrY, qrSize, qrSize)
+
+    // Subtitle with better spacing from QR code
+    doc.setFontSize(12)
+    doc.setFont("helvetica", "normal")
+    const subtitleWidth = contentWidth - qrSize - 25 // 25mm buffer from QR code
+    const subtitle = `Cost Estimate for ${data.client_company} - ${this.formatDate(data.created_at)}`
+    doc.text(subtitle, margin, 45, { maxWidth: subtitleWidth })
+
+    // Date information
+    doc.setFontSize(10)
+    doc.setTextColor(100, 100, 100)
+    doc.text(`Created: ${this.formatDate(data.created_at)}`, margin, 55)
+    doc.text(`Valid Until: ${this.formatDate(data.valid_until)}`, margin, 62)
+
+    // QR code label
+    doc.setFontSize(8)
+    doc.text("Scan to view online", qrX, qrY + qrSize + 5)
+
+    // Reset text color
+    doc.setTextColor(0, 0, 0)
+
+    // Client Information Section
+    let yPos = 80
+    doc.setFontSize(14)
+    doc.setFont("helvetica", "bold")
+    doc.text("CLIENT INFORMATION", margin, yPos)
+
+    // Draw line under section header
+    doc.setLineWidth(0.5)
+    doc.line(margin, yPos + 2, pageWidth - margin, yPos + 2)
+
+    yPos += 15
+    doc.setFontSize(10)
+    doc.setFont("helvetica", "normal")
+
+    // Client details in two columns
+    const leftColX = margin
+    const rightColX = margin + contentWidth / 2
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Company:", leftColX, yPos)
+    doc.setFont("helvetica", "normal")
+    doc.text(data.client_company || "N/A", leftColX + 25, yPos)
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Contact Person:", rightColX, yPos)
+    doc.setFont("helvetica", "normal")
+    doc.text(data.client_name || "N/A", rightColX + 35, yPos)
+
+    yPos += 10
+    doc.setFont("helvetica", "bold")
+    doc.text("Email:", leftColX, yPos)
+    doc.setFont("helvetica", "normal")
+    doc.text(data.client_email || "N/A", leftColX + 25, yPos)
+
+    doc.setFont("helvetica", "bold")
+    doc.text("Phone:", rightColX, yPos)
+    doc.setFont("helvetica", "normal")
+    doc.text(data.client_phone || "N/A", rightColX + 35, yPos)
+
+    yPos += 10
+    doc.setFont("helvetica", "bold")
+    doc.text("Industry:", leftColX, yPos)
+    doc.setFont("helvetica", "normal")
+    doc.text(data.client_industry || "N/A", leftColX + 25, yPos)
+
+    // Add designation if available
+    if (data.client_designation) {
+      doc.setFont("helvetica", "bold")
+      doc.text("Designation:", rightColX, yPos)
+      doc.setFont("helvetica", "normal")
+      doc.text(data.client_designation, rightColX + 35, yPos)
+    }
+
+    // Products & Services Section
+    yPos += 25
+    doc.setFontSize(14)
+    doc.setFont("helvetica", "bold")
+    doc.text("PRODUCTS & SERVICES", margin, yPos)
+
+    doc.setLineWidth(0.5)
+    doc.line(margin, yPos + 2, pageWidth - margin, yPos + 2)
+
+    yPos += 15
+
+    // Product details
+    data.products.forEach(async (product, index) => {
+      // Check if we need a new page
+      if (yPos > 250) {
+        doc.addPage()
+        yPos = 30
+      }
+
+      doc.setFontSize(12)
+      doc.setFont("helvetica", "bold")
+      doc.text(`${index + 1}. ${product.name}`, margin, yPos)
+
+      // Price aligned to the right
+      const priceText = `₱${this.formatCurrency(product.specs_rental.price_per_month)}`
+      const priceWidth = doc.getTextWidth(priceText)
+      doc.text(priceText, pageWidth - margin - priceWidth, yPos)
+
+      yPos += 8
+      doc.setFontSize(10)
+      doc.setFont("helvetica", "normal")
+
+      const details = [
+        `Rental: N/A`,
+        `Site Code: ${product.site_code || "N/A"}`,
+        `Dimensions: ${product.specs_rental.width || "N/A"}ft x ${product.specs_rental.height || "N/A"}ft`,
+        `Location: ${product.specs_rental.location || "N/A"}`,
+      ]
+
+      details.forEach((detail) => {
+        doc.text(detail, margin + 5, yPos)
+        yPos += 6
+      })
+
+      // Product images
+      if (product.media && product.media.length > 0) {
+        yPos += 5
+        doc.setFont("helvetica", "bold")
+        doc.text("Product Images:", margin + 5, yPos)
+        yPos += 10
+
+        const imageWidth = 60
+        const imageHeight = 40
+        const imagesPerRow = 2
+        let imageX = margin + 10
+
+        for (let i = 0; i < Math.min(product.media.length, 4); i++) {
+          try {
+            if (i > 0 && i % imagesPerRow === 0) {
+              yPos += imageHeight + 10
+              imageX = margin + 10
+            }
+
+            // Check if we need a new page for images
+            if (yPos + imageHeight > 280) {
+              doc.addPage()
+              yPos = 30
+              imageX = margin + 10
+            }
+
+            const response = await fetch(`/api/proxy-image?url=${encodeURIComponent(product.media[i].url)}`)
+            if (response.ok) {
+              const blob = await response.blob()
+              const reader = new FileReader()
+
+              await new Promise((resolve) => {
+                reader.onload = () => {
+                  try {
+                    doc.addImage(reader.result as string, "JPEG", imageX, yPos, imageWidth, imageHeight)
+                  } catch (error) {
+                    console.error("Error adding image to PDF:", error)
+                  }
+                  resolve(null)
+                }
+                reader.readAsDataURL(blob)
+              })
+            }
+
+            imageX += imageWidth + 10
+          } catch (error) {
+            console.error("Error processing image:", error)
+          }
+        }
+
+        yPos += imageHeight + 15
+      } else {
+        yPos += 15
+      }
+    })
+
+    // Cost Estimate Summary
+    yPos += 10
+
+    // Check if we need a new page for summary
+    if (yPos > 250) {
+      doc.addPage()
+      yPos = 30
+    }
+
+    doc.setLineWidth(0.5)
+    doc.line(margin, yPos, pageWidth - margin, yPos)
+
+    yPos += 15
+    doc.setFontSize(14)
+    doc.setFont("helvetica", "bold")
+    doc.text("COST ESTIMATE SUMMARY", margin, yPos)
+
+    yPos += 15
+    doc.setFontSize(10)
+    doc.setFont("helvetica", "normal")
+    doc.text(`Total Products: ${data.products.length}`, margin + 5, yPos)
+
+    yPos += 15
+
+    // Total amount box
+    doc.setFillColor(240, 240, 240)
+    doc.rect(margin, yPos - 5, contentWidth, 15, "F")
+
+    doc.setFontSize(12)
+    doc.setFont("helvetica", "bold")
+    const totalText = `TOTAL AMOUNT: ₱${this.formatCurrency(data.total_amount)}`
+    doc.text(totalText, margin + 5, yPos + 5)
+
+    return doc.output("arraybuffer")
+  }
+}
+
+export const pdfService = new PDFService()
 
 export const generateProposalPDF = async (proposal: any, products: any[]) => {
   const doc = new jsPDF()

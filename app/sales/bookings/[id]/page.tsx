@@ -64,20 +64,64 @@ export default function BookingDetailsPage() {
     fetchBookingDetails()
   }, [params.id])
 
-  // Format date from Firestore Timestamp
-  const formatDate = (date: any) => {
+  // Safely convert any value to string for display
+  const safeToString = (value: any): string => {
+    if (value === null || value === undefined) return "N/A"
+    if (typeof value === "string") return value
+    if (typeof value === "number") return value.toString()
+    if (typeof value === "boolean") return value.toString()
+    if (value instanceof Date) return value.toISOString()
+    if (value && typeof value === "object") {
+      // Handle Firestore timestamp objects
+      if (typeof value.toDate === "function") {
+        try {
+          return value.toDate().toISOString()
+        } catch {
+          return "Invalid date"
+        }
+      }
+      // Handle other objects by converting to JSON string
+      try {
+        return JSON.stringify(value)
+      } catch {
+        return "Invalid object"
+      }
+    }
+    return String(value)
+  }
+
+  // Format date from Firestore Timestamp or other date formats
+  const formatDate = (date: any): string => {
     if (!date) return "N/A"
+
     try {
+      let dateObj: Date
+
+      // Handle Firestore Timestamp
       if (date && typeof date.toDate === "function") {
-        return format(date.toDate(), "MMM d, yyyy")
+        dateObj = date.toDate()
       }
-      if (typeof date === "string") {
-        return format(new Date(date), "MMM d, yyyy")
+      // Handle string dates
+      else if (typeof date === "string") {
+        dateObj = new Date(date)
       }
-      if (date instanceof Date) {
-        return format(date, "MMM d, yyyy")
+      // Handle Date objects
+      else if (date instanceof Date) {
+        dateObj = date
       }
-      return "Invalid date"
+      // Handle timestamp numbers
+      else if (typeof date === "number") {
+        dateObj = new Date(date)
+      } else {
+        return "Invalid date"
+      }
+
+      // Check if date is valid
+      if (isNaN(dateObj.getTime())) {
+        return "Invalid date"
+      }
+
+      return format(dateObj, "MMM d, yyyy")
     } catch (error) {
       console.error("Error formatting date:", error)
       return "Invalid date"
@@ -85,18 +129,75 @@ export default function BookingDetailsPage() {
   }
 
   // Calculate booking duration in months
-  const calculateDuration = (startDate: any, endDate: any) => {
-    if (!startDate || !endDate) return "N/A"
+  const calculateDuration = (startDate: any, endDate: any): string => {
+    if (!startDate || !endDate) return ""
 
     try {
-      const start = startDate.toDate ? startDate.toDate() : new Date(startDate)
-      const end = endDate.toDate ? endDate.toDate() : new Date(endDate)
+      let start: Date, end: Date
+
+      // Convert start date
+      if (startDate && typeof startDate.toDate === "function") {
+        start = startDate.toDate()
+      } else if (typeof startDate === "string") {
+        start = new Date(startDate)
+      } else if (startDate instanceof Date) {
+        start = startDate
+      } else {
+        return ""
+      }
+
+      // Convert end date
+      if (endDate && typeof endDate.toDate === "function") {
+        end = endDate.toDate()
+      } else if (typeof endDate === "string") {
+        end = new Date(endDate)
+      } else if (endDate instanceof Date) {
+        end = endDate
+      } else {
+        return ""
+      }
+
+      // Check if dates are valid
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return ""
+      }
 
       const months = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
 
-      return `(${months} ${months === 1 ? "month" : "months"})`
+      if (months <= 0) return ""
+
+      return ` (${months} ${months === 1 ? "month" : "months"})`
     } catch (error) {
+      console.error("Error calculating duration:", error)
       return ""
+    }
+  }
+
+  // Format currency safely
+  const formatCurrency = (amount: any): string => {
+    if (!amount && amount !== 0) return "N/A"
+
+    try {
+      let numAmount: number
+
+      if (typeof amount === "number") {
+        numAmount = amount
+      } else if (typeof amount === "string") {
+        // Remove any non-numeric characters except decimal point and minus sign
+        const cleanAmount = amount.replace(/[^\d.-]/g, "")
+        numAmount = Number.parseFloat(cleanAmount)
+      } else {
+        return "N/A"
+      }
+
+      if (isNaN(numAmount)) return "N/A"
+
+      // Use absolute value to remove any negative signs
+      const absAmount = Math.abs(numAmount)
+      return `₱${absAmount.toLocaleString()}`
+    } catch (error) {
+      console.error("Error formatting currency:", error)
+      return "N/A"
     }
   }
 
@@ -158,7 +259,7 @@ export default function BookingDetailsPage() {
   }
 
   // Determine booking status for progress tracker
-  const bookingStatus = booking.status?.toLowerCase() || "pending"
+  const bookingStatus = safeToString(booking.status).toLowerCase()
   const progressSteps = [
     { name: "Cost Estimate", completed: true },
     { name: "Quotation", completed: true },
@@ -168,15 +269,15 @@ export default function BookingDetailsPage() {
   ]
 
   // Get client initials for the avatar
-  const formatFullName = (user: any) => {
+  const formatFullName = (user: any): string => {
     if (!user) return ""
-    const firstName = user.first_name || ""
-    const middleName = user.middle_name ? ` ${user.middle_name} ` : " "
-    const lastName = user.last_name || ""
+    const firstName = safeToString(user.first_name || "")
+    const middleName = user.middle_name ? ` ${safeToString(user.middle_name)} ` : " "
+    const lastName = safeToString(user.last_name || "")
     return `${firstName}${middleName}${lastName}`.trim()
   }
 
-  const clientName = user ? formatFullName(user) : booking.client_name || ""
+  const clientName = user ? formatFullName(user) : safeToString(booking.client_name)
   const clientInitials =
     clientName
       .split(" ")
@@ -184,18 +285,6 @@ export default function BookingDetailsPage() {
       .join("")
       .toUpperCase()
       .substring(0, 2) || "CL"
-
-  // Format currency safely
-  const formatCurrency = (amount: any) => {
-    if (!amount && amount !== 0) return "N/A"
-    try {
-      const numAmount = typeof amount === "number" ? amount : Number.parseFloat(amount.toString())
-      if (isNaN(numAmount)) return "N/A"
-      return `₱${numAmount.toLocaleString()}`
-    } catch (error) {
-      return "N/A"
-    }
-  }
 
   return (
     <div className="container mx-auto p-6">
@@ -241,7 +330,7 @@ export default function BookingDetailsPage() {
                   {product.media && product.media[0] ? (
                     <Image
                       src={product.media[0].url || "/placeholder.svg"}
-                      alt={product.name || "Site image"}
+                      alt={safeToString(product.name) || "Site image"}
                       width={400}
                       height={300}
                       className="w-full h-48 object-cover"
@@ -254,39 +343,39 @@ export default function BookingDetailsPage() {
                 </div>
                 <div className="space-y-2 text-sm">
                   <p>
-                    <span className="font-semibold">Site Code:</span> {product.site_code || "N/A"}
+                    <span className="font-semibold">Site Code:</span> {safeToString(product.site_code)}
                   </p>
                   <p>
-                    <span className="font-semibold">Site Name:</span> {product.name || "N/A"}
+                    <span className="font-semibold">Site Name:</span> {safeToString(product.name)}
                   </p>
                   <p>
-                    <span className="font-semibold">Type:</span> {product.type || "N/A"}
+                    <span className="font-semibold">Type:</span> {safeToString(product.type)}
                   </p>
                   {product.specs_rental && (
                     <>
                       <p>
-                        <span className="font-semibold">Dimension:</span>
+                        <span className="font-semibold">Dimension:</span>{" "}
                         {product.specs_rental.width && product.specs_rental.height
-                          ? `${product.specs_rental.width}ft x ${product.specs_rental.height}ft`
+                          ? `${safeToString(product.specs_rental.width)}ft x ${safeToString(product.specs_rental.height)}ft`
                           : "N/A"}
                       </p>
                       <p>
-                        <span className="font-semibold">Location:</span>
-                        {product.specs_rental.location || product.light?.location || "N/A"}
+                        <span className="font-semibold">Location:</span>{" "}
+                        {safeToString(product.specs_rental.location || product.light?.location)}
                       </p>
-                      {product.specs_rental.geopoint && (
+                      {product.specs_rental.geopoint && Array.isArray(product.specs_rental.geopoint) && (
                         <p>
-                          <span className="font-semibold">Geopoint:</span>
-                          {`${product.specs_rental.geopoint[0]}, ${product.specs_rental.geopoint[1]}`}
+                          <span className="font-semibold">Geopoint:</span>{" "}
+                          {`${safeToString(product.specs_rental.geopoint[0])}, ${safeToString(product.specs_rental.geopoint[1])}`}
                         </p>
                       )}
                     </>
                   )}
                   <p>
-                    <span className="font-semibold">Site Orientation:</span> {product.orientation || "N/A"}
+                    <span className="font-semibold">Site Orientation:</span> {safeToString(product.orientation)}
                   </p>
                   <p>
-                    <span className="font-semibold">Site Owner:</span> {product.seller_name || "N/A"}
+                    <span className="font-semibold">Site Owner:</span> {safeToString(product.seller_name)}
                   </p>
                 </div>
               </>
@@ -304,7 +393,7 @@ export default function BookingDetailsPage() {
             <h2 className="font-semibold">Reserved</h2>
             <div className="flex items-center">
               <span className="inline-block w-3 h-3 rounded-full mr-2 bg-green-500"></span>
-              <span className="text-sm">{booking.status || "Pending"}</span>
+              <span className="text-sm">{safeToString(booking.status) || "Pending"}</span>
             </div>
           </div>
           <div className="p-4">
@@ -314,10 +403,10 @@ export default function BookingDetailsPage() {
                   {clientInitials}
                 </div>
                 <div>
-                  <h3 className="font-semibold text-lg">
-                    {user ? formatFullName(user) : booking.client_name || "N/A"}
-                  </h3>
-                  <p className="text-sm text-gray-600">{user?.company || booking.company || "No company specified"}</p>
+                  <h3 className="font-semibold text-lg">{clientName || "N/A"}</h3>
+                  <p className="text-sm text-gray-600">
+                    {safeToString(user?.company || booking.company) || "No company specified"}
+                  </p>
                 </div>
               </div>
               <Button
@@ -334,35 +423,35 @@ export default function BookingDetailsPage() {
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-gray-600">Client Name:</p>
-                <p className="font-medium">{user ? formatFullName(user) : booking.client_name || "N/A"}</p>
+                <p className="font-medium">{clientName || "N/A"}</p>
               </div>
 
               <div>
                 <p className="text-sm text-gray-600">Company:</p>
-                <p className="font-medium">{user?.company || booking.company || "N/A"}</p>
+                <p className="font-medium">{safeToString(user?.company || booking.company)}</p>
               </div>
 
               <div>
                 <p className="text-sm text-gray-600">Contact Number:</p>
-                <p className="font-medium">{user?.phone_number || booking.contact_number || "N/A"}</p>
+                <p className="font-medium">{safeToString(user?.phone_number || booking.contact_number)}</p>
               </div>
 
               <div>
                 <p className="text-sm text-gray-600">Email:</p>
-                <p className="font-medium">{user?.email || booking.email || "N/A"}</p>
+                <p className="font-medium">{safeToString(user?.email || booking.email)}</p>
               </div>
 
               <div>
                 <p className="text-sm text-gray-600">Booking Dates:</p>
                 <p className="font-medium">
-                  {formatDate(booking.start_date)} to {formatDate(booking.end_date)}{" "}
+                  {formatDate(booking.start_date)} to {formatDate(booking.end_date)}
                   {calculateDuration(booking.start_date, booking.end_date)}
                 </p>
               </div>
 
               <div>
                 <p className="text-sm text-gray-600">Project Name:</p>
-                <p className="font-medium">{booking.project_name || "N/A"}</p>
+                <p className="font-medium">{safeToString(booking.project_name)}</p>
               </div>
 
               <div>
@@ -372,12 +461,12 @@ export default function BookingDetailsPage() {
 
               <div>
                 <p className="text-sm text-gray-600">Payment Status:</p>
-                <p className="font-medium">{booking.payment_status || "N/A"}</p>
+                <p className="font-medium">{safeToString(booking.payment_status)}</p>
               </div>
 
               <div>
                 <p className="text-sm text-gray-600">Booking Reference:</p>
-                <p className="font-medium">{booking.booking_reference || booking.id.substring(0, 8)}</p>
+                <p className="font-medium">{safeToString(booking.booking_reference) || booking.id.substring(0, 8)}</p>
               </div>
             </div>
           </div>
@@ -391,10 +480,11 @@ export default function BookingDetailsPage() {
             <h2 className="font-semibold">Notes</h2>
           </div>
           <div className="p-4">
-            <p className="whitespace-pre-line">{booking.notes}</p>
+            <p className="whitespace-pre-line">{safeToString(booking.notes)}</p>
           </div>
         </div>
       )}
+
       {/* Sales Chat Widget */}
       <SalesChatWidget autoOpen={chatOpen} onOpenChange={setChatOpen} />
     </div>
