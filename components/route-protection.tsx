@@ -34,7 +34,7 @@ export function RouteProtection({ children, requiredRoles, redirectTo = "/unauth
       return
     }
 
-    // User is authorized
+    // User is authorized - no subscription checks needed
     setAuthorized(true)
   }, [user, userData, loading, hasRole, requiredRoles, router, redirectTo])
 
