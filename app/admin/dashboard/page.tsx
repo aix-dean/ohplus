@@ -174,6 +174,15 @@ export default function AdminDashboardPage() {
       isAvailable: true,
     },
     {
+      id: "creatives",
+      name: "Creatives/Contents",
+      headerColor: "bg-department-creatives-orange",
+      contentBgColor: "bg-card-content-creatives",
+      members: [],
+      href: "/cms/dashboard",
+      isAvailable: true,
+    },
+    {
       id: "accounting",
       name: "Accounting",
       headerColor: "bg-department-accounting-purple",
@@ -204,15 +213,6 @@ export default function AdminDashboardPage() {
       contentBgColor: "bg-card-content-fleet",
       members: [],
       isAvailable: false,
-    },
-    {
-      id: "creatives",
-      name: "Creatives/Contents",
-      headerColor: "bg-department-creatives-orange",
-      contentBgColor: "bg-card-content-creatives",
-      members: [],
-      href: "/cms/dashboard",
-      isAvailable: true,
     },
     {
       id: "finance",
