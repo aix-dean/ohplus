@@ -86,7 +86,6 @@ interface AuthContextType {
   assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
   getRoleDashboardPath: (roles: RoleType[]) => string | null
   hasRole: (requiredRoles: RoleType | RoleType[]) => boolean
-  isAdmin: () => boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -577,22 +576,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe()
   }, [fetchUserData, isRegistering])
 
-  // Function to check if user is admin
-  const isAdmin = useCallback((): boolean => {
-    return userData?.roles?.includes("admin") || false
-  }, [userData])
-
   // Function to check if user has a specific role or any of the roles in an array
-  // Admin users have access to everything
   const hasRole = useCallback(
     (requiredRoles: RoleType | RoleType[]): boolean => {
       if (!userData || !userData.roles || userData.roles.length === 0) {
         return false
-      }
-
-      // Admin users have access to all roles/pages
-      if (userData.roles.includes("admin")) {
-        return true
       }
 
       if (Array.isArray(requiredRoles)) {
@@ -652,7 +640,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     assignLicenseKey,
     getRoleDashboardPath,
     hasRole,
-    isAdmin,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

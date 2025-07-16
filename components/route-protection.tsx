@@ -14,7 +14,7 @@ interface RouteProtectionProps {
 }
 
 export function RouteProtection({ children, requiredRoles, redirectTo = "/unauthorized" }: RouteProtectionProps) {
-  const { user, userData, loading, hasRole, isAdmin } = useAuth()
+  const { user, userData, loading, hasRole } = useAuth()
   const router = useRouter()
   const [authorized, setAuthorized] = useState(false)
 
@@ -28,24 +28,15 @@ export function RouteProtection({ children, requiredRoles, redirectTo = "/unauth
       return
     }
 
-    // If user data is loaded
-    if (userData) {
-      // Admin users can access all pages
-      if (isAdmin()) {
-        setAuthorized(true)
-        return
-      }
-
-      // For non-admin users, check if they have the required role(s)
-      if (!hasRole(requiredRoles)) {
-        router.push(redirectTo)
-        return
-      }
-
-      // User is authorized
-      setAuthorized(true)
+    // If user data is loaded and user doesn't have required role(s)
+    if (userData && !hasRole(requiredRoles)) {
+      router.push(redirectTo)
+      return
     }
-  }, [user, userData, loading, hasRole, isAdmin, requiredRoles, router, redirectTo])
+
+    // User is authorized
+    setAuthorized(true)
+  }, [user, userData, loading, hasRole, requiredRoles, router, redirectTo])
 
   // Show loading state while checking authorization
   if (loading || !authorized) {
