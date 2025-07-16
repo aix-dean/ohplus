@@ -59,7 +59,12 @@ export default function AdminInventoryPage() {
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
-    if (!userData?.company_id) return
+    if (!userData?.company_id) {
+      setTotalItems(0)
+      setTotalPages(1)
+      setLoadingCount(false)
+      return
+    }
 
     setLoadingCount(true)
     try {
@@ -81,13 +86,22 @@ export default function AdminInventoryPage() {
   // Fetch products for the current page
   const fetchProducts = useCallback(
     async (page: number) => {
-      if (!userData?.company_id) return
+      if (!userData?.company_id) {
+        setProducts([])
+        setLastDoc(null)
+        setHasMore(false)
+        setLoading(false)
+        setLoadingMore(false)
+        return
+      }
 
       // Check if we have this page in cache
       if (pageCache.has(page)) {
         const cachedData = pageCache.get(page)!
         setProducts(cachedData.items)
         setLastDoc(cachedData.lastDoc)
+        setLoading(false)
+        setLoadingMore(false)
         return
       }
 
@@ -119,7 +133,7 @@ export default function AdminInventoryPage() {
         console.error("Error fetching products:", error)
         toast({
           title: "Error",
-          description: "Failed to load product count. Please try again.",
+          description: "Failed to load products. Please try again.",
           variant: "destructive",
         })
       } finally {
@@ -132,18 +146,16 @@ export default function AdminInventoryPage() {
 
   // Load initial data and count
   useEffect(() => {
-    if (userData?.company_id) {
-      fetchProducts(1)
-      fetchTotalCount()
-    }
+    fetchProducts(1)
+    fetchTotalCount()
   }, [userData?.company_id, fetchProducts, fetchTotalCount])
 
   // Load data when page changes
   useEffect(() => {
-    if (userData?.company_id && currentPage > 0) {
+    if (currentPage > 0) {
       fetchProducts(currentPage)
     }
-  }, [currentPage, fetchProducts, userData?.company_id])
+  }, [currentPage, fetchProducts])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -381,70 +393,107 @@ export default function AdminInventoryPage() {
     }, 1000) // Wait 1 second for userData to refresh
   }
 
+  // Show loading only on initial load
+  if (loading && products.length === 0 && userData === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    )
+  }
+
   return (
     <div className="flex-1 p-4 md:p-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
       </div>
 
-      {loading ? (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        </div>
-      ) : (
-        <div className="grid gap-6">
-          {/* Product List */}
-          <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
-            {/* The "+ Add Site" card is now the first item in the grid */}
-            <Card
-              className="w-full min-h-[284px] flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
-              onClick={handleAddSiteClick}
-            >
-              <Plus className="h-8 w-8 mb-2" />
-              <span className="text-lg font-semibold">+ Add Site</span>
-            </Card>
+      <div className="grid gap-6">
+        {/* Product List */}
+        <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
+          {/* The "+ Add Site" card is now the first item in the grid */}
+          <Card
+            className="w-full min-h-[284px] flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
+            onClick={handleAddSiteClick}
+          >
+            <Plus className="h-8 w-8 mb-2" />
+            <span className="text-lg font-semibold">+ Add Site</span>
+          </Card>
 
-            {products.map((product) => (
-              <Card
-                key={product.id}
-                className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
-                onClick={() => handleViewDetails(product.id)}
-              >
-                <div className="h-48 bg-gray-200 relative">
-                  <Image
-                    src={
-                      product.media && product.media.length > 0
-                        ? product.media[0].url
-                        : "/abstract-geometric-sculpture.png"
-                    }
-                    alt={product.name || "Product image"}
-                    fill
-                    className="object-cover"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.src = "/abstract-geometric-sculpture.png"
-                      target.className = "opacity-50"
-                    }}
-                  />
-                </div>
-
-                <CardContent className="p-4">
-                  <div className="flex flex-col">
-                    <h3 className="font-semibold line-clamp-1">{product.name}</h3>
-                    <div className="mt-2 text-sm font-medium text-green-700">
-                      ₱{Number(product.price).toLocaleString()}
+          {loading && products.length === 0
+            ? // Show loading cards only when initially loading
+              Array.from({ length: 3 }).map((_, index) => (
+                <Card key={`loading-${index}`} className="overflow-hidden border border-gray-200 shadow-md rounded-xl">
+                  <div className="h-48 bg-gray-200 animate-pulse" />
+                  <CardContent className="p-4">
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded animate-pulse" />
+                      <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
+                      <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse" />
                     </div>
-                    <div className="mt-1 text-xs text-gray-500 flex items-center">
-                      <MapPin size={12} className="mr-1 flex-shrink-0" />
-                      <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
-                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            : products.map((product) => (
+                <Card
+                  key={product.id}
+                  className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
+                  onClick={() => handleViewDetails(product.id)}
+                >
+                  <div className="h-48 bg-gray-200 relative">
+                    <Image
+                      src={
+                        product.media && product.media.length > 0
+                          ? product.media[0].url
+                          : "/abstract-geometric-sculpture.png"
+                      }
+                      alt={product.name || "Product image"}
+                      fill
+                      className="object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.src = "/abstract-geometric-sculpture.png"
+                        target.className = "opacity-50"
+                      }}
+                    />
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </ResponsiveCardGrid>
 
-          {/* Pagination Controls */}
+                  <CardContent className="p-4">
+                    <div className="flex flex-col">
+                      <h3 className="font-semibold line-clamp-1">{product.name}</h3>
+                      <div className="mt-2 text-sm font-medium text-green-700">
+                        ₱{Number(product.price).toLocaleString()}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500 flex items-center">
+                        <MapPin size={12} className="mr-1 flex-shrink-0" />
+                        <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+        </ResponsiveCardGrid>
+
+        {/* Show empty state message when no products and not loading */}
+        {!loading && products.length === 0 && userData?.company_id && (
+          <div className="text-center py-12">
+            <div className="text-gray-500 text-lg mb-2">No sites found</div>
+            <div className="text-gray-400 text-sm">Click the "Add Site" button above to create your first site.</div>
+          </div>
+        )}
+
+        {/* Show company setup message when no company_id */}
+        {!loading && !userData?.company_id && (
+          <div className="text-center py-12">
+            <div className="text-gray-500 text-lg mb-2">Welcome to your inventory!</div>
+            <div className="text-gray-400 text-sm">
+              Click the "Add Site" button above to set up your company and create your first site.
+            </div>
+          </div>
+        )}
+
+        {/* Pagination Controls - Only show if there are products or multiple pages */}
+        {(products.length > 0 || totalPages > 1) && (
           <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
             <div className="text-sm text-gray-500 flex items-center">
               {loadingCount ? (
@@ -502,8 +551,8 @@ export default function AdminInventoryPage() {
               </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog

@@ -16,7 +16,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
@@ -24,39 +23,31 @@ import { useAuth } from "@/contexts/auth-context"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Loader2, Info } from "lucide-react"
+import { getAllRoles, type RoleType } from "@/lib/hardcoded-access-service"
 
 interface GenerateInvitationCodeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-const PREDEFINED_ROLES = [
-  { value: "user", label: "User", description: "Basic access to the platform" },
-  { value: "editor", label: "Editor", description: "Can create and edit content" },
-  { value: "manager", label: "Manager", description: "Can manage teams and projects" },
-  { value: "admin", label: "Admin", description: "Full administrative access" },
-]
+// Remove the old PREDEFINED_ROLES constant and replace with:
+const PREDEFINED_ROLES = getAllRoles().map((role) => ({
+  value: role.id,
+  label: role.name,
+  description: role.description,
+  color: role.color,
+}))
 
-const AVAILABLE_PERMISSIONS = [
-  { id: "read_proposals", label: "Read Proposals", description: "View proposal documents" },
-  { id: "write_proposals", label: "Write Proposals", description: "Create and edit proposals" },
-  { id: "read_clients", label: "Read Clients", description: "View client information" },
-  { id: "write_clients", label: "Write Clients", description: "Create and edit client data" },
-  { id: "read_inventory", label: "Read Inventory", description: "View inventory items" },
-  { id: "write_inventory", label: "Write Inventory", description: "Manage inventory items" },
-  { id: "read_analytics", label: "Read Analytics", description: "View reports and analytics" },
-  { id: "admin_access", label: "Admin Access", description: "Administrative functions" },
-]
+const AVAILABLE_PERMISSIONS = []
 
 export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInvitationCodeDialogProps) {
   const { userData } = useAuth()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     validityDays: 30,
-    maxUsage: 0, // 0 means unlimited
-    role: "",
+    maxUsage: 0,
+    role: "" as RoleType | "custom" | "",
     customRole: "",
-    permissions: [] as string[],
     description: "",
   })
 
@@ -88,6 +79,13 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
         return
       }
 
+      // Validate that the role exists in our hardcoded roles (unless it's custom)
+      if (formData.role !== "custom" && !PREDEFINED_ROLES.find((r) => r.value === formData.role)) {
+        toast.error("Invalid role selected")
+        setLoading(false)
+        return
+      }
+
       if (formData.validityDays < 1 || formData.validityDays > 365) {
         toast.error("Validity period must be between 1 and 365 days")
         setLoading(false)
@@ -110,7 +108,6 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
         max_usage: formData.maxUsage,
         usage_count: 0,
         role: finalRole,
-        permissions: formData.permissions,
         status: "active",
         created_by: userData.uid,
         company_id: userData.company_id,
@@ -129,7 +126,6 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
         maxUsage: 0,
         role: "",
         customRole: "",
-        permissions: [],
         description: "",
       })
 
@@ -265,33 +261,6 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
             </CardContent>
           </Card>
 
-          {/* Permissions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Permissions</CardTitle>
-              <CardDescription>Select specific permissions for this role</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {AVAILABLE_PERMISSIONS.map((permission) => (
-                  <div key={permission.id} className="flex items-start space-x-3">
-                    <Checkbox
-                      id={permission.id}
-                      checked={formData.permissions.includes(permission.id)}
-                      onCheckedChange={(checked) => handlePermissionChange(permission.id, checked as boolean)}
-                    />
-                    <div className="space-y-1">
-                      <Label htmlFor={permission.id} className="text-sm font-medium cursor-pointer">
-                        {permission.label}
-                      </Label>
-                      <p className="text-xs text-muted-foreground">{permission.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Description */}
           <Card>
             <CardHeader>
@@ -337,22 +306,6 @@ export function GenerateInvitationCodeDialog({ open, onOpenChange }: GenerateInv
                   </Badge>
                 </div>
               </div>
-
-              {formData.permissions.length > 0 && (
-                <div>
-                  <span className="font-medium text-sm">Permissions:</span>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {formData.permissions.map((permId) => {
-                      const perm = AVAILABLE_PERMISSIONS.find((p) => p.id === permId)
-                      return (
-                        <Badge key={permId} variant="outline" className="text-xs">
-                          {perm?.label}
-                        </Badge>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
         </form>

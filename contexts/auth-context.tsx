@@ -14,6 +14,7 @@ import { auth, db } from "@/lib/firebase"
 import { subscriptionService } from "@/lib/subscription-service"
 import type { Subscription } from "@/lib/types/subscription"
 import { generateLicenseKey } from "@/lib/utils"
+import { assignRoleToUser, type RoleType } from "@/lib/hardcoded-access-service"
 
 interface UserData {
   uid: string
@@ -91,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
   const [subscriptionData, setSubscriptionData] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isRegistering, setIsRegistering] = useState(false)
 
   const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
     try {
@@ -348,26 +350,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     orgCode?: string,
   ) => {
     setLoading(true)
+    setIsRegistering(true)
     try {
       console.log("Registering new user with tenant ID:", auth.tenantId)
 
       const userCredential = await createUserWithEmailAndPassword(auth, personalInfo.email, password)
       const firebaseUser = userCredential.user
-      setUser(firebaseUser)
 
       let licenseKey = generateLicenseKey()
       let companyId = null
+      let assignedRole: RoleType = "admin" // Default to admin for new org creators
 
       if (orgCode) {
+        console.log("Processing invitation code:", orgCode)
         const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
         const invitationSnapshot = await getDocs(invitationQuery)
 
         if (!invitationSnapshot.empty) {
           const invitationDoc = invitationSnapshot.docs[0]
           const invitationData = invitationDoc.data()
+          console.log("Invitation data found:", invitationData)
 
           licenseKey = invitationData.license_key || licenseKey
           companyId = invitationData.company_id || null
+
+          // Validate and assign role from invitation
+          const invitationRole = invitationData.role
+          if (invitationRole && ["admin", "sales", "logistics", "cms"].includes(invitationRole)) {
+            assignedRole = invitationRole as RoleType
+          } else {
+            assignedRole = "sales" // Default fallback for invited users
+          }
+
+          console.log("Assigned role from invitation:", assignedRole)
 
           const updateData: any = {
             used: true,
@@ -382,16 +397,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           await updateDoc(doc(db, "invitation_codes", invitationDoc.id), updateData)
+          console.log("Invitation code marked as used")
+        } else {
+          console.log("No invitation found for code:", orgCode)
+          assignedRole = "sales" // Default for invalid invitation codes
         }
       }
 
+      console.log("Creating user with role:", assignedRole)
+
+      // Create user document in iboard_users collection
       const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
       const userData = {
         email: firebaseUser.email,
         uid: firebaseUser.uid,
         license_key: licenseKey,
         company_id: companyId,
-        role: "user",
+        role: assignedRole,
         permissions: [],
         type: "OHPLUS",
         created: serverTimestamp(),
@@ -404,7 +426,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         project_id: orgCode ? null : firebaseUser.uid,
       }
 
+      await setDoc(userDocRef, userData)
+      console.log("User document created in iboard_users collection")
+
+      // Also assign the role to the user_roles collection
+      try {
+        await assignRoleToUser(firebaseUser.uid, assignedRole, firebaseUser.uid)
+        console.log("Role assigned to user_roles collection:", assignedRole)
+      } catch (roleError) {
+        console.error("Error assigning role to user_roles collection:", roleError)
+        // Don't fail registration if role assignment fails
+      }
+
+      // Create project if not joining an organization
       if (!orgCode) {
+        console.log("Creating new project for new organization")
         const projectDocRef = doc(db, "projects", firebaseUser.uid)
         await setDoc(projectDocRef, {
           company_name: companyInfo.company_name,
@@ -416,13 +452,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
       }
 
-      await setDoc(userDocRef, userData)
+      // Set the user and fetch data
+      setUser(firebaseUser)
       await fetchUserData(firebaseUser)
-      console.log("Registration completed successfully with tenant ID:", auth.tenantId)
+
+      console.log("Registration completed successfully with role:", assignedRole)
     } catch (error) {
       console.error("Error in AuthContext register:", error)
       setLoading(false)
+      setIsRegistering(false)
       throw error
+    } finally {
+      setIsRegistering(false)
     }
   }
 
@@ -488,6 +529,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log("Auth state changed: user logged in", firebaseUser.uid)
         setUser(firebaseUser)
 
+        // If we're in the middle of registration, skip the OHPLUS check
+        // because the user document might not be created yet
+        if (isRegistering) {
+          console.log("Registration in progress, skipping OHPLUS check")
+          return
+        }
+
         const isOHPlusAccount = await findOHPlusAccount(firebaseUser.uid)
         if (isOHPlusAccount) {
           await fetchUserData(firebaseUser)
@@ -505,7 +553,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })
     return () => unsubscribe()
-  }, [fetchUserData])
+  }, [fetchUserData, isRegistering])
 
   const value = {
     user,
