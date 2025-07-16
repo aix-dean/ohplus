@@ -1,320 +1,431 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Eye, EyeOff, Loader2 } from "lucide-react"
-import Link from "next/link"
-import { getUserRoles } from "@/lib/hardcoded-access-service"
+import { FirebaseError } from "firebase/app"
+import { Eye, EyeOff } from "lucide-react"
+import { query, collection, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export default function RegisterPage() {
-  const [personalInfo, setPersonalInfo] = useState({
-    email: "",
-    first_name: "",
-    last_name: "",
-    middle_name: "",
-    phone_number: "",
-    gender: "",
-  })
-  const [companyInfo, setCompanyInfo] = useState({
-    company_name: "",
-    company_location: "",
-  })
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [middleName, setMiddleName] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("+63 ")
+  const [loading, setLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [error, setError] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const [invitationRole, setInvitationRole] = useState<string | null>(null)
+  const [loadingInvitation, setLoadingInvitation] = useState(false)
 
-  const { register, userData, getRoleDashboardPath } = useAuth()
+  const { register, user, userData } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const orgCode = searchParams.get("code")
 
-  const handlePersonalInfoChange = (field: string, value: string) => {
-    setPersonalInfo((prev) => ({ ...prev, [field]: value }))
+  // Get organization code from URL parameters
+  const orgCode = searchParams.get("orgCode")
+
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (user) {
+      router.push("/admin/dashboard")
+    }
+  }, [user, router])
+
+  // Fetch invitation details when orgCode is present
+  useEffect(() => {
+    const fetchInvitationDetails = async () => {
+      if (!orgCode) return
+
+      setLoadingInvitation(true)
+      try {
+        const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
+        const invitationSnapshot = await getDocs(invitationQuery)
+
+        if (!invitationSnapshot.empty) {
+          const invitationDoc = invitationSnapshot.docs[0]
+          const invitationData = invitationDoc.data()
+
+          if (invitationData.role) {
+            setInvitationRole(invitationData.role)
+          }
+        } else {
+          setErrorMessage("Invalid invitation code.")
+        }
+      } catch (error) {
+        console.error("Error fetching invitation details:", error)
+        setErrorMessage("Error loading invitation details.")
+      } finally {
+        setLoadingInvitation(false)
+      }
+    }
+
+    fetchInvitationDetails()
+  }, [orgCode])
+
+  const getFriendlyErrorMessage = (error: unknown): string => {
+    if (error instanceof FirebaseError) {
+      switch (error.code) {
+        case "auth/email-already-in-use":
+          return "This email address is already in use. Please use a different email or log in."
+        case "auth/invalid-email":
+          return "The email address is not valid. Please check the format."
+        case "auth/weak-password":
+          return "The password is too weak. Please choose a stronger password (at least 6 characters)."
+        case "auth/operation-not-allowed":
+          return "Email/password accounts are not enabled. Please contact support."
+        case "auth/network-request-failed":
+          return "Network error. Please check your internet connection and try again."
+        default:
+          return "An unexpected error occurred during registration. Please try again."
+      }
+    }
+    return "An unknown error occurred. Please try again."
   }
 
-  const handleCompanyInfoChange = (field: string, value: string) => {
-    setCompanyInfo((prev) => ({ ...prev, [field]: value }))
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+
+    if (!value.startsWith("+63 ")) {
+      setPhoneNumber("+63 ")
+      return
+    }
+
+    const numbersOnly = value.slice(4).replace(/\D/g, "")
+    if (numbersOnly.length <= 10) {
+      setPhoneNumber("+63 " + numbersOnly)
+    }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
+  const isPhoneNumberValid = () => {
+    const numbersOnly = phoneNumber.slice(4).replace(/\D/g, "")
+    return numbersOnly.length === 10
+  }
 
-    // Validation
+  const passwordCriteria = {
+    minLength: password.length >= 8,
+    hasLowerCase: /[a-z]/.test(password),
+    hasUpperCase: /[A-Z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    hasSpecialChar: /[^a-zA-Z0-9]/.test(password),
+  }
+
+  const passwordStrengthScore = Object.values(passwordCriteria).filter(Boolean).length
+
+  const getBarColorClass = (score: number) => {
+    if (score === 0) return "bg-gray-300"
+    if (score <= 2) return "bg-red-500"
+    if (score <= 4) return "bg-yellow-500"
+    return "bg-green-500"
+  }
+
+  const getStrengthText = (score: number) => {
+    if (score === 0) return "Enter a password"
+    if (score <= 2) return "Weak"
+    if (score <= 4) return "Moderate"
+    return "Strong"
+  }
+
+  const handleRegister = async () => {
+    setErrorMessage(null)
+
+    if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
+      setErrorMessage("Please fill in all required fields.")
+      return
+    }
+
+    if (!isPhoneNumberValid()) {
+      setErrorMessage("Phone number must be exactly 10 digits after +63.")
+      return
+    }
+
     if (password !== confirmPassword) {
-      setError("Passwords do not match")
+      setErrorMessage("Passwords do not match.")
       return
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters long")
-      return
-    }
-
-    if (!personalInfo.email || !personalInfo.first_name || !personalInfo.last_name) {
-      setError("Please fill in all required personal information")
-      return
-    }
-
-    if (!orgCode && (!companyInfo.company_name || !companyInfo.company_location)) {
-      setError("Please fill in all required company information")
-      return
-    }
-
-    setIsLoading(true)
+    setLoading(true)
 
     try {
-      await register(personalInfo, companyInfo, password, orgCode || undefined)
+      await register(
+        {
+          email,
+          first_name: firstName,
+          last_name: lastName,
+          middle_name: middleName,
+          phone_number: phoneNumber,
+          gender: "",
+        },
+        {
+          company_name: "",
+          company_location: "",
+        },
+        password,
+        orgCode || undefined,
+      )
 
-      // Wait a moment for userData to be populated after registration
-      setTimeout(async () => {
-        // Check user roles from user_roles collection for more accurate role checking
-        if (userData?.uid) {
-          const userRoles = await getUserRoles(userData.uid)
-          console.log("User roles from user_roles collection:", userRoles)
-
-          // Use the first role found, or fall back to the role field in user document
-          const primaryRole = userRoles.length > 0 ? userRoles[0] : userData.role
-          console.log("Primary role for navigation:", primaryRole)
-
-          const dashboardPath = getRoleDashboardPath(primaryRole)
-          console.log("Redirecting to:", dashboardPath)
-          router.push(dashboardPath)
-        } else {
-          // Fallback if userData is not available yet
-          router.push("/admin/dashboard")
-        }
-      }, 1500)
-    } catch (error: any) {
-      console.error("Registration error:", error)
-      setError(error.message || "Failed to create account. Please try again.")
+      // Registration successful - redirect will be handled by useEffect
+      // The redirect logic will be handled after userData is loaded
+    } catch (error: unknown) {
+      console.error("Registration failed:", error)
+      setErrorMessage(getFriendlyErrorMessage(error))
     } finally {
-      setIsLoading(false)
+      setLoading(false)
     }
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Card className="w-full max-w-2xl">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">
-            {orgCode ? "Join Organization" : "Create Account"}
-          </CardTitle>
-          <CardDescription className="text-center">
-            {orgCode ? "Complete your profile to join the organization" : "Sign up for your OH+ account"}
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-6">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+  // Role-based navigation after registration
+  useEffect(() => {
+    if (user && userData && !loading) {
+      const role = userData.role?.toLowerCase()
 
-            {/* Personal Information */}
+      switch (role) {
+        case "admin":
+          router.push("/admin/dashboard")
+          break
+        case "sales":
+          router.push("/sales/dashboard")
+          break
+        case "logistics":
+          router.push("/logistics/dashboard")
+          break
+        case "cms":
+          router.push("/cms/dashboard")
+          break
+        default:
+          // Fallback to admin dashboard for unknown roles
+          router.push("/admin/dashboard")
+          break
+      }
+    }
+  }, [user, userData, loading, router])
+
+  return (
+    <div className="flex min-h-screen flex-col lg:flex-row">
+      {/* Left Panel - Image */}
+      <div className="relative hidden w-full items-center justify-center bg-gray-900 sm:flex lg:w-[40%]">
+        <Image
+          src="/registration-background.png"
+          alt="Background"
+          layout="fill"
+          objectFit="cover"
+          className="absolute inset-0 z-0 opacity-50"
+        />
+      </div>
+
+      {/* Right Panel - Form */}
+      <div className="flex w-full items-center justify-center bg-white p-4 dark:bg-gray-950 sm:p-6 lg:w-[60%] lg:p-8">
+        <Card className="w-full max-w-md border-none shadow-none sm:max-w-lg">
+          <CardHeader className="space-y-1 text-left">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-3xl font-bold">
+                {orgCode ? "Join Organization" : "Create an Account"}
+              </CardTitle>
+            </div>
+            <CardDescription className="text-gray-600 dark:text-gray-400">
+              {orgCode ? "Complete your registration to join the organization!" : "It's free to create one!"}
+            </CardDescription>
+            {orgCode && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mt-2">
+                <p className="text-sm text-blue-800">
+                  <strong>Organization Code:</strong> {orgCode}
+                </p>
+                {loadingInvitation && <p className="text-sm text-blue-600 mt-1">Loading invitation details...</p>}
+                {invitationRole && (
+                  <p className="text-sm text-green-800 mt-1">
+                    <strong>Assigned Role:</strong> {invitationRole}
+                  </p>
+                )}
+                {!loadingInvitation && !invitationRole && orgCode && (
+                  <p className="text-sm text-gray-600 mt-1">No specific role assigned</p>
+                )}
+              </div>
+            )}
+          </CardHeader>
+          <CardContent>
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Personal Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="Enter your email"
-                    value={personalInfo.email}
-                    onChange={(e) => handlePersonalInfoChange("email", e.target.value)}
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="Enter your phone number"
-                    value={personalInfo.phone_number}
-                    onChange={(e) => handlePersonalInfoChange("phone_number", e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name *</Label>
+                  <Label htmlFor="firstName">First Name</Label>
                   <Input
                     id="firstName"
-                    type="text"
-                    placeholder="Enter your first name"
-                    value={personalInfo.first_name}
-                    onChange={(e) => handlePersonalInfoChange("first_name", e.target.value)}
+                    placeholder="John"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
                     required
-                    disabled={isLoading}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name *</Label>
+                  <Label htmlFor="lastName">Last Name</Label>
                   <Input
                     id="lastName"
-                    type="text"
-                    placeholder="Enter your last name"
-                    value={personalInfo.last_name}
-                    onChange={(e) => handlePersonalInfoChange("last_name", e.target.value)}
+                    placeholder="Doe"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
                     required
-                    disabled={isLoading}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="middleName">Middle Name</Label>
-                  <Input
-                    id="middleName"
-                    type="text"
-                    placeholder="Enter your middle name"
-                    value={personalInfo.middle_name}
-                    onChange={(e) => handlePersonalInfoChange("middle_name", e.target.value)}
-                    disabled={isLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="gender">Gender</Label>
-                  <Select
-                    value={personalInfo.gender}
-                    onValueChange={(value) => handlePersonalInfoChange("gender", value)}
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                      <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="middleName">Middle Name (Optional)</Label>
+                <Input
+                  id="middleName"
+                  placeholder=""
+                  value={middleName}
+                  onChange={(e) => setMiddleName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phoneNumber">Cellphone number</Label>
+                <Input
+                  id="phoneNumber"
+                  placeholder="+63 9XXXXXXXXX"
+                  value={phoneNumber}
+                  onChange={handlePhoneNumberChange}
+                  className={!isPhoneNumberValid() && phoneNumber.length > 4 ? "border-red-500" : ""}
+                  required
+                />
+                {!isPhoneNumberValid() && phoneNumber.length > 4 && (
+                  <p className="text-xs text-red-500">Phone number must be exactly 10 digits after +63</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="m@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
+                  </button>
+                </div>
+                <div className="mt-2">
+                  <div className="flex gap-1 h-1">
+                    {[...Array(5)].map((_, i) => (
+                      <div
+                        key={i}
+                        className={`flex-1 ${
+                          i < passwordStrengthScore ? getBarColorClass(passwordStrengthScore) : "bg-gray-300"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    {getStrengthText(passwordStrengthScore)}
+                  </p>
+                  {passwordStrengthScore < 5 && password.length > 0 && (
+                    <ul className="list-inside text-sm mt-1">
+                      {!passwordCriteria.minLength && (
+                        <li className="text-red-500">Password should be at least 8 characters long</li>
+                      )}
+                      {!passwordCriteria.hasLowerCase && (
+                        <li className="text-red-500">Password should contain at least one lowercase letter</li>
+                      )}
+                      {!passwordCriteria.hasUpperCase && (
+                        <li className="text-red-500">Password should contain at least one uppercase letter</li>
+                      )}
+                      {!passwordCriteria.hasNumber && (
+                        <li className="text-red-500">Password should contain at least one number</li>
+                      )}
+                      {!passwordCriteria.hasSpecialChar && (
+                        <li className="text-red-500">Password should contain at least one special character</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm password</Label>
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                    <span className="sr-only">{showConfirmPassword ? "Hide password" : "Show password"}</span>
+                  </button>
+                </div>
+              </div>
+              <p className="text-center text-xs text-gray-500 dark:text-gray-400">
+                By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
+                <a href="#" className="text-blue-600 hover:underline">
+                  Terms and Conditions
+                </a>
+                ,{" "}
+                <a href="#" className="text-blue-600 hover:underline">
+                  Privacy Policy
+                </a>
+                , and all platform{" "}
+                <a href="#" className="text-blue-600 hover:underline">
+                  rules and regulations
+                </a>{" "}
+                set by OH!Plus.
+              </p>
+              <Button
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                type="submit"
+                onClick={handleRegister}
+                disabled={loading || loadingInvitation}
+              >
+                {loading ? (orgCode ? "Joining..." : "Signing Up...") : orgCode ? "Join Organization" : "Sign Up"}
+              </Button>
             </div>
 
-            {/* Company Information - Only show if not joining via org code */}
-            {!orgCode && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Company Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName">Company Name *</Label>
-                    <Input
-                      id="companyName"
-                      type="text"
-                      placeholder="Enter your company name"
-                      value={companyInfo.company_name}
-                      onChange={(e) => handleCompanyInfoChange("company_name", e.target.value)}
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="companyLocation">Company Location *</Label>
-                    <Input
-                      id="companyLocation"
-                      type="text"
-                      placeholder="Enter your company location"
-                      value={companyInfo.company_location}
-                      onChange={(e) => handleCompanyInfoChange("company_location", e.target.value)}
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
+            {errorMessage && (
+              <div className="text-red-500 text-sm mt-4 text-center" role="alert">
+                {errorMessage}
               </div>
             )}
-
-            {/* Password */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Security</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password *</Label>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      disabled={isLoading}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                      disabled={isLoading}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password *</Label>
-                  <div className="relative">
-                    <Input
-                      id="confirmPassword"
-                      type={showConfirmPassword ? "text" : "password"}
-                      placeholder="Confirm your password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      required
-                      disabled={isLoading}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      disabled={isLoading}
-                    >
-                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating account...
-                </>
-              ) : (
-                "Create Account"
-              )}
-            </Button>
-
-            <div className="text-center text-sm">
-              Already have an account?{" "}
-              <Link href="/login" className="text-blue-600 hover:underline">
-                Sign in
-              </Link>
-            </div>
           </CardContent>
-        </form>
-      </Card>
+        </Card>
+      </div>
     </div>
   )
 }
