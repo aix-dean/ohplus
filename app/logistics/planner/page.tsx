@@ -1145,12 +1145,6 @@ export default function LogisticsPlannerPage() {
               <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-primary"></div>
               <span className="ml-2 text-base sm:text-lg">Loading calendar...</span>
             </div>
-          ) : assignments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-              <CalendarIcon size={48} className="mb-4" />
-              <h3 className="text-lg font-medium mb-2">No Service Assignments Found</h3>
-              <p className="text-sm text-center">No service assignments have been created yet for your organization.</p>
-            </div>
           ) : (
             <div className="min-w-[640px]">{renderCalendar()}</div>
           )}
