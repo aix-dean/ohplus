@@ -84,6 +84,22 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// License key generator function
+const generateLicenseKey = (): string => {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+  const segments = []
+
+  for (let i = 0; i < 4; i++) {
+    let segment = ""
+    for (let j = 0; j < 4; j++) {
+      segment += chars.charAt(Math.floor(Math.random() * chars.length))
+    }
+    segments.push(segment)
+  }
+
+  return segments.join("-")
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
@@ -193,7 +209,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let companyId: string | null = null
       let projectId: string | null = null
       let assignedRole: RoleType = "admin" // Default role
-      const finalLicenseKey = licenseKey || "FREE_TRIAL" // Default license key
+      const generatedLicenseKey = generateLicenseKey()
 
       // If orgCode is provided, find the invitation and get the company details
       if (orgCode) {
@@ -207,9 +223,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!invitationSnapshot.empty) {
           const invitationDoc = invitationSnapshot.docs[0]
           const invitationData = invitationDoc.data()
-          companyId = invitationData.company_id
+          companyId = invitationData.company_id // Get company_id from invitation
           assignedRole = invitationData.role || "admin"
-          projectId = invitationData.project_id || null
+          projectId = invitationData.project_id || companyId // Use project_id from invitation or fallback to company_id
 
           // Mark invitation as used
           await updateDoc(invitationDoc.ref, {
@@ -231,7 +247,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = {
         email: firebaseUser.email,
         uid: firebaseUser.uid,
-        license_key: finalLicenseKey,
+        license_key: generatedLicenseKey,
         company_id: companyId,
         role: assignedRole,
         permissions: [],
@@ -255,16 +271,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           company_name: companyInfo.company_name || "My Company",
           company_location: companyInfo.company_location || "",
           project_name: "My First Project",
-          license_key: finalLicenseKey,
-          created: serverTimestamp(),
-          updated: serverTimestamp(),
-        })
-
-        // Create subscription document for new company
-        const subscriptionDocRef = doc(db, "subscriptions", companyId)
-        await setDoc(subscriptionDocRef, {
-          plan: "free_trial",
-          status: "active",
+          license_key: generatedLicenseKey, // Save the generated license key in projects document
           created: serverTimestamp(),
           updated: serverTimestamp(),
         })
