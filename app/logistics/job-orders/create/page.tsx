@@ -1,267 +1,499 @@
 "use client"
-
-import type React from "react"
-
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Upload } from "lucide-react"
+import Image from "next/image"
+import { ArrowLeft, CalendarIcon, Plus, Loader2, FileText, ImageIcon, Package } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
-import { createJobOrder, generateJONumber } from "@/lib/job-order-service"
 import { useToast } from "@/hooks/use-toast"
+import { createJobOrder, generateJONumber } from "@/lib/job-order-service"
+import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
+import type { JobOrderType } from "@/lib/types/job-order"
+import { cn } from "@/lib/utils"
+
+const joTypes = ["Installation", "Maintenance", "Repair", "Dismantling", "Other"]
 
 interface JobOrderFormData {
-  joNumber: string
-  siteName: string
-  siteLocation: string
-  joType: string
-  requestedBy: string
+  joType: JobOrderType | ""
+  dateRequested: Date | undefined
+  deadline: Date | undefined
+  remarks: string
   assignTo: string
-  dateRequested: string
-  deadline: string
-  jobDescription: string
-  message: string
-  attachments: string[]
+  attachmentFile: File | null
+  attachmentUrl: string | null
+  uploadingAttachment: boolean
+  attachmentError: string | null
+  joTypeError: boolean
+  dateRequestedError: boolean
 }
 
 export default function CreateJobOrderPage() {
   const router = useRouter()
   const { user, userData } = useAuth()
   const { toast } = useToast()
-  const [loading, setLoading] = useState(false)
-  const [formData, setFormData] = useState<JobOrderFormData>({
-    joNumber: generateJONumber(),
-    siteName: "",
-    siteLocation: "",
+
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [siteName, setSiteName] = useState("")
+  const [siteLocation, setSiteLocation] = useState("")
+  const [jobDescription, setJobDescription] = useState("")
+  const [siteNameError, setSiteNameError] = useState(false)
+  const [jobDescriptionError, setJobDescriptionError] = useState(false)
+
+  const [jobOrderForm, setJobOrderForm] = useState<JobOrderFormData>({
     joType: "",
-    requestedBy: userData?.name || "",
-    assignTo: "",
-    dateRequested: new Date().toISOString().split("T")[0],
-    deadline: "",
-    jobDescription: "",
-    message: "",
-    attachments: [],
+    dateRequested: new Date(),
+    deadline: undefined,
+    remarks: "",
+    assignTo: userData?.uid || "",
+    attachmentFile: null,
+    attachmentUrl: null,
+    uploadingAttachment: false,
+    attachmentError: null,
+    joTypeError: false,
+    dateRequestedError: false,
   })
 
-  const handleInputChange = (field: keyof JobOrderFormData, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
-  }
+  const handleFormUpdate = useCallback((field: keyof JobOrderFormData, value: any) => {
+    setJobOrderForm((prev) => ({ ...prev, [field]: value }))
+  }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleAttachmentUpload = useCallback(
+    async (file: File) => {
+      handleFormUpdate("uploadingAttachment", true)
+      handleFormUpdate("attachmentError", null)
+      handleFormUpdate("attachmentUrl", null)
 
-    if (!user?.uid || !userData?.company_id) {
-      toast({
-        title: "Error",
-        description: "User authentication required",
-        variant: "destructive",
-      })
-      return
-    }
+      const allowedTypes = ["image/jpeg", "image/png", "image/gif"]
+      const maxSize = 5 * 1024 * 1024 // 5MB
 
-    // Validate required fields
-    if (!formData.siteName || !formData.joType || !formData.deadline) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setLoading(true)
-    try {
-      const jobOrderData = {
-        ...formData,
-        created_by: user.uid,
-        company_id: userData.company_id,
-        status: "pending" as const,
-        quotation_id: "", // Can be linked later if needed
+      if (file.size > maxSize) {
+        handleFormUpdate("attachmentError", "File size exceeds 5MB limit.")
+        handleFormUpdate("uploadingAttachment", false)
+        return
       }
 
-      const jobOrderId = await createJobOrder(jobOrderData)
+      if (!allowedTypes.includes(file.type)) {
+        handleFormUpdate("attachmentError", "Invalid file type. Only JPG, PNG, GIF are allowed.")
+        handleFormUpdate("uploadingAttachment", false)
+        return
+      }
+
+      try {
+        const downloadURL = await uploadFileToFirebaseStorage(file, "attachments/job-orders/")
+        handleFormUpdate("attachmentUrl", downloadURL)
+        handleFormUpdate("attachmentFile", file)
+        toast({
+          title: "Upload Successful",
+          description: `${file.name} uploaded successfully.`,
+        })
+      } catch (error: any) {
+        console.error("Upload failed:", error)
+        handleFormUpdate("attachmentError", `Upload failed: ${error.message || "Unknown error"}`)
+        toast({
+          title: "Upload Failed",
+          description: `Could not upload ${file.name}. ${error.message || "Please try again."}`,
+          variant: "destructive",
+        })
+      } finally {
+        handleFormUpdate("uploadingAttachment", false)
+      }
+    },
+    [handleFormUpdate, toast],
+  )
+
+  const validateForm = useCallback((): boolean => {
+    let hasError = false
+
+    if (!siteName.trim()) {
+      setSiteNameError(true)
+      hasError = true
+    } else {
+      setSiteNameError(false)
+    }
+
+    if (!jobDescription.trim()) {
+      setJobDescriptionError(true)
+      hasError = true
+    } else {
+      setJobDescriptionError(false)
+    }
+
+    if (!jobOrderForm.joType) {
+      handleFormUpdate("joTypeError", true)
+      hasError = true
+    } else {
+      handleFormUpdate("joTypeError", false)
+    }
+
+    if (!jobOrderForm.dateRequested) {
+      handleFormUpdate("dateRequestedError", true)
+      hasError = true
+    } else {
+      handleFormUpdate("dateRequestedError", false)
+    }
+
+    if (!jobOrderForm.deadline) {
+      hasError = true
+    }
+
+    return !hasError
+  }, [siteName, jobDescription, jobOrderForm, handleFormUpdate])
+
+  const handleCreateJobOrder = useCallback(async () => {
+    if (!user?.uid || !userData?.company_id) {
+      toast({
+        title: "Missing Information",
+        description: "Cannot create Job Order due to missing data or user authentication.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!validateForm()) {
+      toast({
+        title: "Missing Fields",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      const jobOrderData = {
+        joNumber: generateJONumber(),
+        dateRequested: jobOrderForm.dateRequested!.toISOString(),
+        joType: jobOrderForm.joType as JobOrderType,
+        deadline: jobOrderForm.deadline!.toISOString(),
+        requestedBy: userData?.first_name || "Auto-Generated",
+        remarks: jobOrderForm.remarks,
+        assignTo: jobOrderForm.assignTo,
+        attachments: jobOrderForm.attachmentUrl
+          ? [
+              {
+                url: jobOrderForm.attachmentUrl,
+                name: jobOrderForm.attachmentFile?.name || "Attachment",
+                type: jobOrderForm.attachmentFile?.type || "image",
+              },
+            ]
+          : [],
+        siteName: siteName,
+        siteLocation: siteLocation,
+        jobDescription: jobDescription,
+        company_id: userData?.company_id || "",
+        created_by: user.uid,
+        status: "pending" as const,
+        quotation_id: "",
+      }
+
+      const joId = await createJobOrder(jobOrderData)
 
       toast({
         title: "Success",
-        description: "Job order created successfully",
+        description: "Job Order created successfully!",
       })
 
-      router.push(`/logistics/job-orders/${jobOrderId}`)
-    } catch (error) {
+      router.push(`/logistics/job-orders/${joId}`)
+    } catch (error: any) {
       console.error("Error creating job order:", error)
       toast({
         title: "Error",
-        description: "Failed to create job order. Please try again.",
+        description: `Failed to create Job Order: ${error.message || "Unknown error"}. Please try again.`,
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      setIsSubmitting(false)
     }
-  }
-
-  const joTypes = ["Installation", "Maintenance", "Repair", "Dismantling", "Other"]
+  }, [user, userData, validateForm, jobOrderForm, siteName, siteLocation, jobDescription, toast, router])
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center mb-6">
-          <Button variant="ghost" onClick={() => router.back()} className="mr-4 p-2">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Create Job Order</h1>
-            <p className="text-gray-600 mt-1">Fill in the details to create a new job order</p>
+    <div className="flex flex-col min-h-screen bg-white p-4 md:p-6">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" size="icon" onClick={() => router.back()}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <h1 className="text-2xl font-bold text-gray-900">Create Job Order</h1>
+        <Badge variant="secondary">
+          <Package className="h-3 w-3 mr-1" />
+          Logistics
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto w-full">
+        {/* Left Column: Job Information */}
+        <div className="space-y-6">
+          <h2 className="text-lg font-bold text-gray-900">Job Information</h2>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm text-gray-800">Site Name *</Label>
+              <Input
+                value={siteName}
+                onChange={(e) => {
+                  setSiteName(e.target.value)
+                  setSiteNameError(false)
+                }}
+                placeholder="Enter site name"
+                className={cn(
+                  "bg-white text-gray-800 border-gray-300 text-sm h-9",
+                  siteNameError && "border-red-500 focus-visible:ring-red-500",
+                )}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm text-gray-800">Site Location</Label>
+              <Input
+                value={siteLocation}
+                onChange={(e) => setSiteLocation(e.target.value)}
+                placeholder="Enter site location"
+                className="bg-white text-gray-800 border-gray-300 text-sm h-9"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm text-gray-800">Job Description *</Label>
+              <Textarea
+                value={jobDescription}
+                onChange={(e) => {
+                  setJobDescription(e.target.value)
+                  setJobDescriptionError(false)
+                }}
+                placeholder="Describe the job requirements and specifications"
+                className={cn(
+                  "bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-24",
+                  jobDescriptionError && "border-red-500 focus-visible:ring-red-500",
+                )}
+              />
+            </div>
+
+            {/* Site Preview Card */}
+            <div className="space-y-1 mt-3">
+              <p className="text-sm font-semibold">Site Preview:</p>
+              <div className="flex items-center gap-2 p-3 bg-gray-100 rounded-md">
+                <Image
+                  src="/placeholder.svg?height=48&width=48"
+                  alt="Site preview"
+                  width={48}
+                  height={48}
+                  className="rounded-md object-cover"
+                />
+                <div className="flex-1">
+                  <p className="font-semibold text-sm">{siteName || "Site Name"}</p>
+                  <p className="text-xs text-gray-600">{siteLocation || "Location not specified"}</p>
+                  <p className="text-xs text-gray-500">{jobDescription || "No description provided"}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-4 border-t border-gray-200 mt-6">
+              <p className="text-sm font-semibold mb-2">Company Information:</p>
+              <div className="space-y-1">
+                <p className="text-sm">
+                  <span className="font-semibold">Company:</span> {userData?.company_name || "N/A"}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Created By:</span> {userData?.first_name || "N/A"}
+                </p>
+                <p className="text-sm">
+                  <span className="font-semibold">Date:</span> {format(new Date(), "MMM d, yyyy")}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <Card className="border-gray-200 shadow-sm rounded-xl">
-            <CardHeader className="border-b border-gray-100 pb-4">
-              <CardTitle className="text-lg font-semibold">Job Order Details</CardTitle>
+        {/* Right Column: Job Order Form */}
+        <div className="space-y-6">
+          <h2 className="text-lg font-bold text-gray-900">Job Order Details</h2>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Job Order Form
+              </CardTitle>
             </CardHeader>
-            <CardContent className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="joNumber">JO Number *</Label>
-                  <Input
-                    id="joNumber"
-                    value={formData.joNumber}
-                    onChange={(e) => handleInputChange("joNumber", e.target.value)}
-                    placeholder="Auto-generated"
-                    disabled
-                    className="bg-gray-50"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="joType">JO Type *</Label>
-                  <Select value={formData.joType} onValueChange={(value) => handleInputChange("joType", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select job type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {joTypes.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="siteName">Site Name *</Label>
-                  <Input
-                    id="siteName"
-                    value={formData.siteName}
-                    onChange={(e) => handleInputChange("siteName", e.target.value)}
-                    placeholder="Enter site name"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="siteLocation">Site Location</Label>
-                  <Input
-                    id="siteLocation"
-                    value={formData.siteLocation}
-                    onChange={(e) => handleInputChange("siteLocation", e.target.value)}
-                    placeholder="Enter site location"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="requestedBy">Requested By</Label>
-                  <Input
-                    id="requestedBy"
-                    value={formData.requestedBy}
-                    onChange={(e) => handleInputChange("requestedBy", e.target.value)}
-                    placeholder="Enter requester name"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="assignTo">Assign To</Label>
-                  <Input
-                    id="assignTo"
-                    value={formData.assignTo}
-                    onChange={(e) => handleInputChange("assignTo", e.target.value)}
-                    placeholder="Enter assignee name"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="dateRequested">Date Requested</Label>
-                  <Input
-                    id="dateRequested"
-                    type="date"
-                    value={formData.dateRequested}
-                    onChange={(e) => handleInputChange("dateRequested", e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="deadline">Deadline *</Label>
-                  <Input
-                    id="deadline"
-                    type="date"
-                    value={formData.deadline}
-                    onChange={(e) => handleInputChange("deadline", e.target.value)}
-                    required
-                  />
-                </div>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm text-gray-800">JO #</Label>
+                <Input value={generateJONumber()} disabled className="bg-gray-100 text-gray-600 text-sm h-9" />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="jobDescription">Job Description</Label>
-                <Textarea
-                  id="jobDescription"
-                  value={formData.jobDescription}
-                  onChange={(e) => handleInputChange("jobDescription", e.target.value)}
-                  placeholder="Describe the job requirements and specifications"
-                  rows={4}
+                <Label className="text-sm text-gray-800">Date Requested</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
+                        !jobOrderForm.dateRequested && "text-gray-500",
+                        jobOrderForm.dateRequestedError && "border-red-500 focus-visible:ring-red-500",
+                      )}
+                      onClick={() => handleFormUpdate("dateRequestedError", false)}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                      {jobOrderForm.dateRequested ? format(jobOrderForm.dateRequested, "PPP") : <span>Date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={jobOrderForm.dateRequested}
+                      onSelect={(date) => {
+                        handleFormUpdate("dateRequested", date)
+                        handleFormUpdate("dateRequestedError", false)
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm text-gray-800">JO Type</Label>
+                <Select
+                  onValueChange={(value: JobOrderType) => {
+                    handleFormUpdate("joType", value)
+                    handleFormUpdate("joTypeError", false)
+                  }}
+                  value={jobOrderForm.joType}
+                >
+                  <SelectTrigger
+                    className={cn(
+                      "bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
+                      jobOrderForm.joTypeError && "border-red-500 focus-visible:ring-red-500",
+                    )}
+                  >
+                    <SelectValue placeholder="Choose JO Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {joTypes.map((type) => (
+                      <SelectItem key={type} value={type} className="text-sm">
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm text-gray-800">Deadline</Label>
+                <Input
+                  type="date"
+                  value={jobOrderForm.deadline ? format(jobOrderForm.deadline, "yyyy-MM-dd") : ""}
+                  onChange={(e) => {
+                    const date = e.target.value ? new Date(e.target.value) : undefined
+                    handleFormUpdate("deadline", date)
+                  }}
+                  className="bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9"
+                  required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="message">Additional Message</Label>
-                <Textarea
-                  id="message"
-                  value={formData.message}
-                  onChange={(e) => handleInputChange("message", e.target.value)}
-                  placeholder="Any additional notes or instructions"
-                  rows={3}
+                <Label className="text-sm text-gray-800">Requested By</Label>
+                <Input
+                  value={userData?.first_name || "(Auto-Generated)"}
+                  disabled
+                  className="bg-gray-100 text-gray-600 text-sm h-9"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Attachments</Label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                  <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-600">Drag and drop files here, or click to select files</p>
-                  <p className="text-xs text-gray-500 mt-1">Support for images, documents, and other file types</p>
-                </div>
+                <Label className="text-sm text-gray-800">Remarks</Label>
+                <Textarea
+                  placeholder="Remarks..."
+                  value={jobOrderForm.remarks}
+                  onChange={(e) => handleFormUpdate("remarks", e.target.value)}
+                  className="bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-24"
+                />
               </div>
 
-              <div className="flex justify-end space-x-4 pt-6 border-t border-gray-100">
-                <Button type="button" variant="outline" onClick={() => router.back()} disabled={loading}>
-                  Cancel
+              <div className="space-y-2">
+                <Label className="text-sm text-gray-800">Attachments</Label>
+                <input
+                  type="file"
+                  id="attachment-upload"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => {
+                    if (event.target.files && event.target.files[0]) {
+                      handleAttachmentUpload(event.target.files[0])
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-24 h-24 flex flex-col items-center justify-center text-gray-500 border-dashed border-2 border-gray-300 bg-gray-100 hover:bg-gray-200"
+                  onClick={() => document.getElementById("attachment-upload")?.click()}
+                  disabled={jobOrderForm.uploadingAttachment}
+                >
+                  {jobOrderForm.uploadingAttachment ? (
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  ) : (
+                    <Plus className="h-6 w-6" />
+                  )}
+                  <span className="text-xs mt-1">{jobOrderForm.uploadingAttachment ? "Uploading..." : "Upload"}</span>
                 </Button>
-                <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700">
-                  {loading ? "Creating..." : "Create Job Order"}
-                </Button>
+                {jobOrderForm.attachmentFile && !jobOrderForm.uploadingAttachment && (
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <ImageIcon className="h-4 w-4" />
+                    <span>{jobOrderForm.attachmentFile.name}</span>
+                  </div>
+                )}
+                {jobOrderForm.attachmentError && (
+                  <p className="text-xs text-red-500 mt-1">{jobOrderForm.attachmentError}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm text-gray-800">Assign to</Label>
+                <Select onValueChange={(value) => handleFormUpdate("assignTo", value)} value={jobOrderForm.assignTo}>
+                  <SelectTrigger className="bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9">
+                    <SelectValue placeholder="Choose Assignee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={userData?.uid || ""} className="text-sm">
+                      {userData?.first_name}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </CardContent>
           </Card>
-        </form>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => router.back()}
+              disabled={isSubmitting}
+              className="flex-1 bg-transparent text-gray-800 border-gray-300 hover:bg-gray-50"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateJobOrder}
+              disabled={isSubmitting}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+              Create Job Order
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   )
