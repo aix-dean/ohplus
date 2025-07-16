@@ -34,7 +34,7 @@ export default function RegisterPage() {
   const searchParams = useSearchParams()
 
   // Get organization code from URL parameters
-  const orgCode = searchParams.get("orgCode")
+  const code = searchParams.get("code")
 
   // Redirect if user is already logged in
   useEffect(() => {
@@ -43,14 +43,14 @@ export default function RegisterPage() {
     }
   }, [user, router])
 
-  // Fetch invitation details when orgCode is present
+  // Fetch invitation details when code is present
   useEffect(() => {
     const fetchInvitationDetails = async () => {
-      if (!orgCode) return
+      if (!code) return
 
       setLoadingInvitation(true)
       try {
-        const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
+        const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", code))
         const invitationSnapshot = await getDocs(invitationQuery)
 
         if (!invitationSnapshot.empty) {
@@ -72,7 +72,7 @@ export default function RegisterPage() {
     }
 
     fetchInvitationDetails()
-  }, [orgCode])
+  }, [code])
 
   const getFriendlyErrorMessage = (error: unknown): string => {
     if (error instanceof FirebaseError) {
@@ -172,7 +172,7 @@ export default function RegisterPage() {
           company_location: "",
         },
         password,
-        orgCode || undefined,
+        code || undefined,
       )
 
       // Registration successful - redirect will be handled by useEffect
@@ -239,17 +239,15 @@ export default function RegisterPage() {
         <Card className="w-full max-w-md border-none shadow-none sm:max-w-lg">
           <CardHeader className="space-y-1 text-left">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-3xl font-bold">
-                {orgCode ? "Join Organization" : "Create an Account"}
-              </CardTitle>
+              <CardTitle className="text-3xl font-bold">{code ? "Join Organization" : "Create an Account"}</CardTitle>
             </div>
             <CardDescription className="text-gray-600 dark:text-gray-400">
-              {orgCode ? "Complete your registration to join the organization!" : "It's free to create one!"}
+              {code ? "Complete your registration to join the organization!" : "It's free to create one!"}
             </CardDescription>
-            {orgCode && (
+            {code && (
               <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mt-2">
                 <p className="text-sm text-blue-800">
-                  <strong>Organization Code:</strong> {orgCode}
+                  <strong>Organization Code:</strong> {code}
                 </p>
                 {loadingInvitation && <p className="text-sm text-blue-600 mt-1">Loading invitation details...</p>}
                 {invitationRole && (
@@ -257,7 +255,7 @@ export default function RegisterPage() {
                     <strong>Assigned Role:</strong> {invitationRole}
                   </p>
                 )}
-                {!loadingInvitation && !invitationRole && orgCode && (
+                {!loadingInvitation && !invitationRole && code && (
                   <p className="text-sm text-gray-600 mt-1">No specific role assigned</p>
                 )}
               </div>
@@ -424,7 +422,7 @@ export default function RegisterPage() {
                 onClick={handleRegister}
                 disabled={loading || loadingInvitation}
               >
-                {loading ? (orgCode ? "Joining..." : "Signing Up...") : orgCode ? "Join Organization" : "Sign Up"}
+                {loading ? (code ? "Joining..." : "Signing Up...") : code ? "Join Organization" : "Sign Up"}
               </Button>
             </div>
 
