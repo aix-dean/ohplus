@@ -16,6 +16,7 @@ import type { JobOrder } from "@/lib/types/job-order"
 // Get all job orders for a specific user
 export async function getJobOrders(userId: string): Promise<JobOrder[]> {
   try {
+    console.log("DEBUG: getJobOrders called with userId:", userId)
     const jobOrdersRef = collection(db, "job_orders")
     const q = query(jobOrdersRef, where("created_by", "==", userId), orderBy("created", "desc"))
     const querySnapshot = await getDocs(q)
@@ -45,6 +46,7 @@ export async function getJobOrders(userId: string): Promise<JobOrder[]> {
       })
     })
 
+    console.log("DEBUG: getJobOrders returning", jobOrders.length, "job orders")
     return jobOrders
   } catch (error) {
     console.error("Error fetching job orders:", error)
@@ -55,13 +57,27 @@ export async function getJobOrders(userId: string): Promise<JobOrder[]> {
 // Get all job orders for a specific company
 export async function getJobOrdersByCompanyId(companyId: string): Promise<JobOrder[]> {
   try {
+    console.log("DEBUG: getJobOrdersByCompanyId called with companyId:", companyId)
+
+    if (!companyId) {
+      console.log("DEBUG: No companyId provided")
+      return []
+    }
+
     const jobOrdersRef = collection(db, "job_orders")
+    console.log("DEBUG: Created collection reference")
+
     const q = query(jobOrdersRef, where("company_id", "==", companyId), orderBy("created", "desc"))
+    console.log("DEBUG: Created query with company_id filter")
+
     const querySnapshot = await getDocs(q)
+    console.log("DEBUG: Query executed, got", querySnapshot.size, "documents")
 
     const jobOrders: JobOrder[] = []
     querySnapshot.forEach((doc) => {
       const data = doc.data()
+      console.log("DEBUG: Processing document", doc.id, "with data:", data)
+
       jobOrders.push({
         id: doc.id,
         joNumber: data.joNumber || "",
@@ -84,9 +100,16 @@ export async function getJobOrdersByCompanyId(companyId: string): Promise<JobOrd
       })
     })
 
+    console.log("DEBUG: getJobOrdersByCompanyId returning", jobOrders.length, "job orders")
+    console.log("DEBUG: Job orders:", jobOrders)
     return jobOrders
   } catch (error) {
     console.error("Error fetching job orders by company ID:", error)
+    console.error("Error details:", {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    })
     throw error
   }
 }
@@ -94,10 +117,12 @@ export async function getJobOrdersByCompanyId(companyId: string): Promise<JobOrd
 // Get a single job order by ID
 export async function getJobOrderById(jobOrderId: string): Promise<JobOrder | null> {
   try {
+    console.log("DEBUG: getJobOrderById called with jobOrderId:", jobOrderId)
     const jobOrderDoc = await getDoc(doc(db, "job_orders", jobOrderId))
 
     if (jobOrderDoc.exists()) {
       const data = jobOrderDoc.data()
+      console.log("DEBUG: Found job order document:", data)
       return {
         id: jobOrderDoc.id,
         joNumber: data.joNumber || "",
@@ -120,6 +145,7 @@ export async function getJobOrderById(jobOrderId: string): Promise<JobOrder | nu
       }
     }
 
+    console.log("DEBUG: Job order document not found")
     return null
   } catch (error) {
     console.error("Error fetching job order:", error)
@@ -130,6 +156,8 @@ export async function getJobOrderById(jobOrderId: string): Promise<JobOrder | nu
 // Create a new job order
 export async function createJobOrder(jobOrderData: Partial<JobOrder>): Promise<string> {
   try {
+    console.log("DEBUG: createJobOrder called with data:", jobOrderData)
+
     const newJobOrder = {
       ...jobOrderData,
       created: serverTimestamp(),
@@ -137,7 +165,10 @@ export async function createJobOrder(jobOrderData: Partial<JobOrder>): Promise<s
       status: jobOrderData.status || "pending",
     }
 
+    console.log("DEBUG: Creating job order with data:", newJobOrder)
     const docRef = await addDoc(collection(db, "job_orders"), newJobOrder)
+    console.log("DEBUG: Job order created with ID:", docRef.id)
+
     return docRef.id
   } catch (error) {
     console.error("Error creating job order:", error)
@@ -148,6 +179,8 @@ export async function createJobOrder(jobOrderData: Partial<JobOrder>): Promise<s
 // Update a job order
 export async function updateJobOrder(jobOrderId: string, jobOrderData: Partial<JobOrder>): Promise<void> {
   try {
+    console.log("DEBUG: updateJobOrder called with ID:", jobOrderId, "and data:", jobOrderData)
+
     const jobOrderRef = doc(db, "job_orders", jobOrderId)
     const updateData = {
       ...jobOrderData,
@@ -155,6 +188,7 @@ export async function updateJobOrder(jobOrderId: string, jobOrderData: Partial<J
     }
 
     await updateDoc(jobOrderRef, updateData)
+    console.log("DEBUG: Job order updated successfully")
   } catch (error) {
     console.error("Error updating job order:", error)
     throw error

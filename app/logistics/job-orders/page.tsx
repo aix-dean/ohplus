@@ -23,6 +23,7 @@ export default function LogisticsJobOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userNames, setUserNames] = useState<Record<string, string>>({})
+  const [debugInfo, setDebugInfo] = useState<any>(null)
 
   const router = useRouter()
 
@@ -44,30 +45,67 @@ export default function LogisticsJobOrdersPage() {
 
   useEffect(() => {
     const fetchJOs = async () => {
-      if (!user?.uid || !userData?.company_id) {
-        setError("User not authenticated or company not found.")
+      console.log("=== DEBUG: Starting job orders fetch ===")
+      console.log("User:", user?.uid)
+      console.log("UserData:", userData)
+      console.log("Company ID:", userData?.company_id)
+
+      if (!user?.uid) {
+        console.log("DEBUG: No user UID found")
+        setError("User not authenticated.")
         setLoading(false)
         return
       }
+
+      if (!userData?.company_id) {
+        console.log("DEBUG: No company ID found in userData")
+        setError("Company not found. Please ensure your account is properly set up.")
+        setLoading(false)
+        return
+      }
+
       try {
         setLoading(true)
+        setError(null)
+
+        console.log("DEBUG: Fetching job orders for company:", userData.company_id)
         const fetchedJOs = await getJobOrdersByCompanyId(userData.company_id)
+
+        console.log("DEBUG: Fetched job orders:", fetchedJOs)
+        console.log("DEBUG: Number of job orders:", fetchedJOs.length)
+
         setJobOrders(fetchedJOs)
+        setDebugInfo({
+          userId: user.uid,
+          companyId: userData.company_id,
+          jobOrdersCount: fetchedJOs.length,
+          userData: userData,
+        })
 
         // Fetch user names for all unique assignees
         const uniqueAssignees = [...new Set(fetchedJOs.map((jo) => jo.assignTo).filter(Boolean))]
+        console.log("DEBUG: Unique assignees:", uniqueAssignees)
+
         for (const assigneeId of uniqueAssignees) {
           await fetchUserName(assigneeId)
         }
       } catch (err) {
         console.error("Failed to fetch job orders:", err)
-        setError("Failed to load job orders. Please try again.")
+        setError(`Failed to load job orders: ${err instanceof Error ? err.message : "Unknown error"}`)
       } finally {
         setLoading(false)
       }
     }
-    fetchJOs()
-  }, [user?.uid, userData?.company_id])
+
+    // Only fetch if we have both user and userData
+    if (user && userData) {
+      fetchJOs()
+    } else {
+      console.log("DEBUG: Waiting for user and userData to be available")
+      console.log("User available:", !!user)
+      console.log("UserData available:", !!userData)
+    }
+  }, [user, userData]) // Updated dependency array
 
   const filteredJobOrders = useMemo(() => {
     if (!searchTerm) {
@@ -76,10 +114,10 @@ export default function LogisticsJobOrdersPage() {
     const lowerCaseSearchTerm = searchTerm.toLowerCase()
     return jobOrders.filter(
       (jo) =>
-        jo.joNumber.toLowerCase().includes(lowerCaseSearchTerm) ||
-        jo.siteName.toLowerCase().includes(lowerCaseSearchTerm) ||
-        jo.joType.toLowerCase().includes(lowerCaseSearchTerm) ||
-        jo.requestedBy.toLowerCase().includes(lowerCaseSearchTerm) ||
+        jo.joNumber?.toLowerCase().includes(lowerCaseSearchTerm) ||
+        jo.siteName?.toLowerCase().includes(lowerCaseSearchTerm) ||
+        jo.joType?.toLowerCase().includes(lowerCaseSearchTerm) ||
+        jo.requestedBy?.toLowerCase().includes(lowerCaseSearchTerm) ||
         (jo.assignTo && jo.assignTo.toLowerCase().includes(lowerCaseSearchTerm)),
     )
   }, [jobOrders, searchTerm])
@@ -170,8 +208,21 @@ export default function LogisticsJobOrdersPage() {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] text-red-500">
-        <p>{error}</p>
+      <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-red-500">
+            <p className="text-lg font-semibold mb-4">{error}</p>
+            {debugInfo && (
+              <div className="bg-gray-100 p-4 rounded-lg text-sm text-gray-700 max-w-md">
+                <h3 className="font-semibold mb-2">Debug Information:</h3>
+                <pre className="whitespace-pre-wrap">{JSON.stringify(debugInfo, null, 2)}</pre>
+              </div>
+            )}
+            <Button onClick={() => window.location.reload()} className="mt-4" variant="outline">
+              Retry
+            </Button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -212,6 +263,16 @@ export default function LogisticsJobOrdersPage() {
           )}
         </div>
 
+        {/* Debug info for development */}
+        {process.env.NODE_ENV === "development" && debugInfo && (
+          <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <details>
+              <summary className="cursor-pointer font-semibold">Debug Information</summary>
+              <pre className="mt-2 text-xs overflow-auto">{JSON.stringify(debugInfo, null, 2)}</pre>
+            </details>
+          </div>
+        )}
+
         {filteredJobOrders.length === 0 ? (
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="text-center py-12">
@@ -222,6 +283,15 @@ export default function LogisticsJobOrdersPage() {
               <p className="text-gray-600 mb-6">
                 {searchTerm ? "No job orders match your search criteria." : "No job orders have been created yet."}
               </p>
+              {!searchTerm && (
+                <Button
+                  onClick={() => router.push("/logistics/job-orders/create")}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <ClipboardList className="h-4 w-4 mr-2" />
+                  Create Your First Job Order
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
@@ -274,11 +344,30 @@ export default function LogisticsJobOrdersPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => router.push(`/logistics/job-orders/${jo.id}`)}>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              router.push(`/logistics/job-orders/${jo.id}`)
+                            }}
+                          >
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => alert(`Edit JO ${jo.joNumber}`)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => alert(`Assign JO ${jo.joNumber}`)}>Assign</DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              alert(`Edit JO ${jo.joNumber}`)
+                            }}
+                          >
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              alert(`Assign JO ${jo.joNumber}`)
+                            }}
+                          >
+                            Assign
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
