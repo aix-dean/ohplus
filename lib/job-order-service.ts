@@ -205,3 +205,32 @@ export async function getQuotationsForSelection(userId: string): Promise<any[]> 
     throw error
   }
 }
+
+export async function createMultipleJobOrders(
+  jobOrdersData: Array<Omit<JobOrder, "id" | "createdAt" | "updatedAt" | "status" | "createdBy">>,
+  createdBy: string,
+  status: JobOrderStatus,
+): Promise<string[]> {
+  console.log("Creating multiple job orders:", jobOrdersData.length)
+
+  try {
+    const jobOrderIds: string[] = []
+
+    for (const jobOrderData of jobOrdersData) {
+      const docRef = await addDoc(collection(db, JOB_ORDERS_COLLECTION), {
+        ...jobOrderData,
+        createdBy: createdBy,
+        status: status,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+      jobOrderIds.push(docRef.id)
+      console.log("Job Order successfully added with ID:", docRef.id)
+    }
+
+    return jobOrderIds
+  } catch (error) {
+    console.error("Error adding multiple job orders to Firestore:", error)
+    throw error
+  }
+}
