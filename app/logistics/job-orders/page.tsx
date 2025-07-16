@@ -157,6 +157,13 @@ export default function LogisticsJobOrdersPage() {
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold">Job Orders</h1>
+          <Button
+            onClick={() => router.push("/logistics/job-orders/create")}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <ClipboardList className="h-4 w-4 mr-2" />
+            Create JO
+          </Button>
         </div>
 
         <div className="relative mb-4">
