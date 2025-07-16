@@ -503,6 +503,7 @@ function SalesDashboardContent() {
       phone: client.phone || "",
       address: client.address || "",
       industry: client.industry || "",
+      designation: client.designation || "", // Add designation field
       targetAudience: "", // These might need to be fetched or added later
       campaignObjective: "", // These might need to be fetched or added later
     })
@@ -552,7 +553,7 @@ function SalesDashboardContent() {
       return
     }
 
-    if (!user?.uid) {
+    if (!user?.uid || !userData?.company_id) {
       toast({
         title: "Authentication Required",
         description: "Please log in to create a proposal.",
@@ -569,6 +570,7 @@ function SalesDashboardContent() {
       const proposalId = await createProposal(proposalTitle, selectedClientForProposal, selectedProducts, user.uid, {
         // You can add notes or custom messages here if needed
         // notes: "Generated from dashboard selection",
+        companyId: userData.company_id, // Add company_id to the proposal creation
       })
 
       toast({
@@ -838,8 +840,8 @@ function SalesDashboardContent() {
               <div className="flex flex-col gap-2">
                 <h1 className="text-xl md:text-2xl font-bold">
                   {userData?.first_name
-                  ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
-                  : "Dashboard"}
+                    ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                    : "Dashboard"}
                 </h1>
                 {/* Conditionally hide the SearchBox when in proposalCreationMode or ceQuoteMode */}
                 {!(proposalCreationMode || ceQuoteMode) && (
