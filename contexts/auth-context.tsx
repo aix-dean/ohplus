@@ -360,16 +360,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let assignedRole = "admin" // Default to admin for new org creators
 
       if (orgCode) {
+        console.log("Processing invitation code:", orgCode)
         const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
         const invitationSnapshot = await getDocs(invitationQuery)
 
         if (!invitationSnapshot.empty) {
           const invitationDoc = invitationSnapshot.docs[0]
           const invitationData = invitationDoc.data()
+          console.log("Invitation data found:", invitationData)
 
           licenseKey = invitationData.license_key || licenseKey
           companyId = invitationData.company_id || null
           assignedRole = invitationData.role || "user" // Assign role from invitation, default to user
+
+          console.log("Assigned role from invitation:", assignedRole)
 
           const updateData: any = {
             used: true,
@@ -384,8 +388,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           await updateDoc(doc(db, "invitation_codes", invitationDoc.id), updateData)
+          console.log("Invitation code marked as used")
+        } else {
+          console.log("No invitation found for code:", orgCode)
         }
       }
+
+      console.log("Creating user with role:", assignedRole)
 
       const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
       const userData = {
@@ -407,6 +416,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!orgCode) {
+        console.log("Creating new project for new organization")
         const projectDocRef = doc(db, "projects", firebaseUser.uid)
         await setDoc(projectDocRef, {
           company_name: companyInfo.company_name,
@@ -420,7 +430,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       await setDoc(userDocRef, userData)
       await fetchUserData(firebaseUser)
-      console.log("Registration completed successfully with tenant ID:", auth.tenantId)
+      console.log("Registration completed successfully with role:", assignedRole)
     } catch (error) {
       console.error("Error in AuthContext register:", error)
       setLoading(false)
