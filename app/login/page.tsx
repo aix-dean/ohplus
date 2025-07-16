@@ -134,48 +134,18 @@ export default function LoginPage() {
     console.log("isLoading:", isLoading)
 
     if (user && userData && !isLoading) {
-      console.log("All conditions met for navigation")
       console.log("userData.roles:", userData.roles)
-      console.log("userData.role (legacy):", userData.role)
 
-      // Use the new roles array from user_roles collection
+      // Only use the roles array from user_roles collection
       if (userData.roles && userData.roles.length > 0) {
-        console.log("Using roles array for navigation")
+        console.log("Using roles from user_roles collection:", userData.roles)
         const dashboardPath = getRoleDashboardPath(userData.roles)
-        console.log("Dashboard path determined:", dashboardPath)
+        console.log("Navigating to:", dashboardPath)
         router.push(dashboardPath)
       } else {
-        console.log("No roles in array, falling back to legacy role")
-        // Fallback to legacy role field if no roles in array
-        const role = userData.role?.toLowerCase()
-        console.log("Legacy role (lowercase):", role)
-
-        switch (role) {
-          case "admin":
-            console.log("Redirecting to admin dashboard (legacy)")
-            router.push("/admin/dashboard")
-            break
-          case "sales":
-            console.log("Redirecting to sales dashboard (legacy)")
-            router.push("/sales/dashboard")
-            break
-          case "logistics":
-            console.log("Redirecting to logistics dashboard (legacy)")
-            router.push("/logistics/dashboard")
-            break
-          case "cms":
-            console.log("Redirecting to cms dashboard (legacy)")
-            router.push("/cms/dashboard")
-            break
-          default:
-            console.log("Unknown role, defaulting to admin dashboard (legacy)")
-            // Fallback to admin dashboard for unknown roles
-            router.push("/admin/dashboard")
-            break
-        }
+        console.log("No roles found in user_roles collection, defaulting to admin dashboard")
+        router.push("/admin/dashboard")
       }
-    } else {
-      console.log("Navigation conditions not met yet")
     }
   }, [user, userData, isLoading, router, getRoleDashboardPath])
 

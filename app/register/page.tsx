@@ -187,33 +187,23 @@ export default function RegisterPage() {
 
   // Role-based navigation after registration
   useEffect(() => {
+    console.log("Register navigation useEffect triggered")
+    console.log("user:", !!user)
+    console.log("userData:", userData)
+    console.log("loading:", loading)
+
     if (user && userData && !loading) {
-      // Use the new roles array from user_roles collection
+      console.log("userData.roles:", userData.roles)
+
+      // Only use the roles array from user_roles collection
       if (userData.roles && userData.roles.length > 0) {
+        console.log("Using roles from user_roles collection:", userData.roles)
         const dashboardPath = getRoleDashboardPath(userData.roles)
+        console.log("Navigating to:", dashboardPath)
         router.push(dashboardPath)
       } else {
-        // Fallback to legacy role field if no roles in array
-        const role = userData.role?.toLowerCase()
-
-        switch (role) {
-          case "admin":
-            router.push("/admin/dashboard")
-            break
-          case "sales":
-            router.push("/sales/dashboard")
-            break
-          case "logistics":
-            router.push("/logistics/dashboard")
-            break
-          case "cms":
-            router.push("/cms/dashboard")
-            break
-          default:
-            // Fallback to admin dashboard for unknown roles
-            router.push("/admin/dashboard")
-            break
-        }
+        console.log("No roles found in user_roles collection, defaulting to admin dashboard")
+        router.push("/admin/dashboard")
       }
     }
   }, [user, userData, loading, router, getRoleDashboardPath])

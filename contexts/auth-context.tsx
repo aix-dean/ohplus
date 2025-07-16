@@ -120,7 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
           license_key: data.license_key || null,
-          role: data.role || "user", // Keep the legacy role field
+          role: userRoles.length > 0 ? userRoles[0] : "user", // Set role based on first role from user_roles
           roles: userRoles, // Add the roles array from user_roles collection
           permissions: data.permissions || [],
           project_id: data.project_id,
@@ -148,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           displayName: firebaseUser.displayName,
           license_key: null,
           company_id: null,
-          role: "user",
+          role: userRoles.length > 0 ? userRoles[0] : "user",
           roles: userRoles,
           permissions: [],
         }
@@ -168,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       console.log("Final fetchedUserData with roles:", fetchedUserData)
       console.log("Roles array:", fetchedUserData.roles)
-      console.log("Legacy role:", fetchedUserData.role)
+      console.log("Primary role:", fetchedUserData.role)
 
       setUserData(fetchedUserData)
 
