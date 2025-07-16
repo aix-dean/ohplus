@@ -279,46 +279,49 @@ export function SalesChatWidget({
                         const lastMessageText = getLastMessageText(thread)
 
                         return (
-                          <div
-                            key={thread.id}
-                            className={`p-3 rounded-lg cursor-pointer hover:bg-accent transition-colors ${
-                              activeThread?.id === thread.id ? "bg-accent" : ""
-                            }`}
-                            onClick={() => {
-                              setActiveThread(thread)
-                              setView("chat")
-                            }}
-                          >
-                            <div className="flex items-start space-x-3">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={thread.receiver_photo_url || "/placeholder.svg"} />
-                                <AvatarFallback>{thread.receiver_name?.charAt(0) || "C"}</AvatarFallback>
-                              </Avatar>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                              
-                                    <p className="text-sm font-medium truncate flex-1 min-w-0">{thread.receiver_name}</p>
-                              
-                                  <div className="flex items-center gap-1 shrink-0 max-w-[40%] text-right">
-                                    {thread.priority && (
-                                      <Badge variant={getPriorityColor(thread.priority) as any} className="text-xs whitespace-nowrap">
-                                        {thread.priority}
-                                      </Badge>
-                                    )}
-                                    {lastMessageTime && (
-                                      <span className="text-xs text-muted-foreground whitespace-nowrap truncate">
-                                        {formatDistanceToNow(lastMessageTime, { addSuffix: true })}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <p className="text-xs text-muted-foreground truncate">{lastMessageText}</p>
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+            <div key={thread.id}
+     className={`p-3 rounded-lg cursor-pointer hover:bg-accent transition-colors ${
+       activeThread?.id === thread.id ? "bg-accent" : ""
+     }`}
+     onClick={() => {
+       setActiveThread(thread)
+       setView("chat")
+     }}>
+  <div className="flex items-start space-x-3">
+    <Avatar className="h-8 w-8">
+      <AvatarImage src={thread.receiver_photo_url || "/placeholder.svg"} />
+      <AvatarFallback>{thread.receiver_name?.charAt(0) || "C"}</AvatarFallback>
+    </Avatar>
+
+    {/* Main content container */}
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center gap-2 w-full">
+        {/* Name */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{thread.receiver_name}</p>
+        </div>
+
+        {/* Time & Priority */}
+        <div className="flex-shrink-0 flex items-center gap-1 text-right">
+          {thread.priority && (
+            <Badge variant={getPriorityColor(thread.priority) as any} className="text-xs whitespace-nowrap">
+              {thread.priority}
+            </Badge>
+          )}
+          {lastMessageTime && (
+            <span className="text-xs text-muted-foreground whitespace-nowrap">
+              {formatDistanceToNow(lastMessageTime, { addSuffix: true })}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Last message */}
+      <p className="text-xs text-muted-foreground truncate">{lastMessageText}</p>
+    </div>
+  </div>
+</div>
+
                   )}
                 </ScrollArea>
               )}
