@@ -291,22 +291,26 @@ ${proposal?.client.contactPerson || "Client"}`)
     <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6">
       {/* Custom Header for Public View */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm mb-6">
-        <div className="max-w-[850px] mx-auto px-4 py-2 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Image src="/oh-plus-logo.png" alt="OH+ Logo" width={40} height={40} />
+        <div className="max-w-[850px] mx-auto px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center space-x-3 sm:space-x-4">
+            <Image src="/oh-plus-logo.png" alt="OH+ Logo" width={32} height={32} className="sm:w-10 sm:h-10" />
             <div>
-              <h1 className="text-xl font-bold text-gray-900">OH Plus</h1>
-              <p className="text-sm text-gray-600">Professional Advertising Solutions</p>
+              <h1 className="text-lg sm:text-xl font-bold text-gray-900">OH Plus</h1>
+              <p className="text-xs sm:text-sm text-gray-600">Professional Advertising Solutions</p>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 w-full sm:w-auto justify-between sm:justify-end">
             <div className="flex flex-col items-center space-y-1">
               <div className="bg-white p-1 rounded border border-gray-200">
-                <img src={generateQRCodeUrl(proposal.id) || "/placeholder.svg"} alt="QR Code" className="w-12 h-12" />
+                <img
+                  src={generateQRCodeUrl(proposal.id) || "/placeholder.svg"}
+                  alt="QR Code"
+                  className="w-10 h-10 sm:w-12 sm:h-12"
+                />
               </div>
               <span className="text-xs text-gray-500">Share</span>
             </div>
-            <Badge className={`${getStatusColor(proposal.status)} text-white border-0`}>
+            <Badge className={`${getStatusColor(proposal.status)} text-white border-0 text-xs sm:text-sm`}>
               {getStatusIcon(proposal.status)}
               <span className="ml-1 capitalize">{proposal.status}</span>
             </Badge>
@@ -314,10 +318,11 @@ ${proposal?.client.contactPerson || "Client"}`)
               onClick={handleDownloadPDF}
               disabled={isGeneratingPDF}
               size="sm"
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-blue-600 hover:bg-blue-700 text-xs sm:text-sm px-2 sm:px-4"
             >
-              <Download className="h-4 w-4 mr-2" />
-              {isGeneratingPDF ? "Generating..." : "Download PDF"}
+              <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">{isGeneratingPDF ? "Generating..." : "Download PDF"}</span>
+              <span className="sm:hidden">PDF</span>
             </Button>
           </div>
         </div>
@@ -326,27 +331,27 @@ ${proposal?.client.contactPerson || "Client"}`)
       {/* Document Container */}
       <div className="max-w-[850px] mx-auto bg-white shadow-md rounded-sm overflow-hidden">
         {/* Document Header */}
-        <div className="border-b-2 border-blue-600 p-6 sm:p-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
+        <div className="border-b-2 border-blue-600 p-4 sm:p-6 md:p-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-4">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">PROPOSAL</h1>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-1 font-[Calibri]">PROPOSAL</h1>
               <p className="text-sm text-gray-500">{proposal.title}</p>
             </div>
-            <div className="mt-4 sm:mt-0">
+            <div className="mt-4 md:mt-0">
               <Image src="/oh-plus-logo.png" alt="Company Logo" width={40} height={40} />
             </div>
           </div>
         </div>
 
         {/* Document Content */}
-        <div className="p-6 sm:p-8">
+        <div className="p-4 sm:p-6 md:p-8">
           {/* Proposal Information */}
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
               Proposal Information
             </h2>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-2">Title</h3>
                 <p className="text-base font-medium text-gray-900">{proposal.title}</p>
@@ -372,7 +377,7 @@ ${proposal?.client.contactPerson || "Client"}`)
               Client Information
             </h2>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-2">Company</h3>
                 <p className="text-base font-medium text-gray-900">{proposal.client.company}</p>
@@ -381,6 +386,12 @@ ${proposal?.client.contactPerson || "Client"}`)
                 <h3 className="text-sm font-medium text-gray-500 mb-2">Contact Person</h3>
                 <p className="text-base text-gray-900">{proposal.client.contactPerson}</p>
               </div>
+              {proposal.client.designation && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 mb-2">Designation</h3>
+                  <p className="text-base text-gray-900">{proposal.client.designation}</p>
+                </div>
+              )}
               <div>
                 <h3 className="text-sm font-medium text-gray-500 mb-2">Email</h3>
                 <p className="text-base text-gray-900">{proposal.client.email}</p>
@@ -425,44 +436,58 @@ ${proposal?.client.contactPerson || "Client"}`)
             </h2>
 
             <div className="border border-gray-300 rounded-sm overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">Product</th>
-                    <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">Type</th>
-                    <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">Location</th>
-                    <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">Price</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {proposal.products.map((product, index) => (
-                    <tr key={product.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                      <td className="py-3 px-4 border-b border-gray-200">
-                        <div className="font-medium text-gray-900">{product.name}</div>
-                        {product.site_code && <div className="text-xs text-gray-500">Site: {product.site_code}</div>}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[600px]">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="py-2 px-2 sm:px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                        Product
+                      </th>
+                      <th className="py-2 px-2 sm:px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                        Type
+                      </th>
+                      <th className="py-2 px-2 sm:px-4 text-left font-medium text-gray-700 border-b border-gray-300">
+                        Location
+                      </th>
+                      <th className="py-2 px-2 sm:px-4 text-right font-medium text-gray-700 border-b border-gray-300">
+                        Price
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {proposal.products.map((product, index) => (
+                      <tr key={product.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                        <td className="py-3 px-2 sm:px-4 border-b border-gray-200">
+                          <div className="font-medium text-gray-900 text-xs sm:text-sm">{product.name}</div>
+                          {product.site_code && <div className="text-xs text-gray-500">Site: {product.site_code}</div>}
+                        </td>
+                        <td className="py-3 px-2 sm:px-4 border-b border-gray-200">
+                          <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
+                            {product.type}
+                          </span>
+                        </td>
+                        <td className="py-3 px-2 sm:px-4 border-b border-gray-200 text-xs sm:text-sm">
+                          {product.location}
+                        </td>
+                        <td className="py-3 px-2 sm:px-4 text-right border-b border-gray-200">
+                          <div className="font-medium text-gray-900 text-xs sm:text-sm">
+                            ₱{product.price.toLocaleString()}
+                          </div>
+                          <div className="text-xs text-gray-500">per day</div>
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="bg-gray-50">
+                      <td colSpan={3} className="py-3 px-2 sm:px-4 text-right font-medium text-xs sm:text-sm">
+                        Total Investment:
                       </td>
-                      <td className="py-3 px-4 border-b border-gray-200">
-                        <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
-                          {product.type}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 border-b border-gray-200">{product.location}</td>
-                      <td className="py-3 px-4 text-right border-b border-gray-200">
-                        <div className="font-medium text-gray-900">₱{product.price.toLocaleString()}</div>
-                        <div className="text-xs text-gray-500">per day</div>
+                      <td className="py-3 px-2 sm:px-4 text-right font-bold text-green-600 text-sm sm:text-base">
+                        ₱{proposal.totalAmount.toLocaleString()}
                       </td>
                     </tr>
-                  ))}
-                  <tr className="bg-gray-50">
-                    <td colSpan={3} className="py-3 px-4 text-right font-medium">
-                      Total Investment:
-                    </td>
-                    <td className="py-3 px-4 text-right font-bold text-green-600">
-                      ₱{proposal.totalAmount.toLocaleString()}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Product Details */}
@@ -471,7 +496,7 @@ ${proposal?.client.contactPerson || "Client"}`)
                 <div key={product.id} className="border border-gray-200 rounded-sm p-4">
                   <h3 className="text-lg font-medium text-gray-900 mb-3">{product.name} Details</h3>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                     {product.specs_rental?.traffic_count && (
                       <div>
                         <h4 className="text-xs font-medium text-gray-500 uppercase">Traffic Count</h4>
@@ -515,7 +540,7 @@ ${proposal?.client.contactPerson || "Client"}`)
                   {product.media && product.media.length > 0 && (
                     <div>
                       <h4 className="text-xs font-medium text-gray-500 uppercase mb-2">Media</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {product.media.map((media, mediaIndex) => (
                           <div
                             key={mediaIndex}
@@ -534,7 +559,7 @@ ${proposal?.client.contactPerson || "Client"}`)
                             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all flex items-center justify-center">
                               <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded-full p-2">
                                 <svg
-                                  className="w-6 h-6 text-gray-700"
+                                  className="w-4 h-4 sm:w-6 sm:h-6 text-gray-700"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -592,17 +617,21 @@ ${proposal?.client.contactPerson || "Client"}`)
             </h2>
 
             {proposal.status === "accepted" ? (
-              <div className="bg-green-50 border border-green-200 rounded-sm p-6">
+              <div className="bg-green-50 border border-green-200 rounded-sm p-4 sm:p-6">
                 <div className="flex items-center text-green-700 mb-3">
-                  <CheckCircle className="h-5 w-5 mr-2" />
-                  <span className="font-semibold text-lg">Proposal Accepted!</span>
+                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  <span className="font-semibold text-base sm:text-lg">Proposal Accepted!</span>
                 </div>
-                <p className="text-green-600 mb-4">
+                <p className="text-green-600 mb-4 text-sm sm:text-base">
                   Thank you for accepting our proposal. Our team is now preparing your quotation and will contact you
                   shortly with the next steps.
                 </p>
                 <div className="space-y-3">
-                  <Button variant="outline" className="w-full" onClick={handleContactSales}>
+                  <Button
+                    variant="outline"
+                    className="w-full text-sm sm:text-base bg-transparent"
+                    onClick={handleContactSales}
+                  >
                     <Mail className="h-4 w-4 mr-2" />
                     Contact Sales Team
                   </Button>
@@ -610,7 +639,7 @@ ${proposal?.client.contactPerson || "Client"}`)
               </div>
             ) : (
               <div className="space-y-4">
-                <p className="text-gray-600 mb-4">
+                <p className="text-gray-600 mb-4 text-sm sm:text-base">
                   We're excited about the opportunity to work with you. Please review our proposal and let us know your
                   decision.
                 </p>
@@ -618,12 +647,16 @@ ${proposal?.client.contactPerson || "Client"}`)
                   <Button
                     onClick={handleAcceptProposal}
                     disabled={isAccepting}
-                    className="bg-green-600 hover:bg-green-700"
+                    className="bg-green-600 hover:bg-green-700 text-sm sm:text-base"
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
                     {isAccepting ? "Accepting..." : "Accept Proposal"}
                   </Button>
-                  <Button variant="outline" onClick={handleContactSales}>
+                  <Button
+                    variant="outline"
+                    onClick={handleContactSales}
+                    className="text-sm sm:text-base bg-transparent"
+                  >
                     <Mail className="h-4 w-4 mr-2" />
                     Contact Sales Team
                   </Button>
@@ -638,20 +671,20 @@ ${proposal?.client.contactPerson || "Client"}`)
               Contact Information
             </h2>
 
-            <div className="bg-gray-50 border border-gray-200 rounded-sm p-6">
+            <div className="bg-gray-50 border border-gray-200 rounded-sm p-4 sm:p-6">
               <p className="text-sm text-gray-600 mb-4">
                 Have questions about this proposal? We'd love to discuss it with you.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-center space-x-3">
-                  <Mail className="h-5 w-5 text-blue-600" />
+                  <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-gray-900">Email</p>
-                    <p className="text-sm text-blue-600">sales@oohoperator.com</p>
+                    <p className="text-sm text-blue-600 break-all">sales@oohoperator.com</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <Phone className="h-5 w-5 text-blue-600" />
+                  <Phone className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-gray-900">Phone</p>
                     <p className="text-sm text-blue-600">+63 123 456 7890</p>
