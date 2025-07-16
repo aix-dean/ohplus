@@ -1,14 +1,10 @@
 import type React from "react"
-import { SalesChatWidget } from "@/components/sales-chat/sales-chat-widget"
+import { RouteProtection } from "@/components/RouteProtection"
+
 export default function SalesLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  return (
-    <div className="w-full">
-      {children}
-      <SalesChatWidget />
-    </div>
-  )
+  return <RouteProtection requiredRoles={["admin", "sales"]}>{children}</RouteProtection>
 }

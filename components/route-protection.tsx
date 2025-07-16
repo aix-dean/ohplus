@@ -2,51 +2,51 @@
 
 import type React from "react"
 
-import { useAuth } from "@/contexts/auth-context"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import { useAuth } from "@/contexts/auth-context"
 import type { RoleType } from "@/lib/hardcoded-access-service"
 
 interface RouteProtectionProps {
   children: React.ReactNode
   requiredRoles: RoleType | RoleType[]
+  redirectTo?: string
 }
 
-export function RouteProtection({ children, requiredRoles }: RouteProtectionProps) {
-  const { user, userData, loading } = useAuth()
+export function RouteProtection({ children, requiredRoles, redirectTo = "/unauthorized" }: RouteProtectionProps) {
+  const { user, userData, loading, hasRole } = useAuth()
   const router = useRouter()
+  const [authorized, setAuthorized] = useState(false)
 
   useEffect(() => {
-    if (!loading && !user) {
+    // Wait until auth state is loaded
+    if (loading) return
+
+    // If not logged in, redirect to login
+    if (!user) {
       router.push("/login")
       return
     }
 
-    if (!loading && user && userData) {
-      const userRoles = userData.roles || []
-      const requiredRolesArray = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles]
-
-      // Admin users can access all sections
-      const hasAdminAccess = userRoles.includes("admin")
-      const hasRequiredRole = requiredRolesArray.some((role) => userRoles.includes(role))
-
-      if (!hasAdminAccess && !hasRequiredRole) {
-        router.push("/unauthorized")
-      }
+    // If user data is loaded and user doesn't have required role(s)
+    if (userData && !hasRole(requiredRoles)) {
+      router.push(redirectTo)
+      return
     }
-  }, [user, userData, loading, router, requiredRoles])
 
-  if (loading) {
+    // User is authorized
+    setAuthorized(true)
+  }, [user, userData, loading, hasRole, requiredRoles, router, redirectTo])
+
+  // Show loading state while checking authorization
+  if (loading || !authorized) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-gray-900"></div>
       </div>
     )
   }
 
-  if (!user) {
-    return null
-  }
-
+  // Render children if authorized
   return <>{children}</>
 }
