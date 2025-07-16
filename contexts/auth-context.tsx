@@ -5,7 +5,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signOut,
+  signOut as firebaseSignOut,
   sendPasswordResetEmail,
   type User as FirebaseUser,
 } from "firebase/auth"
@@ -18,23 +18,16 @@ import { assignRoleToUser, getUserRoles, type RoleType } from "@/lib/hardcoded-a
 
 interface UserData {
   uid: string
-  email: string | null
-  displayName: string | null
-  license_key: string | null
-  company_id?: string | null
-  role: string | null
-  roles: RoleType[] // Add roles array from user_roles collection
-  permissions: string[]
-  project_id?: string
-  first_name?: string
-  last_name?: string
-  middle_name?: string
-  phone_number?: string
-  gender?: string
-  type?: string
-  created?: Date
-  updated?: Date
-  onboarding?: boolean
+  email: string
+  displayName?: string
+  role?: string
+  roles: RoleType[]
+  companyName?: string
+  firstName?: string
+  lastName?: string
+  phoneNumber?: string
+  position?: string
+  createdAt?: any
 }
 
 interface ProjectData {
@@ -77,15 +70,16 @@ interface AuthContextType {
     password: string,
     orgCode?: string,
   ) => Promise<void>
-  logout: () => Promise<void>
+  signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
   updateUserData: (updates: Partial<UserData>) => Promise<void>
   updateProjectData: (updates: Partial<ProjectData>) => Promise<void>
   refreshUserData: () => Promise<void>
   refreshSubscriptionData: () => Promise<void>
   assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
-  getRoleDashboardPath: (roles: RoleType[]) => string | null
-  hasRole: (requiredRoles: RoleType | RoleType[]) => boolean
+  getRoleDashboardPath: () => string | null
+  hasRole: (roles: RoleType | RoleType[]) => boolean
+  isAdmin: () => boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -119,24 +113,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         fetchedUserData = {
           uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          license_key: data.license_key || null,
-          role: userRoles.length > 0 ? userRoles[0] : null, // Set role based on first role from user_roles
-          roles: userRoles, // Add the roles array from user_roles collection
-          permissions: data.permissions || [],
-          project_id: data.project_id,
-          first_name: data.first_name,
-          last_name: data.last_name,
-          middle_name: data.middle_name,
-          phone_number: data.phone_number,
-          gender: data.gender,
-          type: data.type,
-          created: data.created?.toDate(),
-          updated: data.updated?.toDate(),
-          company_id: data.company_id || null,
-          onboarding: data.onboarding || false,
-          ...data,
+          email: firebaseUser.email || "",
+          displayName: firebaseUser.displayName || "",
+          role: data.role, // Keep for backward compatibility
+          roles: userRoles, // New roles array from user_roles collection
+          companyName: data.companyName,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phoneNumber: data.phoneNumber,
+          position: data.position,
+          createdAt: data.createdAt,
         }
       } else {
         console.log("User document doesn't exist, creating basic one")
@@ -147,14 +133,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         fetchedUserData = {
           uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          license_key: null,
-          company_id: null,
-          role: userRoles.length > 0 ? userRoles[0] : null,
+          email: firebaseUser.email || "",
+          displayName: firebaseUser.displayName || "",
           roles: userRoles,
-          permissions: [],
-          onboarding: true, // New users need to complete onboarding
         }
 
         // Create the user document with uid field
@@ -340,7 +321,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const isOHPlusAccount = await findOHPlusAccount(userCredential.user.uid)
 
       if (!isOHPlusAccount) {
-        await signOut(auth)
+        await firebaseSignOut(auth)
         throw new Error("OHPLUS_ACCOUNT_NOT_FOUND")
       }
 
@@ -488,19 +469,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const logout = async () => {
-    setLoading(true)
+  const signOut = async () => {
     try {
       console.log("Logging out user")
-      await signOut(auth)
+      await firebaseSignOut(auth)
       setUser(null)
       setUserData(null)
       setProjectData(null)
       setSubscriptionData(null)
     } catch (error) {
       console.error("Logout error:", error)
-      setLoading(false)
-      throw error
     }
   }
 
@@ -562,7 +540,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await fetchUserData(firebaseUser)
         } else {
           console.log("No OHPLUS account found, signing out")
-          await signOut(auth)
+          await firebaseSignOut(auth)
         }
       } else {
         console.log("Auth state changed: user logged out")
@@ -592,35 +570,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [userData],
   )
 
-  const getRoleDashboardPath = useCallback((roles: RoleType[]): string | null => {
-    console.log("getRoleDashboardPath called with roles:", roles)
+  const isAdmin = useCallback((): boolean => {
+    return userData?.roles?.includes("admin") || false
+  }, [userData])
 
-    if (!roles || roles.length === 0) {
+  const getRoleDashboardPath = useCallback((): string | null => {
+    console.log("getRoleDashboardPath called with roles:", userData?.roles)
+
+    if (!userData?.roles || userData.roles.length === 0) {
       console.log("No roles found, returning null")
       return null
     }
 
-    // Priority order: admin > sales > logistics > cms
-    if (roles.includes("admin")) {
+    // Admin users go to admin dashboard
+    if (userData.roles.includes("admin")) {
       console.log("Admin role found, redirecting to admin dashboard")
       return "/admin/dashboard"
     }
-    if (roles.includes("sales")) {
+
+    // For non-admin users, prioritize in this order
+    if (userData.roles.includes("sales")) {
       console.log("Sales role found, redirecting to sales dashboard")
       return "/sales/dashboard"
     }
-    if (roles.includes("logistics")) {
+    if (userData.roles.includes("logistics")) {
       console.log("Logistics role found, redirecting to logistics dashboard")
       return "/logistics/dashboard"
     }
-    if (roles.includes("cms")) {
+    if (userData.roles.includes("cms")) {
       console.log("CMS role found, redirecting to cms dashboard")
       return "/cms/dashboard"
     }
 
+    // If user has roles but none match our expected roles
     console.log("No matching roles found, returning null")
     return null
-  }, [])
+  }, [userData])
 
   const value = {
     user,
@@ -631,7 +616,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     loginOHPlusOnly,
     register,
-    logout,
+    signOut,
     resetPassword,
     updateUserData,
     updateProjectData,
@@ -640,6 +625,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     assignLicenseKey,
     getRoleDashboardPath,
     hasRole,
+    isAdmin,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

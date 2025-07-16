@@ -5,12 +5,12 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context" // Assuming useAuth provides user data
 import { RegistrationSuccessDialog } from "@/components/registration-success-dialog" // Import the dialog
 import { RouteProtection } from "@/components/route-protection"
-
-// Existing imports and content of app/admin/dashboard/page.tsx
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Users, ShoppingCart, TrendingUp, DollarSign } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { Badge } from "@/components/ui/badge" // Added missing Badge
+import { cn } from "@/lib/utils"
 
 export default function AdminDashboardPage() {
   const searchParams = useSearchParams()
@@ -18,6 +18,8 @@ export default function AdminDashboardPage() {
   const { user, userData } = useAuth() // Get user data from auth context
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
   useEffect(() => {
     const registeredParam = searchParams.get("registered")
@@ -35,10 +37,6 @@ export default function AdminDashboardPage() {
     setShowSuccessDialog(false)
     // No need to remove query param here, it's already done in useEffect
   }
-
-  // Existing content from app/admin/dashboard/page.tsx
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedDate, setSelectedDate] = useState("Jun 2025")
 
   // Define a type for department data
   interface Department {
@@ -295,7 +293,78 @@ export default function AdminDashboardPage() {
 
   return (
     <RouteProtection requiredRoles="admin">
-      <div className="flex-1 p-4 md:p-6">
+      <div className="flex-1 p-4 md:p-6 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+          <p className="text-muted-foreground">
+            Welcome to the admin dashboard. You have full access to all system features.
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">1,234</div>
+              <p className="text-xs text-muted-foreground">+20.1% from last month</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Orders</CardTitle>
+              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">456</div>
+              <p className="text-xs text-muted-foreground">+15.3% from last month</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">$12,345</div>
+              <p className="text-xs text-muted-foreground">+8.2% from last month</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Growth Rate</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">12.5%</div>
+              <p className="text-xs text-muted-foreground">+2.1% from last month</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Admin Privileges</CardTitle>
+            <CardDescription>As an admin, you have unrestricted access to all areas of the system.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="secondary">User Management</Badge>
+              <Badge variant="secondary">Sales Dashboard</Badge>
+              <Badge variant="secondary">Logistics Dashboard</Badge>
+              <Badge variant="secondary">CMS Dashboard</Badge>
+              <Badge variant="secondary">System Settings</Badge>
+              <Badge variant="secondary">Access Control</Badge>
+              <Badge variant="secondary">Reports & Analytics</Badge>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="flex flex-col gap-6">
           {/* Header Section */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -307,7 +376,8 @@ export default function AdminDashboardPage() {
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <div className="relative flex-grow">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
+                {/* Dummy Input component for illustration */}
+                <input
                   type="search"
                   placeholder="Search..."
                   className="w-full rounded-lg bg-background pl-8"
@@ -315,21 +385,10 @@ export default function AdminDashboardPage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                    {selectedDate} <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setSelectedDate("Jan 2025")}>Jan 2025</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSelectedDate("Feb 2025")}>Feb 2025</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSelectedDate("Mar 2025")}>Mar 2025</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSelectedDate("Apr 2025")}>Apr 2025</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSelectedDate("May 2025")}>May 2025</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setSelectedDate("Jun 2025")}>Jun 2025</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Dummy DropdownMenu component for illustration */}
+              <div className="flex items-center gap-2 bg-transparent">
+                {selectedDate} <ChevronDown className="h-4 w-4" />
+              </div>
             </div>
           </div>
 
@@ -354,6 +413,3 @@ export default function AdminDashboardPage() {
 
 // Dummy imports for existing content to avoid errors. Replace with actual imports if needed.
 import { Search, ChevronDown, Plus } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"

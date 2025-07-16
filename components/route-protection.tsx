@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
@@ -14,7 +13,7 @@ interface RouteProtectionProps {
 }
 
 export function RouteProtection({ children, requiredRoles, redirectTo = "/unauthorized" }: RouteProtectionProps) {
-  const { user, userData, loading, hasRole } = useAuth()
+  const { user, userData, loading, hasRole, isAdmin } = useAuth()
   const router = useRouter()
   const [authorized, setAuthorized] = useState(false)
 
@@ -28,15 +27,24 @@ export function RouteProtection({ children, requiredRoles, redirectTo = "/unauth
       return
     }
 
-    // If user data is loaded and user doesn't have required role(s)
-    if (userData && !hasRole(requiredRoles)) {
+    // If user data is not loaded yet, wait
+    if (!userData) return
+
+    // Admin users have unrestricted access to all pages
+    if (isAdmin()) {
+      setAuthorized(true)
+      return
+    }
+
+    // For non-admin users, check if they have required role(s)
+    if (!hasRole(requiredRoles)) {
       router.push(redirectTo)
       return
     }
 
     // User is authorized
     setAuthorized(true)
-  }, [user, userData, loading, hasRole, requiredRoles, router, redirectTo])
+  }, [user, userData, loading, hasRole, isAdmin, requiredRoles, router, redirectTo])
 
   // Show loading state while checking authorization
   if (loading || !authorized) {
