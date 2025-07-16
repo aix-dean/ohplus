@@ -1,210 +1,171 @@
-import { db } from "./firebase"
-import { collection, query, where, getDocs, doc, getDoc, addDoc, serverTimestamp, orderBy } from "firebase/firestore"
-import type { Quotation } from "./types/quotation"
-import type { JobOrder, JobOrderStatus } from "./types/job-order"
-import type { Product } from "./firebase-service"
-import type { Client } from "./client-service"
+import {
+  collection,
+  getDocs,
+  addDoc,
+  query,
+  where,
+  orderBy,
+  doc,
+  getDoc,
+  updateDoc,
+  serverTimestamp,
+} from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import type { JobOrder } from "@/lib/types/job-order"
 
-const QUOTATIONS_COLLECTION = "quotations"
-const JOB_ORDERS_COLLECTION = "job_orders"
-const PRODUCTS_COLLECTION = "products"
-const CLIENTS_COLLECTION = "client_db"
-
-// New interface for quotation items
-export interface QuotationItem {
-  price: number
-  product_id: string
-  product_location: string
-  product_name: string
-  site_code: string
-  type: string
-}
-
-export async function getQuotationsForSelection(userId: string): Promise<Quotation[]> {
-  try {
-    const q = query(
-      collection(db, QUOTATIONS_COLLECTION),
-      where("created_by", "==", userId),
-      orderBy("created", "desc"),
-    )
-    const querySnapshot = await getDocs(q)
-    const quotations: Quotation[] = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Quotation[]
-    return quotations
-  } catch (error) {
-    console.error("Error fetching quotations for selection:", error)
-    throw error
-  }
-}
-
-export async function getQuotationById(quotationId: string): Promise<Quotation | null> {
-  try {
-    const docRef = doc(db, QUOTATIONS_COLLECTION, quotationId)
-    const docSnap = await getDoc(docRef)
-
-    if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() } as Quotation
-    } else {
-      return null
-    }
-  } catch (error) {
-    console.error("Error fetching quotation by ID:", error)
-    throw error
-  }
-}
-
-export async function getQuotationDetailsForJobOrder(quotationId: string): Promise<{
-  quotation: Quotation
-  products: Product[]
-  client: Client | null
-  items?: QuotationItem[]
-} | null> {
-  console.log(`[getQuotationDetailsForJobOrder] Attempting to fetch details for quotationId: ${quotationId}`)
-  try {
-    const quotationDocRef = doc(db, QUOTATIONS_COLLECTION, quotationId)
-    const quotationDocSnap = await getDoc(quotationDocRef)
-
-    if (!quotationDocSnap.exists()) {
-      console.warn(`[getQuotationDetailsForJobOrder] Quotation with ID ${quotationId} not found.`)
-      return null
-    }
-    const quotation = { id: quotationDocSnap.id, ...quotationDocSnap.data() } as Quotation
-    console.log("[getQuotationDetailsForJobOrder] Fetched quotation:", quotation)
-
-    const products: Product[] = []
-    let items: QuotationItem[] = []
-
-    // Check if quotation has items array (multiple products)
-    if (quotation.items && Array.isArray(quotation.items)) {
-      console.log(`[getQuotationDetailsForJobOrder] Found ${quotation.items.length} items in quotation`)
-      items = quotation.items as QuotationItem[]
-
-      // Fetch all products for the items
-      for (const item of items) {
-        if (item.product_id) {
-          console.log(`[getQuotationDetailsForJobOrder] Fetching product with ID: ${item.product_id}`)
-          const productDocRef = doc(db, PRODUCTS_COLLECTION, item.product_id)
-          const productDocSnap = await getDoc(productDocRef)
-          if (productDocSnap.exists()) {
-            const product = { id: productDocSnap.id, ...productDocSnap.data() } as Product
-            products.push(product)
-            console.log("[getQuotationDetailsForJobOrder] Fetched product:", product)
-          } else {
-            console.warn(`[getQuotationDetailsForJobOrder] Product with ID ${item.product_id} not found.`)
-          }
-        }
-      }
-    } else if (quotation.product_id) {
-      // Single product (legacy format)
-      console.log(`[getQuotationDetailsForJobOrder] Fetching single product with ID: ${quotation.product_id}`)
-      const productDocRef = doc(db, PRODUCTS_COLLECTION, quotation.product_id)
-      const productDocSnap = await getDoc(productDocRef)
-      if (productDocSnap.exists()) {
-        const product = { id: productDocSnap.id, ...productDocSnap.data() } as Product
-        products.push(product)
-        console.log("[getQuotationDetailsForJobOrder] Fetched single product:", product)
-      } else {
-        console.warn(`[getQuotationDetailsForJobOrder] Product with ID ${quotation.product_id} not found.`)
-      }
-    }
-
-    let client: Client | null = null
-    if (quotation.client_id) {
-      console.log(`[getQuotationDetailsForJobOrder] Attempting to fetch client by ID: ${quotation.client_id}`)
-      const clientDocRef = doc(db, CLIENTS_COLLECTION, quotation.client_id)
-      const clientDocSnap = await getDoc(clientDocRef)
-      if (clientDocSnap.exists()) {
-        client = { id: clientDocSnap.id, ...clientDocSnap.data() } as Client
-        console.log("[getQuotationDetailsForJobOrder] Fetched client by ID:", client)
-      } else {
-        console.warn(`[getQuotationDetailsForJobOrder] Client with ID ${quotation.client_id} not found.`)
-      }
-    }
-
-    if (products.length === 0) {
-      console.warn(`[getQuotationDetailsForJobOrder] No products found for quotation ${quotationId}.`)
-      return null
-    }
-
-    console.log("[getQuotationDetailsForJobOrder] Successfully fetched all details.")
-    return { quotation, products, client, items }
-  } catch (error: any) {
-    console.error("[getQuotationDetailsForJobOrder] Error fetching quotation details for job order:", error)
-    throw new Error("Failed to fetch quotation details due to an unexpected error.")
-  }
-}
-
-export async function createJobOrder(
-  jobOrderData: Omit<JobOrder, "id" | "createdAt" | "updatedAt" | "status" | "createdBy">,
-  createdBy: string,
-  status: JobOrderStatus,
-): Promise<string> {
-  console.log("Received job order data in createJobOrder (service):", jobOrderData)
-  console.log("Created By (service):", createdBy)
-  console.log("Status (service):", status)
-
-  try {
-    const docRef = await addDoc(collection(db, JOB_ORDERS_COLLECTION), {
-      ...jobOrderData,
-      createdBy: createdBy,
-      status: status,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
-    console.log("Job Order successfully added with ID:", docRef.id)
-    return docRef.id
-  } catch (error) {
-    console.error("Error adding job order to Firestore:", error)
-    throw error
-  }
-}
-
-export async function createMultipleJobOrders(
-  jobOrdersData: Array<Omit<JobOrder, "id" | "createdAt" | "updatedAt" | "status" | "createdBy">>,
-  createdBy: string,
-  status: JobOrderStatus,
-): Promise<string[]> {
-  console.log("Creating multiple job orders:", jobOrdersData.length)
-
-  try {
-    const jobOrderIds: string[] = []
-
-    for (const jobOrderData of jobOrdersData) {
-      const docRef = await addDoc(collection(db, JOB_ORDERS_COLLECTION), {
-        ...jobOrderData,
-        createdBy: createdBy,
-        status: status,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      })
-      jobOrderIds.push(docRef.id)
-      console.log("Job Order successfully added with ID:", docRef.id)
-    }
-
-    return jobOrderIds
-  } catch (error) {
-    console.error("Error adding multiple job orders to Firestore:", error)
-    throw error
-  }
-}
-
+// Get all job orders for a specific user
 export async function getJobOrders(userId: string): Promise<JobOrder[]> {
   try {
-    const q = query(
-      collection(db, JOB_ORDERS_COLLECTION),
-      where("createdBy", "==", userId),
-      orderBy("createdAt", "desc"),
-    )
+    const jobOrdersRef = collection(db, "job_orders")
+    const q = query(jobOrdersRef, where("created_by", "==", userId), orderBy("created", "desc"))
     const querySnapshot = await getDocs(q)
-    const jobOrders: JobOrder[] = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as JobOrder[]
+
+    const jobOrders: JobOrder[] = []
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      jobOrders.push({
+        id: doc.id,
+        joNumber: data.joNumber || "",
+        siteName: data.siteName || "",
+        siteLocation: data.siteLocation || "",
+        joType: data.joType || "",
+        requestedBy: data.requestedBy || "",
+        assignTo: data.assignTo || "",
+        dateRequested: data.dateRequested,
+        deadline: data.deadline,
+        jobDescription: data.jobDescription || "",
+        message: data.message || "",
+        attachments: data.attachments || [],
+        status: data.status || "pending",
+        created: data.created,
+        updated: data.updated,
+        created_by: data.created_by || "",
+        company_id: data.company_id || "",
+        quotation_id: data.quotation_id || "",
+      })
+    })
+
     return jobOrders
   } catch (error) {
     console.error("Error fetching job orders:", error)
     throw error
   }
+}
+
+// Get all job orders for a specific company
+export async function getJobOrdersByCompanyId(companyId: string): Promise<JobOrder[]> {
+  try {
+    const jobOrdersRef = collection(db, "job_orders")
+    const q = query(jobOrdersRef, where("company_id", "==", companyId), orderBy("created", "desc"))
+    const querySnapshot = await getDocs(q)
+
+    const jobOrders: JobOrder[] = []
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      jobOrders.push({
+        id: doc.id,
+        joNumber: data.joNumber || "",
+        siteName: data.siteName || "",
+        siteLocation: data.siteLocation || "",
+        joType: data.joType || "",
+        requestedBy: data.requestedBy || "",
+        assignTo: data.assignTo || "",
+        dateRequested: data.dateRequested,
+        deadline: data.deadline,
+        jobDescription: data.jobDescription || "",
+        message: data.message || "",
+        attachments: data.attachments || [],
+        status: data.status || "pending",
+        created: data.created,
+        updated: data.updated,
+        created_by: data.created_by || "",
+        company_id: data.company_id || "",
+        quotation_id: data.quotation_id || "",
+      })
+    })
+
+    return jobOrders
+  } catch (error) {
+    console.error("Error fetching job orders by company ID:", error)
+    throw error
+  }
+}
+
+// Get a single job order by ID
+export async function getJobOrderById(jobOrderId: string): Promise<JobOrder | null> {
+  try {
+    const jobOrderDoc = await getDoc(doc(db, "job_orders", jobOrderId))
+
+    if (jobOrderDoc.exists()) {
+      const data = jobOrderDoc.data()
+      return {
+        id: jobOrderDoc.id,
+        joNumber: data.joNumber || "",
+        siteName: data.siteName || "",
+        siteLocation: data.siteLocation || "",
+        joType: data.joType || "",
+        requestedBy: data.requestedBy || "",
+        assignTo: data.assignTo || "",
+        dateRequested: data.dateRequested,
+        deadline: data.deadline,
+        jobDescription: data.jobDescription || "",
+        message: data.message || "",
+        attachments: data.attachments || [],
+        status: data.status || "pending",
+        created: data.created,
+        updated: data.updated,
+        created_by: data.created_by || "",
+        company_id: data.company_id || "",
+        quotation_id: data.quotation_id || "",
+      }
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error fetching job order:", error)
+    return null
+  }
+}
+
+// Create a new job order
+export async function createJobOrder(jobOrderData: Partial<JobOrder>): Promise<string> {
+  try {
+    const newJobOrder = {
+      ...jobOrderData,
+      created: serverTimestamp(),
+      updated: serverTimestamp(),
+      status: jobOrderData.status || "pending",
+    }
+
+    const docRef = await addDoc(collection(db, "job_orders"), newJobOrder)
+    return docRef.id
+  } catch (error) {
+    console.error("Error creating job order:", error)
+    throw error
+  }
+}
+
+// Update a job order
+export async function updateJobOrder(jobOrderId: string, jobOrderData: Partial<JobOrder>): Promise<void> {
+  try {
+    const jobOrderRef = doc(db, "job_orders", jobOrderId)
+    const updateData = {
+      ...jobOrderData,
+      updated: serverTimestamp(),
+    }
+
+    await updateDoc(jobOrderRef, updateData)
+  } catch (error) {
+    console.error("Error updating job order:", error)
+    throw error
+  }
+}
+
+// Generate a unique JO number
+export function generateJONumber(): string {
+  const timestamp = Date.now().toString()
+  const random = Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, "0")
+  return `JO-${timestamp.slice(-6)}${random}`
 }
