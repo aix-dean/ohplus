@@ -13,6 +13,9 @@ import {
 import { db } from "@/lib/firebase"
 import type { JobOrder } from "@/lib/types/job-order"
 
+
+const JOB_ORDERS_COLLECTION = "job_orders"
+
 // Get all job orders for a specific user
 export async function getJobOrders(userId: string): Promise<JobOrder[]> {
   try {
