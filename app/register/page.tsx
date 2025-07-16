@@ -29,7 +29,7 @@ export default function RegisterPage() {
   const [invitationRole, setInvitationRole] = useState<string | null>(null)
   const [loadingInvitation, setLoadingInvitation] = useState(false)
 
-  const { register, user, userData } = useAuth()
+  const { register, user, userData, getRoleDashboardPath } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -188,28 +188,16 @@ export default function RegisterPage() {
   // Role-based navigation after registration
   useEffect(() => {
     if (user && userData && !loading) {
-      const role = userData.role?.toLowerCase()
+      console.log("Registration navigation - userData:", userData)
+      console.log("Registration navigation - roles:", userData.roles)
 
-      switch (role) {
-        case "admin":
-          router.push("/admin/dashboard")
-          break
-        case "sales":
-          router.push("/sales/dashboard")
-          break
-        case "logistics":
-          router.push("/logistics/dashboard")
-          break
-        case "cms":
-          router.push("/cms/dashboard")
-          break
-        default:
-          // Fallback to admin dashboard for unknown roles
-          router.push("/admin/dashboard")
-          break
-      }
+      // Use the roles array from user_roles collection
+      const dashboardPath = getRoleDashboardPath(userData.roles || [])
+      console.log("Registration navigation - redirecting to:", dashboardPath)
+
+      router.push(dashboardPath)
     }
-  }, [user, userData, loading, router])
+  }, [user, userData, loading, router, getRoleDashboardPath])
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">

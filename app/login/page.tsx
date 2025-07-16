@@ -31,7 +31,7 @@ export default function LoginPage() {
   const [orgCode, setOrgCode] = useState("")
   const [isValidatingCode, setIsValidatingCode] = useState(false)
 
-  const { loginOHPlusOnly, user, userData } = useAuth()
+  const { loginOHPlusOnly, user, userData, getRoleDashboardPath } = useAuth()
   const router = useRouter()
 
   // Redirect if already logged in
@@ -129,28 +129,16 @@ export default function LoginPage() {
   // Role-based navigation after login
   useEffect(() => {
     if (user && userData && !isLoading) {
-      const role = userData.role?.toLowerCase()
+      console.log("Login navigation - userData:", userData)
+      console.log("Login navigation - roles:", userData.roles)
 
-      switch (role) {
-        case "admin":
-          router.push("/admin/dashboard")
-          break
-        case "sales":
-          router.push("/sales/dashboard")
-          break
-        case "logistics":
-          router.push("/logistics/dashboard")
-          break
-        case "cms":
-          router.push("/cms/dashboard")
-          break
-        default:
-          // Fallback to admin dashboard for unknown roles
-          router.push("/admin/dashboard")
-          break
-      }
+      // Use the roles array from user_roles collection
+      const dashboardPath = getRoleDashboardPath(userData.roles || [])
+      console.log("Login navigation - redirecting to:", dashboardPath)
+
+      router.push(dashboardPath)
     }
-  }, [user, userData, isLoading, router])
+  }, [user, userData, isLoading, router, getRoleDashboardPath])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white p-4">
