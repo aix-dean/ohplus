@@ -169,3 +169,40 @@ export function generateJONumber(): string {
     .padStart(3, "0")
   return `JO-${timestamp.slice(-6)}${random}`
 }
+
+// Get quotations available for job order creation
+export async function getQuotationsForSelection(userId: string): Promise<any[]> {
+  try {
+    const quotationsRef = collection(db, "quotations")
+    const q = query(
+      quotationsRef,
+      where("created_by", "==", userId),
+      where("status", "==", "accepted"),
+      orderBy("created", "desc"),
+    )
+    const querySnapshot = await getDocs(q)
+
+    const quotations: any[] = []
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      quotations.push({
+        id: doc.id,
+        quotation_number: data.quotation_number || "",
+        client_name: data.client_name || "",
+        product_name: data.product_name || "",
+        items: data.items || null,
+        status: data.status || "",
+        created: data.created,
+        created_by: data.created_by || "",
+        created_by_first_name: data.created_by_first_name || "",
+        created_by_last_name: data.created_by_last_name || "",
+        company_id: data.company_id || "",
+      })
+    })
+
+    return quotations
+  } catch (error) {
+    console.error("Error fetching quotations for selection:", error)
+    throw error
+  }
+}
