@@ -154,6 +154,7 @@ export async function createJobOrder(
       updatedAt: serverTimestamp(),
     })
     console.log("Job Order successfully added with ID:", docRef.id)
+
     return docRef.id
   } catch (error) {
     console.error("Error adding job order to Firestore:", error)

@@ -43,7 +43,7 @@ export default function RegisterPage() {
     }
   }, [user, router])
 
-  // Fetch invitation details when orgCode is present
+  // Fetch invitation details when code is present
   useEffect(() => {
     const fetchInvitationDetails = async () => {
       if (!orgCode) return

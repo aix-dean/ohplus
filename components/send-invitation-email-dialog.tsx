@@ -57,7 +57,7 @@ export function SendInvitationEmailDialog({ open, onOpenChange, code }: SendInvi
     setLoading(true)
 
     try {
-      const registrationUrl = `${window.location.origin}/register?code=${code.code}`
+      const registrationUrl = `${window.location.origin}/register?orgCode=${code.code}`
 
       const response = await fetch("/api/invitations/send-email", {
         method: "POST",
@@ -250,7 +250,7 @@ export function SendInvitationEmailDialog({ open, onOpenChange, code }: SendInvi
                     Click the link below to register your account:
                     <br />
                     <span className="text-blue-600 underline">
-                      {window.location.origin}/register?code={code.code}
+                      {window.location.origin}/register?orgCode={code.code}
                     </span>
                   </p>
 
