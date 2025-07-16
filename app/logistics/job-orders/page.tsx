@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect } from "react"
 import { format } from "date-fns"
-import { Search, MoreHorizontal, X, ClipboardList } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { MoreHorizontal, ClipboardList } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
@@ -19,7 +18,6 @@ import { useRouter } from "next/navigation"
 export default function LogisticsJobOrdersPage() {
   const { user, userData } = useAuth()
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userNames, setUserNames] = useState<Record<string, string>>({})
@@ -105,22 +103,7 @@ export default function LogisticsJobOrdersPage() {
       console.log("User available:", !!user)
       console.log("UserData available:", !!userData)
     }
-  }, [user, userData]) // Updated dependency array
-
-  const filteredJobOrders = useMemo(() => {
-    if (!searchTerm) {
-      return jobOrders
-    }
-    const lowerCaseSearchTerm = searchTerm.toLowerCase()
-    return jobOrders.filter(
-      (jo) =>
-        jo.joNumber?.toLowerCase().includes(lowerCaseSearchTerm) ||
-        jo.siteName?.toLowerCase().includes(lowerCaseSearchTerm) ||
-        jo.joType?.toLowerCase().includes(lowerCaseSearchTerm) ||
-        jo.requestedBy?.toLowerCase().includes(lowerCaseSearchTerm) ||
-        (jo.assignTo && jo.assignTo.toLowerCase().includes(lowerCaseSearchTerm)),
-    )
-  }, [jobOrders, searchTerm])
+  }, [user, userData])
 
   // Helper function to get status color (using joType for now, as no 'status' field exists)
   const getJoTypeColor = (joType: string) => {
@@ -143,16 +126,6 @@ export default function LogisticsJobOrdersPage() {
       <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-3xl font-bold mb-6">Job Orders</h1>
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-            <Input
-              type="text"
-              placeholder="Search job orders..."
-              className="pl-10 pr-8 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500 w-full max-w-md"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <Table>
               <TableHeader>
@@ -241,28 +214,6 @@ export default function LogisticsJobOrdersPage() {
           </Button>
         </div>
 
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-          <Input
-            type="text"
-            placeholder="Search job orders..."
-            className="pl-10 pr-8 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500 w-full max-w-md"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          {searchTerm && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-gray-500 hover:bg-gray-100"
-              onClick={() => setSearchTerm("")}
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Clear search</span>
-            </Button>
-          )}
-        </div>
-
         {/* Debug info for development */}
         {process.env.NODE_ENV === "development" && debugInfo && (
           <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -273,25 +224,21 @@ export default function LogisticsJobOrdersPage() {
           </div>
         )}
 
-        {filteredJobOrders.length === 0 ? (
+        {jobOrders.length === 0 ? (
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="text-center py-12">
               <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 <ClipboardList className="h-8 w-8 text-gray-400" />
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No job orders found</h3>
-              <p className="text-gray-600 mb-6">
-                {searchTerm ? "No job orders match your search criteria." : "No job orders have been created yet."}
-              </p>
-              {!searchTerm && (
-                <Button
-                  onClick={() => router.push("/logistics/job-orders/create")}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  <ClipboardList className="h-4 w-4 mr-2" />
-                  Create Your First Job Order
-                </Button>
-              )}
+              <p className="text-gray-600 mb-6">No job orders have been created yet.</p>
+              <Button
+                onClick={() => router.push("/logistics/job-orders/create")}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Create Your First Job Order
+              </Button>
             </CardContent>
           </Card>
         ) : (
@@ -310,7 +257,7 @@ export default function LogisticsJobOrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredJobOrders.map((jo) => (
+                {jobOrders.map((jo) => (
                   <TableRow
                     key={jo.id}
                     className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
