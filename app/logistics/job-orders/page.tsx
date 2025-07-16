@@ -62,7 +62,7 @@ export default function JobOrdersPage() {
         const { jobOrders: fetchedJobOrders } = await getJobOrdersByCompanyId(userData.company_id)
 
         console.log("DEBUG: Fetched job orders:", fetchedJobOrders)
-        setJobOrders(fetchedJobOrders)
+        setJobOrders(fetchedJobOrders || [])
       } catch (err) {
         console.error("DEBUG: Error fetching job orders:", err)
         setError("Failed to load job orders. Please try again.")
@@ -235,14 +235,14 @@ export default function JobOrdersPage() {
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <Package className="h-12 w-12 text-gray-400 mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            {jobOrders.length === 0 ? "No job orders found" : "No matching job orders"}
+            {(jobOrders || []).length === 0 ? "No job orders found" : "No matching job orders"}
           </h3>
           <p className="text-gray-600 mb-4">
-            {jobOrders.length === 0
+            {(jobOrders || []).length === 0
               ? "No job orders have been created yet."
               : "Try adjusting your search or filter criteria."}
           </p>
-          {jobOrders.length === 0 && (
+          {(jobOrders || []).length === 0 && (
             <Button onClick={() => router.push("/logistics/job-orders/create")}>
               <Plus className="h-4 w-4 mr-2" />
               Create Your First Job Order
