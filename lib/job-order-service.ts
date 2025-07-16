@@ -177,7 +177,6 @@ export async function getQuotationsForSelection(userId: string): Promise<any[]> 
     const q = query(
       quotationsRef,
       where("created_by", "==", userId),
-      where("status", "==", "accepted"),
       orderBy("created", "desc"),
     )
     const querySnapshot = await getDocs(q)
