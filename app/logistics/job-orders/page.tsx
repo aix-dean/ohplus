@@ -106,7 +106,7 @@ export default function JobOrdersPage() {
     }
   }
 
-  const filteredJobOrders = jobOrders.filter((jobOrder) => {
+  const filteredJobOrders = (jobOrders || []).filter((jobOrder) => {
     const matchesSearch =
       jobOrder.joNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       jobOrder.siteName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
