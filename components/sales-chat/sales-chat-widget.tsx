@@ -295,7 +295,7 @@ export function SalesChatWidget({
 
                               {/* Main content container */}
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 w-full">
+                                <div className="flex items-center justify-between gap-2">
                                   {/* Name */}
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium truncate">{thread.receiver_name}</p>
