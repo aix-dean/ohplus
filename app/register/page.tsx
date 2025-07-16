@@ -29,7 +29,7 @@ export default function RegisterPage() {
   const [invitationRole, setInvitationRole] = useState<string | null>(null)
   const [loadingInvitation, setLoadingInvitation] = useState(false)
 
-  const { register, user } = useAuth()
+  const { register, user, userData } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -175,8 +175,8 @@ export default function RegisterPage() {
         orgCode || undefined,
       )
 
-      // Registration successful - redirect to dashboard
-      router.push("/admin/dashboard")
+      // Registration successful - redirect will be handled by useEffect
+      // The redirect logic will be handled after userData is loaded
     } catch (error: unknown) {
       console.error("Registration failed:", error)
       setErrorMessage(getFriendlyErrorMessage(error))
@@ -184,6 +184,32 @@ export default function RegisterPage() {
       setLoading(false)
     }
   }
+
+  // Role-based navigation after registration
+  useEffect(() => {
+    if (user && userData && !loading) {
+      const role = userData.role?.toLowerCase()
+
+      switch (role) {
+        case "admin":
+          router.push("/admin/dashboard")
+          break
+        case "sales":
+          router.push("/sales/dashboard")
+          break
+        case "logistics":
+          router.push("/logistics/dashboard")
+          break
+        case "cms":
+          router.push("/cms/dashboard")
+          break
+        default:
+          // Fallback to admin dashboard for unknown roles
+          router.push("/admin/dashboard")
+          break
+      }
+    }
+  }, [user, userData, loading, router])
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">

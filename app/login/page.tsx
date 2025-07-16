@@ -31,7 +31,7 @@ export default function LoginPage() {
   const [orgCode, setOrgCode] = useState("")
   const [isValidatingCode, setIsValidatingCode] = useState(false)
 
-  const { loginOHPlusOnly, user } = useAuth()
+  const { loginOHPlusOnly, user, userData } = useAuth()
   const router = useRouter()
 
   // Redirect if already logged in
@@ -48,7 +48,7 @@ export default function LoginPage() {
 
     try {
       await loginOHPlusOnly(email, password)
-      router.push("/admin/dashboard")
+      // The redirect will be handled by the useEffect below after userData is loaded
     } catch (error: any) {
       console.error("Login error:", error)
 
@@ -125,6 +125,32 @@ export default function LoginPage() {
       setIsValidatingCode(false)
     }
   }
+
+  // Role-based navigation after login
+  useEffect(() => {
+    if (user && userData && !isLoading) {
+      const role = userData.role?.toLowerCase()
+
+      switch (role) {
+        case "admin":
+          router.push("/admin/dashboard")
+          break
+        case "sales":
+          router.push("/sales/dashboard")
+          break
+        case "logistics":
+          router.push("/logistics/dashboard")
+          break
+        case "cms":
+          router.push("/cms/dashboard")
+          break
+        default:
+          // Fallback to admin dashboard for unknown roles
+          router.push("/admin/dashboard")
+          break
+      }
+    }
+  }, [user, userData, isLoading, router])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white p-4">

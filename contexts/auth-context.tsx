@@ -82,6 +82,7 @@ interface AuthContextType {
   refreshUserData: () => Promise<void>
   refreshSubscriptionData: () => Promise<void>
   assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
+  getRoleDashboardPath: (role: string | null) => string
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -555,6 +556,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe()
   }, [fetchUserData, isRegistering])
 
+  const getRoleDashboardPath = useCallback((role: string | null): string => {
+    if (!role) return "/admin/dashboard"
+
+    const normalizedRole = role.toLowerCase()
+    switch (normalizedRole) {
+      case "admin":
+        return "/admin/dashboard"
+      case "sales":
+        return "/sales/dashboard"
+      case "logistics":
+        return "/logistics/dashboard"
+      case "cms":
+        return "/cms/dashboard"
+      default:
+        return "/admin/dashboard"
+    }
+  }, [])
+
   const value = {
     user,
     userData,
@@ -571,6 +590,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUserData,
     refreshSubscriptionData,
     assignLicenseKey,
+    getRoleDashboardPath,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
