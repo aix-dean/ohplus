@@ -95,9 +95,8 @@ async function calculateImageFitDimensions(
 
 // Helper function to format currency without +/- signs
 function formatCurrency(amount: number): string {
-  return `₱${Math.abs(amount).toLocaleString()}`
+  return `₱${Math.abs(Number(amount) || 0).toLocaleString()}`
 }
-
 export async function generateProposalPDF(proposal: Proposal, returnBase64 = false): Promise<string | void> {
   try {
     // Create new PDF document
