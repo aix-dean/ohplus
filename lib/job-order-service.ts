@@ -18,7 +18,7 @@ export async function getJobOrders(userId: string): Promise<JobOrder[]> {
   try {
     console.log("DEBUG: getJobOrders called with userId:", userId)
     const jobOrdersRef = collection(db, "job_orders")
-    const q = query(jobOrdersRef, where("created_by", "==", userId), orderBy("created", "desc"))
+    const q = query(jobOrdersRef, where("createdBy", "==", userId), orderBy("createdAt", "desc"))
     const querySnapshot = await getDocs(q)
 
     const jobOrders: JobOrder[] = []
@@ -38,11 +38,11 @@ export async function getJobOrders(userId: string): Promise<JobOrder[]> {
         message: data.message || "",
         attachments: data.attachments || [],
         status: data.status || "pending",
-        created: data.created,
-        updated: data.updated,
-        created_by: data.created_by || "",
+        created: data.createdAt,
+        updated: data.updatedAt,
+        created_by: data.createdBy || "",
         company_id: data.company_id || "",
-        quotation_id: data.quotation_id || "",
+        quotation_id: data.quotationId || "",
       })
     })
 
@@ -67,7 +67,7 @@ export async function getJobOrdersByCompanyId(companyId: string): Promise<JobOrd
     const jobOrdersRef = collection(db, "job_orders")
     console.log("DEBUG: Created collection reference")
 
-    const q = query(jobOrdersRef, where("company_id", "==", companyId), orderBy("created", "desc"))
+    const q = query(jobOrdersRef, where("company_id", "==", companyId), orderBy("createdAt", "desc"))
     console.log("DEBUG: Created query with company_id filter")
 
     const querySnapshot = await getDocs(q)
@@ -92,11 +92,11 @@ export async function getJobOrdersByCompanyId(companyId: string): Promise<JobOrd
         message: data.message || "",
         attachments: data.attachments || [],
         status: data.status || "pending",
-        created: data.created,
-        updated: data.updated,
-        created_by: data.created_by || "",
+        created: data.createdAt,
+        updated: data.updatedAt,
+        created_by: data.createdBy || "",
         company_id: data.company_id || "",
-        quotation_id: data.quotation_id || "",
+        quotation_id: data.quotationId || "",
       })
     })
 
@@ -137,11 +137,11 @@ export async function getJobOrderById(jobOrderId: string): Promise<JobOrder | nu
         message: data.message || "",
         attachments: data.attachments || [],
         status: data.status || "pending",
-        created: data.created,
-        updated: data.updated,
-        created_by: data.created_by || "",
+        created: data.createdAt,
+        updated: data.updatedAt,
+        created_by: data.createdBy || "",
         company_id: data.company_id || "",
-        quotation_id: data.quotation_id || "",
+        quotation_id: data.quotationId || "",
       }
     }
 
@@ -160,10 +160,19 @@ export async function createJobOrder(jobOrderData: Partial<JobOrder>): Promise<s
 
     const newJobOrder = {
       ...jobOrderData,
-      created: serverTimestamp(),
-      updated: serverTimestamp(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
       status: jobOrderData.status || "pending",
+      // Map the fields to match database structure
+      createdBy: jobOrderData.created_by,
+      quotationId: jobOrderData.quotation_id,
     }
+
+    // Remove the old field names to avoid duplication
+    delete newJobOrder.created
+    delete newJobOrder.updated
+    delete newJobOrder.created_by
+    delete newJobOrder.quotation_id
 
     console.log("DEBUG: Creating job order with data:", newJobOrder)
     const docRef = await addDoc(collection(db, "job_orders"), newJobOrder)
@@ -184,8 +193,22 @@ export async function updateJobOrder(jobOrderId: string, jobOrderData: Partial<J
     const jobOrderRef = doc(db, "job_orders", jobOrderId)
     const updateData = {
       ...jobOrderData,
-      updated: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     }
+
+    // Map fields to match database structure
+    if (jobOrderData.created_by) {
+      updateData.createdBy = jobOrderData.created_by
+      delete updateData.created_by
+    }
+    if (jobOrderData.quotation_id) {
+      updateData.quotationId = jobOrderData.quotation_id
+      delete updateData.quotation_id
+    }
+
+    // Remove fields that shouldn't be updated
+    delete updateData.created
+    delete updateData.updated
 
     await updateDoc(jobOrderRef, updateData)
     console.log("DEBUG: Job order updated successfully")

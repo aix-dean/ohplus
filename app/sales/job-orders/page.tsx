@@ -1,26 +1,29 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import Link from "next/link"
 import { format } from "date-fns"
-import { Plus, MoreHorizontal } from "lucide-react"
+import { Search, Plus, MoreHorizontal, X } from "lucide-react" // Added X for clear search
+import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Card, CardContent } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Card, CardContent } from "@/components/ui/card" // Added Card and CardContent
+import { Skeleton } from "@/components/ui/skeleton" // Added Skeleton
 import { useAuth } from "@/contexts/auth-context"
 import { getJobOrders } from "@/lib/job-order-service"
 import type { JobOrder } from "@/lib/types/job-order"
-import { useRouter } from "next/navigation"
+import { useRouter } from "next/navigation" // Added useRouter
 
 export default function JobOrdersPage() {
   const { user } = useAuth()
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const router = useRouter()
+  const router = useRouter() // Initialize useRouter
 
   useEffect(() => {
     const fetchJOs = async () => {
@@ -43,6 +46,21 @@ export default function JobOrdersPage() {
     fetchJOs()
   }, [user?.uid])
 
+  const filteredJobOrders = useMemo(() => {
+    if (!searchTerm) {
+      return jobOrders
+    }
+    const lowerCaseSearchTerm = searchTerm.toLowerCase()
+    return jobOrders.filter(
+      (jo) =>
+        jo.joNumber.toLowerCase().includes(lowerCaseSearchTerm) ||
+        jo.siteName.toLowerCase().includes(lowerCaseSearchTerm) ||
+        jo.joType.toLowerCase().includes(lowerCaseSearchTerm) ||
+        jo.requestedBy.toLowerCase().includes(lowerCaseSearchTerm) ||
+        (jo.assignTo && jo.assignTo.toLowerCase().includes(lowerCaseSearchTerm)),
+    )
+  }, [jobOrders, searchTerm])
+
   // Helper function to get status color (using joType for now, as no 'status' field exists)
   const getJoTypeColor = (joType: string) => {
     switch (joType?.toLowerCase()) {
@@ -64,6 +82,16 @@ export default function JobOrdersPage() {
       <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-3xl font-bold mb-6">Job Orders</h1>
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+            <Input
+              type="text"
+              placeholder="Search job orders..."
+              className="pl-10 pr-8 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500 w-full max-w-md"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <Table>
               <TableHeader>
@@ -132,7 +160,29 @@ export default function JobOrdersPage() {
           <h1 className="text-3xl font-bold">Job Orders</h1>
         </div>
 
-        {jobOrders.length === 0 ? (
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+          <Input
+            type="text"
+            placeholder="Search job orders..."
+            className="pl-10 pr-8 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500 w-full max-w-md"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {searchTerm && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-gray-500 hover:bg-gray-100"
+              onClick={() => setSearchTerm("")}
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Clear search</span>
+            </Button>
+          )}
+        </div>
+
+        {filteredJobOrders.length === 0 ? (
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="text-center py-12">
               <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -173,11 +223,11 @@ export default function JobOrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {jobOrders.map((jo) => (
+                {filteredJobOrders.map((jo) => (
                   <TableRow
                     key={jo.id}
                     className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
-                    onClick={() => router.push(`/sales/job-orders/${jo.id}`)}
+                    onClick={() => router.push(`/sales/job-orders/${jo.id}`)} // Placeholder navigation
                   >
                     <TableCell className="font-medium py-3">{jo.joNumber}</TableCell>
                     <TableCell className="py-3">{jo.siteName}</TableCell>
@@ -222,14 +272,13 @@ export default function JobOrdersPage() {
           </Card>
         )}
 
-        <Button
-          onClick={() => router.push("/sales/job-orders/select-quotation")}
-          size="lg"
-          className="rounded-full shadow-lg px-6 py-3 text-lg"
-        >
-          <Plus className="mr-2 h-5 w-5" />
-          Create JO
-        </Button>
+   
+          <Button
+             onClick={() => router.push("/sales/job-orders/select-quotation")} 
+           size="lg" className="rounded-full shadow-lg px-6 py-3 text-lg">
+            <Plus className="mr-2 h-5 w-5" />
+            Create JO
+          </Button>
       </div>
     </div>
   )
