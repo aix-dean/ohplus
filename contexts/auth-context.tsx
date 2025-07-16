@@ -190,10 +190,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       const firebaseUser = userCredential.user
 
-      let companyId = orgCode || null
+      let companyId: string | null = null
+      let projectId: string | null = null
       let assignedRole: RoleType = "admin" // Default role
+      const finalLicenseKey = licenseKey || "FREE_TRIAL" // Default license key
 
-      // If orgCode is provided, find the invitation and get the role
+      // If orgCode is provided, find the invitation and get the company details
       if (orgCode) {
         const invitationsQuery = query(
           collection(db, "invitations"),
@@ -207,6 +209,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const invitationData = invitationDoc.data()
           companyId = invitationData.company_id
           assignedRole = invitationData.role || "admin"
+          projectId = invitationData.project_id || null
 
           // Mark invitation as used
           await updateDoc(invitationDoc.ref, {
@@ -214,7 +217,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             used_by: firebaseUser.uid,
             used_at: serverTimestamp(),
           })
+        } else {
+          throw new Error("Invalid or expired invitation code")
         }
+      } else {
+        // Creating new company - user becomes the project owner
+        companyId = firebaseUser.uid // Use user ID as company ID for new companies
+        projectId = firebaseUser.uid // Use user ID as project ID for new companies
       }
 
       // Create user document
@@ -222,7 +231,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = {
         email: firebaseUser.email,
         uid: firebaseUser.uid,
-        license_key: licenseKey,
+        license_key: finalLicenseKey,
         company_id: companyId,
         role: assignedRole,
         permissions: [],
@@ -234,19 +243,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         middle_name: personalInfo.middle_name,
         phone_number: personalInfo.phone_number,
         gender: personalInfo.gender,
-        project_id: orgCode ? null : firebaseUser.uid,
+        project_id: projectId,
       }
 
       await setDoc(userDocRef, userData)
 
       // Create project if no orgCode (new company)
-      if (!orgCode) {
-        const projectDocRef = doc(db, "projects", firebaseUser.uid)
+      if (!orgCode && companyId && projectId) {
+        const projectDocRef = doc(db, "projects", projectId)
         await setDoc(projectDocRef, {
-          company_name: companyInfo.company_name,
-          company_location: companyInfo.company_location,
+          company_name: companyInfo.company_name || "My Company",
+          company_location: companyInfo.company_location || "",
           project_name: "My First Project",
-          license_key: licenseKey,
+          license_key: finalLicenseKey,
+          created: serverTimestamp(),
+          updated: serverTimestamp(),
+        })
+
+        // Create subscription document for new company
+        const subscriptionDocRef = doc(db, "subscriptions", companyId)
+        await setDoc(subscriptionDocRef, {
+          plan: "free_trial",
+          status: "active",
           created: serverTimestamp(),
           updated: serverTimestamp(),
         })
