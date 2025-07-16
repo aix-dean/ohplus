@@ -209,3 +209,62 @@ export async function getJobOrders(userId: string): Promise<JobOrder[]> {
     throw error
   }
 }
+
+export async function getJobOrdersByCompanyId(companyId: string): Promise<JobOrder[]> {
+  try {
+    console.log("DEBUG: getJobOrdersByCompanyId called with companyId:", companyId)
+
+    if (!companyId) {
+      console.log("DEBUG: No companyId provided")
+      return []
+    }
+
+    const jobOrdersRef = collection(db, "job_orders")
+    console.log("DEBUG: Created collection reference")
+
+    const q = query(jobOrdersRef, where("company_id", "==", companyId), orderBy("createdAt", "desc"))
+    console.log("DEBUG: Created query with company_id filter")
+
+    const querySnapshot = await getDocs(q)
+    console.log("DEBUG: Query executed, got", querySnapshot.size, "documents")
+
+    const jobOrders: JobOrder[] = []
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      console.log("DEBUG: Processing document", doc.id, "with data:", data)
+
+      jobOrders.push({
+        id: doc.id,
+        joNumber: data.joNumber || "",
+        siteName: data.siteName || "",
+        siteLocation: data.siteLocation || "",
+        joType: data.joType || "",
+        requestedBy: data.requestedBy || "",
+        assignTo: data.assignTo || "",
+        dateRequested: data.dateRequested,
+        deadline: data.deadline,
+        jobDescription: data.jobDescription || "",
+        message: data.message || "",
+        attachments: data.attachments || [],
+        status: data.status || "pending",
+        created: data.createdAt,
+        updated: data.updatedAt,
+        created_by: data.createdBy || "",
+        company_id: data.company_id || "",
+        quotation_id: data.quotationId || "",
+      })
+    })
+
+    console.log("DEBUG: getJobOrdersByCompanyId returning", jobOrders.length, "job orders")
+    console.log("DEBUG: Job orders:", jobOrders)
+    return jobOrders
+  } catch (error) {
+    console.error("Error fetching job orders by company ID:", error)
+    console.error("Error details:", {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    })
+    throw error
+  }
+}
