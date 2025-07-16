@@ -11,7 +11,10 @@ import {
   serverTimestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import type { JobOrder } from "@/lib/types/job-order"
+import type { Quotation } from "./types/quotation"
+import type { JobOrder, JobOrderStatus } from "./types/job-order"
+import type { Product } from "./firebase-service"
+import type { Client } from "./client-service"
 
 
 const JOB_ORDERS_COLLECTION = "job_orders"
