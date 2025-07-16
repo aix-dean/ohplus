@@ -166,7 +166,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         )
       }
 
-      console.log("Fetched user data:", fetchedUserData)
+      console.log("Final fetchedUserData with roles:", fetchedUserData)
+      console.log("Roles array:", fetchedUserData.roles)
+      console.log("Legacy role:", fetchedUserData.role)
+
       setUserData(fetchedUserData)
 
       if (fetchedUserData.project_id) {
@@ -569,14 +572,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchUserData, isRegistering])
 
   const getRoleDashboardPath = useCallback((roles: RoleType[]): string => {
-    if (!roles || roles.length === 0) return "/admin/dashboard"
+    console.log("getRoleDashboardPath called with roles:", roles)
+
+    if (!roles || roles.length === 0) {
+      console.log("No roles found, defaulting to admin dashboard")
+      return "/admin/dashboard"
+    }
 
     // Priority order: admin > sales > logistics > cms
-    if (roles.includes("admin")) return "/admin/dashboard"
-    if (roles.includes("sales")) return "/sales/dashboard"
-    if (roles.includes("logistics")) return "/logistics/dashboard"
-    if (roles.includes("cms")) return "/cms/dashboard"
+    if (roles.includes("admin")) {
+      console.log("Admin role found, redirecting to admin dashboard")
+      return "/admin/dashboard"
+    }
+    if (roles.includes("sales")) {
+      console.log("Sales role found, redirecting to sales dashboard")
+      return "/sales/dashboard"
+    }
+    if (roles.includes("logistics")) {
+      console.log("Logistics role found, redirecting to logistics dashboard")
+      return "/logistics/dashboard"
+    }
+    if (roles.includes("cms")) {
+      console.log("CMS role found, redirecting to cms dashboard")
+      return "/cms/dashboard"
+    }
 
+    console.log("No matching roles found, defaulting to admin dashboard")
     return "/admin/dashboard"
   }, [])
 
