@@ -29,7 +29,7 @@ export default function RegisterPage() {
   const [invitationRole, setInvitationRole] = useState<string | null>(null)
   const [loadingInvitation, setLoadingInvitation] = useState(false)
 
-  const { register, user, userData } = useAuth()
+  const { register, user, userData, getRoleDashboardPath } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -188,36 +188,35 @@ export default function RegisterPage() {
   // Role-based navigation after registration
   useEffect(() => {
     if (user && userData && !loading) {
-      // Use the roles array from user_roles collection instead of the legacy role field
-      const userRoles = userData.roles || []
-
-      console.log("User roles for navigation after registration:", userRoles)
-
-      if (userRoles.length === 0) {
-        console.log("No roles found, redirecting to admin dashboard")
-        router.push("/admin/dashboard")
-        return
-      }
-
-      // Priority order: admin > sales > logistics > cms
-      if (userRoles.includes("admin")) {
-        console.log("Admin role found, redirecting to admin dashboard")
-        router.push("/admin/dashboard")
-      } else if (userRoles.includes("sales")) {
-        console.log("Sales role found, redirecting to sales dashboard")
-        router.push("/sales/dashboard")
-      } else if (userRoles.includes("logistics")) {
-        console.log("Logistics role found, redirecting to logistics dashboard")
-        router.push("/logistics/dashboard")
-      } else if (userRoles.includes("cms")) {
-        console.log("CMS role found, redirecting to cms dashboard")
-        router.push("/cms/dashboard")
+      // Use the new roles array from user_roles collection
+      if (userData.roles && userData.roles.length > 0) {
+        const dashboardPath = getRoleDashboardPath(userData.roles)
+        router.push(dashboardPath)
       } else {
-        console.log("Unknown roles, redirecting to admin dashboard")
-        router.push("/admin/dashboard")
+        // Fallback to legacy role field if no roles in array
+        const role = userData.role?.toLowerCase()
+
+        switch (role) {
+          case "admin":
+            router.push("/admin/dashboard")
+            break
+          case "sales":
+            router.push("/sales/dashboard")
+            break
+          case "logistics":
+            router.push("/logistics/dashboard")
+            break
+          case "cms":
+            router.push("/cms/dashboard")
+            break
+          default:
+            // Fallback to admin dashboard for unknown roles
+            router.push("/admin/dashboard")
+            break
+        }
       }
     }
-  }, [user, userData, loading, router])
+  }, [user, userData, loading, router, getRoleDashboardPath])
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">

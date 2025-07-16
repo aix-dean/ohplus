@@ -31,7 +31,7 @@ export default function LoginPage() {
   const [orgCode, setOrgCode] = useState("")
   const [isValidatingCode, setIsValidatingCode] = useState(false)
 
-  const { loginOHPlusOnly, user, userData } = useAuth()
+  const { loginOHPlusOnly, user, userData, getRoleDashboardPath } = useAuth()
   const router = useRouter()
 
   // Redirect if already logged in
@@ -129,36 +129,35 @@ export default function LoginPage() {
   // Role-based navigation after login
   useEffect(() => {
     if (user && userData && !isLoading) {
-      // Use the roles array from user_roles collection instead of the legacy role field
-      const userRoles = userData.roles || []
-
-      console.log("User roles for navigation:", userRoles)
-
-      if (userRoles.length === 0) {
-        console.log("No roles found, redirecting to admin dashboard")
-        router.push("/admin/dashboard")
-        return
-      }
-
-      // Priority order: admin > sales > logistics > cms
-      if (userRoles.includes("admin")) {
-        console.log("Admin role found, redirecting to admin dashboard")
-        router.push("/admin/dashboard")
-      } else if (userRoles.includes("sales")) {
-        console.log("Sales role found, redirecting to sales dashboard")
-        router.push("/sales/dashboard")
-      } else if (userRoles.includes("logistics")) {
-        console.log("Logistics role found, redirecting to logistics dashboard")
-        router.push("/logistics/dashboard")
-      } else if (userRoles.includes("cms")) {
-        console.log("CMS role found, redirecting to cms dashboard")
-        router.push("/cms/dashboard")
+      // Use the new roles array from user_roles collection
+      if (userData.roles && userData.roles.length > 0) {
+        const dashboardPath = getRoleDashboardPath(userData.roles)
+        router.push(dashboardPath)
       } else {
-        console.log("Unknown roles, redirecting to admin dashboard")
-        router.push("/admin/dashboard")
+        // Fallback to legacy role field if no roles in array
+        const role = userData.role?.toLowerCase()
+
+        switch (role) {
+          case "admin":
+            router.push("/admin/dashboard")
+            break
+          case "sales":
+            router.push("/sales/dashboard")
+            break
+          case "logistics":
+            router.push("/logistics/dashboard")
+            break
+          case "cms":
+            router.push("/cms/dashboard")
+            break
+          default:
+            // Fallback to admin dashboard for unknown roles
+            router.push("/admin/dashboard")
+            break
+        }
       }
     }
-  }, [user, userData, isLoading, router])
+  }, [user, userData, isLoading, router, getRoleDashboardPath])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white p-4">
