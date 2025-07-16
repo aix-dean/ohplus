@@ -164,50 +164,14 @@ export function SalesChatWidget({
     }, 0)
   }
 
-  // Helper function to safely get last message text
-  const getLastMessageText = (thread: SalesThread): string => {
-    if (!thread.lastMessage) return "No messages yet"
-
-    // Handle case where lastMessage might be an object or string
-    if (typeof thread.lastMessage === "string") {
-      return thread.lastMessage
-    }
-
-    if (typeof thread.lastMessage === "object" && thread.lastMessage.text) {
-      return thread.lastMessage.text || "No messages yet"
-    }
-
-    return "No messages yet"
-  }
-
-  // Helper function to safely get last message timestamp
-  const getLastMessageTime = (thread: SalesThread): Date | null => {
-    if (!thread.lastMessage) return null
-
-    // Handle case where lastMessage might be an object
-    if (typeof thread.lastMessage === "object" && thread.lastMessage.timestamp) {
-      if (thread.lastMessage.timestamp.toDate) {
-        return thread.lastMessage.timestamp.toDate()
-      }
-    }
-
-    // Fallback to thread creation time
-    if (thread.createdAt && thread.createdAt.toDate) {
-      return thread.createdAt.toDate()
-    }
-
-    return null
-  }
-
   const filteredThreads = threads.filter((thread) => {
     // Get the other participant (not the current user)
     const otherParticipant = thread.participants.find((p) => p !== user?.uid)
     const displayName = thread.receiver_name || "Customer"
-    const lastMessageText = getLastMessageText(thread)
 
     return (
       displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lastMessageText.toLowerCase().includes(searchTerm.toLowerCase())
+      thread.lastMessage?.toLowerCase().includes(searchTerm.toLowerCase())
     )
   })
 
@@ -227,7 +191,7 @@ export function SalesChatWidget({
       {/* The floating button div has been completely removed from here. */}
       {/* Chat Dialog */}
       {isOpen && (
-        <div className="fixed bottom-10 right-20 z-40 w-80 h-[28rem]">
+        <div className="fixed bottom-20 right-20 z-40 w-80 h-[28rem]">
           <Card className="h-full flex flex-col shadow-xl">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -274,64 +238,43 @@ export function SalesChatWidget({
                     </div>
                   ) : (
                     <div className="space-y-1 p-2">
-                      {filteredThreads.map((thread) => {
-                        const lastMessageTime = getLastMessageTime(thread)
-                        const lastMessageText = getLastMessageText(thread)
-
-                        return (
-                          <div
-                            key={thread.id}
-                            className={`p-3 rounded-lg cursor-pointer hover:bg-accent transition-colors ${
-                              activeThread?.id === thread.id ? "bg-accent" : ""
-                            }`}
-                            onClick={() => {
-                              setActiveThread(thread)
-                              setView("chat")
-                            }}
-                          >
-                            <div className="flex items-start space-x-3">
-                              <Avatar className="h-8 w-8 flex-shrink-0">
-                                <AvatarImage src={thread.receiver_photo_url || "/placeholder.svg"} />
-                                <AvatarFallback>{thread.receiver_name?.charAt(0) || "C"}</AvatarFallback>
-                              </Avatar>
-
-                              {/* Main content container with proper overflow handling */}
-                              <div className="flex-1 min-w-0 overflow-hidden">
-                                <div className="flex items-start justify-between gap-2 mb-1">
-                                  {/* Name container with proper text handling */}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-foreground leading-tight break-words line-clamp-1">
-                                      {thread.receiver_name || "Customer"}
-                                    </p>
-                                  </div>
-
-                                  {/* Time & Priority container */}
-                                  <div className="flex flex-col items-end gap-1 flex-shrink-0 ml-2">
-                                    {lastMessageTime && (
-                                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                        {formatDistanceToNow(lastMessageTime, { addSuffix: true })}
-                                      </span>
-                                    )}
-                                    {thread.priority && (
-                                      <Badge
-                                        variant={getPriorityColor(thread.priority) as any}
-                                        className="text-xs h-4 px-1"
-                                      >
-                                        {thread.priority}
-                                      </Badge>
-                                    )}
-                                  </div>
+                      {filteredThreads.map((thread) => (
+                        <div
+                          key={thread.id}
+                          className={`p-3 rounded-lg cursor-pointer hover:bg-accent transition-colors ${
+                            activeThread?.id === thread.id ? "bg-accent" : ""
+                          }`}
+                          onClick={() => {
+                            setActiveThread(thread)
+                            setView("chat")
+                          }}
+                        >
+                          <div className="flex items-start space-x-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={thread.receiver_photo_url || "/placeholder.svg"} />
+                              <AvatarFallback>{thread.receiver_name?.charAt(0) || "C"}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-medium truncate">{thread.receiver_name}</p>
+                                <div className="flex items-center space-x-1">
+                                  {thread.priority && (
+                                    <Badge variant={getPriorityColor(thread.priority) as any} className="text-xs">
+                                      {thread.priority}
+                                    </Badge>
+                                  )}
+                                  {thread.lastMessageTimestamp && thread.lastMessageTimestamp.toDate && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {formatDistanceToNow(thread.lastMessageTimestamp.toDate(), { addSuffix: true })}
+                                    </span>
+                                  )}
                                 </div>
-
-                                {/* Last message with proper truncation */}
-                                <p className="text-xs text-muted-foreground line-clamp-1 break-words">
-                                  {lastMessageText}
-                                </p>
                               </div>
+                              <p className="text-xs text-muted-foreground truncate">{thread.lastMessage}</p>
                             </div>
                           </div>
-                        )
-                      })}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </ScrollArea>
@@ -347,17 +290,15 @@ export function SalesChatWidget({
                         onClick={() => handleStartChat(customer)}
                       >
                         <div className="flex items-center space-x-3">
-                          <Avatar className="h-8 w-8 flex-shrink-0">
+                          <Avatar className="h-8 w-8">
                             <AvatarImage src={customer.photoUrl || "/placeholder.svg"} />
                             <AvatarFallback>{customer.name.charAt(0)}</AvatarFallback>
                           </Avatar>
-                          <div className="flex-1 min-w-0 overflow-hidden">
-                            <p className="text-sm font-medium line-clamp-1 break-words">{customer.name}</p>
-                            <p className="text-xs text-muted-foreground line-clamp-1 break-words">
-                              {customer.role || "Customer"}
-                            </p>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium">{customer.name}</p>
+                            <p className="text-xs text-muted-foreground">{customer.role || "Customer"}</p>
                           </div>
-                          <div className="flex items-center space-x-2 flex-shrink-0">
+                          <div className="flex items-center space-x-2">
                             <div className="h-2 w-2 bg-green-400 rounded-full" />
                             <span className="text-xs text-muted-foreground">Online</span>
                           </div>
@@ -372,22 +313,22 @@ export function SalesChatWidget({
                 <div className="h-full flex flex-col">
                   {/* Chat Header */}
                   <div className="p-3 border-b flex items-center justify-between">
-                    <div className="flex items-center space-x-2 min-w-0 flex-1">
-                      <Button variant="ghost" size="sm" onClick={() => setView("threads")} className="flex-shrink-0">
+                    <div className="flex items-center space-x-2">
+                      <Button variant="ghost" size="sm" onClick={() => setView("threads")}>
                         ←
                       </Button>
-                      <Avatar className="h-6 w-6 flex-shrink-0">
+                      <Avatar className="h-6 w-6">
                         <AvatarImage src={activeThread.receiver_photo_url || "/placeholder.svg"} />
                         <AvatarFallback>{activeThread.receiver_name?.charAt(0) || "C"}</AvatarFallback>
                       </Avatar>
-                      <div className="min-w-0 flex-1 overflow-hidden">
-                        <p className="text-sm font-medium line-clamp-1 break-words">{activeThread.receiver_name}</p>
+                      <div>
+                        <p className="text-sm font-medium">{activeThread.receiver_name}</p>
                         <p className="text-xs text-muted-foreground">Customer</p>
                       </div>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="flex-shrink-0">
+                        <Button variant="ghost" size="sm">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>

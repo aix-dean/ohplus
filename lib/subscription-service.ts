@@ -219,7 +219,7 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
       id: "solo",
       name: "Solo Plan",
       description: "Ideal for first time users and media owners with 1-3 OOH sites.",
-      price: 1500,
+      price: 1380,
       billingCycle: "monthly",
       features: [
         "Manage up to 3 sites",
@@ -247,8 +247,8 @@ export const getSubscriptionPlans = (): SubscriptionPlan[] => {
       id: "membership",
       name: "Membership",
       description: "Access exclusive perks and features from OH!Plus.",
-      price: 30000,
-      billingCycle: "annually",
+      price: 3120,
+      billingCycle: "monthly",
       features: [
         "Manage up to 8 sites",
         "FREE Listing to OOH Marketplaces",

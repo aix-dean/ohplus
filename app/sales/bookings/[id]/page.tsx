@@ -307,7 +307,7 @@ export default function BookingDetailsPage() {
               <Button
                 onClick={handleChatWithCustomer}
                 disabled={chatLoading || !booking?.user_id}
-                className="flex items-center gap-2 bg-transparent"
+                className="flex items-center gap-2"
                 variant="outline"
               >
                 <MessageCircle className="h-4 w-4" />
