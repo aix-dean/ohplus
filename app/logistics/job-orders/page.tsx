@@ -1,270 +1,226 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
-import { format } from "date-fns"
-import { Search, MoreHorizontal, X, ClipboardList } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Card, CardContent } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
+import { useState, useEffect } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { getJobOrdersByCompanyId } from "@/lib/job-order-service"
 import type { JobOrder } from "@/lib/types/job-order"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Search, Plus, MoreHorizontal, Eye, Edit, UserCheck } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 export default function LogisticsJobOrdersPage() {
-  const { user, userData } = useAuth()
-  const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
+  const { user } = useAuth()
   const router = useRouter()
+  const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
+  const [filteredJobOrders, setFilteredJobOrders] = useState<JobOrder[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
 
   useEffect(() => {
-    const fetchJOs = async () => {
-      if (!user?.uid || !userData?.company_id) {
-        setError("User not authenticated or company not found.")
-        setLoading(false)
-        return
-      }
-      try {
-        setLoading(true)
-        const fetchedJOs = await getJobOrdersByCompanyId(userData.company_id)
-        setJobOrders(fetchedJOs)
-      } catch (err) {
-        console.error("Failed to fetch job orders:", err)
-        setError("Failed to load job orders. Please try again.")
-      } finally {
-        setLoading(false)
-      }
+    if (user?.company_id) {
+      fetchJobOrders()
     }
-    fetchJOs()
-  }, [user?.uid, userData?.company_id])
+  }, [user])
 
-  const filteredJobOrders = useMemo(() => {
+  useEffect(() => {
+    filterJobOrders()
+  }, [searchTerm, jobOrders])
+
+  const fetchJobOrders = async () => {
+    try {
+      setLoading(true)
+      if (user?.company_id) {
+        const orders = await getJobOrdersByCompanyId(user.company_id)
+        setJobOrders(orders)
+      }
+    } catch (error) {
+      console.error("Error fetching job orders:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filterJobOrders = () => {
     if (!searchTerm) {
-      return jobOrders
+      setFilteredJobOrders(jobOrders)
+      return
     }
-    const lowerCaseSearchTerm = searchTerm.toLowerCase()
-    return jobOrders.filter(
-      (jo) =>
-        jo.joNumber.toLowerCase().includes(lowerCaseSearchTerm) ||
-        jo.siteName.toLowerCase().includes(lowerCaseSearchTerm) ||
-        jo.joType.toLowerCase().includes(lowerCaseSearchTerm) ||
-        jo.requestedBy.toLowerCase().includes(lowerCaseSearchTerm) ||
-        (jo.assignTo && jo.assignTo.toLowerCase().includes(lowerCaseSearchTerm)),
-    )
-  }, [jobOrders, searchTerm])
 
-  // Helper function to get status color (using joType for now, as no 'status' field exists)
-  const getJoTypeColor = (joType: string) => {
-    switch (joType?.toLowerCase()) {
-      case "installation":
-        return "bg-blue-100 text-blue-800 border-blue-200"
-      case "maintenance":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200"
-      case "repair":
-        return "bg-red-100 text-red-800 border-red-200"
-      case "dismantling":
-        return "bg-gray-100 text-gray-800 border-gray-200"
+    const filtered = jobOrders.filter(
+      (order) =>
+        order.joNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.joType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.requestedBy.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.assignTo.toLowerCase().includes(searchTerm.toLowerCase()),
+    )
+    setFilteredJobOrders(filtered)
+  }
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case "completed":
+        return "default"
+      case "pending":
+        return "secondary"
+      case "in_progress":
+        return "outline"
+      case "cancelled":
+        return "destructive"
       default:
-        return "bg-purple-100 text-purple-800 border-purple-200"
+        return "secondary"
     }
+  }
+
+  const getTypeBadgeColor = (type: string) => {
+    switch (type.toLowerCase()) {
+      case "installation":
+        return "bg-blue-100 text-blue-800"
+      case "maintenance":
+        return "bg-green-100 text-green-800"
+      case "repair":
+        return "bg-red-100 text-red-800"
+      case "dismantling":
+        return "bg-orange-100 text-orange-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return "N/A"
+
+    let date: Date
+    if (timestamp.toDate) {
+      date = timestamp.toDate()
+    } else if (timestamp instanceof Date) {
+      date = timestamp
+    } else {
+      date = new Date(timestamp)
+    }
+
+    return date.toLocaleDateString()
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold mb-6">Job Orders</h1>
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-            <Input
-              type="text"
-              placeholder="Search job orders..."
-              className="pl-10 pr-8 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500 w-full max-w-md"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <Card className="border-gray-200 shadow-sm rounded-xl">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50 border-b border-gray-200">
-                  <TableHead className="font-semibold text-gray-900 py-3">JO #</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Site</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Date Requested</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">JO Type</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Deadline</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Requested By</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Assigned To</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3 w-[50px] text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array(5)
-                  .fill(0)
-                  .map((_, i) => (
-                    <TableRow key={i} className="border-b border-gray-100">
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-20" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-32" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-20" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-28" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-8 ml-auto" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </Card>
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] text-red-500">
-        <p>{error}</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+    <div className="container mx-auto p-6">
+      <div className="flex justify-between items-center mb-6">
+        <div>
           <h1 className="text-3xl font-bold">Job Orders</h1>
-          <Button
-            onClick={() => router.push("/logistics/job-orders/create")}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <ClipboardList className="h-4 w-4 mr-2" />
-            Create JO
-          </Button>
+          <p className="text-muted-foreground">Manage and track job orders for your company</p>
         </div>
-
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-          <Input
-            type="text"
-            placeholder="Search job orders..."
-            className="pl-10 pr-8 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500 w-full max-w-md"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          {searchTerm && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-gray-500 hover:bg-gray-100"
-              onClick={() => setSearchTerm("")}
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Clear search</span>
-            </Button>
-          )}
-        </div>
-
-        {filteredJobOrders.length === 0 ? (
-          <Card className="border-gray-200 shadow-sm rounded-xl">
-            <CardContent className="text-center py-12">
-              <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <ClipboardList className="h-8 w-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No job orders found</h3>
-              <p className="text-gray-600 mb-6">
-                {searchTerm ? "No job orders match your search criteria." : "No job orders have been created yet."}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50 border-b border-gray-200">
-                  <TableHead className="font-semibold text-gray-900 py-3">JO #</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Site</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Date Requested</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">JO Type</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Deadline</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Requested By</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Assigned To</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3 w-[50px] text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredJobOrders.map((jo) => (
-                  <TableRow
-                    key={jo.id}
-                    className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
-                    onClick={() => router.push(`/logistics/job-orders/${jo.id}`)}
-                  >
-                    <TableCell className="font-medium py-3">{jo.joNumber}</TableCell>
-                    <TableCell className="py-3">{jo.siteName}</TableCell>
-                    <TableCell className="py-3">
-                      <Badge variant="outline" className="border font-medium bg-gray-100 text-gray-800 border-gray-200">
-                        {jo.dateRequested ? format(new Date(jo.dateRequested), "MMM d, yyyy") : "N/A"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Badge variant="outline" className={`${getJoTypeColor(jo.joType)} border font-medium`}>
-                        {jo.joType}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Badge variant="outline" className="border font-medium bg-gray-100 text-gray-800 border-gray-200">
-                        {jo.deadline ? format(new Date(jo.deadline), "MMM d, yyyy") : "N/A"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3">{jo.requestedBy}</TableCell>
-                    <TableCell className="py-3">{jo.assignTo || "Unassigned"}</TableCell>
-                    <TableCell className="text-right py-3">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => router.push(`/logistics/job-orders/${jo.id}`)}>
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => alert(`Edit JO ${jo.joNumber}`)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => alert(`Assign JO ${jo.joNumber}`)}>Assign</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        )}
+        <Button onClick={() => router.push("/logistics/job-orders/create")} className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Create Job Order
+        </Button>
       </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Search job orders..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {filteredJobOrders.length} of {jobOrders.length} job orders
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {filteredJobOrders.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No job orders found</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-2 font-medium">JO Number</th>
+                    <th className="text-left p-2 font-medium">Site Name</th>
+                    <th className="text-left p-2 font-medium">Type</th>
+                    <th className="text-left p-2 font-medium">Requested By</th>
+                    <th className="text-left p-2 font-medium">Assigned To</th>
+                    <th className="text-left p-2 font-medium">Date Requested</th>
+                    <th className="text-left p-2 font-medium">Deadline</th>
+                    <th className="text-left p-2 font-medium">Status</th>
+                    <th className="text-left p-2 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredJobOrders.map((order) => (
+                    <tr key={order.id} className="border-b hover:bg-muted/50">
+                      <td className="p-2">
+                        <Link
+                          href={`/logistics/job-orders/${order.id}`}
+                          className="font-medium text-primary hover:underline"
+                        >
+                          {order.joNumber}
+                        </Link>
+                      </td>
+                      <td className="p-2">{order.siteName}</td>
+                      <td className="p-2">
+                        <Badge className={getTypeBadgeColor(order.joType)}>{order.joType}</Badge>
+                      </td>
+                      <td className="p-2">{order.requestedBy}</td>
+                      <td className="p-2">{order.assignTo}</td>
+                      <td className="p-2">{formatDate(order.dateRequested)}</td>
+                      <td className="p-2">{formatDate(order.deadline)}</td>
+                      <td className="p-2">
+                        <Badge variant={getStatusBadgeVariant(order.status)}>{order.status.replace("_", " ")}</Badge>
+                      </td>
+                      <td className="p-2">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => router.push(`/logistics/job-orders/${order.id}`)}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => router.push(`/logistics/job-orders/${order.id}/edit`)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <UserCheck className="h-4 w-4 mr-2" />
+                              Assign
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

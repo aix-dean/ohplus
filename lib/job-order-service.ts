@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { JobOrder } from "@/lib/types/job-order"
+import type { Quotation } from "@/lib/types/quotation"
 
 // Get all job orders for a specific user
 export async function getJobOrders(userId: string): Promise<JobOrder[]> {
@@ -157,6 +158,29 @@ export async function updateJobOrder(jobOrderId: string, jobOrderData: Partial<J
     await updateDoc(jobOrderRef, updateData)
   } catch (error) {
     console.error("Error updating job order:", error)
+    throw error
+  }
+}
+
+// Get all quotations for selection (if not already imported from quotation service)
+export async function getQuotationsForSelection(userId: string): Promise<Quotation[]> {
+  try {
+    const quotationsRef = collection(db, "quotations")
+    const q = query(quotationsRef, where("created_by", "==", userId), orderBy("created", "desc"))
+    const querySnapshot = await getDocs(q)
+
+    const quotations: Quotation[] = []
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      quotations.push({
+        id: doc.id,
+        ...data,
+      } as Quotation)
+    })
+
+    return quotations
+  } catch (error) {
+    console.error("Error fetching quotations for selection:", error)
     throw error
   }
 }
