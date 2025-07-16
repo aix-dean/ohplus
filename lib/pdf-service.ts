@@ -94,8 +94,11 @@ async function calculateImageFitDimensions(
 }
 
 // Helper function to format currency without +/- signs
-function formatCurrency(amount: number): string {
-  return `₱${Math.abs(Number(amount) || 0).toLocaleString()}`
+function formatCurrency(amount: number | string): string {
+  // Convert to number and ensure it's positive
+  const numAmount = typeof amount === "string" ? Number.parseFloat(amount.replace(/[^\d.-]/g, "")) : amount
+  const cleanAmount = Math.abs(Number(numAmount) || 0)
+  return `₱${cleanAmount.toLocaleString()}`
 }
 export async function generateProposalPDF(proposal: Proposal, returnBase64 = false): Promise<string | void> {
   try {
@@ -286,7 +289,10 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
         pdf.text(`${index + 1}. ${product.name || "Unnamed Product"}`, margin, yPosition)
 
         // Price on the right without +/- signs
-        const price = typeof product.price === "string" ? Number.parseFloat(product.price) || 0 : product.price || 0
+        const price =
+          typeof product.price === "string"
+            ? Number.parseFloat(product.price.replace(/[^\d.-]/g, ""))
+            : product.price || 0
         const priceText = formatCurrency(price)
         const priceWidth = pdf.getTextWidth(priceText)
         pdf.text(priceText, pageWidth - margin - priceWidth, yPosition)
@@ -832,7 +838,7 @@ export async function generateReportPDF(
           width = height * aspectRatio
           if (width > maxWidth) {
             width = maxWidth
-            height = width / aspectRatio
+            height = height / aspectRatio
           }
         }
 
