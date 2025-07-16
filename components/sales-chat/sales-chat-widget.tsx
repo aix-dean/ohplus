@@ -296,9 +296,9 @@ export function SalesChatWidget({
                               </Avatar>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium truncate">{thread.receiver_name}</p>
-                                  </div>
+                              
+                                    <p className="text-sm font-medium truncate flex-1 min-w-0">{thread.receiver_name}</p>
+                              
                                   <div className="flex items-center gap-1 shrink-0 max-w-[40%] text-right">
                                     {thread.priority && (
                                       <Badge variant={getPriorityColor(thread.priority) as any} className="text-xs whitespace-nowrap">
