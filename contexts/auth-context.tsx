@@ -11,8 +11,6 @@ import {
 } from "firebase/auth"
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
-import { subscriptionService } from "@/lib/subscription-service"
-import type { Subscription } from "@/lib/types/subscription"
 import { generateLicenseKey } from "@/lib/utils"
 import { assignRoleToUser, getUserRoles, type RoleType } from "@/lib/hardcoded-access-service"
 
@@ -57,7 +55,6 @@ interface AuthContextType {
   user: FirebaseUser | null
   userData: UserData | null
   projectData: ProjectData | null
-  subscriptionData: Subscription | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   loginOHPlusOnly: (email: string, password: string) => Promise<void>
@@ -82,7 +79,6 @@ interface AuthContextType {
   updateUserData: (updates: Partial<UserData>) => Promise<void>
   updateProjectData: (updates: Partial<ProjectData>) => Promise<void>
   refreshUserData: () => Promise<void>
-  refreshSubscriptionData: () => Promise<void>
   assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
   getRoleDashboardPath: (roles: RoleType[]) => string | null
   hasRole: (requiredRoles: RoleType | RoleType[]) => boolean
@@ -94,7 +90,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
-  const [subscriptionData, setSubscriptionData] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
   const [isRegistering, setIsRegistering] = useState(false)
 
@@ -205,36 +200,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log("No project_id found in user data")
         setProjectData(null)
       }
-
-      // Fetch subscription data - first try by license_key, then by company_id
-      let subscription = null
-
-      if (fetchedUserData.license_key) {
-        console.log("Fetching subscription data for license_key:", fetchedUserData.license_key)
-        try {
-          subscription = await subscriptionService.getSubscriptionByLicenseKey(fetchedUserData.license_key)
-        } catch (subscriptionError) {
-          console.error("Error fetching subscription by license_key:", subscriptionError)
-        }
-      }
-
-      // If no subscription found by license_key and user has company_id, try by company_id
-      if (!subscription && fetchedUserData.company_id) {
-        console.log("No subscription found by license_key, trying company_id:", fetchedUserData.company_id)
-        try {
-          subscription = await subscriptionService.getSubscriptionByCompanyId(fetchedUserData.company_id)
-        } catch (subscriptionError) {
-          console.error("Error fetching subscription by company_id:", subscriptionError)
-        }
-      }
-
-      console.log("Final subscription data:", subscription)
-      setSubscriptionData(subscription)
     } catch (error) {
       console.error("Error fetching user data or subscription:", error)
       setUserData(null)
       setProjectData(null)
-      setSubscriptionData(null)
     }
   }, [])
 
@@ -244,57 +213,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user, fetchUserData])
 
-  const refreshSubscriptionData = useCallback(async () => {
-    if (userData?.license_key) {
-      console.log("Refreshing subscription data for license_key:", userData.license_key)
-      try {
-        let subData = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
+  const assignLicenseKey = useCallback(async (uid: string, licenseKey: string) => {
+    try {
+      console.log("Assigning license key:", licenseKey, "to user:", uid)
 
-        // If no subscription found by license_key and user has company_id, try by company_id
-        if (!subData && userData.company_id) {
-          console.log("No subscription found by license_key, trying company_id:", userData.company_id)
-          subData = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
-        }
+      const userDocRef = doc(db, "iboard_users", uid)
+      await setDoc(userDocRef, { license_key: licenseKey }, { merge: true })
 
-        setSubscriptionData(subData)
-      } catch (error) {
-        console.error("Error refreshing subscription data:", error)
-        setSubscriptionData(null)
-      }
-    } else if (userData?.company_id) {
-      console.log("No license_key, trying to refresh subscription by company_id:", userData.company_id)
-      try {
-        const subData = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
-        setSubscriptionData(subData)
-      } catch (error) {
-        console.error("Error refreshing subscription data by company_id:", error)
-        setSubscriptionData(null)
-      }
-    } else {
-      console.log("No license_key or company_id available for subscription refresh")
-      setSubscriptionData(null)
+      setUserData((prev) => (prev ? { ...prev, license_key: licenseKey } : null))
+
+      console.log("License key assigned successfully")
+    } catch (error) {
+      console.error("Error assigning license key:", error)
+      throw error
     }
-  }, [userData])
-
-  const assignLicenseKey = useCallback(
-    async (uid: string, licenseKey: string) => {
-      try {
-        console.log("Assigning license key:", licenseKey, "to user:", uid)
-
-        const userDocRef = doc(db, "iboard_users", uid)
-        await setDoc(userDocRef, { license_key: licenseKey }, { merge: true })
-
-        setUserData((prev) => (prev ? { ...prev, license_key: licenseKey } : null))
-        await refreshSubscriptionData()
-
-        console.log("License key assigned successfully")
-      } catch (error) {
-        console.error("Error assigning license key:", error)
-        throw error
-      }
-    },
-    [refreshSubscriptionData],
-  )
+  }, [])
 
   const findOHPlusAccount = async (uid: string) => {
     try {
@@ -496,7 +429,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null)
       setUserData(null)
       setProjectData(null)
-      setSubscriptionData(null)
     } catch (error) {
       console.error("Logout error:", error)
       setLoading(false)
@@ -569,7 +501,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null)
         setUserData(null)
         setProjectData(null)
-        setSubscriptionData(null)
       }
       setLoading(false)
     })
@@ -626,7 +557,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     userData,
     projectData,
-    subscriptionData,
     loading,
     login,
     loginOHPlusOnly,
@@ -636,7 +566,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateUserData,
     updateProjectData,
     refreshUserData,
-    refreshSubscriptionData,
     assignLicenseKey,
     getRoleDashboardPath,
     hasRole,
