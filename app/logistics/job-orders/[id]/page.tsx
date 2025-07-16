@@ -6,7 +6,6 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { format } from "date-fns"
 import Image from "next/image"
-import jsPDF from "jspdf"
 import {
   ArrowLeft,
   Calendar,
@@ -24,53 +23,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { getJobOrderById } from "@/lib/job-order-service"
+import { generateJobOrderPDF } from "@/lib/pdf-service"
 import type { JobOrder } from "@/lib/types/job-order"
-
-// Helper function to load image and convert to base64
-async function loadImageAsBase64(url: string): Promise<string | null> {
-  try {
-    const response = await fetch(url)
-    const blob = await response.blob()
-
-    return new Promise((resolve) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = () => resolve(null)
-      reader.readAsDataURL(blob)
-    })
-  } catch (error) {
-    console.error("Error loading image:", error)
-    return null
-  }
-}
-
-// Helper function to get image dimensions
-function getImageDimensions(base64: string): Promise<{ width: number; height: number }> {
-  return new Promise((resolve) => {
-    const img = new Image()
-    img.onload = () => {
-      resolve({ width: img.width, height: img.height })
-    }
-    img.onerror = () => {
-      resolve({ width: 100, height: 100 }) // Default dimensions
-    }
-    img.src = base64
-  })
-}
-
-// Helper function to safely convert to Date
-function safeToDate(dateValue: any): Date {
-  if (dateValue instanceof Date) {
-    return dateValue
-  }
-  if (typeof dateValue === "string" || typeof dateValue === "number") {
-    return new Date(dateValue)
-  }
-  if (dateValue && typeof dateValue.toDate === "function") {
-    return dateValue.toDate()
-  }
-  return new Date() // fallback to current date
-}
+import { toast } from "sonner"
 
 export default function JobOrderDetailPage() {
   const params = useParams()
@@ -78,7 +33,7 @@ export default function JobOrderDetailPage() {
   const [jobOrder, setJobOrder] = useState<JobOrder | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isPrinting, setIsPrinting] = useState(false)
+  const [generatingPDF, setGeneratingPDF] = useState(false)
 
   const jobOrderId = params.id as string
 
@@ -105,386 +60,21 @@ export default function JobOrderDetailPage() {
     }
   }, [jobOrderId])
 
-  const generateJobOrderPDF = async (jobOrder: JobOrder) => {
+  const handlePrintPDF = async () => {
+    if (!jobOrder) return
+
     try {
-      setIsPrinting(true)
+      setGeneratingPDF(true)
+      toast.info("Generating PDF...")
 
-      // Create new PDF document
-      const pdf = new jsPDF("p", "mm", "a4")
-      const pageWidth = pdf.internal.pageSize.getWidth()
-      const pageHeight = pdf.internal.pageSize.getHeight()
-      const margin = 20
-      const contentWidth = pageWidth - margin * 2
-      let yPosition = margin
+      await generateJobOrderPDF(jobOrder, false)
 
-      // Safely convert dates
-      const createdAt = safeToDate(jobOrder.createdAt)
-      const dateRequested = safeToDate(jobOrder.dateRequested)
-      const deadline = safeToDate(jobOrder.deadline)
-
-      // Helper function to add text with word wrapping
-      const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
-        pdf.setFontSize(fontSize)
-        const lines = pdf.splitTextToSize(text, maxWidth)
-        pdf.text(lines, x, y)
-        return y + lines.length * fontSize * 0.3
-      }
-
-      // Helper function to check if we need a new page
-      const checkNewPage = (requiredHeight: number) => {
-        if (yPosition + requiredHeight > pageHeight - margin - 20) {
-          pdf.addPage()
-          yPosition = margin
-        }
-      }
-
-      // Modern Header with gradient-like effect using rectangles
-      pdf.setFillColor(30, 58, 138) // Dark blue
-      pdf.rect(0, 0, pageWidth, 25, "F")
-
-      pdf.setFillColor(59, 130, 246) // Lighter blue
-      pdf.rect(0, 20, pageWidth, 5, "F")
-
-      // Header text
-      pdf.setTextColor(255, 255, 255)
-      pdf.setFontSize(20)
-      pdf.setFont("helvetica", "bold")
-      pdf.text("JOB ORDER", margin, 15)
-
-      pdf.setFontSize(12)
-      pdf.setFont("helvetica", "normal")
-      pdf.text(`#${jobOrder.joNumber}`, pageWidth - margin - 40, 15)
-
-      yPosition = 35
-      pdf.setTextColor(0, 0, 0)
-
-      // Job Order Information Card
-      pdf.setFillColor(248, 250, 252) // Light gray background
-      pdf.rect(margin, yPosition, contentWidth, 45, "F")
-      pdf.setLineWidth(0.5)
-      pdf.setDrawColor(226, 232, 240)
-      pdf.rect(margin, yPosition, contentWidth, 45)
-
-      yPosition += 8
-
-      // Job Order Title
-      pdf.setFontSize(16)
-      pdf.setFont("helvetica", "bold")
-      pdf.text(jobOrder.siteName || "Job Order", margin + 5, yPosition)
-      yPosition += 8
-
-      // Status Badge
-      const statusColors = {
-        completed: { bg: [34, 197, 94], text: [255, 255, 255] },
-        "in-progress": { bg: [59, 130, 246], text: [255, 255, 255] },
-        pending: { bg: [245, 158, 11], text: [255, 255, 255] },
-        cancelled: { bg: [239, 68, 68], text: [255, 255, 255] },
-      }
-
-      const statusColor = statusColors[jobOrder.status as keyof typeof statusColors] || statusColors.pending
-      pdf.setFillColor(...statusColor.bg)
-      pdf.rect(margin + 5, yPosition - 2, 25, 6, "F")
-      pdf.setTextColor(...statusColor.text)
-      pdf.setFontSize(9)
-      pdf.setFont("helvetica", "bold")
-      pdf.text(jobOrder.status.toUpperCase(), margin + 7, yPosition + 2)
-      pdf.setTextColor(0, 0, 0)
-
-      // Job Type Badge
-      const typeColors = {
-        installation: { bg: [59, 130, 246], text: [255, 255, 255] },
-        maintenance: { bg: [245, 158, 11], text: [255, 255, 255] },
-        repair: { bg: [239, 68, 68], text: [255, 255, 255] },
-        dismantling: { bg: [107, 114, 128], text: [255, 255, 255] },
-      }
-
-      const typeColor = typeColors[jobOrder.joType?.toLowerCase() as keyof typeof typeColors] || typeColors.installation
-      pdf.setFillColor(...typeColor.bg)
-      pdf.rect(margin + 35, yPosition - 2, 30, 6, "F")
-      pdf.setTextColor(...typeColor.text)
-      pdf.text(jobOrder.joType.toUpperCase(), margin + 37, yPosition + 2)
-      pdf.setTextColor(0, 0, 0)
-
-      yPosition += 10
-
-      // Key Information in two columns
-      pdf.setFontSize(10)
-      pdf.setFont("helvetica", "normal")
-
-      const leftCol = margin + 5
-      const rightCol = margin + contentWidth / 2 + 5
-
-      // Left column
-      pdf.setFont("helvetica", "bold")
-      pdf.text("Created:", leftCol, yPosition)
-      pdf.setFont("helvetica", "normal")
-      pdf.text(createdAt.toLocaleDateString(), leftCol + 25, yPosition)
-
-      // Right column
-      pdf.setFont("helvetica", "bold")
-      pdf.text("Deadline:", rightCol, yPosition)
-      pdf.setFont("helvetica", "normal")
-      pdf.text(deadline.toLocaleDateString(), rightCol + 25, yPosition)
-      yPosition += 6
-
-      // Second row
-      pdf.setFont("helvetica", "bold")
-      pdf.text("Requested By:", leftCol, yPosition)
-      pdf.setFont("helvetica", "normal")
-      pdf.text(jobOrder.requestedBy || "N/A", leftCol + 35, yPosition)
-
-      pdf.setFont("helvetica", "bold")
-      pdf.text("Assigned To:", rightCol, yPosition)
-      pdf.setFont("helvetica", "normal")
-      pdf.text(jobOrder.assignTo || "Unassigned", rightCol + 30, yPosition)
-
-      yPosition += 15
-
-      // Site Information Section
-      checkNewPage(50)
-      pdf.setFontSize(14)
-      pdf.setFont("helvetica", "bold")
-      pdf.setTextColor(30, 58, 138)
-      pdf.text("SITE INFORMATION", margin, yPosition)
-      yPosition += 2
-
-      // Underline
-      pdf.setLineWidth(2)
-      pdf.setDrawColor(59, 130, 246)
-      pdf.line(margin, yPosition, margin + 60, yPosition)
-      yPosition += 10
-
-      pdf.setTextColor(0, 0, 0)
-      pdf.setFontSize(10)
-      pdf.setFont("helvetica", "normal")
-
-      // Site details in a structured layout
-      const siteData = [
-        { label: "Site Name:", value: jobOrder.siteName || "N/A" },
-        { label: "Site Code:", value: jobOrder.siteCode || "N/A" },
-        { label: "Location:", value: jobOrder.siteLocation || "N/A" },
-        { label: "Site Type:", value: jobOrder.siteType || "N/A" },
-        { label: "Site Size:", value: jobOrder.siteSize || "N/A" },
-        { label: "Illumination:", value: jobOrder.siteIllumination || "N/A" },
-      ]
-
-      let currentY = yPosition
-      siteData.forEach((item, index) => {
-        const isLeftColumn = index % 2 === 0
-        const xPos = isLeftColumn ? leftCol : rightCol
-
-        if (isLeftColumn && index > 0) {
-          currentY += 6
-        }
-
-        pdf.setFont("helvetica", "bold")
-        pdf.text(item.label, xPos, currentY)
-        pdf.setFont("helvetica", "normal")
-        const labelWidth = item.label === "Illumination:" ? 30 : 25
-        pdf.text(item.value, xPos + labelWidth, currentY)
-      })
-
-      yPosition = currentY + 10
-
-      // Site Image if available
-      if (jobOrder.siteImageUrl) {
-        checkNewPage(60)
-        pdf.setFontSize(12)
-        pdf.setFont("helvetica", "bold")
-        pdf.setTextColor(30, 58, 138)
-        pdf.text("SITE IMAGE", margin, yPosition)
-        yPosition += 8
-
-        try {
-          const imageBase64 = await loadImageAsBase64(jobOrder.siteImageUrl)
-          if (imageBase64) {
-            const dimensions = await getImageDimensions(imageBase64)
-            let { width, height } = dimensions
-            const maxWidth = contentWidth * 0.6
-            const maxHeight = 50
-
-            // Calculate aspect ratio
-            const aspectRatio = width / height
-            if (width > height) {
-              width = maxWidth
-              height = width / aspectRatio
-              if (height > maxHeight) {
-                height = maxHeight
-                width = height * aspectRatio
-              }
-            } else {
-              height = maxHeight
-              width = height * aspectRatio
-              if (width > maxWidth) {
-                width = maxWidth
-                height = width / aspectRatio
-              }
-            }
-
-            // Center the image
-            const imageX = margin + (contentWidth - width) / 2
-            pdf.addImage(imageBase64, "JPEG", imageX, yPosition, width, height)
-            yPosition += height + 10
-          }
-        } catch (error) {
-          console.error("Error adding site image:", error)
-        }
-      }
-
-      // Contract Information Section
-      checkNewPage(40)
-      pdf.setFontSize(14)
-      pdf.setFont("helvetica", "bold")
-      pdf.setTextColor(30, 58, 138)
-      pdf.text("CONTRACT DETAILS", margin, yPosition)
-      yPosition += 2
-
-      pdf.setLineWidth(2)
-      pdf.setDrawColor(59, 130, 246)
-      pdf.line(margin, yPosition, margin + 60, yPosition)
-      yPosition += 10
-
-      pdf.setTextColor(0, 0, 0)
-      pdf.setFontSize(10)
-
-      // Contract details
-      const contractData = [
-        { label: "Client Company:", value: jobOrder.clientCompany || "N/A" },
-        { label: "Client Name:", value: jobOrder.clientName || "N/A" },
-        { label: "Quotation #:", value: jobOrder.quotationNumber || "N/A" },
-        { label: "Contract Duration:", value: jobOrder.contractDuration || "N/A" },
-        {
-          label: "Lease Rate/Month:",
-          value: jobOrder.leaseRatePerMonth ? `PHP ${jobOrder.leaseRatePerMonth.toLocaleString()}` : "N/A",
-        },
-        {
-          label: "Total Amount:",
-          value: jobOrder.totalAmount ? `PHP ${jobOrder.totalAmount.toLocaleString()}` : "N/A",
-        },
-      ]
-
-      currentY = yPosition
-      contractData.forEach((item, index) => {
-        const isLeftColumn = index % 2 === 0
-        const xPos = isLeftColumn ? leftCol : rightCol
-
-        if (isLeftColumn && index > 0) {
-          currentY += 6
-        }
-
-        pdf.setFont("helvetica", "bold")
-        pdf.text(item.label, xPos, currentY)
-        pdf.setFont("helvetica", "normal")
-        const labelWidth = item.label === "Contract Duration:" ? 40 : item.label === "Lease Rate/Month:" ? 40 : 35
-        pdf.text(item.value, xPos + labelWidth, currentY)
-      })
-
-      yPosition = currentY + 15
-
-      // Compliance Status Section
-      checkNewPage(30)
-      pdf.setFontSize(14)
-      pdf.setFont("helvetica", "bold")
-      pdf.setTextColor(30, 58, 138)
-      pdf.text("COMPLIANCE STATUS", margin, yPosition)
-      yPosition += 2
-
-      pdf.setLineWidth(2)
-      pdf.setDrawColor(59, 130, 246)
-      pdf.line(margin, yPosition, margin + 60, yPosition)
-      yPosition += 10
-
-      pdf.setTextColor(0, 0, 0)
-      pdf.setFontSize(10)
-
-      // Compliance checkboxes
-      const complianceItems = [
-        { label: "PO/MO", status: jobOrder.poMo },
-        { label: "Signed Quotation", status: jobOrder.signedQuotation },
-        { label: "Project FA", status: jobOrder.projectFa },
-      ]
-
-      complianceItems.forEach((item, index) => {
-        const xPos = leftCol + index * 60
-
-        // Checkbox
-        pdf.setLineWidth(0.5)
-        pdf.setDrawColor(0, 0, 0)
-        pdf.rect(xPos, yPosition - 2, 4, 4)
-
-        if (item.status) {
-          pdf.setFillColor(34, 197, 94) // Green
-          pdf.rect(xPos + 0.5, yPosition - 1.5, 3, 3, "F")
-          pdf.setTextColor(255, 255, 255)
-          pdf.setFontSize(8)
-          pdf.text("✓", xPos + 1.2, yPosition + 0.5)
-          pdf.setTextColor(0, 0, 0)
-        }
-
-        pdf.setFontSize(10)
-        pdf.text(item.label, xPos + 8, yPosition + 1)
-      })
-
-      yPosition += 15
-
-      // Remarks Section
-      if (jobOrder.remarks) {
-        checkNewPage(25)
-        pdf.setFontSize(14)
-        pdf.setFont("helvetica", "bold")
-        pdf.setTextColor(30, 58, 138)
-        pdf.text("REMARKS", margin, yPosition)
-        yPosition += 2
-
-        pdf.setLineWidth(2)
-        pdf.setDrawColor(59, 130, 246)
-        pdf.line(margin, yPosition, margin + 30, yPosition)
-        yPosition += 8
-
-        pdf.setTextColor(0, 0, 0)
-        pdf.setFontSize(10)
-        pdf.setFont("helvetica", "normal")
-        yPosition = addText(jobOrder.remarks, margin, yPosition, contentWidth)
-        yPosition += 10
-      }
-
-      // Modern Footer
-      const footerY = pageHeight - 25
-      pdf.setFillColor(248, 250, 252)
-      pdf.rect(0, footerY, pageWidth, 25, "F")
-
-      pdf.setLineWidth(2)
-      pdf.setDrawColor(59, 130, 246)
-      pdf.line(0, footerY, pageWidth, footerY)
-
-      pdf.setFontSize(8)
-      pdf.setTextColor(107, 114, 128)
-      pdf.text("Generated by OH Plus Platform", margin, footerY + 8)
-      pdf.text(
-        `Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`,
-        margin,
-        footerY + 15,
-      )
-
-      pdf.setFont("helvetica", "bold")
-      pdf.text("LOGISTICS DEPARTMENT", pageWidth - margin - 50, footerY + 8)
-      pdf.setFont("helvetica", "normal")
-      pdf.text("Smart. Seamless. Scalable.", pageWidth - margin - 50, footerY + 15)
-
-      // Save the PDF
-      const fileName = `job-order-${jobOrder.joNumber}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      toast.success("PDF generated successfully!")
     } catch (error) {
       console.error("Error generating PDF:", error)
-      alert("Failed to generate PDF. Please try again.")
+      toast.error("Failed to generate PDF. Please try again.")
     } finally {
-      setIsPrinting(false)
-    }
-  }
-
-  const handlePrintJobOrder = () => {
-    if (jobOrder) {
-      generateJobOrderPDF(jobOrder)
+      setGeneratingPDF(false)
     }
   }
 
@@ -553,12 +143,21 @@ export default function JobOrderDetailPage() {
         </Badge>
         <div className="ml-auto">
           <Button
-            onClick={handlePrintJobOrder}
-            disabled={isPrinting}
+            onClick={handlePrintPDF}
+            disabled={generatingPDF}
             className="bg-blue-600 hover:bg-blue-700 text-white"
           >
-            <Printer className="mr-2 h-4 w-4" />
-            {isPrinting ? "Generating PDF..." : "Print Job Order"}
+            {generatingPDF ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Generating...
+              </>
+            ) : (
+              <>
+                <Printer className="h-4 w-4 mr-2" />
+                Print PDF
+              </>
+            )}
           </Button>
         </div>
       </div>
@@ -583,7 +182,8 @@ export default function JobOrderDetailPage() {
                 <span className="font-semibold">Site Name:</span> {jobOrder.siteName}
               </p>
               <p className="text-sm">
-                <span className="font-semibold">Site Location:</span> {jobOrder.siteLocation || "N/A"}
+                <span className="font-semibold">Site Location:</span>{" "}
+                {jobOrder.siteLocation || jobOrder.siteCode || "N/A"}
               </p>
               <p className="text-sm">
                 <span className="font-semibold">JO Type:</span>{" "}
@@ -606,7 +206,9 @@ export default function JobOrderDetailPage() {
                 />
                 <div className="flex-1">
                   <p className="font-semibold text-sm">{jobOrder.siteName}</p>
-                  <p className="text-xs text-gray-600">{jobOrder.siteLocation || "Location not specified"}</p>
+                  <p className="text-xs text-gray-600">
+                    {jobOrder.siteLocation || jobOrder.siteCode || "Location not specified"}
+                  </p>
                   <p className="text-xs text-gray-500">{jobOrder.joType} Job</p>
                 </div>
               </div>
@@ -695,6 +297,30 @@ export default function JobOrderDetailPage() {
                   {jobOrder.assignTo || "Unassigned"}
                 </div>
               </div>
+
+              {/* Client Information */}
+              {(jobOrder.clientCompany || jobOrder.clientName) && (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-800">Client Company</Label>
+                    <div className="p-2 bg-gray-50 rounded text-sm">{jobOrder.clientCompany || "N/A"}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm text-gray-800">Client Name</Label>
+                    <div className="p-2 bg-gray-50 rounded text-sm">{jobOrder.clientName || "N/A"}</div>
+                  </div>
+                </>
+              )}
+
+              {/* Financial Information */}
+              {jobOrder.totalAmount && (
+                <div className="space-y-2">
+                  <Label className="text-sm text-gray-800">Total Amount</Label>
+                  <div className="p-2 bg-green-50 rounded text-sm font-semibold text-green-800">
+                    PHP {jobOrder.totalAmount.toLocaleString()}
+                  </div>
+                </div>
+              )}
 
               {/* Attachments */}
               {jobOrder.attachments && jobOrder.attachments.length > 0 && (

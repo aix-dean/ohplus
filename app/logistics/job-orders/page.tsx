@@ -1,130 +1,98 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { format } from "date-fns"
-import { Search, MoreHorizontal, X, ClipboardList } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import {
+  Search,
+  Plus,
+  MoreHorizontal,
+  Eye,
+  Edit,
+  Trash2,
+  Calendar,
+  User,
+  MapPin,
+  Clock,
+  AlertCircle,
+  Package,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Card, CardContent } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/contexts/auth-context"
 import { getJobOrdersByCompanyId } from "@/lib/job-order-service"
-import { getUserById } from "@/lib/firebase-service"
 import type { JobOrder } from "@/lib/types/job-order"
-import { useRouter } from "next/navigation"
 
-export default function LogisticsJobOrdersPage() {
+export default function JobOrdersPage() {
+  const router = useRouter()
   const { user, userData } = useAuth()
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [userNames, setUserNames] = useState<Record<string, string>>({})
-  const [debugInfo, setDebugInfo] = useState<any>(null)
-
-  const router = useRouter()
-
-  const fetchUserName = async (userId: string): Promise<string> => {
-    if (userNames[userId]) {
-      return userNames[userId]
-    }
-
-    try {
-      const user = await getUserById(userId)
-      const name = user?.name || user?.first_name || "Unknown User"
-      setUserNames((prev) => ({ ...prev, [userId]: name }))
-      return name
-    } catch (error) {
-      console.error("Error fetching user name:", error)
-      return "Unknown User"
-    }
-  }
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [typeFilter, setTypeFilter] = useState<string>("all")
 
   useEffect(() => {
-    const fetchJOs = async () => {
-      console.log("=== DEBUG: Starting job orders fetch ===")
-      console.log("User:", user?.uid)
-      console.log("UserData:", userData)
-      console.log("Company ID:", userData?.company_id)
-
-      if (!user?.uid) {
-        console.log("DEBUG: No user UID found")
-        setError("User not authenticated.")
-        setLoading(false)
-        return
-      }
-
-      if (!userData?.company_id) {
-        console.log("DEBUG: No company ID found in userData")
-        setError("Company not found. Please ensure your account is properly set up.")
-        setLoading(false)
-        return
-      }
-
+    const fetchJobOrders = async () => {
       try {
         setLoading(true)
         setError(null)
 
-        console.log("DEBUG: Fetching job orders for company:", userData.company_id)
-        const fetchedJOs = await getJobOrdersByCompanyId(userData.company_id)
+        console.log("DEBUG: Auth state - user:", !!user, "userData:", !!userData)
 
-        console.log("DEBUG: Fetched job orders:", fetchedJOs)
-        console.log("DEBUG: Number of job orders:", fetchedJOs.length)
-
-        setJobOrders(fetchedJOs)
-        setDebugInfo({
-          userId: user.uid,
-          companyId: userData.company_id,
-          jobOrdersCount: fetchedJOs.length,
-          userData: userData,
-        })
-
-        // Fetch user names for all unique assignees
-        const uniqueAssignees = [...new Set(fetchedJOs.map((jo) => jo.assignTo).filter(Boolean))]
-        console.log("DEBUG: Unique assignees:", uniqueAssignees)
-
-        for (const assigneeId of uniqueAssignees) {
-          await fetchUserName(assigneeId)
+        if (!user) {
+          console.log("DEBUG: No user found")
+          setError("Please log in to view job orders")
+          return
         }
+
+        if (!userData?.company_id) {
+          console.log("DEBUG: No company_id found in userData:", userData)
+          setError("Company information not found. Please contact support.")
+          return
+        }
+
+        console.log("DEBUG: Fetching job orders for company_id:", userData.company_id)
+
+        const { jobOrders: fetchedJobOrders } = await getJobOrdersByCompanyId(userData.company_id)
+
+        console.log("DEBUG: Fetched job orders:", fetchedJobOrders)
+        setJobOrders(fetchedJobOrders)
       } catch (err) {
-        console.error("Failed to fetch job orders:", err)
-        setError(`Failed to load job orders: ${err instanceof Error ? err.message : "Unknown error"}`)
+        console.error("DEBUG: Error fetching job orders:", err)
+        setError("Failed to load job orders. Please try again.")
       } finally {
         setLoading(false)
       }
     }
 
-    // Only fetch if we have both user and userData
-    if (user && userData) {
-      fetchJOs()
-    } else {
-      console.log("DEBUG: Waiting for user and userData to be available")
-      console.log("User available:", !!user)
-      console.log("UserData available:", !!userData)
-    }
-  }, [user, userData]) // Updated dependency array
+    fetchJobOrders()
+  }, [user, userData])
 
-  const filteredJobOrders = useMemo(() => {
-    if (!searchTerm) {
-      return jobOrders
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "completed":
+        return "bg-green-100 text-green-800 border-green-200"
+      case "pending":
+        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+      case "approved":
+        return "bg-blue-100 text-blue-800 border-blue-200"
+      case "rejected":
+        return "bg-red-100 text-red-800 border-red-200"
+      case "cancelled":
+        return "bg-gray-100 text-gray-800 border-gray-200"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200"
     }
-    const lowerCaseSearchTerm = searchTerm.toLowerCase()
-    return jobOrders.filter(
-      (jo) =>
-        jo.joNumber?.toLowerCase().includes(lowerCaseSearchTerm) ||
-        jo.siteName?.toLowerCase().includes(lowerCaseSearchTerm) ||
-        jo.joType?.toLowerCase().includes(lowerCaseSearchTerm) ||
-        jo.requestedBy?.toLowerCase().includes(lowerCaseSearchTerm) ||
-        (jo.assignTo && jo.assignTo.toLowerCase().includes(lowerCaseSearchTerm)),
-    )
-  }, [jobOrders, searchTerm])
+  }
 
-  // Helper function to get status color (using joType for now, as no 'status' field exists)
-  const getJoTypeColor = (joType: string) => {
-    switch (joType?.toLowerCase()) {
+  const getTypeColor = (type: string) => {
+    switch (type?.toLowerCase()) {
       case "installation":
         return "bg-blue-100 text-blue-800 border-blue-200"
       case "maintenance":
@@ -138,69 +106,47 @@ export default function LogisticsJobOrdersPage() {
     }
   }
 
+  const filteredJobOrders = jobOrders.filter((jobOrder) => {
+    const matchesSearch =
+      jobOrder.joNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      jobOrder.siteName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      jobOrder.requestedBy?.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesStatus = statusFilter === "all" || jobOrder.status === statusFilter
+    const matchesType = typeFilter === "all" || jobOrder.joType === typeFilter
+
+    return matchesSearch && matchesStatus && matchesType
+  })
+
+  const formatDate = (dateValue: any) => {
+    if (!dateValue) return "N/A"
+
+    try {
+      let date: Date
+
+      if (dateValue instanceof Date) {
+        date = dateValue
+      } else if (typeof dateValue === "string") {
+        date = new Date(dateValue)
+      } else if (dateValue.toDate && typeof dateValue.toDate === "function") {
+        date = dateValue.toDate()
+      } else {
+        return "N/A"
+      }
+
+      return format(date, "MMM dd, yyyy")
+    } catch (error) {
+      console.error("Error formatting date:", error)
+      return "N/A"
+    }
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold mb-6">Job Orders</h1>
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-            <Input
-              type="text"
-              placeholder="Search job orders..."
-              className="pl-10 pr-8 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500 w-full max-w-md"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <Card className="border-gray-200 shadow-sm rounded-xl">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50 border-b border-gray-200">
-                  <TableHead className="font-semibold text-gray-900 py-3">JO #</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Site</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Date Requested</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">JO Type</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Deadline</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Requested By</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Assigned To</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3 w-[50px] text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array(5)
-                  .fill(0)
-                  .map((_, i) => (
-                    <TableRow key={i} className="border-b border-gray-100">
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-20" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-32" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-20" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-28" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-8 ml-auto" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </Card>
+      <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+        <div className="flex items-center space-x-2">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="text-lg">Loading job orders...</span>
         </div>
       </div>
     )
@@ -208,176 +154,176 @@ export default function LogisticsJobOrdersPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-red-500">
-            <p className="text-lg font-semibold mb-4">{error}</p>
-            {debugInfo && (
-              <div className="bg-gray-100 p-4 rounded-lg text-sm text-gray-700 max-w-md">
-                <h3 className="font-semibold mb-2">Debug Information:</h3>
-                <pre className="whitespace-pre-wrap">{JSON.stringify(debugInfo, null, 2)}</pre>
-              </div>
-            )}
-            <Button onClick={() => window.location.reload()} className="mt-4" variant="outline">
-              Retry
-            </Button>
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] p-4 text-center">
+        <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Error Loading Job Orders</h2>
+        <p className="text-gray-600 mb-4">{error}</p>
+        <Button onClick={() => window.location.reload()}>Try Again</Button>
+
+        {/* Debug Information (only in development) */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="mt-8 p-4 bg-gray-100 rounded-lg text-left text-sm">
+            <h3 className="font-semibold mb-2">Debug Information:</h3>
+            <p>User: {user ? "✓ Authenticated" : "✗ Not authenticated"}</p>
+            <p>User ID: {user?.uid || "N/A"}</p>
+            <p>Company ID: {userData?.company_id || "N/A"}</p>
+            <p>User Data: {userData ? "✓ Available" : "✗ Not available"}</p>
           </div>
-        </div>
+        )}
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">Job Orders</h1>
-          <Button
-            onClick={() => router.push("/logistics/job-orders/create")}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <ClipboardList className="h-4 w-4 mr-2" />
-            Create JO
-          </Button>
+    <div className="flex flex-col min-h-screen bg-white p-4 md:p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold text-gray-900">Job Orders</h1>
+          <Badge variant="secondary">
+            <Package className="h-3 w-3 mr-1" />
+            Logistics
+          </Badge>
         </div>
+        <Button onClick={() => router.push("/logistics/job-orders/create")}>
+          <Plus className="h-4 w-4 mr-2" />
+          Create JO
+        </Button>
+      </div>
 
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+      {/* Search and Filters */}
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
-            type="text"
             placeholder="Search job orders..."
-            className="pl-10 pr-8 py-2 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500 w-full max-w-md"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
           />
-          {searchTerm && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0 text-gray-500 hover:bg-gray-100"
-              onClick={() => setSearchTerm("")}
-            >
-              <X className="h-4 w-4" />
-              <span className="sr-only">Clear search</span>
+        </div>
+        <div className="flex gap-2">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="Installation">Installation</SelectItem>
+              <SelectItem value="Maintenance">Maintenance</SelectItem>
+              <SelectItem value="Repair">Repair</SelectItem>
+              <SelectItem value="Dismantling">Dismantling</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Job Orders List */}
+      {filteredJobOrders.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <Package className="h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            {jobOrders.length === 0 ? "No job orders found" : "No matching job orders"}
+          </h3>
+          <p className="text-gray-600 mb-4">
+            {jobOrders.length === 0
+              ? "No job orders have been created yet."
+              : "Try adjusting your search or filter criteria."}
+          </p>
+          {jobOrders.length === 0 && (
+            <Button onClick={() => router.push("/logistics/job-orders/create")}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Your First Job Order
             </Button>
           )}
         </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredJobOrders.map((jobOrder) => (
+            <Card key={jobOrder.id} className="hover:shadow-md transition-shadow cursor-pointer">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <CardTitle className="text-base font-semibold text-blue-600 mb-1">{jobOrder.joNumber}</CardTitle>
+                    <p className="text-sm text-gray-600">{jobOrder.siteName}</p>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => router.push(`/logistics/job-orders/${jobOrder.id}`)}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-red-600">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className={`${getStatusColor(jobOrder.status)} border font-medium`}>
+                    {jobOrder.status}
+                  </Badge>
+                  <Badge variant="outline" className={`${getTypeColor(jobOrder.joType)} border font-medium`}>
+                    {jobOrder.joType}
+                  </Badge>
+                </div>
 
-        {/* Debug info for development */}
-        {process.env.NODE_ENV === "development" && debugInfo && (
-          <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <details>
-              <summary className="cursor-pointer font-semibold">Debug Information</summary>
-              <pre className="mt-2 text-xs overflow-auto">{JSON.stringify(debugInfo, null, 2)}</pre>
-            </details>
-          </div>
-        )}
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center text-gray-600">
+                    <MapPin className="h-3 w-3 mr-2" />
+                    <span className="truncate">{jobOrder.siteLocation || jobOrder.siteCode || "N/A"}</span>
+                  </div>
+                  <div className="flex items-center text-gray-600">
+                    <User className="h-3 w-3 mr-2" />
+                    <span>Requested by {jobOrder.requestedBy}</span>
+                  </div>
+                  <div className="flex items-center text-gray-600">
+                    <Calendar className="h-3 w-3 mr-2" />
+                    <span>{formatDate(jobOrder.dateRequested)}</span>
+                  </div>
+                  <div className="flex items-center text-gray-600">
+                    <Clock className="h-3 w-3 mr-2" />
+                    <span>Due: {formatDate(jobOrder.deadline)}</span>
+                  </div>
+                </div>
 
-        {filteredJobOrders.length === 0 ? (
-          <Card className="border-gray-200 shadow-sm rounded-xl">
-            <CardContent className="text-center py-12">
-              <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <ClipboardList className="h-8 w-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No job orders found</h3>
-              <p className="text-gray-600 mb-6">
-                {searchTerm ? "No job orders match your search criteria." : "No job orders have been created yet."}
-              </p>
-              {!searchTerm && (
                 <Button
-                  onClick={() => router.push("/logistics/job-orders/create")}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-3 bg-transparent"
+                  onClick={() => router.push(`/logistics/job-orders/${jobOrder.id}`)}
                 >
-                  <ClipboardList className="h-4 w-4 mr-2" />
-                  Create Your First Job Order
+                  View Details
                 </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50 border-b border-gray-200">
-                  <TableHead className="font-semibold text-gray-900 py-3">JO #</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Site</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Date Requested</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">JO Type</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Deadline</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Requested By</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Assigned To</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3 w-[50px] text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredJobOrders.map((jo) => (
-                  <TableRow
-                    key={jo.id}
-                    className="cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100"
-                    onClick={() => router.push(`/logistics/job-orders/${jo.id}`)}
-                  >
-                    <TableCell className="font-medium py-3">{jo.joNumber}</TableCell>
-                    <TableCell className="py-3">{jo.siteName}</TableCell>
-                    <TableCell className="py-3">
-                      <Badge variant="outline" className="border font-medium bg-gray-100 text-gray-800 border-gray-200">
-                        {jo.dateRequested ? format(new Date(jo.dateRequested), "MMM d, yyyy") : "N/A"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Badge variant="outline" className={`${getJoTypeColor(jo.joType)} border font-medium`}>
-                        {jo.joType}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Badge variant="outline" className="border font-medium bg-gray-100 text-gray-800 border-gray-200">
-                        {jo.deadline ? format(new Date(jo.deadline), "MMM d, yyyy") : "N/A"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3">{jo.requestedBy}</TableCell>
-                    <TableCell className="py-3">{userNames[jo.assignTo] || jo.assignTo || "Unassigned"}</TableCell>
-                    <TableCell className="text-right py-3">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              router.push(`/logistics/job-orders/${jo.id}`)
-                            }}
-                          >
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              alert(`Edit JO ${jo.joNumber}`)
-                            }}
-                          >
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              alert(`Assign JO ${jo.joNumber}`)
-                            }}
-                          >
-                            Assign
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        )}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
