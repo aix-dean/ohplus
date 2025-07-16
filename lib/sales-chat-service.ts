@@ -134,8 +134,10 @@ export class SalesChatService {
         receiver_photo_url: receiverInfo?.photoUrl || "",
         seller_photo: senderInfo?.photoUrl || "",
         createdAt: serverTimestamp() as Timestamp,
-        lastMessage: "No messages yet", // Store as string instead of object
-        lastMessageTimestamp: serverTimestamp() as Timestamp,
+        lastMessage: {
+          text: "",
+          timestamp: serverTimestamp() as Timestamp,
+        },
         productId: projectId,
         productName: projectName,
         status: "active",
@@ -200,10 +202,12 @@ export class SalesChatService {
 
       const messageRef = await addDoc(this.messagesCollection, message)
 
-      // Update thread with last message info - store as separate fields
+      // Update thread with last message info
       await updateDoc(doc(this.threadsCollection, threadId), {
-        lastMessage: text || `Sent a ${file ? "file" : "message"}`,
-        lastMessageTimestamp: serverTimestamp(),
+        lastMessage: {
+          text: text || `Sent a ${file ? "file" : "message"}`,
+          timestamp: serverTimestamp(),
+        },
       })
 
       console.log("Message sent:", { threadId, senderId, text: text.substring(0, 50) })
@@ -238,8 +242,7 @@ export class SalesChatService {
           const thread = {
             id: docSnapshot.id,
             ...threadData,
-            lastMessage: threadData.lastMessage || "No messages yet",
-            lastMessageTimestamp: threadData.lastMessageTimestamp || threadData.createdAt,
+            lastMessage: threadData.lastMessage || { text: "", timestamp: threadData.createdAt },
             status: threadData.status || "active",
             priority: threadData.priority || "medium",
           } as SalesThread
@@ -283,8 +286,8 @@ export class SalesChatService {
 
         // Sort threads manually to handle null timestamps
         threads.sort((a, b) => {
-          const aTime = a.lastMessageTimestamp?.toDate?.() || a.createdAt?.toDate?.() || new Date(0)
-          const bTime = b.lastMessageTimestamp?.toDate?.() || b.createdAt?.toDate?.() || new Date(0)
+          const aTime = a.lastMessage?.timestamp?.toDate?.() || a.createdAt?.toDate?.() || new Date(0)
+          const bTime = b.lastMessage?.timestamp?.toDate?.() || b.createdAt?.toDate?.() || new Date(0)
           return bTime.getTime() - aTime.getTime()
         })
 
