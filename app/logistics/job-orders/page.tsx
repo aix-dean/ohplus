@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/contexts/auth-context"
 import { getJobOrdersByCompanyId } from "@/lib/job-order-service"
+import { getUserById } from "@/lib/firebase-service"
 import type { JobOrder } from "@/lib/types/job-order"
 import { useRouter } from "next/navigation"
 
@@ -21,8 +22,25 @@ export default function LogisticsJobOrdersPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [userNames, setUserNames] = useState<Record<string, string>>({})
 
   const router = useRouter()
+
+  const fetchUserName = async (userId: string): Promise<string> => {
+    if (userNames[userId]) {
+      return userNames[userId]
+    }
+
+    try {
+      const user = await getUserById(userId)
+      const name = user?.name || user?.first_name || "Unknown User"
+      setUserNames((prev) => ({ ...prev, [userId]: name }))
+      return name
+    } catch (error) {
+      console.error("Error fetching user name:", error)
+      return "Unknown User"
+    }
+  }
 
   useEffect(() => {
     const fetchJOs = async () => {
@@ -35,6 +53,12 @@ export default function LogisticsJobOrdersPage() {
         setLoading(true)
         const fetchedJOs = await getJobOrdersByCompanyId(userData.company_id)
         setJobOrders(fetchedJOs)
+
+        // Fetch user names for all unique assignees
+        const uniqueAssignees = [...new Set(fetchedJOs.map((jo) => jo.assignTo).filter(Boolean))]
+        for (const assigneeId of uniqueAssignees) {
+          await fetchUserName(assigneeId)
+        }
       } catch (err) {
         console.error("Failed to fetch job orders:", err)
         setError("Failed to load job orders. Please try again.")
@@ -240,7 +264,7 @@ export default function LogisticsJobOrdersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3">{jo.requestedBy}</TableCell>
-                    <TableCell className="py-3">{jo.assignTo || "Unassigned"}</TableCell>
+                    <TableCell className="py-3">{userNames[jo.assignTo] || jo.assignTo || "Unassigned"}</TableCell>
                     <TableCell className="text-right py-3">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
