@@ -9,17 +9,14 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Activity, Users, Globe, Eye, MapPin, Clock, User } from "lucide-react"
+import { Activity, Users, Globe, Eye, MapPin, Clock, User, ArrowLeft } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 interface AnalyticsDocument {
   id: string
   action: string
   created: any
-  geopoint: {
-    latitude: number
-    longitude: number
-  }
+  geopoint: [number, number] | { latitude: number; longitude: number }
   ip_address: string
   isGuest: boolean
   page: string
@@ -30,6 +27,7 @@ interface AnalyticsDocument {
     page: string
     platform: string
     section: string
+    uid?: string
   }>
   uid: string
 }
@@ -38,43 +36,75 @@ export default function AnalyticsPage() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsDocument[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isConnected, setIsConnected] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
-    // Set up real-time listener for analytics_ohplus collection
-    const analyticsQuery = query(collection(db, "analytics_ohplus"), orderBy("created", "desc"), limit(50))
+    console.log("Setting up analytics listener...")
 
-    const unsubscribe = onSnapshot(
-      analyticsQuery,
-      (snapshot) => {
-        const data = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as AnalyticsDocument[]
+    try {
+      // Set up real-time listener for analytics_ohplus collection
+      const analyticsQuery = query(collection(db, "analytics_ohplus"), orderBy("created", "desc"), limit(100))
 
-        setAnalyticsData(data)
-        setIsLoading(false)
-        setIsConnected(true)
-      },
-      (error) => {
-        console.error("Error fetching analytics data:", error)
-        setIsLoading(false)
-        setIsConnected(false)
-      },
-    )
+      const unsubscribe = onSnapshot(
+        analyticsQuery,
+        (snapshot) => {
+          console.log("Received analytics data:", snapshot.size, "documents")
 
-    return () => unsubscribe()
+          const data = snapshot.docs.map((doc) => {
+            const docData = doc.data()
+            return {
+              id: doc.id,
+              ...docData,
+            } as AnalyticsDocument
+          })
+
+          setAnalyticsData(data)
+          setIsLoading(false)
+          setIsConnected(true)
+          setError(null)
+        },
+        (error) => {
+          console.error("Error fetching analytics data:", error)
+          setError(error.message)
+          setIsLoading(false)
+          setIsConnected(false)
+        },
+      )
+
+      return () => {
+        console.log("Cleaning up analytics listener")
+        unsubscribe()
+      }
+    } catch (err) {
+      console.error("Error setting up listener:", err)
+      setError(err instanceof Error ? err.message : "Unknown error")
+      setIsLoading(false)
+    }
   }, [])
 
   const formatTimestamp = (timestamp: any) => {
     if (!timestamp) return "N/A"
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
-    return date.toLocaleString()
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+      return date.toLocaleString()
+    } catch {
+      return "Invalid Date"
+    }
   }
 
   const formatGeopoint = (geopoint: any) => {
     if (!geopoint) return "N/A"
-    return `${geopoint.latitude.toFixed(6)}, ${geopoint.longitude.toFixed(6)}`
+
+    if (Array.isArray(geopoint)) {
+      return `${geopoint[0]?.toFixed(6) || 0}, ${geopoint[1]?.toFixed(6) || 0}`
+    }
+
+    if (typeof geopoint === "object" && geopoint.latitude !== undefined) {
+      return `${geopoint.latitude.toFixed(6)}, ${geopoint.longitude.toFixed(6)}`
+    }
+
+    return "Invalid Location"
   }
 
   // Calculate summary statistics
@@ -131,6 +161,29 @@ export default function AnalyticsPage() {
     )
   }
 
+  if (error) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold tracking-tight">Analytics Dashboard</h1>
+          <Button variant="outline" onClick={() => router.push("/login")}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Login
+          </Button>
+        </div>
+
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Activity className="h-12 w-12 text-red-500 mb-4" />
+            <h3 className="text-lg font-semibold mb-2 text-red-600">Connection Error</h3>
+            <p className="text-muted-foreground text-center mb-4">Failed to connect to analytics database: {error}</p>
+            <Button onClick={() => window.location.reload()}>Retry Connection</Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -146,6 +199,7 @@ export default function AnalyticsPage() {
           </p>
         </div>
         <Button variant="outline" onClick={() => router.push("/login")}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Login
         </Button>
       </div>
@@ -204,7 +258,7 @@ export default function AnalyticsPage() {
             <Activity className="h-5 w-5" />
             Recent Analytics Events
           </CardTitle>
-          <CardDescription>Latest events from analytics_ohplus collection</CardDescription>
+          <CardDescription>Latest {analyticsData.length} events from analytics_ohplus collection</CardDescription>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[600px]">
@@ -218,13 +272,14 @@ export default function AnalyticsPage() {
                   <TableHead>Location</TableHead>
                   <TableHead>IP Address</TableHead>
                   <TableHead>Created</TableHead>
+                  <TableHead>UID</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {analyticsData.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell>
-                      <Badge variant="outline" className="flex items-center gap-1">
+                      <Badge variant="outline" className="flex items-center gap-1 w-fit">
                         <Eye className="h-3 w-3" />
                         {item.action}
                       </Badge>
@@ -233,19 +288,22 @@ export default function AnalyticsPage() {
                       <Badge variant="secondary">{item.page}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="flex items-center gap-1">
+                      <Badge variant="outline" className="flex items-center gap-1 w-fit">
                         <Globe className="h-3 w-3" />
                         {item.platform}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={item.isGuest ? "destructive" : "default"} className="flex items-center gap-1">
+                      <Badge
+                        variant={item.isGuest ? "destructive" : "default"}
+                        className="flex items-center gap-1 w-fit"
+                      >
                         <User className="h-3 w-3" />
                         {item.isGuest ? "Guest" : "User"}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground font-mono">
                         <MapPin className="h-3 w-3" />
                         {formatGeopoint(item.geopoint)}
                       </div>
@@ -257,6 +315,7 @@ export default function AnalyticsPage() {
                         {formatTimestamp(item.created)}
                       </div>
                     </TableCell>
+                    <TableCell className="font-mono text-sm">{item.uid || "N/A"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -295,8 +354,11 @@ export default function AnalyticsPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Activity className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">No Analytics Data</h3>
-            <p className="text-muted-foreground text-center">
-              No analytics events have been recorded yet. Visit the login page to generate some data.
+            <p className="text-muted-foreground text-center mb-4">
+              No analytics events have been recorded yet in the analytics_ohplus collection.
+            </p>
+            <p className="text-sm text-muted-foreground text-center">
+              Visit the login page to generate some analytics data, then return here to view it.
             </p>
           </CardContent>
         </Card>
