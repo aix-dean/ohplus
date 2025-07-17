@@ -17,7 +17,7 @@ import { CompanyRegistrationDialog } from "@/components/company-registration-dia
 const promoEndDate = new Date(2025, 6, 19, 23, 59, 0) // July 19, 2025, 11:59 PM PH time (UTC+8)
 
 export default function ChoosePlanPage() {
-  const { user, userData, subscriptionData, loading } = useAuth()
+  const { user, userData, subscriptionData, loading, refreshSubscriptionData } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
   const [isUpdating, setIsUpdating] = useState(false)
@@ -134,7 +134,7 @@ export default function ChoosePlanPage() {
           description: `Welcome to the ${selectedPlan.name}! Your new subscription has been created.`,
         })
 
-        window.location.reload()
+        await refreshSubscriptionData()
         router.push("/admin/subscriptions") // Navigate back to the main subscription page
       } catch (error: any) {
         console.error("Failed to select plan:", error)
@@ -148,7 +148,7 @@ export default function ChoosePlanPage() {
         setSelectedPlanId(null)
       }
     },
-    [user, userData, plans, toast, router],
+    [user, userData, plans, refreshSubscriptionData, toast, router],
   )
 
   const handlePromoBannerClick = useCallback(() => {
@@ -158,13 +158,13 @@ export default function ChoosePlanPage() {
   const handleCompanyRegistrationSuccess = useCallback(async () => {
     setIsCompanyRegistrationDialogOpen(false)
     // After successful registration, refresh user data to get the new company_id
-    window.location.reload()
+    await refreshSubscriptionData() // This also refreshes userData
     if (planToUpgradeAfterRegistration) {
       // Re-attempt the upgrade with the stored planId
       handleUpgrade(planToUpgradeAfterRegistration)
       setPlanToUpgradeAfterRegistration(null) // Clear the stored plan
     }
-  }, [planToUpgradeAfterRegistration, handleUpgrade])
+  }, [refreshSubscriptionData, planToUpgradeAfterRegistration, handleUpgrade])
 
   const currentPlan = subscriptionData?.planType || "None"
   const isGraphicExpoActive = currentPlan === "graphic-expo-event"
