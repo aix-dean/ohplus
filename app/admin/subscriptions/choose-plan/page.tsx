@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { PromoBanner } from "@/components/promo-banner"
-import { CompanyRegistrationDialog } from "@/components/company-registration-dialog" // Import the dialog
+import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
 
 // Move promoEndDate outside the component to ensure it's a stable reference
 const promoEndDate = new Date(2025, 6, 19, 23, 59, 0) // July 19, 2025, 11:59 PM PH time (UTC+8)
@@ -28,8 +28,8 @@ export default function ChoosePlanPage() {
     minutes: number
     seconds: number
   } | null>(null)
-  const [isCompanyRegistrationDialogOpen, setIsCompanyRegistrationDialogOpen] = useState(false) // New state for dialog
-  const [planToUpgradeAfterRegistration, setPlanToUpgradeAfterRegistration] = useState<string | null>(null) // New state to store plan
+  const [isCompanyRegistrationDialogOpen, setIsCompanyRegistrationDialogOpen] = useState(false)
+  const [planToUpgradeAfterRegistration, setPlanToUpgradeAfterRegistration] = useState<string | null>(null)
 
   const plans = getSubscriptionPlans()
 
@@ -76,7 +76,7 @@ export default function ChoosePlanPage() {
 
       // Check for company_id before proceeding
       if (!userData?.company_id) {
-        setPlanToUpgradeAfterRegistration(planId) // Store the planId to upgrade after registration
+        setPlanToUpgradeAfterRegistration(planId)
         setIsCompanyRegistrationDialogOpen(true)
         return
       }

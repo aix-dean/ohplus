@@ -13,6 +13,8 @@ import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, whe
 import { auth, db } from "@/lib/firebase"
 import { generateLicenseKey } from "@/lib/utils"
 import { assignRoleToUser, getUserRoles, type RoleType } from "@/lib/hardcoded-access-service"
+import { subscriptionService } from "@/lib/subscription-service"
+import type { SubscriptionData } from "@/lib/types/subscription"
 
 interface UserData {
   uid: string
@@ -55,6 +57,7 @@ interface AuthContextType {
   user: FirebaseUser | null
   userData: UserData | null
   projectData: ProjectData | null
+  subscriptionData: SubscriptionData | null
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   loginOHPlusOnly: (email: string, password: string) => Promise<void>
@@ -79,6 +82,7 @@ interface AuthContextType {
   updateUserData: (updates: Partial<UserData>) => Promise<void>
   updateProjectData: (updates: Partial<ProjectData>) => Promise<void>
   refreshUserData: () => Promise<void>
+  refreshSubscriptionData: () => Promise<void>
   assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
   getRoleDashboardPath: (roles: RoleType[]) => string | null
   hasRole: (requiredRoles: RoleType | RoleType[]) => boolean
@@ -90,128 +94,181 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
+  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null)
   const [loading, setLoading] = useState(true)
   const [isRegistering, setIsRegistering] = useState(false)
 
-  const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
+  const fetchSubscriptionData = useCallback(async (licenseKey: string, companyId?: string) => {
     try {
-      console.log("Fetching user data for UID:", firebaseUser.uid)
+      console.log("Fetching subscription data for license key:", licenseKey, "company ID:", companyId)
 
-      // Query iboard_users collection by uid field
-      const usersQuery = query(collection(db, "iboard_users"), where("uid", "==", firebaseUser.uid))
-      const usersSnapshot = await getDocs(usersQuery)
+      let subscription: SubscriptionData | null = null
 
-      let fetchedUserData: UserData
-
-      if (!usersSnapshot.empty) {
-        const userDoc = usersSnapshot.docs[0]
-        const data = userDoc.data()
-        console.log("User document data:", data)
-
-        // Fetch roles from user_roles collection
-        const userRoles = await getUserRoles(firebaseUser.uid)
-        console.log("User roles from user_roles collection:", userRoles)
-
-        fetchedUserData = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          license_key: data.license_key || null,
-          role: userRoles.length > 0 ? userRoles[0] : null, // Set role based on first role from user_roles
-          roles: userRoles, // Add the roles array from user_roles collection
-          permissions: data.permissions || [],
-          project_id: data.project_id,
-          first_name: data.first_name,
-          last_name: data.last_name,
-          middle_name: data.middle_name,
-          phone_number: data.phone_number,
-          gender: data.gender,
-          type: data.type,
-          created: data.created?.toDate(),
-          updated: data.updated?.toDate(),
-          company_id: data.company_id || null,
-          onboarding: data.onboarding || false,
-          ...data,
+      // Try to fetch by company_id first if available
+      if (companyId) {
+        try {
+          subscription = await subscriptionService.getSubscriptionByCompanyId(companyId)
+          console.log("Subscription found by company ID:", subscription)
+        } catch (error) {
+          console.log("No subscription found by company ID, trying license key")
         }
-      } else {
-        console.log("User document doesn't exist, creating basic one")
-
-        // Fetch roles from user_roles collection even if user doc doesn't exist
-        const userRoles = await getUserRoles(firebaseUser.uid)
-        console.log("User roles from user_roles collection:", userRoles)
-
-        fetchedUserData = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          license_key: null,
-          company_id: null,
-          role: userRoles.length > 0 ? userRoles[0] : null,
-          roles: userRoles,
-          permissions: [],
-          onboarding: true, // New users need to complete onboarding
-        }
-
-        // Create the user document with uid field
-        const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
-        await setDoc(
-          userDocRef,
-          {
-            ...fetchedUserData,
-            created: serverTimestamp(),
-            updated: serverTimestamp(),
-          },
-          { merge: true },
-        )
       }
 
-      console.log("Final fetchedUserData with roles:", fetchedUserData)
-      console.log("Roles array:", fetchedUserData.roles)
-      console.log("Primary role:", fetchedUserData.role)
-
-      setUserData(fetchedUserData)
-
-      if (fetchedUserData.project_id) {
-        console.log("Fetching project data for project_id:", fetchedUserData.project_id)
-
-        const projectDocRef = doc(db, "projects", fetchedUserData.project_id)
-        const projectDocSnap = await getDoc(projectDocRef)
-
-        if (projectDocSnap.exists()) {
-          const projectData = projectDocSnap.data()
-          console.log("Project document data:", projectData)
-
-          setProjectData({
-            project_id: projectDocSnap.id,
-            company_name: projectData.company_name,
-            company_location: projectData.company_location,
-            company_website: projectData.company_website,
-            project_name: projectData.project_name,
-            social_media: projectData.social_media,
-            license_key: projectData.license_key,
-            created: projectData.created?.toDate(),
-            updated: projectData.updated?.toDate(),
-          })
-        } else {
-          console.log("Project document doesn't exist")
-          setProjectData(null)
+      // If no subscription found by company_id, try license_key
+      if (!subscription) {
+        try {
+          subscription = await subscriptionService.getSubscriptionByLicenseKey(licenseKey)
+          console.log("Subscription found by license key:", subscription)
+        } catch (error) {
+          console.log("No subscription found by license key")
         }
-      } else {
-        console.log("No project_id found in user data")
-        setProjectData(null)
       }
+
+      setSubscriptionData(subscription)
+      return subscription
     } catch (error) {
-      console.error("Error fetching user data or subscription:", error)
-      setUserData(null)
-      setProjectData(null)
+      console.error("Error fetching subscription data:", error)
+      setSubscriptionData(null)
+      return null
     }
   }, [])
+
+  const fetchUserData = useCallback(
+    async (firebaseUser: FirebaseUser) => {
+      try {
+        console.log("Fetching user data for UID:", firebaseUser.uid)
+
+        // Query iboard_users collection by uid field
+        const usersQuery = query(collection(db, "iboard_users"), where("uid", "==", firebaseUser.uid))
+        const usersSnapshot = await getDocs(usersQuery)
+
+        let fetchedUserData: UserData
+
+        if (!usersSnapshot.empty) {
+          const userDoc = usersSnapshot.docs[0]
+          const data = userDoc.data()
+          console.log("User document data:", data)
+
+          // Fetch roles from user_roles collection
+          const userRoles = await getUserRoles(firebaseUser.uid)
+          console.log("User roles from user_roles collection:", userRoles)
+
+          fetchedUserData = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName,
+            license_key: data.license_key || null,
+            role: userRoles.length > 0 ? userRoles[0] : null, // Set role based on first role from user_roles
+            roles: userRoles, // Add the roles array from user_roles collection
+            permissions: data.permissions || [],
+            project_id: data.project_id,
+            first_name: data.first_name,
+            last_name: data.last_name,
+            middle_name: data.middle_name,
+            phone_number: data.phone_number,
+            gender: data.gender,
+            type: data.type,
+            created: data.created?.toDate(),
+            updated: data.updated?.toDate(),
+            company_id: data.company_id || null,
+            onboarding: data.onboarding || false,
+            ...data,
+          }
+        } else {
+          console.log("User document doesn't exist, creating basic one")
+
+          // Fetch roles from user_roles collection even if user doc doesn't exist
+          const userRoles = await getUserRoles(firebaseUser.uid)
+          console.log("User roles from user_roles collection:", userRoles)
+
+          fetchedUserData = {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName,
+            license_key: null,
+            company_id: null,
+            role: userRoles.length > 0 ? userRoles[0] : null,
+            roles: userRoles,
+            permissions: [],
+            onboarding: true, // New users need to complete onboarding
+          }
+
+          // Create the user document with uid field
+          const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
+          await setDoc(
+            userDocRef,
+            {
+              ...fetchedUserData,
+              created: serverTimestamp(),
+              updated: serverTimestamp(),
+            },
+            { merge: true },
+          )
+        }
+
+        console.log("Final fetchedUserData with roles:", fetchedUserData)
+        console.log("Roles array:", fetchedUserData.roles)
+        console.log("Primary role:", fetchedUserData.role)
+
+        setUserData(fetchedUserData)
+
+        // Fetch subscription data if license key is available
+        if (fetchedUserData.license_key) {
+          await fetchSubscriptionData(fetchedUserData.license_key, fetchedUserData.company_id || undefined)
+        } else {
+          setSubscriptionData(null)
+        }
+
+        if (fetchedUserData.project_id) {
+          console.log("Fetching project data for project_id:", fetchedUserData.project_id)
+
+          const projectDocRef = doc(db, "projects", fetchedUserData.project_id)
+          const projectDocSnap = await getDoc(projectDocRef)
+
+          if (projectDocSnap.exists()) {
+            const projectData = projectDocSnap.data()
+            console.log("Project document data:", projectData)
+
+            setProjectData({
+              project_id: projectDocSnap.id,
+              company_name: projectData.company_name,
+              company_location: projectData.company_location,
+              company_website: projectData.company_website,
+              project_name: projectData.project_name,
+              social_media: projectData.social_media,
+              license_key: projectData.license_key,
+              created: projectData.created?.toDate(),
+              updated: projectData.updated?.toDate(),
+            })
+          } else {
+            console.log("Project document doesn't exist")
+            setProjectData(null)
+          }
+        } else {
+          console.log("No project_id found in user data")
+          setProjectData(null)
+        }
+      } catch (error) {
+        console.error("Error fetching user data or subscription:", error)
+        setUserData(null)
+        setProjectData(null)
+        setSubscriptionData(null)
+      }
+    },
+    [fetchSubscriptionData],
+  )
 
   const refreshUserData = useCallback(async () => {
     if (user) {
       await fetchUserData(user)
     }
   }, [user, fetchUserData])
+
+  const refreshSubscriptionData = useCallback(async () => {
+    if (userData?.license_key) {
+      await fetchSubscriptionData(userData.license_key, userData.company_id || undefined)
+    }
+  }, [userData, fetchSubscriptionData])
 
   const assignLicenseKey = useCallback(async (uid: string, licenseKey: string) => {
     try {
@@ -429,6 +486,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null)
       setUserData(null)
       setProjectData(null)
+      setSubscriptionData(null)
     } catch (error) {
       console.error("Logout error:", error)
       setLoading(false)
@@ -501,6 +559,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null)
         setUserData(null)
         setProjectData(null)
+        setSubscriptionData(null)
       }
       setLoading(false)
     })
@@ -557,6 +616,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     userData,
     projectData,
+    subscriptionData,
     loading,
     login,
     loginOHPlusOnly,
@@ -566,6 +626,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateUserData,
     updateProjectData,
     refreshUserData,
+    refreshSubscriptionData,
     assignLicenseKey,
     getRoleDashboardPath,
     hasRole,
