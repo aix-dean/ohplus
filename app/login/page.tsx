@@ -16,8 +16,43 @@ import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ComingSoonDialog } from "@/components/coming-soon-dialog"
 import { Mail, Lock, Eye, EyeOff } from "lucide-react"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs, addDoc, GeoPoint } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+
+const createAnalyticsDocument = async () => {
+  try {
+    // Get user's IP address (in a real app, you'd get this from a service)
+    const ipAddress = "127.0.0.1" // Placeholder - in production, get from API
+
+    // Get user's location (placeholder coordinates for now)
+    const geopoint = new GeoPoint(14.5973113, 120.9969413)
+
+    const analyticsData = {
+      action: "page_view",
+      created: new Date(),
+      geopoint: geopoint,
+      ip_address: ipAddress,
+      isGuest: true,
+      page: "Home",
+      platform: "WEB",
+      tags: [
+        {
+          action: "page_view",
+          isGuest: true,
+          page: "Home",
+          platform: "WEB",
+          section: "homepage",
+        },
+      ],
+      uid: "",
+    }
+
+    await addDoc(collection(db, "analytics_ohplus"), analyticsData)
+    console.log("Analytics document created successfully")
+  } catch (error) {
+    console.error("Error creating analytics document:", error)
+  }
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -154,6 +189,11 @@ export default function LoginPage() {
       }
     }
   }, [user, userData, isLoading, router, getRoleDashboardPath])
+
+  // Analytics tracking on page load
+  useEffect(() => {
+    createAnalyticsDocument()
+  }, [])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white p-4">
