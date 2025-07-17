@@ -25,7 +25,6 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import { subscriptionService } from "@/lib/subscription-service"
-import { SideNavigation } from "@/components/side-navigation"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -397,205 +396,196 @@ export default function BusinessInventoryPage() {
   // Show loading only on initial load
   if (loading && products.length === 0 && userData === null) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
-        <SideNavigation />
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        </div>
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <SideNavigation />
-      <div className="flex-1 p-4 md:p-6 ml-0 lg:ml-64">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
-        </div>
+    <div className="p-4 md:p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
+      </div>
 
-        <div className="grid gap-6">
-          {/* Product List */}
-          <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
-            {/* The "+ Add Site" card is now the first item in the grid */}
-            <Card
-              className="w-full min-h-[284px] flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
-              onClick={handleAddSiteClick}
-            >
-              <Plus className="h-8 w-8 mb-2" />
-              <span className="text-lg font-semibold">+ Add Site</span>
-            </Card>
+      <div className="grid gap-6">
+        {/* Product List */}
+        <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
+          {/* The "+ Add Site" card is now the first item in the grid */}
+          <Card
+            className="w-full min-h-[284px] flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
+            onClick={handleAddSiteClick}
+          >
+            <Plus className="h-8 w-8 mb-2" />
+            <span className="text-lg font-semibold">+ Add Site</span>
+          </Card>
 
-            {loading && products.length === 0
-              ? // Show loading cards only when initially loading
-                Array.from({ length: 3 }).map((_, index) => (
-                  <Card
-                    key={`loading-${index}`}
-                    className="overflow-hidden border border-gray-200 shadow-md rounded-xl"
-                  >
-                    <div className="h-48 bg-gray-200 animate-pulse" />
-                    <CardContent className="p-4">
-                      <div className="space-y-2">
-                        <div className="h-4 bg-gray-200 rounded animate-pulse" />
-                        <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
-                        <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              : products.map((product) => (
-                  <Card
-                    key={product.id}
-                    className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
-                    onClick={() => handleViewDetails(product.id)}
-                  >
-                    <div className="h-48 bg-gray-200 relative">
-                      <Image
-                        src={
-                          product.media && product.media.length > 0
-                            ? product.media[0].url
-                            : "/abstract-geometric-sculpture.png"
-                        }
-                        alt={product.name || "Product image"}
-                        fill
-                        className="object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.src = "/abstract-geometric-sculpture.png"
-                          target.className = "opacity-50"
-                        }}
-                      />
+          {loading && products.length === 0
+            ? // Show loading cards only when initially loading
+              Array.from({ length: 3 }).map((_, index) => (
+                <Card key={`loading-${index}`} className="overflow-hidden border border-gray-200 shadow-md rounded-xl">
+                  <div className="h-48 bg-gray-200 animate-pulse" />
+                  <CardContent className="p-4">
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded animate-pulse" />
+                      <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
+                      <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse" />
                     </div>
-
-                    <CardContent className="p-4">
-                      <div className="flex flex-col">
-                        <h3 className="font-semibold line-clamp-1">{product.name}</h3>
-                        <div className="mt-2 text-sm font-medium text-green-700">
-                          ₱{Number(product.price).toLocaleString()}
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500 flex items-center">
-                          <MapPin size={12} className="mr-1 flex-shrink-0" />
-                          <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-          </ResponsiveCardGrid>
-
-          {/* Show empty state message when no products and not loading */}
-          {!loading && products.length === 0 && userData?.company_id && (
-            <div className="text-center py-12">
-              <div className="text-gray-500 text-lg mb-2">No sites found</div>
-              <div className="text-gray-400 text-sm">Click the "Add Site" button above to create your first site.</div>
-            </div>
-          )}
-
-          {/* Show company setup message when no company_id */}
-          {!loading && !userData?.company_id && (
-            <div className="text-center py-12">
-              <div className="text-gray-500 text-lg mb-2">Welcome to your inventory!</div>
-              <div className="text-gray-400 text-sm">
-                Click the "Add Site" button above to set up your company and create your first site.
-              </div>
-            </div>
-          )}
-
-          {/* Pagination Controls - Only show if there are products or multiple pages */}
-          {(products.length > 0 || totalPages > 1) && (
-            <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
-              <div className="text-sm text-gray-500 flex items-center">
-                {loadingCount ? (
-                  <div className="flex items-center">
-                    <Loader2 size={14} className="animate-spin mr-2" />
-                    <span>Calculating pages...</span>
+                  </CardContent>
+                </Card>
+              ))
+            : products.map((product) => (
+                <Card
+                  key={product.id}
+                  className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
+                  onClick={() => handleViewDetails(product.id)}
+                >
+                  <div className="h-48 bg-gray-200 relative">
+                    <Image
+                      src={
+                        product.media && product.media.length > 0
+                          ? product.media[0].url
+                          : "/abstract-geometric-sculpture.png"
+                      }
+                      alt={product.name || "Product image"}
+                      fill
+                      className="object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.src = "/abstract-geometric-sculpture.png"
+                        target.className = "opacity-50"
+                      }}
+                    />
                   </div>
-                ) : (
-                  <span>
-                    Page {currentPage} of {totalPages} ({products.length} items)
-                  </span>
+
+                  <CardContent className="p-4">
+                    <div className="flex flex-col">
+                      <h3 className="font-semibold line-clamp-1">{product.name}</h3>
+                      <div className="mt-2 text-sm font-medium text-green-700">
+                        ₱{Number(product.price).toLocaleString()}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500 flex items-center">
+                        <MapPin size={12} className="mr-1 flex-shrink-0" />
+                        <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+        </ResponsiveCardGrid>
+
+        {/* Show empty state message when no products and not loading */}
+        {!loading && products.length === 0 && userData?.company_id && (
+          <div className="text-center py-12">
+            <div className="text-gray-500 text-lg mb-2">No sites found</div>
+            <div className="text-gray-400 text-sm">Click the "Add Site" button above to create your first site.</div>
+          </div>
+        )}
+
+        {/* Show company setup message when no company_id */}
+        {!loading && !userData?.company_id && (
+          <div className="text-center py-12">
+            <div className="text-gray-500 text-lg mb-2">Welcome to your inventory!</div>
+            <div className="text-gray-400 text-sm">
+              Click the "Add Site" button above to set up your company and create your first site.
+            </div>
+          </div>
+        )}
+
+        {/* Pagination Controls - Only show if there are products or multiple pages */}
+        {(products.length > 0 || totalPages > 1) && (
+          <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
+            <div className="text-sm text-gray-500 flex items-center">
+              {loadingCount ? (
+                <div className="flex items-center">
+                  <Loader2 size={14} className="animate-spin mr-2" />
+                  <span>Calculating pages...</span>
+                </div>
+              ) : (
+                <span>
+                  Page {currentPage} of {totalPages} ({products.length} items)
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToPreviousPage}
+                disabled={currentPage === 1}
+                className="h-8 w-8 p-0 bg-transparent"
+              >
+                <ChevronLeft size={16} />
+              </Button>
+
+              {/* Page numbers - Hide on mobile */}
+              <div className="hidden sm:flex items-center gap-1">
+                {getPageNumbers().map((page, index) =>
+                  page === "..." ? (
+                    <span key={`ellipsis-${index}`} className="px-2">
+                      ...
+                    </span>
+                  ) : (
+                    <Button
+                      key={`page-${page}`}
+                      variant={currentPage === page ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => goToPage(page as number)}
+                      className="h-8 w-8 p-0"
+                    >
+                      {page}
+                    </Button>
+                  ),
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToPreviousPage}
-                  disabled={currentPage === 1}
-                  className="h-8 w-8 p-0 bg-transparent"
-                >
-                  <ChevronLeft size={16} />
-                </Button>
-
-                {/* Page numbers - Hide on mobile */}
-                <div className="hidden sm:flex items-center gap-1">
-                  {getPageNumbers().map((page, index) =>
-                    page === "..." ? (
-                      <span key={`ellipsis-${index}`} className="px-2">
-                        ...
-                      </span>
-                    ) : (
-                      <Button
-                        key={`page-${page}`}
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => goToPage(page as number)}
-                        className="h-8 w-8 p-0"
-                      >
-                        {page}
-                      </Button>
-                    ),
-                  )}
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToNextPage}
-                  disabled={currentPage >= totalPages}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronRight size={16} />
-                </Button>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToNextPage}
+                disabled={currentPage >= totalPages}
+                className="h-8 w-8 p-0"
+              >
+                <ChevronRight size={16} />
+              </Button>
             </div>
-          )}
-        </div>
-
-        {/* Delete Confirmation Dialog */}
-        <DeleteConfirmationDialog
-          isOpen={deleteDialogOpen}
-          onClose={() => setDeleteDialogOpen(false)}
-          onConfirm={handleDeleteConfirm}
-          title="Delete Product"
-          description="This product will be removed from your inventory. This action cannot be undone."
-          itemName={productToDelete?.name}
-        />
-
-        {/* Subscription Limit Dialog */}
-        <Dialog open={showSubscriptionLimitDialog} onOpenChange={setShowSubscriptionLimitDialog}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>🎯 Let's Get You Started!</DialogTitle>
-              <DialogDescription>{subscriptionLimitMessage}</DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button onClick={() => router.push("/admin/subscriptions/choose-plan")}>Choose Plan</Button>
-              <DialogClose asChild>
-                <Button variant="outline">Close</Button>
-              </DialogClose>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Company Registration Dialog */}
-        <CompanyRegistrationDialog
-          isOpen={showCompanyDialog}
-          onClose={() => setShowCompanyDialog(false)}
-          onSuccess={handleCompanyRegistrationSuccess}
-        />
+          </div>
+        )}
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Product"
+        description="This product will be removed from your inventory. This action cannot be undone."
+        itemName={productToDelete?.name}
+      />
+
+      {/* Subscription Limit Dialog */}
+      <Dialog open={showSubscriptionLimitDialog} onOpenChange={setShowSubscriptionLimitDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>🎯 Let's Get You Started!</DialogTitle>
+            <DialogDescription>{subscriptionLimitMessage}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => router.push("/admin/subscriptions/choose-plan")}>Choose Plan</Button>
+            <DialogClose asChild>
+              <Button variant="outline">Close</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Company Registration Dialog */}
+      <CompanyRegistrationDialog
+        isOpen={showCompanyDialog}
+        onClose={() => setShowCompanyDialog(false)}
+        onSuccess={handleCompanyRegistrationSuccess}
+      />
     </div>
   )
 }
