@@ -18,7 +18,7 @@ import { getUserProductsCount } from "@/lib/firebase-service"
 const promoEndDate = new Date(2025, 6, 19, 23, 59, 0)
 
 export default function SubscriptionPage() {
-  const { user, userData, subscriptionData, loading } = useAuth()
+  const { user, userData, subscriptionData, loading, refreshSubscriptionData } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
   const [isUpdating, setIsUpdating] = useState(false)
@@ -33,7 +33,6 @@ export default function SubscriptionPage() {
     minutes: number
     seconds: number
   } | null>(null)
-  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   const plans = getSubscriptionPlans()
 
@@ -106,7 +105,7 @@ export default function SubscriptionPage() {
     }
 
     fetchSubscriptionData()
-  }, [loading, user, userData, refreshTrigger])
+  }, [loading, user, userData])
 
   useEffect(() => {
     const calculateTimeLeft = () => {
@@ -186,8 +185,7 @@ export default function SubscriptionPage() {
           description: `Welcome to the ${selectedPlan.name}! Your new subscription has been created.`,
         })
 
-        // Trigger a refresh
-        setRefreshTrigger((prev) => prev + 1)
+        await refreshSubscriptionData()
       } catch (error: any) {
         console.error("Failed to select plan:", error)
         toast({
@@ -200,7 +198,7 @@ export default function SubscriptionPage() {
         setSelectedPlanId(null)
       }
     },
-    [user, userData, plans, toast],
+    [user, userData, plans, refreshSubscriptionData, toast],
   )
 
   const isCurrentPlan = useCallback(

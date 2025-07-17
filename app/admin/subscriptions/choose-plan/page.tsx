@@ -11,13 +11,13 @@ import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { PromoBanner } from "@/components/promo-banner"
-import { CompanyRegistrationDialog } from "@/components/company-registration-dialog" // Import the dialog
+import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
 
 // Move promoEndDate outside the component to ensure it's a stable reference
 const promoEndDate = new Date(2025, 6, 19, 23, 59, 0) // July 19, 2025, 11:59 PM PH time (UTC+8)
 
 export default function ChoosePlanPage() {
-  const { user, userData, subscriptionData, loading } = useAuth()
+  const { user, userData, subscriptionData, loading, refreshSubscriptionData } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
   const [isUpdating, setIsUpdating] = useState(false)
@@ -28,9 +28,8 @@ export default function ChoosePlanPage() {
     minutes: number
     seconds: number
   } | null>(null)
-  const [isCompanyRegistrationDialogOpen, setIsCompanyRegistrationDialogOpen] = useState(false) // New state for dialog
-  const [planToUpgradeAfterRegistration, setPlanToUpgradeAfterRegistration] = useState<string | null>(null) // New state to store plan
-  const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [isCompanyRegistrationDialogOpen, setIsCompanyRegistrationDialogOpen] = useState(false)
+  const [planToUpgradeAfterRegistration, setPlanToUpgradeAfterRegistration] = useState<string | null>(null)
 
   const plans = getSubscriptionPlans()
 
@@ -135,13 +134,8 @@ export default function ChoosePlanPage() {
           description: `Welcome to the ${selectedPlan.name}! Your new subscription has been created.`,
         })
 
-        // Trigger a refresh by updating state
-        setRefreshTrigger((prev) => prev + 1)
-
-        // Navigate to subscription page after a short delay
-        setTimeout(() => {
-          router.push("/admin/subscriptions")
-        }, 1000)
+        await refreshSubscriptionData()
+        router.push("/admin/subscriptions") // Navigate back to the main subscription page
       } catch (error: any) {
         console.error("Failed to select plan:", error)
         toast({
@@ -154,7 +148,7 @@ export default function ChoosePlanPage() {
         setSelectedPlanId(null)
       }
     },
-    [user, userData, plans, toast, router],
+    [user, userData, plans, refreshSubscriptionData, toast, router],
   )
 
   const handlePromoBannerClick = useCallback(() => {
@@ -163,17 +157,14 @@ export default function ChoosePlanPage() {
 
   const handleCompanyRegistrationSuccess = useCallback(async () => {
     setIsCompanyRegistrationDialogOpen(false)
-    // Trigger a refresh
-    setRefreshTrigger((prev) => prev + 1)
-
-    // Wait a moment for the refresh, then attempt upgrade
-    setTimeout(() => {
-      if (planToUpgradeAfterRegistration) {
-        handleUpgrade(planToUpgradeAfterRegistration)
-        setPlanToUpgradeAfterRegistration(null)
-      }
-    }, 500)
-  }, [planToUpgradeAfterRegistration, handleUpgrade])
+    // After successful registration, refresh user data to get the new company_id
+    await refreshSubscriptionData() // This also refreshes userData
+    if (planToUpgradeAfterRegistration) {
+      // Re-attempt the upgrade with the stored planId
+      handleUpgrade(planToUpgradeAfterRegistration)
+      setPlanToUpgradeAfterRegistration(null) // Clear the stored plan
+    }
+  }, [refreshSubscriptionData, planToUpgradeAfterRegistration, handleUpgrade])
 
   const currentPlan = subscriptionData?.planType || "None"
   const isGraphicExpoActive = currentPlan === "graphic-expo-event"
