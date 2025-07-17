@@ -1,5 +1,6 @@
 "use client"
 
+import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 
 import type React from "react"
@@ -35,13 +36,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { storage } from "@/lib/firebase"
+import { storage, db } from "@/lib/firebase"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { Progress } from "@/components/ui/progress"
+import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { getUserProductsCount } from "@/lib/firebase-service"
 import { cn } from "@/lib/utils"
-import { toast } from "@/components/ui/use-toast"
-import { subscriptionService } from "@/lib/subscription-service" // Import subscriptionService
+import { useToast } from "@/hooks/use-toast"
+import { subscriptionService } from "@/lib/subscription-service"
 
 // Helper function to mask the license key
 const maskLicenseKey = (key: string | undefined | null) => {
@@ -53,17 +54,60 @@ const maskLicenseKey = (key: string | undefined | null) => {
   return `${firstFour}${maskedPart}${lastFour}`
 }
 
+// Helper function to format location
+const formatLocation = (location: any): string => {
+  if (!location) return ""
+
+  if (typeof location === "string") {
+    return location
+  }
+
+  if (typeof location === "object") {
+    const parts = []
+    if (location.street) parts.push(location.street)
+    if (location.city) parts.push(location.city)
+    if (location.province) parts.push(location.province)
+    return parts.join(", ")
+  }
+
+  return ""
+}
+
+interface CompanyData {
+  id: string
+  company_name?: string
+  name?: string
+  company_location?: any // Can be string or object
+  address?: any // Can be string or object
+  company_website?: string
+  website?: string
+  photo_url?: string
+  contact_person?: string
+  email?: string
+  phone?: string
+  social_media?: {
+    facebook?: string
+    instagram?: string
+    youtube?: string
+  }
+  created_by?: string
+  created?: Date
+  updated?: Date
+}
+
 export default function AccountPage() {
   const { user, userData, projectData, subscriptionData, loading, updateUserData, updateProjectData, logout } =
     useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { toast } = useToast()
 
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
 
   const [currentProductsCount, setCurrentProductsCount] = useState<number | null>(null)
-  // Removed isLoadingCurrentCount state
+  const [productsCount, setProductsCount] = useState<number | null>(null)
+  const [productsLoading, setProductsLoading] = useState(true)
 
   const [firstName, setFirstName] = useState("")
   const [middleName, setMiddleName] = useState("")
@@ -73,6 +117,8 @@ export default function AccountPage() {
   const [gender, setGender] = useState("")
   const [photoURL, setPhotoURL] = useState("")
 
+  const [companyData, setCompanyData] = useState<CompanyData | null>(null)
+  const [companyLoading, setCompanyLoading] = useState(true)
   const [companyName, setCompanyName] = useState("")
   const [companyLocation, setCompanyLocation] = useState("")
   const [companyWebsite, setCompanyWebsite] = useState("")
@@ -81,7 +127,94 @@ export default function AccountPage() {
   const [instagram, setInstagram] = useState("")
   const [youtube, setYoutube] = useState("")
 
+  const [companyLogoFile, setCompanyLogoFile] = useState<File | null>(null)
+  const [companyLogoPreviewUrl, setCompanyLogoPreviewUrl] = useState<string | null>(null)
+  const [isUploadingCompanyLogo, setIsUploadingCompanyLogo] = useState(false)
+  const companyLogoInputRef = useRef<HTMLInputElement>(null)
+
   const router = useRouter()
+
+  const fetchCompanyData = async () => {
+    if (!user?.uid) return
+
+    setCompanyLoading(true)
+    try {
+      const companiesQuery = query(collection(db, "companies"), where("created_by", "==", user.uid))
+      const companiesSnapshot = await getDocs(companiesQuery)
+
+      if (!companiesSnapshot.empty) {
+        const companyDoc = companiesSnapshot.docs[0]
+        const data = companyDoc.data()
+
+        const company: CompanyData = {
+          id: companyDoc.id,
+          company_name: data.company_name || data.name,
+          company_location: data.company_location || data.address,
+          company_website: data.company_website || data.website,
+          photo_url: data.photo_url,
+          contact_person: data.contact_person,
+          email: data.email,
+          phone: data.phone,
+          social_media: data.social_media || {},
+          created_by: data.created_by,
+          created: data.created?.toDate(),
+          updated: data.updated?.toDate(),
+        }
+
+        setCompanyData(company)
+        setCompanyName(company.company_name || "")
+        setCompanyLocation(formatLocation(company.company_location))
+        setCompanyWebsite(company.company_website || "")
+        setFacebook(company.social_media?.facebook || "")
+        setInstagram(company.social_media?.instagram || "")
+        setYoutube(company.social_media?.youtube || "")
+        setCompanyLogoPreviewUrl(company.photo_url || null)
+      } else {
+        setCompanyData(null)
+      }
+    } catch (error) {
+      console.error("Error fetching company data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load company information.",
+        variant: "destructive",
+      })
+    } finally {
+      setCompanyLoading(false)
+    }
+  }
+
+  const updateCompanyData = async (updates: Partial<CompanyData>) => {
+    if (!companyData?.id) {
+      toast({
+        title: "Error",
+        description: "No company found to update.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const companyDocRef = doc(db, "companies", companyData.id)
+      const updatedFields = { ...updates, updated: serverTimestamp() }
+      await updateDoc(companyDocRef, updatedFields)
+
+      setCompanyData((prev) => (prev ? { ...prev, ...updates } : null))
+
+      toast({
+        title: "Success",
+        description: "Company information updated successfully!",
+      })
+    } catch (error: any) {
+      console.error("Error updating company data:", error)
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update company information.",
+        variant: "destructive",
+      })
+      throw error
+    }
+  }
 
   const handleLogout = async () => {
     try {
@@ -116,17 +249,13 @@ export default function AccountPage() {
     }
 
     if (projectData) {
-      setCompanyName(projectData.company_name || "")
-      setCompanyLocation(projectData.company_location || "")
-      setCompanyWebsite(projectData.company_website || "")
       setProjectName(projectData.project_name || "")
-      setFacebook(projectData.social_media?.facebook || "")
-      setInstagram(projectData.social_media?.instagram || "")
-      setYoutube(projectData.social_media?.youtube || "")
     }
+
+    // Fetch company data
+    fetchCompanyData()
   }, [user, userData, projectData, loading, router])
 
-  // Removed isLoadingCurrentCount state
   useEffect(() => {
     const fetchProductCount = async () => {
       if (user && subscriptionData?.licenseKey) {
@@ -145,12 +274,34 @@ export default function AccountPage() {
       }
     }
     fetchProductCount()
-  }, [user, subscriptionData])
+  }, [user, subscriptionData, toast])
+
+  useEffect(() => {
+    const fetchProductsCount = async () => {
+      if (user?.uid) {
+        setProductsLoading(true)
+        try {
+          const count = await getUserProductsCount(user.uid)
+          setProductsCount(count)
+        } catch (error) {
+          console.error("Error fetching user products count:", error)
+          setProductsCount(0) // Default to 0 on error
+        } finally {
+          setProductsLoading(false)
+        }
+      }
+    }
+
+    if (user) {
+      fetchProductsCount()
+    }
+  }, [user])
 
   const handleSave = async () => {
     setIsSaving(true)
 
     try {
+      // Update user data
       await updateUserData({
         first_name: firstName,
         middle_name: middleName,
@@ -161,30 +312,31 @@ export default function AccountPage() {
         photo_url: photoURL,
       })
 
-      await updateProjectData({
-        company_name: companyName,
-        company_location: companyLocation,
-        company_website: companyWebsite,
-        project_name: projectName,
-        social_media: {
-          facebook,
-          instagram,
-          youtube,
-        },
-      })
+      // Update project data if it exists
+      if (projectData) {
+        await updateProjectData({
+          project_name: projectName,
+        })
+      }
 
-      toast({
-        title: "Success",
-        description: "Account information updated successfully!",
-      })
+      // Update company data if it exists
+      if (companyData) {
+        await updateCompanyData({
+          company_name: companyName,
+          company_location: companyLocation,
+          company_website: companyWebsite,
+          social_media: {
+            facebook,
+            instagram,
+            youtube,
+          },
+        })
+      }
+
       setIsEditing(false)
     } catch (error: any) {
       console.error("Update error:", error)
-      toast({
-        title: "Update Failed",
-        description: error.message || "Failed to update account information.",
-        variant: "destructive",
-      })
+      // Error handling is done in individual update functions
     } finally {
       setIsSaving(false)
     }
@@ -227,10 +379,59 @@ export default function AccountPage() {
     }
   }
 
+  const handleCompanyLogoClick = () => {
+    if (companyLogoInputRef.current) {
+      companyLogoInputRef.current.click()
+    }
+  }
+
+  const handleCompanyLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !user || !companyData) return
+
+    setIsUploadingCompanyLogo(true)
+
+    try {
+      const storageRef = ref(storage, `company_logos/${user.uid}/${Date.now()}_${file.name}`)
+      const snapshot = await uploadBytes(storageRef, file)
+      const downloadURL = await getDownloadURL(snapshot.ref)
+
+      // Update the company data with the new logo URL
+      await updateCompanyData({ photo_url: downloadURL })
+
+      setCompanyLogoPreviewUrl(downloadURL)
+    } catch (error: any) {
+      console.error("Company logo upload error:", error)
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload company logo.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingCompanyLogo(false)
+      if (companyLogoInputRef.current) {
+        companyLogoInputRef.current.value = ""
+      }
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!userData) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Account Not Found</CardTitle>
+            <CardDescription>Please log in to view your account details.</CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     )
   }
@@ -575,96 +776,139 @@ export default function AccountPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-5">
-                  <div className="mb-5 flex flex-col items-center gap-5 sm:flex-row sm:items-start">
-                    <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-100 shadow-sm">
-                      <Building size={40} className="text-gray-400" />
+                  {companyLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     </div>
+                  ) : (
+                    <>
+                      <div className="mb-5 flex flex-col items-center gap-5 sm:flex-row sm:items-start">
+                        <div className="relative group flex-shrink-0">
+                          <div
+                            className="flex h-24 w-24 items-center justify-center rounded-lg border border-gray-200 bg-gray-100 shadow-sm cursor-pointer hover:bg-gray-200 transition-colors overflow-hidden"
+                            onClick={handleCompanyLogoClick}
+                          >
+                            {isUploadingCompanyLogo ? (
+                              <Loader2 size={40} className="animate-spin text-primary" />
+                            ) : companyLogoPreviewUrl || companyData?.photo_url ? (
+                              <img
+                                src={companyLogoPreviewUrl || companyData?.photo_url || "/placeholder.svg"}
+                                alt="Company Logo"
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <Building size={40} className="text-gray-400" />
+                            )}
+                          </div>
+                          <button
+                            className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary p-1.5 text-white shadow-md transition-colors duration-200 hover:bg-primary/90"
+                            onClick={handleCompanyLogoClick}
+                            disabled={isUploadingCompanyLogo || !isEditing}
+                            aria-label="Change company logo"
+                          >
+                            <Camera size={16} />
+                          </button>
+                          <input
+                            type="file"
+                            ref={companyLogoInputRef}
+                            className="hidden"
+                            accept="image/*"
+                            onChange={handleCompanyLogoChange}
+                            disabled={isUploadingCompanyLogo || !isEditing}
+                          />
+                        </div>
 
-                    <div className="flex-1 text-center sm:text-left">
-                      <h2 className="text-xl font-bold text-gray-900">{projectData?.company_name || "Your Company"}</h2>
-                      <p className="mt-0.5 text-base text-gray-600">{projectData?.project_name || "Default Project"}</p>
-                      <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-gray-700 sm:justify-start">
-                        {projectData?.company_location && (
-                          <div className="flex items-center gap-1.5">
-                            <MapPin size={14} className="text-gray-500" />
-                            <span>{projectData.company_location}</span>
+                        <div className="flex-1 text-center sm:text-left">
+                          <h2 className="text-xl font-bold text-gray-900">
+                            {companyData?.company_name || "Your Company"}
+                          </h2>
+                          <p className="mt-0.5 text-base text-gray-600">
+                            {projectData?.project_name || "Default Project"}
+                          </p>
+                          <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-gray-700 sm:justify-start">
+                            {companyData?.company_location && (
+                              <div className="flex items-center gap-1.5">
+                                <MapPin size={14} className="text-gray-500" />
+                                <span>{formatLocation(companyData.company_location)}</span>
+                              </div>
+                            )}
+                            {companyData?.company_website && (
+                              <div className="flex items-center gap-1.5">
+                                <Globe size={14} className="text-gray-500" />
+                                <a
+                                  href={companyData.company_website}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline"
+                                >
+                                  Website
+                                </a>
+                              </div>
+                            )}
                           </div>
-                        )}
-                        {projectData?.company_website && (
-                          <div className="flex items-center gap-1.5">
-                            <Globe size={14} className="text-gray-500" />
-                            <a
-                              href={projectData.company_website}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-primary hover:underline"
-                            >
-                              Website
-                            </a>
-                          </div>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  </div>
 
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <Label htmlFor="companyName" className="text-xs font-medium text-gray-700">
-                        Company Name
-                      </Label>
-                      <Input
-                        id="companyName"
-                        value={companyName}
-                        onChange={(e) => setCompanyName(e.target.value)}
-                        disabled={!isEditing}
-                        placeholder="Your Company Name"
-                        className={cn(
-                          "rounded-md border px-3 py-2 text-sm shadow-sm",
-                          isEditing
-                            ? "border-primary/40 focus:border-primary"
-                            : "border-gray-200 bg-gray-50 text-gray-700",
-                        )}
-                      />
-                    </div>
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <Label htmlFor="companyName" className="text-xs font-medium text-gray-700">
+                            Company Name
+                          </Label>
+                          <Input
+                            id="companyName"
+                            value={companyName}
+                            onChange={(e) => setCompanyName(e.target.value)}
+                            disabled={!isEditing}
+                            placeholder="Your Company Name"
+                            className={cn(
+                              "rounded-md border px-3 py-2 text-sm shadow-sm",
+                              isEditing
+                                ? "border-primary/40 focus:border-primary"
+                                : "border-gray-200 bg-gray-50 text-gray-700",
+                            )}
+                          />
+                        </div>
 
-                    <div className="space-y-1">
-                      <Label htmlFor="companyLocation" className="text-xs font-medium text-gray-700">
-                        Company Address
-                      </Label>
-                      <Input
-                        id="companyLocation"
-                        value={companyLocation}
-                        onChange={(e) => setCompanyLocation(e.target.value)}
-                        disabled={!isEditing}
-                        placeholder="123 Main St, City, Country"
-                        className={cn(
-                          "rounded-md border px-3 py-2 text-sm shadow-sm",
-                          isEditing
-                            ? "border-primary/40 focus:border-primary"
-                            : "border-gray-200 bg-gray-50 text-gray-700",
-                        )}
-                      />
-                    </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="companyLocation" className="text-xs font-medium text-gray-700">
+                            Company Address
+                          </Label>
+                          <Input
+                            id="companyLocation"
+                            value={companyLocation}
+                            onChange={(e) => setCompanyLocation(e.target.value)}
+                            disabled={!isEditing}
+                            placeholder="123 Main St, City, Country"
+                            className={cn(
+                              "rounded-md border px-3 py-2 text-sm shadow-sm",
+                              isEditing
+                                ? "border-primary/40 focus:border-primary"
+                                : "border-gray-200 bg-gray-50 text-gray-700",
+                            )}
+                          />
+                        </div>
 
-                    <div className="space-y-1">
-                      <Label htmlFor="companyWebsite" className="text-xs font-medium text-gray-700">
-                        Company Website
-                      </Label>
-                      <Input
-                        id="companyWebsite"
-                        value={companyWebsite}
-                        onChange={(e) => setCompanyWebsite(e.target.value)}
-                        disabled={!isEditing}
-                        placeholder="https://www.example.com"
-                        className={cn(
-                          "rounded-md border px-3 py-2 text-sm shadow-sm",
-                          isEditing
-                            ? "border-primary/40 focus:border-primary"
-                            : "border-gray-200 bg-gray-50 text-gray-700",
-                        )}
-                      />
-                    </div>
-                  </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="companyWebsite" className="text-xs font-medium text-gray-700">
+                            Company Website
+                          </Label>
+                          <Input
+                            id="companyWebsite"
+                            value={companyWebsite}
+                            onChange={(e) => setCompanyWebsite(e.target.value)}
+                            disabled={!isEditing}
+                            placeholder="https://www.example.com"
+                            className={cn(
+                              "rounded-md border px-3 py-2 text-sm shadow-sm",
+                              isEditing
+                                ? "border-primary/40 focus:border-primary"
+                                : "border-gray-200 bg-gray-50 text-gray-700",
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
 
@@ -784,26 +1028,26 @@ export default function AccountPage() {
                         {subscriptionData?.startDate && (
                           <p>
                             <span className="font-medium">Start Date:</span>{" "}
-                            {new Date(subscriptionData.startDate.toDate()).toLocaleDateString()}
+                            {new Date(subscriptionData.startDate).toLocaleDateString()}
                           </p>
                         )}
                         {subscriptionData?.endDate && (
                           <p>
                             <span className="font-medium">End Date:</span>{" "}
-                            {new Date(subscriptionData.endDate.toDate()).toLocaleDateString()}
+                            {new Date(subscriptionData.endDate).toLocaleDateString()}
                           </p>
                         )}
                         {subscriptionData?.trialEndDate && isTrial && (
                           <p>
                             <span className="font-medium">Trial Ends:</span>{" "}
-                            {new Date(subscriptionData.trialEndDate.toDate()).toLocaleDateString()} ({daysRemaining}{" "}
-                            days remaining)
+                            {new Date(subscriptionData.trialEndDate).toLocaleDateString()} ({daysRemaining} days
+                            remaining)
                           </p>
                         )}
                       </div>
 
                       <div className="flex gap-2">
-                        {subscriptionData?.planType === "Trial" && (
+                        {subscriptionData?.planType === "trial" && (
                           <Button
                             variant="default"
                             size="sm"
@@ -813,7 +1057,7 @@ export default function AccountPage() {
                             Upgrade Now
                           </Button>
                         )}
-                        {subscriptionData?.planType !== "Trial" && (
+                        {subscriptionData?.planType !== "trial" && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -832,24 +1076,22 @@ export default function AccountPage() {
                         <Package className="h-4 w-4 text-blue-600" />
                         Product Usage
                       </h3>
-                      <>
-                        <div className="flex justify-between text-sm font-medium text-gray-700">
-                          <span>{currentProductsCount !== null ? currentProductsCount : "N/A"} products uploaded</span>
-                          <span>{maxProducts === null ? "Unlimited" : `${maxProducts} max`}</span>
-                        </div>
-                        {maxProducts !== null && currentProductsCount !== null && (
-                          <Progress
-                            value={(currentProductsCount / maxProducts) * 100}
-                            className="h-2 rounded-full bg-gray-200 [&>*]:bg-primary"
-                          />
-                        )}
-                        {isLimitReached && (
-                          <p className="mt-2 flex items-center gap-1.5 text-sm text-red-600">
-                            <Info className="h-4 w-4" />
-                            You have reached your product upload limit. Please upgrade your plan.
-                          </p>
-                        )}
-                      </>
+                      <div className="flex justify-between text-sm font-medium text-gray-700">
+                        <span>{currentProductsCount !== null ? currentProductsCount : "N/A"} products uploaded</span>
+                        <span>{maxProducts === null ? "Unlimited" : `${maxProducts} max`}</span>
+                      </div>
+                      {maxProducts !== null && currentProductsCount !== null && (
+                        <Progress
+                          value={(currentProductsCount / maxProducts) * 100}
+                          className="h-2 rounded-full bg-gray-200 [&>*]:bg-primary"
+                        />
+                      )}
+                      {isLimitReached && (
+                        <p className="mt-2 flex items-center gap-1.5 text-sm text-red-600">
+                          <Info className="h-4 w-4" />
+                          You have reached your product upload limit. Please upgrade your plan.
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -862,7 +1104,7 @@ export default function AccountPage() {
                       <p className="text-xs text-gray-600">Subscription Created</p>
                       <p className="mt-0.5 text-sm font-semibold text-gray-900">
                         {subscriptionData?.createdAt
-                          ? new Date(subscriptionData.createdAt.toDate()).toLocaleDateString()
+                          ? new Date(subscriptionData.createdAt).toLocaleDateString()
                           : "N/A"}
                       </p>
                     </div>
@@ -872,7 +1114,7 @@ export default function AccountPage() {
                       <p className="text-xs text-gray-600">Last Updated</p>
                       <p className="mt-0.5 text-sm font-semibold text-gray-900">
                         {subscriptionData?.updatedAt
-                          ? new Date(subscriptionData.updatedAt.toDate()).toLocaleDateString()
+                          ? new Date(subscriptionData.updatedAt).toLocaleDateString()
                           : "N/A"}
                       </p>
                     </div>

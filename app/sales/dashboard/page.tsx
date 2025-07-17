@@ -37,7 +37,6 @@ import {
   type Booking,
 } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
-import ProtectedRoute from "@/components/protected-route"
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { SearchBox } from "@/components/search-box"
@@ -59,6 +58,7 @@ import { createDirectCostEstimate } from "@/lib/cost-estimate-service" // Import
 import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service" // Imports for Quotation creation
 import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
+import { RouteProtection } from "@/components/route-protection"
 // Removed: import { SelectQuotationDialog } from "@/components/select-quotation-dialog"
 
 // Number of items to display per page
@@ -71,7 +71,7 @@ const getSiteCode = (product: Product | null) => {
   // Try different possible locations for site_code
   if (product.site_code) return product.site_code
   if (product.specs_rental && "site_code" in product.specs_rental) return product.specs_rental.site_code
-  if (product.light && "site_code" in product.light) return product.light.site_code
+  if (product.light && "site_code" in product.light) return product.light.siteCode
 
   // Check for camelCase variant
   if ("siteCode" in product) return (product as any).siteCode
@@ -232,11 +232,11 @@ function SalesDashboardContent() {
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
-    if (!user?.uid) return
+    if (!userData?.company_id) return
 
     setLoadingCount(true)
     try {
-      const count = await getUserProductsCount(user.uid, { active: true })
+      const count = await getUserProductsCount(userData?.company_id, { active: true })
       setTotalItems(count)
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
@@ -249,12 +249,12 @@ function SalesDashboardContent() {
     } finally {
       setLoadingCount(false)
     }
-  }, [user, toast])
+  }, [userData, toast])
 
   // Fetch products for the current page
   const fetchProducts = useCallback(
     async (page: number) => {
-      if (!user?.uid) return
+      if (!userData?.company_id) return
 
       // Check if we have this page in cache
       if (pageCache.has(page)) {
@@ -278,7 +278,7 @@ function SalesDashboardContent() {
         // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
-        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, { active: true })
+        const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, { active: true })
 
         setProducts(result.items)
         setLastDoc(result.lastDoc)
@@ -316,23 +316,23 @@ function SalesDashboardContent() {
         setLoadingMore(false)
       }
     },
-    [user, lastDoc, pageCache, toast, checkOngoingBookings],
+    [userData, lastDoc, pageCache, toast, checkOngoingBookings],
   )
 
   // Load initial data and count
   useEffect(() => {
-    if (user?.uid) {
+    if (userData?.company_id) {
       fetchProducts(1)
       fetchTotalCount()
     }
-  }, [user, fetchProducts, fetchTotalCount])
+  }, [userData?.company_id, fetchProducts, fetchTotalCount])
 
   // Load data when page changes
   useEffect(() => {
-    if (user?.uid && currentPage > 0) {
+    if (userData?.company_id && currentPage > 0) {
       fetchProducts(currentPage)
     }
-  }, [currentPage, fetchProducts, user])
+  }, [currentPage, fetchProducts, userData?.company_id])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -504,6 +504,7 @@ function SalesDashboardContent() {
       phone: client.phone || "",
       address: client.address || "",
       industry: client.industry || "",
+      designation: client.designation || "", // Add designation field
       targetAudience: "", // These might need to be fetched or added later
       campaignObjective: "", // These might need to be fetched or added later
     })
@@ -553,7 +554,7 @@ function SalesDashboardContent() {
       return
     }
 
-    if (!user?.uid) {
+    if (!user?.uid || !userData?.company_id) {
       toast({
         title: "Authentication Required",
         description: "Please log in to create a proposal.",
@@ -570,6 +571,7 @@ function SalesDashboardContent() {
       const proposalId = await createProposal(proposalTitle, selectedClientForProposal, selectedProducts, user.uid, {
         // You can add notes or custom messages here if needed
         // notes: "Generated from dashboard selection",
+        companyId: userData.company_id, // Add company_id to the proposal creation
       })
 
       toast({
@@ -838,7 +840,9 @@ function SalesDashboardContent() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex flex-col gap-2">
                 <h1 className="text-xl md:text-2xl font-bold">
-                  {userData?.first_name ? `${userData.first_name}'s Dashboard` : "Dashboard"}
+                  {userData?.first_name
+                    ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                    : "Dashboard"}
                 </h1>
                 {/* Conditionally hide the SearchBox when in proposalCreationMode or ceQuoteMode */}
                 {!(proposalCreationMode || ceQuoteMode) && (
@@ -1515,18 +1519,18 @@ function SalesDashboardContent() {
   )
 }
 
-export default function SalesDashboard() {
+export default function SalesDashboardPage() {
   const { user } = useAuth()
 
   return (
-    <div>
-      <ProtectedRoute module="sales" action="view">
+    <RouteProtection requiredRoles="sales">
+      <div>
         <SalesDashboardContent />
-      </ProtectedRoute>
 
-      {/* Render SalesChatWidget without the floating button */}
-      <SalesChatWidget />
-    </div>
+        {/* Render SalesChatWidget without the floating button */}
+        <SalesChatWidget />
+      </div>
+    </RouteProtection>
   )
 }
 
@@ -1606,8 +1610,6 @@ function ProductCard({
             </div>
           </div>
         )}
-
-        {/* Removed the DropdownMenu for actions */}
       </div>
 
       <CardContent className="p-4">

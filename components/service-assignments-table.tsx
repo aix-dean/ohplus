@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -25,18 +25,25 @@ interface ServiceAssignment {
   coveredDateStart: any
   coveredDateEnd: any
   created: any
+  company_id: string
 }
 
 interface ServiceAssignmentsTableProps {
   onSelectAssignment?: (id: string) => void
+  companyId?: string
 }
 
-export function ServiceAssignmentsTable({ onSelectAssignment }: ServiceAssignmentsTableProps) {
+export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: ServiceAssignmentsTableProps) {
   const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const q = query(collection(db, "service_assignments"), orderBy("created", "desc"))
+    let q = query(collection(db, "service_assignments"), orderBy("created", "desc"))
+
+    // Filter by company_id if provided
+    if (companyId) {
+      q = query(collection(db, "service_assignments"), where("company_id", "==", companyId), orderBy("created", "desc"))
+    }
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const assignmentsData: ServiceAssignment[] = []
@@ -51,7 +58,7 @@ export function ServiceAssignmentsTable({ onSelectAssignment }: ServiceAssignmen
     })
 
     return () => unsubscribe()
-  }, [])
+  }, [companyId])
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {

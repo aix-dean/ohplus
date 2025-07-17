@@ -2,44 +2,33 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
 import { ServiceAssignmentsTable } from "@/components/service-assignments-table"
 import { Plus, Filter, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
-import { doc, getDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function ServiceAssignmentsPage() {
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const router = useRouter()
+  const { userData } = useAuth()
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
-  const [selectedAssignment, setSelectedAssignment] = useState(null)
-  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
 
   const handleSelectAssignment = async (id) => {
-    try {
-      const assignmentDoc = await getDoc(doc(db, "service_assignments", id))
-      if (assignmentDoc.exists()) {
-        setSelectedAssignment({
-          id: assignmentDoc.id,
-          ...assignmentDoc.data(),
-        })
-        setSelectedAssignmentId(id)
-        setDetailsDialogOpen(true)
-      }
-    } catch (err) {
-      console.error("Error fetching assignment:", err)
-    }
+    router.push(`/logistics/service-assignments/${id}`)
+  }
+
+  const handleCreateAssignment = () => {
+    router.push("/logistics/assignments/create")
   }
 
   return (
     <div className="flex-1 overflow-auto">
       <header className="flex justify-between items-center p-4 border-b border-gray-200">
         <div>
-          <h1 className="text-xl font-bold">Service Assignments</h1>
+          <h1 className="text-2xl font-bold">Service Assignments</h1>
           <p className="text-sm text-gray-500">Manage service assignments</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={handleCreateAssignment} className="bg-blue-600 hover:bg-blue-700">
           <Plus className="mr-2 h-4 w-4" /> Create Assignment
         </Button>
       </header>
@@ -55,24 +44,7 @@ export default function ServiceAssignmentsPage() {
           </Button>
         </div>
 
-        <ServiceAssignmentsTable onSelectAssignment={handleSelectAssignment} />
-
-        <ServiceAssignmentDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          onSuccess={() => {
-            // You could add a success toast notification here
-          }}
-        />
-        <ServiceAssignmentDetailsDialog
-          open={detailsDialogOpen}
-          onOpenChange={setDetailsDialogOpen}
-          assignmentId={selectedAssignmentId}
-          assignment={selectedAssignment}
-          onStatusChange={() => {
-            // You could add a refresh function here
-          }}
-        />
+        <ServiceAssignmentsTable onSelectAssignment={handleSelectAssignment} companyId={userData?.company_id} />
       </main>
     </div>
   )

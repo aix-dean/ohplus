@@ -1,38 +1,40 @@
 "use client"
 
 import { getProductById } from "@/lib/firebase-service"
-import { notFound } from "next/navigation"
+import { notFound, useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
-import Link from "next/link"
 import {
-  ArrowLeft,
   Calendar,
   MapPin,
-  User,
-  Play,
-  Clock,
-  RefreshCw,
-  Plus,
-  FileText,
-  PenToolIcon as Tool,
   AlertTriangle,
+  Shield,
+  Zap,
+  Users,
+  Settings,
+  Eye,
+  History,
+  FileCheck,
+  ArrowLeft,
+  MoreVertical,
+  Edit,
+  Bell,
+  Sun,
 } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardContentInner } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { formatDate } from "@/lib/utils"
 import { useState, useEffect } from "react"
-import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { format } from "date-fns"
-// Add the import for the new dialog component
 import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
-import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { AlarmSettingDialog } from "@/components/alarm-setting-dialog"
+import { IlluminationIndexCardDialog } from "@/components/illumination-index-card-dialog"
+import { DisplayIndexCardDialog } from "@/components/display-index-card-dialog"
 
 type Props = {
   params: { id: string }
-  searchParams: { [key: string]: string | string[] | undefined }
 }
 
 interface ServiceAssignment {
@@ -56,16 +58,19 @@ interface ServiceAssignment {
   created: any
 }
 
-export default function SiteDetailsPage({ params, searchParams }: Props) {
+export default function SiteDetailsPage({ params }: Props) {
   const [product, setProduct] = useState<any>(null)
   const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
-  const [openServiceAssignmentDialog, setOpenServiceAssignmentDialog] = useState(false)
-  // Add state for the selected assignment ID and dialog visibility
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
+  const [alarmDialogOpen, setAlarmDialogOpen] = useState(false)
+  const [illuminationIndexCardDialogOpen, setIlluminationIndexCardDialogOpen] = useState(false)
+  const [displayIndexCardDialogOpen, setDisplayIndexCardDialogOpen] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const view = searchParams.get("view")
 
   // Fetch product data and service assignments
   useEffect(() => {
@@ -109,28 +114,50 @@ export default function SiteDetailsPage({ params, searchParams }: Props) {
     fetchData()
   }, [params.id])
 
+  const handleCreateServiceAssignment = () => {
+    router.push(`/logistics/assignments/create?projectSite=${params.id}`)
+  }
+
   if (loading) {
-    return <div className="container mx-auto py-4">Loading...</div>
+    return (
+      <div className="container mx-auto py-4">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded mb-4"></div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="space-y-4">
+              <div className="h-64 bg-gray-200 rounded"></div>
+              <div className="h-32 bg-gray-200 rounded"></div>
+            </div>
+            <div className="lg:col-span-2 space-y-4">
+              <div className="h-32 bg-gray-200 rounded"></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="h-32 bg-gray-200 rounded"></div>
+                <div className="h-32 bg-gray-200 rounded"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (error) {
-    return <div className="container mx-auto py-4">Error: {error.message}</div>
+    return (
+      <div className="container mx-auto py-4">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Site</h2>
+          <p className="text-gray-600">{error.message}</p>
+          <Button onClick={() => router.back()} className="mt-4">
+            Go Back
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   if (!product) {
     notFound()
   }
-
-  // Check navigation source
-  const view = searchParams.view as string | undefined
-  const isFromIllumination = view === "illumination"
-  const isFromCompliance = view === "compliance"
-  const isFromContent = view === "content"
-  const isFromStructure = view === "structure"
-  const isFromDisplayHealth = view === "display-health"
-
-  // Show job orders for content, structure, and compliance tabs
-  const showJobOrders = isFromContent || isFromStructure || isFromCompliance
 
   // Determine if this is a static or dynamic site
   const contentType = (product.content_type || "").toLowerCase()
@@ -148,14 +175,7 @@ export default function SiteDetailsPage({ params, searchParams }: Props) {
   // Get geopoint
   const geopoint = product.specs_rental?.geopoint
     ? `${product.specs_rental.geopoint[0]},${product.specs_rental.geopoint[1]}`
-    : "Not specified"
-
-  // Get current advertisement (placeholder data)
-  const currentAd = product.status === "VACANT" ? "VACANT" : "Samsung Galaxy S22"
-
-  // Contract end date (placeholder data)
-  const contractEndDate = new Date()
-  contractEndDate.setMonth(contractEndDate.getMonth() + 4)
+    : "12.5346567742,14. 09346723"
 
   // Get the first media item for the thumbnail
   const thumbnailUrl =
@@ -165,115 +185,35 @@ export default function SiteDetailsPage({ params, searchParams }: Props) {
         ? "/roadside-billboard.png"
         : "/led-billboard-1.png"
 
-  // Helper function to get service type icon
-  const getServiceTypeIcon = (type: string) => {
-    const typeLower = type.toLowerCase()
-    if (typeLower.includes("repair") || typeLower.includes("maintenance")) {
-      return <Tool className="h-3 w-3 text-blue-600" />
-    } else if (typeLower.includes("inspection") || typeLower.includes("monitoring")) {
-      return <FileText className="h-3 w-3 text-green-600" />
-    } else if (typeLower.includes("emergency")) {
-      return <AlertTriangle className="h-3 w-3 text-red-600" />
-    }
-    return <User className="h-3 w-3 text-blue-600" />
-  }
-
-  // Helper function to get status color
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "completed":
-        return "bg-green-100 text-green-800"
-      case "in progress":
-        return "bg-blue-100 text-blue-800"
-      case "pending":
-        return "bg-yellow-100 text-yellow-800"
-      case "cancelled":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  // Mock content schedule data
-  const currentTime = new Date()
-  const baseMinute = Math.floor(currentTime.getMinutes() / 10) * 10
-  const baseHour = currentTime.getHours()
-
-  const contentSchedule = [
-    {
-      time: `${baseHour}:${baseMinute}:30`,
-      spot: 1,
-      status: "Filler",
-      client: "GT",
-      length: "10 s",
-      isPlaying: false,
-    },
-    {
-      time: `${baseHour}:${baseMinute}:40`,
-      spot: 2,
-      status: "Payee",
-      client: "Political party 1",
-      length: "10 s",
-      isPlaying: false,
-    },
-    {
-      time: `${baseHour}:${baseMinute}:50`,
-      spot: 3,
-      status: "Filler",
-      client: "GT",
-      length: "10 s",
-      isPlaying: false,
-    },
-    {
-      time: `${baseHour}:${baseMinute + 1}:00`,
-      spot: 4,
-      status: "Payee",
-      client: "Senator A",
-      length: "10 s",
-      isPlaying: true,
-    },
-    {
-      time: `${baseHour}:${baseMinute + 1}:10`,
-      spot: 5,
-      status: "Filler",
-      client: "GT",
-      length: "10 s",
-      isPlaying: false,
-    },
-    {
-      time: `${baseHour}:${baseMinute + 1}:20`,
-      spot: 6,
-      status: "Payee",
-      client: "Beauty Brand X",
-      length: "10 s",
-      isPlaying: false,
-    },
-  ]
-
-  // Update the handleBack function to use the new logistics path
-  const handleBack = () => {
-    router.push("/logistics/dashboard")
-  }
+  // Check if we should show specific view content
+  const isFromContent = view === "content"
+  const isFromStructure = view === "structure"
+  const isFromCompliance = view === "compliance"
+  const isFromIllumination = view === "illumination"
+  const isFromDisplayHealth = view === "display-health"
 
   return (
-    <div className="container mx-auto py-4 space-y-4 relative">
-      {/* Top section with two cards */}
-      <div className="flex flex-col md:flex-row gap-4 border border-gray-200 rounded-lg py-2 px-4 shadow-sm">
-        {/* Left card - Site image and basic info */}
-        <Card className="flex-1 shadow-none border-none">
-          <CardContent className="p-0">
-            <div className="p-4">
-              {/* Update any other references to operations paths */}
-              <Link
-                href="/logistics/dashboard"
-                className="inline-flex items-center text-xs text-gray-500 hover:text-gray-700"
-              >
-                <ArrowLeft className="mr-1 h-3 w-3" />
-                Back to Dashboard
-              </Link>
-            </div>
-            <div className="flex px-4 pb-4 items-center">
-              <div className="relative aspect-square w-full max-w-[100px] flex-shrink-0">
+    <div className="container mx-auto py-4 space-y-4">
+      {/* Header */}
+      <div className="bg-slate-800 text-white p-4 rounded-lg flex items-center justify-between">
+        <h1 className="text-lg font-semibold">Logistics- Site Information</h1>
+        <Link href="/logistics/dashboard" className="inline-flex items-center text-sm text-white/80 hover:text-white">
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          Back to Dashboard
+        </Link>
+      </div>
+
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Site Information */}
+        <div className="lg:col-span-1 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Site Information</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Site Image */}
+              <div className="relative aspect-square w-full">
                 <Image
                   src={thumbnailUrl || "/placeholder.svg"}
                   alt={product.name}
@@ -284,540 +224,446 @@ export default function SiteDetailsPage({ params, searchParams }: Props) {
                     target.src = isStatic ? "/roadside-billboard.png" : "/led-billboard-1.png"
                   }}
                 />
-              </div>
-              <div className="pl-3 space-y-1">
-                <div>
-                  <div className="text-[10px] text-gray-500">{product.id}</div>
-                  <h1 className="text-sm font-semibold">{product.name}</h1>
+                {/* Map overlay */}
+                <div className="absolute inset-0 bg-black/20 rounded-md flex items-center justify-center">
+                  <MapPin className="h-8 w-8 text-red-500" />
                 </div>
+              </div>
 
-                <div>
-                  <div className="text-[10px] text-gray-500">Current:</div>
-                  <div className="text-xs">{currentAd}</div>
-                  <div className="text-[10px] text-gray-500 flex items-center mt-1">
-                    <Calendar className="h-2 w-2 mr-1" />
-                    until {formatDate(contractEndDate)}
+              {/* Site Details */}
+              <div className="space-y-2">
+                <h2 className="font-semibold text-lg">{product.site_code || product.id}</h2>
+                <h3 className="text-base">{product.name}</h3>
+
+                <div className="space-y-1 text-sm">
+                  <div>
+                    <span className="font-medium">Site Code:</span> {product.id}
+                  </div>
+                  <div>
+                    <span className="font-medium">Site Name:</span> {product.name}
+                  </div>
+                  <div>
+                    <span className="font-medium">Type:</span> {isStatic ? "Static" : "Dynamic"} - Billboard
+                  </div>
+                  <div>
+                    <span className="font-medium">Dimension:</span> {dimension}
+                  </div>
+                  <div>
+                    <span className="font-medium">Location:</span> {location}
+                  </div>
+                  <div>
+                    <span className="font-medium">Geopoint:</span> {geopoint}
+                  </div>
+                  <div>
+                    <span className="font-medium">Site Orientation:</span> {product.site_orientation || ""}
+                  </div>
+                  <div>
+                    <span className="font-medium">Site Owner:</span> {product.site_owner || ""}
+                  </div>
+                  <div>
+                    <span className="font-medium">Land Owner:</span> {product.land_owner || ""}
                   </div>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Right card - Site information */}
-        <Card className="flex-1 shadow-none border-none">
-          <CardHeader className="py-2">
-            <CardTitle className="text-base font-semibold">Site Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col space-y-1">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                <div>
-                  <div className="text-[10px] font-medium text-gray-500">Site Code:</div>
-                  <div className="text-xs">{product.id}</div>
+              {/* Site Calendar */}
+              <div className="border-t pt-4">
+                <h4 className="font-medium mb-2">Site Calendar</h4>
+                <div className="bg-gray-50 p-3 rounded-md">
+                  <Calendar className="h-4 w-4 mb-2" />
+                  <div className="text-sm text-gray-600">Calendar view placeholder</div>
                 </div>
+              </div>
 
-                <div>
-                  <div className="text-[10px] font-medium text-gray-500">Site Name:</div>
-                  <div className="text-xs">{product.name}</div>
+              {/* Action Buttons */}
+              <div className="space-y-2">
+                <Button className="w-full bg-blue-600 hover:bg-blue-700" onClick={handleCreateServiceAssignment}>
+                  Create Service Assignment
+                </Button>
+                <Button variant="outline" className="w-full bg-transparent">
+                  Create Report
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column - Site Data and Details */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Job Orders */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg">Job Orders</CardTitle>
+              <Button variant="outline" size="sm">
+                <Eye className="h-4 w-4 mr-2" />
+                See All
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {serviceAssignments.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">No job orders found for this site.</div>
+              ) : (
+                <div className="space-y-3">
+                  {serviceAssignments.slice(0, 3).map((assignment) => (
+                    <div
+                      key={assignment.id}
+                      className="border rounded-lg p-3 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => {
+                        setSelectedAssignmentId(assignment.id)
+                        setDetailsDialogOpen(true)
+                      }}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium text-sm">SA: {assignment.saNumber}</div>
+                          <div className="text-xs text-gray-500 mt-1">{assignment.serviceType}</div>
+                          <div className="text-xs text-gray-600 mt-1 line-clamp-2">{assignment.jobDescription}</div>
+                        </div>
+                        <Badge
+                          variant={assignment.status === "completed" ? "default" : "secondary"}
+                          className="text-xs"
+                        >
+                          {assignment.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
                 </div>
+              )}
+            </CardContent>
+          </Card>
 
-                <div>
-                  <div className="text-[10px] font-medium text-gray-500">Type:</div>
-                  <div className="text-xs">
-                    {isStatic ? "Static Billboard" : isDynamic ? "LED Billboard" : "Unknown"}
+          {/* Site Data Grid - Updated to include Display card */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Illumination - Top Left */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base flex items-center">
+                  <Zap className="h-4 w-4 mr-2" />
+                  Illumination
+                </CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => console.log("Edit illumination clicked")}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setAlarmDialogOpen(true)
+                      }}
+                    >
+                      <Bell className="mr-2 h-4 w-4" />
+                      Alarm Settings
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-start gap-4">
+                  {/* Left side - Date and Power info */}
+                  <div className="flex-1 space-y-3">
+                    <div className="text-sm">
+                      <div className="font-medium">July 3, 2020 (Tues), 2:00 pm</div>
+                      <div className="text-gray-600 text-xs">Lights ON at 6:00pm everyday</div>
+                    </div>
+
+                    <div className="space-y-1 text-sm">
+                      <div>
+                        <span className="font-medium">Power Consumption:</span> 150 kWh/month
+                      </div>
+                      <div>
+                        <span className="font-medium">Average Power Consumption:</span> 160 kWh over last 3 months
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right side - Illumination details */}
+                  <div className="space-y-1 text-sm min-w-[200px]">
+                    <div>
+                      <span className="font-medium">Upper:</span> 5: 240 Lux metal halides
+                    </div>
+                    <div>
+                      <span className="font-medium">Lower:</span> 5: 240 Lux metal halides
+                    </div>
+                    <div>
+                      <span className="font-medium">Side (Left):</span> N/A
+                    </div>
+                    <div>
+                      <span className="font-medium">Side (Right):</span> N/A
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <div className="text-[10px] font-medium text-gray-500">Dimension:</div>
-                  <div className="text-xs">{dimension}</div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4 w-full bg-transparent"
+                  onClick={() => setIlluminationIndexCardDialogOpen(true)}
+                >
+                  View Index Card
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Display - Top Middle */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base flex items-center">
+                  <Sun className="h-4 w-4 mr-2" />
+                  Display
+                </CardTitle>
+                <AlertTriangle className="h-4 w-4 text-yellow-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="text-sm">
+                    <div className="font-medium">July 1, 2025 (Tue), 2:00 pm</div>
+                    <div className="text-gray-600 text-xs">
+                      <span className="font-medium">Operating Time:</span> 6:00 pm to 11:00 pm
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 text-sm">
+                    <div>
+                      <span className="font-medium">Brightness:</span>
+                      <div className="text-xs text-gray-600 ml-2">
+                        7:00 am-3:00 pm (20%)
+                        <br />
+                        3:00 pm-11:00 pm (100%)
+                      </div>
+                    </div>
+                    <div>
+                      <span className="font-medium">Spots in a loop:</span> 10 spots
+                    </div>
+                    <div>
+                      <span className="font-medium">Service Life:</span> 3 years, 8 months, and 10 days
+                    </div>
+                    <div>
+                      <span className="font-medium">Power Consumption:</span> 150 kWh/month
+                    </div>
+                    <div>
+                      <span className="font-medium">Average Power Consumption:</span> 160 kWh over last 3 months
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <div className="text-[10px] font-medium text-gray-500">Site Orientation:</div>
-                  <div className="text-xs">{product.specs_rental?.audience_type || "Facing"}</div>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-4 w-full bg-transparent"
+                  onClick={() => setDisplayIndexCardDialogOpen(true)}
+                >
+                  View Index Card
+                </Button>
+              </CardContent>
+            </Card>
 
-                <div>
-                  <div className="text-[10px] font-medium text-gray-500">Site Owner:</div>
-                  <div className="text-xs">{product.seller_name || "GTIS"}</div>
+            {/* Compliance - Top Right */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center">
+                  <Shield className="h-4 w-4 mr-2" />
+                  Compliance{" "}
+                  <Badge variant="secondary" className="ml-2">
+                    {product.compliance ? product.compliance.filter((item) => item.status === "Done").length : 0}/
+                    {product.compliance?.length || 0}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-1 text-sm">
+                  {product.compliance && product.compliance.length > 0 ? (
+                    product.compliance.map((item, index) => (
+                      <div className="flex items-center justify-between" key={index}>
+                        <span>{item.name}</span>
+                        <span className={item.status === "Done" ? "text-green-600" : "text-red-600"}>
+                          {item.status}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div>No compliance data available.</div>
+                  )}
                 </div>
+                <Button variant="outline" size="sm" className="mt-3 w-full bg-transparent">
+                  <Eye className="h-4 w-4 mr-2" />
+                  See All
+                </Button>
+              </CardContent>
+            </Card>
 
-                <div>
-                  <div className="text-[10px] font-medium text-gray-500">Land Owner:</div>
-                  <div className="text-xs">Arotronics Corp.</div>
+            {/* Structure - Bottom Left */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Structure
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <span className="font-medium">Color:</span> {product.structure?.color || ""}
+                  </div>
+                  <div>
+                    <span className="font-medium">Contractor:</span> {product.structure?.contractor || ""}
+                  </div>
+                  <div>
+                    <span className="font-medium">Condition:</span> {product.structure?.condition || ""}
+                  </div>
+                  <div>
+                    <span className="font-medium">Last Maintenance:</span> {product.structure?.last_maintenance || ""}
+                  </div>
                 </div>
+                <div className="flex gap-2 mt-3">
+                  <Button variant="outline" size="sm" className="flex-1 bg-transparent">
+                    View Blueprint
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-1 bg-transparent">
+                    <History className="h-4 w-4 mr-2" />
+                    View History
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
 
+            {/* Content - Bottom Right */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center">
+                  <FileCheck className="h-4 w-4 mr-2" />
+                  Content
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {product.content_schedule && product.content_schedule.length > 0 ? (
+                  <div className="space-y-2 text-sm">
+                    {product.content_schedule.map((content, index) => (
+                      <div key={index}>
+                        <span className="font-medium">
+                          {content.start_date} - {content.end_date}:
+                        </span>{" "}
+                        {content.name}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm">No content scheduled</div>
+                )}
+                <Button variant="outline" size="sm" className="mt-3 w-full bg-transparent">
+                  <History className="h-4 w-4 mr-2" />
+                  View History
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Crew - Full width */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center">
+                <Users className="h-4 w-4 mr-2" />
+                Crew
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 text-sm">
                 <div>
-                  <div className="text-[10px] font-medium text-gray-500">Geopoint:</div>
-                  <div className="text-xs break-words">{geopoint}</div>
+                  <span className="font-medium">Security:</span> {product.crew?.security || ""}
+                </div>
+                <div>
+                  <span className="font-medium">Caretaker:</span> {product.crew?.caretaker || ""}
                 </div>
               </div>
+              <Button variant="outline" size="sm" className="mt-3 bg-transparent">
+                <History className="h-4 w-4 mr-2" />
+                View History
+              </Button>
+            </CardContent>
+          </Card>
 
-              <div>
-                <div className="text-[10px] font-medium text-gray-500">Location:</div>
-                <div className="flex items-start text-xs">
-                  <MapPin className="h-2 w-2 mr-1 mt-1 flex-shrink-0" />
-                  <span className="break-words">{location}</span>
-                </div>
+          {/* Issues - Full width */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center">
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Issues
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2">Issue</th>
+                      <th className="text-left py-2">Type</th>
+                      <th className="text-left py-2">Content</th>
+                      <th className="text-left py-2">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {product.issues && product.issues.length > 0 ? (
+                      product.issues.map((issue, index) => (
+                        <tr key={index} className="border-b border-gray-100">
+                          <td className="py-2">{issue.title}</td>
+                          <td className="py-2">{issue.type}</td>
+                          <td className="py-2">{issue.description}</td>
+                          <td className="py-2">
+                            <Badge variant={issue.status === "resolved" ? "default" : "destructive"}>
+                              {issue.status}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="text-center py-4 text-gray-500">
+                          No issues reported
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* Automation - Full width */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center">
+                <Settings className="h-4 w-4 mr-2" />
+                Automation
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {product.automation && product.automation.length > 0 ? (
+                <div className="space-y-2 text-sm">
+                  {product.automation.map((auto, index) => (
+                    <div key={index} className="flex justify-between items-center">
+                      <span>{auto.name}</span>
+                      <Badge variant={auto.active ? "default" : "secondary"}>
+                        {auto.active ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">No automation configured</div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      {/* Job Orders Section - Only show when coming from content, structure, or compliance tabs */}
-      {showJobOrders && (
-        <div className="border border-gray-200 rounded-lg py-2 px-4 shadow-sm">
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="text-base font-semibold flex items-center">
-              Job Orders
-              <Badge variant="secondary" className="ml-2 text-[10px]">
-                {serviceAssignments.length}
-              </Badge>
-            </h2>
-            {/* Update the Button component to use the new logistics path */}
-            <Button variant="ghost" size="sm" className="text-xs h-7 px-2" asChild>
-              <Link href="/logistics/assignments">View All</Link>
-            </Button>
-          </div>
-
-          {serviceAssignments.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No job orders found for this site. Create a new service assignment.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {serviceAssignments.map((assignment) => (
-                // Update the onClick handler for the service assignment cards
-                <Card
-                  key={assignment.id}
-                  className="border-2 border-gray-300 rounded-lg overflow-hidden shadow-none hover:shadow-md hover:border-gray-400 transition-all duration-200 cursor-pointer"
-                  onClick={() => {
-                    setSelectedAssignmentId(assignment.id)
-                    setDetailsDialogOpen(true)
-                  }}
-                >
-                  <CardContentInner className="p-3 relative">
-                    <Badge topRight className={`text-[10px] ${getStatusColor(assignment.status)}`}>
-                      {assignment.status}
-                    </Badge>
-
-                    <div className="font-medium text-xs mb-2">SA: {assignment.saNumber}</div>
-
-                    <div className="text-[10px] text-gray-500">
-                      {assignment.created
-                        ? format(new Date(assignment.created.toDate()), "MMM d, yyyy")
-                        : "Date not specified"}
-                    </div>
-
-                    <div className="font-medium text-xs mt-2">Type: {assignment.serviceType || "Not specified"}</div>
-                    <div className="text-[10px] text-gray-500 mt-1 line-clamp-2">
-                      {assignment.jobDescription || "No description provided"}
-                    </div>
-                    <div className="flex justify-between items-center mt-1">
-                      <div className="text-[10px] text-gray-500">
-                        Assigned to: {assignment.assignedTo || "Unassigned"}
-                      </div>
-                      <div className="bg-blue-100 rounded-full w-5 h-5 flex items-center justify-center">
-                        {getServiceTypeIcon(assignment.serviceType)}
-                      </div>
-                    </div>
-                  </CardContentInner>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Content Schedule Section - Only show when coming from LED Sites content tab */}
-      {isFromContent && isDynamic && (
-        <div className="border border-gray-200 rounded-lg py-2 px-4 shadow-sm">
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="text-base font-semibold flex items-center">Content Schedule</h2>
-            <div className="flex items-center gap-2">
-              <div className="text-xs text-gray-500 flex items-center">
-                <Clock className="h-3 w-3 mr-1" />
-                Last updated: {new Date().toLocaleTimeString()}
-              </div>
-              <Button variant="outline" size="sm" className="h-7 gap-1">
-                <RefreshCw className="h-3 w-3" />
-                <span className="text-xs">Refresh</span>
-              </Button>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="py-2 px-3 text-left font-medium text-xs">Time</th>
-                  <th className="py-2 px-3 text-left font-medium text-xs">Spot</th>
-                  <th className="py-2 px-3 text-left font-medium text-xs">Status</th>
-                  <th className="py-2 px-3 text-left font-medium text-xs">Client</th>
-                  <th className="py-2 px-3 text-left font-medium text-xs">Length</th>
-                </tr>
-              </thead>
-              <tbody>
-                {contentSchedule.map((item, index) => (
-                  <tr key={index} className={`border-b border-gray-100 ${item.isPlaying ? "bg-blue-50" : ""}`}>
-                    <td className="py-1 px-3 text-xs">{item.time}</td>
-                    <td className="py-1 px-3 text-xs">{item.spot}</td>
-                    <td className="py-1 px-3 text-xs">{item.status}</td>
-                    <td className="py-1 px-3 text-xs">{item.client}</td>
-                    <td className="py-1 px-3 text-xs">{item.length}</td>
-                    {item.isPlaying && (
-                      <td className="py-1 px-3">
-                        <div className="flex items-center">
-                          <Play size={12} className="text-blue-600 fill-current" />
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mt-3 flex justify-between items-center">
-            <div className="flex items-center gap-4 text-xs">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span>Payee</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded-full bg-gray-300"></div>
-                <span>Filler</span>
-              </div>
-            </div>
-
-            <Button variant="ghost" size="sm" className="text-xs h-7 px-2" asChild>
-              <Link href="#">View Full Schedule</Link>
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Lights Health Section - Only show when coming from illumination tab */}
-      {isFromIllumination && (
-        <div className="border border-gray-200 rounded-lg py-2 px-4 shadow-sm">
-          <div className="mb-2">
-            <h2 className="text-base font-semibold flex items-center">
-              Lights Health <span className="ml-2 text-green-500">80%</span>
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Lights Status Grid */}
-            <div className="border border-gray-100 rounded-lg p-3">
-              <table className="w-full">
-                <tbody>
-                  <tr className="border-b border-gray-100">
-                    <td className="py-1 flex items-center">
-                      <span className="transform rotate-90 text-xs">▲</span>
-                      <span className="ml-2 text-xs">Upper</span>
-                    </td>
-                    <td className="py-1 text-center text-green-500 font-medium text-xs">U1</td>
-                    <td className="py-1 text-center text-green-500 font-medium text-xs">U2</td>
-                    <td className="py-1 text-center text-green-500 font-medium text-xs">U3</td>
-                    <td className="py-1 text-center text-green-500 font-medium text-xs">U4</td>
-                    <td className="py-1 text-center text-green-500 font-medium text-xs">U5</td>
-                  </tr>
-                  <tr className="border-b border-gray-100">
-                    <td className="py-1 flex items-center">
-                      <span className="transform rotate-90 text-xs">▼</span>
-                      <span className="ml-2 text-xs">Lower</span>
-                    </td>
-                    <td className="py-1 text-center text-green-500 font-medium text-xs">L1</td>
-                    <td className="py-1 text-center text-green-500 font-medium text-xs">L2</td>
-                    <td className="py-1 text-center text-green-500 font-medium text-xs">L3</td>
-                    <td className="py-1 text-center text-red-500 font-medium text-xs">L4</td>
-                    <td className="py-1 text-center text-green-500 font-medium text-xs">L5</td>
-                  </tr>
-                  <tr className="border-b border-gray-100">
-                    <td className="py-1 flex items-center">
-                      <span className="transform rotate-180 text-xs">▶</span>
-                      <span className="ml-2 text-xs">Side (Left)</span>
-                    </td>
-                    <td className="py-1 text-center text-xs">-</td>
-                    <td className="py-1 text-center text-xs">-</td>
-                    <td className="py-1 text-center text-xs">-</td>
-                    <td className="py-1 text-center text-xs">-</td>
-                    <td className="py-1 text-center text-xs">-</td>
-                  </tr>
-                  <tr>
-                    <td className="py-1 flex items-center">
-                      <span className="text-xs">▶</span>
-                      <span className="ml-2 text-xs">Side (Right)</span>
-                    </td>
-                    <td className="py-1 text-center text-xs">-</td>
-                    <td className="py-1 text-center text-xs">-</td>
-                    <td className="py-1 text-center text-xs">-</td>
-                    <td className="py-1 text-center text-xs">-</td>
-                    <td className="py-1 text-center text-xs">-</td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div className="mt-2 flex items-center justify-end gap-4 text-[10px]">
-                <div className="flex items-center">
-                  <div className="w-4 h-1 bg-green-500 mr-1"></div>
-                  <span>Working</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-4 h-1 bg-red-500 mr-1"></div>
-                  <span>Defective</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Lights Specification */}
-            <div className="border border-gray-100 rounded-lg p-3">
-              <h3 className="text-sm font-semibold mb-2">Lights Specification</h3>
-              <div className="space-y-1">
-                <div className="text-xs">
-                  <span className="font-medium">Upper: </span>
-                  <span>5- 240 Lux metal halides</span>
-                </div>
-                <div className="text-xs">
-                  <span className="font-medium">Lower: </span>
-                  <span>5- 240 Lux metal halides</span>
-                </div>
-                <div className="text-xs">
-                  <span className="font-medium">Side (Left): </span>
-                  <span>N/A</span>
-                </div>
-                <div className="text-xs">
-                  <span className="font-medium">Side (Right): </span>
-                  <span>N/A</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Lights Schedule Section - Only show when coming from illumination tab */}
-      {isFromIllumination && (
-        <div className="border border-gray-200 rounded-lg py-2 px-4 shadow-sm">
-          <div className="mb-2">
-            <h2 className="text-base font-semibold">Lights Schedule</h2>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="py-2 px-3 text-left font-medium text-xs">Date</th>
-                  <th className="py-2 px-3 text-left font-medium text-xs">Time ON</th>
-                  <th className="py-2 px-3 text-left font-medium text-xs">Time OFF</th>
-                  <th className="py-2 px-3 text-left font-medium text-xs">Remarks</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-gray-100">
-                  <td className="py-1 px-3 text-xs">May 1, 2025</td>
-                  <td className="py-1 px-3 text-xs">6:00 PM</td>
-                  <td className="py-1 px-3 text-xs">1:00 AM</td>
-                  <td className="py-1 px-3 text-xs">-</td>
-                </tr>
-                <tr className="border-b border-gray-100 bg-blue-50">
-                  <td className="py-1 px-3 text-xs">May 2, 2025</td>
-                  <td className="py-1 px-3 text-xs">0:00 PM</td>
-                  <td className="py-1 px-3 text-xs">0:00 AM</td>
-                  <td className="py-1 px-3 text-xs">Typhoon</td>
-                </tr>
-                <tr className="border-b border-gray-100">
-                  <td className="py-1 px-3 text-xs">May 3, 2025</td>
-                  <td className="py-1 px-3 text-xs">6:00 PM</td>
-                  <td className="py-1 px-3 text-xs">1:00 AM</td>
-                  <td className="py-1 px-3 text-xs">-</td>
-                </tr>
-                <tr className="border-b border-gray-100">
-                  <td className="py-1 px-3 text-xs">May 4, 2025</td>
-                  <td className="py-1 px-3 text-xs">6:00 PM</td>
-                  <td className="py-1 px-3 text-xs">1:00 AM</td>
-                  <td className="py-1 px-3 text-xs">-</td>
-                </tr>
-                <tr className="border-b border-gray-100 bg-blue-50">
-                  <td className="py-1 px-3 text-xs">May 5, 2025</td>
-                  <td className="py-1 px-3 text-xs">6:00 PM</td>
-                  <td className="py-1 px-3 text-xs">1:00 AM</td>
-                  <td className="py-1 px-3 text-xs">-</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* LED Panels Health Section - Only show when coming from display-health tab */}
-      {isFromDisplayHealth && (
-        <div className="border border-gray-200 rounded-lg py-2 px-4 shadow-sm">
-          <div className="mb-2">
-            <h2 className="text-base font-semibold flex items-center">LED Panels Health</h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* LED Panel Status */}
-            <div className="border border-gray-100 rounded-lg p-3">
-              <div className="flex">
-                <div className="w-1/3">
-                  <Image
-                    src="/led-panel-grid.png"
-                    alt="LED Panel Grid"
-                    width={200}
-                    height={200}
-                    className="object-contain"
-                  />
-                </div>
-                <div className="w-2/3 pl-4 flex flex-col justify-between">
-                  <div>
-                    <div className="text-sm text-gray-500">
-                      as of {formatDate(new Date())}, {new Date().toLocaleTimeString()}
-                    </div>
-                    <div className="text-2xl font-bold text-green-500">56/56</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium">Report:</div>
-                    <div className="text-sm">All panels are working. No issues currently.</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* LED Specifications */}
-            <div className="border border-gray-100 rounded-lg p-3">
-              <h3 className="text-sm font-semibold mb-2">Specifications</h3>
-              <div className="space-y-1">
-                <div className="text-xs">
-                  <span className="font-medium">LED Age: </span>
-                  <span>5 years</span>
-                </div>
-                <div className="text-xs">
-                  <span className="font-medium">Pitch: </span>
-                  <span>P6</span>
-                </div>
-                <div className="text-xs">
-                  <span className="font-medium">Nits: </span>
-                  <span>8,000 nits</span>
-                </div>
-                <div className="text-xs">
-                  <span className="font-medium">Color Depth: </span>
-                  <span>16 bit</span>
-                </div>
-                <div className="text-xs">
-                  <span className="font-medium">Cabinet Size: </span>
-                  <span>960mm x 960mm</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Compliance Documents Section - Only show when coming from compliance tab */}
-      {isFromCompliance && (
-        <div className="border border-gray-200 rounded-lg py-2 px-4 shadow-sm">
-          <div className="mb-2">
-            <h2 className="text-base font-semibold flex items-center">
-              Compliance Documents <span className="ml-2 text-green-500">80%</span>
-            </h2>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="py-2 px-3 text-left font-medium text-xs">Documents</th>
-                  <th className="py-2 px-3 text-left font-medium text-xs">Date Issued</th>
-                  <th className="py-2 px-3 text-left font-medium text-xs">Remarks</th>
-                  <th className="py-2 px-3 text-left font-medium text-xs">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-b border-gray-100">
-                  <td className="py-1 px-3 text-xs">1.Mayor's Permit</td>
-                  <td className="py-1 px-3 text-xs">Jan 15, 2025</td>
-                  <td className="py-1 px-3 text-xs">-</td>
-                  <td className="py-1 px-3 text-green-500 font-medium text-xs">Done</td>
-                </tr>
-                <tr className="border-b border-gray-100">
-                  <td className="py-1 px-3 text-xs">2.Barangay Clearance</td>
-                  <td className="py-1 px-3 text-xs">-</td>
-                  <td className="py-1 px-3 text-xs">Release date on May 15, 2025</td>
-                  <td className="py-1 px-3 text-red-500 font-medium text-xs">Ongoing</td>
-                </tr>
-                <tr className="border-b border-gray-100">
-                  <td className="py-1 px-3 text-xs">3.DTI Registration</td>
-                  <td className="py-1 px-3 text-xs">Jan 10, 2025</td>
-                  <td className="py-1 px-3 text-xs">-</td>
-                  <td className="py-1 px-3 text-green-500 font-medium text-xs">Done</td>
-                </tr>
-                <tr className="border-b border-gray-100">
-                  <td className="py-1 px-3 text-xs">4.BIR Registration (Form 2303)</td>
-                  <td className="py-1 px-3 text-xs">Nov 20, 2025</td>
-                  <td className="py-1 px-3 text-xs">-</td>
-                  <td className="py-1 px-3 text-green-500 font-medium text-xs">Done</td>
-                </tr>
-                <tr className="border-b border-gray-100">
-                  <td className="py-1 px-3 text-xs">5.Property Insurance</td>
-                  <td className="py-1 px-3 text-xs">Dec 3, 2025</td>
-                  <td className="py-1 px-3 text-xs">-</td>
-                  <td className="py-1 px-3 text-green-500 font-medium text-xs">Done</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Floating Action Button for Service Assignment */}
-      <Button
-        onClick={() => setOpenServiceAssignmentDialog(true)}
-        className="fixed bottom-6 right-6 rounded-full w-14 h-14 shadow-lg"
-        size="icon"
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
-
-      {/* Service Assignment Dialog */}
-      <ServiceAssignmentDialog
-        open={openServiceAssignmentDialog}
-        onOpenChange={setOpenServiceAssignmentDialog}
-        onSuccess={() => {
-          // Refresh service assignments after successful creation
-          const fetchAssignments = async () => {
-            try {
-              const assignmentsQuery = query(
-                collection(db, "service_assignments"),
-                where("projectSiteId", "==", params.id),
-                orderBy("created", "desc"),
-              )
-
-              const assignmentsSnapshot = await getDocs(assignmentsQuery)
-              const assignmentsData: ServiceAssignment[] = []
-
-              assignmentsSnapshot.forEach((doc) => {
-                assignmentsData.push({
-                  id: doc.id,
-                  ...doc.data(),
-                } as ServiceAssignment)
-              })
-
-              setServiceAssignments(assignmentsData)
-            } catch (err) {
-              console.error("Error refreshing assignments:", err)
-            }
-          }
-
-          fetchAssignments()
-        }}
-        initialProjectSite={product.id} // Pass the current product ID
-      />
-      {/* Add the dialog component at the end of the return statement, just before the closing </div> */}
       <ServiceAssignmentDetailsDialog
         open={detailsDialogOpen}
         onOpenChange={setDetailsDialogOpen}
@@ -849,6 +695,23 @@ export default function SiteDetailsPage({ params, searchParams }: Props) {
           }
 
           fetchAssignments()
+        }}
+      />
+      <AlarmSettingDialog open={alarmDialogOpen} onOpenChange={setAlarmDialogOpen} />
+      <IlluminationIndexCardDialog
+        open={illuminationIndexCardDialogOpen}
+        onOpenChange={setIlluminationIndexCardDialogOpen}
+        onCreateJO={() => {
+          // Navigate to create service assignment with this site pre-selected
+          router.push(`/logistics/assignments/create?projectSite=${params.id}`)
+        }}
+      />
+      <DisplayIndexCardDialog
+        open={displayIndexCardDialogOpen}
+        onOpenChange={setDisplayIndexCardDialogOpen}
+        onCreateJO={() => {
+          // Navigate to create service assignment with this site pre-selected
+          router.push(`/logistics/assignments/create?projectSite=${params.id}`)
         }}
       />
     </div>

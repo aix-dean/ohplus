@@ -1,33 +1,35 @@
-// Define the types for subscription plan and billing cycle
-export type SubscriptionPlanType = "Trial" | "Basic" | "Premium" | "Enterprise" | "Graphic Expo Event"
-export type BillingCycle = "monthly" | "yearly" | "one-time"
+export type SubscriptionPlanType = "solo" | "family" | "membership" | "enterprise" | "trial" | "graphic-expo-event"
+export type BillingCycle = "monthly" | "annually"
+export type SubscriptionStatus = "active" | "inactive" | "trialing" | "cancelled" | "expired"
 
-// Define the status of a subscription
-export type SubscriptionStatus = "active" | "inactive" | "canceled" | "trialing" | "expired"
-
-// Define the main Subscription interface based on the provided image
 export interface Subscription {
-  id: string // Firestore document ID
-  billingCycle: BillingCycle
-  createdAt: Date // Stored as Timestamp in Firestore, converted to Date on client
-  endDate: Date | null // Stored as Timestamp in Firestore, converted to Date on client
+  id: string
   licenseKey: string
-  maxProducts: number | null
   planType: SubscriptionPlanType
-  startDate: Date // Stored as Timestamp in Firestore, converted to Date on client
-  status: SubscriptionStatus
-  trialEndDate: Date | null // Stored as Timestamp in Firestore, converted to Date on client
+  billingCycle: BillingCycle
   uid: string // User ID
-  updatedAt: Date // Stored as Timestamp in Firestore, converted to Date on client
+  startDate: Date // When the subscription started
+  endDate: Date | null // When the subscription ends (null for lifetime or ongoing)
+  status: SubscriptionStatus
+  maxProducts: number // Max products allowed for this subscription
+  maxUsers: number // Max users allowed for this subscription
+  trialEndDate: Date | null // End date of the trial period, if applicable
+  companyId: string | null // Company ID field
+  createdAt: Date // Timestamp of creation
+  updatedAt: Date // Last updated timestamp
 }
 
-/**
- * Calculates the end date for a subscription based on the plan type, billing cycle, and start date.
- * @param planType The type of the subscription plan.
- * @param billingCycle The billing cycle (e.g., "monthly", "yearly").
- * @param startDate The start date of the subscription.
- * @returns An object containing the calculated endDate and trialEndDate.
- */
+export interface SubscriptionPlan {
+  id: string
+  name: string
+  description: string // Added description for plans
+  price: number // Price per month/year depending on context, or 0 for free/trial
+  billingCycle: BillingCycle | "N/A" // Added billing cycle to plan definition
+  features: string[]
+  buttonText: string // Added button text for plans
+}
+
+// Helper function to calculate subscription end date
 export function calculateSubscriptionEndDate(
   planType: SubscriptionPlanType,
   billingCycle: BillingCycle,
@@ -36,56 +38,66 @@ export function calculateSubscriptionEndDate(
   let endDate: Date | null = null
   let trialEndDate: Date | null = null
 
-  const start = new Date(startDate) // Ensure we're working with a Date object
+  const start = new Date(startDate)
 
-  switch (planType) {
-    case "Trial":
-      trialEndDate = new Date(start)
-      trialEndDate.setDate(start.getDate() + 60) // 60 days trial
-      endDate = null // Trial plans typically don't have a fixed 'endDate' beyond trial
-      break
-    case "Basic":
-    case "Premium":
+  if (planType === "trial") {
+    trialEndDate = new Date(start)
+    trialEndDate.setDate(start.getDate() + 60) // 60-day trial
+    endDate = trialEndDate // Trial ends, subscription ends
+  } else if (planType === "graphic-expo-event") {
+    endDate = new Date(start)
+    endDate.setDate(start.getDate() + 90) // 90 days for graphic expo event plan
+  } else if (planType === "enterprise") {
+    endDate = null // Enterprise has no fixed end date, or handled separately
+  } else {
+    if (billingCycle === "monthly") {
       endDate = new Date(start)
-      if (billingCycle === "monthly") {
-        endDate.setMonth(start.getMonth() + 1)
-      } else if (billingCycle === "yearly") {
-        endDate.setFullYear(start.getFullYear() + 1)
-      }
-      break
-    case "Enterprise":
-      endDate = null // Enterprise might be perpetual or custom, set to null for unlimited
-      break
-    case "Graphic Expo Event":
+      endDate.setMonth(start.getMonth() + 1)
+    } else if (billingCycle === "annually") {
       endDate = new Date(start)
-      endDate.setMonth(start.getMonth() + 2) // Example: 2 months for Graphic Expo Event
-      break
-    default:
-      endDate = null
-      break
+      endDate.setFullYear(start.getFullYear() + 1)
+    }
   }
 
   return { endDate, trialEndDate }
 }
 
-/**
- * Gets the maximum number of products allowed for a given plan type.
- * @param planType The type of the subscription plan.
- * @returns The maximum number of products, or null if unlimited.
- */
-export function getMaxProductsForPlan(planType: SubscriptionPlanType): number | null {
+// Helper function to get max products for a given plan type
+export function getMaxProductsForPlan(planType: SubscriptionPlanType): number {
   switch (planType) {
-    case "Trial":
-      return 1 // Example: 1 product for trial
-    case "Basic":
-      return 3
-    case "Premium":
-      return 10
-    case "Enterprise":
-      return null // Unlimited
-    case "Graphic Expo Event":
-      return 5 // Example: 5 products for Graphic Expo Event
+    case "solo":
+      return 3 // Manage up to 3 sites
+    case "family":
+      return 5 // Manage up to 5 sites
+    case "membership":
+      return 8 // Manage up to 8 sites
+    case "enterprise":
+      return 99999 // Unlimited for enterprise
+    case "trial":
+      return 3 // Example: 1 product for trial
+    case "graphic-expo-event":
+      return 5 // Example: 5 products for event plan
     default:
       return 0
+  }
+}
+
+// Helper function to get max users for a given plan type
+export function getMaxUsersForPlan(planType: SubscriptionPlanType): number {
+  switch (planType) {
+    case "solo":
+      return 12 // Solo plan allows 3 users
+    case "family":
+      return 12 // Family plan allows 5 users
+    case "membership":
+      return 12 // Membership allows 10 users
+    case "enterprise":
+      return 99999 // Unlimited for enterprise
+    case "trial":
+      return 12 // Trial allows 2 users
+    case "graphic-expo-event":
+      return 12 // Event plan allows 5 users
+    default:
+      return 12 // Default to 12 users
   }
 }

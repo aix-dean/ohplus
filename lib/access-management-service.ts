@@ -301,7 +301,7 @@ export async function removeRoleFromUser(userId: string, roleId: string): Promis
   }
 }
 
-// Initialize default permissions
+// Initialize default permissions based on departmental structure and routes
 export async function initializeDefaultPermissions(): Promise<void> {
   try {
     // Check if permissions already exist
@@ -311,109 +311,319 @@ export async function initializeDefaultPermissions(): Promise<void> {
       return
     }
 
-    // Define default permissions
+    // Define default permissions based on departmental routes and functionalities
     const defaultPermissions: Omit<Permission, "id">[] = [
-      // Sales module permissions
-      {
-        name: "View Sales Dashboard",
-        description: "Allow viewing the sales dashboard",
-        module: "sales",
-        action: "view",
-      },
-      {
-        name: "Create Sales Order",
-        description: "Allow creating new sales orders",
-        module: "sales",
-        action: "create",
-      },
-      {
-        name: "Edit Sales Order",
-        description: "Allow editing existing sales orders",
-        module: "sales",
-        action: "edit",
-      },
-      {
-        name: "Delete Sales Order",
-        description: "Allow deleting sales orders",
-        module: "sales",
-        action: "delete",
-      },
-
-      // Logistics module permissions
-      {
-        name: "View Logistics Dashboard",
-        description: "Allow viewing the logistics dashboard",
-        module: "logistics",
-        action: "view",
-      },
-      {
-        name: "Create Logistics Task",
-        description: "Allow creating new logistics tasks",
-        module: "logistics",
-        action: "create",
-      },
-      {
-        name: "Edit Logistics Task",
-        description: "Allow editing existing logistics tasks",
-        module: "logistics",
-        action: "edit",
-      },
-      {
-        name: "Delete Logistics Task",
-        description: "Allow deleting logistics tasks",
-        module: "logistics",
-        action: "delete",
-      },
-
-      // CMS module permissions
-      {
-        name: "View CMS Dashboard",
-        description: "Allow viewing the CMS dashboard",
-        module: "cms",
-        action: "view",
-      },
-      {
-        name: "Create CMS Content",
-        description: "Allow creating new CMS content",
-        module: "cms",
-        action: "create",
-      },
-      {
-        name: "Edit CMS Content",
-        description: "Allow editing existing CMS content",
-        module: "cms",
-        action: "edit",
-      },
-      {
-        name: "Delete CMS Content",
-        description: "Allow deleting CMS content",
-        module: "cms",
-        action: "delete",
-      },
-
       // Admin module permissions
       {
         name: "View Admin Dashboard",
-        description: "Allow viewing the admin dashboard",
+        description: "Access to admin dashboard and overview",
         module: "admin",
         action: "view",
       },
       {
         name: "Manage Users",
-        description: "Allow managing users",
+        description: "Create, edit, and manage user accounts",
         module: "admin",
         action: "edit",
       },
       {
-        name: "Manage Roles",
-        description: "Allow managing roles",
+        name: "Manage Roles and Permissions",
+        description: "Create and manage roles and permissions",
         module: "admin",
         action: "edit",
       },
       {
-        name: "Manage Permissions",
-        description: "Allow managing permissions",
+        name: "Manage Invitation Codes",
+        description: "Generate and manage invitation codes",
         module: "admin",
+        action: "edit",
+      },
+      {
+        name: "View Documents",
+        description: "Access to document management",
+        module: "admin",
+        action: "view",
+      },
+      {
+        name: "Manage Documents",
+        description: "Upload, edit, and delete documents",
+        module: "admin",
+        action: "edit",
+      },
+      {
+        name: "View Inventory",
+        description: "Access to inventory management",
+        module: "admin",
+        action: "view",
+      },
+      {
+        name: "Manage Inventory",
+        description: "Add, edit, and manage inventory items",
+        module: "admin",
+        action: "edit",
+      },
+      {
+        name: "View Chat Analytics",
+        description: "Access to chat analytics and reports",
+        module: "admin",
+        action: "view",
+      },
+      {
+        name: "Manage Subscriptions",
+        description: "Manage subscription plans and billing",
+        module: "admin",
+        action: "edit",
+      },
+
+      // Sales module permissions
+      {
+        name: "View Sales Dashboard",
+        description: "Access to sales dashboard and metrics",
+        module: "sales",
+        action: "view",
+      },
+      {
+        name: "View Project Campaigns",
+        description: "Access to project campaign tracking",
+        module: "sales",
+        action: "view",
+      },
+      {
+        name: "Manage Project Campaigns",
+        description: "Create and manage project campaigns",
+        module: "sales",
+        action: "edit",
+      },
+      {
+        name: "View Proposals",
+        description: "Access to view proposals",
+        module: "sales",
+        action: "view",
+      },
+      {
+        name: "Create Proposals",
+        description: "Create new proposals",
+        module: "sales",
+        action: "create",
+      },
+      {
+        name: "Edit Proposals",
+        description: "Edit existing proposals",
+        module: "sales",
+        action: "edit",
+      },
+      {
+        name: "Delete Proposals",
+        description: "Delete proposals",
+        module: "sales",
+        action: "delete",
+      },
+      {
+        name: "View Bookings",
+        description: "Access to booking management",
+        module: "sales",
+        action: "view",
+      },
+      {
+        name: "Manage Bookings",
+        description: "Create and manage bookings",
+        module: "sales",
+        action: "edit",
+      },
+      {
+        name: "View Job Orders",
+        description: "Access to job order management",
+        module: "sales",
+        action: "view",
+      },
+      {
+        name: "Manage Job Orders",
+        description: "Create and manage job orders",
+        module: "sales",
+        action: "edit",
+      },
+      {
+        name: "View Clients",
+        description: "Access to client information",
+        module: "sales",
+        action: "view",
+      },
+      {
+        name: "Manage Clients",
+        description: "Add, edit, and manage client information",
+        module: "sales",
+        action: "edit",
+      },
+      {
+        name: "View Products",
+        description: "Access to product catalog",
+        module: "sales",
+        action: "view",
+      },
+      {
+        name: "Manage Products",
+        description: "Add, edit, and manage products",
+        module: "sales",
+        action: "edit",
+      },
+      {
+        name: "View Sales Planner",
+        description: "Access to sales planning tools",
+        module: "sales",
+        action: "view",
+      },
+      {
+        name: "Use Customer Chat",
+        description: "Access to customer chat functionality",
+        module: "sales",
+        action: "view",
+      },
+      {
+        name: "View Billings",
+        description: "Access to billing information",
+        module: "sales",
+        action: "view",
+      },
+      {
+        name: "Manage Billings",
+        description: "Create and manage billing records",
+        module: "sales",
+        action: "edit",
+      },
+
+      // Logistics module permissions
+      {
+        name: "View Logistics Dashboard",
+        description: "Access to logistics dashboard and metrics",
+        module: "logistics",
+        action: "view",
+      },
+      {
+        name: "View Service Assignments",
+        description: "Access to service assignment tracking",
+        module: "logistics",
+        action: "view",
+      },
+      {
+        name: "Create Service Assignments",
+        description: "Create new service assignments",
+        module: "logistics",
+        action: "create",
+      },
+      {
+        name: "Edit Service Assignments",
+        description: "Edit existing service assignments",
+        module: "logistics",
+        action: "edit",
+      },
+      {
+        name: "Delete Service Assignments",
+        description: "Delete service assignments",
+        module: "logistics",
+        action: "delete",
+      },
+      {
+        name: "View Logistics Planner",
+        description: "Access to logistics planning tools",
+        module: "logistics",
+        action: "view",
+      },
+      {
+        name: "Manage Logistics Planner",
+        description: "Create and manage logistics schedules",
+        module: "logistics",
+        action: "edit",
+      },
+      {
+        name: "View Alerts",
+        description: "Access to system alerts and notifications",
+        module: "logistics",
+        action: "view",
+      },
+      {
+        name: "Manage Alerts",
+        description: "Create and manage alert configurations",
+        module: "logistics",
+        action: "edit",
+      },
+      {
+        name: "View Sites",
+        description: "Access to site information and status",
+        module: "logistics",
+        action: "view",
+      },
+      {
+        name: "Manage Sites",
+        description: "Add, edit, and manage site information",
+        module: "logistics",
+        action: "edit",
+      },
+      {
+        name: "View Reports",
+        description: "Access to logistics reports",
+        module: "logistics",
+        action: "view",
+      },
+      {
+        name: "Manage Teams",
+        description: "Manage teams and personnel assignments",
+        module: "logistics",
+        action: "edit",
+      },
+      {
+        name: "View Weather Data",
+        description: "Access to weather information and forecasts",
+        module: "logistics",
+        action: "view",
+      },
+
+      // CMS module permissions
+      {
+        name: "View CMS Dashboard",
+        description: "Access to CMS dashboard and overview",
+        module: "cms",
+        action: "view",
+      },
+      {
+        name: "View CMS Planner",
+        description: "Access to content planning tools",
+        module: "cms",
+        action: "view",
+      },
+      {
+        name: "Manage CMS Planner",
+        description: "Create and manage content schedules",
+        module: "cms",
+        action: "edit",
+      },
+      {
+        name: "View Orders",
+        description: "Access to content orders and requests",
+        module: "cms",
+        action: "view",
+      },
+      {
+        name: "Create Orders",
+        description: "Create new content orders",
+        module: "cms",
+        action: "create",
+      },
+      {
+        name: "Edit Orders",
+        description: "Edit existing content orders",
+        module: "cms",
+        action: "edit",
+      },
+      {
+        name: "Delete Orders",
+        description: "Delete content orders",
+        module: "cms",
+        action: "delete",
+      },
+      {
+        name: "Manage Content",
+        description: "Create, edit, and manage digital content",
+        module: "cms",
         action: "edit",
       },
     ]
@@ -430,7 +640,73 @@ export async function initializeDefaultPermissions(): Promise<void> {
   }
 }
 
-// Initialize admin role
+// Initialize departmental roles
+export async function initializeDepartmentalRoles(): Promise<void> {
+  try {
+    // Check if roles already exist
+    const existingRoles = await getRoles()
+    if (existingRoles.length > 0) {
+      console.log("Roles already initialized, skipping...")
+      return
+    }
+
+    // Define departmental roles
+    const departmentalRoles = [
+      {
+        name: "Administrator",
+        description: "Full system access with all administrative privileges",
+        isAdmin: true,
+      },
+      {
+        name: "Sales Manager",
+        description: "Full access to sales module with management capabilities",
+        isAdmin: false,
+      },
+      {
+        name: "Sales Representative",
+        description: "Standard sales access for day-to-day operations",
+        isAdmin: false,
+      },
+      {
+        name: "Logistics Manager",
+        description: "Full access to logistics module with management capabilities",
+        isAdmin: false,
+      },
+      {
+        name: "Logistics Coordinator",
+        description: "Standard logistics access for operational tasks",
+        isAdmin: false,
+      },
+      {
+        name: "CMS Manager",
+        description: "Full access to content management with editing privileges",
+        isAdmin: false,
+      },
+      {
+        name: "CMS Editor",
+        description: "Content creation and editing access",
+        isAdmin: false,
+      },
+      {
+        name: "Viewer",
+        description: "Read-only access across all modules",
+        isAdmin: false,
+      },
+    ]
+
+    // Create all roles
+    for (const role of departmentalRoles) {
+      await createRole(role)
+    }
+
+    console.log("Departmental roles initialized successfully")
+  } catch (error) {
+    console.error("Error initializing departmental roles:", error)
+    throw new Error("Failed to initialize departmental roles")
+  }
+}
+
+// Initialize admin role (legacy function - now part of departmental roles)
 export async function initializeAdminRole(): Promise<string> {
   try {
     // Check if admin role already exists

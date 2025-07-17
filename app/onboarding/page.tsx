@@ -61,16 +61,15 @@ export default function OnboardingPage() {
   const searchParams = useSearchParams()
   const { userData, loading, updateUserData } = useAuth()
 
-  const totalContentSteps = 3 // Welcome, Upload Product, All Set
-  const currentStep = Number.parseInt(searchParams.get("step") || "1") // Default to 1 for the first content step
+  const totalContentSteps = 3
+  const currentStep = Number.parseInt(searchParams.get("step") || "1")
 
   useEffect(() => {
     if (!loading && !userData) {
-      router.push("/login") // Redirect to login if not authenticated
+      router.push("/login")
     }
   }, [userData, loading, router])
 
-  // Ensure the URL always has a valid step parameter, defaulting to 1
   useEffect(() => {
     if (currentStep < 1 || currentStep > totalContentSteps) {
       router.replace(`/onboarding?step=1`)
@@ -87,14 +86,13 @@ export default function OnboardingPage() {
     if (currentStep > 1) {
       router.push(`/onboarding?step=${currentStep - 1}`)
     } else {
-      // If on the first content step (step 1) and pressing back, go to subscription selection
-      router.push("/register/select-subscription")
+      router.push("/login") // Go to login if on the first step and pressing back
     }
   }
 
   const handleFinishOnboarding = async (redirectPath: string) => {
     if (userData) {
-      await updateUserData({ onboarding: false }) // Mark onboarding as complete
+      await updateUserData({ onboarding: false })
     }
     router.push(redirectPath)
   }
@@ -109,7 +107,7 @@ export default function OnboardingPage() {
 
   const renderStepContent = () => {
     switch (currentStep) {
-      case 1: // Welcome/Introduction
+      case 1:
         return (
           <div className="flex flex-col md:flex-row items-center justify-center min-h-[calc(100vh-160px)] p-8">
             <div className="md:w-1/2 text-center md:text-left space-y-6">
@@ -125,7 +123,7 @@ export default function OnboardingPage() {
             </div>
           </div>
         )
-      case 2: // Upload Product
+      case 2:
         return (
           <div className="flex flex-col md:flex-row items-center justify-center min-h-[calc(100vh-160px)] p-8">
             <div className="md:w-1/2 text-center md:text-left space-y-6">
@@ -145,7 +143,7 @@ export default function OnboardingPage() {
             </div>
           </div>
         )
-      case 3: // You're All Set
+      case 3:
         return (
           <div className="flex flex-col md:flex-row items-center justify-center min-h-[calc(100vh-160px)] p-8">
             <div className="md:w-1/2 text-center md:text-left space-y-6">

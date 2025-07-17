@@ -1,172 +1,159 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/contexts/auth-context"
+import { useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Shield, Users, Lock, AlertCircle, CheckCircle } from "lucide-react"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { initializeDefaultPermissions, initializeAdminRole, assignRoleToUser } from "@/lib/access-management-service"
-import { toast } from "@/components/ui/use-toast"
-import { UserManagement } from "@/components/access-management/user-management"
-import { RoleManagement } from "@/components/access-management/role-management"
-import { PermissionManagement } from "@/components/access-management/permission-management"
+import { Shield, Users } from "lucide-react"
+import { getAllRoles, type HardcodedRole } from "@/lib/hardcoded-access-service"
+import { useRouter } from "next/navigation"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 export default function AccessManagementPage() {
-  const { user, userData } = useAuth()
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [initializing, setInitializing] = useState(false)
-  const [initializationStatus, setInitializationStatus] = useState<{
-    success: boolean
-    message: string
-  } | null>(null)
+  const [roles] = useState<HardcodedRole[]>(getAllRoles())
+  const [selectedRole, setSelectedRole] = useState<HardcodedRole | null>(null)
+  const [isRoleDetailsOpen, setIsRoleDetailsOpen] = useState(false)
 
-  useEffect(() => {
-    // Simple check to make sure we're authenticated
-    if (!user && !loading) {
-      router.push("/login")
-    } else {
-      setLoading(false)
+  const getRoleColorClass = (roleId: string) => {
+    const colorClasses = {
+      admin: "border-purple-200 bg-purple-50",
+      sales: "border-green-200 bg-green-50",
+      logistics: "border-blue-200 bg-blue-50",
+      cms: "border-orange-200 bg-orange-50",
     }
-  }, [user, router, loading])
-
-  const handleInitializePermissions = async () => {
-    try {
-      setInitializing(true)
-      setInitializationStatus(null)
-
-      // Initialize default permissions
-      await initializeDefaultPermissions()
-
-      // Initialize admin role
-      const adminRoleId = await initializeAdminRole()
-
-      // If the current user exists, assign them the admin role
-      if (user) {
-        await assignRoleToUser(user.uid, adminRoleId)
-      }
-
-      setInitializationStatus({
-        success: true,
-        message: "Default permissions and admin role have been initialized successfully!",
-      })
-
-      toast({
-        title: "Initialization Complete",
-        description: "Default permissions and admin role have been initialized successfully!",
-      })
-    } catch (error) {
-      console.error("Error initializing permissions:", error)
-      setInitializationStatus({
-        success: false,
-        message: `Error initializing permissions: ${error instanceof Error ? error.message : "Unknown error"}`,
-      })
-
-      toast({
-        variant: "destructive",
-        title: "Initialization Failed",
-        description: "There was an error initializing permissions. Please check the console for details.",
-      })
-    } finally {
-      setInitializing(false)
-    }
+    return colorClasses[roleId as keyof typeof colorClasses] || "border-gray-200 bg-gray-50"
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Loading Access Management...</h2>
-          <p className="text-gray-500">Please wait while we verify your permissions.</p>
-        </div>
-      </div>
-    )
+  const getRoleBadgeClass = (roleId: string) => {
+    const badgeClasses = {
+      admin: "bg-purple-100 text-purple-800 hover:bg-purple-100",
+      sales: "bg-green-100 text-green-800 hover:bg-green-100",
+      logistics: "bg-blue-100 text-blue-800 hover:bg-blue-100",
+      cms: "bg-orange-100 text-orange-800 hover:bg-orange-100",
+    }
+    return badgeClasses[roleId as keyof typeof badgeClasses] || "bg-gray-100 text-gray-800 hover:bg-gray-100"
+  }
+
+  const handleViewRoleDetails = (role: HardcodedRole) => {
+    setSelectedRole(role)
+    setIsRoleDetailsOpen(true)
   }
 
   return (
-    <div className="container mx-auto py-10">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Access Management</h1>
-        <Button onClick={handleInitializePermissions} disabled={initializing} className="flex items-center gap-2">
-          {initializing ? (
-            <>
-              <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
-              <span>Initializing...</span>
-            </>
-          ) : (
-            <>
-              <Lock className="h-4 w-4" />
-              <span>Initialize Default Permissions</span>
-            </>
-          )}
+    <div className="container mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Access Management</h1>
+          <p className="text-muted-foreground">Manage roles and permissions for your organization.</p>
+        </div>
+        <Button
+          variant="outline"
+          className="gap-2 bg-transparent"
+          onClick={() => router.push("/admin/user-management")}
+        >
+          <Users className="h-4 w-4" />
+          Manage Users
         </Button>
       </div>
 
-      {initializationStatus && (
-        <Alert variant={initializationStatus.success ? "default" : "destructive"} className="mb-6">
-          {initializationStatus.success ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-          <AlertTitle>{initializationStatus.success ? "Success" : "Error"}</AlertTitle>
-          <AlertDescription>{initializationStatus.message}</AlertDescription>
-        </Alert>
-      )}
-
-      <Tabs defaultValue="users" className="w-full">
-        <TabsList className="mb-6">
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <span>Users</span>
-          </TabsTrigger>
-          <TabsTrigger value="roles" className="flex items-center gap-2">
+      <Tabs defaultValue="roles" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="roles" className="gap-2">
             <Shield className="h-4 w-4" />
-            <span>Roles</span>
-          </TabsTrigger>
-          <TabsTrigger value="permissions" className="flex items-center gap-2">
-            <Lock className="h-4 w-4" />
-            <span>Permissions</span>
+            Roles
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="users">
-          <Card>
-            <CardHeader>
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>
-                Assign roles to users to control their access to different parts of the system.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <UserManagement />
-            </CardContent>
-          </Card>
-        </TabsContent>
+        <TabsContent value="roles" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {roles.map((role) => (
+              <Card key={role.id} className={`${getRoleColorClass(role.id)} border-2`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">{role.name}</CardTitle>
+                    <Badge className={getRoleBadgeClass(role.id)}>{role.id.toUpperCase()}</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{role.description}</p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <div className="text-sm font-medium mb-2">Permissions</div>
+                    <div className="text-2xl font-bold text-primary">{role.permissions.length}</div>
+                    <div className="text-xs text-muted-foreground">modules accessible</div>
+                  </div>
 
-        <TabsContent value="roles">
-          <Card>
-            <CardHeader>
-              <CardTitle>Role Management</CardTitle>
-              <CardDescription>Create and manage roles with specific permissions.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <RoleManagement />
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium">Key Modules:</div>
+                    <div className="flex flex-wrap gap-1">
+                      {role.permissions.slice(0, 3).map((permission, index) => (
+                        <Badge key={index} variant="outline" className="text-xs">
+                          {permission.module}
+                        </Badge>
+                      ))}
+                      {role.permissions.length > 3 && (
+                        <Badge variant="outline" className="text-xs">
+                          +{role.permissions.length - 3} more
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
 
-        <TabsContent value="permissions">
-          <Card>
-            <CardHeader>
-              <CardTitle>Permission Management</CardTitle>
-              <CardDescription>Define permissions for different modules and actions.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <PermissionManagement />
-            </CardContent>
-          </Card>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full bg-transparent"
+                    onClick={() => handleViewRoleDetails(role)}
+                  >
+                    View Details
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </TabsContent>
       </Tabs>
+
+      {/* Role Details Dialog */}
+      <Dialog open={isRoleDetailsOpen} onOpenChange={setIsRoleDetailsOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedRole?.name}
+              {selectedRole && (
+                <Badge className={getRoleBadgeClass(selectedRole.id)}>{selectedRole.id.toUpperCase()}</Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>{selectedRole?.description}</DialogDescription>
+          </DialogHeader>
+
+          {selectedRole && (
+            <div className="space-y-6 py-4">
+              <div>
+                <h3 className="text-lg font-medium mb-4">Permissions & Access</h3>
+                <div className="space-y-4">
+                  {selectedRole.permissions.map((permission, index) => (
+                    <div key={index} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="font-medium capitalize">{permission.module}</div>
+                        <div className="flex gap-1">
+                          {permission.actions.map((action) => (
+                            <Badge key={action} variant="outline" className="text-xs">
+                              {action}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="text-sm text-muted-foreground">{permission.description}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

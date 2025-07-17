@@ -5,43 +5,48 @@ export type JobOrderStatus = "draft" | "pending" | "approved" | "rejected" | "co
 
 export interface JobOrder {
   id: string
-  quotationId: string
-  joNumber: string // Auto-generated or manually assigned
-  dateRequested: string // ISO string
-  joType: JobOrderType
-  deadline: string // ISO string
-  requestedBy: string // User's name or ID
-  remarks: string
-  assignTo: string // User ID of assignee
-  attachments: string[] // Array of attachment URLs
-
-  // Fields copied from Quotation/Product/Client for snapshot
-  quotationNumber: string
-  clientName: string
-  clientCompany: string
-  contractDuration: string // e.g., "6 months"
-  contractPeriodStart: string // ISO string
-  contractPeriodEnd: string // ISO string
+  joNumber: string
   siteName: string
-  siteCode: string
-  siteType: string
-  siteSize: string
-  siteIllumination: string
-  leaseRatePerMonth: number
-  totalMonths: number
-  totalLease: number
-  vatAmount: number
-  totalAmount: number
-  siteImageUrl: string
-  missingCompliance: {
-    signedQuotation: boolean
-    poMo: boolean
-    projectFa: boolean
-  }
+  siteLocation?: string
+  joType: JobOrderType | string
+  requestedBy: string
+  assignTo: string
+  dateRequested: string | Date
+  deadline: string | Date
+  jobDescription?: string
+  message?: string
+  attachments: string[]
+  status: JobOrderStatus | string
+  created?: Date | Timestamp
+  updated?: Date | Timestamp
+  created_by: string
+  company_id: string
+  quotation_id?: string
 
-  // Audit fields
-  createdBy: string // User ID of the creator
-  status: JobOrderStatus
-  createdAt: Timestamp // Firestore Timestamp
-  updatedAt: Timestamp // Firestore Timestamp
+  // Additional fields from the actual database structure
+  clientCompany?: string
+  clientName?: string
+  contractDuration?: string
+  contractPeriodEnd?: string | Date
+  contractPeriodStart?: string | Date
+  leaseRatePerMonth?: number
+  missingCompliance?: Record<string, any>
+  poMo?: boolean
+  projectFa?: boolean
+  signedQuotation?: boolean
+  poMoUrl?: string | null
+  product_id?: string
+  projectFaUrl?: string | null
+  quotationNumber?: string
+  remarks?: string
+  signedQuotationUrl?: string | null
+  siteCode?: string
+  siteIllumination?: string
+  siteImageUrl?: string
+  siteSize?: string
+  siteType?: string
+  totalAmount?: number
+  totalLease?: number
+  totalMonths?: number
+  vatAmount?: number
 }
