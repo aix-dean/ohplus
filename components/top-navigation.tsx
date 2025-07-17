@@ -149,6 +149,15 @@ export function TopNavigation() {
     setIsOpen(false)
   }
 
+  const handleLogout = async () => {
+    try {
+      await signOut()
+      router.push("/login")
+    } catch (error: any) {
+      console.error("Logout error:", error)
+    }
+  }
+
   return (
     <nav className={`top-nav relative ${navBgColor} z-40`}>
       {/* Diagonal section - positioned to always be before the date area */}
@@ -211,7 +220,7 @@ export function TopNavigation() {
                 <div className="ml-3 relative z-10">
                   <button
                     type="button"
-                    onClick={signOut}
+                    onClick={handleLogout}
                     className="p-2 rounded-full text-white hover:text-gray-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
                     aria-label="Sign out"
                   >
@@ -283,7 +292,7 @@ export function TopNavigation() {
                 )}
 
                 <button
-                  onClick={signOut}
+                  onClick={handleLogout}
                   className="w-full text-left py-3 px-4 rounded-md flex items-center text-gray-700"
                 >
                   <LogOut className="mr-3 h-5 w-5" />
