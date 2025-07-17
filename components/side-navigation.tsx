@@ -138,6 +138,11 @@ export function SideNavigation() {
     return null
   }
 
+  // Return null for business section to hide the entire navigation
+  if (currentSection === "business") {
+    return null
+  }
+
   const SectionIcon = currentNavItem?.icon
 
   return (
