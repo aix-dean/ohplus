@@ -328,7 +328,7 @@ export default function BusinessInventoryPage() {
     }
 
     console.log("All checks passed, redirecting to create product")
-    router.push("/admin/products/create")
+    router.push("/business/products/create")
   }
 
   const handleCompanyRegistrationSuccess = async () => {
