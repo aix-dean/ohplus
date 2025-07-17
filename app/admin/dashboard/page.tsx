@@ -237,7 +237,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-businessdev-darkpurple",
       contentBgColor: "bg-card-content-businessdev",
       members: [],
-      isAvailable: false,
+      isAvailable: true,
     },
     {
       id: "legal",
