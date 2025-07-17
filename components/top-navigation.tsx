@@ -222,11 +222,10 @@ export function TopNavigation() {
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="px-3 py-2 bg-white text-black rounded-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors flex items-center"
+                    className="p-2 rounded-full text-white hover:text-gray-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
                     aria-label="Sign out"
                   >
                     <LogOut className="h-5 w-5" />
-                    <span className="ml-2 text-sm">Logout</span>
                   </button>
                 </div>
               </div>
