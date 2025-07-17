@@ -1,22 +1,20 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { collection, onSnapshot, orderBy, query, limit } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Activity, Users, Globe, Monitor } from "lucide-react"
+import { Eye, Globe, Users, Activity, MapPin, Clock, Monitor } from "lucide-react"
+import { format } from "date-fns"
 
-interface AnalyticsData {
+interface AnalyticsDocument {
   id: string
   action: string
   created: any
-  geopoint: {
-    latitude: number
-    longitude: number
-  }
+  geopoint: [number, number]
   ip_address: string
   isGuest: boolean
   page: string
@@ -27,65 +25,52 @@ interface AnalyticsData {
     page: string
     platform: string
     section: string
+    uid: string
   }>
   uid: string
 }
 
 export default function AnalyticsPage() {
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [stats, setStats] = useState({
-    totalViews: 0,
-    guestViews: 0,
-    uniquePages: 0,
-    webPlatform: 0,
-  })
+  const [analytics, setAnalytics] = useState<AnalyticsDocument[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isLive, setIsLive] = useState(false)
 
   useEffect(() => {
-    const q = query(collection(db, "analytics_ohplus"), orderBy("created", "desc"), limit(100))
+    const q = query(collection(db, "analytics_ohplus"), orderBy("created", "desc"), limit(50))
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const data: AnalyticsData[] = []
-      querySnapshot.forEach((doc) => {
-        data.push({
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const docs = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-        } as AnalyticsData)
-      })
+        })) as AnalyticsDocument[]
 
-      setAnalyticsData(data)
-
-      // Calculate stats
-      const uniquePages = new Set(data.map((item) => item.page)).size
-      const guestViews = data.filter((item) => item.isGuest).length
-      const webPlatform = data.filter((item) => item.platform === "WEB").length
-
-      setStats({
-        totalViews: data.length,
-        guestViews,
-        uniquePages,
-        webPlatform,
-      })
-
-      setIsLoading(false)
-    })
+        setAnalytics(docs)
+        setLoading(false)
+        setIsLive(true)
+      },
+      (error) => {
+        console.error("Error fetching analytics:", error)
+        setLoading(false)
+      },
+    )
 
     return () => unsubscribe()
   }, [])
 
-  const formatDate = (timestamp: any) => {
-    if (!timestamp) return "N/A"
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
-    return date.toLocaleString()
-  }
+  const totalViews = analytics.length
+  const guestViews = analytics.filter((doc) => doc.isGuest).length
+  const webPlatform = analytics.filter((doc) => doc.platform === "WEB").length
+  const uniquePages = new Set(analytics.map((doc) => doc.page)).size
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="container mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
-            <p className="text-muted-foreground">Real-time monitoring of analytics_ohplus collection</p>
+            <Skeleton className="h-8 w-48 mb-2" />
+            <Skeleton className="h-4 w-96" />
           </div>
         </div>
 
@@ -93,11 +78,12 @@ export default function AnalyticsPage() {
           {[...Array(4)].map((_, i) => (
             <Card key={i}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-24" />
                 <Skeleton className="h-4 w-4" />
               </CardHeader>
               <CardContent>
-                <Skeleton className="h-8 w-16" />
+                <Skeleton className="h-8 w-16 mb-2" />
+                <Skeleton className="h-3 w-32" />
               </CardContent>
             </Card>
           ))}
@@ -108,7 +94,7 @@ export default function AnalyticsPage() {
             <Skeleton className="h-6 w-32" />
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
@@ -121,26 +107,28 @@ export default function AnalyticsPage() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Analytics Dashboard</h1>
           <p className="text-muted-foreground">Real-time monitoring of analytics_ohplus collection</p>
         </div>
-        <Badge variant="outline" className="text-green-600 border-green-600">
-          <div className="w-2 h-2 bg-green-600 rounded-full mr-2 animate-pulse" />
-          Live
-        </Badge>
+        <div className="flex items-center space-x-2">
+          <div className={`w-2 h-2 rounded-full ${isLive ? "bg-green-500" : "bg-gray-400"}`} />
+          <span className="text-sm text-muted-foreground">{isLive ? "Live" : "Offline"}</span>
+        </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Views</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
+            <Eye className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalViews}</div>
+            <div className="text-2xl font-bold">{totalViews}</div>
+            <p className="text-xs text-muted-foreground">All page views tracked</p>
           </CardContent>
         </Card>
 
@@ -150,39 +138,45 @@ export default function AnalyticsPage() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.guestViews}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Unique Pages</CardTitle>
-            <Globe className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.uniquePages}</div>
+            <div className="text-2xl font-bold">{guestViews}</div>
+            <p className="text-xs text-muted-foreground">Views from guest users</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Web Platform</CardTitle>
-            <Monitor className="h-4 w-4 text-muted-foreground" />
+            <Globe className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.webPlatform}</div>
+            <div className="text-2xl font-bold">{webPlatform}</div>
+            <p className="text-xs text-muted-foreground">Views from web platform</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Unique Pages</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{uniquePages}</div>
+            <p className="text-xs text-muted-foreground">Different pages visited</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Recent Activity Table */}
+      {/* Analytics Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>Latest {analyticsData.length} analytics entries</CardDescription>
+          <CardTitle className="flex items-center space-x-2">
+            <Activity className="h-5 w-5" />
+            <span>Recent Analytics Events</span>
+          </CardTitle>
+          <CardDescription>Latest {analytics.length} analytics events from the collection</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -190,35 +184,48 @@ export default function AnalyticsPage() {
                   <TableHead>Action</TableHead>
                   <TableHead>Page</TableHead>
                   <TableHead>Platform</TableHead>
-                  <TableHead>Guest</TableHead>
-                  <TableHead>IP Address</TableHead>
+                  <TableHead>User Type</TableHead>
                   <TableHead>Location</TableHead>
-                  <TableHead>UID</TableHead>
+                  <TableHead>IP Address</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {analyticsData.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-mono text-xs">{formatDate(item.created)}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{item.action}</Badge>
+                {analytics.map((doc) => (
+                  <TableRow key={doc.id}>
+                    <TableCell className="font-mono text-xs">
+                      <div className="flex items-center space-x-1">
+                        <Clock className="h-3 w-3 text-muted-foreground" />
+                        <span>
+                          {doc.created?.toDate ? format(doc.created.toDate(), "MMM dd, yyyy HH:mm:ss") : "Invalid Date"}
+                        </span>
+                      </div>
                     </TableCell>
-                    <TableCell className="font-medium">{item.page}</TableCell>
                     <TableCell>
-                      <Badge variant="outline">{item.platform}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={item.isGuest ? "destructive" : "default"}>
-                        {item.isGuest ? "Guest" : "User"}
+                      <Badge variant="outline" className="font-mono">
+                        {doc.action}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">{item.ip_address}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {item.geopoint
-                        ? `${item.geopoint.latitude.toFixed(4)}, ${item.geopoint.longitude.toFixed(4)}`
-                        : "N/A"}
+                    <TableCell>
+                      <Badge variant="secondary">{doc.page}</Badge>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">{item.uid || "N/A"}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-1">
+                        <Monitor className="h-3 w-3 text-muted-foreground" />
+                        <span className="font-mono text-xs">{doc.platform}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={doc.isGuest ? "destructive" : "default"}>{doc.isGuest ? "Guest" : "User"}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-1">
+                        <MapPin className="h-3 w-3 text-muted-foreground" />
+                        <span className="font-mono text-xs">
+                          {doc.geopoint ? `${doc.geopoint[0]}, ${doc.geopoint[1]}` : "N/A"}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{doc.ip_address}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -227,20 +234,20 @@ export default function AnalyticsPage() {
         </CardContent>
       </Card>
 
-      {/* Detailed Data View */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Raw Data Structure</CardTitle>
-          <CardDescription>Latest document structure for debugging</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {analyticsData.length > 0 && (
+      {/* Document Structure */}
+      {analytics.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Latest Document Structure</CardTitle>
+            <CardDescription>Raw structure of the most recent analytics document</CardDescription>
+          </CardHeader>
+          <CardContent>
             <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
-              {JSON.stringify(analyticsData[0], null, 2)}
+              {JSON.stringify(analytics[0], null, 2)}
             </pre>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
