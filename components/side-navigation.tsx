@@ -140,6 +140,10 @@ export function SideNavigation() {
 
   const SectionIcon = currentNavItem?.icon
 
+  if (pathname === "/business/inventory") {
+    return null
+  }
+
   return (
     <div className="w-64 h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 overflow-y-auto shadow-sm">
       <nav className="p-3 space-y-4">
