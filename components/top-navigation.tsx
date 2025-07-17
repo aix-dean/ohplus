@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { Menu, X, Settings, LogOut, User, Bell, ArrowLeft } from "lucide-react"
 import { format } from "date-fns"
@@ -192,19 +193,19 @@ export function TopNavigation() {
                     </span>
                   )}
                 </button>
-                {/* Profile dropdown */}
+                {/* Profile button */}
                 <div className="ml-3 relative z-10">
-                  {" "}
-                  {/* Added relative z-10 */}
-                  <button
-                    type="button"
-                    className="max-w-xs bg-white rounded-full flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-                  >
-                    <span className="sr-only">Open user menu</span>
-                    <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                      <User className="h-5 w-5 text-gray-500" />
-                    </div>
-                  </button>
+                  <Link href="/account">
+                    <button
+                      type="button"
+                      className="max-w-xs bg-white rounded-full flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary hover:ring-4 transition-all"
+                    >
+                      <span className="sr-only">Go to profile</span>
+                      <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
+                        <User className="h-5 w-5 text-gray-500" />
+                      </div>
+                    </button>
+                  </Link>
                 </div>
               </div>
             )}
