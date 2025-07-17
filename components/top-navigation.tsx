@@ -149,60 +149,41 @@ export function TopNavigation() {
     setIsOpen(false)
   }
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     try {
       console.log("Logout attempt started")
 
-      // Clear all possible storage locations first
-      if (typeof window !== "undefined") {
-        // Clear localStorage completely
-        localStorage.clear()
+      // Immediately redirect to login without waiting for async operations
+      window.location.href = "/login"
 
-        // Clear sessionStorage completely
-        sessionStorage.clear()
+      // Clear storage in the background after redirect starts
+      setTimeout(() => {
+        if (typeof window !== "undefined") {
+          // Clear localStorage completely
+          localStorage.clear()
 
-        // Clear all cookies more aggressively
-        const cookies = document.cookie.split(";")
-        for (const cookie of cookies) {
-          const eqPos = cookie.indexOf("=")
-          const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim()
-          // Clear for current domain
-          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`
-          // Clear for parent domain
-          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`
-          // Clear for root domain
-          const domain = window.location.hostname.split(".").slice(-2).join(".")
-          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=.${domain}`
-        }
+          // Clear sessionStorage completely
+          sessionStorage.clear()
 
-        // Clear any Firebase auth state if using Firebase
-        try {
-          if (window.firebase && window.firebase.auth) {
-            await window.firebase.auth().signOut()
+          // Clear all cookies
+          const cookies = document.cookie.split(";")
+          for (const cookie of cookies) {
+            const eqPos = cookie.indexOf("=")
+            const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim()
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`
+            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`
           }
-        } catch (e) {
-          console.log("Firebase signout not available")
         }
-      }
 
-      // Try the auth context signOut after clearing storage
-      if (signOut && typeof signOut === "function") {
-        console.log("Using auth context signOut")
-        try {
-          await signOut()
-        } catch (e) {
-          console.log("Auth context signOut failed:", e)
+        // Try auth context signOut in background
+        if (signOut && typeof signOut === "function") {
+          signOut().catch((e) => console.log("Background signOut failed:", e))
         }
-      }
-
-      console.log("Redirecting to login")
-
-      // Use replace instead of href to prevent back navigation
-      window.location.replace("/login")
-    } catch (error: any) {
+      }, 100)
+    } catch (error) {
       console.error("Logout error:", error)
       // Force redirect even if there's an error
-      window.location.replace("/login")
+      window.location.href = "/login"
     }
   }
 
