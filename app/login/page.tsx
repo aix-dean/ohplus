@@ -361,6 +361,14 @@ export default function LoginPage() {
                 >
                   Join an organization
                 </Button>
+
+                {/* Analytics Navigation Link */}
+                <div className="mt-4 pt-2 border-t border-gray-200">
+                  <Link href="/analytics" className="text-xs text-gray-500 hover:text-blue-600 transition-colors">
+                    View Analytics Dashboard
+                  </Link>
+                </div>
+
                 <div className="md:hidden flex flex-col items-center mt-4 pt-[30px]">
                   <span className="text-sm text-gray-500 mb-2">powered by:</span>
                   <Image

@@ -6,14 +6,17 @@ import { db } from "@/lib/firebase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Activity, Globe, MapPin, Monitor, User, Clock } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Activity, Users, Globe, Monitor } from "lucide-react"
 
-interface AnalyticsDocument {
+interface AnalyticsData {
   id: string
   action: string
   created: any
-  geopoint: [number, number]
+  geopoint: {
+    latitude: number
+    longitude: number
+  }
   ip_address: string
   isGuest: boolean
   page: string
@@ -24,91 +27,140 @@ interface AnalyticsDocument {
     page: string
     platform: string
     section: string
-    uid: string
   }>
   uid: string
 }
 
 export default function AnalyticsPage() {
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsDocument[]>([])
-  const [loading, setLoading] = useState(true)
-  const [totalViews, setTotalViews] = useState(0)
-  const [guestViews, setGuestViews] = useState(0)
-  const [webViews, setWebViews] = useState(0)
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [stats, setStats] = useState({
+    totalViews: 0,
+    guestViews: 0,
+    uniquePages: 0,
+    webPlatform: 0,
+  })
 
   useEffect(() => {
     const q = query(collection(db, "analytics_ohplus"), orderBy("created", "desc"), limit(100))
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const docs: AnalyticsDocument[] = []
+      const data: AnalyticsData[] = []
       querySnapshot.forEach((doc) => {
-        docs.push({
+        data.push({
           id: doc.id,
           ...doc.data(),
-        } as AnalyticsDocument)
+        } as AnalyticsData)
       })
 
-      setAnalyticsData(docs)
-      setTotalViews(docs.length)
-      setGuestViews(docs.filter((doc) => doc.isGuest).length)
-      setWebViews(docs.filter((doc) => doc.platform === "WEB").length)
-      setLoading(false)
+      setAnalyticsData(data)
+
+      // Calculate stats
+      const uniquePages = new Set(data.map((item) => item.page)).size
+      const guestViews = data.filter((item) => item.isGuest).length
+      const webPlatform = data.filter((item) => item.platform === "WEB").length
+
+      setStats({
+        totalViews: data.length,
+        guestViews,
+        uniquePages,
+        webPlatform,
+      })
+
+      setIsLoading(false)
     })
 
     return () => unsubscribe()
   }, [])
 
-  const formatTimestamp = (timestamp: any) => {
+  const formatDate = (timestamp: any) => {
     if (!timestamp) return "N/A"
-    try {
-      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
-      return date.toLocaleString()
-    } catch (error) {
-      return "Invalid Date"
-    }
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+    return date.toLocaleString()
   }
 
-  const formatGeopoint = (geopoint: [number, number]) => {
-    if (!geopoint || !Array.isArray(geopoint)) return "N/A"
-    return `${geopoint[0]?.toFixed(6)}, ${geopoint[1]?.toFixed(6)}`
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+            <p className="text-muted-foreground">Real-time monitoring of analytics_ohplus collection</p>
+          </div>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-4" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Activity className="h-6 w-6" />
-        <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+          <p className="text-muted-foreground">Real-time monitoring of analytics_ohplus collection</p>
+        </div>
+        <Badge variant="outline" className="text-green-600 border-green-600">
+          <div className="w-2 h-2 bg-green-600 rounded-full mr-2 animate-pulse" />
+          Live
+        </Badge>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Views</CardTitle>
             <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalViews}</div>
+            <div className="text-2xl font-bold">{stats.totalViews}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Guest Views</CardTitle>
-            <User className="h-4 w-4 text-muted-foreground" />
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{guestViews}</div>
+            <div className="text-2xl font-bold">{stats.guestViews}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Unique Pages</CardTitle>
+            <Globe className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.uniquePages}</div>
           </CardContent>
         </Card>
 
@@ -118,30 +170,19 @@ export default function AnalyticsPage() {
             <Monitor className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{webViews}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Live Monitoring</CardTitle>
-            <Globe className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-500">●</div>
-            <p className="text-xs text-muted-foreground">Real-time</p>
+            <div className="text-2xl font-bold">{stats.webPlatform}</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Analytics Table */}
+      {/* Recent Activity Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Analytics Events</CardTitle>
-          <CardDescription>Real-time monitoring of analytics_ohplus collection</CardDescription>
+          <CardTitle>Recent Activity</CardTitle>
+          <CardDescription>Latest {analyticsData.length} analytics entries</CardDescription>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[600px]">
+          <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -156,66 +197,50 @@ export default function AnalyticsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {analyticsData.map((doc) => (
-                  <TableRow key={doc.id}>
+                {analyticsData.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-mono text-xs">{formatDate(item.created)}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{item.action}</Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">{item.page}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{item.platform}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={item.isGuest ? "destructive" : "default"}>
+                        {item.isGuest ? "Guest" : "User"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{item.ip_address}</TableCell>
                     <TableCell className="font-mono text-xs">
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {formatTimestamp(doc.created)}
-                      </div>
+                      {item.geopoint
+                        ? `${item.geopoint.latitude.toFixed(4)}, ${item.geopoint.longitude.toFixed(4)}`
+                        : "N/A"}
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{doc.action}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{doc.page}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="default">{doc.platform}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={doc.isGuest ? "destructive" : "default"}>{doc.isGuest ? "Guest" : "User"}</Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{doc.ip_address}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        {formatGeopoint(doc.geopoint)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{doc.uid || "N/A"}</TableCell>
+                    <TableCell className="font-mono text-xs">{item.uid || "N/A"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </ScrollArea>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Document Details */}
-      {analyticsData.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Latest Document Structure</CardTitle>
-            <CardDescription>Raw document data from analytics_ohplus collection</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-64">
-              <pre className="text-xs bg-muted p-4 rounded-md overflow-auto">
-                {JSON.stringify(analyticsData[0], null, 2)}
-              </pre>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      )}
-
-      {analyticsData.length === 0 && (
-        <Card>
-          <CardContent className="flex items-center justify-center h-32">
-            <p className="text-muted-foreground">No analytics data found</p>
-          </CardContent>
-        </Card>
-      )}
+      {/* Detailed Data View */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Raw Data Structure</CardTitle>
+          <CardDescription>Latest document structure for debugging</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {analyticsData.length > 0 && (
+            <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
+              {JSON.stringify(analyticsData[0], null, 2)}
+            </pre>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
