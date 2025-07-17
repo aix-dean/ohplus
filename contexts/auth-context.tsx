@@ -13,6 +13,7 @@ import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, whe
 import { auth, db } from "@/lib/firebase"
 import { generateLicenseKey } from "@/lib/utils"
 import { assignRoleToUser, getUserRoles, type RoleType } from "@/lib/hardcoded-access-service"
+import { subscriptionService } from "@/lib/subscription-service"
 
 interface UserData {
   uid: string
@@ -55,6 +56,8 @@ interface AuthContextType {
   user: FirebaseUser | null
   userData: UserData | null
   projectData: ProjectData | null
+  subscriptionData: any | null
+  refreshSubscriptionData: () => Promise<void>
   loading: boolean
   login: (email: string, password: string) => Promise<void>
   loginOHPlusOnly: (email: string, password: string) => Promise<void>
@@ -90,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<FirebaseUser | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [projectData, setProjectData] = useState<ProjectData | null>(null)
+  const [subscriptionData, setSubscriptionData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isRegistering, setIsRegistering] = useState(false)
 
@@ -199,6 +203,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         console.log("No project_id found in user data")
         setProjectData(null)
+      }
+
+      // Fetch subscription data if company_id exists
+      if (fetchedUserData.company_id) {
+        try {
+          console.log("Fetching subscription data for company_id:", fetchedUserData.company_id)
+          const subscription = await subscriptionService.getSubscriptionByCompanyId(fetchedUserData.company_id)
+          console.log("Subscription data:", subscription)
+          setSubscriptionData(subscription)
+        } catch (error) {
+          console.error("Error fetching subscription data:", error)
+          setSubscriptionData(null)
+        }
+      } else {
+        setSubscriptionData(null)
       }
     } catch (error) {
       console.error("Error fetching user data or subscription:", error)
@@ -429,6 +448,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null)
       setUserData(null)
       setProjectData(null)
+      setSubscriptionData(null)
     } catch (error) {
       console.error("Logout error:", error)
       setLoading(false)
@@ -474,6 +494,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setProjectData((prev) => (prev ? { ...prev, ...updates } : null))
   }
+
+  const refreshSubscriptionData = useCallback(async () => {
+    if (user && userData?.company_id) {
+      try {
+        console.log("Refreshing subscription data for company_id:", userData.company_id)
+        const subscription = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
+        setSubscriptionData(subscription)
+
+        // Also refresh user data to get any updates
+        await fetchUserData(user)
+      } catch (error) {
+        console.error("Error refreshing subscription data:", error)
+        setSubscriptionData(null)
+      }
+    }
+  }, [user, userData?.company_id, fetchUserData])
 
   useEffect(() => {
     console.log("Setting up auth state listener with tenant ID:", auth.tenantId)
@@ -557,6 +593,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     userData,
     projectData,
+    subscriptionData,
     loading,
     login,
     loginOHPlusOnly,
@@ -566,6 +603,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateUserData,
     updateProjectData,
     refreshUserData,
+    refreshSubscriptionData,
     assignLicenseKey,
     getRoleDashboardPath,
     hasRole,
