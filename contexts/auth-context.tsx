@@ -1,52 +1,583 @@
 "use client"
 
-import type React from "react"
-import { createContext, useState, useEffect, useContext } from "react"
-import { getAuth, onAuthStateChanged, type User } from "firebase/auth"
-import { app } from "../firebase"
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  sendPasswordResetEmail,
+  type User as FirebaseUser,
+} from "firebase/auth"
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore"
+import { auth, db } from "@/lib/firebase"
+import { generateLicenseKey } from "@/lib/utils"
+import { assignRoleToUser, getUserRoles, type RoleType } from "@/lib/hardcoded-access-service"
 
-interface AuthContextType {
-  user: User | null
-  loading: boolean
-  refreshUserData: () => Promise<void>
+interface UserData {
+  uid: string
+  email: string | null
+  displayName: string | null
+  license_key: string | null
+  company_id?: string | null
+  role: string | null
+  roles: RoleType[] // Add roles array from user_roles collection
+  permissions: string[]
+  project_id?: string
+  first_name?: string
+  last_name?: string
+  middle_name?: string
+  phone_number?: string
+  gender?: string
+  type?: string
+  created?: Date
+  updated?: Date
+  onboarding?: boolean
 }
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true,
-  refreshUserData: async () => {},
-})
+interface ProjectData {
+  project_id: string
+  company_name?: string
+  company_location?: string
+  company_website?: string
+  project_name?: string
+  social_media?: {
+    facebook?: string
+    instagram?: string
+    youtube?: string
+  }
+  license_key?: string | null
+  created?: Date
+  updated?: Date
+}
 
-export const useAuth = () => useContext(AuthContext)
+interface AuthContextType {
+  user: FirebaseUser | null
+  userData: UserData | null
+  projectData: ProjectData | null
+  loading: boolean
+  login: (email: string, password: string) => Promise<void>
+  loginOHPlusOnly: (email: string, password: string) => Promise<void>
+  register: (
+    personalInfo: {
+      email: string
+      first_name: string
+      last_name: string
+      middle_name: string
+      phone_number: string
+      gender: string
+    },
+    companyInfo: {
+      company_name: string
+      company_location: string
+    },
+    password: string,
+    orgCode?: string,
+  ) => Promise<void>
+  logout: () => Promise<void>
+  resetPassword: (email: string) => Promise<void>
+  updateUserData: (updates: Partial<UserData>) => Promise<void>
+  updateProjectData: (updates: Partial<ProjectData>) => Promise<void>
+  refreshUserData: () => Promise<void>
+  assignLicenseKey: (uid: string, licenseKey: string) => Promise<void>
+  getRoleDashboardPath: (roles: RoleType[]) => string | null
+  hasRole: (requiredRoles: RoleType | RoleType[]) => boolean
+}
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null)
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<FirebaseUser | null>(null)
+  const [userData, setUserData] = useState<UserData | null>(null)
+  const [projectData, setProjectData] = useState<ProjectData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isRegistering, setIsRegistering] = useState(false)
 
-  useEffect(() => {
-    const auth = getAuth(app)
+  const fetchUserData = useCallback(async (firebaseUser: FirebaseUser) => {
+    try {
+      console.log("Fetching user data for UID:", firebaseUser.uid)
 
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user)
-      setLoading(false)
-    })
+      // Query iboard_users collection by uid field
+      const usersQuery = query(collection(db, "iboard_users"), where("uid", "==", firebaseUser.uid))
+      const usersSnapshot = await getDocs(usersQuery)
 
-    return () => unsubscribe()
+      let fetchedUserData: UserData
+
+      if (!usersSnapshot.empty) {
+        const userDoc = usersSnapshot.docs[0]
+        const data = userDoc.data()
+        console.log("User document data:", data)
+
+        // Fetch roles from user_roles collection
+        const userRoles = await getUserRoles(firebaseUser.uid)
+        console.log("User roles from user_roles collection:", userRoles)
+
+        fetchedUserData = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          license_key: data.license_key || null,
+          role: userRoles.length > 0 ? userRoles[0] : null, // Set role based on first role from user_roles
+          roles: userRoles, // Add the roles array from user_roles collection
+          permissions: data.permissions || [],
+          project_id: data.project_id,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          middle_name: data.middle_name,
+          phone_number: data.phone_number,
+          gender: data.gender,
+          type: data.type,
+          created: data.created?.toDate(),
+          updated: data.updated?.toDate(),
+          company_id: data.company_id || null,
+          onboarding: data.onboarding || false,
+          ...data,
+        }
+      } else {
+        console.log("User document doesn't exist, creating basic one")
+
+        // Fetch roles from user_roles collection even if user doc doesn't exist
+        const userRoles = await getUserRoles(firebaseUser.uid)
+        console.log("User roles from user_roles collection:", userRoles)
+
+        fetchedUserData = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          license_key: null,
+          company_id: null,
+          role: userRoles.length > 0 ? userRoles[0] : null,
+          roles: userRoles,
+          permissions: [],
+          onboarding: true, // New users need to complete onboarding
+        }
+
+        // Create the user document with uid field
+        const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
+        await setDoc(
+          userDocRef,
+          {
+            ...fetchedUserData,
+            created: serverTimestamp(),
+            updated: serverTimestamp(),
+          },
+          { merge: true },
+        )
+      }
+
+      console.log("Final fetchedUserData with roles:", fetchedUserData)
+      console.log("Roles array:", fetchedUserData.roles)
+      console.log("Primary role:", fetchedUserData.role)
+
+      setUserData(fetchedUserData)
+
+      if (fetchedUserData.project_id) {
+        console.log("Fetching project data for project_id:", fetchedUserData.project_id)
+
+        const projectDocRef = doc(db, "projects", fetchedUserData.project_id)
+        const projectDocSnap = await getDoc(projectDocRef)
+
+        if (projectDocSnap.exists()) {
+          const projectData = projectDocSnap.data()
+          console.log("Project document data:", projectData)
+
+          setProjectData({
+            project_id: projectDocSnap.id,
+            company_name: projectData.company_name,
+            company_location: projectData.company_location,
+            company_website: projectData.company_website,
+            project_name: projectData.project_name,
+            social_media: projectData.social_media,
+            license_key: projectData.license_key,
+            created: projectData.created?.toDate(),
+            updated: projectData.updated?.toDate(),
+          })
+        } else {
+          console.log("Project document doesn't exist")
+          setProjectData(null)
+        }
+      } else {
+        console.log("No project_id found in user data")
+        setProjectData(null)
+      }
+    } catch (error) {
+      console.error("Error fetching user data or subscription:", error)
+      setUserData(null)
+      setProjectData(null)
+    }
   }, [])
 
-  const refreshUserData = async () => {
-    const auth = getAuth(app)
-    if (auth.currentUser) {
-      await auth.currentUser.reload()
-      setUser(auth.currentUser)
+  const refreshUserData = useCallback(async () => {
+    if (user) {
+      await fetchUserData(user)
+    }
+  }, [user, fetchUserData])
+
+  const assignLicenseKey = useCallback(async (uid: string, licenseKey: string) => {
+    try {
+      console.log("Assigning license key:", licenseKey, "to user:", uid)
+
+      const userDocRef = doc(db, "iboard_users", uid)
+      await setDoc(userDocRef, { license_key: licenseKey }, { merge: true })
+
+      setUserData((prev) => (prev ? { ...prev, license_key: licenseKey } : null))
+
+      console.log("License key assigned successfully")
+    } catch (error) {
+      console.error("Error assigning license key:", error)
+      throw error
+    }
+  }, [])
+
+  const findOHPlusAccount = async (uid: string) => {
+    try {
+      // Query for OHPLUS accounts with this uid
+      const usersQuery = query(collection(db, "iboard_users"), where("uid", "==", uid), where("type", "==", "OHPLUS"))
+      const usersSnapshot = await getDocs(usersQuery)
+
+      if (!usersSnapshot.empty) {
+        // Return true if OHPLUS account found
+        return true
+      }
+
+      return false
+    } catch (error) {
+      console.error("Error finding OHPLUS account:", error)
+      return false
     }
   }
 
-  const value: AuthContextType = {
-    user,
-    loading,
-    refreshUserData,
+  const login = async (email: string, password: string) => {
+    setLoading(true)
+    try {
+      console.log("Logging in user with tenant ID:", auth.tenantId)
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      setUser(userCredential.user)
+      await fetchUserData(userCredential.user)
+    } catch (error) {
+      console.error("Login error:", error)
+      setLoading(false)
+      throw error
+    }
   }
 
-  return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>
+  const loginOHPlusOnly = async (email: string, password: string) => {
+    setLoading(true)
+    try {
+      console.log("Logging in OHPLUS user only with tenant ID:", auth.tenantId)
+
+      // Authenticate with Firebase using tenant ID
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+
+      // Check if this is an OHPLUS account
+      const isOHPlusAccount = await findOHPlusAccount(userCredential.user.uid)
+
+      if (!isOHPlusAccount) {
+        await signOut(auth)
+        throw new Error("OHPLUS_ACCOUNT_NOT_FOUND")
+      }
+
+      setUser(userCredential.user)
+      await fetchUserData(userCredential.user)
+    } catch (error) {
+      console.error("OHPLUS login error:", error)
+      setLoading(false)
+      throw error
+    }
+  }
+
+  const register = async (
+    personalInfo: {
+      email: string
+      first_name: string
+      last_name: string
+      middle_name: string
+      phone_number: string
+      gender: string
+    },
+    companyInfo: {
+      company_name: string
+      company_location: string
+    },
+    password: string,
+    orgCode?: string,
+  ) => {
+    setLoading(true)
+    setIsRegistering(true)
+    try {
+      console.log("Registering new user with tenant ID:", auth.tenantId)
+
+      const userCredential = await createUserWithEmailAndPassword(auth, personalInfo.email, password)
+      const firebaseUser = userCredential.user
+
+      let licenseKey = generateLicenseKey()
+      let companyId = null
+      let assignedRole: RoleType = "admin" // Default to admin for new org creators
+
+      if (orgCode) {
+        console.log("Processing invitation code:", orgCode)
+        const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
+        const invitationSnapshot = await getDocs(invitationQuery)
+
+        if (!invitationSnapshot.empty) {
+          const invitationDoc = invitationSnapshot.docs[0]
+          const invitationData = invitationDoc.data()
+          console.log("Invitation data found:", invitationData)
+
+          licenseKey = invitationData.license_key || licenseKey
+          companyId = invitationData.company_id || null
+
+          // Validate and assign role from invitation
+          const invitationRole = invitationData.role
+          if (invitationRole && ["admin", "sales", "logistics", "cms"].includes(invitationRole)) {
+            assignedRole = invitationRole as RoleType
+          } else {
+            assignedRole = "sales" // Default fallback for invited users
+          }
+
+          console.log("Assigned role from invitation:", assignedRole)
+
+          const updateData: any = {
+            used: true,
+            used_count: (invitationData.used_count || 0) + 1,
+            last_used_at: serverTimestamp(),
+          }
+
+          if (invitationData.used_by && Array.isArray(invitationData.used_by)) {
+            updateData.used_by = [...invitationData.used_by, firebaseUser.uid]
+          } else {
+            updateData.used_by = [firebaseUser.uid]
+          }
+
+          await updateDoc(doc(db, "invitation_codes", invitationDoc.id), updateData)
+          console.log("Invitation code marked as used")
+        } else {
+          console.log("No invitation found for code:", orgCode)
+          assignedRole = "sales" // Default for invalid invitation codes
+        }
+      }
+
+      console.log("Creating user with role:", assignedRole)
+
+      // Create user document in iboard_users collection
+      const userDocRef = doc(db, "iboard_users", firebaseUser.uid)
+      const userData = {
+        email: firebaseUser.email,
+        uid: firebaseUser.uid,
+        license_key: licenseKey,
+        company_id: companyId,
+        role: assignedRole,
+        permissions: [],
+        type: "OHPLUS",
+        created: serverTimestamp(),
+        updated: serverTimestamp(),
+        first_name: personalInfo.first_name,
+        last_name: personalInfo.last_name,
+        middle_name: personalInfo.middle_name,
+        phone_number: personalInfo.phone_number,
+        gender: personalInfo.gender,
+        project_id: orgCode ? null : firebaseUser.uid,
+        onboarding: true, // New users need to complete onboarding
+      }
+
+      await setDoc(userDocRef, userData)
+      console.log("User document created in iboard_users collection")
+
+      // Also assign the role to the user_roles collection
+      try {
+        await assignRoleToUser(firebaseUser.uid, assignedRole, firebaseUser.uid)
+        console.log("Role assigned to user_roles collection:", assignedRole)
+      } catch (roleError) {
+        console.error("Error assigning role to user_roles collection:", roleError)
+        // Don't fail registration if role assignment fails
+      }
+
+      // Create project if not joining an organization
+      if (!orgCode) {
+        console.log("Creating new project for new organization")
+        const projectDocRef = doc(db, "projects", firebaseUser.uid)
+        await setDoc(projectDocRef, {
+          company_name: companyInfo.company_name,
+          company_location: companyInfo.company_location,
+          project_name: "My First Project",
+          license_key: licenseKey,
+          created: serverTimestamp(),
+          updated: serverTimestamp(),
+        })
+      }
+
+      // Set the user and fetch data
+      setUser(firebaseUser)
+      await fetchUserData(firebaseUser)
+
+      console.log("Registration completed successfully with role:", assignedRole)
+    } catch (error) {
+      console.error("Error in AuthContext register:", error)
+      setLoading(false)
+      setIsRegistering(false)
+      throw error
+    } finally {
+      setIsRegistering(false)
+    }
+  }
+
+  const logout = async () => {
+    setLoading(true)
+    try {
+      console.log("Logging out user")
+      await signOut(auth)
+      setUser(null)
+      setUserData(null)
+      setProjectData(null)
+    } catch (error) {
+      console.error("Logout error:", error)
+      setLoading(false)
+      throw error
+    }
+  }
+
+  const resetPassword = async (email: string) => {
+    try {
+      console.log("Sending password reset email to:", email, "with tenant ID:", auth.tenantId)
+      await sendPasswordResetEmail(auth, email)
+      console.log("Password reset email sent successfully")
+    } catch (error: any) {
+      console.error("Password reset error:", error)
+
+      const errorMessage =
+        error.code === "auth/user-not-found"
+          ? "No account found with this email address."
+          : error.message || "Failed to send password reset email."
+
+      throw new Error(errorMessage)
+    }
+  }
+
+  const updateUserData = async (updates: Partial<UserData>) => {
+    if (!user) throw new Error("User not authenticated.")
+
+    console.log("Updating user data:", updates)
+    const userDocRef = doc(db, "iboard_users", user.uid)
+    const updatedFields = { ...updates, updated: serverTimestamp() }
+    await updateDoc(userDocRef, updatedFields)
+
+    setUserData((prev) => (prev ? { ...prev, ...updates } : null))
+  }
+
+  const updateProjectData = async (updates: Partial<ProjectData>) => {
+    if (!user || !userData?.project_id) throw new Error("Project not found or user not authenticated.")
+
+    console.log("Updating project data:", updates)
+    const projectDocRef = doc(db, "projects", userData.project_id)
+    const updatedFields = { ...updates, updated: serverTimestamp() }
+    await updateDoc(projectDocRef, updatedFields)
+
+    setProjectData((prev) => (prev ? { ...prev, ...updates } : null))
+  }
+
+  useEffect(() => {
+    console.log("Setting up auth state listener with tenant ID:", auth.tenantId)
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        console.log("Auth state changed: user logged in", firebaseUser.uid)
+        setUser(firebaseUser)
+
+        // If we're in the middle of registration, skip the OHPLUS check
+        // because the user document might not be created yet
+        if (isRegistering) {
+          console.log("Registration in progress, skipping OHPLUS check")
+          return
+        }
+
+        const isOHPlusAccount = await findOHPlusAccount(firebaseUser.uid)
+        if (isOHPlusAccount) {
+          await fetchUserData(firebaseUser)
+        } else {
+          console.log("No OHPLUS account found, signing out")
+          await signOut(auth)
+        }
+      } else {
+        console.log("Auth state changed: user logged out")
+        setUser(null)
+        setUserData(null)
+        setProjectData(null)
+      }
+      setLoading(false)
+    })
+    return () => unsubscribe()
+  }, [fetchUserData, isRegistering])
+
+  // Function to check if user has a specific role or any of the roles in an array
+  const hasRole = useCallback(
+    (requiredRoles: RoleType | RoleType[]): boolean => {
+      if (!userData || !userData.roles || userData.roles.length === 0) {
+        return false
+      }
+
+      if (Array.isArray(requiredRoles)) {
+        return requiredRoles.some((role) => userData.roles.includes(role))
+      }
+
+      return userData.roles.includes(requiredRoles)
+    },
+    [userData],
+  )
+
+  const getRoleDashboardPath = useCallback((roles: RoleType[]): string | null => {
+    console.log("getRoleDashboardPath called with roles:", roles)
+
+    if (!roles || roles.length === 0) {
+      console.log("No roles found, returning null")
+      return null
+    }
+
+    // Priority order: admin > sales > logistics > cms
+    if (roles.includes("admin")) {
+      console.log("Admin role found, redirecting to admin dashboard")
+      return "/admin/dashboard"
+    }
+    if (roles.includes("sales")) {
+      console.log("Sales role found, redirecting to sales dashboard")
+      return "/sales/dashboard"
+    }
+    if (roles.includes("logistics")) {
+      console.log("Logistics role found, redirecting to logistics dashboard")
+      return "/logistics/dashboard"
+    }
+    if (roles.includes("cms")) {
+      console.log("CMS role found, redirecting to cms dashboard")
+      return "/cms/dashboard"
+    }
+
+    console.log("No matching roles found, returning null")
+    return null
+  }, [])
+
+  const value = {
+    user,
+    userData,
+    projectData,
+    loading,
+    login,
+    loginOHPlusOnly,
+    register,
+    logout,
+    resetPassword,
+    updateUserData,
+    updateProjectData,
+    refreshUserData,
+    assignLicenseKey,
+    getRoleDashboardPath,
+    hasRole,
+  }
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider")
+  }
+  return context
 }
