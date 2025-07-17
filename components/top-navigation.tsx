@@ -57,6 +57,9 @@ export function TopNavigation() {
     if (path === "/help") return "Help & Support"
     if (path === "/features") return "Features"
 
+    // Add this new check for business section
+    if (pathname.startsWith("/business")) return "Business Developer"
+
     if (segments[0]) {
       const section = segments[0].charAt(0).toUpperCase() + segments[0].slice(1)
       let page = ""

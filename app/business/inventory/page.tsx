@@ -405,7 +405,7 @@ export default function BusinessInventoryPage() {
   return (
     <div className="p-4 md:p-6">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-900">Business Developer</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
       </div>
 
       <div className="grid gap-6">
