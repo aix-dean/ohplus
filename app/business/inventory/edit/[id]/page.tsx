@@ -21,7 +21,7 @@ import { db } from "@/lib/firebase"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import type { Product } from "@/lib/firebase-service"
-import { SideNavigation } from "@/components/side-navigation"
+// import { SideNavigation } from "@/components/side-navigation"
 
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
@@ -491,14 +491,11 @@ export default function BusinessEditProductPage() {
 
   if (!user) {
     return (
-      <div className="flex min-h-screen">
-        <SideNavigation />
-        <div className="flex-1 p-6">
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold mb-2">Authentication Required</h2>
-            <p className="text-gray-500 mb-6">Please log in to edit a product.</p>
-            <Button onClick={() => router.push("/login")}>Log In</Button>
-          </div>
+      <div className="p-6">
+        <div className="text-center py-12">
+          <h2 className="text-2xl font-bold mb-2">Authentication Required</h2>
+          <p className="text-gray-500 mb-6">Please log in to edit a product.</p>
+          <Button onClick={() => router.push("/login")}>Log In</Button>
         </div>
       </div>
     )
@@ -506,32 +503,29 @@ export default function BusinessEditProductPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen">
-        <SideNavigation />
-        <div className="flex-1 p-6">
-          <div className="max-w-3xl mx-auto">
-            <Button variant="ghost" onClick={handleBack} className="mb-6">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
+      <div className="p-6">
+        <div className="max-w-3xl mx-auto">
+          <Button variant="ghost" onClick={handleBack} className="mb-6">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Loading Product Data
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-32 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                  <Skeleton className="h-8 w-full" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Loading Product Data
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
@@ -539,34 +533,7 @@ export default function BusinessEditProductPage() {
 
   if (!product) {
     return (
-      <div className="flex min-h-screen">
-        <SideNavigation />
-        <div className="flex-1 p-6">
-          <div className="max-w-3xl mx-auto">
-            <Button variant="ghost" onClick={handleBack} className="mb-6">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Inventory
-            </Button>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Product Not Found</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-500 mb-6">The product you're trying to edit could not be found.</p>
-                <Button onClick={() => router.push("/business/inventory")}>Return to Inventory</Button>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex min-h-screen">
-      <SideNavigation />
-      <div className="flex-1 p-6">
+      <div className="p-6">
         <div className="max-w-3xl mx-auto">
           <Button variant="ghost" onClick={handleBack} className="mb-6">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -575,379 +542,480 @@ export default function BusinessEditProductPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Edit Site: {product.name}</CardTitle>
+              <CardTitle>Product Not Found</CardTitle>
             </CardHeader>
             <CardContent>
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-6 flex items-start">
-                  <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
+              <p className="text-gray-500 mb-6">The product you're trying to edit could not be found.</p>
+              <Button onClick={() => router.push("/business/inventory")}>Return to Inventory</Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Basic Information */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Basic Information</h3>
+  return (
+    <div className="p-6">
+      <div className="max-w-3xl mx-auto">
+        <Button variant="ghost" onClick={handleBack} className="mb-6">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Inventory
+        </Button>
 
-                  <div className="grid gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">
-                        Name <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="name"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        placeholder="Enter site name"
-                        required
-                      />
-                    </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Edit Site: {product.name}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-6 flex items-start">
+                <AlertCircle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="description">
-                        Description <span className="text-red-500">*</span>
-                      </Label>
-                      <Textarea
-                        id="description"
-                        name="description"
-                        value={formData.description}
-                        onChange={handleInputChange}
-                        placeholder="Enter site description"
-                        rows={4}
-                        required
-                      />
-                    </div>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Basic Information</h3>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="price">Price per Month (₱)</Label>
-                      <Input
-                        id="price"
-                        name="price"
-                        type="number"
-                        value={formData.price}
-                        onChange={handleInputChange}
-                        placeholder="Enter price per month"
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="content_type">Content Type</Label>
-                      <select
-                        id="content_type"
-                        name="content_type"
-                        value={formData.content_type}
-                        onChange={handleInputChange}
-                        className="w-full p-2 border border-gray-300 rounded-md"
-                      >
-                        <option value="Static">Static</option>
-                        <option value="Dynamic(LED)">Dynamic(LED)</option>
-                      </select>
-                    </div>
-
-                    {/* Dynamic content specific fields */}
-                    {isDynamicContent && (
-                      <div className="space-y-4 p-4 bg-gray-50 rounded-md border border-gray-200">
-                        <h4 className="text-sm font-medium">Dynamic Content Settings</h4>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="cms.spots_per_loop">
-                            Spots per Loop <span className="text-red-500">*</span>
-                          </Label>
-                          <Input
-                            id="cms.spots_per_loop"
-                            name="cms.spots_per_loop"
-                            type="number"
-                            value={formData.cms.spots_per_loop}
-                            onChange={handleInputChange}
-                            placeholder="Enter number of spots per loop"
-                            min="1"
-                            required={isDynamicContent}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="cms.loops_per_day">
-                            Loops per Day <span className="text-red-500">*</span>
-                          </Label>
-                          <Input
-                            id="cms.loops_per_day"
-                            name="cms.loops_per_day"
-                            type="number"
-                            value={formData.cms.loops_per_day}
-                            onChange={handleInputChange}
-                            placeholder="Enter number of loops per day"
-                            min="1"
-                            required={isDynamicContent}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      <Label htmlFor="categories">
-                        Categories <span className="text-red-500">*</span>
-                      </Label>
-                      <div className="relative">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className={`w-full justify-between ${selectedCategories.length === 0 ? "border-red-300" : ""}`}
-                          onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                          disabled={isLoadingCategories || categories.length === 0}
-                        >
-                          <span>
-                            {isLoadingCategories
-                              ? "Loading categories..."
-                              : selectedCategories.length > 0
-                                ? `${selectedCategories.length} categories selected`
-                                : "Select categories"}
-                          </span>
-                          <ArrowLeft
-                            className={`h-4 w-4 transition-transform ${showCategoryDropdown ? "rotate-90" : "-rotate-90"}`}
-                          />
-                        </Button>
-
-                        {showCategoryDropdown && (
-                          <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
-                            {categories.map((category) => (
-                              <div
-                                key={category.id}
-                                className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                onClick={() => toggleCategory(category.id)}
-                              >
-                                <div className="flex-1">{category.name}</div>
-                                {selectedCategories.includes(category.id) ? (
-                                  <Check className="h-4 w-4 text-green-500" />
-                                ) : null}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Selected categories */}
-                      {selectedCategories.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {selectedCategories.map((categoryId) => {
-                            const category = categories.find((c) => c.id === categoryId)
-                            return category ? (
-                              <Badge key={categoryId} variant="secondary" className="flex items-center gap-1">
-                                {category.name}
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-4 w-4 p-0 hover:bg-transparent"
-                                  onClick={() => removeCategory(categoryId)}
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </Badge>
-                            ) : null
-                          })}
-                        </div>
-                      )}
-
-                      {categories.length === 0 && !isLoadingCategories && (
-                        <p className="text-xs text-amber-600 mt-1">No active categories found</p>
-                      )}
-                    </div>
+                <div className="grid gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">
+                      Name <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="name"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      placeholder="Enter site name"
+                      required
+                    />
                   </div>
-                </div>
 
-                {/* Location Information */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Location Information</h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">
+                      Description <span className="text-red-500">*</span>
+                    </Label>
+                    <Textarea
+                      id="description"
+                      name="description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      placeholder="Enter site description"
+                      rows={4}
+                      required
+                    />
+                  </div>
 
-                  <div className="grid gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="specs_rental.location">
-                        Location <span className="text-red-500">*</span>
-                      </Label>
-                      <GooglePlacesAutocomplete
-                        value={formData.specs_rental.location}
-                        onChange={handleLocationChange}
-                        placeholder="Enter site location"
-                        required
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="price">Price per Month (₱)</Label>
+                    <Input
+                      id="price"
+                      name="price"
+                      type="number"
+                      value={formData.price}
+                      onChange={handleInputChange}
+                      placeholder="Enter price per month"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="audience_types">Audience Types (Multiple)</Label>
-                      <div className="relative">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full justify-between bg-transparent"
-                          onClick={() => setShowAudienceDropdown(!showAudienceDropdown)}
-                        >
-                          <span>
-                            {selectedAudienceTypes.length > 0
-                              ? `${selectedAudienceTypes.length} audience types selected`
-                              : "Select audience types"}
-                          </span>
-                          <ArrowLeft
-                            className={`h-4 w-4 transition-transform ${showAudienceDropdown ? "rotate-90" : "-rotate-90"}`}
-                          />
-                        </Button>
+                  <div className="space-y-2">
+                    <Label htmlFor="content_type">Content Type</Label>
+                    <select
+                      id="content_type"
+                      name="content_type"
+                      value={formData.content_type}
+                      onChange={handleInputChange}
+                      className="w-full p-2 border border-gray-300 rounded-md"
+                    >
+                      <option value="Static">Static</option>
+                      <option value="Dynamic(LED)">Dynamic(LED)</option>
+                    </select>
+                  </div>
 
-                        {showAudienceDropdown && (
-                          <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
-                            {AUDIENCE_TYPES.map((type) => (
-                              <div
-                                key={type}
-                                className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                onClick={() => toggleAudienceType(type)}
-                              >
-                                <div className="flex-1">{type}</div>
-                                {selectedAudienceTypes.includes(type) ? (
-                                  <Check className="h-4 w-4 text-green-500" />
-                                ) : null}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                  {/* Dynamic content specific fields */}
+                  {isDynamicContent && (
+                    <div className="space-y-4 p-4 bg-gray-50 rounded-md border border-gray-200">
+                      <h4 className="text-sm font-medium">Dynamic Content Settings</h4>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="cms.spots_per_loop">
+                          Spots per Loop <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id="cms.spots_per_loop"
+                          name="cms.spots_per_loop"
+                          type="number"
+                          value={formData.cms.spots_per_loop}
+                          onChange={handleInputChange}
+                          placeholder="Enter number of spots per loop"
+                          min="1"
+                          required={isDynamicContent}
+                        />
                       </div>
 
-                      {/* Selected audience types */}
-                      {selectedAudienceTypes.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {selectedAudienceTypes.map((type) => (
-                            <Badge key={type} variant="secondary" className="flex items-center gap-1">
-                              {type}
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-4 w-4 p-0 hover:bg-transparent"
-                                onClick={() => removeAudienceType(type)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </Badge>
+                      <div className="space-y-2">
+                        <Label htmlFor="cms.loops_per_day">
+                          Loops per Day <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          id="cms.loops_per_day"
+                          name="cms.loops_per_day"
+                          type="number"
+                          value={formData.cms.loops_per_day}
+                          onChange={handleInputChange}
+                          placeholder="Enter number of loops per day"
+                          min="1"
+                          required={isDynamicContent}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="categories">
+                      Categories <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={`w-full justify-between ${selectedCategories.length === 0 ? "border-red-300" : ""}`}
+                        onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                        disabled={isLoadingCategories || categories.length === 0}
+                      >
+                        <span>
+                          {isLoadingCategories
+                            ? "Loading categories..."
+                            : selectedCategories.length > 0
+                              ? `${selectedCategories.length} categories selected`
+                              : "Select categories"}
+                        </span>
+                        <ArrowLeft
+                          className={`h-4 w-4 transition-transform ${showCategoryDropdown ? "rotate-90" : "-rotate-90"}`}
+                        />
+                      </Button>
+
+                      {showCategoryDropdown && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                          {categories.map((category) => (
+                            <div
+                              key={category.id}
+                              className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                              onClick={() => toggleCategory(category.id)}
+                            >
+                              <div className="flex-1">{category.name}</div>
+                              {selectedCategories.includes(category.id) ? (
+                                <Check className="h-4 w-4 text-green-500" />
+                              ) : null}
+                            </div>
                           ))}
                         </div>
                       )}
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="specs_rental.traffic_count">Traffic Count (Daily)</Label>
-                      <Input
-                        id="specs_rental.traffic_count"
-                        name="specs_rental.traffic_count"
-                        type="number"
-                        value={formData.specs_rental.traffic_count}
-                        onChange={handleInputChange}
-                        placeholder="Enter average daily traffic count"
-                        min="0"
-                      />
+                    {/* Selected categories */}
+                    {selectedCategories.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {selectedCategories.map((categoryId) => {
+                          const category = categories.find((c) => c.id === categoryId)
+                          return category ? (
+                            <Badge key={categoryId} variant="secondary" className="flex items-center gap-1">
+                              {category.name}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-4 w-4 p-0 hover:bg-transparent"
+                                onClick={() => removeCategory(categoryId)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </Badge>
+                          ) : null
+                        })}
+                      </div>
+                    )}
+
+                    {categories.length === 0 && !isLoadingCategories && (
+                      <p className="text-xs text-amber-600 mt-1">No active categories found</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Location Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Location Information</h3>
+
+                <div className="grid gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="specs_rental.location">
+                      Location <span className="text-red-500">*</span>
+                    </Label>
+                    <GooglePlacesAutocomplete
+                      value={formData.specs_rental.location}
+                      onChange={handleLocationChange}
+                      placeholder="Enter site location"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="audience_types">Audience Types (Multiple)</Label>
+                    <div className="relative">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-between bg-transparent"
+                        onClick={() => setShowAudienceDropdown(!showAudienceDropdown)}
+                      >
+                        <span>
+                          {selectedAudienceTypes.length > 0
+                            ? `${selectedAudienceTypes.length} audience types selected`
+                            : "Select audience types"}
+                        </span>
+                        <ArrowLeft
+                          className={`h-4 w-4 transition-transform ${showAudienceDropdown ? "rotate-90" : "-rotate-90"}`}
+                        />
+                      </Button>
+
+                      {showAudienceDropdown && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                          {AUDIENCE_TYPES.map((type) => (
+                            <div
+                              key={type}
+                              className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                              onClick={() => toggleAudienceType(type)}
+                            >
+                              <div className="flex-1">{type}</div>
+                              {selectedAudienceTypes.includes(type) ? (
+                                <Check className="h-4 w-4 text-green-500" />
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
+                    {/* Selected audience types */}
+                    {selectedAudienceTypes.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {selectedAudienceTypes.map((type) => (
+                          <Badge key={type} variant="secondary" className="flex items-center gap-1">
+                            {type}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-4 w-4 p-0 hover:bg-transparent"
+                              onClick={() => removeAudienceType(type)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="specs_rental.traffic_count">Traffic Count (Daily)</Label>
+                    <Input
+                      id="specs_rental.traffic_count"
+                      name="specs_rental.traffic_count"
+                      type="number"
+                      value={formData.specs_rental.traffic_count}
+                      onChange={handleInputChange}
+                      placeholder="Enter average daily traffic count"
+                      min="0"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="specs_rental.elevation">Elevation (ft)</Label>
+                    <Input
+                      id="specs_rental.elevation"
+                      name="specs_rental.elevation"
+                      type="number"
+                      value={formData.specs_rental.elevation}
+                      onChange={handleInputChange}
+                      placeholder="Enter elevation from ground level in feet"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="specs_rental.elevation">Elevation (ft)</Label>
+                      <Label htmlFor="specs_rental.height">Height (ft)</Label>
                       <Input
-                        id="specs_rental.elevation"
-                        name="specs_rental.elevation"
+                        id="specs_rental.height"
+                        name="specs_rental.height"
                         type="number"
-                        value={formData.specs_rental.elevation}
+                        value={formData.specs_rental.height}
                         onChange={handleInputChange}
-                        placeholder="Enter elevation from ground level in feet"
+                        placeholder="Enter height in feet"
                         min="0"
                         step="0.01"
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="specs_rental.height">Height (ft)</Label>
-                        <Input
-                          id="specs_rental.height"
-                          name="specs_rental.height"
-                          type="number"
-                          value={formData.specs_rental.height}
-                          onChange={handleInputChange}
-                          placeholder="Enter height in feet"
-                          min="0"
-                          step="0.01"
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="specs_rental.width">Width (ft)</Label>
+                      <Input
+                        id="specs_rental.width"
+                        name="specs_rental.width"
+                        type="number"
+                        value={formData.specs_rental.width}
+                        onChange={handleInputChange}
+                        placeholder="Enter width in feet"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="specs_rental.width">Width (ft)</Label>
-                        <Input
-                          id="specs_rental.width"
-                          name="specs_rental.width"
-                          type="number"
-                          value={formData.specs_rental.width}
-                          onChange={handleInputChange}
-                          placeholder="Enter width in feet"
-                          min="0"
-                          step="0.01"
-                        />
-                      </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="latitude">Latitude</Label>
+                      <Input
+                        id="latitude"
+                        type="number"
+                        value={formData.specs_rental.geopoint[0]}
+                        onChange={(e) => handleGeopointChange(e, 0)}
+                        placeholder="Enter latitude"
+                        step="0.000001"
+                      />
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="latitude">Latitude</Label>
-                        <Input
-                          id="latitude"
-                          type="number"
-                          value={formData.specs_rental.geopoint[0]}
-                          onChange={(e) => handleGeopointChange(e, 0)}
-                          placeholder="Enter latitude"
-                          step="0.000001"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="longitude">Longitude</Label>
-                        <Input
-                          id="longitude"
-                          type="number"
-                          value={formData.specs_rental.geopoint[1]}
-                          onChange={(e) => handleGeopointChange(e, 1)}
-                          placeholder="Enter longitude"
-                          step="0.000001"
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="longitude">Longitude</Label>
+                      <Input
+                        id="longitude"
+                        type="number"
+                        value={formData.specs_rental.geopoint[1]}
+                        onChange={(e) => handleGeopointChange(e, 1)}
+                        placeholder="Enter longitude"
+                        step="0.000001"
+                      />
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Media Upload */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">
-                    Media <span className="text-red-500">*</span>
-                  </h3>
+              {/* Media Upload */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">
+                  Media <span className="text-red-500">*</span>
+                </h3>
 
-                  {/* Existing Media */}
-                  {existingMedia && existingMedia.length > 0 && (
-                    <div className="space-y-4">
-                      <h4 className="text-sm font-medium">Existing Media</h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        {existingMedia.map((item, index) => (
+                {/* Existing Media */}
+                {existingMedia && existingMedia.length > 0 && (
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium">Existing Media</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      {existingMedia.map((item, index) => (
+                        <div key={index} className="border rounded-lg p-3 space-y-2">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center">
+                              {item.isVideo ? (
+                                <Film className="h-3 w-3 mr-1 text-blue-500" />
+                              ) : (
+                                <ImageIcon className="h-3 w-3 mr-1 text-green-500" />
+                              )}
+                              <h5 className="text-xs font-medium">
+                                {item.isVideo ? "Video" : "Image"} {index + 1}
+                              </h5>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveExistingMedia(index)}
+                              className="h-6 w-6 p-0 text-red-500"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+
+                          <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
+                            {item.isVideo ? (
+                              <video src={item.url} controls className="w-full h-full object-contain" />
+                            ) : (
+                              <img
+                                src={item.url || "/placeholder.svg"}
+                                alt={`Media ${index + 1}`}
+                                className="w-full h-full object-contain"
+                              />
+                            )}
+                          </div>
+
+                          <div className="text-xs text-gray-500">Distance: {item.distance || "Not specified"}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div
+                  className={`border-2 border-dashed ${
+                    existingMedia.length === 0 && mediaFiles.length === 0 ? "border-red-300" : "border-gray-300"
+                  } rounded-lg p-6 text-center`}
+                >
+                  <input
+                    type="file"
+                    id="media-upload"
+                    multiple
+                    accept="image/*,video/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    required={existingMedia.length === 0 && mediaFiles.length === 0}
+                  />
+                  <label htmlFor="media-upload" className="flex flex-col items-center justify-center cursor-pointer">
+                    <Upload
+                      className={`h-10 w-10 ${
+                        existingMedia.length === 0 && mediaFiles.length === 0 ? "text-red-400" : "text-gray-400"
+                      } mb-2`}
+                    />
+                    <p className="text-sm font-medium mb-1">Click to upload or drag and drop</p>
+                    <p className="text-xs text-gray-500">Images or videos (max 10MB each)</p>
+                    {existingMedia.length === 0 && mediaFiles.length === 0 && (
+                      <p className="text-xs text-red-500 mt-2">At least one media file is required</p>
+                    )}
+                  </label>
+                </div>
+
+                {/* New Media Preview - Grid Layout */}
+                {mediaPreviewUrls.length > 0 && (
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium">New Media</h4>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      {mediaPreviewUrls.map((url, index) => {
+                        const isVideo = mediaTypes[index] === "Video"
+                        return (
                           <div key={index} className="border rounded-lg p-3 space-y-2">
                             <div className="flex justify-between items-start">
                               <div className="flex items-center">
-                                {item.isVideo ? (
+                                {isVideo ? (
                                   <Film className="h-3 w-3 mr-1 text-blue-500" />
                                 ) : (
                                   <ImageIcon className="h-3 w-3 mr-1 text-green-500" />
                                 )}
                                 <h5 className="text-xs font-medium">
-                                  {item.isVideo ? "Video" : "Image"} {index + 1}
+                                  {isVideo ? "Video" : "Image"} {index + 1}
                                 </h5>
                               </div>
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleRemoveExistingMedia(index)}
+                                onClick={() => handleRemoveMedia(index)}
                                 className="h-6 w-6 p-0 text-red-500"
                               >
                                 <Trash2 className="h-3 w-3" />
@@ -955,126 +1023,46 @@ export default function BusinessEditProductPage() {
                             </div>
 
                             <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
-                              {item.isVideo ? (
-                                <video src={item.url} controls className="w-full h-full object-contain" />
+                              {isVideo ? (
+                                <video src={url} controls className="w-full h-full object-contain" />
                               ) : (
                                 <img
-                                  src={item.url || "/placeholder.svg"}
-                                  alt={`Media ${index + 1}`}
+                                  src={url || "/placeholder.svg"}
+                                  alt={`Preview ${index + 1}`}
                                   className="w-full h-full object-contain"
                                 />
                               )}
                             </div>
 
-                            <div className="text-xs text-gray-500">Distance: {item.distance || "Not specified"}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div
-                    className={`border-2 border-dashed ${
-                      existingMedia.length === 0 && mediaFiles.length === 0 ? "border-red-300" : "border-gray-300"
-                    } rounded-lg p-6 text-center`}
-                  >
-                    <input
-                      type="file"
-                      id="media-upload"
-                      multiple
-                      accept="image/*,video/*"
-                      className="hidden"
-                      onChange={handleFileChange}
-                      required={existingMedia.length === 0 && mediaFiles.length === 0}
-                    />
-                    <label htmlFor="media-upload" className="flex flex-col items-center justify-center cursor-pointer">
-                      <Upload
-                        className={`h-10 w-10 ${
-                          existingMedia.length === 0 && mediaFiles.length === 0 ? "text-red-400" : "text-gray-400"
-                        } mb-2`}
-                      />
-                      <p className="text-sm font-medium mb-1">Click to upload or drag and drop</p>
-                      <p className="text-xs text-gray-500">Images or videos (max 10MB each)</p>
-                      {existingMedia.length === 0 && mediaFiles.length === 0 && (
-                        <p className="text-xs text-red-500 mt-2">At least one media file is required</p>
-                      )}
-                    </label>
-                  </div>
-
-                  {/* New Media Preview - Grid Layout */}
-                  {mediaPreviewUrls.length > 0 && (
-                    <div className="space-y-4">
-                      <h4 className="text-sm font-medium">New Media</h4>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        {mediaPreviewUrls.map((url, index) => {
-                          const isVideo = mediaTypes[index] === "Video"
-                          return (
-                            <div key={index} className="border rounded-lg p-3 space-y-2">
-                              <div className="flex justify-between items-start">
-                                <div className="flex items-center">
-                                  {isVideo ? (
-                                    <Film className="h-3 w-3 mr-1 text-blue-500" />
-                                  ) : (
-                                    <ImageIcon className="h-3 w-3 mr-1 text-green-500" />
-                                  )}
-                                  <h5 className="text-xs font-medium">
-                                    {isVideo ? "Video" : "Image"} {index + 1}
-                                  </h5>
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRemoveMedia(index)}
-                                  className="h-6 w-6 p-0 text-red-500"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-
-                              <div className="aspect-video bg-gray-100 rounded-md overflow-hidden">
-                                {isVideo ? (
-                                  <video src={url} controls className="w-full h-full object-contain" />
-                                ) : (
-                                  <img
-                                    src={url || "/placeholder.svg"}
-                                    alt={`Preview ${index + 1}`}
-                                    className="w-full h-full object-contain"
-                                  />
-                                )}
-                              </div>
-
-                              <div className="space-y-1">
-                                <Label htmlFor={`media-distance-${index}`} className="text-xs">
-                                  Viewing Distance
-                                </Label>
-                                <Input
-                                  id={`media-distance-${index}`}
-                                  value={mediaDistances[index]}
-                                  onChange={(e) => handleMediaDistanceChange(index, e.target.value)}
-                                  placeholder="e.g., 100m"
-                                  className="h-8 text-xs"
-                                />
-                              </div>
+                            <div className="space-y-1">
+                              <Label htmlFor={`media-distance-${index}`} className="text-xs">
+                                Viewing Distance
+                              </Label>
+                              <Input
+                                id={`media-distance-${index}`}
+                                value={mediaDistances[index]}
+                                onChange={(e) => handleMediaDistanceChange(index, e.target.value)}
+                                placeholder="e.g., 100m"
+                                className="h-8 text-xs"
+                              />
                             </div>
-                          )
-                        })}
-                      </div>
+                          </div>
+                        )
+                      })}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+              </div>
 
-                {/* Submit Button */}
-                <div className="flex justify-end pt-4">
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "Updating..." : "Update Site"}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+              {/* Submit Button */}
+              <div className="flex justify-end pt-4">
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Updating..." : "Update Site"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
