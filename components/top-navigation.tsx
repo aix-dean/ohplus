@@ -149,44 +149,6 @@ export function TopNavigation() {
     setIsOpen(false)
   }
 
-  const handleLogout = () => {
-    try {
-      console.log("Logout attempt started")
-
-      // Immediately redirect to login without waiting for async operations
-      window.location.href = "/login"
-
-      // Clear storage in the background after redirect starts
-      setTimeout(() => {
-        if (typeof window !== "undefined") {
-          // Clear localStorage completely
-          localStorage.clear()
-
-          // Clear sessionStorage completely
-          sessionStorage.clear()
-
-          // Clear all cookies
-          const cookies = document.cookie.split(";")
-          for (const cookie of cookies) {
-            const eqPos = cookie.indexOf("=")
-            const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim()
-            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`
-            document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`
-          }
-        }
-
-        // Try auth context signOut in background
-        if (signOut && typeof signOut === "function") {
-          signOut().catch((e) => console.log("Background signOut failed:", e))
-        }
-      }, 100)
-    } catch (error) {
-      console.error("Logout error:", error)
-      // Force redirect even if there's an error
-      window.location.href = "/login"
-    }
-  }
-
   return (
     <nav className={`top-nav relative ${navBgColor} z-40`}>
       {/* Diagonal section - positioned to always be before the date area */}
@@ -249,7 +211,7 @@ export function TopNavigation() {
                 <div className="ml-3 relative z-10">
                   <button
                     type="button"
-                    onClick={handleLogout}
+                    onClick={signOut}
                     className="p-2 rounded-full text-white hover:text-gray-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
                     aria-label="Sign out"
                   >
@@ -321,7 +283,7 @@ export function TopNavigation() {
                 )}
 
                 <button
-                  onClick={handleLogout}
+                  onClick={signOut}
                   className="w-full text-left py-3 px-4 rounded-md flex items-center text-gray-700"
                 >
                   <LogOut className="mr-3 h-5 w-5" />
