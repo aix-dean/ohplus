@@ -237,6 +237,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-businessdev-darkpurple",
       contentBgColor: "bg-card-content-businessdev",
       members: [],
+      href: "/business/inventory",
       isAvailable: true,
     },
     {
