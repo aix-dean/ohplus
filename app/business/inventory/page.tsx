@@ -409,7 +409,7 @@ export default function BusinessInventoryPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <SideNavigation />
-      <div className="flex-1 p-4 md:p-6 ml-0 lg:ml-64">
+      <div className="flex-1 p-4 md:p-6">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
         </div>
