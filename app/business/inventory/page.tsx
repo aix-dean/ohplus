@@ -261,7 +261,7 @@ export default function BusinessInventoryPage() {
 
   const handleEditClick = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation()
-    router.push(`/admin/products/edit/${product.id}`)
+    router.push(`/business/inventory/edit/${product.id}`)
   }
 
   const handleViewDetails = (productId: string) => {
@@ -397,14 +397,17 @@ export default function BusinessInventoryPage() {
   // Show loading only on initial load
   if (loading && products.length === 0 && userData === null) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      <div className="flex min-h-screen">
+        <SideNavigation />
+        <div className="flex-1 flex items-center justify-center bg-gray-50">
+          <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen">
       <SideNavigation />
       <div className="flex-1 p-4 md:p-6">
         <div className="mb-6 flex items-center justify-between">

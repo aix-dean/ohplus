@@ -434,7 +434,7 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Documents", href: "/admin/documents", icon: FileText },
-                  { title: "Inventory", href: "/business/inventory", icon: Package },
+                  { title: "Inventory", href: "/admin/inventory", icon: Package },
                   { title: "User Management", href: "/admin/user-management", icon: Users },
                   { title: "Plan Profile", href: "/admin/subscriptions", icon: FileText },
                 ].map((item) => {
