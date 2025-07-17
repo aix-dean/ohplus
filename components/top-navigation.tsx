@@ -226,6 +226,7 @@ export function TopNavigation() {
                     aria-label="Sign out"
                   >
                     <LogOut className="h-5 w-5" />
+                    <span className="ml-2 text-sm">Logout</span>
                   </button>
                 </div>
               </div>
