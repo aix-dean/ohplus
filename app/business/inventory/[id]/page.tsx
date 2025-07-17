@@ -8,9 +8,9 @@ import { Loader2, ArrowLeft, MapPin, Calendar, DollarSign, Edit, Trash2 } from "
 import { getUserProduct, softDeleteProduct, type Product } from "@/lib/firebase-service"
 import { toast } from "@/components/ui/use-toast"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
-import { SideNavigation } from "@/components/side-navigation"
 import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
+import { SideNavigation } from "@/components/side-navigation"
 
 interface BusinessInventoryDetailPageProps {
   params: {
@@ -96,28 +96,22 @@ export default function BusinessInventoryDetailPage({ params }: BusinessInventor
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
-        <SideNavigation />
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        </div>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     )
   }
 
   if (!product) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
-        <SideNavigation />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Product not found</h2>
-            <p className="text-gray-600 mb-4">The requested product could not be found.</p>
-            <Button onClick={handleBackClick}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Inventory
-            </Button>
-          </div>
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Product not found</h2>
+          <p className="text-gray-600 mb-4">The requested product could not be found.</p>
+          <Button onClick={handleBackClick}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Inventory
+          </Button>
         </div>
       </div>
     )

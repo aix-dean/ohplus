@@ -14,7 +14,6 @@ import { useResponsive } from "@/hooks/use-responsive"
 import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { CompanyRegistrationDialog } from "@/components/company-registration-dialog"
-import { SideNavigation } from "@/components/side-navigation"
 import Image from "next/image"
 import {
   Dialog,
@@ -26,6 +25,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import { subscriptionService } from "@/lib/subscription-service"
+import { SideNavigation } from "@/components/side-navigation"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
