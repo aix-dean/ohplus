@@ -361,6 +361,13 @@ export default function LoginPage() {
                 >
                   Join an organization
                 </Button>
+                <Button
+                  variant="outline"
+                  className="w-full mt-2 bg-transparent"
+                  onClick={() => router.push("/analytics")}
+                >
+                  View Analytics
+                </Button>
                 <div className="md:hidden flex flex-col items-center mt-4 pt-[30px]">
                   <span className="text-sm text-gray-500 mb-2">powered by:</span>
                   <Image
