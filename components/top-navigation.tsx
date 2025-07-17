@@ -153,41 +153,56 @@ export function TopNavigation() {
     try {
       console.log("Logout attempt started")
 
-      // Try the auth context signOut first
-      if (signOut && typeof signOut === "function") {
-        console.log("Using auth context signOut")
-        await signOut()
+      // Clear all possible storage locations first
+      if (typeof window !== "undefined") {
+        // Clear localStorage completely
+        localStorage.clear()
+
+        // Clear sessionStorage completely
+        sessionStorage.clear()
+
+        // Clear all cookies more aggressively
+        const cookies = document.cookie.split(";")
+        for (const cookie of cookies) {
+          const eqPos = cookie.indexOf("=")
+          const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim()
+          // Clear for current domain
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`
+          // Clear for parent domain
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`
+          // Clear for root domain
+          const domain = window.location.hostname.split(".").slice(-2).join(".")
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=.${domain}`
+        }
+
+        // Clear any Firebase auth state if using Firebase
+        try {
+          if (window.firebase && window.firebase.auth) {
+            await window.firebase.auth().signOut()
+          }
+        } catch (e) {
+          console.log("Firebase signout not available")
+        }
       }
 
-      // Clear browser storage regardless
-      if (typeof window !== "undefined") {
-        // Clear localStorage
-        Object.keys(localStorage).forEach((key) => {
-          if (key.includes("auth") || key.includes("token") || key.includes("user")) {
-            localStorage.removeItem(key)
-          }
-        })
-
-        // Clear sessionStorage
-        Object.keys(sessionStorage).forEach((key) => {
-          if (key.includes("auth") || key.includes("token") || key.includes("user")) {
-            sessionStorage.removeItem(key)
-          }
-        })
-
-        // Clear all cookies
-        document.cookie.split(";").forEach((c) => {
-          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
-        })
+      // Try the auth context signOut after clearing storage
+      if (signOut && typeof signOut === "function") {
+        console.log("Using auth context signOut")
+        try {
+          await signOut()
+        } catch (e) {
+          console.log("Auth context signOut failed:", e)
+        }
       }
 
       console.log("Redirecting to login")
-      // Force redirect to login
-      window.location.href = "/login"
+
+      // Use replace instead of href to prevent back navigation
+      window.location.replace("/login")
     } catch (error: any) {
       console.error("Logout error:", error)
       // Force redirect even if there's an error
-      window.location.href = "/login"
+      window.location.replace("/login")
     }
   }
 
