@@ -120,6 +120,9 @@ export function SideNavigation() {
     // Ensure sales section is active for new quotations page
     currentSection = "sales"
   }
+  if (pathname?.startsWith("/business")) {
+    currentSection = "business"
+  }
 
   // Find the navigation item for the current section
   const currentNavItem = navigationItems.find((item) => item.section === currentSection)
@@ -129,7 +132,8 @@ export function SideNavigation() {
     currentSection !== "admin" &&
     currentSection !== "sales" &&
     currentSection !== "logistics" &&
-    currentSection !== "cms"
+    currentSection !== "cms" &&
+    currentSection !== "business"
   ) {
     return null
   }
@@ -213,6 +217,109 @@ export function SideNavigation() {
                   { title: "Campaign Scheduler", href: "/cms/scheduler", icon: Calendar },
                   { title: "Analytics", href: "/cms/analytics", icon: BarChart3 },
                   { title: "Settings", href: "/cms/settings", icon: Cog },
+                ].map((item) => {
+                  const Icon = item.icon
+                  const active = isActive(pathname, item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
+                        active
+                          ? "bg-gray-100 text-gray-900 font-medium"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                      )}
+                    >
+                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      <span className="flex-1">{item.title}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Intelligence Section */}
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
+              <div className="flex items-center space-x-2 mb-3">
+                <h3 className="text-sm font-medium">Intelligence</h3>
+                <Sparkles className="h-4 w-4" />
+              </div>
+              <div className="relative">
+                <div className="flex items-center space-x-2">
+                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <div className="flex-1 grid grid-cols-2 gap-2">
+                    <div className="h-12 bg-white/20 rounded-md"></div>
+                    <div className="h-12 bg-white/20 rounded-md"></div>
+                  </div>
+                  <button className="p-1 hover:bg-white/10 rounded transition-colors">
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex justify-end mt-3">
+                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
+              </div>
+            </div>
+          </>
+        ) : currentSection === "business" ? (
+          <>
+            {/* Notification Section */}
+            <div className="bg-gradient-to-br from-orange-400 to-orange-500 rounded-lg p-3 text-white">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium">Notification</h3>
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs text-white/90">No notification for now.</p>
+              </div>
+              <div className="flex justify-end mt-3">
+                <button className="text-xs text-white/90 hover:text-white transition-colors">See All</button>
+              </div>
+            </div>
+
+            {/* To Go Section */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <div className="px-3 py-2 border-b border-gray-100">
+                <h3 className="text-sm font-medium text-gray-700">To Go</h3>
+              </div>
+              <div className="p-1">
+                {[
+                  { title: "Dashboard", href: "/business/dashboard", icon: LayoutDashboard },
+                  { title: "Inventory", href: "/business/inventory", icon: Package },
+                ].map((item) => {
+                  const Icon = item.icon
+                  const active = isActive(pathname, item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
+                        active
+                          ? "bg-gray-100 text-gray-900 font-medium"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                      )}
+                    >
+                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      <span className="flex-1">{item.title}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* To Do Section */}
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <div className="px-3 py-2 border-b border-gray-100">
+                <h3 className="text-sm font-medium text-gray-700">To Do</h3>
+              </div>
+              <div className="p-1">
+                {[
+                  { title: "Analytics", href: "/business/analytics", icon: BarChart3 },
+                  { title: "Settings", href: "/business/settings", icon: Settings },
+                  { title: "Support", href: "/business/support", icon: MessageCircle },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)

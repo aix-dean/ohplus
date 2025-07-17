@@ -25,7 +25,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog"
 import { subscriptionService } from "@/lib/subscription-service"
-import { BusinessSideNavigation } from "@/components/business-side-navigation"
+import { SideNavigation } from "@/components/side-navigation"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -397,8 +397,8 @@ export default function BusinessInventoryPage() {
   // Show loading only on initial load
   if (loading && products.length === 0 && userData === null) {
     return (
-      <div className="flex min-h-screen">
-        <BusinessSideNavigation />
+      <div className="flex min-h-screen bg-gray-50">
+        <SideNavigation />
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
         </div>
@@ -407,8 +407,8 @@ export default function BusinessInventoryPage() {
   }
 
   return (
-    <div className="flex min-h-screen">
-      <BusinessSideNavigation />
+    <div className="flex min-h-screen bg-gray-50">
+      <SideNavigation />
       <div className="flex-1 p-4 md:p-6 ml-0 lg:ml-64">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>

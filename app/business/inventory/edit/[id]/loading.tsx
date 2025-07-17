@@ -1,53 +1,41 @@
-import { BusinessSideNavigation } from "@/components/business-side-navigation"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ArrowLeft, Loader2 } from "lucide-react"
+import { SideNavigation } from "@/components/side-navigation"
 
-export default function Loading() {
+export default function BusinessEditProductLoading() {
   return (
     <div className="flex min-h-screen">
-      <BusinessSideNavigation />
-      <div className="flex-1 p-4 md:p-6 ml-0 lg:ml-64">
-        <div className="mb-6">
-          <div className="h-8 w-32 bg-gray-200 rounded animate-pulse mb-4" />
-          <div className="h-10 w-64 bg-gray-200 rounded animate-pulse" />
-        </div>
+      <SideNavigation />
+      <div className="flex-1 p-6">
+        <div className="max-w-3xl mx-auto">
+          <Button variant="ghost" className="mb-6">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
 
-        <div className="grid grid-cols-1 gap-6">
-          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm p-4">
-            <div className="h-6 w-40 bg-gray-200 rounded animate-pulse mb-6" />
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
-                <div className="h-10 bg-gray-200 rounded animate-pulse" />
-              </div>
-              <div className="space-y-2">
-                <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
-                <div className="h-24 bg-gray-200 rounded animate-pulse" />
-              </div>
-              <div className="space-y-2">
-                <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
-                <div className="h-10 bg-gray-200 rounded animate-pulse" />
-              </div>
-              <div className="space-y-2">
-                <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
-                <div className="h-10 bg-gray-200 rounded animate-pulse" />
-              </div>
-            </div>
-          </div>
-
-          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm p-4">
-            <div className="h-6 w-32 bg-gray-200 rounded animate-pulse mb-6" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Array.from({ length: 8 }).map((_, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
-                  <div className="h-10 bg-gray-200 rounded animate-pulse" />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Loading Product Data
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
-          </div>
+                <Skeleton className="h-40 w-full" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

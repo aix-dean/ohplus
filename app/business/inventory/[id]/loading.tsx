@@ -1,40 +1,33 @@
-import { BusinessSideNavigation } from "@/components/business-side-navigation"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@/components/ui/button"
+import { ArrowLeft } from "lucide-react"
+import { SideNavigation } from "@/components/side-navigation"
 
-export default function Loading() {
+export default function BusinessProductDetailLoading() {
   return (
     <div className="flex min-h-screen">
-      <BusinessSideNavigation />
-      <div className="flex-1 p-4 md:p-6 ml-0 lg:ml-64">
-        <div className="mb-6">
-          <div className="h-8 w-32 bg-gray-200 rounded animate-pulse mb-4" />
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="h-10 w-64 bg-gray-200 rounded animate-pulse" />
-            <div className="flex items-center gap-2">
-              <div className="h-10 w-24 bg-gray-200 rounded animate-pulse" />
-              <div className="h-10 w-24 bg-gray-200 rounded animate-pulse" />
-            </div>
-          </div>
-        </div>
+      <SideNavigation />
+      <div className="flex-1 overflow-auto p-6">
+        <div className="max-w-5xl mx-auto">
+          <Button variant="ghost" className="mb-6">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            <Skeleton className="h-4 w-20" />
+          </Button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm p-4">
-            <div className="h-6 w-24 bg-gray-200 rounded animate-pulse mb-4" />
-            <div className="space-y-4">
-              <div className="h-48 bg-gray-200 rounded animate-pulse" />
-              <div className="h-48 bg-gray-200 rounded animate-pulse" />
-            </div>
-          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <Skeleton className="h-8 w-64 mb-2" />
+              <Skeleton className="h-4 w-96 mb-6" />
 
-          <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm p-4 lg:col-span-2">
-            <div className="h-6 w-24 bg-gray-200 rounded animate-pulse mb-4" />
-            <div className="h-10 bg-gray-200 rounded animate-pulse mb-6" />
-            <div className="space-y-4">
-              <div className="h-6 bg-gray-200 rounded animate-pulse" />
-              <div className="h-20 bg-gray-200 rounded animate-pulse" />
-              <div className="h-6 bg-gray-200 rounded animate-pulse" />
-              <div className="h-10 bg-gray-200 rounded animate-pulse" />
-              <div className="h-6 bg-gray-200 rounded animate-pulse" />
-              <div className="h-10 bg-gray-200 rounded animate-pulse" />
+              <Skeleton className="h-[300px] w-full mb-6 rounded-lg" />
+
+              <Skeleton className="h-10 w-full mb-6" />
+
+              <Skeleton className="h-40 w-full rounded-lg" />
+            </div>
+
+            <div>
+              <Skeleton className="h-[400px] w-full rounded-lg" />
             </div>
           </div>
         </div>
