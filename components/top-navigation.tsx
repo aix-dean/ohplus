@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
-import Link from "next/link"
+import { useState, useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { Menu, X, Settings, LogOut, User, Bell, ArrowLeft } from "lucide-react"
 import { format } from "date-fns"
@@ -11,7 +10,6 @@ import { useIsAdmin } from "@/hooks/use-is-admin"
 
 export function TopNavigation() {
   const [isOpen, setIsOpen] = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -20,25 +18,9 @@ export function TopNavigation() {
   const { unreadCount } = useUnreadMessages()
   const isAdmin = useIsAdmin()
 
-  const profileRef = useRef<HTMLDivElement>(null)
-
   useEffect(() => {
     setIsOpen(false)
-    setProfileOpen(false)
   }, [pathname])
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
-        setProfileOpen(false)
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -184,7 +166,9 @@ export function TopNavigation() {
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
-              <h1 className="text-xl font-semibold text-white">{pageTitle == "Admin - Subscriptions" ? "Admin - Plan Profile" : pageTitle}</h1>
+              <h1 className="text-xl font-semibold text-white">
+                {pageTitle == "Admin - Subscriptions" ? "Admin - Plan Profile" : pageTitle}
+              </h1>
             </div>
             <div className="top-nav-links hidden md:flex"></div>
           </div>
@@ -209,65 +193,18 @@ export function TopNavigation() {
                   )}
                 </button>
                 {/* Profile dropdown */}
-                <div className="ml-3 relative z-10" ref={profileRef}>
+                <div className="ml-3 relative z-10">
                   {" "}
                   {/* Added relative z-10 */}
                   <button
                     type="button"
                     className="max-w-xs bg-white rounded-full flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-                    id="user-menu-button"
-                    aria-expanded={profileOpen}
-                    aria-haspopup="true"
-                    onClick={() => {
-                      setProfileOpen(!profileOpen)
-                    }}
                   >
                     <span className="sr-only">Open user menu</span>
                     <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
                       <User className="h-5 w-5 text-gray-500" />
                     </div>
                   </button>
-                  {/* Profile dropdown menu */}
-                  {profileOpen && (
-                    <div
-                      className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
-                      role="menu"
-                      aria-orientation="vertical"
-                      aria-labelledby="user-menu-button"
-                    >
-                      <div className="py-1">
-                        <Link
-                          href="/account"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setProfileOpen(false)}
-                        >
-                          Your Profile
-                        </Link>
-                        <Link
-                          href="/settings"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setProfileOpen(false)}
-                        >
-                          Settings
-                        </Link>
-                        {isAdmin && (
-                          <Link
-                            href="/admin"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            onClick={() => setProfileOpen(false)}
-                          >
-                            Admin
-                          </Link>
-                        )}
-                        <button
-                          onClick={signOut}
-                          className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          Sign out
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
