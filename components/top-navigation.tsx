@@ -15,7 +15,7 @@ export function TopNavigation() {
   const router = useRouter()
   const [currentTime, setCurrentTime] = useState(new Date())
 
-  const { user, userData, signOut } = useAuth()
+  const { user, userData, logout } = useAuth()
   const { unreadCount } = useUnreadMessages()
   const isAdmin = useIsAdmin()
 
@@ -151,7 +151,7 @@ export function TopNavigation() {
 
   const handleLogout = async () => {
     try {
-      await signOut()
+      await logout()
       router.push("/login")
     } catch (error: any) {
       console.error("Logout error:", error)
