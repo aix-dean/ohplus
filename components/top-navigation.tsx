@@ -211,7 +211,10 @@ export function TopNavigation() {
                 <div className="ml-3 relative z-10">
                   <button
                     type="button"
-                    onClick={signOut}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      signOut()
+                    }}
                     className="p-2 rounded-full text-white hover:text-gray-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
                     aria-label="Sign out"
                   >
