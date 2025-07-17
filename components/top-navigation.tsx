@@ -151,10 +151,29 @@ export function TopNavigation() {
 
   const handleLogout = async () => {
     try {
-      await signOut()
-      router.push("/login")
+      if (signOut && typeof signOut === "function") {
+        await signOut()
+        router.push("/login")
+      } else {
+        // Fallback logout method
+        if (typeof window !== "undefined") {
+          // Clear any stored auth tokens
+          localStorage.removeItem("authToken")
+          sessionStorage.removeItem("authToken")
+
+          // Clear cookies if any
+          document.cookie.split(";").forEach((c) => {
+            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/")
+          })
+
+          // Redirect to login
+          router.push("/login")
+        }
+      }
     } catch (error: any) {
       console.error("Logout error:", error)
+      // Force redirect to login even if logout fails
+      router.push("/login")
     }
   }
 
