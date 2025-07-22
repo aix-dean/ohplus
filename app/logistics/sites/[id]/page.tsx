@@ -528,13 +528,6 @@ export default function SiteDetailsPage({ params }: Props) {
                     <span className="font-medium">Last Maintenance:</span>{" "}
                     {product.specs_rental?.structure_last_maintenance || ""}
                   </div>
-                  <div>
-                    <span className="font-medium">Site Orientation:</span>{" "}
-                    {product.specs_rental?.site_orientation || ""}
-                  </div>
-                  <div>
-                    <span className="font-medium">Land Owner:</span> {product.specs_rental?.land_owner || ""}
-                  </div>
                 </div>
                 <div className="flex gap-2 mt-3">
                   <Button variant="outline" size="sm" className="flex-1 bg-transparent">
