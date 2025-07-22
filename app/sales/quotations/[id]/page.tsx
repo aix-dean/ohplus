@@ -648,12 +648,15 @@ export default function QuotationDetailsPage() {
                     <h3 className="text-lg font-medium text-gray-900 mb-3">{product.name} Details</h3>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                      {product.specs_rental?.traffic_count && (
-                        <div>
-                          <h4 className="text-xs font-medium text-gray-500 uppercase">Traffic Count</h4>
-                          <p className="text-sm text-gray-900">{safeString(product.specs_rental.traffic_count)}/day</p>
-                        </div>
-                      )}
+                      <div>
+                        <h4 className="text-xs font-medium text-gray-500 uppercase">Traffic Count</h4>
+                        <p className="text-sm text-gray-900">
+                        {product.specs_rental?.traffic_count
+                          ? product.specs_rental.traffic_count.toLocaleString() + "/day"
+                          : "0/day"}
+                        </p>
+                      </div>
+    
 
                       {product.specs_rental?.height && product.specs_rental?.width && (
                         <div>
