@@ -252,7 +252,7 @@ export async function createSalesEvent(
       ...eventData,
       start: startTimestamp,
       end: endTimestamp,
-      recurrence,
+      recurrence: recurrence || null,
       createdBy: userId,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -288,8 +288,10 @@ export async function updateSalesEvent(eventId: string, eventData: Partial<Sales
       updateData.end = Timestamp.fromDate(eventData.end)
     }
 
-    // Convert recurrence end date if it exists
-    if (updateData.recurrence && updateData.recurrence.endDate instanceof Date) {
+    // Convert recurrence end date if it exists and handle undefined recurrence
+    if (updateData.recurrence === undefined) {
+      updateData.recurrence = null // If explicitly set to undefined (e.g., from "none" option)
+    } else if (updateData.recurrence && updateData.recurrence.endDate instanceof Date) {
       updateData.recurrence = {
         ...updateData.recurrence,
         endDate: Timestamp.fromDate(updateData.recurrence.endDate),
