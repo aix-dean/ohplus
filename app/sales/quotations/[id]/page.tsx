@@ -292,6 +292,20 @@ export default function QuotationDetailsPage() {
     }))
   }
 
+  const handleStartDateChange = (date: Date | undefined) => {
+    setEditableQuotation((prev) => ({
+      ...prev!,
+      start_date: date || null,
+    }))
+  }
+
+  const handleEndDateChange = (date: Date | undefined) => {
+    setEditableQuotation((prev) => ({
+      ...prev!,
+      end_date: date || null,
+    }))
+  }
+
   const handleSendQuotationClick = () => {
     if (quotation) {
       setQuotationToSend(quotation)
@@ -576,6 +590,76 @@ export default function QuotationDetailsPage() {
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-2">Created Date</h3>
                   <p className="text-base text-gray-900">{formatDate(quotation.created)}</p>
+                </div>
+                <div>
+                  <Label htmlFor="start_date" className="text-sm font-medium text-gray-500 mb-2">
+                    Start Date
+                  </Label>
+                  {isEditing ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal mt-1",
+                            !editableQuotation.start_date && "text-muted-foreground",
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {editableQuotation.start_date ? (
+                            format(getDateObject(editableQuotation.start_date)!, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={getDateObject(editableQuotation.start_date)}
+                          onSelect={handleStartDateChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    <p className="text-base text-gray-900">{formatDate(quotation.start_date)}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="end_date" className="text-sm font-medium text-gray-500 mb-2">
+                    End Date
+                  </Label>
+                  {isEditing ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal mt-1",
+                            !editableQuotation.end_date && "text-muted-foreground",
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {editableQuotation.end_date ? (
+                            format(getDateObject(editableQuotation.end_date)!, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={getDateObject(editableQuotation.end_date)}
+                          onSelect={handleEndDateChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  ) : (
+                    <p className="text-base text-gray-900">{formatDate(quotation.end_date)}</p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="valid_until" className="text-sm font-medium text-gray-500 mb-2">
