@@ -55,16 +55,10 @@ import { ProposalHistory } from "@/components/proposal-history"
 import { ClientDialog } from "@/components/client-dialog"
 import { DateRangeCalendarDialog } from "@/components/date-range-calendar-dialog"
 import { createDirectCostEstimate } from "@/lib/cost-estimate-service" // Import for CE creation
-import {
-  createQuotation,
-  generateQuotationNumber,
-  calculateItemTotal,
-  calculateQuotationTotal,
-} from "@/lib/quotation-service" // Imports for Quotation creation
+import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service" // Imports for Quotation creation
 import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
 import { RouteProtection } from "@/components/route-protection"
-import type { QuotationItem } from "@/lib/types/quotation" // Import QuotationItem
 // Removed: import { SelectQuotationDialog } from "@/components/select-quotation-dialog"
 
 // Number of items to display per page
@@ -140,6 +134,8 @@ function SalesDashboardContent() {
   const [actionAfterDateSelection, setActionAfterDateSelection] = useState<"cost_estimate" | "quotation" | null>(null)
   const [isCreatingDocument, setIsCreatingDocument] = useState(false) // New loading state for document creation
   const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
+
+  // Removed: const [isSelectQuotationDialogOpen, setIsSelectQuotationDialogOpen] = useState(false)
 
   // On mobile, default to grid view
   useEffect(() => {
@@ -710,43 +706,45 @@ function SalesDashboardContent() {
         })
         router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
       } else if (actionAfterDateSelection === "quotation") {
-        const quotationItems: QuotationItem[] = selectedSites.map((site) => {
-          const { durationDays, itemTotalAmount } = calculateItemTotal(
-            startDate.toISOString(),
-            endDate.toISOString(),
-            site.price || 0,
-          )
-          return {
-            product_id: site.id,
-            product_name: site.name,
-            product_location: site.specs_rental?.location || site.light?.location || "N/A",
-            site_code: getSiteCode(site) || "N/A",
-            price: site.price || 0,
-            duration_days: durationDays,
-            item_total_amount: itemTotalAmount,
-            type: site.type || "Unknown",
-            media_url: site.media && site.media.length > 0 ? site.media[0].url : undefined,
-          }
-        })
+        // For simplicity, let's assume the quotation is for the first selected site
+        const firstSite = selectedSites[0]
+        if (!firstSite) {
+          throw new Error("No site selected for quotation.")
+        }
 
-        const overallTotalAmount = calculateQuotationTotal(quotationItems)
-        const overallDurationDays = quotationItems.length > 0 ? quotationItems[0].duration_days : 0 // Assuming all items have the same duration
+        const { durationDays, totalAmount } = calculateQuotationTotal(
+          startDate.toISOString(),
+          endDate.toISOString(),
+          firstSite.price || 0,
+        )
+
+        // Log userData to debug
+        console.log("User Data from AuthContext:", userData)
+        console.log("First Name from userData:", userData?.first_name)
+        console.log("Last Name from userData:", userData?.last_name)
 
         const quotationData = {
           quotation_number: generateQuotationNumber(),
-          items: quotationItems, // Pass the array of items
-          total_amount: overallTotalAmount,
-          duration_days: overallDurationDays,
+          product_id: firstSite.id,
+          product_name: firstSite.name,
+          product_location: firstSite.specs_rental?.location || firstSite.light?.location || "N/A",
+          site_code: getSiteCode(firstSite) || "N/A",
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+          price: firstSite.price || 0,
+          total_amount: totalAmount,
+          duration_days: durationDays,
           status: "draft" as const, // Default status
           created_by: user.uid,
-          created_by_first_name: userData?.first_name || "",
-          created_by_last_name: userData?.last_name || "",
+          created_by_first_name: userData?.first_name || "", // Add first name
+          created_by_last_name: userData?.last_name || "", // Add last name
           client_name: selectedClientForProposal.contactPerson,
           client_email: selectedClientForProposal.email,
-          client_id: selectedClientForProposal.id,
+          client_id: selectedClientForProposal.id, // ADDED THIS LINE
           // campaignId and proposalId can be added if applicable, but not directly from this flow
         }
 
+        // Log the final quotationData object before sending
         console.log("Final quotationData object being sent:", quotationData)
 
         const newQuotationId = await createQuotation(quotationData)
@@ -757,7 +755,7 @@ function SalesDashboardContent() {
         })
         router.push(`/sales/quotations/${newQuotationId}`) // Navigate to the new internal quotation view page
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Error creating document:", error)
       toast({
         title: "Error",
@@ -1511,6 +1509,12 @@ function SalesDashboardContent() {
           })
         }}
       />
+
+      {/* Removed: Select Quotation Dialog for Job Order */}
+      {/* <SelectQuotationDialog
+        isOpen={isSelectQuotationDialogOpen}
+        onClose={() => setIsSelectQuotationDialogOpen(false)}
+      /> */}
     </div>
   )
 }

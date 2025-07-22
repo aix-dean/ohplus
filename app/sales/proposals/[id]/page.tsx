@@ -755,7 +755,7 @@ export default function ProposalDetailsPage() {
                         <td className="py-3 px-4 border-b border-gray-200">{product.location}</td>
                         <td className="py-3 px-4 text-right border-b border-gray-200">
                           <div className="font-medium text-gray-900">₱{product.price.toLocaleString()}</div>
-                          <div className="text-xs text-gray-500">per day</div>
+                          <div className="text-xs text-gray-500">per month</div>
                         </td>
                       </tr>
                     ))}
