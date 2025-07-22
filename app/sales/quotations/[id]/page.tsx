@@ -657,14 +657,14 @@ export default function QuotationDetailsPage() {
                         </p>
                       </div>
 
-                        <div>
-                          <h4 className="text-xs font-medium text-gray-500 uppercase">Dimensions</h4>
-                          <p className="text-sm text-gray-900">
-                                {product.specs_rental?.height && product.specs_rental?.width
-                            ? `${product.specs_rental.height}m x ${product.specs_rental.width}m`
-                            : "N/A"}
-                          </p>
-                        </div>
+                      <div>
+                        <h4 className="text-xs font-medium text-gray-500 uppercase">Dimensions</h4>
+                        <p className="text-sm text-gray-900">
+                              {product.specs_rental?.height && product.specs_rental?.width
+                          ? `${product.specs_rental.height}m x ${product.specs_rental.width}m`
+                          : "N/A"}
+                        </p>
+                      </div>
           
                       {product.specs_rental?.audience_type && (
                         <div>
