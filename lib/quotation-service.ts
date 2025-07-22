@@ -389,9 +389,10 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   const cellPadding = 3
   const headerRowHeight = 8
   const dataRowHeight = 12 // Increased for multi-line product name
+
+  // Adjusted column widths (removed 'Image' column)
   const colWidths = [
-    contentWidth * 0.15, // Image
-    contentWidth * 0.25, // Product
+    contentWidth * 0.4, // Product
     contentWidth * 0.15, // Type
     contentWidth * 0.25, // Location
     contentWidth * 0.2, // Price
@@ -409,18 +410,13 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setTextColor(75, 85, 99)
 
   let currentX = margin
-  pdf.text("Image", currentX + colWidths[0] / 2, yPosition + headerRowHeight / 2, {
-    baseline: "middle",
-    align: "center",
-  })
-  currentX += colWidths[0]
   pdf.text("Product", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
-  currentX += colWidths[1]
+  currentX += colWidths[0]
   pdf.text("Type", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
-  currentX += colWidths[2]
+  currentX += colWidths[1]
   pdf.text("Location", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
-  currentX += colWidths[3]
-  pdf.text("Price", currentX + colWidths[4] - cellPadding, yPosition + headerRowHeight / 2, {
+  currentX += colWidths[2]
+  pdf.text("Price", currentX + colWidths[3] - cellPadding, yPosition + headerRowHeight / 2, {
     baseline: "middle",
     align: "right",
   })
@@ -432,44 +428,13 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setTextColor(0, 0, 0)
 
   for (const product of quotation.products) {
-    checkNewPage(dataRowHeight + 10) // Check for new page before adding each product row, add extra for image
+    checkNewPage(dataRowHeight + 5) // Check for new page before adding each product row
     pdf.setFillColor(255, 255, 255) // bg-white
-    pdf.rect(margin, yPosition, contentWidth, dataRowHeight + 10, "F") // Increased height for image
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight + 5, "F") // Adjusted height
     pdf.setDrawColor(200, 200, 200)
-    pdf.rect(margin, yPosition, contentWidth, dataRowHeight + 10, "S")
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight + 5, "S")
 
     currentX = margin
-    // Product Image
-    const productImageUrl = product.media?.[0]?.url || "/placeholder.svg?height=64&width=64"
-    if (productImageUrl) {
-      await addImageToPDF(
-        pdf,
-        productImageUrl,
-        currentX + cellPadding,
-        yPosition + cellPadding,
-        colWidths[0] - 2 * cellPadding,
-        dataRowHeight + 10 - 2 * cellPadding,
-      )
-    } else {
-      // Placeholder for no image
-      pdf.setFillColor(230, 230, 230) // Light gray
-      pdf.rect(
-        currentX + cellPadding,
-        yPosition + cellPadding,
-        colWidths[0] - 2 * cellPadding,
-        dataRowHeight + 10 - 2 * cellPadding,
-        "F",
-      )
-      pdf.setTextColor(150, 150, 150)
-      pdf.setFontSize(6)
-      pdf.text("No Image", currentX + colWidths[0] / 2, yPosition + (dataRowHeight + 10) / 2, {
-        align: "center",
-        baseline: "middle",
-      })
-      pdf.setTextColor(0, 0, 0)
-      pdf.setFontSize(9)
-    }
-    currentX += colWidths[0]
 
     let productText = safeString(product.name)
     if (product.site_code) {
@@ -478,34 +443,34 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     if (product.description) {
       productText += `\n${product.description}`
     }
-    addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[1] - 2 * cellPadding, 9)
-    currentX += colWidths[1]
-    pdf.text(safeString(product.type), currentX + cellPadding, yPosition + (dataRowHeight + 10) / 2, {
+    addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[0] - 2 * cellPadding, 9)
+    currentX += colWidths[0]
+    pdf.text(safeString(product.type), currentX + cellPadding, yPosition + (dataRowHeight + 5) / 2, {
       baseline: "middle",
     })
-    currentX += colWidths[2]
+    currentX += colWidths[1]
     addText(
       safeString(product.location),
       currentX + cellPadding,
       yPosition + cellPadding,
-      colWidths[3] - 2 * cellPadding,
+      colWidths[2] - 2 * cellPadding,
       9,
     )
-    currentX += colWidths[3]
+    currentX += colWidths[2]
     pdf.text(
       `₱${safeString(product.price)}/month`, // Display monthly price here
-      currentX + colWidths[4] - cellPadding,
-      yPosition + (dataRowHeight + 10) / 2,
+      currentX + colWidths[3] - cellPadding,
+      yPosition + (dataRowHeight + 5) / 2,
       {
         baseline: "middle",
         align: "right",
       },
     )
-    yPosition += dataRowHeight + 10
+    yPosition += dataRowHeight + 5
   }
 
-  // Total Amount Row
-  checkNewPage(headerRowHeight + 15) // Ensure space for total row and gap
+  // Total Amount Row - now inside the table
+  checkNewPage(headerRowHeight) // Ensure space for total row
   pdf.setFillColor(243, 244, 246) // bg-gray-50
   pdf.rect(margin, yPosition, contentWidth, headerRowHeight, "F")
   pdf.setDrawColor(200, 200, 200)
@@ -515,15 +480,17 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setFont("helvetica", "bold")
   pdf.setTextColor(37, 99, 235) // Blue color
 
+  // Position "Total Amount:" to span Product, Type, Location columns
   pdf.text(
     "Total Amount:",
-    margin + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] - 5,
+    margin + colWidths[0] + colWidths[1] + colWidths[2] - 5, // Adjusted X position
     yPosition + headerRowHeight / 2,
     {
       baseline: "middle",
       align: "right",
     },
   )
+  // Position the actual total amount under the Price column
   pdf.text(
     `₱${safeString(quotation.total_amount)}`,
     pageWidth - margin - cellPadding,
@@ -533,7 +500,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
       align: "right",
     },
   )
-  yPosition += headerRowHeight + 15
+  yPosition += headerRowHeight + 15 // Add space after the table
 
   // Product Details Section
   for (const product of quotation.products) {
