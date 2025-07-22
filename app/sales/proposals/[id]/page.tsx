@@ -788,7 +788,7 @@ export default function ProposalDetailsPage() {
                         <div>
                           <h4 className="text-xs font-medium text-gray-500 uppercase">Dimensions</h4>
                           <p className="text-sm text-gray-900">
-                            {product.specs_rental.height}m × {product.specs_rental.width}m
+                            {product.specs_rental.height}m x {product.specs_rental.width}m
                           </p>
                         </div>
                       )}
