@@ -536,6 +536,123 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   )
   yPosition += headerRowHeight + 15
 
+  // Product Details Section
+  for (const product of quotation.products) {
+    checkNewPage(60) // Estimate space for title, dimensions, description
+    pdf.setFontSize(12)
+    pdf.setFont("helvetica", "bold")
+    pdf.setTextColor(0, 0, 0)
+    pdf.text(`${safeString(product.name)} Details`, margin, yPosition)
+    yPosition += 5
+    pdf.setLineWidth(0.2)
+    pdf.setDrawColor(200, 200, 200)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 5
+
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+
+    // Dimensions
+    if (product.specs_rental?.width && product.specs_rental?.height) {
+      pdf.text("DIMENSIONS", margin, yPosition)
+      pdf.text(
+        `${safeString(product.specs_rental.width)}m x ${safeString(product.specs_rental.height)}m`,
+        margin + 30,
+        yPosition,
+      )
+      yPosition += 5
+    }
+    // Elevation
+    if (product.specs_rental?.elevation) {
+      pdf.text("ELEVATION", margin, yPosition)
+      pdf.text(`${safeString(product.specs_rental.elevation)}m`, margin + 30, yPosition)
+      yPosition += 5
+    }
+    // Traffic Count
+    if (product.specs_rental?.traffic_count) {
+      pdf.text("TRAFFIC COUNT", margin, yPosition)
+      pdf.text(safeString(product.specs_rental.traffic_count), margin + 30, yPosition)
+      yPosition += 5
+    }
+    // Audience Type(s)
+    if (product.specs_rental?.audience_type) {
+      pdf.text("AUDIENCE TYPE", margin, yPosition)
+      pdf.text(safeString(product.specs_rental.audience_type), margin + 30, yPosition)
+      yPosition += 5
+    } else if (product.specs_rental?.audience_types && product.specs_rental.audience_types.length > 0) {
+      pdf.text("AUDIENCE TYPES", margin, yPosition)
+      pdf.text(product.specs_rental.audience_types.join(", "), margin + 30, yPosition)
+      yPosition += 5
+    }
+    yPosition += 5 // Add some space after specs
+
+    // Description
+    if (product.description) {
+      checkNewPage(20) // Check for description space
+      pdf.setFontSize(9)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("DESCRIPTION", margin, yPosition)
+      yPosition += 5
+      pdf.setFont("helvetica", "normal")
+      yPosition = addText(safeString(product.description), margin, yPosition, contentWidth)
+      yPosition += 5
+    }
+
+    // Media Images
+    if (product.media && product.media.length > 0) {
+      checkNewPage(100) // Estimate space for media title + first row of images
+      pdf.setFontSize(9)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("MEDIA", margin, yPosition)
+      yPosition += 5
+      pdf.setFont("helvetica", "normal")
+
+      const imageWidth = (contentWidth - 3 * cellPadding) / 4 // 4 images per row
+      const imageHeight = imageWidth * (2 / 3) // Aspect ratio 3:2
+      let currentImageX = margin
+      let imagesInRow = 0
+
+      for (const mediaItem of product.media) {
+        if (imagesInRow === 4) {
+          // Start new row after 4 images
+          yPosition += imageHeight + cellPadding
+          currentImageX = margin
+          imagesInRow = 0
+          checkNewPage(imageHeight + cellPadding) // Check for new page for the new row
+        }
+
+        if (!mediaItem.isVideo) {
+          // Only display images in PDF
+          await addImageToPDF(
+            pdf,
+            mediaItem.url || "/placeholder.svg?height=200&width=300",
+            currentImageX,
+            yPosition,
+            imageWidth,
+            imageHeight,
+          )
+        } else {
+          // Placeholder for video in PDF
+          pdf.setFillColor(230, 230, 230) // Light gray
+          pdf.rect(currentImageX, yPosition, imageWidth, imageHeight, "F")
+          pdf.setTextColor(150, 150, 150)
+          pdf.setFontSize(6)
+          pdf.text("Video Not Supported", currentImageX + imageWidth / 2, yPosition + imageHeight / 2, {
+            align: "center",
+            baseline: "middle",
+          })
+          pdf.setTextColor(0, 0, 0)
+          pdf.setFontSize(9)
+        }
+
+        currentImageX += imageWidth + cellPadding
+        imagesInRow++
+      }
+      yPosition += imageHeight + 10 // Space after last row of images
+    }
+    yPosition += 10 // Space after each product details section
+  }
+
   // Additional Information (Notes)
   if (quotation.notes) {
     checkNewPage(30)
