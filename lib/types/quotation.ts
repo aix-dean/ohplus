@@ -1,35 +1,34 @@
+import type { Timestamp } from "firebase/firestore"
+
 export interface QuotationProduct {
   id: string
   name: string
+  type: string
   location: string
-  price: number // Monthly price
+  price: number
   site_code?: string
-  type?: string // e.g., "LED Billboard", "Static Billboard"
-  imageUrl?: string // Added for product image
-  description?: string // Added for product description
+  imageUrl?: string // Added imageUrl
+  description?: string // Added description
 }
 
 export interface Quotation {
   id?: string
   quotation_number: string
-  quotation_request_id?: string
-  start_date: string
-  end_date: string
+  client_name: string
+  client_email: string
+  start_date: string // ISO string
+  end_date: string // ISO string
+  valid_until: string // ISO string
+  products: QuotationProduct[]
   total_amount: number
   duration_days: number
+  status: "draft" | "sent" | "viewed" | "accepted" | "rejected" | "expired"
   notes?: string
-  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed"
-  created: any // Firebase Timestamp
-  updated?: any // Firebase Timestamp
-  created_by?: string
-  created_by_first_name?: string
-  created_by_last_name?: string
-  client_name?: string
-  client_email?: string
-  client_id?: string
-  campaignId?: string
+  created?: Timestamp
+  updated?: Timestamp
+  createdBy?: string
+  updatedBy?: string
+  quotation_request_id?: string
   proposalId?: string
-  valid_until?: any // Firebase Timestamp
-  seller_id?: string
-  products: QuotationProduct[] // Array of products
+  campaignId?: string
 }

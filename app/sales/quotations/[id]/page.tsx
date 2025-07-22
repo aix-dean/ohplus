@@ -145,26 +145,33 @@ export default function QuotationDetailsPage() {
 
   // Effect to recalculate total amount whenever relevant fields change in editableQuotation
   useEffect(() => {
-    if (editableQuotation && editableQuotation.products && editableQuotation.start_date && editableQuotation.end_date) {
-      const { durationDays, totalAmount } = calculateQuotationTotal(
-        editableQuotation.start_date,
-        editableQuotation.end_date,
-        editableQuotation.products,
-      )
+    if (editableQuotation) {
+      const startDateObj = getDateObject(editableQuotation.start_date)
+      const endDateObj = getDateObject(editableQuotation.end_date)
 
-      setEditableQuotation((prev) => {
-        // Only update if there's an actual change to prevent infinite loops
-        if (prev && (prev.duration_days !== durationDays || prev.total_amount !== totalAmount)) {
-          return {
-            ...prev,
-            duration_days: durationDays,
-            total_amount: totalAmount,
+      if (startDateObj && endDateObj && editableQuotation.products) {
+        const { durationDays, totalAmount } = calculateQuotationTotal(
+          startDateObj.toISOString(),
+          endDateObj.toISOString(),
+          editableQuotation.products,
+        )
+
+        setEditableQuotation((prev) => {
+          // Only update if the calculated values are different from the current state
+          if (prev && (prev.duration_days !== durationDays || prev.total_amount !== totalAmount)) {
+            return {
+              ...prev,
+              duration_days: durationDays,
+              total_amount: totalAmount,
+            }
           }
-        }
-        return prev // Return previous state if no change
-      })
+          return prev // No change, prevent re-render
+        })
+      }
     }
-  }, [editableQuotation]) // Dependencies for recalculation
+  }, [
+    editableQuotation, // Use the entire editableQuotation object as a dependency
+  ]) // Dependencies for recalculation
 
   const handleStatusUpdate = async (newStatus: Quotation["status"]) => {
     if (!quotation || !quotation.id) return
