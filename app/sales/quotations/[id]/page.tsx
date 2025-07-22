@@ -38,8 +38,9 @@ import {
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
 import { SendQuotationDialog } from "@/components/send-quotation-dialog"
-import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-dialog" // Ensure this import is correct
+import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-dialog"
 import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog"
+import { Timestamp } from "firebase/firestore" // Import Timestamp for Firebase date handling
 
 // Helper function to generate QR code URL (kept here for consistency with proposal view)
 const generateQRCodeUrl = (quotationId: string) => {
@@ -193,32 +194,44 @@ export default function QuotationDetailsPage() {
 
     setIsSaving(true)
     try {
-      // Calculate duration_days and total_amount based on the new logic
+      // Ensure start_date, end_date, and valid_until are Date objects for local calculation
       const startDateObj = getDateObject(editableQuotation.start_date)
       const endDateObj = getDateObject(editableQuotation.end_date)
+      const validUntilObj = getDateObject(editableQuotation.valid_until)
 
       let calculatedDurationDays = 0
       if (startDateObj && endDateObj) {
-        calculatedDurationDays = Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24))
+        // Calculate duration in days, ensuring at least 1 day if start and end are the same day
+        calculatedDurationDays = Math.max(
+          1,
+          Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24)),
+        )
       }
 
       const dailyRate = (editableQuotation.price || 0) / 30
-      const calculatedTotalAmount = Math.max(0, calculatedDurationDays) * dailyRate // Ensure total amount is not negative
+      const calculatedTotalAmount = Math.max(0, calculatedDurationDays) * dailyRate
 
-      // Update the editableQuotation with the new calculated values
-      const updatedEditableQuotation = {
+      // Prepare the data to be sent to the backend
+      // Convert Date objects back to Firebase Timestamps for saving if the service expects them
+      const dataToSave = {
         ...editableQuotation,
         duration_days: calculatedDurationDays,
         total_amount: calculatedTotalAmount,
+        start_date: startDateObj ? Timestamp.fromDate(startDateObj) : null,
+        end_date: endDateObj ? Timestamp.fromDate(endDateObj) : null,
+        valid_until: validUntilObj ? Timestamp.fromDate(validUntilObj) : null,
       }
-      setEditableQuotation(updatedEditableQuotation)
 
       // Assuming a fixed user ID and name for now, replace with actual user context
       const currentUserId = "current_user_id"
       const currentUserName = "Current User"
 
-      await updateQuotation(updatedEditableQuotation.id, updatedEditableQuotation, currentUserId, currentUserName)
-      setQuotation(updatedEditableQuotation) // Update the main quotation state with saved changes
+      await updateQuotation(dataToSave.id, dataToSave, currentUserId, currentUserName)
+
+      // After successful save, update the local state with the data that was actually saved
+      // This ensures consistency if the backend modifies or re-formats data
+      setQuotation(dataToSave as Quotation)
+      setEditableQuotation(dataToSave as Quotation) // Also update editable state to reflect saved data
       setIsEditing(false)
       toast({
         title: "Success",
