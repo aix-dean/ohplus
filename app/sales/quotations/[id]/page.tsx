@@ -83,10 +83,29 @@ export default function QuotationDetailsPage() {
     return String(value)
   }
 
-  // Helper function to get a Date object from a potential Firebase Timestamp or Date
+  // Helper function to get a Date object from a potential Firebase Timestamp, Date, or string
   const getDateObject = (date: any): Date | undefined => {
-    if (!date) return undefined
-    return date.toDate ? date.toDate() : date
+    if (date === null || date === undefined) {
+      return undefined
+    }
+    if (date instanceof Date) {
+      return date
+    }
+    // Check for Firebase Timestamp structure (has toDate method)
+    if (typeof date === "object" && date.toDate && typeof date.toDate === "function") {
+      return date.toDate()
+    }
+    // Attempt to parse string dates
+    if (typeof date === "string") {
+      const parsedDate = new Date(date)
+      if (!isNaN(parsedDate.getTime())) {
+        // Check if date parsing was successful
+        return parsedDate
+      }
+    }
+    // If none of the above, log a warning and return undefined
+    console.warn("getDateObject received unexpected or invalid date type:", typeof date, date)
+    return undefined
   }
 
   useEffect(() => {
@@ -200,12 +219,20 @@ export default function QuotationDetailsPage() {
       const validUntilObj = getDateObject(editableQuotation.valid_until)
 
       let calculatedDurationDays = 0
-      if (startDateObj && endDateObj) {
+      // Only perform calculation if both start and end dates are valid Date objects
+      if (startDateObj instanceof Date && endDateObj instanceof Date) {
         // Calculate duration in days, ensuring at least 1 day if start and end are the same day
         calculatedDurationDays = Math.max(
           1,
           Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24)),
         )
+      } else {
+        console.error("Cannot calculate duration: start_date or end_date is not a valid Date object.", {
+          startDateObj,
+          endDateObj,
+        })
+        // Optionally, you might want to throw an error or set a specific default for duration_days
+        // For now, calculatedDurationDays remains 0, leading to total_amount 0.
       }
 
       const dailyRate = (editableQuotation.price || 0) / 30
