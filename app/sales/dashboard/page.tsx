@@ -712,11 +712,6 @@ function SalesDashboardContent() {
           throw new Error("No site selected for quotation.")
         }
 
-        const { durationDays, totalAmount } = calculateQuotationTotal(
-          startDate.toISOString(),
-          endDate.toISOString(),
-          firstSite.price || 0,
-        )
 
         // Log userData to debug
         console.log("User Data from AuthContext:", userData)
