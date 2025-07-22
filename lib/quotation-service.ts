@@ -19,6 +19,7 @@ import { addQuotationToCampaign } from "@/lib/campaign-service"
 import { jsPDF } from "jspdf"
 import { loadImageAsBase64, generateQRCode, getImageDimensions } from "@/lib/pdf-service"
 import type { QuotationProduct, Quotation } from "@/lib/types/quotation" // Import the updated Quotation type
+import { getProductById as getProductFromFirebase } from "@/lib/firebase-service" // Import the product fetching function
 
 // Create a new quotation
 export async function createQuotation(quotationData: Omit<Quotation, "id">): Promise<string> {
@@ -57,12 +58,34 @@ export async function getQuotationById(quotationId: string): Promise<Quotation |
     const quotationDoc = await getDoc(doc(db, "quotations", quotationId))
 
     if (quotationDoc.exists()) {
-      const data = quotationDoc.data()
+      const data = quotationDoc.data() as Quotation
+      const productsFromQuotation = data.products || []
+
+      // Fetch full product details for each product in the quotation
+      const enrichedProducts: QuotationProduct[] = await Promise.all(
+        productsFromQuotation.map(async (productInQuotation) => {
+          if (productInQuotation.id) {
+            const fullProductDetails = await getProductFromFirebase(productInQuotation.id)
+            if (fullProductDetails) {
+              // Merge existing quotation product data with full product details.
+              // Prioritize quotation-specific fields (like price, notes if they were overridden)
+              // but ensure all detailed fields (media, specs_rental, description, etc.) are present.
+              return {
+                ...fullProductDetails, // Start with all details from the product collection
+                ...productInQuotation, // Overlay with any specific data stored in the quotation's product entry
+                // Ensure price from quotation is used if it exists, otherwise fallback to product price
+                price: productInQuotation.price !== undefined ? productInQuotation.price : fullProductDetails.price,
+              } as QuotationProduct
+            }
+          }
+          return productInQuotation // Return as is if product not found or no ID
+        }),
+      )
+
       return {
         id: quotationDoc.id,
         ...data,
-        // Ensure products array is always present, even if empty
-        products: data.products || [],
+        products: enrichedProducts,
       } as Quotation
     }
 

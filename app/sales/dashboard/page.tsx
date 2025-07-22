@@ -713,11 +713,6 @@ function SalesDashboardContent() {
           price: site.price || 0, // This is the monthly price
           type: site.type || "Unknown",
           site_code: getSiteCode(site) || "N/A",
-          description: site.description || "", // Include description
-          health_percentage: site.health_percentage, // Include health_percentage
-          light: site.light, // Include light
-          media: site.media, // Include media array
-          specs_rental: site.specs_rental, // Include specs_rental
         }))
 
         // Calculate total amount for all selected products
@@ -745,7 +740,6 @@ function SalesDashboardContent() {
           client_name: selectedClientForProposal.contactPerson,
           client_email: selectedClientForProposal.email,
           client_id: selectedClientForProposal.id,
-          seller_id: user.uid, // Explicitly set seller_id
         }
 
         console.log("Final quotationData object being sent:", quotationData)
@@ -1126,10 +1120,7 @@ function SalesDashboardContent() {
                                       <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
                                         {result.image_url ? (
                                           <Image
-                                            src={
-                                              result.image_url ||
-                                              "/placeholder.svg?height=48&width=48&query=placeholder"
-                                            }
+                                            src={result.image_url || "/placeholder.svg"}
                                             alt={result.name || "Search result"}
                                             width={48}
                                             height={48}
@@ -1270,10 +1261,7 @@ function SalesDashboardContent() {
                                   {product.media && product.media.length > 0 ? (
                                     <>
                                       <Image
-                                        src={
-                                          product.media[0].url ||
-                                          "/placeholder.svg?height=48&width=48&query=placeholder"
-                                        }
+                                        src={product.media[0].url || "/placeholder.svg"}
                                         alt={product.name || "Product image"}
                                         width={48}
                                         height={48}
@@ -1589,7 +1577,7 @@ function ProductCard({
     >
       <div className="h-48 bg-gray-200 relative">
         <Image
-          src={thumbnailUrl || "/placeholder.svg?height=64&width=64&query=placeholder"}
+          src={thumbnailUrl || "/placeholder.svg"}
           alt={product.name || "Product image"}
           fill
           className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
