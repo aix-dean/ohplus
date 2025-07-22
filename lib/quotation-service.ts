@@ -18,35 +18,7 @@ import { db } from "@/lib/firebase"
 import { addQuotationToCampaign } from "@/lib/campaign-service"
 import { jsPDF } from "jspdf"
 import { loadImageAsBase64, generateQRCode, getImageDimensions } from "@/lib/pdf-service" // Import getImageDimensions
-
-export interface Quotation {
-  id?: string
-  quotation_number: string
-  quotation_request_id?: string // Add this field
-  product_id: string
-  product_name: string
-  product_location?: string
-  site_code?: string
-  start_date: string
-  end_date: string
-  price: number
-  total_amount: number
-  duration_days: number
-  notes?: string
-  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed" // Added "viewed" for consistency
-  created: any
-  updated?: any
-  created_by?: string
-  created_by_first_name?: string // Added for user's first name
-  created_by_last_name?: string // Added for user's last name
-  client_name?: string
-  client_email?: string
-  client_id?: string // Added client_id
-  campaignId?: string // Add campaign ID field
-  proposalId?: string // Add proposal ID field
-  valid_until?: any // Added valid_until field
-  seller_id?: string // Added seller_id field for pagination
-}
+import type { QuotationItem } from "@/lib/types/quotation" // Import both interfaces
 
 // Create a new quotation
 export async function createQuotation(quotationData: Omit<Quotation, "id">): Promise<string> {
@@ -127,24 +99,29 @@ export function generateQuotationNumber(): string {
   return `QT-${year}${month}${day}-${time}`
 }
 
-// Calculate total amount based on dates and price
-export function calculateQuotationTotal(
+// Calculate total amount for a single item based on dates and price
+export function calculateItemTotal(
   startDate: string,
   endDate: string,
   pricePerDay: number,
 ): {
   durationDays: number
-  totalAmount: number
+  itemTotalAmount: number
 } {
   const start = new Date(startDate)
   const end = new Date(endDate)
   const durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-  const totalAmount = Math.max(1, durationDays) * pricePerDay
+  const itemTotalAmount = Math.max(1, durationDays) * pricePerDay
 
   return {
     durationDays: Math.max(1, durationDays), // Minimum 1 day
-    totalAmount,
+    itemTotalAmount,
   }
+}
+
+// Calculate overall quotation total from an array of items
+export function calculateQuotationTotal(items: QuotationItem[]): number {
+  return items.reduce((sum, item) => sum + item.item_total_amount, 0)
 }
 
 // Helper to format date
@@ -243,7 +220,10 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   const contentWidth = pageWidth - margin * 2
   let yPosition = margin
 
-  // Safely convert dates
+  // Safely convert dates (assuming all items have the same start/end dates for overall duration)
+  const firstItem = quotation.items[0]
+  const startDate = firstItem ? safeToDate(firstItem.start_date) : new Date()
+  const endDate = firstItem ? safeToDate(firstItem.end_date) : new Date()
   const createdDate = safeToDate(quotation.created)
   const validUntilDate = safeToDate(quotation.valid_until)
 
@@ -415,43 +395,43 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   })
   yPosition += headerRowHeight
 
-  // Table Row for Product
-  pdf.setFillColor(255, 255, 255) // bg-white
-  pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "F")
-  pdf.setDrawColor(200, 200, 200)
-  pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "S")
-
+  // Table Rows for Products
   pdf.setFontSize(9)
   pdf.setFont("helvetica", "normal")
   pdf.setTextColor(0, 0, 0)
 
-  currentX = margin
-  let productText = safeString(quotation.product_name)
-  if (quotation.site_code) {
-    productText += `\nSite: ${quotation.site_code}`
-  }
-  addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[0] - 2 * cellPadding, 9)
-  currentX += colWidths[0]
-  pdf.text("Rental", currentX + cellPadding, yPosition + dataRowHeight / 2, { baseline: "middle" })
-  currentX += colWidths[1]
-  addText(
-    safeString(quotation.product_location),
-    currentX + cellPadding,
-    yPosition + cellPadding,
-    colWidths[2] - 2 * cellPadding,
-    9,
-  )
-  currentX += colWidths[2]
-  pdf.text(
-    `₱${safeString(quotation.price)}/day`,
-    currentX + colWidths[3] - cellPadding,
-    yPosition + dataRowHeight / 2,
-    {
+  for (const item of quotation.items) {
+    checkNewPage(dataRowHeight) // Check for new page before drawing each row
+    pdf.setFillColor(255, 255, 255) // bg-white
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "F")
+    pdf.setDrawColor(200, 200, 200)
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "S")
+
+    currentX = margin
+    let productText = safeString(item.product_name)
+    if (item.site_code) {
+      productText += `\nSite: ${item.site_code}`
+    }
+    addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[0] - 2 * cellPadding, 9)
+    currentX += colWidths[0]
+    pdf.text(safeString(item.type || "Rental"), currentX + cellPadding, yPosition + dataRowHeight / 2, {
+      baseline: "middle",
+    })
+    currentX += colWidths[1]
+    addText(
+      safeString(item.product_location),
+      currentX + cellPadding,
+      yPosition + cellPadding,
+      colWidths[2] - 2 * cellPadding,
+      9,
+    )
+    currentX += colWidths[2]
+    pdf.text(`₱${safeString(item.price)}/day`, currentX + colWidths[3] - cellPadding, yPosition + dataRowHeight / 2, {
       baseline: "middle",
       align: "right",
-    },
-  )
-  yPosition += dataRowHeight
+    })
+    yPosition += dataRowHeight
+  }
 
   // Total Amount Row
   pdf.setFillColor(243, 244, 246) // bg-gray-50
@@ -653,4 +633,34 @@ export async function getQuotationsPaginated(
   const hasMore = querySnapshot.docs.length === pageSize
 
   return { quotations, lastVisibleId, hasMore }
+}
+
+interface Quotation {
+  id?: string
+  quotation_number: string
+  quotation_request_id?: string // Add this field
+  product_id: string
+  product_name: string
+  product_location?: string
+  site_code?: string
+  start_date: string
+  end_date: string
+  price: number
+  total_amount: number
+  duration_days: number
+  notes?: string
+  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed" // Added "viewed" for consistency
+  created: any
+  updated?: any
+  created_by?: string
+  created_by_first_name?: string // Added for user's first name
+  created_by_last_name?: string // Added for user's last name
+  client_name?: string
+  client_email?: string
+  client_id?: string // Added client_id
+  campaignId?: string // Add campaign ID field
+  proposalId?: string // Add proposal ID field
+  valid_until?: any // Added valid_until field
+  seller_id?: string // Added seller_id field for pagination
+  items?: QuotationItem[] // Added items field
 }
