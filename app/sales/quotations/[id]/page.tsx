@@ -153,6 +153,7 @@ export default function QuotationDetailsPage() {
       )
 
       setEditableQuotation((prev) => {
+        // Only update if there's an actual change to prevent infinite loops
         if (prev && (prev.duration_days !== durationDays || prev.total_amount !== totalAmount)) {
           return {
             ...prev,
@@ -160,7 +161,7 @@ export default function QuotationDetailsPage() {
             total_amount: totalAmount,
           }
         }
-        return prev // Return previous state if no change to prevent infinite loop
+        return prev // Return previous state if no change
       })
     }
   }, [editableQuotation]) // Dependencies for recalculation
@@ -757,6 +758,9 @@ export default function QuotationDetailsPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-100">
                     <tr>
+                      <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300 w-[100px]">
+                        Image
+                      </th>
                       <th className="py-2 px-4 text-left font-medium text-gray-700 border-b border-gray-300">
                         Product
                       </th>
@@ -773,8 +777,18 @@ export default function QuotationDetailsPage() {
                     {currentQuotation.products.map((product, index) => (
                       <tr key={product.id || index} className="bg-white">
                         <td className="py-3 px-4 border-b border-gray-200">
+                          <img
+                            src={product.imageUrl || "/placeholder.svg?height=64&width=64&query=product"}
+                            alt={product.name}
+                            className="w-16 h-16 object-cover rounded-sm"
+                          />
+                        </td>
+                        <td className="py-3 px-4 border-b border-gray-200">
                           <div className="font-medium text-gray-900">{safeString(product.name)}</div>
                           {product.site_code && <div className="text-xs text-gray-500">Site: {product.site_code}</div>}
+                          {product.description && (
+                            <div className="text-xs text-gray-600 mt-1">{safeString(product.description)}</div>
+                          )}
                         </td>
                         <td className="py-3 px-4 border-b border-gray-200">
                           <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
@@ -802,7 +816,7 @@ export default function QuotationDetailsPage() {
                       </tr>
                     ))}
                     <tr className="bg-gray-50">
-                      <td colSpan={3} className="py-3 px-4 text-right font-medium">
+                      <td colSpan={4} className="py-3 px-4 text-right font-medium">
                         Total Amount:
                       </td>
                       <td className="py-3 px-4 text-right font-bold text-blue-600">

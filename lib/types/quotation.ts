@@ -5,6 +5,8 @@ export interface QuotationProduct {
   price: number // Monthly price
   site_code?: string
   type?: string // e.g., "LED Billboard", "Static Billboard"
+  imageUrl?: string // Added for product image
+  description?: string // Added for product description
 }
 
 export interface Quotation {

@@ -19,6 +19,7 @@ import { addQuotationToCampaign } from "@/lib/campaign-service"
 import { jsPDF } from "jspdf"
 import { loadImageAsBase64, generateQRCode, getImageDimensions } from "@/lib/pdf-service"
 import type { QuotationProduct } from "@/lib/types/quotation"
+import type { Quotation } from "@/lib/types/quotation" // Import the updated Quotation type
 
 // Create a new quotation
 export async function createQuotation(quotationData: Omit<Quotation, "id">): Promise<string> {
@@ -368,7 +369,8 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   const headerRowHeight = 8
   const dataRowHeight = 12 // Increased for multi-line product name
   const colWidths = [
-    contentWidth * 0.4, // Product
+    contentWidth * 0.15, // Image
+    contentWidth * 0.25, // Product
     contentWidth * 0.15, // Type
     contentWidth * 0.25, // Location
     contentWidth * 0.2, // Price
@@ -386,13 +388,18 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setTextColor(75, 85, 99)
 
   let currentX = margin
-  pdf.text("Product", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
+  pdf.text("Image", currentX + colWidths[0] / 2, yPosition + headerRowHeight / 2, {
+    baseline: "middle",
+    align: "center",
+  })
   currentX += colWidths[0]
-  pdf.text("Type", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
+  pdf.text("Product", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
   currentX += colWidths[1]
-  pdf.text("Location", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
+  pdf.text("Type", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
   currentX += colWidths[2]
-  pdf.text("Price", currentX + colWidths[3] - cellPadding, yPosition + headerRowHeight / 2, {
+  pdf.text("Location", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
+  currentX += colWidths[3]
+  pdf.text("Price", currentX + colWidths[4] - cellPadding, yPosition + headerRowHeight / 2, {
     baseline: "middle",
     align: "right",
   })
@@ -403,41 +410,77 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setFont("helvetica", "normal")
   pdf.setTextColor(0, 0, 0)
 
-  quotation.products.forEach((product) => {
-    checkNewPage(dataRowHeight) // Check for new page before adding each product row
+  for (const product of quotation.products) {
+    checkNewPage(dataRowHeight + 10) // Check for new page before adding each product row, add extra for image
     pdf.setFillColor(255, 255, 255) // bg-white
-    pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "F")
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight + 10, "F") // Increased height for image
     pdf.setDrawColor(200, 200, 200)
-    pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "S")
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight + 10, "S")
 
     currentX = margin
+    // Product Image
+    if (product.imageUrl) {
+      await addImageToPDF(
+        pdf,
+        product.imageUrl,
+        currentX + cellPadding,
+        yPosition + cellPadding,
+        colWidths[0] - 2 * cellPadding,
+        dataRowHeight + 10 - 2 * cellPadding,
+      )
+    } else {
+      // Placeholder for no image
+      pdf.setFillColor(230, 230, 230) // Light gray
+      pdf.rect(
+        currentX + cellPadding,
+        yPosition + cellPadding,
+        colWidths[0] - 2 * cellPadding,
+        dataRowHeight + 10 - 2 * cellPadding,
+        "F",
+      )
+      pdf.setTextColor(150, 150, 150)
+      pdf.setFontSize(6)
+      pdf.text("No Image", currentX + colWidths[0] / 2, yPosition + (dataRowHeight + 10) / 2, {
+        align: "center",
+        baseline: "middle",
+      })
+      pdf.setTextColor(0, 0, 0)
+      pdf.setFontSize(9)
+    }
+    currentX += colWidths[0]
+
     let productText = safeString(product.name)
     if (product.site_code) {
       productText += `\nSite: ${product.site_code}`
     }
-    addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[0] - 2 * cellPadding, 9)
-    currentX += colWidths[0]
-    pdf.text(safeString(product.type), currentX + cellPadding, yPosition + dataRowHeight / 2, { baseline: "middle" })
+    if (product.description) {
+      productText += `\n${product.description}`
+    }
+    addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[1] - 2 * cellPadding, 9)
     currentX += colWidths[1]
+    pdf.text(safeString(product.type), currentX + cellPadding, yPosition + (dataRowHeight + 10) / 2, {
+      baseline: "middle",
+    })
+    currentX += colWidths[2]
     addText(
       safeString(product.location),
       currentX + cellPadding,
       yPosition + cellPadding,
-      colWidths[2] - 2 * cellPadding,
+      colWidths[3] - 2 * cellPadding,
       9,
     )
-    currentX += colWidths[2]
+    currentX += colWidths[3]
     pdf.text(
       `₱${safeString(product.price)}/month`, // Display monthly price here
-      currentX + colWidths[3] - cellPadding,
-      yPosition + dataRowHeight / 2,
+      currentX + colWidths[4] - cellPadding,
+      yPosition + (dataRowHeight + 10) / 2,
       {
         baseline: "middle",
         align: "right",
       },
     )
-    yPosition += dataRowHeight
-  })
+    yPosition += dataRowHeight + 10
+  }
 
   // Total Amount Row
   checkNewPage(headerRowHeight + 15) // Ensure space for total row and gap
@@ -450,10 +493,15 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setFont("helvetica", "bold")
   pdf.setTextColor(37, 99, 235) // Blue color
 
-  pdf.text("Total Amount:", margin + colWidths[0] + colWidths[1] + colWidths[2] - 5, yPosition + headerRowHeight / 2, {
-    baseline: "middle",
-    align: "right",
-  })
+  pdf.text(
+    "Total Amount:",
+    margin + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] - 5,
+    yPosition + headerRowHeight / 2,
+    {
+      baseline: "middle",
+      align: "right",
+    },
+  )
   pdf.text(
     `₱${safeString(quotation.total_amount)}`,
     pageWidth - margin - cellPadding,
@@ -641,34 +689,4 @@ export async function getQuotationsPaginated(
   const hasMore = querySnapshot.docs.length === pageSize
 
   return { quotations, lastVisibleId, hasMore }
-}
-
-interface Quotation {
-  id?: string
-  quotation_number: string
-  quotation_request_id?: string // Add this field
-  product_id: string
-  product_name: string
-  product_location?: string
-  site_code?: string
-  start_date: string
-  end_date: string
-  price: number
-  total_amount: number
-  duration_days: number
-  notes?: string
-  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed" // Added "viewed" for consistency
-  created: any
-  updated?: any
-  created_by?: string
-  created_by_first_name?: string // Added for user's first name
-  created_by_last_name?: string // Added for user's last name
-  client_name?: string
-  client_email?: string
-  client_id?: string // Added client_id
-  campaignId?: string // Add campaign ID field
-  proposalId?: string // Add proposal ID field
-  valid_until?: any // Added valid_until field
-  seller_id?: string // Added seller_id field for pagination
-  products?: QuotationProduct[] // Added products field
 }
