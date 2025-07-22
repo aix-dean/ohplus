@@ -828,6 +828,89 @@ export default function QuotationDetailsPage() {
               </div>
             </div>
 
+            {/* Product Details */}
+            {currentQuotation.products.map((product, index) => (
+              <div key={product.id || index} className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                  {safeString(product.name)} Details
+                </h2>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
+                  {product.specs_rental?.width && product.specs_rental?.height && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500 mb-2">Dimensions</Label>
+                      <p className="text-base text-gray-900">
+                        {safeString(product.specs_rental.width)}m x {safeString(product.specs_rental.height)}m
+                      </p>
+                    </div>
+                  )}
+                  {product.specs_rental?.elevation && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500 mb-2">Elevation</Label>
+                      <p className="text-base text-gray-900">{safeString(product.specs_rental.elevation)}m</p>
+                    </div>
+                  )}
+                  {product.specs_rental?.traffic_count && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500 mb-2">Traffic Count</Label>
+                      <p className="text-base text-gray-900">{safeString(product.specs_rental.traffic_count)}</p>
+                    </div>
+                  )}
+                  {product.specs_rental?.audience_type && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500 mb-2">Audience Type</Label>
+                      <p className="text-base text-gray-900">{safeString(product.specs_rental.audience_type)}</p>
+                    </div>
+                  )}
+                  {product.specs_rental?.audience_types && product.specs_rental.audience_types.length > 0 && (
+                    <div>
+                      <Label className="text-sm font-medium text-gray-500 mb-2">Audience Types</Label>
+                      <p className="text-base text-gray-900">{product.specs_rental.audience_types.join(", ")}</p>
+                    </div>
+                  )}
+                </div>
+
+                {product.description && (
+                  <div className="mb-6">
+                    <Label className="text-sm font-medium text-gray-500 mb-2">Description</Label>
+                    <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
+                      <p className="text-sm text-gray-700 leading-relaxed">{safeString(product.description)}</p>
+                    </div>
+                  </div>
+                )}
+
+                {product.media && product.media.length > 0 && (
+                  <div className="mb-6">
+                    <Label className="text-sm font-medium text-gray-500 mb-2">Media</Label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-2">
+                      {product.media.map((mediaItem, mediaIndex) => (
+                        <div
+                          key={mediaIndex}
+                          className="relative aspect-video overflow-hidden rounded-sm border border-gray-200"
+                        >
+                          {mediaItem.isVideo ? (
+                            <video
+                              src={mediaItem.url || "/placeholder.svg?height=200&width=300&query=video"}
+                              controls
+                              className="absolute inset-0 w-full h-full object-cover"
+                            >
+                              Your browser does not support the video tag.
+                            </video>
+                          ) : (
+                            <img
+                              src={mediaItem.url || "/placeholder.svg?height=200&width=300&query=image"}
+                              alt={mediaItem.name || `Product media ${mediaIndex + 1}`}
+                              className="absolute inset-0 w-full h-full object-cover"
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
             {/* Additional Information (Notes) */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
