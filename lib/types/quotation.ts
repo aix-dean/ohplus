@@ -1,25 +1,24 @@
 export interface QuotationProduct {
   id: string
   name: string
-  location?: string
+  location: string
+  price: number // Monthly price
   site_code?: string
-  price: number // This is the monthly price from the product
-  type?: string
+  type?: string // e.g., "LED Billboard", "Static Billboard"
 }
 
 export interface Quotation {
   id?: string
   quotation_number: string
   quotation_request_id?: string
-  products: QuotationProduct[] // Array of products included in the quotation
   start_date: string
   end_date: string
-  total_amount: number // This will be the sum of (product.price / 30) * duration_days for all products
-  duration_days: number // Duration for the entire quotation
+  total_amount: number
+  duration_days: number
   notes?: string
   status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed"
-  created: any
-  updated?: any
+  created: any // Firebase Timestamp
+  updated?: any // Firebase Timestamp
   created_by?: string
   created_by_first_name?: string
   created_by_last_name?: string
@@ -28,6 +27,7 @@ export interface Quotation {
   client_id?: string
   campaignId?: string
   proposalId?: string
-  valid_until?: any
+  valid_until?: any // Firebase Timestamp
   seller_id?: string
+  products: QuotationProduct[] // Array of products
 }

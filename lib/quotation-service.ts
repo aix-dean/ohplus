@@ -17,38 +17,8 @@ import {
 import { db } from "@/lib/firebase"
 import { addQuotationToCampaign } from "@/lib/campaign-service"
 import { jsPDF } from "jspdf"
-import { loadImageAsBase64, generateQRCode, getImageDimensions } from "@/lib/pdf-service" // Import getImageDimensions
-import type { QuotationProduct } from "@/lib/types/quotation" // Import the updated type
-
-export interface Quotation {
-  id?: string
-  quotation_number: string
-  quotation_request_id?: string // Add this field
-  product_id: string
-  product_name: string
-  product_location?: string
-  site_code?: string
-  start_date: string
-  end_date: string
-  price: number
-  total_amount: number
-  duration_days: number
-  notes?: string
-  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed" // Added "viewed" for consistency
-  created: any
-  updated?: any
-  created_by?: string
-  created_by_first_name?: string // Added for user's first name
-  created_by_last_name?: string // Added for user's last name
-  client_name?: string
-  client_email?: string
-  client_id?: string // Added client_id
-  campaignId?: string // Add campaign ID field
-  proposalId?: string // Add proposal ID field
-  valid_until?: any // Added valid_until field
-  seller_id?: string // Added seller_id field for pagination
-  products?: QuotationProduct[] // Added products field
-}
+import { loadImageAsBase64, generateQRCode, getImageDimensions } from "@/lib/pdf-service"
+import type { QuotationProduct } from "@/lib/types/quotation"
 
 // Create a new quotation
 export async function createQuotation(quotationData: Omit<Quotation, "id">): Promise<string> {
@@ -671,4 +641,34 @@ export async function getQuotationsPaginated(
   const hasMore = querySnapshot.docs.length === pageSize
 
   return { quotations, lastVisibleId, hasMore }
+}
+
+interface Quotation {
+  id?: string
+  quotation_number: string
+  quotation_request_id?: string // Add this field
+  product_id: string
+  product_name: string
+  product_location?: string
+  site_code?: string
+  start_date: string
+  end_date: string
+  price: number
+  total_amount: number
+  duration_days: number
+  notes?: string
+  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed" // Added "viewed" for consistency
+  created: any
+  updated?: any
+  created_by?: string
+  created_by_first_name?: string // Added for user's first name
+  created_by_last_name?: string // Added for user's last name
+  client_name?: string
+  client_email?: string
+  client_id?: string // Added client_id
+  campaignId?: string // Add campaign ID field
+  proposalId?: string // Add proposal ID field
+  valid_until?: any // Added valid_until field
+  seller_id?: string // Added seller_id field for pagination
+  products?: QuotationProduct[] // Added products field
 }

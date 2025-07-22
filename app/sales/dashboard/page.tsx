@@ -13,13 +13,12 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
-  Calendar,
+  CalendarIcon,
   CheckCircle2,
   ArrowLeft,
   Filter,
   AlertCircle,
   Search,
-  CheckCircle,
   PlusCircle,
   Calculator,
   FileText,
@@ -60,6 +59,7 @@ import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
 import { RouteProtection } from "@/components/route-protection"
 import type { QuotationProduct } from "@/lib/types/quotation"
+import { CheckCircle } from "lucide-react"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -133,6 +133,7 @@ function SalesDashboardContent() {
   const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false)
   const [actionAfterDateSelection, setActionAfterDateSelection] = useState<"cost_estimate" | "quotation" | null>(null)
   const [isCreatingDocument, setIsCreatingDocument] = useState(false) // New loading state for document creation
+
   const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
 
   // On mobile, default to grid view
@@ -1303,7 +1304,7 @@ function SalesDashboardContent() {
                                 {product.type?.toLowerCase() === "rental" &&
                                   (productsWithBookings[product.id] ? (
                                     <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                                      <Calendar className="mr-1 h-3 w-3" /> Booked
+                                      <CalendarIcon className="mr-1 h-3 w-3" /> Booked
                                     </Badge>
                                   ) : (
                                     <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
