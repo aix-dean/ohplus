@@ -739,6 +739,7 @@ function SalesDashboardContent() {
           end_date: endDate.toISOString(),
           price: firstSite.price || 0,
           total_amount: totalAmount,
+          valid_until: validUntil,
           duration_days: durationDays,
           status: "draft" as const, // Default status
           created_by: user.uid,
