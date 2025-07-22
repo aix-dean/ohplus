@@ -151,7 +151,9 @@ export default function QuotationDetailsPage() {
   }, [params.id, toast, router])
 
   useEffect(() => {
-    if (isEditing && editableQuotation) {
+    // This effect should run whenever editableQuotation's relevant properties change,
+    // to keep duration_days and total_amount up-to-date for display and saving.
+    if (editableQuotation) {
       const startDateObj = getDateObject(editableQuotation.start_date)
       const endDateObj = getDateObject(editableQuotation.end_date)
       const currentPrice = Number.parseFloat(String(editableQuotation.price)) || 0
@@ -167,19 +169,20 @@ export default function QuotationDetailsPage() {
       const dailyRate = currentPrice / 30
       const calculatedTotalAmount = Math.max(0, calculatedDurationDays) * dailyRate
 
-      // Only update if there's a change to avoid infinite loops
-      if (
-        editableQuotation.duration_days !== calculatedDurationDays ||
-        editableQuotation.total_amount !== calculatedTotalAmount
-      ) {
-        setEditableQuotation((prev) => ({
-          ...prev!,
-          duration_days: calculatedDurationDays,
-          total_amount: calculatedTotalAmount,
-        }))
-      }
+      // Only update if there's a change to avoid infinite loops and unnecessary re-renders
+      setEditableQuotation((prev) => {
+        if (!prev) return null
+        if (prev.duration_days !== calculatedDurationDays || prev.total_amount !== calculatedTotalAmount) {
+          return {
+            ...prev,
+            duration_days: calculatedDurationDays,
+            total_amount: calculatedTotalAmount,
+          }
+        }
+        return prev
+      })
     }
-  }, [editableQuotation, isEditing])
+  }, [editableQuotation]) // Updated to use the entire editableQuotation object
 
   const handleStatusUpdate = async (newStatus: Quotation["status"]) => {
     if (!quotation || !quotation.id) return
@@ -834,7 +837,7 @@ export default function QuotationDetailsPage() {
                         Total Amount:
                       </td>
                       <td className="py-3 px-4 text-right font-bold text-blue-600">
-                        ₱{safeString(quotation.total_amount)}
+                        ₱{safeString(isEditing ? editableQuotation.total_amount : quotation.total_amount)}
                       </td>
                     </tr>
                   </tbody>
