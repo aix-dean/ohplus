@@ -82,6 +82,12 @@ export default function QuotationDetailsPage() {
     return String(value)
   }
 
+  // Helper function to get a Date object from a potential Firebase Timestamp or Date
+  const getDateObject = (date: any): Date | undefined => {
+    if (!date) return undefined
+    return date.toDate ? date.toDate() : date
+  }
+
   useEffect(() => {
     async function fetchQuotationAndProduct() {
       if (params.id) {
@@ -188,34 +194,31 @@ export default function QuotationDetailsPage() {
     setIsSaving(true)
     try {
       // Calculate duration_days and total_amount based on the new logic
-      const startDateObj = new Date(editableQuotation.start_date)
-      const endDateObj = new Date(editableQuotation.end_date)
-      const calculatedDurationDays = Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24))
-      const dailyRate = editableQuotation.price / 30
-      const calculatedTotalAmount = Math.max(1, calculatedDurationDays) * dailyRate
+      const startDateObj = getDateObject(editableQuotation.start_date)
+      const endDateObj = getDateObject(editableQuotation.end_date)
+
+      let calculatedDurationDays = 0
+      if (startDateObj && endDateObj) {
+        calculatedDurationDays = Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24))
+      }
+
+      const dailyRate = (editableQuotation.price || 0) / 30
+      const calculatedTotalAmount = Math.max(0, calculatedDurationDays) * dailyRate // Ensure total amount is not negative
 
       // Update the editableQuotation with the new calculated values
-      setEditableQuotation((prev) => ({
-        ...prev!,
+      const updatedEditableQuotation = {
+        ...editableQuotation,
         duration_days: calculatedDurationDays,
         total_amount: calculatedTotalAmount,
-      }))
+      }
+      setEditableQuotation(updatedEditableQuotation)
 
       // Assuming a fixed user ID and name for now, replace with actual user context
       const currentUserId = "current_user_id"
       const currentUserName = "Current User"
 
-      await updateQuotation(
-        editableQuotation.id,
-        {
-          ...editableQuotation,
-          duration_days: calculatedDurationDays,
-          total_amount: calculatedTotalAmount,
-        },
-        currentUserId,
-        currentUserName,
-      )
-      setQuotation(editableQuotation) // Update the main quotation state with saved changes
+      await updateQuotation(updatedEditableQuotation.id, updatedEditableQuotation, currentUserId, currentUserName)
+      setQuotation(updatedEditableQuotation) // Update the main quotation state with saved changes
       setIsEditing(false)
       toast({
         title: "Success",
@@ -319,7 +322,8 @@ export default function QuotationDetailsPage() {
   const formatDate = (date: any) => {
     if (!date) return "N/A"
     try {
-      const dateObj = date.toDate ? date.toDate() : new Date(date)
+      const dateObj = getDateObject(date)
+      if (!dateObj) return "N/A"
       return new Intl.DateTimeFormat("en-US", {
         year: "numeric",
         month: "long",
@@ -334,7 +338,8 @@ export default function QuotationDetailsPage() {
   const formatDateTime = (date: any) => {
     if (!date) return "N/A"
     try {
-      const dateObj = date.toDate ? date.toDate() : new Date(date)
+      const dateObj = getDateObject(date)
+      if (!dateObj) return "N/A"
       return new Intl.DateTimeFormat("en-US", {
         year: "numeric",
         month: "short",
@@ -547,7 +552,7 @@ export default function QuotationDetailsPage() {
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
                           {editableQuotation.valid_until ? (
-                            format(editableQuotation.valid_until.toDate(), "PPP")
+                            format(getDateObject(editableQuotation.valid_until)!, "PPP")
                           ) : (
                             <span>Pick a date</span>
                           )}
@@ -556,7 +561,7 @@ export default function QuotationDetailsPage() {
                       <PopoverContent className="w-auto p-0">
                         <Calendar
                           mode="single"
-                          selected={editableQuotation.valid_until?.toDate()}
+                          selected={getDateObject(editableQuotation.valid_until)}
                           onSelect={handleDateChange}
                           initialFocus
                         />
