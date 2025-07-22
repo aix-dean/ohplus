@@ -1,325 +1,692 @@
 import {
   collection,
-  doc,
-  getDoc,
-  getDocs,
   addDoc,
-  updateDoc,
-  query,
   serverTimestamp,
-  Timestamp,
+  getDoc,
+  doc,
+  getDocs,
+  query,
+  where,
+  updateDoc,
+  orderBy,
+  limit,
+  startAfter,
+  type DocumentData,
+  type QueryDocumentSnapshot,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import type { Quotation, QuotationProduct } from "@/lib/types/quotation"
-import { generatePdf } from "@/lib/pdf-service" // Assuming this exists for PDF generation
+import { addQuotationToCampaign } from "@/lib/campaign-service"
+import { jsPDF } from "jspdf"
+import { loadImageAsBase64, generateQRCode, getImageDimensions } from "@/lib/pdf-service"
+import type { QuotationProduct, Quotation } from "@/lib/types/quotation" // Import the updated Quotation type
 
-const QUOTATIONS_COLLECTION = "quotations"
-
-// Helper to convert Firestore Timestamp to Date or ISO string
-const convertFirestoreTimestampToDate = (timestamp: Timestamp | Date | string | undefined): Date | undefined => {
-  if (timestamp instanceof Timestamp) {
-    return timestamp.toDate()
-  }
-  if (timestamp instanceof Date) {
-    return timestamp
-  }
-  if (typeof timestamp === "string") {
-    const parsedDate = new Date(timestamp)
-    return isNaN(parsedDate.getTime()) ? undefined : parsedDate
-  }
-  return undefined
-}
-
-// Helper to format date to YYYY-MM-DD for consistent calculation
-const formatDateToYYYYMMDD = (date: Date | string | undefined): string | undefined => {
-  const dateObj = convertFirestoreTimestampToDate(date)
-  if (!dateObj) return undefined
-  return dateObj.toISOString().split("T")[0]
-}
-
-export const getQuotationById = async (id: string): Promise<Quotation | null> => {
+// Create a new quotation
+export async function createQuotation(quotationData: Omit<Quotation, "id">): Promise<string> {
   try {
-    const docRef = doc(db, QUOTATIONS_COLLECTION, id)
-    const docSnap = await getDoc(docRef)
+    console.log("Creating quotation with data:", quotationData)
 
-    if (docSnap.exists()) {
-      const data = docSnap.data()
-      return {
-        id: docSnap.id,
-        quotation_number: data.quotation_number,
-        client_name: data.client_name,
-        client_email: data.client_email,
-        start_date: data.start_date?.toDate ? data.start_date.toDate().toISOString() : data.start_date,
-        end_date: data.end_date?.toDate ? data.end_date.toDate().toISOString() : data.end_date,
-        valid_until: data.valid_until?.toDate ? data.valid_until.toDate().toISOString() : data.valid_until,
-        products: data.products || [],
-        total_amount: data.total_amount || 0,
-        duration_days: data.duration_days || 0,
-        status: data.status || "draft",
-        notes: data.notes || "",
-        created: data.created || null,
-        updated: data.updated || null,
-        createdBy: data.createdBy || "",
-        updatedBy: data.updatedBy || "",
-        quotation_request_id: data.quotation_request_id || "",
-        proposalId: data.proposalId || "",
-        campaignId: data.campaignId || "",
-      } as Quotation
-    } else {
-      return null
-    }
-  } catch (error) {
-    console.error("Error getting quotation by ID:", error)
-    throw error
-  }
-}
-
-export const getAllQuotations = async (): Promise<Quotation[]> => {
-  try {
-    const q = query(collection(db, QUOTATIONS_COLLECTION))
-    const querySnapshot = await getDocs(q)
-    const quotations: Quotation[] = []
-    querySnapshot.forEach((doc) => {
-      const data = doc.data()
-      quotations.push({
-        id: doc.id,
-        quotation_number: data.quotation_number,
-        client_name: data.client_name,
-        client_email: data.client_email,
-        start_date: data.start_date?.toDate ? data.start_date.toDate().toISOString() : data.start_date,
-        end_date: data.end_date?.toDate ? data.end_date.toDate().toISOString() : data.end_date,
-        valid_until: data.valid_until?.toDate ? data.valid_until.toDate().toISOString() : data.valid_until,
-        products: data.products || [],
-        total_amount: data.total_amount || 0,
-        duration_days: data.duration_days || 0,
-        status: data.status || "draft",
-        notes: data.notes || "",
-        created: data.created || null,
-        updated: data.updated || null,
-        createdBy: data.createdBy || "",
-        updatedBy: data.updatedBy || "",
-        quotation_request_id: data.quotation_request_id || "",
-        proposalId: data.proposalId || "",
-        campaignId: data.campaignId || "",
-      })
-    })
-    return quotations
-  } catch (error) {
-    console.error("Error getting all quotations:", error)
-    throw error
-  }
-}
-
-export const createQuotation = async (
-  quotationData: Omit<Quotation, "id" | "created" | "updated" | "status">,
-  userId: string,
-  userName: string,
-): Promise<string> => {
-  try {
-    const newQuotation: Omit<Quotation, "id"> = {
+    const newQuotation = {
       ...quotationData,
-      status: "draft", // Default status
-      created: serverTimestamp() as Timestamp,
-      updated: serverTimestamp() as Timestamp,
-      createdBy: userName,
-      updatedBy: userName,
-    }
-    const docRef = await addDoc(collection(db, QUOTATIONS_COLLECTION), newQuotation)
-    return docRef.id
-  } catch (error) {
-    console.error("Error creating quotation:", error)
-    throw error
-  }
-}
-
-export const updateQuotation = async (
-  id: string,
-  quotationData: Partial<Quotation>,
-  userId: string,
-  userName: string,
-): Promise<void> => {
-  try {
-    const docRef = doc(db, QUOTATIONS_COLLECTION, id)
-    await updateDoc(docRef, {
-      ...quotationData,
+      created: serverTimestamp(),
       updated: serverTimestamp(),
-      updatedBy: userName,
+    }
+
+    const docRef = await addDoc(collection(db, "quotations"), newQuotation)
+    console.log("Quotation created with ID:", docRef.id)
+
+    // If there's a campaign ID, add this quotation to the campaign
+    if (quotationData.campaignId) {
+      try {
+        await addQuotationToCampaign(quotationData.campaignId, docRef.id, quotationData.created_by || "system")
+      } catch (error) {
+        console.error("Error linking quotation to campaign:", error)
+        // Don't throw here, as the quotation was created successfully
+      }
+    }
+
+    return docRef.id
+  } catch (error: any) {
+    console.error("Error creating quotation:", error)
+    throw new Error("Failed to create quotation: " + error.message)
+  }
+}
+
+// Get quotation by ID
+export async function getQuotationById(quotationId: string): Promise<Quotation | null> {
+  try {
+    const quotationDoc = await getDoc(doc(db, "quotations", quotationId))
+
+    if (quotationDoc.exists()) {
+      const data = quotationDoc.data()
+      return {
+        id: quotationDoc.id,
+        ...data,
+        // Ensure products array is always present, even if empty
+        products: data.products || [],
+      } as Quotation
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error fetching quotation:", error)
+    return null
+  }
+}
+
+// Update an existing quotation
+export async function updateQuotation(
+  quotationId: string,
+  updatedData: Partial<Quotation>,
+  userId: string,
+  userName: string,
+): Promise<void> {
+  try {
+    const quotationRef = doc(db, "quotations", quotationId)
+    await updateDoc(quotationRef, {
+      ...updatedData,
+      updated: serverTimestamp(),
+      updated_by: userName, // Or userId if you prefer to store ID
     })
+    console.log(`Quotation ${quotationId} updated successfully.`)
   } catch (error) {
     console.error("Error updating quotation:", error)
-    throw error
+    throw new Error("Failed to update quotation: " + error.message)
   }
 }
 
-export const updateQuotationStatus = async (id: string, status: Quotation["status"]): Promise<void> => {
+// Generate quotation number
+export function generateQuotationNumber(): string {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  const day = String(now.getDate()).padStart(2, "0")
+  const time = String(now.getTime()).slice(-4)
+
+  return `QT-${year}${month}${day}-${time}`
+}
+
+// Calculate total amount based on dates and price
+export function calculateQuotationTotal(
+  startDate: string,
+  endDate: string,
+  products: QuotationProduct[], // Now accepts an array of products
+): {
+  durationDays: number
+  totalAmount: number
+} {
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  const durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+
+  let totalAmount = 0
+  products.forEach((product) => {
+    const dailyRate = (product.price || 0) / 30 // Assuming price is monthly
+    totalAmount += dailyRate * Math.max(1, durationDays)
+  })
+
+  return {
+    durationDays: Math.max(1, durationDays), // Minimum 1 day
+    totalAmount,
+  }
+}
+
+// Helper to format date
+const formatDate = (date: any) => {
+  if (!date) return "N/A"
   try {
-    const docRef = doc(db, QUOTATIONS_COLLECTION, id)
-    await updateDoc(docRef, {
-      status: status,
-      updated: serverTimestamp(),
+    const dateObj = date.toDate ? date.toDate() : new Date(date)
+    return new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    }).format(dateObj)
+  } catch (error) {
+    return "Invalid Date"
+  }
+}
+
+// Helper to safely convert to string for PDF
+const safeString = (value: any): string => {
+  if (value === null || value === undefined) return "N/A"
+  if (typeof value === "string") return value
+  if (typeof value === "number") return value.toLocaleString()
+  if (typeof value === "boolean") return value.toString()
+  if (value && typeof value === "object") {
+    if (value.id) return value.id.toString()
+    if (value.toString) return value.toString()
+    return "N/A"
+  }
+  return String(value)
+}
+
+// Helper function to safely convert to Date (re-using from pdf-service)
+function safeToDate(dateValue: any): Date {
+  if (dateValue instanceof Date) {
+    return dateValue
+  }
+  if (typeof dateValue === "string" || typeof dateValue === "number") {
+    return new Date(dateValue)
+  }
+  if (dateValue && typeof dateValue.toDate === "function") {
+    return dateValue.toDate()
+  }
+  return new Date() // fallback to current date
+}
+
+// Helper function to add image to PDF (copied and adapted from pdf-service)
+const addImageToPDF = async (
+  pdf: jsPDF,
+  imageUrl: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  maxHeight: number,
+) => {
+  try {
+    const base64 = await loadImageAsBase64(imageUrl)
+    if (!base64) return { width: 0, height: 0 }
+
+    const dimensions = await getImageDimensions(base64)
+
+    // Calculate scaled dimensions to fit within max bounds
+    let { width, height } = dimensions
+    const aspectRatio = width / height
+
+    // Scale to fill the maximum available space
+    if (width > height) {
+      width = maxWidth
+      height = width / aspectRatio
+      if (height > maxHeight) {
+        height = maxHeight
+        width = height * aspectRatio
+      }
+    } else {
+      height = maxHeight
+      width = height * aspectRatio
+      if (width > maxWidth) {
+        width = maxWidth
+        height = width / aspectRatio
+      }
+    }
+
+    pdf.addImage(base64, "JPEG", x, y, width, height)
+    return { width, height }
+  } catch (error) {
+    console.error("Error adding image to PDF:", error)
+    return { width: 0, height: 0 }
+  }
+}
+
+// Generate PDF for quotation
+export async function generateQuotationPDF(quotation: Quotation): Promise<void> {
+  const pdf = new jsPDF("p", "mm", "a4")
+  const pageWidth = pdf.internal.pageSize.getWidth()
+  const pageHeight = pdf.internal.pageSize.getHeight()
+  const margin = 15
+  const contentWidth = pageWidth - margin * 2
+  let yPosition = margin
+
+  // Safely convert dates
+  const createdDate = safeToDate(quotation.created)
+  const validUntilDate = safeToDate(quotation.valid_until)
+
+  // Helper function to add text with word wrapping
+  const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
+    pdf.setFontSize(fontSize)
+    const lines = pdf.splitTextToSize(text, maxWidth)
+    pdf.text(lines, x, y)
+    return y + lines.length * fontSize * 0.3 // Adjust line height multiplier
+  }
+
+  // Helper function to check if we need a new page
+  const checkNewPage = (requiredHeight: number) => {
+    if (yPosition + requiredHeight > pageHeight - margin) {
+      pdf.addPage()
+      yPosition = margin
+      // Add QR code and logo to new page as well
+      addHeaderElementsToPage()
+    }
+  }
+
+  // Helper function to add QR code and logo to current page
+  const addHeaderElementsToPage = async () => {
+    try {
+      const qrSize = 25
+      const qrX = pageWidth - margin - qrSize
+      const qrY = margin
+
+      // Generate QR Code for quotation view URL
+      const quotationViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/quotations/${quotation.id}/accept`
+      const qrCodeUrl = await generateQRCode(quotationViewUrl)
+      const qrBase64 = await loadImageAsBase64(qrCodeUrl)
+
+      if (qrBase64) {
+        pdf.addImage(qrBase64, "PNG", qrX, qrY, qrSize, qrSize)
+        pdf.setFontSize(6)
+        pdf.setTextColor(100, 100, 100)
+        pdf.text("Scan to view online", qrX, qrY + qrSize + 3)
+        pdf.setTextColor(0, 0, 0)
+      }
+
+      // Add Company Logo
+      const logoUrl = "/oh-plus-logo.png"
+      const logoBase64 = await loadImageAsBase64(logoUrl)
+      if (logoBase64) {
+        const logoWidth = 30 // Adjust as needed
+        const logoHeight = 10 // Adjust as needed
+        pdf.addImage(logoBase64, "PNG", margin, margin, logoWidth, logoHeight)
+      }
+    } catch (error) {
+      console.error("Error adding header elements to PDF:", error)
+    }
+  }
+
+  // Add header elements to first page
+  await addHeaderElementsToPage()
+  yPosition = Math.max(yPosition, margin + 40) // Ensure content starts below header elements
+
+  // Header (Quotation Title)
+  pdf.setFontSize(20)
+  pdf.setFont("helvetica", "bold")
+  pdf.setTextColor(37, 99, 235) // Blue color
+  pdf.text("QUOTATION", margin, yPosition)
+  yPosition += 10
+
+  pdf.setFontSize(14)
+  pdf.setFont("helvetica", "normal")
+  pdf.setTextColor(0, 0, 0)
+  pdf.text(`Quotation No: ${quotation.quotation_number}`, margin, yPosition)
+  yPosition += 15
+
+  pdf.setLineWidth(0.3)
+  pdf.setDrawColor(37, 99, 235) // Blue line
+  pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+  yPosition += 10
+
+  // Quotation Information Section
+  checkNewPage(30)
+  pdf.setFontSize(12)
+  pdf.setFont("helvetica", "bold")
+  pdf.text("QUOTATION INFORMATION", margin, yPosition)
+  yPosition += 5
+  pdf.setLineWidth(0.2)
+  pdf.setDrawColor(200, 200, 200)
+  pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+  yPosition += 5
+
+  pdf.setFontSize(9)
+  pdf.setFont("helvetica", "normal")
+  pdf.text(`Created Date: ${formatDate(createdDate)}`, margin, yPosition)
+  pdf.text(`Valid Until: ${formatDate(validUntilDate)}`, margin + contentWidth / 2, yPosition)
+  yPosition += 5
+  pdf.text(`Total Amount: ₱${safeString(quotation.total_amount)}`, margin, yPosition)
+  yPosition += 10
+
+  // Client Information Section
+  checkNewPage(30)
+  pdf.setFontSize(12)
+  pdf.setFont("helvetica", "bold")
+  pdf.text("CLIENT INFORMATION", margin, yPosition)
+  yPosition += 5
+  pdf.setLineWidth(0.2)
+  pdf.setDrawColor(200, 200, 200)
+  pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+  yPosition += 5
+
+  pdf.setFontSize(9)
+  pdf.setFont("helvetica", "normal")
+  pdf.text(`Client Name: ${safeString(quotation.client_name)}`, margin, yPosition)
+  pdf.text(`Client Email: ${safeString(quotation.client_email)}`, margin + contentWidth / 2, yPosition)
+  yPosition += 5
+  if (quotation.quotation_request_id) {
+    pdf.text(`Related Request ID: ${safeString(quotation.quotation_request_id)}`, margin, yPosition)
+    yPosition += 5
+  }
+  if (quotation.proposalId) {
+    pdf.text(`Related Proposal ID: ${safeString(quotation.proposalId)}`, margin, yPosition)
+    yPosition += 5
+  }
+  if (quotation.campaignId) {
+    pdf.text(`Related Campaign ID: ${safeString(quotation.campaignId)}`, margin, yPosition)
+    yPosition += 5
+  }
+  yPosition += 5
+
+  // Product & Services Section (Manual Table Drawing)
+  checkNewPage(50) // Estimate space for table header + one row
+  pdf.setFontSize(12)
+  pdf.setFont("helvetica", "bold")
+  pdf.text("PRODUCT & SERVICES", margin, yPosition)
+  yPosition += 5
+  pdf.setLineWidth(0.2)
+  pdf.setDrawColor(200, 200, 200)
+  pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+  yPosition += 5
+
+  const tableStartY = yPosition
+  const cellPadding = 3
+  const headerRowHeight = 8
+  const dataRowHeight = 12 // Increased for multi-line product name
+  const colWidths = [
+    contentWidth * 0.15, // Image
+    contentWidth * 0.25, // Product
+    contentWidth * 0.15, // Type
+    contentWidth * 0.25, // Location
+    contentWidth * 0.2, // Price
+  ]
+
+  // Table Headers
+  pdf.setFillColor(243, 244, 246) // bg-gray-100
+  pdf.rect(margin, yPosition, contentWidth, headerRowHeight, "F")
+  pdf.setDrawColor(200, 200, 200)
+  pdf.setLineWidth(0.1)
+  pdf.rect(margin, yPosition, contentWidth, headerRowHeight, "S")
+
+  pdf.setFontSize(9)
+  pdf.setFont("helvetica", "bold")
+  pdf.setTextColor(75, 85, 99)
+
+  let currentX = margin
+  pdf.text("Image", currentX + colWidths[0] / 2, yPosition + headerRowHeight / 2, {
+    baseline: "middle",
+    align: "center",
+  })
+  currentX += colWidths[0]
+  pdf.text("Product", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
+  currentX += colWidths[1]
+  pdf.text("Type", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
+  currentX += colWidths[2]
+  pdf.text("Location", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
+  currentX += colWidths[3]
+  pdf.text("Price", currentX + colWidths[4] - cellPadding, yPosition + headerRowHeight / 2, {
+    baseline: "middle",
+    align: "right",
+  })
+  yPosition += headerRowHeight
+
+  // Table Rows for Products
+  pdf.setFontSize(9)
+  pdf.setFont("helvetica", "normal")
+  pdf.setTextColor(0, 0, 0)
+
+  for (const product of quotation.products) {
+    checkNewPage(dataRowHeight + 10) // Check for new page before adding each product row, add extra for image
+    pdf.setFillColor(255, 255, 255) // bg-white
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight + 10, "F") // Increased height for image
+    pdf.setDrawColor(200, 200, 200)
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight + 10, "S")
+
+    currentX = margin
+    // Product Image
+    const productImageUrl = product.media?.[0]?.url || "/placeholder.svg?height=64&width=64"
+    if (productImageUrl) {
+      await addImageToPDF(
+        pdf,
+        productImageUrl,
+        currentX + cellPadding,
+        yPosition + cellPadding,
+        colWidths[0] - 2 * cellPadding,
+        dataRowHeight + 10 - 2 * cellPadding,
+      )
+    } else {
+      // Placeholder for no image
+      pdf.setFillColor(230, 230, 230) // Light gray
+      pdf.rect(
+        currentX + cellPadding,
+        yPosition + cellPadding,
+        colWidths[0] - 2 * cellPadding,
+        dataRowHeight + 10 - 2 * cellPadding,
+        "F",
+      )
+      pdf.setTextColor(150, 150, 150)
+      pdf.setFontSize(6)
+      pdf.text("No Image", currentX + colWidths[0] / 2, yPosition + (dataRowHeight + 10) / 2, {
+        align: "center",
+        baseline: "middle",
+      })
+      pdf.setTextColor(0, 0, 0)
+      pdf.setFontSize(9)
+    }
+    currentX += colWidths[0]
+
+    let productText = safeString(product.name)
+    if (product.site_code) {
+      productText += `\nSite: ${product.site_code}`
+    }
+    if (product.description) {
+      productText += `\n${product.description}`
+    }
+    addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[1] - 2 * cellPadding, 9)
+    currentX += colWidths[1]
+    pdf.text(safeString(product.type), currentX + cellPadding, yPosition + (dataRowHeight + 10) / 2, {
+      baseline: "middle",
     })
+    currentX += colWidths[2]
+    addText(
+      safeString(product.location),
+      currentX + cellPadding,
+      yPosition + cellPadding,
+      colWidths[3] - 2 * cellPadding,
+      9,
+    )
+    currentX += colWidths[3]
+    pdf.text(
+      `₱${safeString(product.price)}/month`, // Display monthly price here
+      currentX + colWidths[4] - cellPadding,
+      yPosition + (dataRowHeight + 10) / 2,
+      {
+        baseline: "middle",
+        align: "right",
+      },
+    )
+    yPosition += dataRowHeight + 10
+  }
+
+  // Total Amount Row
+  checkNewPage(headerRowHeight + 15) // Ensure space for total row and gap
+  pdf.setFillColor(243, 244, 246) // bg-gray-50
+  pdf.rect(margin, yPosition, contentWidth, headerRowHeight, "F")
+  pdf.setDrawColor(200, 200, 200)
+  pdf.rect(margin, yPosition, contentWidth, headerRowHeight, "S")
+
+  pdf.setFontSize(11)
+  pdf.setFont("helvetica", "bold")
+  pdf.setTextColor(37, 99, 235) // Blue color
+
+  pdf.text(
+    "Total Amount:",
+    margin + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] - 5,
+    yPosition + headerRowHeight / 2,
+    {
+      baseline: "middle",
+      align: "right",
+    },
+  )
+  pdf.text(
+    `₱${safeString(quotation.total_amount)}`,
+    pageWidth - margin - cellPadding,
+    yPosition + headerRowHeight / 2,
+    {
+      baseline: "middle",
+      align: "right",
+    },
+  )
+  yPosition += headerRowHeight + 15
+
+  // Additional Information (Notes)
+  if (quotation.notes) {
+    checkNewPage(30)
+    pdf.setFontSize(12)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("ADDITIONAL INFORMATION", margin, yPosition)
+    yPosition += 5
+    pdf.setLineWidth(0.2)
+    pdf.setDrawColor(200, 200, 200)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 5
+
+    yPosition = addText(quotation.notes, margin, yPosition, contentWidth)
+    yPosition += 10
+  }
+
+  // Footer
+  pdf.setFontSize(7)
+  pdf.setFont("helvetica", "normal")
+  pdf.setTextColor(107, 114, 128) // Gray color
+  pdf.text(`This quotation is valid until ${formatDate(validUntilDate)}`, pageWidth / 2, pageHeight - 20, {
+    align: "center",
+  })
+  pdf.text(
+    `© ${new Date().getFullYear()} OH+ Outdoor Advertising. All rights reserved.`,
+    pageWidth / 2,
+    pageHeight - 10,
+    { align: "center" },
+  )
+
+  // Download the PDF
+  pdf.save(`Quotation-${quotation.quotation_number}.pdf`)
+}
+
+// Send quotation email to client
+export async function sendQuotationEmail(quotation: Quotation, requestorEmail: string): Promise<boolean> {
+  try {
+    console.log("Sending quotation email:", {
+      quotationId: quotation.id,
+      quotationNumber: quotation.quotation_number,
+      requestorEmail,
+    })
+
+    const response = await fetch("/api/quotations/send-email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        quotation,
+        requestorEmail,
+      }),
+    })
+
+    console.log("API response status:", response.status)
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
+      console.error("API error response:", errorData)
+      throw new Error(errorData.details || errorData.error || `HTTP ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log("Email sent successfully:", result)
+    return true
+  } catch (error) {
+    console.error("Error sending quotation email:", error)
+    throw error // Re-throw to show specific error message
+  }
+}
+
+// Update quotation status
+export async function updateQuotationStatus(quotationId: string, status: string): Promise<void> {
+  try {
+    const response = await fetch("/api/quotations/update-status", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        quotationId,
+        status,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error("Failed to update quotation status")
+    }
   } catch (error) {
     console.error("Error updating quotation status:", error)
     throw error
   }
 }
 
-export const deleteQuotation = async (id: string): Promise<void> => {
+// Get quotations by campaign ID
+export async function getQuotationsByCampaignId(campaignId: string): Promise<Quotation[]> {
   try {
-    await updateDoc(doc(db, QUOTATIONS_COLLECTION, id), {
-      deleted: true,
-      updated: serverTimestamp(),
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const quotationsRef = collection(db, "quotations")
+    const q = query(quotationsRef, where("campaignId", "==", campaignId))
+
+    const querySnapshot = await getDocs(q)
+    const quotations: Quotation[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      quotations.push({ id: doc.id, ...data, products: data.products || [] } as Quotation)
     })
+
+    return quotations
   } catch (error) {
-    console.error("Error deleting quotation:", error)
-    throw error
+    console.error("Error fetching quotations by campaign ID:", error)
+    return []
   }
 }
 
-export const calculateQuotationTotal = (startDateISO: string, endDateISO: string, products: QuotationProduct[]) => {
-  const startDate = new Date(startDateISO)
-  const endDate = new Date(endDateISO)
+// Get quotations by created_by ID
+export async function getQuotationsByCreatedBy(userId: string): Promise<Quotation[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
 
-  // Calculate duration in days
-  const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
-  const durationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1 // +1 to include both start and end day
+    const quotationsRef = collection(db, "quotations")
+    const q = query(quotationsRef, where("created_by", "==", userId), orderBy("created", "desc"))
 
-  // Calculate total amount based on monthly prices and duration
-  let totalAmount = 0
-  products.forEach((product) => {
-    // Assuming price is per month, calculate daily rate and then total
-    const dailyPrice = product.price / 30.44 // Average days in a month
-    totalAmount += dailyPrice * durationDays
+    const querySnapshot = await getDocs(q)
+    const quotations: Quotation[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      quotations.push({ id: doc.id, ...data, products: data.products || [] } as Quotation)
+    })
+
+    return quotations
+  } catch (error) {
+    console.error("Error fetching quotations by created_by ID:", error)
+    return []
+  }
+}
+
+// Get paginated quotations by seller ID
+export async function getQuotationsPaginated(
+  userId: string,
+  pageSize: number,
+  startAfterDoc: QueryDocumentSnapshot<DocumentData> | null,
+) {
+  const quotationsRef = collection(db, "quotations")
+  let q
+
+  if (startAfterDoc) {
+    q = query(
+      quotationsRef,
+      where("seller_id", "==", userId),
+      orderBy("created", "desc"),
+      startAfter(startAfterDoc),
+      limit(pageSize),
+    )
+  } else {
+    q = query(quotationsRef, where("seller_id", "==", userId), orderBy("created", "desc"), limit(pageSize))
+  }
+
+  const querySnapshot = await getDocs(q)
+  const quotations: any[] = []
+  querySnapshot.forEach((doc) => {
+    const data = doc.data()
+    quotations.push({ id: doc.id, ...data, products: data.products || [] })
   })
 
-  return { durationDays, totalAmount }
-}
+  const lastVisibleId = querySnapshot.docs[querySnapshot.docs.length - 1] || null
+  const hasMore = querySnapshot.docs.length === pageSize
 
-export const generateQuotationPDF = async (quotation: Quotation) => {
-  const docDefinition = {
-    content: [
-      { text: "QUOTATION", style: "header" },
-      { text: `Quotation Number: ${quotation.quotation_number}`, style: "subheader" },
-      {
-        text: `Created Date: ${new Date(quotation.created?.toDate() || Date.now()).toLocaleDateString()}`,
-        style: "subheader",
-      },
-      { text: "\n" },
-      { text: "Client Information", style: "sectionHeader" },
-      {
-        columns: [
-          { text: `Client Name: ${quotation.client_name}` },
-          { text: `Client Email: ${quotation.client_email}` },
-        ],
-      },
-      { text: "\n" },
-      { text: "Quotation Details", style: "sectionHeader" },
-      {
-        columns: [
-          { text: `Start Date: ${new Date(quotation.start_date).toLocaleDateString()}` },
-          { text: `End Date: ${new Date(quotation.end_date).toLocaleDateString()}` },
-        ],
-      },
-      { text: `Valid Until: ${new Date(quotation.valid_until).toLocaleDateString()}` },
-      { text: `Duration: ${quotation.duration_days} days` },
-      { text: "\n" },
-      { text: "Products & Services", style: "sectionHeader" },
-      {
-        table: {
-          headerRows: 1,
-          widths: ["auto", "*", "auto", "auto", "auto"],
-          body: [
-            [
-              { text: "Image", style: "tableHeader" },
-              { text: "Product", style: "tableHeader" },
-              { text: "Type", style: "tableHeader" },
-              { text: "Location", style: "tableHeader" },
-              { text: "Price (Monthly)", style: "tableHeader", alignment: "right" },
-            ],
-            ...quotation.products.map((product) => [
-              {
-                image: product.imageUrl || "public/placeholder.svg", // Use placeholder if no image
-                width: 50,
-                height: 50,
-                fit: [50, 50],
-                alignment: "center",
-              },
-              {
-                stack: [
-                  { text: product.name, bold: true },
-                  product.site_code ? { text: `Site: ${product.site_code}`, fontSize: 8, color: "#555" } : null,
-                  product.description ? { text: product.description, fontSize: 8, color: "#555" } : null,
-                ].filter(Boolean),
-              },
-              product.type,
-              product.location,
-              { text: `₱${product.price.toLocaleString()}`, alignment: "right" },
-            ]),
-            [
-              { text: "Total Amount:", colSpan: 4, alignment: "right", style: "tableTotal" },
-              {},
-              {},
-              {},
-              { text: `₱${quotation.total_amount.toLocaleString()}`, alignment: "right", style: "tableTotal" },
-            ],
-          ],
-        },
-        layout: "lightHorizontalLines",
-      },
-      { text: "\n" },
-      { text: "Additional Information", style: "sectionHeader" },
-      { text: quotation.notes || "N/A", style: "notes" },
-      { text: "\n" },
-      {
-        text: `This quotation is valid until ${new Date(quotation.valid_until).toLocaleDateString()}`,
-        style: "footer",
-      },
-      { text: `© ${new Date().getFullYear()} OH+ Outdoor Advertising. All rights reserved.`, style: "footer" },
-    ],
-    styles: {
-      header: {
-        fontSize: 22,
-        bold: true,
-        marginBottom: 10,
-        alignment: "center",
-      },
-      subheader: {
-        fontSize: 10,
-        color: "#555",
-        alignment: "center",
-      },
-      sectionHeader: {
-        fontSize: 14,
-        bold: true,
-        margin: [0, 10, 0, 5],
-        color: "#333",
-      },
-      tableHeader: {
-        bold: true,
-        fontSize: 10,
-        color: "white",
-        fillColor: "#4285F4", // Google Blue
-        alignment: "center",
-      },
-      tableTotal: {
-        bold: true,
-        fontSize: 12,
-        color: "#4285F4",
-      },
-      notes: {
-        fontSize: 10,
-        color: "#555",
-        italics: true,
-      },
-      footer: {
-        fontSize: 8,
-        color: "#888",
-        alignment: "center",
-        marginTop: 10,
-      },
-    },
-    defaultPageMargins: [40, 40, 40, 40],
-  }
-
-  await generatePdf(docDefinition, `Quotation-${quotation.quotation_number}.pdf`)
+  return { quotations, lastVisibleId, hasMore }
 }

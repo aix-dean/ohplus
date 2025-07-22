@@ -145,33 +145,26 @@ export default function QuotationDetailsPage() {
 
   // Effect to recalculate total amount whenever relevant fields change in editableQuotation
   useEffect(() => {
-    if (editableQuotation) {
-      const startDateObj = getDateObject(editableQuotation.start_date)
-      const endDateObj = getDateObject(editableQuotation.end_date)
+    if (editableQuotation && editableQuotation.products && editableQuotation.start_date && editableQuotation.end_date) {
+      const { durationDays, totalAmount } = calculateQuotationTotal(
+        editableQuotation.start_date,
+        editableQuotation.end_date,
+        editableQuotation.products,
+      )
 
-      if (startDateObj && endDateObj && editableQuotation.products) {
-        const { durationDays, totalAmount } = calculateQuotationTotal(
-          startDateObj.toISOString(),
-          endDateObj.toISOString(),
-          editableQuotation.products,
-        )
-
-        setEditableQuotation((prev) => {
-          // Only update if the calculated values are different from the current state
-          if (prev && (prev.duration_days !== durationDays || prev.total_amount !== totalAmount)) {
-            return {
-              ...prev,
-              duration_days: durationDays,
-              total_amount: totalAmount,
-            }
+      setEditableQuotation((prev) => {
+        // Only update if there's an actual change to prevent infinite loops
+        if (prev && (prev.duration_days !== durationDays || prev.total_amount !== totalAmount)) {
+          return {
+            ...prev,
+            duration_days: durationDays,
+            total_amount: totalAmount,
           }
-          return prev // No change, prevent re-render
-        })
-      }
+        }
+        return prev // Return previous state if no change
+      })
     }
-  }, [
-    editableQuotation, // Use the entire editableQuotation object as a dependency
-  ]) // Dependencies for recalculation
+  }, [editableQuotation]) // Dependencies for recalculation [^3]
 
   const handleStatusUpdate = async (newStatus: Quotation["status"]) => {
     if (!quotation || !quotation.id) return
@@ -785,7 +778,7 @@ export default function QuotationDetailsPage() {
                       <tr key={product.id || index} className="bg-white">
                         <td className="py-3 px-4 border-b border-gray-200">
                           <img
-                            src={product.imageUrl || "/placeholder.svg?height=64&width=64&query=product"}
+                            src={product.media?.[0]?.url || "/placeholder.svg?height=64&width=64&query=product"}
                             alt={product.name}
                             className="w-16 h-16 object-cover rounded-sm"
                           />
