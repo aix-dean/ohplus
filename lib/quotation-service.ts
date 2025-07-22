@@ -266,8 +266,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     if (yPosition + requiredHeight > pageHeight - margin) {
       pdf.addPage()
       yPosition = margin
-      // Add QR code and logo to new page as well
-      addHeaderElementsToPage()
+      // Only add header elements on the first page, which is handled by the initial call
     }
   }
 
@@ -304,7 +303,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     }
   }
 
-  // Add header elements to first page
+  // Add header elements ONLY to the first page
   await addHeaderElementsToPage()
   yPosition = Math.max(yPosition, margin + 40) // Ensure content starts below header elements
 
