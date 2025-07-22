@@ -726,6 +726,8 @@ function SalesDashboardContent() {
 
         // Step 3: Compute total amount
         const totalAmount = dailyRate * durationDays;
+        const validUntil = new Date();
+        validUntil.setDate(validUntil.getDate() + 5);
 
         const quotationData = {
           quotation_number: generateQuotationNumber(),
