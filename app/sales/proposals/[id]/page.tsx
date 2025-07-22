@@ -38,6 +38,7 @@ import { ProposalActivityTimeline } from "@/components/proposal-activity-timelin
 import { CostEstimatesList } from "@/components/cost-estimates-list"
 import { SendProposalDialog } from "@/components/send-proposal-dialog"
 import { SendProposalOptionsDialog } from "@/components/send-proposal-options-dialog" // Import the new options dialog
+import { ComingSoonDialog } from "@/components/coming-soon-dialog" // Import ComingSoonDialog
 
 // Helper function to generate QR code URL (kept here for consistency with proposal view)
 const generateQRCodeUrl = (proposalId: string) => {
@@ -59,6 +60,7 @@ export default function ProposalDetailsPage() {
   const [isSendEmailDialogOpen, setIsSendEmailDialogOpen] = useState(false) // State for email dialog
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isComingSoonDialogOpen, setIsComingSoonDialogOpen] = useState(false) // State for Coming Soon dialog
 
   useEffect(() => {
     async function fetchProposal() {
@@ -384,6 +386,7 @@ export default function ProposalDetailsPage() {
         <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
           <Button
             variant="ghost"
+            onClick={() => setIsComingSoonDialogOpen(true)} // Added onClick to open dialog
             className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
           >
             <LayoutGrid className="h-8 w-8 text-gray-500 mb-1" />
@@ -775,34 +778,37 @@ export default function ProposalDetailsPage() {
                     <h3 className="text-lg font-medium text-gray-900 mb-3">{product.name} Details</h3>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                      <div>
-                        <h4 className="text-xs font-medium text-gray-500 uppercase">Traffic Count</h4>
-                        <p className="text-sm text-gray-900">
-                          {product.specs_rental?.traffic_count
-                            ? product.specs_rental.traffic_count.toLocaleString() + "/day"
-                            : "0/day"}
-                        </p>
-                      </div>
+                      {product.specs_rental?.traffic_count && (
+                        <div>
+                          <h4 className="text-xs font-medium text-gray-500 uppercase">Traffic Count</h4>
+                          <p className="text-sm text-gray-900">
+                            {product.specs_rental.traffic_count.toLocaleString()}/day
+                          </p>
+                        </div>
+                      )}
 
-                      <div>
-                        <h4 className="text-xs font-medium text-gray-500 uppercase">Dimensions</h4>
-                        <p className="text-sm text-gray-900">
-                          {product.specs_rental?.height && product.specs_rental?.width
-                            ? `${product.specs_rental.height}m x ${product.specs_rental.width}m`
-                            : "N/A"}
-                        </p>
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-medium text-gray-500 uppercase">Audience Type</h4>
-                        <p className="text-sm text-gray-900">{product.specs_rental?.audience_type || "N/A"}</p>
-                      </div>
+                      {product.specs_rental?.height && product.specs_rental?.width && (
+                        <div>
+                          <h4 className="text-xs font-medium text-gray-500 uppercase">Dimensions</h4>
+                          <p className="text-sm text-gray-900">
+                            {product.specs_rental.height}m × {product.specs_rental.width}m
+                          </p>
+                        </div>
+                      )}
 
-                      <div>
-                        <h4 className="text-xs font-medium text-gray-500 uppercase">Health Status</h4>
-                        <p className="text-sm text-gray-900">
-                          {product.health_percentage ? `${product.health_percentage}%` : "N/A"}
-                        </p>
-                      </div>
+                      {product.specs_rental?.audience_type && (
+                        <div>
+                          <h4 className="text-xs font-medium text-gray-500 uppercase">Audience Type</h4>
+                          <p className="text-sm text-gray-900">{product.specs_rental.audience_type}</p>
+                        </div>
+                      )}
+
+                      {product.health_percentage && (
+                        <div>
+                          <h4 className="text-xs font-medium text-gray-500 uppercase">Health Status</h4>
+                          <p className="text-sm text-gray-900">{product.health_percentage}%</p>
+                        </div>
+                      )}
                     </div>
 
                     {product.description && (
@@ -1049,6 +1055,13 @@ export default function ProposalDetailsPage() {
           </div>
         </div>
       )}
+
+      {/* Coming Soon Dialog */}
+      <ComingSoonDialog
+        isOpen={isComingSoonDialogOpen}
+        onClose={() => setIsComingSoonDialogOpen(false)}
+        feature="Templates"
+      />
     </div>
   )
 }
