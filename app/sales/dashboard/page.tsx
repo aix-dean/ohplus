@@ -723,6 +723,16 @@ function SalesDashboardContent() {
         console.log("First Name from userData:", userData?.first_name)
         console.log("Last Name from userData:", userData?.last_name)
 
+        const durationDays = Math.ceil(
+          (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        // Step 2: Calculate daily rate
+        const dailyRate = (firstSite.price || 0) / 30;
+
+        // Step 3: Compute total amount
+        const totalAmount = dailyRate * durationDays;
+
         const quotationData = {
           quotation_number: generateQuotationNumber(),
           product_id: firstSite.id,
