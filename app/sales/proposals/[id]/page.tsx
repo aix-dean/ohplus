@@ -792,7 +792,6 @@ export default function ProposalDetailsPage() {
                           </p>
                         </div>
                       )}
-                      {/*
                       {product.specs_rental?.audience_type && (
                         <div>
                           <h4 className="text-xs font-medium text-gray-500 uppercase">Audience Type</h4>
@@ -806,7 +805,7 @@ export default function ProposalDetailsPage() {
                           <p className="text-sm text-gray-900">{product.health_percentage}%</p>
                         </div>
                       )}
-                      */}
+
                     </div>
 
                     {product.description && (
