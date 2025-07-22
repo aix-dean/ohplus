@@ -41,6 +41,7 @@ import { SendQuotationDialog } from "@/components/send-quotation-dialog"
 import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-dialog"
 import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog"
 import { Timestamp } from "firebase/firestore" // Import Timestamp for Firebase date handling
+import { Input } from "@/components/ui/input"
 
 // Helper function to generate QR code URL (kept here for consistency with proposal view)
 const generateQRCodeUrl = (quotationId: string) => {
@@ -148,6 +149,37 @@ export default function QuotationDetailsPage() {
 
     fetchQuotationAndProduct()
   }, [params.id, toast, router])
+
+  useEffect(() => {
+    if (isEditing && editableQuotation) {
+      const startDateObj = getDateObject(editableQuotation.start_date)
+      const endDateObj = getDateObject(editableQuotation.end_date)
+      const currentPrice = Number.parseFloat(String(editableQuotation.price)) || 0
+
+      let calculatedDurationDays = 0
+      if (startDateObj instanceof Date && endDateObj instanceof Date) {
+        calculatedDurationDays = Math.max(
+          1,
+          Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24)),
+        )
+      }
+
+      const dailyRate = currentPrice / 30
+      const calculatedTotalAmount = Math.max(0, calculatedDurationDays) * dailyRate
+
+      // Only update if there's a change to avoid infinite loops
+      if (
+        editableQuotation.duration_days !== calculatedDurationDays ||
+        editableQuotation.total_amount !== calculatedTotalAmount
+      ) {
+        setEditableQuotation((prev) => ({
+          ...prev!,
+          duration_days: calculatedDurationDays,
+          total_amount: calculatedTotalAmount,
+        }))
+      }
+    }
+  }, [editableQuotation, isEditing])
 
   const handleStatusUpdate = async (newStatus: Quotation["status"]) => {
     if (!quotation || !quotation.id) return
@@ -698,7 +730,9 @@ export default function QuotationDetailsPage() {
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 mb-2">Total Amount</h3>
-                  <p className="text-base font-semibold text-gray-900">₱{safeString(quotation.total_amount)}</p>
+                  <p className="text-base font-semibold text-gray-900">
+                    ₱{safeString(isEditing ? editableQuotation.total_amount : quotation.total_amount)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -780,7 +814,18 @@ export default function QuotationDetailsPage() {
                         {safeString(product?.specs_rental?.location || product?.light?.location)}
                       </td>
                       <td className="py-3 px-4 text-right border-b border-gray-200">
-                        <div className="font-medium text-gray-900">₱{safeString(quotation.price)}</div>
+                        {isEditing ? (
+                          <Input
+                            type="number"
+                            name="price"
+                            value={editableQuotation.price || ""}
+                            onChange={handleChange}
+                            className="w-full text-right"
+                            step="0.01"
+                          />
+                        ) : (
+                          <div className="font-medium text-gray-900">₱{safeString(quotation.price)}</div>
+                        )}
                         <div className="text-xs text-gray-500">per month</div>
                       </td>
                     </tr>
