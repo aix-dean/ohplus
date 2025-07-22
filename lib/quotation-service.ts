@@ -17,10 +17,9 @@ import {
 import { db } from "@/lib/firebase"
 import { addQuotationToCampaign } from "@/lib/campaign-service"
 import { jsPDF } from "jspdf"
-import { loadImageAsBase64, generateQRCode, getImageDimensions } from "@/lib/pdf-service"
-import type { QuotationItem } from "@/lib/types/quotation" // Import only QuotationItem interface
+import { loadImageAsBase64, generateQRCode, getImageDimensions } from "@/lib/pdf-service" // Import getImageDimensions
 
-export interface QuotationUpdate {
+export interface Quotation {
   id?: string
   quotation_number: string
   quotation_request_id?: string // Add this field
@@ -47,11 +46,10 @@ export interface QuotationUpdate {
   proposalId?: string // Add proposal ID field
   valid_until?: any // Added valid_until field
   seller_id?: string // Added seller_id field for pagination
-  items?: QuotationItem[] // Added items field
 }
 
 // Create a new quotation
-export async function createQuotation(quotationData: Omit<QuotationUpdate, "id">): Promise<string> {
+export async function createQuotation(quotationData: Omit<Quotation, "id">): Promise<string> {
   try {
     console.log("Creating quotation with data:", quotationData)
 
@@ -82,12 +80,12 @@ export async function createQuotation(quotationData: Omit<QuotationUpdate, "id">
 }
 
 // Get quotation by ID
-export async function getQuotationById(quotationId: string): Promise<QuotationUpdate | null> {
+export async function getQuotationById(quotationId: string): Promise<Quotation | null> {
   try {
     const quotationDoc = await getDoc(doc(db, "quotations", quotationId))
 
     if (quotationDoc.exists()) {
-      return { id: quotationDoc.id, ...quotationDoc.data() } as QuotationUpdate
+      return { id: quotationDoc.id, ...quotationDoc.data() } as Quotation
     }
 
     return null
@@ -100,7 +98,7 @@ export async function getQuotationById(quotationId: string): Promise<QuotationUp
 // Update an existing quotation
 export async function updateQuotation(
   quotationId: string,
-  updatedData: Partial<QuotationUpdate>,
+  updatedData: Partial<Quotation>,
   userId: string,
   userName: string,
 ): Promise<void> {
@@ -129,33 +127,24 @@ export function generateQuotationNumber(): string {
   return `QT-${year}${month}${day}-${time}`
 }
 
-// Calculate total amount for a single item based on dates and monthly price
-export function calculateItemTotal(
+// Calculate total amount based on dates and price
+export function calculateQuotationTotal(
   startDate: string,
   endDate: string,
-  monthlyPrice: number, // Now interpreted as monthly price
+  pricePerDay: number,
 ): {
   durationDays: number
-  itemTotalAmount: number
+  totalAmount: number
 } {
   const start = new Date(startDate)
   const end = new Date(endDate)
   const durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-
-  // Calculate daily rate from monthly price
-  const dailyRate = monthlyPrice / 30
-
-  const itemTotalAmount = Math.max(1, durationDays) * dailyRate
+  const totalAmount = Math.max(1, durationDays) * pricePerDay
 
   return {
     durationDays: Math.max(1, durationDays), // Minimum 1 day
-    itemTotalAmount,
+    totalAmount,
   }
-}
-
-// Calculate overall quotation total from an array of items
-export function calculateQuotationTotal(items: QuotationItem[]): number {
-  return items.reduce((sum, item) => sum + item.item_total_amount, 0)
 }
 
 // Helper to format date
@@ -246,7 +235,7 @@ const addImageToPDF = async (
 }
 
 // Generate PDF for quotation
-export async function generateQuotationPDF(quotation: QuotationUpdate): Promise<void> {
+export async function generateQuotationPDF(quotation: Quotation): Promise<void> {
   const pdf = new jsPDF("p", "mm", "a4")
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
@@ -254,7 +243,7 @@ export async function generateQuotationPDF(quotation: QuotationUpdate): Promise<
   const contentWidth = pageWidth - margin * 2
   let yPosition = margin
 
-  // Safely convert dates (assuming all items have the same start/end dates for overall duration)
+  // Safely convert dates
   const createdDate = safeToDate(quotation.created)
   const validUntilDate = safeToDate(quotation.valid_until)
 
@@ -426,48 +415,43 @@ export async function generateQuotationPDF(quotation: QuotationUpdate): Promise<
   })
   yPosition += headerRowHeight
 
-  // Table Rows for Products
+  // Table Row for Product
+  pdf.setFillColor(255, 255, 255) // bg-white
+  pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "F")
+  pdf.setDrawColor(200, 200, 200)
+  pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "S")
+
   pdf.setFontSize(9)
   pdf.setFont("helvetica", "normal")
   pdf.setTextColor(0, 0, 0)
 
-  for (const item of quotation.items || []) {
-    checkNewPage(dataRowHeight) // Check for new page before drawing each row
-    pdf.setFillColor(255, 255, 255) // bg-white
-    pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "F")
-    pdf.setDrawColor(200, 200, 200)
-    pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "S")
-
-    currentX = margin
-    let productText = safeString(item.product_name)
-    if (item.site_code) {
-      productText += `\nSite: ${item.site_code}`
-    }
-    addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[0] - 2 * cellPadding, 9)
-    currentX += colWidths[0]
-    pdf.text(safeString(item.type || "Rental"), currentX + cellPadding, yPosition + dataRowHeight / 2, {
-      baseline: "middle",
-    })
-    currentX += colWidths[1]
-    addText(
-      safeString(item.product_location),
-      currentX + cellPadding,
-      yPosition + cellPadding,
-      colWidths[2] - 2 * cellPadding,
-      9,
-    )
-    currentX += colWidths[2]
-    pdf.text(
-      `₱${safeString(item.item_total_amount)}`,
-      currentX + colWidths[3] - cellPadding,
-      yPosition + dataRowHeight / 2,
-      {
-        baseline: "middle",
-        align: "right",
-      },
-    )
-    yPosition += dataRowHeight
+  currentX = margin
+  let productText = safeString(quotation.product_name)
+  if (quotation.site_code) {
+    productText += `\nSite: ${quotation.site_code}`
   }
+  addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[0] - 2 * cellPadding, 9)
+  currentX += colWidths[0]
+  pdf.text("Rental", currentX + cellPadding, yPosition + dataRowHeight / 2, { baseline: "middle" })
+  currentX += colWidths[1]
+  addText(
+    safeString(quotation.product_location),
+    currentX + cellPadding,
+    yPosition + cellPadding,
+    colWidths[2] - 2 * cellPadding,
+    9,
+  )
+  currentX += colWidths[2]
+  pdf.text(
+    `₱${safeString(quotation.price)}/day`,
+    currentX + colWidths[3] - cellPadding,
+    yPosition + dataRowHeight / 2,
+    {
+      baseline: "middle",
+      align: "right",
+    },
+  )
+  yPosition += dataRowHeight
 
   // Total Amount Row
   pdf.setFillColor(243, 244, 246) // bg-gray-50
@@ -506,6 +490,8 @@ export async function generateQuotationPDF(quotation: QuotationUpdate): Promise<
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 5
 
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
     yPosition = addText(quotation.notes, margin, yPosition, contentWidth)
     yPosition += 10
   }
@@ -529,7 +515,7 @@ export async function generateQuotationPDF(quotation: QuotationUpdate): Promise<
 }
 
 // Send quotation email to client
-export async function sendQuotationEmail(quotation: QuotationUpdate, requestorEmail: string): Promise<boolean> {
+export async function sendQuotationEmail(quotation: Quotation, requestorEmail: string): Promise<boolean> {
   try {
     console.log("Sending quotation email:", {
       quotationId: quotation.id,
@@ -589,7 +575,7 @@ export async function updateQuotationStatus(quotationId: string, status: string)
 }
 
 // Get quotations by campaign ID
-export async function getQuotationsByCampaignId(campaignId: string): Promise<QuotationUpdate[]> {
+export async function getQuotationsByCampaignId(campaignId: string): Promise<Quotation[]> {
   try {
     if (!db) {
       throw new Error("Firestore not initialized")
@@ -599,10 +585,10 @@ export async function getQuotationsByCampaignId(campaignId: string): Promise<Quo
     const q = query(quotationsRef, where("campaignId", "==", campaignId))
 
     const querySnapshot = await getDocs(q)
-    const quotations: QuotationUpdate[] = []
+    const quotations: Quotation[] = []
 
     querySnapshot.forEach((doc) => {
-      quotations.push({ id: doc.id, ...doc.data() } as QuotationUpdate)
+      quotations.push({ id: doc.id, ...doc.data() } as Quotation)
     })
 
     return quotations
@@ -613,7 +599,7 @@ export async function getQuotationsByCampaignId(campaignId: string): Promise<Quo
 }
 
 // Get quotations by created_by ID
-export async function getQuotationsByCreatedBy(userId: string): Promise<QuotationUpdate[]> {
+export async function getQuotationsByCreatedBy(userId: string): Promise<Quotation[]> {
   try {
     if (!db) {
       throw new Error("Firestore not initialized")
@@ -623,10 +609,10 @@ export async function getQuotationsByCreatedBy(userId: string): Promise<Quotatio
     const q = query(quotationsRef, where("created_by", "==", userId), orderBy("created", "desc"))
 
     const querySnapshot = await getDocs(q)
-    const quotations: QuotationUpdate[] = []
+    const quotations: Quotation[] = []
 
     querySnapshot.forEach((doc) => {
-      quotations.push({ id: doc.id, ...doc.data() } as QuotationUpdate)
+      quotations.push({ id: doc.id, ...doc.data() } as Quotation)
     })
 
     return quotations

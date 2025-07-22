@@ -1,630 +1,1632 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
-import { useAuth } from "@/contexts/auth-context"
+import type React from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  startAfter,
-  getDocs,
-  type DocumentData,
-  type QueryDocumentSnapshot,
-} from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import { format } from "date-fns"
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, PlusCircle, CalendarIcon, Search, Filter, X } from "lucide-react"
-import type { DateRange } from "react-day-picker"
-import {
-  createQuotation,
-  generateQuotationNumber,
-  calculateItemTotal, // Use calculateItemTotal for each item
-  calculateQuotationTotal, // Use calculateQuotationTotal for overall sum
-  type QuotationItem,
-} from "@/lib/quotation-service"
+import Image from "next/image"
+import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { getProductsBySellerId, type Product } from "@/lib/firebase-service"
-import { Input } from "@/components/ui/input"
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuCheckboxItem,
-} from "@/components/ui/dropdown-menu"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+  MapPin,
+  LayoutGrid,
+  List,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  CheckCircle2,
+  ArrowLeft,
+  Filter,
+  AlertCircle,
+  Search,
+  CheckCircle,
+  PlusCircle,
+  Calculator,
+  FileText,
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import {
+  getPaginatedUserProducts,
+  getUserProductsCount,
+  softDeleteProduct,
+  type Product,
+  type Booking,
+} from "@/lib/firebase-service"
+import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
+import { collection, query, where, getDocs, Timestamp } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { SearchBox } from "@/components/search-box"
+import type { SearchResult } from "@/lib/algolia-service"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useResponsive } from "@/hooks/use-responsive"
+import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
 import { cn } from "@/lib/utils"
-import { Loader2 } from "lucide-react" // Import Loader2
+import { SalesChatWidget } from "@/components/sales-chat/sales-chat-widget"
+import { Input } from "@/components/ui/input"
+import { useDebounce } from "@/hooks/use-debounce"
+import { getPaginatedClients, type Client } from "@/lib/client-service"
+import { createProposal } from "@/lib/proposal-service"
+import type { ProposalClient } from "@/lib/types/proposal"
+import { ProposalHistory } from "@/components/proposal-history"
+import { ClientDialog } from "@/components/client-dialog"
+import { DateRangeCalendarDialog } from "@/components/date-range-calendar-dialog"
+import { createDirectCostEstimate } from "@/lib/cost-estimate-service" // Import for CE creation
+import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service" // Imports for Quotation creation
+import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
+import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
+import { RouteProtection } from "@/components/route-protection"
+// Removed: import { SelectQuotationDialog } from "@/components/select-quotation-dialog"
 
-export default function SalesDashboardPage() {
-  const { user } = useAuth()
+// Number of items to display per page
+const ITEMS_PER_PAGE = 12
+
+// Function to get site code from product
+const getSiteCode = (product: Product | null) => {
+  if (!product) return null
+
+  // Try different possible locations for site_code
+  if (product.site_code) return product.site_code
+  if (product.specs_rental && "site_code" in product.specs_rental) return product.specs_rental.site_code
+  if (product.light && "site_code" in product.light) return product.light.siteCode
+
+  // Check for camelCase variant
+  if ("siteCode" in product) return (product as any).siteCode
+
+  return null
+}
+
+function SalesDashboardContent() {
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null)
+  const [productsWithBookings, setProductsWithBookings] = useState<Record<string, boolean>>({})
+  const [loadingBookings, setLoadingBookings] = useState(false)
+  const { isMobile, isTablet } = useResponsive()
+
+  // Search state
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [searchQuery, setSearchQuery] = useState("")
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null)
+  const [pageCache, setPageCache] = useState<
+    Map<number, { items: Product[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null }>
+  >(new Map())
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadingCount, setLoadingCount] = useState(false)
+
+  const { user, userData } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
 
-  const [loading, setLoading] = useState(true)
-  const [products, setProducts] = useState<Product[]>([])
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedProductTypes, setSelectedProductTypes] = useState<string[]>([])
+  // Proposal Creation Flow State
+  const [selectedProducts, setSelectedProducts] = useState<Product[]>([])
+  const [proposalCreationMode, setProposalCreationMode] = useState(false)
+  const [selectedClientForProposal, setSelectedClientForProposal] = useState<ProposalClient | null>(null)
+  const [isCreatingProposal, setIsCreatingProposal] = useState(false)
+
+  // Client Search/Selection on Dashboard (now for both proposal and CE/Quote)
+  const [dashboardClientSearchTerm, setDashboardClientSearchTerm] = useState("")
+  const [dashboardClientSearchResults, setDashboardClientSearchResults] = useState<Client[]>([])
+  const [isSearchingDashboardClients, setIsSearchingDashboardClients] = useState(false)
+  const debouncedDashboardClientSearchTerm = useDebounce(dashboardClientSearchTerm, 500)
+
+  const clientSearchRef = useRef<HTMLDivElement>(null)
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false)
+  const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false)
+
+  // CE/Quote mode states
+  const [ceQuoteMode, setCeQuoteMode] = useState(false)
   const [selectedSites, setSelectedSites] = useState<Product[]>([])
-  const [dateRange, setDateRange] = useState<DateRange | undefined>()
-  const [isCreatingQuotation, setIsCreatingQuotation] = useState(false)
+  const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false)
+  const [actionAfterDateSelection, setActionAfterDateSelection] = useState<"cost_estimate" | "quotation" | null>(null)
+  const [isCreatingDocument, setIsCreatingDocument] = useState(false) // New loading state for document creation
+  const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
 
-  const [quotations, setQuotations] = useState<any[]>([])
-  const [currentPage, setCurrentPage] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
-  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null)
-  const [firstVisible, setFirstVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null)
-  const [pageHistory, setPageHistory] = useState<QueryDocumentSnapshot<DocumentData>[]>([])
+  // Removed: const [isSelectQuotationDialogOpen, setIsSelectQuotationDialogOpen] = useState(false)
 
-  const pageSize = 10
+  // On mobile, default to grid view
+  useEffect(() => {
+    if (isMobile) {
+      setViewMode("grid")
+    }
+  }, [isMobile])
 
-  const fetchProducts = async () => {
-    if (!user?.uid) return
-    setLoading(true)
+  // Fetch clients for dashboard client selection (for proposals and CE/Quote)
+  useEffect(() => {
+    const fetchClients = async () => {
+      if (user?.uid && (proposalCreationMode || ceQuoteMode)) {
+        // Ensure user is logged in
+        setIsSearchingDashboardClients(true)
+        try {
+          const result = await getPaginatedClients(10, null, debouncedDashboardClientSearchTerm.trim(), null, user.uid) // Pass user.uid as uploadedByFilter
+          setDashboardClientSearchResults(result.items)
+        } catch (error) {
+          console.error("Error fetching clients for dashboard:", error)
+          setDashboardClientSearchResults([])
+        } finally {
+          setIsSearchingDashboardClients(false)
+        }
+      } else {
+        setDashboardClientSearchResults([])
+      }
+    }
+    fetchClients()
+  }, [debouncedDashboardClientSearchTerm, proposalCreationMode, ceQuoteMode, user?.uid]) // Add user.uid to dependencies
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (clientSearchRef.current && !clientSearchRef.current.contains(event.target as Node)) {
+        setIsClientDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
+
+  // Check for ongoing bookings
+  const checkOngoingBookings = useCallback(
+    async (productIds: string[]) => {
+      if (!productIds.length) return
+
+      setLoadingBookings(true)
+      try {
+        const currentDate = new Date()
+        const bookingsRef = collection(db, "booking")
+
+        // Create a map to store booking status for each product
+        const bookingStatus: Record<string, boolean> = {}
+
+        // We need to check each product individually since Firestore doesn't support OR queries
+        for (const productId of productIds) {
+          // Only check rental products
+          const product = products.find((p) => p.id === productId)
+          if (product?.type?.toLowerCase() !== "rental") continue
+
+          const q = query(bookingsRef, where("product_id", "==", productId), where("status", "==", "CONFIRMED"))
+
+          const querySnapshot = await getDocs(q)
+
+          // Check if any booking is ongoing (current date is between start_date and end_date)
+          let hasOngoingBooking = false
+          querySnapshot.forEach((doc) => {
+            const booking = doc.data() as Booking
+            const startDate =
+              booking.start_date instanceof Timestamp ? booking.start_date.toDate() : new Date(booking.start_date)
+
+            const endDate =
+              booking.end_date instanceof Timestamp ? booking.end_date.toDate() : new Date(booking.end_date)
+
+            if (currentDate >= startDate && currentDate <= endDate) {
+              hasOngoingBooking = true
+            }
+          })
+
+          bookingStatus[productId] = hasOngoingBooking
+        }
+
+        setProductsWithBookings(bookingStatus)
+      } catch (error) {
+        console.error("Error checking ongoing bookings:", error)
+      } finally {
+        setLoadingBookings(false)
+      }
+    },
+    [products],
+  )
+
+  // Fetch total count of products
+  const fetchTotalCount = useCallback(async () => {
+    if (!userData?.company_id) return
+
+    setLoadingCount(true)
     try {
-      const fetchedProducts = await getProductsBySellerId(user.uid)
-      setProducts(fetchedProducts)
+      const count = await getUserProductsCount(userData?.company_id, { active: true })
+      setTotalItems(count)
+      setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
-      console.error("Error fetching products:", error)
+      console.error("Error fetching total count:", error)
       toast({
         title: "Error",
-        description: "Failed to load products.",
+        description: "Failed to load product count. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      setLoadingCount(false)
     }
-  }
+  }, [userData, toast])
 
-  const fetchQuotations = async (direction: "first" | "next" | "prev" = "first") => {
-    if (!user?.uid) {
-      setLoading(false)
-      return
-    }
+  // Fetch products for the current page
+  const fetchProducts = useCallback(
+    async (page: number) => {
+      if (!userData?.company_id) return
 
-    setLoading(true)
+      // Check if we have this page in cache
+      if (pageCache.has(page)) {
+        const cachedData = pageCache.get(page)!
+        setProducts(cachedData.items)
+        setLastDoc(cachedData.lastDoc)
 
-    try {
-      const quotationsRef = collection(db, "quotations")
-      let q
+        // Check for ongoing bookings for the cached products
+        const productIds = cachedData.items.map((product) => product.id)
+        checkOngoingBookings(productIds)
 
-      if (direction === "first") {
-        q = query(quotationsRef, where("created_by", "==", user.uid), orderBy("created", "desc"), limit(pageSize + 1))
-      } else if (direction === "next" && lastVisible) {
-        q = query(
-          quotationsRef,
-          where("created_by", "==", user.uid),
-          orderBy("created", "desc"),
-          startAfter(lastVisible),
-          limit(pageSize + 1),
-        )
-      } else if (direction === "prev" && pageHistory.length > 0) {
-        const prevDoc = pageHistory[pageHistory.length - 1]
-        q = query(
-          quotationsRef,
-          where("created_by", "==", user.uid),
-          orderBy("created", "desc"),
-          startAfter(prevDoc),
-          limit(pageSize + 1),
-        )
-      } else {
-        setLoading(false)
         return
       }
 
-      const querySnapshot = await getDocs(q)
-      const fetchedQuotations: any[] = []
+      const isFirstPage = page === 1
+      setLoading(isFirstPage)
+      setLoadingMore(!isFirstPage)
 
-      querySnapshot.forEach((doc) => {
-        fetchedQuotations.push({ id: doc.id, ...doc.data() })
-      })
+      try {
+        // For the first page, start from the beginning
+        // For subsequent pages, use the last document from the previous page
+        const startDoc = isFirstPage ? null : lastDoc
 
-      const newHasMore = fetchedQuotations.length > pageSize
+        const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, { active: true })
 
-      if (newHasMore) {
-        fetchedQuotations.pop()
+        setProducts(result.items)
+        setLastDoc(result.lastDoc)
+        setHasMore(result.hasMore)
+
+        // Check for ongoing bookings
+        const productIds = result.items.map((product) => product.id)
+        checkOngoingBookings(productIds)
+
+        // Cache this page
+        setPageCache((prev) => {
+          const newCache = new Map(prev)
+          newCache.set(page, {
+            items: result.items,
+            lastDoc: result.lastDoc,
+          })
+          return newCache
+        })
+
+        // Store product names in localStorage for breadcrumb navigation
+        const simplifiedProducts = result.items.map((product) => ({
+          id: product.id,
+          name: product.name,
+        }))
+        localStorage.setItem("salesProducts", JSON.stringify(simplifiedProducts))
+      } catch (error) {
+        console.error("Error fetching products:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load product count. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+        setLoadingMore(false)
       }
+    },
+    [userData, lastDoc, pageCache, toast, checkOngoingBookings],
+  )
 
-      const docs = querySnapshot.docs.slice(0, pageSize)
-      const newLastVisible = docs[docs.length - 1] || null
-      const newFirstVisible = docs[0] || null
-
-      setQuotations(fetchedQuotations)
-      setLastVisible(newLastVisible)
-      setFirstVisible(newFirstVisible)
-      setHasMore(newHasMore)
-
-      if (direction === "first") {
-        setCurrentPage(1)
-        setPageHistory([])
-      } else if (direction === "next") {
-        setCurrentPage((prev) => prev + 1)
-        if (firstVisible) {
-          setPageHistory((prev) => [...prev, firstVisible])
-        }
-      } else if (direction === "prev") {
-        setCurrentPage((prev) => prev - 1)
-        setPageHistory((prev) => prev.slice(0, -1))
-      }
-    } catch (error) {
-      console.error("Error fetching quotations:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  // Load initial data and count
   useEffect(() => {
-    if (user?.uid) {
-      fetchProducts()
-      fetchQuotations("first")
+    if (userData?.company_id) {
+      fetchProducts(1)
+      fetchTotalCount()
     }
-  }, [user?.uid])
+  }, [userData?.company_id, fetchProducts, fetchTotalCount])
 
-  const handleNextPage = () => {
-    if (hasMore && !loading) {
-      fetchQuotations("next")
+  // Load data when page changes
+  useEffect(() => {
+    if (userData?.company_id && currentPage > 0) {
+      fetchProducts(currentPage)
+    }
+  }, [currentPage, fetchProducts, userData?.company_id])
+
+  // Pagination handlers
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page)
+      // Scroll to top when changing pages
+      window.scrollTo({ top: 0, behavior: "smooth" })
     }
   }
 
-  const handlePrevPage = () => {
-    if (currentPage > 1 && !loading) {
-      fetchQuotations("prev")
+  const goToPreviousPage = () => goToPage(currentPage - 1)
+  const goToNextPage = () => goToPage(currentPage + 1)
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pageNumbers = []
+    const maxPagesToShow = 5
+
+    if (totalPages <= maxPagesToShow) {
+      // If we have 5 or fewer pages, show all of them
+      for (let i = 1; i <= totalPages; i++) {
+        pageNumbers.push(i)
+      }
+    } else {
+      // Always include first page
+      pageNumbers.push(1)
+
+      // Calculate start and end of page range around current page
+      let startPage = Math.max(2, currentPage - 1)
+      let endPage = Math.min(totalPages - 1, currentPage + 1)
+
+      // Adjust if we're near the beginning
+      if (currentPage <= 3) {
+        endPage = Math.min(totalPages - 1, 4)
+      }
+
+      // Adjust if we're near the end
+      if (currentPage >= totalPages - 2) {
+        startPage = Math.max(2, totalPages - 3)
+      }
+
+      // Add ellipsis if needed before the range
+      if (startPage > 2) {
+        pageNumbers.push("...")
+      }
+
+      // Add the range of pages
+      for (let i = startPage; i <= endPage; i++) {
+        pageNumbers.push(i)
+      }
+
+      // Add ellipsis if needed after the range
+      if (endPage < totalPages - 1) {
+        pageNumbers.push("...")
+      }
+
+      // Always include last page
+      pageNumbers.push(totalPages)
     }
+
+    return pageNumbers
+  }
+
+  // Handle product deletion
+  const handleDeleteClick = (product: Product, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setProductToDelete(product)
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete) return
+
+    try {
+      await softDeleteProduct(productToDelete.id)
+
+      // Update the UI by removing the deleted product
+      setProducts((prevProducts) => prevProducts.filter((p) => p.id !== productToDelete.id))
+
+      // Update total count
+      setTotalItems((prev) => prev - 1)
+
+      // Recalculate total pages
+      setTotalPages(Math.max(1, Math.ceil((totalItems - 1) / ITEMS_PER_PAGE)))
+
+      // Clear cache to force refresh
+      setPageCache(new Map())
+
+      toast({
+        title: "Product deleted",
+        description: `${productToDelete.name} has been successfully deleted.`,
+      })
+    } catch (error) {
+      console.error("Error deleting product:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete the product. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Handle edit click
+  const handleEditClick = (product: Product, e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push(`/sales/products/edit/${product.id}`)
+  }
+
+  // Handle view details click
+  const handleViewDetails = (productId: string) => {
+    router.push(`/sales/products/${productId}`)
+  }
+
+  // Handle search result click
+  const handleSearchResultClick = (result: SearchResult) => {
+    if (result.type === "product") {
+      router.push(`/sales/products/${result.objectID}`)
+    } else if (result.type === "client") {
+      router.push(`/sales/clients/${result.objectID}`)
+    }
+  }
+
+  // Handle search results
+  const handleSearchResults = (results: SearchResult[], query: string) => {
+    setSearchResults(results)
+    setSearchQuery(query)
+    setIsSearching(!!query)
+  }
+
+  // Handle search error
+  const handleSearchError = (error: string | null) => {
+    setSearchError(error)
+  }
+
+  // Handle search loading
+  const handleSearchLoading = (isLoading: boolean) => {
+    // We don't need to do anything with this for now
+  }
+
+  // Handle search clear
+  const handleSearchClear = () => {
+    setSearchResults([])
+    setSearchQuery("")
+    setIsSearching(false)
+    setSearchError(null)
+  }
+
+  // Clear search and return to normal view
+  const handleClearSearch = () => {
+    handleSearchClear()
+  }
+
+  // Handle proposal creation flow
+  const handleInitiateProposalFlow = () => {
+    setProposalCreationMode(true) // Activate the combined client & product selection mode
+    setCeQuoteMode(false) // Ensure CE/Quote mode is off
+    setSelectedClientForProposal(null) // Reset selected client
+    setDashboardClientSearchTerm("") // Clear client search term
+    setSelectedProducts([]) // Clear any previously selected products
+    setSelectedSites([]) // Clear any previously selected sites
+  }
+
+  const handleClientSelectOnDashboard = (client: Client) => {
+    setSelectedClientForProposal({
+      id: client.id,
+      company: client.company || "",
+      contactPerson: client.name || "",
+      email: client.email || "",
+      phone: client.phone || "",
+      address: client.address || "",
+      industry: client.industry || "",
+      designation: client.designation || "", // Add designation field
+      targetAudience: "", // These might need to be fetched or added later
+      campaignObjective: "", // These might need to be fetched or added later
+    })
+    setDashboardClientSearchTerm(client.company || client.name || "") // Display selected client in search bar
+    toast({
+      title: "Client Selected",
+      description: `Selected ${client.name} (${client.company}). Now select products.`,
+      variant: "success",
+    })
+    setIsClientDropdownOpen(false) // Close dropdown after selection
+  }
+
+  const handleCancelProposalCreationMode = () => {
+    setProposalCreationMode(false)
+    setSelectedClientForProposal(null)
+    setDashboardClientSearchTerm("")
+    setDashboardClientSearchResults([])
+    setSelectedProducts([])
   }
 
   const handleProductSelect = (product: Product) => {
-    setSelectedSites((prev) =>
-      prev.some((site) => site.id === product.id) ? prev.filter((site) => site.id !== product.id) : [...prev, product],
-    )
+    setSelectedProducts((prev) => {
+      const isSelected = prev.some((p) => p.id === product.id)
+      if (isSelected) {
+        return prev.filter((p) => p.id !== product.id)
+      } else {
+        return [...prev, product]
+      }
+    })
   }
 
-  const handleRemoveSelectedSite = (productId: string) => {
-    setSelectedSites((prev) => prev.filter((site) => site.id !== productId))
-  }
-
-  const handleDatesSelected = async () => {
-    if (!dateRange?.from || !dateRange?.to || selectedSites.length === 0) {
+  const handleConfirmProposalCreation = async () => {
+    if (!selectedClientForProposal) {
       toast({
-        title: "Missing Information",
-        description: "Please select a date range and at least one product.",
+        title: "No Client Selected",
+        description: "Please select a client first.",
+        variant: "destructive",
+      })
+      return
+    }
+    if (selectedProducts.length === 0) {
+      toast({
+        title: "No products selected",
+        description: "Please select at least one product for the proposal.",
         variant: "destructive",
       })
       return
     }
 
-    setIsCreatingQuotation(true)
-    try {
-      const quotationNumber = generateQuotationNumber()
-      const validUntil = new Date()
-      validUntil.setDate(validUntil.getDate() + 30) // Valid for 30 days
-
-      const quotationItems: QuotationItem[] = selectedSites.map((site) => {
-        const { durationDays, itemTotalAmount } = calculateItemTotal(
-          dateRange.from!.toISOString(),
-          dateRange.to!.toISOString(),
-          site.price_per_day, // This is now treated as monthly price
-        )
-
-        return {
-          product_id: site.id!,
-          product_name: site.name,
-          product_location: site.specs_rental?.location || site.light?.location || "N/A",
-          site_code: site.site_code,
-          price: site.price_per_day, // Store the monthly price
-          duration_days: durationDays,
-          item_total_amount: itemTotalAmount,
-          type: site.type,
-          media_url: site.media?.[0]?.url,
-          start_date: dateRange.from!.toISOString(),
-          end_date: dateRange.to!.toISOString(),
-        }
-      })
-
-      const overallTotalAmount = calculateQuotationTotal(quotationItems)
-      const overallDurationDays = quotationItems.length > 0 ? quotationItems[0].duration_days : 0 // Assuming consistent duration
-
-      const quotationData = {
-        quotation_number: quotationNumber,
-        items: quotationItems,
-        total_amount: overallTotalAmount,
-        duration_days: overallDurationDays,
-        status: "draft",
-        created_by: user?.uid,
-        created_by_first_name: user?.first_name,
-        created_by_last_name: user?.last_name,
-        client_name: "N/A", // Placeholder, will be updated later
-        client_email: "N/A", // Placeholder, will be updated later
-        valid_until: validUntil,
-        seller_id: user?.uid,
-      }
-
-      const newQuotationId = await createQuotation(quotationData)
+    if (!user?.uid || !userData?.company_id) {
       toast({
-        title: "Success",
-        description: `Quotation ${quotationNumber} created successfully!`,
+        title: "Authentication Required",
+        description: "Please log in to create a proposal.",
+        variant: "destructive",
       })
-      router.push(`/sales/quotations/${newQuotationId}`)
+      return
+    }
+
+    setIsCreatingProposal(true) // Set loading state for proposal creation
+    try {
+      // Generate a simple title for the proposal
+      const proposalTitle = `Proposal for ${selectedClientForProposal.company} - ${new Date().toLocaleDateString()}`
+
+      const proposalId = await createProposal(proposalTitle, selectedClientForProposal, selectedProducts, user.uid, {
+        // You can add notes or custom messages here if needed
+        // notes: "Generated from dashboard selection",
+        companyId: userData.company_id, // Add company_id to the proposal creation
+      })
+
+      toast({
+        title: "Proposal Created",
+        description: "Your proposal has been created successfully.",
+      })
+
+      // Redirect to the new proposal's detail page
+      router.push(`/sales/proposals/${proposalId}`)
+
+      // Reset the proposal creation mode and selected items
+      setProposalCreationMode(false)
+      setSelectedProducts([])
+      setSelectedClientForProposal(null)
     } catch (error) {
-      console.error("Error creating quotation:", error)
+      console.error("Error creating proposal:", error)
       toast({
         title: "Error",
-        description: "Failed to create quotation.",
+        description: "Failed to create proposal. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setIsCreatingQuotation(false)
+      setIsCreatingProposal(false) // Reset loading state
     }
   }
 
-  const allProductTypes = useMemo(() => {
-    const types = new Set<string>()
-    products.forEach((product) => {
-      if (product.type) {
-        types.add(product.type)
+  // Handle CE/Quote mode
+  const handleCeQuoteMode = () => {
+    setCeQuoteMode(true)
+    setProposalCreationMode(false) // Ensure proposal mode is off
+    setSelectedSites([])
+    setSelectedClientForProposal(null) // Reset selected client
+    setDashboardClientSearchTerm("") // Clear client search term
+    setSelectedProducts([]) // Clear any previously selected products
+  }
+
+  const handleSiteSelect = (product: Product) => {
+    setSelectedSites((prev) => {
+      const isSelected = prev.some((p) => p.id === product.id)
+      if (isSelected) {
+        return prev.filter((p) => p.id !== product.id)
+      } else {
+        return [...prev, product]
       }
     })
-    return Array.from(types)
-  }, [products])
+  }
 
-  const filteredProducts = useMemo(() => {
-    let filtered = products
+  // New functions to open the date range dialog
+  const openCreateCostEstimateDateDialog = () => {
+    if (selectedSites.length === 0) {
+      toast({
+        title: "No sites selected",
+        description: "Please select at least one site for the cost estimate.",
+        variant: "destructive",
+      })
+      return
+    }
+    if (!selectedClientForProposal) {
+      toast({
+        title: "No Client Selected",
+        description: "Please select a client first.",
+        variant: "destructive",
+      })
+      return
+    }
+    setActionAfterDateSelection("cost_estimate")
+    setIsDateRangeDialogOpen(true)
+  }
 
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (product) =>
-          product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          product.site_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          product.specs_rental?.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          product.light?.location?.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
+  const openCreateQuotationDateDialog = () => {
+    if (selectedSites.length === 0) {
+      toast({
+        title: "No sites selected",
+        description: "Please select at least one site for the quotation.",
+        variant: "destructive",
+      })
+      return
+    }
+    if (!selectedClientForProposal) {
+      toast({
+        title: "No Client Selected",
+        description: "Please select a client first.",
+        variant: "destructive",
+      })
+      return
+    }
+    setActionAfterDateSelection("quotation")
+    setIsDateRangeDialogOpen(true)
+  }
+
+  // Callback from DateRangeCalendarDialog - NOW CREATES THE DOCUMENT
+  const handleDatesSelected = async (startDate: Date, endDate: Date) => {
+    if (!user?.uid || !selectedClientForProposal || selectedSites.length === 0) {
+      toast({
+        title: "Missing Information",
+        description: "Client, sites, or user information is missing. Cannot create document.",
+        variant: "destructive",
+      })
+      return
     }
 
-    if (selectedProductTypes.length > 0) {
-      filtered = filtered.filter((product) => product.type && selectedProductTypes.includes(product.type))
-    }
+    setIsCreatingDocument(true)
+    setIsDateRangeDialogOpen(false) // Close dialog immediately
 
-    return filtered
-  }, [products, searchTerm, selectedProductTypes])
-
-  const formatDate = (date: any) => {
-    if (!date) return "N/A"
     try {
-      if (date && typeof date.toDate === "function") {
-        return format(date.toDate(), "MMM d, yyyy")
+      if (actionAfterDateSelection === "cost_estimate") {
+        const clientData = {
+          id: selectedClientForProposal.id,
+          name: selectedClientForProposal.contactPerson,
+          email: selectedClientForProposal.email,
+          company: selectedClientForProposal.company,
+          phone: selectedClientForProposal.phone,
+          address: selectedClientForProposal.address,
+        }
+
+        const sitesData = selectedSites.map((site) => ({
+          id: site.id,
+          name: site.name,
+          location: site.specs_rental?.location || site.light?.location || "N/A",
+          price: site.price || 0,
+          type: site.type || "Unknown",
+        }))
+
+        const newCostEstimateId = await createDirectCostEstimate(clientData, sitesData, user.uid, {
+          startDate,
+          endDate,
+        })
+
+        toast({
+          title: "Cost Estimate Created",
+          description: "Your cost estimate has been created successfully.",
+        })
+        router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
+      } else if (actionAfterDateSelection === "quotation") {
+        // For simplicity, let's assume the quotation is for the first selected site
+        const firstSite = selectedSites[0]
+        if (!firstSite) {
+          throw new Error("No site selected for quotation.")
+        }
+
+        const { durationDays, totalAmount } = calculateQuotationTotal(
+          startDate.toISOString(),
+          endDate.toISOString(),
+          firstSite.price || 0,
+        )
+
+        // Log userData to debug
+        console.log("User Data from AuthContext:", userData)
+        console.log("First Name from userData:", userData?.first_name)
+        console.log("Last Name from userData:", userData?.last_name)
+
+        const quotationData = {
+          quotation_number: generateQuotationNumber(),
+          product_id: firstSite.id,
+          product_name: firstSite.name,
+          product_location: firstSite.specs_rental?.location || firstSite.light?.location || "N/A",
+          site_code: getSiteCode(firstSite) || "N/A",
+          start_date: startDate.toISOString(),
+          end_date: endDate.toISOString(),
+          price: firstSite.price || 0,
+          total_amount: totalAmount,
+          duration_days: durationDays,
+          status: "draft" as const, // Default status
+          created_by: user.uid,
+          created_by_first_name: userData?.first_name || "", // Add first name
+          created_by_last_name: userData?.last_name || "", // Add last name
+          client_name: selectedClientForProposal.contactPerson,
+          client_email: selectedClientForProposal.email,
+          client_id: selectedClientForProposal.id, // ADDED THIS LINE
+          // campaignId and proposalId can be added if applicable, but not directly from this flow
+        }
+
+        // Log the final quotationData object before sending
+        console.log("Final quotationData object being sent:", quotationData)
+
+        const newQuotationId = await createQuotation(quotationData)
+
+        toast({
+          title: "Quotation Created",
+          description: "Your quotation has been created successfully.",
+        })
+        router.push(`/sales/quotations/${newQuotationId}`) // Navigate to the new internal quotation view page
       }
-      if (typeof date === "string") {
-        return format(new Date(date), "MMM d, yyyy")
-      }
-      return "Invalid date"
     } catch (error) {
-      return "Invalid date"
+      console.error("Error creating document:", error)
+      toast({
+        title: "Error",
+        description: `Failed to create document: ${error.message || "Unknown error"}`,
+        variant: "destructive",
+      })
+    } finally {
+      setIsCreatingDocument(false)
+      setCeQuoteMode(false)
+      setSelectedSites([])
+      setSelectedClientForProposal(null)
+      setActionAfterDateSelection(null)
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "accepted":
-        return "bg-green-100 text-green-800 border-green-200"
-      case "sent":
-        return "bg-blue-100 text-blue-800 border-blue-200"
-      case "draft":
-        return "bg-gray-100 text-gray-800 border-gray-200"
-      case "rejected":
-        return "bg-red-100 text-red-800 border-red-200"
-      case "expired":
-        return "bg-orange-100 text-orange-800 border-orange-200"
-      case "viewed":
-        return "bg-purple-100 text-purple-800 border-purple-200"
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
+  const handleCancelCeQuote = () => {
+    setCeQuoteMode(false)
+    setSelectedSites([])
+    setSelectedClientForProposal(null)
+    setDashboardClientSearchTerm("")
+  }
+
+  return (
+    <div className="flex-1 p-4 md:p-6">
+      {loading ? (
+        // Skeleton Loading State
+        <div className="flex flex-col gap-5">
+          {/* Header Skeleton */}
+          <div className="flex justify-between items-center">
+            <div>
+              <Skeleton className="h-8 w-64 mb-2" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+          </div>
+
+          {/* Search and Actions Bar Skeleton */}
+          <div className="flex flex-col sm:flex-row gap-4 justify-between">
+            <Skeleton className="h-10 w-full sm:w-96" />
+            <div className="flex gap-3">
+              <Skeleton className="h-10 w-20" />
+              <Skeleton className="h-10 w-20" />
+              <Skeleton className="h-10 w-20" />
+            </div>
+          </div>
+
+          {/* Filters Skeleton (if applicable, otherwise can be removed) */}
+          <div className="flex gap-3">
+            <Skeleton className="h-9 w-24" />
+            <Skeleton className="h-9 w-24" />
+            <Skeleton className="h-9 w-32" />
+          </div>
+
+          {/* Grid View Skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
+            {Array(8)
+              .fill(0)
+              .map((_, i) => (
+                <div key={i} className="border rounded-lg overflow-hidden">
+                  <Skeleton className="h-48 w-full" />
+                  <div className="p-4">
+                    <Skeleton className="h-4 w-1/3 mb-2" />
+                    <Skeleton className="h-4 w-2/3 mb-4" />
+                    <Skeleton className="h-4 w-1/2 mb-2" />
+                    <Skeleton className="h-4 w-1/4" />
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      ) : (
+        // Actual Dashboard Content
+        <div
+          className={cn(
+            "grid grid-cols-1 gap-6",
+            // Only apply two-column layout when proposalCreationMode is true
+            proposalCreationMode && "lg:grid-cols-[1fr_300px]",
+          )}
+        >
+          {/* Left Column: Main Dashboard Content */}
+          <div className="flex flex-col gap-4 md:gap-6">
+            {/* Header with title, actions, and search box */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex flex-col gap-2">
+                <h1 className="text-xl md:text-2xl font-bold">
+                  {userData?.first_name
+                    ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                    : "Dashboard"}
+                </h1>
+                {/* Conditionally hide the SearchBox when in proposalCreationMode or ceQuoteMode */}
+                {!(proposalCreationMode || ceQuoteMode) && (
+                  <div className="w-full sm:w-64 md:w-80">
+                    <SearchBox
+                      onSearchResults={handleSearchResults}
+                      onSearchError={handleSearchError}
+                      onSearchLoading={handleSearchLoading}
+                      onSearchClear={handleSearchClear}
+                      userId={user?.uid}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+                {/* Proposal Creation Mode Controls (on dashboard) */}
+                {proposalCreationMode && (
+                  <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <span className="text-sm text-blue-700">
+                      {selectedClientForProposal ? (
+                        <>
+                          Client: <span className="font-semibold">{selectedClientForProposal.company}</span>
+                        </>
+                      ) : (
+                        "Select a client"
+                      )}
+                      {selectedProducts.length > 0 && `, ${selectedProducts.length} products selected`}
+                    </span>
+                    <Button size="sm" variant="outline" onClick={handleCancelProposalCreationMode}>
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+
+                {/* CE/Quote Mode Controls (on dashboard) */}
+                {ceQuoteMode && (
+                  <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <span className="text-sm text-blue-700">
+                      {selectedClientForProposal ? (
+                        <>
+                          Client: <span className="font-semibold">{selectedClientForProposal.company}</span>
+                        </>
+                      ) : (
+                        "Select a client"
+                      )}
+                      {selectedSites.length > 0 && `, ${selectedSites.length} sites selected`}
+                    </span>
+                    <Button size="sm" variant="outline" onClick={handleCancelCeQuote}>
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+
+                {/* Action Buttons (only visible when not in any selection mode) */}
+                {!(proposalCreationMode || ceQuoteMode) && !isSearching && (
+                  <div className="flex gap-2">
+                    <Button onClick={handleInitiateProposalFlow} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
+                      Planning & Proposals
+                    </Button>
+                    <Button onClick={handleCeQuoteMode} className="bg-[#ff3333] text-white hover:bg-[#cc2929]">
+                      CE/Quote
+                    </Button>
+                    <Button
+                      className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
+                      onClick={() => setIsCollabPartnerDialogOpen(true)}
+                    >
+                      Collab
+                    </Button>
+                    <Button
+                      onClick={() => router.push("/sales/job-orders/select-quotation")} // Changed to navigate to new page
+                      className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
+                    >
+                      Job Order
+                    </Button>
+                  </div>
+                )}
+
+                {!isMobile && (
+                  <div className="border rounded-md p-1 flex">
+                    <Button
+                      variant={viewMode === "grid" ? "default" : "ghost"}
+                      size="icon"
+                      className={cn("h-8 w-8", viewMode === "grid" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
+                      onClick={() => setViewMode("grid")}
+                    >
+                      <LayoutGrid size={18} />
+                    </Button>
+                    <Button
+                      variant={viewMode === "list" ? "default" : "ghost"}
+                      size="icon"
+                      className={cn("h-8 w-8", viewMode === "list" && "bg-gray-200 text-gray-800 hover:bg-gray-300")}
+                      onClick={() => setViewMode("list")}
+                    >
+                      <List size={18} />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Client Selection UI on Dashboard - Visible when proposalCreationMode OR ceQuoteMode is active */}
+            {(proposalCreationMode || ceQuoteMode) && (
+              <div className="relative w-full max-w-xs" ref={clientSearchRef}>
+                <div className="relative">
+                  <Input
+                    placeholder="Search or select client..."
+                    value={
+                      selectedClientForProposal
+                        ? selectedClientForProposal.company || selectedClientForProposal.contactPerson
+                        : dashboardClientSearchTerm
+                    }
+                    onChange={(e) => {
+                      setDashboardClientSearchTerm(e.target.value)
+                      setSelectedClientForProposal(null)
+                    }}
+                    onFocus={() => {
+                      setIsClientDropdownOpen(true)
+                      if (selectedClientForProposal) {
+                        setDashboardClientSearchTerm("")
+                      }
+                    }}
+                    className={cn(
+                      "pr-10 h-9 text-sm",
+                      (proposalCreationMode || ceQuoteMode) && "border-blue-500 ring-2 ring-blue-200",
+                    )}
+                  />
+                  {isSearchingDashboardClients && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-500" />
+                  )}
+                </div>
+                {/* Results dropdown */}
+                {isClientDropdownOpen && (
+                  <Card className="absolute top-full z-50 mt-1 w-full max-h-[200px] overflow-auto shadow-lg">
+                    <div className="p-2">
+                      {/* Always show "Add New Client" option at the top */}
+                      <div
+                        className="flex items-center gap-2 py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm mb-2 border-b pb-2"
+                        onClick={() => setIsNewClientDialogOpen(true)}
+                      >
+                        <PlusCircle className="h-4 w-4 text-blue-500" />
+                        <span className="font-medium text-blue-700">Add New Client</span>
+                      </div>
+
+                      {dashboardClientSearchResults.length > 0 ? (
+                        dashboardClientSearchResults.map((result) => (
+                          <div
+                            key={result.id}
+                            className="flex items-center justify-between py-1.5 px-2 hover:bg-gray-100 cursor-pointer rounded-md text-sm"
+                            onClick={() => handleClientSelectOnDashboard(result)}
+                          >
+                            <div>
+                              <p className="font-medium">
+                                {result.name} ({result.company})
+                              </p>
+                              <p className="text-xs text-gray-500">{result.email}</p>
+                            </div>
+                            {selectedClientForProposal?.id === result.id && (
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-gray-500 text-center py-2">
+                          {dashboardClientSearchTerm.trim() && !isSearchingDashboardClients
+                            ? `No clients found for "${dashboardClientSearchTerm}".`
+                            : "Start typing to search for clients."}
+                        </p>
+                      )}
+                    </div>
+                  </Card>
+                )}
+              </div>
+            )}
+
+            {/* Search Results View */}
+            {isSearching && (
+              <div className="flex flex-col gap-4">
+                {/* Search Header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={handleClearSearch} className="h-8 w-8 p-0">
+                      <ArrowLeft size={16} />
+                    </Button>
+                    <h2 className="text-base md:text-lg font-medium truncate">
+                      Results for "{searchQuery}" ({searchResults.length})
+                    </h2>
+                  </div>
+                  <Button variant="outline" size="sm" className="gap-1 hidden sm:flex bg-transparent">
+                    <Filter size={14} />
+                    <span>Filter</span>
+                  </Button>
+                </div>
+
+                {/* Search Error */}
+                {searchError && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{searchError}</AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Search Results */}
+                {searchResults.length > 0 ? (
+                  <div>
+                    {viewMode === "grid" ? (
+                      // Grid View for Search Results
+                      <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
+                        {searchResults.map((result) => (
+                          <Card
+                            key={result.objectID}
+                            className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
+                            onClick={() => handleSearchResultClick(result)}
+                          >
+                            <div className="h-48 bg-gray-200 relative">
+                              <Image
+                                src={result.image_url || "/abstract-geometric-sculpture.png"}
+                                alt={result.name || "Search result"}
+                                fill
+                                className="object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement
+                                  target.src = "/abstract-geometric-sculpture.png"
+                                  target.className = "opacity-50 object-contain"
+                                }}
+                              />
+                            </div>
+
+                            <CardContent className="p-4">
+                              <div className="flex flex-col">
+                                {result.site_code && (
+                                  <span className="text-xs text-gray-700 mb-1">Site Code: {result.site_code}</span>
+                                )}
+
+                                <h3 className="font-semibold line-clamp-1">{result.name}</h3>
+
+                                {result.price && (
+                                  <div className="mt-2 text-sm font-medium text-green-700">
+                                    ₱{Number(result.price).toLocaleString()}
+                                  </div>
+                                )}
+
+                                {result.location && (
+                                  <div className="mt-1 text-xs text-gray-500 flex items-center">
+                                    <MapPin size={12} className="mr-1 flex-shrink-0" />
+                                    <span className="truncate">{result.location}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </ResponsiveCardGrid>
+                    ) : (
+                      // List View for Search Results - Only show on tablet and desktop
+                      !isMobile && (
+                        <div className="border rounded-lg overflow-hidden">
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-[80px]">Image</TableHead>
+                                  <TableHead>Name</TableHead>
+                                  <TableHead>Type</TableHead>
+                                  <TableHead className="hidden md:table-cell">Location</TableHead>
+                                  <TableHead>Price</TableHead>
+                                  <TableHead className="hidden md:table-cell">Site Code</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {searchResults.map((result) => (
+                                  <TableRow
+                                    key={result.objectID}
+                                    className="cursor-pointer hover:bg-gray-50"
+                                    onClick={() => handleSearchResultClick(result)}
+                                  >
+                                    <TableCell>
+                                      <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
+                                        {result.image_url ? (
+                                          <Image
+                                            src={result.image_url || "/placeholder.svg"}
+                                            alt={result.name || "Search result"}
+                                            width={48}
+                                            height={48}
+                                            className="h-full w-full object-cover"
+                                            onError={(e) => {
+                                              const target = e.target as HTMLImageElement
+                                              target.src = "/abstract-geometric-sculpture.png"
+                                              target.className = "opacity-50"
+                                            }}
+                                          />
+                                        ) : (
+                                          <div className="h-full w-full flex items-center justify-center bg-gray-100">
+                                            <MapPin size={16} className="text-gray-400" />
+                                          </div>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="font-medium">{result.name}</TableCell>
+                                    <TableCell>
+                                      <Badge
+                                        variant="outline"
+                                        className={
+                                          result.type?.toLowerCase() === "product" ||
+                                          result.type?.toLowerCase() === "rental"
+                                            ? "bg-blue-50 text-blue-700 border-blue-200"
+                                            : result.type?.toLowerCase() === "client"
+                                              ? "bg-green-50 text-green-700 border-green-200"
+                                              : "bg-purple-50 text-purple-700 border-purple-200"
+                                        }
+                                      >
+                                        {result.type || "Unknown"}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="hidden md:table-cell">
+                                      {result.location || "Unknown location"}
+                                    </TableCell>
+                                    <TableCell>
+                                      {result.price ? `₱${Number(result.price).toLocaleString()}` : "Not set"}
+                                    </TableCell>
+                                    <TableCell className="hidden md:table-cell">{result.site_code || "—"}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : (
+                  // No Search Results
+                  <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg border border-dashed">
+                    <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                      <Search size={24} className="text-gray-400" />
+                    </div>
+                    <h3 className="text-base md:text-lg font-medium mb-2">No results found</h3>
+                    <p className="text-sm text-gray-500 mb-4 px-4">
+                      No items match your search for "{searchQuery}". Try using different keywords.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Regular Dashboard Content - Only show when not searching */}
+            {!isSearching && (
+              <>
+                {/* Empty state */}
+                {!loading && products.length === 0 && (
+                  <div className="text-center py-8 md:py-12 bg-gray-50 rounded-lg border border-dashed">
+                    <div className="mx-auto w-12 h-12 md:w-16 md:h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                      <MapPin size={24} className="text-gray-400" />
+                    </div>
+                    <h3 className="text-base md:text-lg font-medium mb-2">No products yet</h3>
+                    <p className="text-sm text-gray-500 mb-4">Contact an administrator to add products</p>
+                  </div>
+                )}
+
+                {/* Grid View */}
+                {!loading && products.length > 0 && viewMode === "grid" && (
+                  <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
+                    {products.map((product) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        hasOngoingBooking={productsWithBookings[product.id] || false}
+                        onView={() => handleViewDetails(product.id)}
+                        onEdit={(e) => handleEditClick(product, e)}
+                        onDelete={(e) => handleDeleteClick(product, e)}
+                        isSelected={
+                          proposalCreationMode
+                            ? selectedProducts.some((p) => p.id === product.id)
+                            : selectedSites.some((p) => p.id === product.id)
+                        }
+                        onSelect={() =>
+                          proposalCreationMode ? handleProductSelect(product) : handleSiteSelect(product)
+                        }
+                        selectionMode={proposalCreationMode || ceQuoteMode}
+                      />
+                    ))}
+                  </ResponsiveCardGrid>
+                )}
+
+                {/* List View - Only show on tablet and desktop */}
+                {!loading && products.length > 0 && viewMode === "list" && !isMobile && (
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[80px]">Image</TableHead>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead className="hidden md:table-cell">Location</TableHead>
+                            <TableHead>Price</TableHead>
+                            <TableHead className="hidden md:table-cell">Site Code</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {products.map((product) => (
+                            <TableRow
+                              key={product.id}
+                              className={`cursor-pointer hover:bg-gray-50 ${proposalCreationMode || ceQuoteMode ? "opacity-50" : ""}`}
+                              onClick={() => {
+                                if (proposalCreationMode) {
+                                  handleProductSelect(product)
+                                } else if (ceQuoteMode) {
+                                  handleSiteSelect(product)
+                                } else {
+                                  handleViewDetails(product.id)
+                                }
+                              }}
+                            >
+                              <TableCell>
+                                <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
+                                  {product.media && product.media.length > 0 ? (
+                                    <>
+                                      <Image
+                                        src={product.media[0].url || "/placeholder.svg"}
+                                        alt={product.name || "Product image"}
+                                        width={48}
+                                        height={48}
+                                        className={`h-full w-full object-cover ${productsWithBookings[product.id] ? "grayscale" : ""}`}
+                                        onError={(e) => {
+                                          const target = e.target as HTMLImageElement
+                                          target.src = "/abstract-geometric-sculpture.png"
+                                          target.className = "opacity-50"
+                                        }}
+                                      />
+                                    </>
+                                  ) : (
+                                    <div className="h-full w-full flex items-center justify-center bg-gray-100">
+                                      <MapPin size={16} className="text-gray-400" />
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-medium">{product.name}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    product.type?.toLowerCase() === "rental"
+                                      ? "bg-blue-50 text-blue-700 border-blue-200"
+                                      : "bg-purple-50 text-purple-700 border-purple-200"
+                                  }
+                                >
+                                  {product.type || "Unknown"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                {product.specs_rental?.location || product.light?.location || "Unknown location"}
+                              </TableCell>
+                              <TableCell>
+                                {product.price ? `₱${Number(product.price).toLocaleString()}` : "Not set"}
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">{getSiteCode(product) || "—"}</TableCell>
+                              <TableCell>
+                                {product.type?.toLowerCase() === "rental" &&
+                                  (productsWithBookings[product.id] ? (
+                                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                                      <Calendar className="mr-1 h-3 w-3" /> Booked
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                      <CheckCircle2 className="mr-1 h-3 w-3" /> Available
+                                    </Badge>
+                                  ))}
+                              </TableCell>
+                              <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                                {/* Edit and delete buttons removed */}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Loading More Indicator */}
+                {loadingMore && (
+                  <div className="flex justify-center my-4">
+                    <div className="flex items-center gap-2">
+                      <Loader2 size={18} className="animate-spin" />
+                      <span>Loading more...</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Pagination Controls */}
+                {!loading && products.length > 0 && (
+                  <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
+                    <div className="text-sm text-gray-500 flex items-center">
+                      {loadingCount ? (
+                        <div className="flex items-center">
+                          <Loader2 size={14} className="animate-spin mr-2" />
+                          <span>Calculating pages...</span>
+                        </div>
+                      ) : (
+                        <span>
+                          Page {currentPage} of {totalPages} ({products.length} items)
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToPreviousPage}
+                        disabled={currentPage === 1}
+                        className="h-8 w-8 p-0 bg-transparent"
+                      >
+                        <ChevronLeft size={16} />
+                      </Button>
+
+                      {/* Page numbers - Hide on mobile */}
+                      <div className="hidden sm:flex items-center gap-1">
+                        {getPageNumbers().map((page, index) =>
+                          page === "..." ? (
+                            <span key={`ellipsis-${index}`} className="px-2">
+                              ...
+                            </span>
+                          ) : (
+                            <Button
+                              key={`page-${page}`}
+                              variant={currentPage === page ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => goToPage(page as number)}
+                              className="h-8 w-8 p-0"
+                            >
+                              {page}
+                            </Button>
+                          ),
+                        )}
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={goToNextPage}
+                        disabled={currentPage >= totalPages}
+                        className="h-8 w-8 p-0"
+                      >
+                        <ChevronRight size={16} />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Right Column: Proposal History - Conditionally rendered */}
+          {proposalCreationMode && (
+            <div className="hidden lg:block">
+              <ProposalHistory />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Floating Action Buttons for CE/Quote and Proposal */}
+      {(ceQuoteMode || proposalCreationMode) && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 flex gap-4 p-4 bg-white border rounded-lg shadow-lg z-50">
+          {proposalCreationMode && (
+            <Button
+              onClick={handleConfirmProposalCreation}
+              className="gap-2 bg-green-600 text-white hover:bg-green-700"
+              disabled={!selectedClientForProposal || selectedProducts.length === 0 || isCreatingProposal}
+            >
+              {isCreatingProposal ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4" />
+                  Create Proposal
+                </>
+              )}
+            </Button>
+          )}
+
+          {ceQuoteMode && (
+            <>
+              <Button
+                onClick={openCreateCostEstimateDateDialog}
+                className="gap-2 bg-gray-200 text-gray-800 hover:bg-gray-300"
+                disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+              >
+                {isCreatingDocument && actionAfterDateSelection === "cost_estimate" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Calculator className="h-4 w-4" />
+                    Create Cost Estimate
+                  </>
+                )}
+              </Button>
+              <Button
+                onClick={openCreateQuotationDateDialog}
+                className="gap-2 bg-green-600 text-white hover:bg-green-700"
+                disabled={selectedSites.length === 0 || !selectedClientForProposal || isCreatingDocument}
+              >
+                {isCreatingDocument && actionAfterDateSelection === "quotation" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4" />
+                    Create Quotation
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Date Range Selection Dialog */}
+      <DateRangeCalendarDialog
+        isOpen={isDateRangeDialogOpen}
+        onClose={() => setIsDateRangeDialogOpen(false)}
+        onSelectDates={handleDatesSelected}
+        selectedSiteIds={selectedSites.map((s) => s.id)}
+        selectedClientId={selectedClientForProposal?.id}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Product"
+        description="This product will be removed from your dashboard. This action cannot be undone."
+        itemName={productToDelete?.name}
+      />
+
+      {/* Collab Partner Selection Dialog */}
+      <CollabPartnerDialog isOpen={isCollabPartnerDialogOpen} onClose={() => setIsCollabPartnerDialogOpen(false)} />
+
+      {/* New Client Dialog (now using ClientDialog) */}
+      <ClientDialog
+        open={isNewClientDialogOpen}
+        onOpenChange={setIsNewClientDialogOpen}
+        onSuccess={(newClient) => {
+          setIsNewClientDialogOpen(false)
+          handleClientSelectOnDashboard(newClient)
+          toast({
+            title: "Client Added",
+            description: `${newClient.name} (${newClient.company}) has been added.`,
+            variant: "success",
+          })
+        }}
+      />
+
+      {/* Removed: Select Quotation Dialog for Job Order */}
+      {/* <SelectQuotationDialog
+        isOpen={isSelectQuotationDialogOpen}
+        onClose={() => setIsSelectQuotationDialogOpen(false)}
+      /> */}
+    </div>
+  )
+}
+
+export default function SalesDashboardPage() {
+  const { user } = useAuth()
+
+  return (
+    <RouteProtection requiredRoles="sales">
+      <div>
+        <SalesDashboardContent />
+
+        {/* Render SalesChatWidget without the floating button */}
+        <SalesChatWidget />
+      </div>
+    </RouteProtection>
+  )
+}
+
+// Product Card Component for Grid View
+function ProductCard({
+  product,
+  hasOngoingBooking,
+  onView,
+  onEdit,
+  onDelete,
+  isSelected = false,
+  onSelect,
+  selectionMode = false,
+}: {
+  product: Product
+  hasOngoingBooking: boolean
+  onView: () => void
+  onEdit: (e: React.MouseEvent) => void
+  onDelete: (e: React.MouseEvent) => void
+  isSelected?: boolean
+  onSelect?: () => void
+  selectionMode?: boolean
+}) {
+  // Get the first media item for the thumbnail
+  const thumbnailUrl =
+    product.media && product.media.length > 0 ? product.media[0].url : "/abstract-geometric-sculpture.png"
+
+  // Determine location based on product type
+  const location = product.specs_rental?.location || product.light?.location || "Unknown location"
+
+  // Format price if available
+  const formattedPrice = product.price ? `₱${Number(product.price).toLocaleString()}/month` : "Price not set"
+
+  // Get site code
+  const siteCode = getSiteCode(product)
+
+  const handleClick = () => {
+    if (selectionMode && onSelect) {
+      onSelect()
+    } else {
+      onView()
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">Sales Dashboard</h1>
-
-        {/* Quotation Creation Section */}
-        <Card className="mb-8 border-gray-200 shadow-sm rounded-xl">
-          <CardHeader className="px-6 py-4 border-b border-gray-200">
-            <CardTitle className="text-xl font-semibold text-gray-900">Create New Quotation</CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Product Selection */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Select Products</h3>
-                <div className="flex items-center space-x-2 mb-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                    <Input
-                      placeholder="Search products by name, site code, or location..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-9 pr-4 py-2 border border-gray-300 rounded-md w-full"
-                    />
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                        <Filter className="h-4 w-4" /> Filter
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-56">
-                      <DropdownMenuLabel>Filter by Type</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <ScrollArea className="h-[200px]">
-                        {allProductTypes.map((type) => (
-                          <DropdownMenuCheckboxItem
-                            key={type}
-                            checked={selectedProductTypes.includes(type)}
-                            onCheckedChange={(checked) => {
-                              setSelectedProductTypes((prev) =>
-                                checked ? [...prev, type] : prev.filter((t) => t !== type),
-                              )
-                            }}
-                          >
-                            {type}
-                          </DropdownMenuCheckboxItem>
-                        ))}
-                      </ScrollArea>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                <ScrollArea className="h-[300px] border border-gray-200 rounded-md p-4">
-                  {loading ? (
-                    <div className="space-y-3">
-                      {Array(5)
-                        .fill(0)
-                        .map((_, i) => (
-                          <Skeleton key={i} className="h-10 w-full" />
-                        ))}
-                    </div>
-                  ) : filteredProducts.length > 0 ? (
-                    <div className="space-y-3">
-                      {filteredProducts.map((product) => (
-                        <div
-                          key={product.id}
-                          className="flex items-center justify-between p-3 border border-gray-100 rounded-md bg-white shadow-sm hover:bg-gray-50 transition-colors"
-                        >
-                          <Label htmlFor={`product-${product.id}`} className="flex items-center gap-3 cursor-pointer">
-                            <Checkbox
-                              id={`product-${product.id}`}
-                              checked={selectedSites.some((site) => site.id === product.id)}
-                              onCheckedChange={() => handleProductSelect(product)}
-                            />
-                            <div>
-                              <p className="font-medium text-gray-900">{product.name}</p>
-                              <p className="text-sm text-gray-500">
-                                {product.site_code} - {product.specs_rental?.location || product.light?.location}
-                              </p>
-                            </div>
-                          </Label>
-                          <Badge variant="secondary" className="text-xs">
-                            ₱{product.price_per_day?.toLocaleString()} / month
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-center text-gray-500">No products found matching your criteria.</p>
-                  )}
-                </ScrollArea>
-              </div>
-
-              {/* Selected Products & Date Range */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Selected Products & Duration</h3>
-                <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="date-range" className="text-sm font-medium text-gray-700 mb-2 block">
-                      Select Booking Dates
-                    </Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          id="date"
-                          variant={"outline"}
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !dateRange?.from && "text-muted-foreground",
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {dateRange?.from ? (
-                            dateRange.to ? (
-                              <>
-                                {format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}
-                              </>
-                            ) : (
-                              format(dateRange.from, "LLL dd, y")
-                            )
-                          ) : (
-                            <span>Pick a date range</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        {/* Calendar component should be imported and used here */}
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div className="border border-gray-200 rounded-md p-4 min-h-[150px]">
-                    <h4 className="text-md font-medium text-gray-700 mb-3">Products for Quotation:</h4>
-                    {selectedSites.length > 0 ? (
-                      <ul className="space-y-2">
-                        {selectedSites.map((site) => (
-                          <li key={site.id} className="flex items-center justify-between text-sm text-gray-700">
-                            <span>
-                              {site.name} ({site.site_code})
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveSelectedSite(site.id!)}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-gray-500 text-sm">No products selected yet.</p>
-                    )}
-                  </div>
-
-                  <Button
-                    onClick={handleDatesSelected}
-                    disabled={!dateRange?.from || !dateRange?.to || selectedSites.length === 0 || isCreatingQuotation}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md flex items-center justify-center gap-2"
-                  >
-                    {isCreatingQuotation ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" /> Creating Quotation...
-                      </>
-                    ) : (
-                      <>
-                        <PlusCircle className="h-4 w-4" /> Generate Quotation
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Existing Quotations List */}
-        <Card className="border-gray-200 shadow-sm rounded-xl">
-          <CardHeader className="px-6 py-4 border-b border-gray-200">
-            <CardTitle className="text-xl font-semibold text-gray-900">Recent Quotations</CardTitle>
-          </CardHeader>
-          {loading ? (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50 border-b border-gray-200">
-                  <TableHead className="font-semibold text-gray-900 py-3">Date</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Amount</TableHead>
-                  <TableHead className="font-semibold text-gray-900 py-3">Reference</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {Array(pageSize)
-                  .fill(0)
-                  .map((_, i) => (
-                    <TableRow key={i} className="border-b border-gray-100">
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-32" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-20" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Skeleton className="h-4 w-28" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          ) : quotations.length > 0 ? (
-            <>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50 border-b border-gray-200">
-                      <TableHead className="font-semibold text-gray-900 py-3">Date</TableHead>
-                      <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
-                      <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
-                      <TableHead className="font-semibold text-gray-900 py-3">Amount</TableHead>
-                      <TableHead className="font-semibold text-gray-900 py-3">Reference</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {quotations.map((quotation) => (
-                      <TableRow
-                        key={quotation.id}
-                        className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
-                      >
-                        <TableCell className="py-3 text-sm text-gray-700">{formatDate(quotation.created)}</TableCell>
-                        <TableCell className="py-3 text-sm text-gray-700">{quotation.client_name || "N/A"}</TableCell>
-                        <TableCell className="py-3">
-                          <Badge
-                            variant="outline"
-                            className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(quotation.status)}`}
-                          >
-                            {quotation.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="py-3 text-sm text-gray-700">
-                          ₱{quotation.total_amount?.toLocaleString() || "0.00"}
-                        </TableCell>
-                        <TableCell className="py-3 text-sm text-gray-700">
-                          {quotation.quotation_number || "N/A"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-              <div className="flex justify-between items-center p-4 border-t border-gray-200">
-                <Button
-                  variant="outline"
-                  onClick={handlePrevPage}
-                  disabled={currentPage === 1 || loading}
-                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900 bg-transparent"
-                >
-                  <ChevronLeft className="h-4 w-4" /> Previous
-                </Button>
-                <span className="text-sm text-gray-700">Page {currentPage}</span>
-                <Button
-                  variant="outline"
-                  onClick={handleNextPage}
-                  disabled={!hasMore || loading}
-                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900 bg-transparent"
-                >
-                  Next <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </>
-          ) : (
-            <CardContent className="p-6 text-center text-gray-600">
-              <p>No quotations found for your account.</p>
-            </CardContent>
-          )}
-        </Card>
-      </div>
-      {loading && (
-        <div className="fixed inset-0 bg-black/10 flex items-center justify-center z-50">
-          <div className="bg-white p-4 rounded-lg shadow">
-            <p>Loading quotations...</p>
-          </div>
-        </div>
+    <Card
+      className={cn(
+        "overflow-hidden cursor-pointer border shadow-md rounded-xl transition-all hover:shadow-lg",
+        isSelected ? "border-green-500 bg-green-50" : "border-gray-200",
+        selectionMode ? "hover:border-green-300" : "",
       )}
-    </div>
+      onClick={handleClick}
+    >
+      <div className="h-48 bg-gray-200 relative">
+        <Image
+          src={thumbnailUrl || "/placeholder.svg"}
+          alt={product.name || "Product image"}
+          fill
+          className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            target.src = "/abstract-geometric-sculpture.png"
+            target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
+          }}
+        />
+
+        {/* Selection indicator */}
+        {selectionMode && (
+          <div className="absolute top-2 left-2 z-10">
+            <div
+              className={cn(
+                "w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                isSelected ? "bg-green-500 border-green-500" : "bg-white border-gray-300",
+              )}
+            >
+              {isSelected && <CheckCircle2 size={16} className="text-white" />}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <CardContent className="p-4">
+        <div className="flex flex-col">
+          {siteCode && <span className="text-xs text-gray-700 mb-1">Site Code: {siteCode}</span>}
+
+          <h3 className="font-semibold line-clamp-1">{product.name}</h3>
+
+          <div className="mt-2 text-sm font-medium text-green-700">{formattedPrice}</div>
+          <Button
+            variant="outline"
+            className="mt-4 w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200"
+          >
+            Create Report
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
