@@ -712,7 +712,6 @@ function SalesDashboardContent() {
           throw new Error("No site selected for quotation.")
         }
 
-
         // Log userData to debug
         console.log("User Data from AuthContext:", userData)
         console.log("First Name from userData:", userData?.first_name)
