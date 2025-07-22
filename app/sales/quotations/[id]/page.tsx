@@ -168,6 +168,7 @@ export default function QuotationDetailsPage() {
         variant: "destructive",
       })
     }
+    console.log(JSON.stringify(quotation))
   }
 
   const handleDownloadPDF = async () => {
