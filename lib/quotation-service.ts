@@ -200,43 +200,43 @@ function safeToDate(dateValue: any): Date {
 const addImageToPDF = async (
   pdf: jsPDF,
   imageUrl: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  maxHeight: number,
+  x: number, // Target X for the bounding box
+  y: number, // Target Y for the bounding box
+  targetWidth: number, // Target width for the bounding box
+  targetHeight: number, // Target height for the bounding box
 ) => {
   try {
     const base64 = await loadImageAsBase64(imageUrl)
-    if (!base64) return { width: 0, height: 0 }
+    if (!base64) return { actualWidth: 0, actualHeight: 0, xOffset: 0, yOffset: 0 }
 
     const dimensions = await getImageDimensions(base64)
 
-    // Calculate scaled dimensions to fit within max bounds
-    let { width, height } = dimensions
-    const aspectRatio = width / height
+    const { width: imgWidth, height: imgHeight } = dimensions
+    const aspectRatio = imgWidth / imgHeight
 
-    // Scale to fill the maximum available space
-    if (width > height) {
-      width = maxWidth
-      height = width / aspectRatio
-      if (height > maxHeight) {
-        height = maxHeight
-        width = height * aspectRatio
-      }
+    let finalWidth = targetWidth
+    let finalHeight = targetHeight
+
+    // Scale to fit within targetWidth and targetHeight while preserving aspect ratio
+    if (imgWidth / imgHeight > targetWidth / targetHeight) {
+      // Image is wider than target box aspect ratio
+      finalHeight = targetWidth / aspectRatio
+      finalWidth = targetWidth
     } else {
-      height = maxHeight
-      width = height * aspectRatio
-      if (width > maxWidth) {
-        width = maxWidth
-        height = width / aspectRatio
-      }
+      // Image is taller than target box aspect ratio
+      finalWidth = targetHeight * aspectRatio
+      finalHeight = targetHeight
     }
 
-    pdf.addImage(base64, "JPEG", x, y, width, height)
-    return { width, height }
+    // Calculate offsets to center the image within the target bounding box
+    const xOffset = x + (targetWidth - finalWidth) / 2
+    const yOffset = y + (targetHeight - finalHeight) / 2
+
+    pdf.addImage(base64, "JPEG", xOffset, yOffset, finalWidth, finalHeight)
+    return { actualWidth: finalWidth, actualHeight: finalHeight, xOffset, yOffset }
   } catch (error) {
     console.error("Error adding image to PDF:", error)
-    return { width: 0, height: 0 }
+    return { actualWidth: 0, actualHeight: 0, xOffset: 0, yOffset: 0 }
   }
 }
 
@@ -385,7 +385,6 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.line(margin, yPosition, pageWidth - margin, yPosition)
   yPosition += 5
 
-  const tableStartY = yPosition
   const cellPadding = 3
   const headerRowHeight = 8
   const dataRowHeight = 12 // Increased for multi-line product name
@@ -573,18 +572,22 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
       yPosition += 5
       pdf.setFont("helvetica", "normal")
 
-      const imageWidth = (contentWidth - 3 * cellPadding) / 4 // 4 images per row
-      const imageHeight = imageWidth * (2 / 3) // Aspect ratio 3:2
+      const imageGridWidth = contentWidth // Use full content width for image grid
+      const imageCountPerRow = 4
+      const imageSpacing = cellPadding // Spacing between images
+      const calculatedImageWidth = (imageGridWidth - (imageCountPerRow - 1) * imageSpacing) / imageCountPerRow
+      const calculatedImageHeight = calculatedImageWidth * (2 / 3) // Maintain 3:2 aspect ratio for display
+
       let currentImageX = margin
       let imagesInRow = 0
 
       for (const mediaItem of product.media) {
-        if (imagesInRow === 4) {
-          // Start new row after 4 images
-          yPosition += imageHeight + cellPadding
+        if (imagesInRow === imageCountPerRow) {
+          // Start new row after `imageCountPerRow` images
+          yPosition += calculatedImageHeight + imageSpacing
           currentImageX = margin
           imagesInRow = 0
-          checkNewPage(imageHeight + cellPadding) // Check for new page for the new row
+          checkNewPage(calculatedImageHeight + imageSpacing) // Check for new page for the new row
         }
 
         if (!mediaItem.isVideo) {
@@ -594,27 +597,32 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
             mediaItem.url || "/placeholder.svg?height=200&width=300",
             currentImageX,
             yPosition,
-            imageWidth,
-            imageHeight,
+            calculatedImageWidth,
+            calculatedImageHeight,
           )
         } else {
           // Placeholder for video in PDF
           pdf.setFillColor(230, 230, 230) // Light gray
-          pdf.rect(currentImageX, yPosition, imageWidth, imageHeight, "F")
+          pdf.rect(currentImageX, yPosition, calculatedImageWidth, calculatedImageHeight, "F")
           pdf.setTextColor(150, 150, 150)
           pdf.setFontSize(6)
-          pdf.text("Video Not Supported", currentImageX + imageWidth / 2, yPosition + imageHeight / 2, {
-            align: "center",
-            baseline: "middle",
-          })
+          pdf.text(
+            "Video Not Supported",
+            currentImageX + calculatedImageWidth / 2,
+            yPosition + calculatedImageHeight / 2,
+            {
+              align: "center",
+              baseline: "middle",
+            },
+          )
           pdf.setTextColor(0, 0, 0)
           pdf.setFontSize(9)
         }
 
-        currentImageX += imageWidth + cellPadding
+        currentImageX += calculatedImageWidth + imageSpacing
         imagesInRow++
       }
-      yPosition += imageHeight + 10 // Space after last row of images
+      yPosition += calculatedImageHeight + 10 // Space after last row of images
     }
     yPosition += 10 // Space after each product details section
   }
