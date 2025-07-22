@@ -59,7 +59,7 @@ import { createQuotation, generateQuotationNumber, calculateQuotationTotal } fro
 import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
 import { RouteProtection } from "@/components/route-protection"
-// Removed: import { SelectQuotationDialog } from "@/components/select-quotation-dialog"
+import type { QuotationProduct } from "@/lib/types/quotation"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -134,8 +134,6 @@ function SalesDashboardContent() {
   const [actionAfterDateSelection, setActionAfterDateSelection] = useState<"cost_estimate" | "quotation" | null>(null)
   const [isCreatingDocument, setIsCreatingDocument] = useState(false) // New loading state for document creation
   const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
-
-  // Removed: const [isSelectQuotationDialogOpen, setIsSelectQuotationDialogOpen] = useState(false)
 
   // On mobile, default to grid view
   useEffect(() => {
@@ -706,52 +704,43 @@ function SalesDashboardContent() {
         })
         router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
       } else if (actionAfterDateSelection === "quotation") {
-        // For simplicity, let's assume the quotation is for the first selected site
-        const firstSite = selectedSites[0]
-        if (!firstSite) {
-          throw new Error("No site selected for quotation.")
-        }
+        // Prepare products for quotation
+        const quotationProducts: QuotationProduct[] = selectedSites.map((site) => ({
+          id: site.id,
+          name: site.name,
+          location: site.specs_rental?.location || site.light?.location || "N/A",
+          price: site.price || 0, // This is the monthly price
+          type: site.type || "Unknown",
+          site_code: getSiteCode(site) || "N/A",
+        }))
 
-        // Log userData to debug
-        console.log("User Data from AuthContext:", userData)
-        console.log("First Name from userData:", userData?.first_name)
-        console.log("Last Name from userData:", userData?.last_name)
+        // Calculate total amount for all selected products
+        const { durationDays, totalAmount } = calculateQuotationTotal(
+          startDate.toISOString(),
+          endDate.toISOString(),
+          quotationProducts,
+        )
 
-        const durationDays = Math.ceil(
-          (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-        );
-
-        // Step 2: Calculate daily rate
-        const dailyRate = (firstSite.price || 0) / 30;
-
-        // Step 3: Compute total amount
-        const totalAmount = dailyRate * durationDays;
-        const validUntil = new Date();
-        validUntil.setDate(validUntil.getDate() + 5);
+        const validUntil = new Date()
+        validUntil.setDate(validUntil.getDate() + 5) // Valid for 5 days
 
         const quotationData = {
           quotation_number: generateQuotationNumber(),
-          product_id: firstSite.id,
-          product_name: firstSite.name,
-          product_location: firstSite.specs_rental?.location || firstSite.light?.location || "N/A",
-          site_code: getSiteCode(firstSite) || "N/A",
+          products: quotationProducts, // Pass the array of products
           start_date: startDate.toISOString(),
           end_date: endDate.toISOString(),
-          price: firstSite.price || 0,
           total_amount: totalAmount,
           valid_until: validUntil,
           duration_days: durationDays,
           status: "draft" as const, // Default status
           created_by: user.uid,
-          created_by_first_name: userData?.first_name || "", // Add first name
-          created_by_last_name: userData?.last_name || "", // Add last name
+          created_by_first_name: userData?.first_name || "",
+          created_by_last_name: userData?.last_name || "",
           client_name: selectedClientForProposal.contactPerson,
           client_email: selectedClientForProposal.email,
-          client_id: selectedClientForProposal.id, // ADDED THIS LINE
-          // campaignId and proposalId can be added if applicable, but not directly from this flow
+          client_id: selectedClientForProposal.id,
         }
 
-        // Log the final quotationData object before sending
         console.log("Final quotationData object being sent:", quotationData)
 
         const newQuotationId = await createQuotation(quotationData)
@@ -762,7 +751,7 @@ function SalesDashboardContent() {
         })
         router.push(`/sales/quotations/${newQuotationId}`) // Navigate to the new internal quotation view page
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating document:", error)
       toast({
         title: "Error",
@@ -1516,12 +1505,6 @@ function SalesDashboardContent() {
           })
         }}
       />
-
-      {/* Removed: Select Quotation Dialog for Job Order */}
-      {/* <SelectQuotationDialog
-        isOpen={isSelectQuotationDialogOpen}
-        onClose={() => setIsSelectQuotationDialogOpen(false)}
-      /> */}
     </div>
   )
 }

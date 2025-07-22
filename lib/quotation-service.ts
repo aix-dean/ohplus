@@ -18,6 +18,7 @@ import { db } from "@/lib/firebase"
 import { addQuotationToCampaign } from "@/lib/campaign-service"
 import { jsPDF } from "jspdf"
 import { loadImageAsBase64, generateQRCode, getImageDimensions } from "@/lib/pdf-service" // Import getImageDimensions
+import type { QuotationProduct } from "@/lib/types/quotation" // Import the updated type
 
 export interface Quotation {
   id?: string
@@ -46,6 +47,7 @@ export interface Quotation {
   proposalId?: string // Add proposal ID field
   valid_until?: any // Added valid_until field
   seller_id?: string // Added seller_id field for pagination
+  products?: QuotationProduct[] // Added products field
 }
 
 // Create a new quotation
@@ -85,7 +87,13 @@ export async function getQuotationById(quotationId: string): Promise<Quotation |
     const quotationDoc = await getDoc(doc(db, "quotations", quotationId))
 
     if (quotationDoc.exists()) {
-      return { id: quotationDoc.id, ...quotationDoc.data() } as Quotation
+      const data = quotationDoc.data()
+      return {
+        id: quotationDoc.id,
+        ...data,
+        // Ensure products array is always present, even if empty
+        products: data.products || [],
+      } as Quotation
     }
 
     return null
@@ -131,7 +139,7 @@ export function generateQuotationNumber(): string {
 export function calculateQuotationTotal(
   startDate: string,
   endDate: string,
-  pricePerDay: number,
+  products: QuotationProduct[], // Now accepts an array of products
 ): {
   durationDays: number
   totalAmount: number
@@ -139,7 +147,12 @@ export function calculateQuotationTotal(
   const start = new Date(startDate)
   const end = new Date(endDate)
   const durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-  const totalAmount = Math.max(1, durationDays) * pricePerDay
+
+  let totalAmount = 0
+  products.forEach((product) => {
+    const dailyRate = (product.price || 0) / 30 // Assuming price is monthly
+    totalAmount += dailyRate * Math.max(1, durationDays)
+  })
 
   return {
     durationDays: Math.max(1, durationDays), // Minimum 1 day
@@ -415,45 +428,49 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   })
   yPosition += headerRowHeight
 
-  // Table Row for Product
-  pdf.setFillColor(255, 255, 255) // bg-white
-  pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "F")
-  pdf.setDrawColor(200, 200, 200)
-  pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "S")
-
+  // Table Rows for Products
   pdf.setFontSize(9)
   pdf.setFont("helvetica", "normal")
   pdf.setTextColor(0, 0, 0)
 
-  currentX = margin
-  let productText = safeString(quotation.product_name)
-  if (quotation.site_code) {
-    productText += `\nSite: ${quotation.site_code}`
-  }
-  addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[0] - 2 * cellPadding, 9)
-  currentX += colWidths[0]
-  pdf.text("Rental", currentX + cellPadding, yPosition + dataRowHeight / 2, { baseline: "middle" })
-  currentX += colWidths[1]
-  addText(
-    safeString(quotation.product_location),
-    currentX + cellPadding,
-    yPosition + cellPadding,
-    colWidths[2] - 2 * cellPadding,
-    9,
-  )
-  currentX += colWidths[2]
-  pdf.text(
-    `₱${safeString(quotation.price)}/day`,
-    currentX + colWidths[3] - cellPadding,
-    yPosition + dataRowHeight / 2,
-    {
-      baseline: "middle",
-      align: "right",
-    },
-  )
-  yPosition += dataRowHeight
+  quotation.products.forEach((product) => {
+    checkNewPage(dataRowHeight) // Check for new page before adding each product row
+    pdf.setFillColor(255, 255, 255) // bg-white
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "F")
+    pdf.setDrawColor(200, 200, 200)
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "S")
+
+    currentX = margin
+    let productText = safeString(product.name)
+    if (product.site_code) {
+      productText += `\nSite: ${product.site_code}`
+    }
+    addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[0] - 2 * cellPadding, 9)
+    currentX += colWidths[0]
+    pdf.text(safeString(product.type), currentX + cellPadding, yPosition + dataRowHeight / 2, { baseline: "middle" })
+    currentX += colWidths[1]
+    addText(
+      safeString(product.location),
+      currentX + cellPadding,
+      yPosition + cellPadding,
+      colWidths[2] - 2 * cellPadding,
+      9,
+    )
+    currentX += colWidths[2]
+    pdf.text(
+      `₱${safeString(product.price)}/month`, // Display monthly price here
+      currentX + colWidths[3] - cellPadding,
+      yPosition + dataRowHeight / 2,
+      {
+        baseline: "middle",
+        align: "right",
+      },
+    )
+    yPosition += dataRowHeight
+  })
 
   // Total Amount Row
+  checkNewPage(headerRowHeight + 15) // Ensure space for total row and gap
   pdf.setFillColor(243, 244, 246) // bg-gray-50
   pdf.rect(margin, yPosition, contentWidth, headerRowHeight, "F")
   pdf.setDrawColor(200, 200, 200)
@@ -490,8 +507,6 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 5
 
-    pdf.setFontSize(9)
-    pdf.setFont("helvetica", "normal")
     yPosition = addText(quotation.notes, margin, yPosition, contentWidth)
     yPosition += 10
   }
@@ -588,7 +603,8 @@ export async function getQuotationsByCampaignId(campaignId: string): Promise<Quo
     const quotations: Quotation[] = []
 
     querySnapshot.forEach((doc) => {
-      quotations.push({ id: doc.id, ...doc.data() } as Quotation)
+      const data = doc.data()
+      quotations.push({ id: doc.id, ...data, products: data.products || [] } as Quotation)
     })
 
     return quotations
@@ -612,7 +628,8 @@ export async function getQuotationsByCreatedBy(userId: string): Promise<Quotatio
     const quotations: Quotation[] = []
 
     querySnapshot.forEach((doc) => {
-      quotations.push({ id: doc.id, ...doc.data() } as Quotation)
+      const data = doc.data()
+      quotations.push({ id: doc.id, ...data, products: data.products || [] } as Quotation)
     })
 
     return quotations
@@ -646,7 +663,8 @@ export async function getQuotationsPaginated(
   const querySnapshot = await getDocs(q)
   const quotations: any[] = []
   querySnapshot.forEach((doc) => {
-    quotations.push({ id: doc.id, ...doc.data() })
+    const data = doc.data()
+    quotations.push({ id: doc.id, ...data, products: data.products || [] })
   })
 
   const lastVisibleId = querySnapshot.docs[querySnapshot.docs.length - 1] || null
