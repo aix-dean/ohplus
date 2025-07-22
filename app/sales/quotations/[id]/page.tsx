@@ -656,17 +656,16 @@ export default function QuotationDetailsPage() {
                           : "0/day"}
                         </p>
                       </div>
-    
 
-                      {product.specs_rental?.height && product.specs_rental?.width && (
                         <div>
                           <h4 className="text-xs font-medium text-gray-500 uppercase">Dimensions</h4>
                           <p className="text-sm text-gray-900">
-                            {product.specs_rental.height}m × {product.specs_rental.width}m
+                                {product.specs_rental?.height && product.specs_rental?.width
+                            ? `${product.specs_rental.height}m x ${product.specs_rental.width}m`
+                            : "N/A"}
                           </p>
                         </div>
-                      )}
-
+          
                       {product.specs_rental?.audience_type && (
                         <div>
                           <h4 className="text-xs font-medium text-gray-500 uppercase">Audience Type</h4>
