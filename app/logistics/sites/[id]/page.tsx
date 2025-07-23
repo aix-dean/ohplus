@@ -83,6 +83,10 @@ export default function SiteDetailsPage({ params }: Props) {
         if (!productData) {
           notFound()
         }
+        console.log("Product data:", productData)
+        console.log("Site orientation:", productData.specs_rental?.site_orientation)
+        console.log("Site owner:", productData.site_owner)
+        console.log("Land owner:", productData.specs_rental?.land_owner)
         setProduct(productData)
 
         // Fetch service assignments for this product
@@ -256,14 +260,14 @@ export default function SiteDetailsPage({ params }: Props) {
                   </div>
                   <div>
                     <span className="font-medium">Site Orientation:</span>{" "}
-                    {product.specs_rental?.site_orientation || "Not specified"}
+                    {product?.specs_rental?.site_orientation || "Not specified"}
                   </div>
                   <div>
-                    <span className="font-medium">Site Owner:</span> {product.site_owner || "Not specified"}
+                    <span className="font-medium">Site Owner:</span> {product?.site_owner || "Not specified"}
                   </div>
                   <div>
                     <span className="font-medium">Land Owner:</span>{" "}
-                    {product.specs_rental?.land_owner || "Not specified"}
+                    {product?.specs_rental?.land_owner || "Not specified"}
                   </div>
                 </div>
               </div>
