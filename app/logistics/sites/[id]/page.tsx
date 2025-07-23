@@ -256,13 +256,14 @@ export default function SiteDetailsPage({ params }: Props) {
                   </div>
                   <div>
                     <span className="font-medium">Site Orientation:</span>{" "}
-                    {product.specs_rental?.site_orientation || ""}
+                    {product.specs_rental?.site_orientation || "Not specified"}
                   </div>
                   <div>
-                    <span className="font-medium">Site Owner:</span> {product.site_owner || ""}
+                    <span className="font-medium">Site Owner:</span> {product.site_owner || "Not specified"}
                   </div>
                   <div>
-                    <span className="font-medium">Land Owner:</span> {product.specs_rental?.land_owner || ""}
+                    <span className="font-medium">Land Owner:</span>{" "}
+                    {product.specs_rental?.land_owner || "Not specified"}
                   </div>
                 </div>
               </div>
