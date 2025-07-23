@@ -110,6 +110,8 @@ export default function BusinessProductCreatePage() {
       structure_contractor: "",
       structure_condition: "",
       structure_last_maintenance: "",
+      illumination_total_wattage: "",
+      illumination_control_system: "",
     },
     type: "RENTAL",
     status: "PENDING",
@@ -624,6 +626,8 @@ export default function BusinessProductCreatePage() {
           structure_contractor: formData.specs_rental.structure_contractor || null,
           structure_condition: formData.specs_rental.structure_condition || null,
           structure_last_maintenance: formData.specs_rental.structure_last_maintenance || null,
+          illumination_total_wattage: formData.specs_rental.illumination_total_wattage || null,
+          illumination_control_system: formData.specs_rental.illumination_control_system || null,
         },
       }
 
@@ -683,56 +687,192 @@ export default function BusinessProductCreatePage() {
     switch (currentStep) {
       case 1: // Site Data
         return (
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="productName">Product Name</Label>
-              <Input
-                id="productName"
-                type="text"
-                placeholder="e.g., LED Billboard 10x20"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                placeholder="A brief description of the product..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={4}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="price">Price</Label>
-              <Input
-                id="price"
-                type="number"
-                placeholder="0.00"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                step="0.01"
-                required
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="type">Content Type</Label>
-              <Select value={formData.content_type} onValueChange={handleContentTypeChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select content type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Static">Static</SelectItem>
-                  <SelectItem value="Dynamic">Dynamic</SelectItem>
-                </SelectContent>
-              </Select>
+          <div className="grid gap-6">
+            {/* Basic Product Information */}
+            <div className="space-y-4">
+              <h4 className="text-lg font-semibold text-gray-800">Basic Information</h4>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="productName">Product Name</Label>
+                  <Input
+                    id="productName"
+                    type="text"
+                    placeholder="e.g., LED Billboard 10x20"
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="A brief description of the product..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="price">Price</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    placeholder="0.00"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    step="0.01"
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="type">Content Type</Label>
+                  <Select value={formData.content_type} onValueChange={handleContentTypeChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select content type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Static">Static</SelectItem>
+                      <SelectItem value="Dynamic">Dynamic</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
 
-            {/* Grouping the new fields under "Additional Details" */}
+            {/* Illumination Setup */}
+            <div className="space-y-4">
+              <h4 className="text-lg font-semibold text-gray-800">Illumination Setup (Metal Halides)</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Upper Metal Halides */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">Upper (4 positions)</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[1, 2, 3, 4].map((position) => (
+                      <div key={`upper-${position}`} className="space-y-1">
+                        <Label htmlFor={`upper-${position}`} className="text-xs text-gray-600">
+                          U{position}
+                        </Label>
+                        <Input
+                          id={`upper-${position}`}
+                          name={`specs_rental.illumination.upper.u${position}`}
+                          type="text"
+                          value={formData.specs_rental[`illumination_upper_u${position}`] || ""}
+                          onChange={handleInputChange}
+                          placeholder="Wattage/Type"
+                          className="h-9 text-sm"
+                          disabled={loading}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Left Metal Halides */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">Left (2 positions)</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[1, 2].map((position) => (
+                      <div key={`left-${position}`} className="space-y-1">
+                        <Label htmlFor={`left-${position}`} className="text-xs text-gray-600">
+                          L{position}
+                        </Label>
+                        <Input
+                          id={`left-${position}`}
+                          name={`specs_rental.illumination_left_l${position}`}
+                          type="text"
+                          value={formData.specs_rental[`illumination_left_l${position}`] || ""}
+                          onChange={handleInputChange}
+                          placeholder="Wattage/Type"
+                          className="h-9 text-sm"
+                          disabled={loading}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Bottom Metal Halides */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">Bottom (4 positions)</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[1, 2, 3, 4].map((position) => (
+                      <div key={`bottom-${position}`} className="space-y-1">
+                        <Label htmlFor={`bottom-${position}`} className="text-xs text-gray-600">
+                          B{position}
+                        </Label>
+                        <Input
+                          id={`bottom-${position}`}
+                          name={`specs_rental.illumination_bottom_b${position}`}
+                          type="text"
+                          value={formData.specs_rental[`illumination_bottom_b${position}`] || ""}
+                          onChange={handleInputChange}
+                          placeholder="Wattage/Type"
+                          className="h-9 text-sm"
+                          disabled={loading}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right Metal Halides */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">Right (2 positions)</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[1, 2].map((position) => (
+                      <div key={`right-${position}`} className="space-y-1">
+                        <Label htmlFor={`right-${position}`} className="text-xs text-gray-600">
+                          R{position}
+                        </Label>
+                        <Input
+                          id={`right-${position}`}
+                          name={`specs_rental.illumination_right_r${position}`}
+                          type="text"
+                          value={formData.specs_rental[`illumination_right_r${position}`] || ""}
+                          onChange={handleInputChange}
+                          placeholder="Wattage/Type"
+                          className="h-9 text-sm"
+                          disabled={loading}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Illumination Details */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="illumination_total_wattage">Total Wattage</Label>
+                  <Input
+                    id="illumination_total_wattage"
+                    name="specs_rental.illumination_total_wattage"
+                    type="number"
+                    value={formData.specs_rental.illumination_total_wattage || ""}
+                    onChange={handleInputChange}
+                    placeholder="Total watts"
+                    disabled={loading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="illumination_control_system">Control System</Label>
+                  <Input
+                    id="illumination_control_system"
+                    name="specs_rental.illumination_control_system"
+                    type="text"
+                    value={formData.specs_rental.illumination_control_system || ""}
+                    onChange={handleInputChange}
+                    placeholder="e.g., Timer, Photocell, Manual"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Structure Details - keep existing */}
             <div className="space-y-6">
-              <h4 className="text-lg font-semibold text-gray-800">Additional Details</h4>
+              <h4 className="text-lg font-semibold text-gray-800">Structure Details</h4>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
