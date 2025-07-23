@@ -237,23 +237,19 @@ export default function CreateProductPage() {
         setUploadingFiles((prev) => prev.filter((name) => name !== mediaItem.file.name))
       }
 
-      // Get user data for site_owner
+      // Get user data for site_owner - change from object to string
       const userData = user as any
-      const siteOwner = {
-        first_name: userData.first_name || "",
-        last_name: userData.last_name || "",
-        full_name:
-          userData.first_name && userData.last_name
-            ? `${userData.first_name} ${userData.last_name}`.trim()
-            : userData.displayName || userData.email || "Unknown",
-      }
+      const siteOwner =
+        userData.first_name && userData.last_name
+          ? `${userData.first_name} ${userData.last_name}`.trim()
+          : userData.displayName || userData.email || "Unknown"
 
       // Prepare product data
       const productData = {
         name: formData.name,
         description: formData.description,
         content_type: formData.content_type,
-        site_owner: siteOwner,
+        site_owner: siteOwner, // Now a string instead of object
         specs_rental: {
           location: formData.location,
           geopoint: formData.geopoint,
