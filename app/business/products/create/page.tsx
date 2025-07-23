@@ -589,6 +589,14 @@ export default function BusinessProductCreatePage() {
           userData?.first_name && userData?.last_name
             ? `${userData.first_name} ${userData.last_name}`
             : user?.email || "",
+        site_owner: {
+          first_name: userData?.first_name || "",
+          last_name: userData?.last_name || "",
+          full_name:
+            userData?.first_name && userData?.last_name
+              ? `${userData.first_name} ${userData.last_name}`
+              : user?.displayName || user?.email || "Unknown User",
+        },
         active: true,
         deleted: false,
         seller_id: user.uid,
