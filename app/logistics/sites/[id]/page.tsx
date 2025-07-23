@@ -189,6 +189,11 @@ export default function SiteDetailsPage({ params }: Props) {
         ? "/roadside-billboard.png"
         : "/led-billboard-1.png"
 
+  // Extract the specific fields we need
+  const siteOrientation = product.specs_rental?.site_orientation || "Not specified"
+  const siteOwner = product.site_owner || "Not specified"
+  const landOwner = product.specs_rental?.land_owner || "Not specified"
+
   // Check if we should show specific view content
   const isFromContent = view === "content"
   const isFromStructure = view === "structure"
@@ -259,15 +264,13 @@ export default function SiteDetailsPage({ params }: Props) {
                     <span className="font-medium">Geopoint:</span> {geopoint}
                   </div>
                   <div>
-                    <span className="font-medium">Site Orientation:</span>{" "}
-                    {product?.specs_rental?.site_orientation || "Not specified"}
+                    <span className="font-medium">Site Orientation:</span> {siteOrientation}
                   </div>
                   <div>
-                    <span className="font-medium">Site Owner:</span> {product?.site_owner || "Not specified"}
+                    <span className="font-medium">Site Owner:</span> {siteOwner}
                   </div>
                   <div>
-                    <span className="font-medium">Land Owner:</span>{" "}
-                    {product?.specs_rental?.land_owner || "Not specified"}
+                    <span className="font-medium">Land Owner:</span> {landOwner}
                   </div>
                 </div>
               </div>
