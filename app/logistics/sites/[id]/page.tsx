@@ -83,9 +83,6 @@ export default function SiteDetailsPage({ params }: Props) {
         if (!productData) {
           notFound()
         }
-        console.log("Product data:", productData) // Add this line for debugging
-        console.log("Site owner:", productData.site_owner) // Add this line
-        console.log("Specs rental:", productData.specs_rental) // Add this line
         setProduct(productData)
 
         // Fetch service assignments for this product
