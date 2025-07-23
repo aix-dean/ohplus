@@ -259,7 +259,10 @@ export default function SiteDetailsPage({ params }: Props) {
                     {product.specs_rental?.site_orientation || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Site Owner:</span> {product.site_owner || ""}
+                    <span className="font-medium">Site Owner:</span>{" "}
+                    {typeof product.site_owner === "object"
+                      ? product.site_owner?.full_name || ""
+                      : product.site_owner || ""}
                   </div>
                   <div>
                     <span className="font-medium">Land Owner:</span> {product.specs_rental?.land_owner || ""}
