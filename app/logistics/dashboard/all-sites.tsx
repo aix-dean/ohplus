@@ -471,6 +471,8 @@ export default function AllSitesTab() {
 
 // Unified Site Card that matches the exact reference design
 function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
+  const router = useRouter()
+
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -478,7 +480,7 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
   }
 
   const handleCardClick = () => {
-    window.location.href = `/logistics/sites/${site.id}`
+    router.push(`/logistics/sites/${site.id}`)
   }
 
   return (
