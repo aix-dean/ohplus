@@ -112,6 +112,18 @@ export default function BusinessProductCreatePage() {
       structure_last_maintenance: "",
       illumination_total_wattage: "",
       illumination_control_system: "",
+      illumination_upper_count: "0",
+      illumination_left_count: "0",
+      illumination_bottom_count: "0",
+      illumination_right_count: "0",
+      illumination_upper_rows: "1",
+      illumination_upper_cols: "1",
+      illumination_left_rows: "1",
+      illumination_left_cols: "1",
+      illumination_bottom_rows: "1",
+      illumination_bottom_cols: "1",
+      illumination_right_rows: "1",
+      illumination_right_cols: "1",
     },
     type: "RENTAL",
     status: "PENDING",
@@ -743,102 +755,429 @@ export default function BusinessProductCreatePage() {
             {/* Illumination Setup */}
             <div className="space-y-4">
               <h4 className="text-lg font-semibold text-gray-800">Illumination Setup (Metal Halides)</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Upper Metal Halides */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium text-gray-700">Upper (4 positions)</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[1, 2, 3, 4].map((position) => (
-                      <div key={`upper-${position}`} className="space-y-1">
-                        <Label htmlFor={`upper-${position}`} className="text-xs text-gray-600">
-                          U{position}
-                        </Label>
-                        <Input
-                          id={`upper-${position}`}
-                          name={`specs_rental.illumination.upper.u${position}`}
-                          type="text"
-                          value={formData.specs_rental[`illumination_upper_u${position}`] || ""}
-                          onChange={handleInputChange}
-                          placeholder="Wattage/Type"
-                          className="h-9 text-sm"
-                          disabled={loading}
-                        />
-                      </div>
-                    ))}
+
+              {/* Upper Metal Halides */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium text-gray-700">Upper Metal Halides</Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="upper-count" className="text-xs text-gray-600">
+                      Count:
+                    </Label>
+                    <Input
+                      id="upper-count"
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={formData.specs_rental.illumination_upper_count || "0"}
+                      onChange={(e) => {
+                        const count = Number.parseInt(e.target.value) || 0
+                        setFormData((prev) => ({
+                          ...prev,
+                          specs_rental: {
+                            ...prev.specs_rental,
+                            illumination_upper_count: count.toString(),
+                          },
+                        }))
+                      }}
+                      className="w-16 h-8 text-sm"
+                      disabled={loading}
+                    />
                   </div>
                 </div>
 
-                {/* Left Metal Halides */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium text-gray-700">Left (2 positions)</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[1, 2].map((position) => (
-                      <div key={`left-${position}`} className="space-y-1">
-                        <Label htmlFor={`left-${position}`} className="text-xs text-gray-600">
-                          L{position}
-                        </Label>
+                {Number.parseInt(formData.specs_rental.illumination_upper_count || "0") > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-gray-600">Rows:</Label>
                         <Input
-                          id={`left-${position}`}
-                          name={`specs_rental.illumination_left_l${position}`}
-                          type="text"
-                          value={formData.specs_rental[`illumination_left_l${position}`] || ""}
-                          onChange={handleInputChange}
-                          placeholder="Wattage/Type"
-                          className="h-9 text-sm"
+                          type="number"
+                          min="1"
+                          max="5"
+                          value={formData.specs_rental.illumination_upper_rows || "1"}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              specs_rental: {
+                                ...prev.specs_rental,
+                                illumination_upper_rows: e.target.value,
+                              },
+                            }))
+                          }
+                          className="w-16 h-8 text-sm"
                           disabled={loading}
                         />
                       </div>
-                    ))}
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-gray-600">Columns:</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="5"
+                          value={formData.specs_rental.illumination_upper_cols || "1"}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              specs_rental: {
+                                ...prev.specs_rental,
+                                illumination_upper_cols: e.target.value,
+                              },
+                            }))
+                          }
+                          className="w-16 h-8 text-sm"
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+
+                    <div
+                      className="grid gap-2"
+                      style={{
+                        gridTemplateColumns: `repeat(${Number.parseInt(formData.specs_rental.illumination_upper_cols || "1")}, 1fr)`,
+                        gridTemplateRows: `repeat(${Number.parseInt(formData.specs_rental.illumination_upper_rows || "1")}, 1fr)`,
+                      }}
+                    >
+                      {Array.from({
+                        length: Number.parseInt(formData.specs_rental.illumination_upper_count || "0"),
+                      }).map((_, index) => (
+                        <div key={`upper-${index}`} className="space-y-1">
+                          <Label htmlFor={`upper-${index}`} className="text-xs text-gray-600">
+                            U{index + 1}
+                          </Label>
+                          <Input
+                            id={`upper-${index}`}
+                            name={`specs_rental.illumination_upper_${index}`}
+                            type="text"
+                            value={formData.specs_rental[`illumination_upper_${index}`] || ""}
+                            onChange={handleInputChange}
+                            placeholder="Wattage/Type"
+                            className="h-9 text-sm"
+                            disabled={loading}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Left Metal Halides */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium text-gray-700">Left Metal Halides</Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="left-count" className="text-xs text-gray-600">
+                      Count:
+                    </Label>
+                    <Input
+                      id="left-count"
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={formData.specs_rental.illumination_left_count || "0"}
+                      onChange={(e) => {
+                        const count = Number.parseInt(e.target.value) || 0
+                        setFormData((prev) => ({
+                          ...prev,
+                          specs_rental: {
+                            ...prev.specs_rental,
+                            illumination_left_count: count.toString(),
+                          },
+                        }))
+                      }}
+                      className="w-16 h-8 text-sm"
+                      disabled={loading}
+                    />
                   </div>
                 </div>
 
-                {/* Bottom Metal Halides */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium text-gray-700">Bottom (4 positions)</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[1, 2, 3, 4].map((position) => (
-                      <div key={`bottom-${position}`} className="space-y-1">
-                        <Label htmlFor={`bottom-${position}`} className="text-xs text-gray-600">
-                          B{position}
-                        </Label>
+                {Number.parseInt(formData.specs_rental.illumination_left_count || "0") > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-gray-600">Rows:</Label>
                         <Input
-                          id={`bottom-${position}`}
-                          name={`specs_rental.illumination_bottom_b${position}`}
-                          type="text"
-                          value={formData.specs_rental[`illumination_bottom_b${position}`] || ""}
-                          onChange={handleInputChange}
-                          placeholder="Wattage/Type"
-                          className="h-9 text-sm"
+                          type="number"
+                          min="1"
+                          max="5"
+                          value={formData.specs_rental.illumination_left_rows || "1"}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              specs_rental: {
+                                ...prev.specs_rental,
+                                illumination_left_rows: e.target.value,
+                              },
+                            }))
+                          }
+                          className="w-16 h-8 text-sm"
                           disabled={loading}
                         />
                       </div>
-                    ))}
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-gray-600">Columns:</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="5"
+                          value={formData.specs_rental.illumination_left_cols || "1"}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              specs_rental: {
+                                ...prev.specs_rental,
+                                illumination_left_cols: e.target.value,
+                              },
+                            }))
+                          }
+                          className="w-16 h-8 text-sm"
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+
+                    <div
+                      className="grid gap-2"
+                      style={{
+                        gridTemplateColumns: `repeat(${Number.parseInt(formData.specs_rental.illumination_left_cols || "1")}, 1fr)`,
+                        gridTemplateRows: `repeat(${Number.parseInt(formData.specs_rental.illumination_left_rows || "1")}, 1fr)`,
+                      }}
+                    >
+                      {Array.from({
+                        length: Number.parseInt(formData.specs_rental.illumination_left_count || "0"),
+                      }).map((_, index) => (
+                        <div key={`left-${index}`} className="space-y-1">
+                          <Label htmlFor={`left-${index}`} className="text-xs text-gray-600">
+                            L{index + 1}
+                          </Label>
+                          <Input
+                            id={`left-${index}`}
+                            name={`specs_rental.illumination_left_${index}`}
+                            type="text"
+                            value={formData.specs_rental[`illumination_left_${index}`] || ""}
+                            onChange={handleInputChange}
+                            placeholder="Wattage/Type"
+                            className="h-9 text-sm"
+                            disabled={loading}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Bottom Metal Halides */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium text-gray-700">Bottom Metal Halides</Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="bottom-count" className="text-xs text-gray-600">
+                      Count:
+                    </Label>
+                    <Input
+                      id="bottom-count"
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={formData.specs_rental.illumination_bottom_count || "0"}
+                      onChange={(e) => {
+                        const count = Number.parseInt(e.target.value) || 0
+                        setFormData((prev) => ({
+                          ...prev,
+                          specs_rental: {
+                            ...prev.specs_rental,
+                            illumination_bottom_count: count.toString(),
+                          },
+                        }))
+                      }}
+                      className="w-16 h-8 text-sm"
+                      disabled={loading}
+                    />
                   </div>
                 </div>
 
-                {/* Right Metal Halides */}
-                <div className="space-y-3">
-                  <Label className="text-sm font-medium text-gray-700">Right (2 positions)</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[1, 2].map((position) => (
-                      <div key={`right-${position}`} className="space-y-1">
-                        <Label htmlFor={`right-${position}`} className="text-xs text-gray-600">
-                          R{position}
-                        </Label>
+                {Number.parseInt(formData.specs_rental.illumination_bottom_count || "0") > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-gray-600">Rows:</Label>
                         <Input
-                          id={`right-${position}`}
-                          name={`specs_rental.illumination_right_r${position}`}
-                          type="text"
-                          value={formData.specs_rental[`illumination_right_r${position}`] || ""}
-                          onChange={handleInputChange}
-                          placeholder="Wattage/Type"
-                          className="h-9 text-sm"
+                          type="number"
+                          min="1"
+                          max="5"
+                          value={formData.specs_rental.illumination_bottom_rows || "1"}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              specs_rental: {
+                                ...prev.specs_rental,
+                                illumination_bottom_rows: e.target.value,
+                              },
+                            }))
+                          }
+                          className="w-16 h-8 text-sm"
                           disabled={loading}
                         />
                       </div>
-                    ))}
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-gray-600">Columns:</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="5"
+                          value={formData.specs_rental.illumination_bottom_cols || "1"}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              specs_rental: {
+                                ...prev.specs_rental,
+                                illumination_bottom_cols: e.target.value,
+                              },
+                            }))
+                          }
+                          className="w-16 h-8 text-sm"
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+
+                    <div
+                      className="grid gap-2"
+                      style={{
+                        gridTemplateColumns: `repeat(${Number.parseInt(formData.specs_rental.illumination_bottom_cols || "1")}, 1fr)`,
+                        gridTemplateRows: `repeat(${Number.parseInt(formData.specs_rental.illumination_bottom_rows || "1")}, 1fr)`,
+                      }}
+                    >
+                      {Array.from({
+                        length: Number.parseInt(formData.specs_rental.illumination_bottom_count || "0"),
+                      }).map((_, index) => (
+                        <div key={`bottom-${index}`} className="space-y-1">
+                          <Label htmlFor={`bottom-${index}`} className="text-xs text-gray-600">
+                            B{index + 1}
+                          </Label>
+                          <Input
+                            id={`bottom-${index}`}
+                            name={`specs_rental.illumination_bottom_${index}`}
+                            type="text"
+                            value={formData.specs_rental[`illumination_bottom_${index}`] || ""}
+                            onChange={handleInputChange}
+                            placeholder="Wattage/Type"
+                            className="h-9 text-sm"
+                            disabled={loading}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Right Metal Halides */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium text-gray-700">Right Metal Halides</Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="right-count" className="text-xs text-gray-600">
+                      Count:
+                    </Label>
+                    <Input
+                      id="right-count"
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={formData.specs_rental.illumination_right_count || "0"}
+                      onChange={(e) => {
+                        const count = Number.parseInt(e.target.value) || 0
+                        setFormData((prev) => ({
+                          ...prev,
+                          specs_rental: {
+                            ...prev.specs_rental,
+                            illumination_right_count: count.toString(),
+                          },
+                        }))
+                      }}
+                      className="w-16 h-8 text-sm"
+                      disabled={loading}
+                    />
                   </div>
                 </div>
+
+                {Number.parseInt(formData.specs_rental.illumination_right_count || "0") > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-gray-600">Rows:</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="5"
+                          value={formData.specs_rental.illumination_right_rows || "1"}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              specs_rental: {
+                                ...prev.specs_rental,
+                                illumination_right_rows: e.target.value,
+                              },
+                            }))
+                          }
+                          className="w-16 h-8 text-sm"
+                          disabled={loading}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs text-gray-600">Columns:</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="5"
+                          value={formData.specs_rental.illumination_right_cols || "1"}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              specs_rental: {
+                                ...prev.specs_rental,
+                                illumination_right_cols: e.target.value,
+                              },
+                            }))
+                          }
+                          className="w-16 h-8 text-sm"
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+
+                    <div
+                      className="grid gap-2"
+                      style={{
+                        gridTemplateColumns: `repeat(${Number.parseInt(formData.specs_rental.illumination_right_cols || "1")}, 1fr)`,
+                        gridTemplateRows: `repeat(${Number.parseInt(formData.specs_rental.illumination_right_rows || "1")}, 1fr)`,
+                      }}
+                    >
+                      {Array.from({
+                        length: Number.parseInt(formData.specs_rental.illumination_right_count || "0"),
+                      }).map((_, index) => (
+                        <div key={`right-${index}`} className="space-y-1">
+                          <Label htmlFor={`right-${index}`} className="text-xs text-gray-600">
+                            R{index + 1}
+                          </Label>
+                          <Input
+                            id={`right-${index}`}
+                            name={`specs_rental.illumination_right_${index}`}
+                            type="text"
+                            value={formData.specs_rental[`illumination_right_${index}`] || ""}
+                            onChange={handleInputChange}
+                            placeholder="Wattage/Type"
+                            className="h-9 text-sm"
+                            disabled={loading}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Additional Illumination Details */}
