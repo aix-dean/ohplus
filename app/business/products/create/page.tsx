@@ -1,920 +1,1288 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import type React from "react"
 import { useRouter } from "next/navigation"
+import { createProduct, getUserProductsCount } from "@/lib/firebase-service"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Badge } from "@/components/ui/badge"
-import { X, Upload, MapPin, Clock, DollarSign, ArrowLeft, ArrowRight } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import {
+  ChevronDown,
+  Upload,
+  Trash2,
+  ImageIcon,
+  Film,
+  X,
+  Check,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react"
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { Badge } from "@/components/ui/badge"
+import { toast } from "@/components/ui/use-toast"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/contexts/auth-context"
-import { createProduct } from "@/lib/firebase-service"
-import { uploadToFirebase } from "@/lib/video-upload-service"
-import { toast } from "@/hooks/use-toast"
+import { subscriptionService } from "@/lib/subscription-service"
 
-interface MediaFile {
-  file: File
-  url: string
-  type: "image" | "video"
-}
+// Audience types for the dropdown
+const AUDIENCE_TYPES = [
+  "General Public",
+  "Commuters",
+  "Pedestrians",
+  "Shoppers",
+  "Business Professionals",
+  "Tourists",
+  "Students",
+  "Mixed",
+]
 
-interface FormData {
+// Category interface
+interface Category {
+  id: string
   name: string
-  description: string
-  content_type: "static" | "dynamic" | ""
-  site_orientation: string
-  land_owner: string
-  structure_color: string
-  structure_contractor: string
-  structure_condition: string
-  structure_last_maintenance: string
-  // Dynamic settings
-  loop_duration: number
-  spots_per_loop: number
-  spot_duration: number
-  operating_hours: {
-    start: string
-    end: string
-  }
-  brightness_schedule: Array<{
-    time_range: string
-    brightness: number
-  }>
-  // Location information
-  location: string
-  geopoint: [number, number] | null
-  width: number
-  height: number
-  audience: {
-    age_groups: string[]
-    interests: string[]
-    demographics: string[]
-  }
-  traffic_data: {
-    daily_impressions: number
-    peak_hours: string[]
-    vehicle_count: number
-  }
-  // Pricing
-  rental_rates: {
-    daily: number
-    weekly: number
-    monthly: number
-  }
-  // Media files
-  media: MediaFile[]
+  type: string
+  position: number
+  photo_url?: string
 }
 
-const initialFormData: FormData = {
-  name: "",
-  description: "",
-  content_type: "",
-  site_orientation: "",
-  land_owner: "",
-  structure_color: "",
-  structure_contractor: "",
-  structure_condition: "",
-  structure_last_maintenance: "",
-  loop_duration: 300,
-  spots_per_loop: 10,
-  spot_duration: 30,
-  operating_hours: {
-    start: "06:00",
-    end: "23:00",
-  },
-  brightness_schedule: [
-    { time_range: "06:00-18:00", brightness: 80 },
-    { time_range: "18:00-23:00", brightness: 100 },
-  ],
-  location: "",
-  geopoint: null,
-  width: 0,
-  height: 0,
-  audience: {
-    age_groups: [],
-    interests: [],
-    demographics: [],
-  },
-  traffic_data: {
-    daily_impressions: 0,
-    peak_hours: [],
-    vehicle_count: 0,
-  },
-  rental_rates: {
-    daily: 0,
-    weekly: 0,
-    monthly: 0,
-  },
-  media: [],
-}
+// Step definitions
+const STEPS = [
+  { id: 1, title: "Site Data", description: "Basic product information and type" },
+  { id: 2, title: "Dynamic Settings", description: "Configure dynamic content settings" },
+  { id: 3, title: "Location Information", description: "Site location and audience details" },
+  { id: 4, title: "Media", description: "Upload product media files" },
+]
 
-const ageGroups = ["18-24", "25-34", "35-44", "45-54", "55-64", "65+"]
-const interests = ["Technology", "Fashion", "Food", "Travel", "Sports", "Entertainment", "Business", "Health"]
-const demographics = ["Urban Professionals", "Students", "Families", "Tourists", "Commuters", "Shoppers"]
-const peakHours = ["06:00-09:00", "12:00-14:00", "17:00-20:00", "20:00-23:00"]
-
-export default function CreateProductPage() {
-  const [currentStep, setCurrentStep] = useState(1)
-  const [formData, setFormData] = useState<FormData>(initialFormData)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [uploadingFiles, setUploadingFiles] = useState<string[]>([])
-  const { user } = useAuth()
+export default function BusinessProductCreatePage() {
   const router = useRouter()
+  const { user, userData, subscriptionData } = useAuth()
+  const [currentStep, setCurrentStep] = useState(1)
+  const [productName, setProductName] = useState("")
+  const [description, setDescription] = useState("")
+  const [price, setPrice] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<string | null>(null)
+  const [mediaFiles, setMediaFiles] = useState<File[]>([])
+  const [mediaPreviewUrls, setMediaPreviewUrls] = useState<string[]>([])
+  const [mediaDistances, setMediaDistances] = useState<string[]>([])
+  const [mediaTypes, setMediaTypes] = useState<string[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false)
 
-  const totalSteps = 4
+  // Selected categories and audience types
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [selectedAudienceTypes, setSelectedAudienceTypes] = useState<string[]>([])
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
+  const [showAudienceDropdown, setShowAudienceDropdown] = useState(false)
 
-  const handleInputChange = (field: string, value: any) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
+  // Form state
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    price: "",
+    content_type: "Static",
+    cms: {
+      start_time: "",
+      end_time: "",
+      spot_duration: "",
+      loops_per_day: "", // Fixed: was spot_per_loop, now consistent with validation
+    },
+    specs_rental: {
+      audience_type: "",
+      audience_types: [] as string[],
+      geopoint: [0, 0] as [number, number],
+      location: "",
+      traffic_count: "",
+      elevation: "",
+      height: "",
+      width: "",
+      site_orientation: "",
+      land_owner: "",
+      structure_color: "",
+      structure_contractor: "",
+      structure_condition: "",
+      structure_last_maintenance: "",
+    },
+    type: "RENTAL",
+    status: "PENDING",
+  })
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setIsLoadingCategories(true)
+        const categoriesRef = collection(db, "categories")
+        const q = query(categoriesRef, where("active", "==", true), where("deleted", "==", false))
+
+        const querySnapshot = await getDocs(q)
+        const categoriesData: Category[] = []
+
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          categoriesData.push({
+            id: doc.id,
+            name: data.name,
+            type: data.type,
+            position: data.position || 0,
+            photo_url: data.photo_url,
+          })
+        })
+
+        // Sort categories by position
+        categoriesData.sort((a, b) => a.position - b.position)
+        setCategories(categoriesData)
+      } catch (error) {
+        console.error("Error fetching categories:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load categories. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoadingCategories(false)
+      }
+    }
+
+    fetchCategories()
+  }, [])
+
+  useEffect(() => {
+    if (formData.content_type === "Dynamic") {
+      validateDynamicContent()
+    }
+  }, [
+    formData.cms.start_time,
+    formData.cms.end_time,
+    formData.cms.spot_duration,
+    formData.cms.loops_per_day,
+    formData.content_type,
+  ])
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    const safeValue = value || "" // Ensure value is never undefined
+
+    if (name.includes(".")) {
+      const [parent, child] = name.split(".")
+      setFormData((prev) => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent as keyof typeof prev],
+          [child]: safeValue,
+        },
+      }))
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: safeValue,
+      }))
+    }
   }
 
-  const handleNestedInputChange = (parent: string, field: string, value: any) => {
+  const handleLocationChange = (value: string) => {
     setFormData((prev) => ({
       ...prev,
-      [parent]: {
-        ...prev[parent as keyof FormData],
-        [field]: value,
+      specs_rental: {
+        ...prev.specs_rental,
+        location: value,
       },
     }))
   }
 
-  const handleArrayToggle = (parent: string, field: string, value: string) => {
-    setFormData((prev) => {
-      const currentArray = (prev[parent as keyof FormData] as any)[field] || []
-      const newArray = currentArray.includes(value)
-        ? currentArray.filter((item: string) => item !== value)
-        : [...currentArray, value]
-
-      return {
-        ...prev,
-        [parent]: {
-          ...prev[parent as keyof FormData],
-          [field]: newArray,
-        },
+  const toggleCategory = (categoryId: string) => {
+    setSelectedCategories((prev) => {
+      if (prev.includes(categoryId)) {
+        return prev.filter((id) => id !== categoryId)
+      } else {
+        return [...prev, categoryId]
       }
     })
   }
 
-  const handleLocationSelect = (location: string, coordinates: [number, number]) => {
+  const toggleAudienceType = (audienceType: string) => {
+    setSelectedAudienceTypes((prev) => {
+      if (prev.includes(audienceType)) {
+        return prev.filter((type) => type !== audienceType)
+      } else {
+        return [...prev, audienceType]
+      }
+    })
+
     setFormData((prev) => ({
       ...prev,
-      location,
-      geopoint: coordinates,
+      specs_rental: {
+        ...prev.specs_rental,
+        audience_types: !selectedAudienceTypes.includes(audienceType)
+          ? [...prev.specs_rental.audience_types, audienceType]
+          : prev.specs_rental.audience_types.filter((type) => type !== audienceType),
+      },
     }))
   }
 
-  const handleFileUpload = async (files: FileList) => {
-    const newFiles: MediaFile[] = []
+  const handleGeopointChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const value = Number.parseFloat(e.target.value) || 0
+    const newGeopoint = [...formData.specs_rental.geopoint]
+    newGeopoint[index] = value
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      const fileType = file.type.startsWith("image/") ? "image" : "video"
+    setFormData((prev) => ({
+      ...prev,
+      specs_rental: {
+        ...prev.specs_rental,
+        geopoint: newGeopoint as [number, number],
+      },
+    }))
+  }
 
-      // Create preview URL
-      const previewUrl = URL.createObjectURL(file)
+  const handleContentTypeChange = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      content_type: value,
+    }))
+    // Clear validation error when content type changes
+    setValidationError(null)
+  }
 
-      newFiles.push({
-        file,
-        url: previewUrl,
-        type: fileType,
-      })
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files)
+
+      // Create preview URLs for the new files
+      const newPreviewUrls = newFiles.map((file) => URL.createObjectURL(file))
+
+      // Automatically detect file types (image or video)
+      const newTypes = newFiles.map((file) => (file.type.startsWith("video/") ? "Video" : "Photo"))
+
+      // Add new files and previews
+      setMediaFiles((prev) => [...prev, ...newFiles])
+      setMediaPreviewUrls((prev) => [...prev, ...newPreviewUrls])
+      setMediaTypes((prev) => [...prev, ...newTypes])
+
+      // Initialize distances for new files
+      setMediaDistances((prev) => [...prev, ...newFiles.map(() => "")])
+    }
+  }
+
+  const handleMediaDistanceChange = (index: number, value: string) => {
+    const newDistances = [...mediaDistances]
+    newDistances[index] = value
+    setMediaDistances(newDistances)
+  }
+
+  const handleRemoveMedia = (index: number) => {
+    // Release the object URL to avoid memory leaks
+    URL.revokeObjectURL(mediaPreviewUrls[index])
+
+    // Remove the file and its associated data
+    setMediaFiles((prev) => prev.filter((_, i) => i !== index))
+    setMediaPreviewUrls((prev) => prev.filter((_, i) => i !== index))
+    setMediaDistances((prev) => prev.filter((_, i) => i !== index))
+    setMediaTypes((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const uploadMediaFiles = async () => {
+    if (mediaFiles.length === 0) {
+      return [] // Return empty array if no media files
     }
 
-    setFormData((prev) => ({
-      ...prev,
-      media: [...prev.media, ...newFiles],
-    }))
+    const storage = getStorage()
+    const mediaData = []
+
+    for (let i = 0; i < mediaFiles.length; i++) {
+      const file = mediaFiles[i]
+      const isVideo = file.type.startsWith("video/")
+
+      try {
+        // Create a unique filename to avoid conflicts
+        const timestamp = Date.now()
+        const randomString = Math.random().toString(36).substring(2, 15)
+        const fileExtension = file.name.split(".").pop()
+        const uniqueFileName = `${timestamp}_${randomString}.${fileExtension}`
+
+        // Create a reference to the file in Firebase Storage
+        const fileRef = ref(storage, `products/${uniqueFileName}`)
+
+        console.log(`Uploading file ${i + 1}/${mediaFiles.length}:`, file.name)
+
+        // Upload the file
+        const snapshot = await uploadBytes(fileRef, file)
+        console.log(`File ${i + 1} uploaded successfully`)
+
+        // Get the download URL
+        const url = await getDownloadURL(snapshot.ref)
+        console.log(`Download URL obtained for file ${i + 1}:`, url)
+
+        // Add the media data
+        mediaData.push({
+          url,
+          distance: mediaDistances[i] || "Not specified",
+          type: mediaTypes[i],
+          isVideo,
+        })
+      } catch (error) {
+        console.error(`Error uploading file ${i + 1}:`, error)
+        throw new Error(`Failed to upload media file "${file.name}". Please try again.`)
+      }
+    }
+
+    console.log("All media files uploaded successfully:", mediaData)
+    return mediaData
   }
 
-  const removeMediaFile = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      media: prev.media.filter((_, i) => i !== index),
-    }))
+  const getCategoryNames = () => {
+    return selectedCategories
+      .map((id) => {
+        const category = categories.find((cat) => cat.id === id)
+        return category ? category.name : ""
+      })
+      .filter(Boolean)
+  }
+
+  // Enhanced validation function for dynamic content with detailed calculations
+  const validateDynamicContent = () => {
+    if (formData.content_type !== "Dynamic") {
+      setValidationError(null)
+      return true
+    }
+
+    const { start_time, end_time, spot_duration, loops_per_day } = formData.cms
+
+    if (!start_time || !end_time || !spot_duration || !loops_per_day) {
+      setValidationError("All dynamic content fields are required.")
+      return false
+    }
+
+    try {
+      // Parse start and end times
+      const [startHour, startMinute] = start_time.split(":").map(Number)
+      const [endHour, endMinute] = end_time.split(":").map(Number)
+
+      // Validate time format
+      if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
+        setValidationError("Invalid time format.")
+        return false
+      }
+
+      // Convert to total minutes
+      const startTotalMinutes = startHour * 60 + startMinute
+      let endTotalMinutes = endHour * 60 + endMinute
+
+      // Handle next day scenario (e.g., 22:00 to 06:00)
+      if (endTotalMinutes <= startTotalMinutes) {
+        endTotalMinutes += 24 * 60 // Add 24 hours
+      }
+
+      // Calculate duration in minutes, then convert to seconds
+      const durationMinutes = endTotalMinutes - startTotalMinutes
+      const durationSeconds = durationMinutes * 60
+
+      // Parse numeric values
+      const spotDurationNum = Number.parseInt(spot_duration)
+      const spotsPerLoopNum = Number.parseInt(loops_per_day)
+
+      if (isNaN(spotDurationNum) || isNaN(spotsPerLoopNum) || spotDurationNum <= 0 || spotsPerLoopNum <= 0) {
+        setValidationError("Spot duration and spots per loop must be positive numbers.")
+        return false
+      }
+
+      // Calculate total spot time needed per loop
+      const totalSpotTimePerLoop = spotDurationNum * spotsPerLoopNum
+
+      // Calculate how many complete loops can fit in the time duration
+      const loopsResult = durationSeconds / totalSpotTimePerLoop
+
+      // Check if the division results in a whole number (integer)
+      if (!Number.isInteger(loopsResult)) {
+        // Calculate suggested values for correction
+        const floorResult = Math.floor(loopsResult)
+        const ceilResult = Math.ceil(loopsResult)
+
+        // Calculate suggested spot durations for current spots per loop
+        const suggestedSpotDurationFloor = Math.floor(durationSeconds / spotsPerLoopNum / floorResult)
+        const suggestedSpotDurationCeil = Math.floor(durationSeconds / spotsPerLoopNum / ceilResult)
+
+        // Calculate suggested spots per loop for current spot duration
+        const suggestedSpotsPerLoopFloor = Math.floor(durationSeconds / spotDurationNum / floorResult)
+        const suggestedSpotsPerLoopCeil = Math.floor(durationSeconds / spotDurationNum / ceilResult)
+
+        // Format duration for display
+        const durationHours = Math.floor(durationMinutes / 60)
+        const remainingMinutes = durationMinutes % 60
+        const durationDisplay = durationHours > 0 ? `${durationHours}h ${remainingMinutes}m` : `${remainingMinutes}m`
+
+        setValidationError(
+          `Invalid Input: The current configuration results in ${loopsResult.toFixed(2)} loops, which is not a whole number. ` +
+            `\n\nTime Duration: ${durationDisplay} (${durationSeconds} seconds)` +
+            `\nCurrent Configuration: ${spotDurationNum}s × ${spotsPerLoopNum} spots = ${totalSpotTimePerLoop}s per loop` +
+            `\nResult: ${durationSeconds}s ÷ ${totalSpotTimePerLoop}s = ${loopsResult.toFixed(2)} loops` +
+            `\n\nSuggested corrections:` +
+            `\n• Option 1: Change spot duration to ${suggestedSpotDurationFloor}s (for ${floorResult} complete loops)` +
+            `\n• Option 2: Change spot duration to ${suggestedSpotDurationCeil}s (for ${ceilResult} complete loops)` +
+            `\n• Option 3: Change spots per loop to ${suggestedSpotsPerLoopFloor} (for ${floorResult} complete loops)` +
+            `\n• Option 4: Change spots per loop to ${suggestedSpotsPerLoopCeil} (for ${ceilResult} complete loops)`,
+        )
+        return false
+      }
+
+      // Success case - show calculation details
+      const durationHours = Math.floor(durationMinutes / 60)
+      const remainingMinutes = durationMinutes % 60
+      const durationDisplay = durationHours > 0 ? `${durationHours}h ${remainingMinutes}m` : `${remainingMinutes}m`
+
+      setValidationError(
+        `✓ Valid Configuration: ${Math.floor(loopsResult)} complete loops will fit in the ${durationDisplay} time period. ` +
+          `Each loop uses ${totalSpotTimePerLoop}s (${spotDurationNum}s × ${spotsPerLoopNum} spots).`,
+      )
+      return true
+    } catch (error) {
+      console.error("Validation error:", error)
+      setValidationError("Invalid time format or values.")
+      return false
+    }
+  }
+
+  const validateCurrentStep = () => {
+    switch (currentStep) {
+      case 1: // Site Data
+        if (!productName.trim()) {
+          toast({
+            title: "Validation Error",
+            description: "Product name is required.",
+            variant: "destructive",
+          })
+          return false
+        }
+        if (!price || Number.parseFloat(price) <= 0) {
+          toast({
+            title: "Validation Error",
+            description: "Price must be a positive number.",
+            variant: "destructive",
+          })
+          return false
+        }
+        return true
+
+      case 2: // Dynamic Settings (only if Dynamic type)
+        if (formData.content_type === "Dynamic") {
+          return validateDynamicContent()
+        }
+        return true
+
+      case 3: // Location Information
+        if (!formData.specs_rental.location.trim()) {
+          toast({
+            title: "Validation Error",
+            description: "Location is required.",
+            variant: "destructive",
+          })
+          return false
+        }
+        return true
+
+      case 4: // Media
+        if (mediaFiles.length === 0) {
+          toast({
+            title: "Validation Error",
+            description: "At least one media file is required.",
+            variant: "destructive",
+          })
+          return false
+        }
+        return true
+
+      default:
+        return true
+    }
+  }
+
+  const handleNext = () => {
+    if (validateCurrentStep()) {
+      // Skip Dynamic Settings step if content type is Static
+      if (currentStep === 1 && formData.content_type === "Static") {
+        setCurrentStep(3) // Skip to Location Information
+      } else {
+        setCurrentStep(currentStep + 1)
+      }
+    }
+  }
+
+  const handlePrevious = () => {
+    // Skip Dynamic Settings step if content type is Static when going back
+    if (currentStep === 3 && formData.content_type === "Static") {
+      setCurrentStep(1) // Go back to Site Data
+    } else {
+      setCurrentStep(currentStep - 1)
+    }
   }
 
   const handleSubmit = async () => {
-    if (!user) {
+    if (!validateCurrentStep()) {
+      return
+    }
+
+    // Check if user is authenticated and has license key
+    if (!user || !userData?.license_key) {
       toast({
-        title: "Authentication Required",
-        description: "Please log in to create a product.",
+        title: "Authentication Error",
+        description: "User not authenticated or license key not found.",
         variant: "destructive",
       })
       return
     }
 
-    setIsSubmitting(true)
+    setLoading(true)
+    setError(null)
 
     try {
-      // Upload media files to Firebase
-      const uploadedMedia = []
-      for (const mediaItem of formData.media) {
-        setUploadingFiles((prev) => [...prev, mediaItem.file.name])
+      console.log("Starting product creation process...")
+      console.log("User ID:", user.uid)
+      console.log("User license key:", userData.license_key)
 
-        try {
-          const uploadedUrl = await uploadToFirebase(mediaItem.file, `products/${user.uid}`)
-          uploadedMedia.push({
-            url: uploadedUrl,
-            type: mediaItem.type,
-            name: mediaItem.file.name,
-          })
-        } catch (uploadError) {
-          console.error("Error uploading file:", uploadError)
-          toast({
-            title: "Upload Error",
-            description: `Failed to upload ${mediaItem.file.name}`,
-            variant: "destructive",
-          })
+      // Check subscription limits before creating a product
+      if (!subscriptionData) {
+        console.log("No subscription data found, fetching...")
+        const subscription = await subscriptionService.getSubscriptionByLicenseKey(userData.license_key)
+        if (!subscription) {
+          throw new Error("No active subscription found for this project.")
         }
-
-        setUploadingFiles((prev) => prev.filter((name) => name !== mediaItem.file.name))
+        console.log("Subscription found:", subscription)
       }
 
-      // Get user data for site_owner - change from object to string
-      const userData = user as any
-      const siteOwner =
-        userData.first_name && userData.last_name
-          ? `${userData.first_name} ${userData.last_name}`.trim()
-          : userData.displayName || userData.email || "Unknown"
+      // Get the current count of non-deleted products for the user
+      const currentProductsCount = await getUserProductsCount(user.uid, { deleted: false })
+      console.log("Current products count:", currentProductsCount)
 
-      // Prepare product data
+      if (subscriptionData?.maxProducts !== null && currentProductsCount >= subscriptionData.maxProducts) {
+        throw new Error(
+          `Product limit reached. Your current plan allows up to ${subscriptionData.maxProducts} products.`,
+        )
+      }
+
+      // Upload media files first
+      console.log("Uploading media files...")
+      const mediaData = await uploadMediaFiles()
+      console.log("Media upload completed:", mediaData)
+
+      const contentType = formData.content_type === "Dynamic(LED)" ? "Dynamic" : formData.content_type
+
+      // Get user display name
+      const userName = userData.displayName || user.displayName || user.email || "Unknown User"
+
       const productData = {
-        name: formData.name,
-        description: formData.description,
-        content_type: formData.content_type,
-        site_owner: siteOwner, // Now a string instead of object
-        specs_rental: {
-          location: formData.location,
-          geopoint: formData.geopoint,
-          width: formData.width,
-          height: formData.height,
-          site_orientation: formData.site_orientation,
-          land_owner: formData.land_owner,
-          structure_color: formData.structure_color,
-          structure_contractor: formData.structure_contractor,
-          structure_condition: formData.structure_condition,
-          structure_last_maintenance: formData.structure_last_maintenance,
-          audience: formData.audience,
-          traffic_data: formData.traffic_data,
-          rental_rates: formData.rental_rates,
-        },
-        media: uploadedMedia,
+        name: productName,
+        description,
+        price: Number.parseFloat(price),
+        content_type: contentType,
+        media: mediaData,
+        categories: selectedCategories,
+        category_names: getCategoryNames(),
+        company_id: userData?.company_id || null,
+        seller_id: user?.uid || "",
+        seller_name:
+          userData?.first_name && userData?.last_name
+            ? `${userData.first_name} ${userData.last_name}`
+            : user?.email || "",
+        site_owner:
+          userData?.first_name && userData?.last_name
+            ? `${userData.first_name} ${userData.last_name}`
+            : user?.displayName || user?.email || "Unknown Owner",
+        active: true,
+        deleted: false,
         seller_id: user.uid,
-        seller_name: user.displayName || user.email,
-        created: new Date(),
-        status: "active",
+        seller_name: userName,
+        status: formData.status,
+        type: formData.type,
+        position: 0,
+        cms:
+          contentType === "Dynamic"
+            ? {
+                start_time: formData.cms.start_time,
+                end_time: formData.cms.end_time,
+                spot_duration: Number.parseInt(formData.cms.spot_duration) || 0,
+                loops_per_day: Number.parseInt(formData.cms.loops_per_day) || 0,
+              }
+            : null,
+        specs_rental: {
+          ...formData.specs_rental,
+          audience_types: selectedAudienceTypes,
+          traffic_count: formData.specs_rental.traffic_count
+            ? Number.parseInt(formData.specs_rental.traffic_count)
+            : null,
+          elevation: formData.specs_rental.elevation ? Number.parseFloat(formData.specs_rental.elevation) : null,
+          height: formData.specs_rental.height ? Number.parseFloat(formData.specs_rental.height) : null,
+          width: formData.specs_rental.width ? Number.parseFloat(formData.specs_rental.width) : null,
+          site_orientation: formData.specs_rental.site_orientation || null,
+          land_owner: formData.specs_rental.land_owner || null,
+          structure_color: formData.specs_rental.structure_color || null,
+          structure_contractor: formData.specs_rental.structure_contractor || null,
+          structure_condition: formData.specs_rental.structure_condition || null,
+          structure_last_maintenance: formData.specs_rental.structure_last_maintenance || null,
+        },
       }
 
-      // Add dynamic-specific data if content type is dynamic
-      if (formData.content_type === "dynamic") {
-        productData.specs_rental = {
-          ...productData.specs_rental,
-          loop_duration: formData.loop_duration,
-          spots_per_loop: formData.spots_per_loop,
-          spot_duration: formData.spot_duration,
-          operating_hours: formData.operating_hours,
-          brightness_schedule: formData.brightness_schedule,
-        }
-      }
-
-      // Create the product
+      console.log("Creating product with data:", productData)
       await createProduct(productData)
 
       toast({
-        title: "Product Created",
-        description: "Your billboard has been successfully listed.",
+        title: "Product created",
+        description: "Your product has been created successfully.",
       })
+
+      // Clean up object URLs to prevent memory leaks
+      mediaPreviewUrls.forEach((url) => URL.revokeObjectURL(url))
 
       router.push("/business/inventory")
     } catch (error) {
       console.error("Error creating product:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to create product. Please try again."
+      setError(errorMessage)
       toast({
         title: "Error",
-        description: "Failed to create product. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
-      setIsSubmitting(false)
-      setUploadingFiles([])
+      setLoading(false)
     }
   }
 
-  const nextStep = () => {
-    if (currentStep < totalSteps) {
-      setCurrentStep(currentStep + 1)
-    }
+  const removeCategory = (categoryId: string) => {
+    setSelectedCategories((prev) => prev.filter((id) => id !== categoryId))
   }
 
-  const prevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1)
-    }
+  const removeAudienceType = (audienceType: string) => {
+    setSelectedAudienceTypes((prev) => prev.filter((type) => type !== audienceType))
+
+    setFormData((prev) => ({
+      ...prev,
+      specs_rental: {
+        ...prev.specs_rental,
+        audience_types: prev.specs_rental.audience_types.filter((type) => type !== audienceType),
+      },
+    }))
   }
 
-  const canProceed = () => {
+  const getStepTitle = () => {
+    const step = STEPS.find((s) => s.id === currentStep)
+    return step ? step.title : "Unknown Step"
+  }
+
+  const getStepDescription = () => {
+    const step = STEPS.find((s) => s.id === currentStep)
+    return step ? step.description : ""
+  }
+
+  const renderStepContent = () => {
     switch (currentStep) {
-      case 1:
-        return formData.name && formData.description && formData.content_type
-      case 2:
-        return formData.content_type !== "dynamic" || (formData.loop_duration && formData.spots_per_loop)
-      case 3:
-        return formData.location && formData.width && formData.height
-      case 4:
-        return true
-      default:
-        return false
-    }
-  }
-
-  return (
-    <div className="container mx-auto py-6 max-w-4xl">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-4 mb-4">
-          <Button variant="ghost" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Create New Billboard</h1>
-            <p className="text-gray-600">List your billboard for rental</p>
-          </div>
-        </div>
-
-        {/* Progress indicator */}
-        <div className="flex items-center gap-2 mb-6">
-          {Array.from({ length: totalSteps }, (_, i) => (
-            <div key={i} className="flex items-center">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  i + 1 <= currentStep ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-600"
-                }`}
-              >
-                {i + 1}
-              </div>
-              {i < totalSteps - 1 && (
-                <div className={`w-12 h-1 ${i + 1 < currentStep ? "bg-blue-600" : "bg-gray-200"}`} />
-              )}
+      case 1: // Site Data
+        return (
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="productName">Product Name</Label>
+              <Input
+                id="productName"
+                type="text"
+                placeholder="e.g., LED Billboard 10x20"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+                required
+              />
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Step 1: Site Data */}
-      {currentStep === 1 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              Site Data
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="name">Billboard Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
-                  placeholder="Enter billboard name"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="content_type">Content Type *</Label>
-                <Select
-                  value={formData.content_type}
-                  onValueChange={(value) => handleInputChange("content_type", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select content type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="static">Static</SelectItem>
-                    <SelectItem value="dynamic">Dynamic</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description *</Label>
+            <div className="grid gap-2">
+              <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
-                value={formData.description}
-                onChange={(e) => handleInputChange("description", e.target.value)}
-                placeholder="Describe your billboard location, visibility, and key features"
+                placeholder="A brief description of the product..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 rows={4}
               />
             </div>
-
+            <div className="grid gap-2">
+              <Label htmlFor="price">Price</Label>
+              <Input
+                id="price"
+                type="number"
+                placeholder="0.00"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                step="0.01"
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="type">Content Type</Label>
+              <Select value={formData.content_type} onValueChange={handleContentTypeChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select content type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Static">Static</SelectItem>
+                  <SelectItem value="Dynamic">Dynamic</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-6">
               <h4 className="text-lg font-semibold text-gray-800">Structure Details</h4>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="site_orientation">Site Orientation</Label>
+                  <Label htmlFor="specs_rental.site_orientation">Site Orientation</Label>
                   <Select
-                    value={formData.site_orientation}
-                    onValueChange={(value) => handleInputChange("site_orientation", value)}
+                    value={formData.specs_rental.site_orientation || ""}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        specs_rental: {
+                          ...prev.specs_rental,
+                          site_orientation: value,
+                        },
+                      }))
+                    }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select orientation" />
+                      <SelectValue placeholder="Select site orientation" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="north">North</SelectItem>
-                      <SelectItem value="south">South</SelectItem>
-                      <SelectItem value="east">East</SelectItem>
-                      <SelectItem value="west">West</SelectItem>
-                      <SelectItem value="northeast">Northeast</SelectItem>
-                      <SelectItem value="northwest">Northwest</SelectItem>
-                      <SelectItem value="southeast">Southeast</SelectItem>
-                      <SelectItem value="southwest">Southwest</SelectItem>
+                      <SelectItem value="North">North</SelectItem>
+                      <SelectItem value="South">South</SelectItem>
+                      <SelectItem value="East">East</SelectItem>
+                      <SelectItem value="West">West</SelectItem>
+                      <SelectItem value="Northeast">Northeast</SelectItem>
+                      <SelectItem value="Northwest">Northwest</SelectItem>
+                      <SelectItem value="Southeast">Southeast</SelectItem>
+                      <SelectItem value="Southwest">Southwest</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="land_owner">Land Owner</Label>
+                  <Label htmlFor="specs_rental.land_owner">Land Owner</Label>
                   <Input
-                    id="land_owner"
-                    value={formData.land_owner}
-                    onChange={(e) => handleInputChange("land_owner", e.target.value)}
+                    id="specs_rental.land_owner"
+                    name="specs_rental.land_owner"
+                    type="text"
+                    value={formData.specs_rental.land_owner || ""}
+                    onChange={handleInputChange}
                     placeholder="Enter land owner name"
+                    disabled={loading}
                   />
                 </div>
+              </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="structure_color">Structure Color</Label>
+                  <Label htmlFor="specs_rental.structure_color">Structure Color</Label>
                   <Input
-                    id="structure_color"
-                    value={formData.structure_color}
-                    onChange={(e) => handleInputChange("structure_color", e.target.value)}
+                    id="specs_rental.structure_color"
+                    name="specs_rental.structure_color"
+                    type="text"
+                    value={formData.specs_rental.structure_color || ""}
+                    onChange={handleInputChange}
                     placeholder="Enter structure color"
+                    disabled={loading}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="structure_contractor">Structure Contractor</Label>
+                  <Label htmlFor="specs_rental.structure_contractor">Structure Contractor</Label>
                   <Input
-                    id="structure_contractor"
-                    value={formData.structure_contractor}
-                    onChange={(e) => handleInputChange("structure_contractor", e.target.value)}
+                    id="specs_rental.structure_contractor"
+                    name="specs_rental.structure_contractor"
+                    type="text"
+                    value={formData.specs_rental.structure_contractor || ""}
+                    onChange={handleInputChange}
                     placeholder="Enter contractor name"
+                    disabled={loading}
                   />
                 </div>
+              </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="structure_condition">Structure Condition</Label>
+                  <Label htmlFor="specs_rental.structure_condition">Structure Condition</Label>
                   <Select
-                    value={formData.structure_condition}
-                    onValueChange={(value) => handleInputChange("structure_condition", value)}
+                    value={formData.specs_rental.structure_condition || ""}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        specs_rental: {
+                          ...prev.specs_rental,
+                          structure_condition: value,
+                        },
+                      }))
+                    }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select condition" />
+                      <SelectValue placeholder="Select structure condition" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="excellent">Excellent</SelectItem>
-                      <SelectItem value="good">Good</SelectItem>
-                      <SelectItem value="fair">Fair</SelectItem>
-                      <SelectItem value="poor">Poor</SelectItem>
-                      <SelectItem value="needs_repair">Needs Repair</SelectItem>
+                      <SelectItem value="Excellent">Excellent</SelectItem>
+                      <SelectItem value="Good">Good</SelectItem>
+                      <SelectItem value="Fair">Fair</SelectItem>
+                      <SelectItem value="Poor">Poor</SelectItem>
+                      <SelectItem value="Needs Repair">Needs Repair</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="structure_last_maintenance">Last Maintenance Date</Label>
+                  <Label htmlFor="specs_rental.structure_last_maintenance">Last Maintenance Date</Label>
                   <Input
-                    id="structure_last_maintenance"
+                    id="specs_rental.structure_last_maintenance"
+                    name="specs_rental.structure_last_maintenance"
                     type="date"
-                    value={formData.structure_last_maintenance}
-                    onChange={(e) => handleInputChange("structure_last_maintenance", e.target.value)}
+                    value={formData.specs_rental.structure_last_maintenance || ""}
+                    onChange={handleInputChange}
+                    disabled={loading}
                   />
                 </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )
 
-      {/* Step 2: Dynamic Settings (only for dynamic content) */}
-      {currentStep === 2 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              {formData.content_type === "dynamic" ? "Dynamic Settings" : "Content Configuration"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {formData.content_type === "dynamic" ? (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="loop_duration">Loop Duration (seconds)</Label>
-                    <Input
-                      id="loop_duration"
-                      type="number"
-                      value={formData.loop_duration}
-                      onChange={(e) => handleInputChange("loop_duration", Number.parseInt(e.target.value) || 0)}
-                      placeholder="300"
-                    />
-                  </div>
+      case 2: // Dynamic Settings
+        return (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-800">Dynamic Content Settings</h3>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="spots_per_loop">Spots per Loop</Label>
-                    <Input
-                      id="spots_per_loop"
-                      type="number"
-                      value={formData.spots_per_loop}
-                      onChange={(e) => handleInputChange("spots_per_loop", Number.parseInt(e.target.value) || 0)}
-                      placeholder="10"
-                    />
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="start_time">Start Time</Label>
+                <Input
+                  id="start_time"
+                  name="cms.start_time"
+                  type="time"
+                  value={formData.cms.start_time || ""}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="spot_duration">Spot Duration (seconds)</Label>
-                    <Input
-                      id="spot_duration"
-                      type="number"
-                      value={formData.spot_duration}
-                      onChange={(e) => handleInputChange("spot_duration", Number.parseInt(e.target.value) || 0)}
-                      placeholder="30"
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="end_time">End Time</Label>
+                <Input
+                  id="end_time"
+                  name="cms.end_time"
+                  type="time"
+                  value={formData.cms.end_time || ""}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="spot_duration">Spot Duration (seconds)</Label>
+                <Input
+                  id="spot_duration"
+                  name="cms.spot_duration"
+                  type="number"
+                  value={formData.cms.spot_duration || ""}
+                  onChange={handleInputChange}
+                  placeholder="Enter duration in seconds"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="spot_per_loop">Spots Per Loop</Label>
+                <Input
+                  id="loops_per_day"
+                  name="cms.loops_per_day"
+                  type="number"
+                  value={formData.cms.loops_per_day || ""}
+                  onChange={handleInputChange}
+                  placeholder="Enter spots per loop"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Validation feedback display */}
+            {validationError && (
+              <div
+                className={`p-4 rounded-lg border ${
+                  validationError.startsWith("✓")
+                    ? "bg-green-50 border-green-200 text-green-800"
+                    : "bg-red-50 border-red-200 text-red-800"
+                }`}
+              >
+                <div className="text-sm font-medium mb-2">
+                  {validationError.startsWith("✓") ? "Configuration Valid" : "Configuration Error"}
                 </div>
-
-                <div className="space-y-4">
-                  <h4 className="font-medium">Operating Hours</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="start_time">Start Time</Label>
-                      <Input
-                        id="start_time"
-                        type="time"
-                        value={formData.operating_hours.start}
-                        onChange={(e) => handleNestedInputChange("operating_hours", "start", e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="end_time">End Time</Label>
-                      <Input
-                        id="end_time"
-                        type="time"
-                        value={formData.operating_hours.end}
-                        onChange={(e) => handleNestedInputChange("operating_hours", "end", e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="font-medium">Brightness Schedule</h4>
-                  {formData.brightness_schedule.map((schedule, index) => (
-                    <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg">
-                      <div className="space-y-2">
-                        <Label>Time Range</Label>
-                        <Input
-                          value={schedule.time_range}
-                          onChange={(e) => {
-                            const newSchedule = [...formData.brightness_schedule]
-                            newSchedule[index].time_range = e.target.value
-                            handleInputChange("brightness_schedule", newSchedule)
-                          }}
-                          placeholder="06:00-18:00"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Brightness (%)</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={schedule.brightness}
-                          onChange={(e) => {
-                            const newSchedule = [...formData.brightness_schedule]
-                            newSchedule[index].brightness = Number.parseInt(e.target.value) || 0
-                            handleInputChange("brightness_schedule", newSchedule)
-                          }}
-                          placeholder="80"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-600">Static billboards don't require dynamic configuration.</p>
-                <p className="text-sm text-gray-500 mt-2">Click Next to continue with location information.</p>
+                <pre className="text-xs whitespace-pre-wrap font-mono">{validationError}</pre>
               </div>
             )}
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )
 
-      {/* Step 3: Location Information */}
-      {currentStep === 3 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              Location Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
+      case 3: // Location Information
+        return (
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-gray-800">Location Information</h3>
+
             <div className="space-y-2">
-              <Label>Location *</Label>
-              <GooglePlacesAutocomplete onLocationSelect={handleLocationSelect} />
-              {formData.location && <p className="text-sm text-gray-600">Selected: {formData.location}</p>}
+              <Label htmlFor="specs_rental.location">
+                Location <span className="text-red-500">*</span>
+              </Label>
+              <GooglePlacesAutocomplete
+                value={formData.specs_rental.location}
+                onChange={handleLocationChange}
+                placeholder="Enter site location"
+                required
+                disabled={loading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="audience_types">Audience Types (Multiple)</Label>
+              <div className="relative">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-between bg-transparent"
+                  onClick={() => setShowAudienceDropdown(!showAudienceDropdown)}
+                  disabled={loading}
+                >
+                  <span>
+                    {selectedAudienceTypes.length > 0
+                      ? `${selectedAudienceTypes.length} audience types selected`
+                      : "Select audience types"}
+                  </span>
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${showAudienceDropdown ? "rotate-180" : "rotate-0"}`}
+                  />
+                </Button>
+                {showAudienceDropdown && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                    {AUDIENCE_TYPES.map((type) => (
+                      <div
+                        key={type}
+                        className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                        onClick={() => toggleAudienceType(type)}
+                      >
+                        <div className="flex-1">{type}</div>
+                        {selectedAudienceTypes.includes(type) ? <Check className="h-4 w-4 text-green-500" /> : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {selectedAudienceTypes.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {selectedAudienceTypes.map((type) => (
+                    <Badge key={type} variant="secondary" className="flex items-center gap-1 pr-1">
+                      {type}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-4 w-4 p-0 hover:bg-transparent"
+                        onClick={() => removeAudienceType(type)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="width">Width (feet) *</Label>
+                <Label htmlFor="specs_rental.traffic_count">Traffic Count (Daily)</Label>
                 <Input
-                  id="width"
+                  id="specs_rental.traffic_count"
+                  name="specs_rental.traffic_count"
                   type="number"
-                  value={formData.width}
-                  onChange={(e) => handleInputChange("width", Number.parseFloat(e.target.value) || 0)}
-                  placeholder="20"
+                  value={formData.specs_rental.traffic_count || ""}
+                  onChange={handleInputChange}
+                  placeholder="Enter average daily traffic count"
+                  min="0"
+                  disabled={loading}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="height">Height (feet) *</Label>
+                <Label htmlFor="specs_rental.elevation">Elevation (ft)</Label>
                 <Input
-                  id="height"
+                  id="specs_rental.elevation"
+                  name="specs_rental.elevation"
                   type="number"
-                  value={formData.height}
-                  onChange={(e) => handleInputChange("height", Number.parseFloat(e.target.value) || 0)}
-                  placeholder="10"
+                  value={formData.specs_rental.elevation || ""}
+                  onChange={handleInputChange}
+                  placeholder="Enter elevation from ground level in feet"
+                  min="0"
+                  step="0.01"
+                  disabled={loading}
                 />
               </div>
             </div>
 
-            <div className="space-y-4">
-              <h4 className="font-medium">Target Audience</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="specs_rental.height">Height (ft)</Label>
+                <Input
+                  id="specs_rental.height"
+                  name="specs_rental.height"
+                  type="number"
+                  value={formData.specs_rental.height || ""}
+                  onChange={handleInputChange}
+                  placeholder="Enter height in feet"
+                  min="0"
+                  step="0.01"
+                  disabled={loading}
+                />
+              </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="specs_rental.width">Width (ft)</Label>
+                <Input
+                  id="specs_rental.width"
+                  name="specs_rental.width"
+                  type="number"
+                  value={formData.specs_rental.width || ""}
+                  onChange={handleInputChange}
+                  placeholder="Enter width in feet"
+                  min="0"
+                  step="0.01"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="latitude">Latitude</Label>
+                <Input
+                  id="latitude"
+                  type="number"
+                  value={formData.specs_rental.geopoint[0]}
+                  onChange={(e) => handleGeopointChange(e, 0)}
+                  placeholder="Enter latitude"
+                  step="0.000001"
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="longitude">Longitude</Label>
+                <Input
+                  id="longitude"
+                  type="number"
+                  value={formData.specs_rental.geopoint[1]}
+                  onChange={(e) => handleGeopointChange(e, 1)}
+                  placeholder="Enter longitude"
+                  step="0.000001"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+          </div>
+        )
+
+      case 4: // Media
+        return (
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-gray-800">
+              Media <span className="text-red-500">*</span>
+            </h3>
+
+            <div
+              className={`border-2 border-dashed ${
+                mediaFiles.length === 0 ? "border-red-400 bg-red-50" : "border-gray-300 bg-gray-50"
+              } rounded-lg p-8 text-center transition-colors duration-200`}
+            >
+              <input
+                type="file"
+                id="media-upload"
+                multiple
+                accept="image/*,video/*"
+                className="hidden"
+                onChange={handleFileChange}
+                required={mediaFiles.length === 0}
+                disabled={loading}
+              />
+              <label htmlFor="media-upload" className="flex flex-col items-center justify-center cursor-pointer">
+                <Upload className={`h-12 w-12 ${mediaFiles.length === 0 ? "text-red-500" : "text-gray-500"} mb-3`} />
+                <p className="text-base font-medium text-gray-700 mb-1">Click to upload or drag and drop</p>
+                <p className="text-sm text-gray-500">Images or videos (max 10MB each)</p>
+                {mediaFiles.length === 0 && (
+                  <p className="text-sm text-red-600 mt-3 font-medium">At least one media file is required</p>
+                )}
+              </label>
+            </div>
+
+            {mediaPreviewUrls.length > 0 && (
               <div className="space-y-4">
-                <div>
-                  <Label className="text-sm font-medium">Age Groups</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {ageGroups.map((age) => (
-                      <div key={age} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`age-${age}`}
-                          checked={formData.audience.age_groups.includes(age)}
-                          onCheckedChange={() => handleArrayToggle("audience", "age_groups", age)}
-                        />
-                        <Label htmlFor={`age-${age}`} className="text-sm">
-                          {age}
-                        </Label>
-                      </div>
-                    ))}
+                <h4 className="text-base font-medium text-gray-700">Uploaded Media</h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {mediaPreviewUrls.map((url, index) => {
+                    const isVideo = mediaTypes[index] === "Video"
+                    return (
+                      <Card key={index} className="relative group overflow-hidden">
+                        <CardContent className="p-0">
+                          <div className="aspect-video bg-gray-100 flex items-center justify-center overflow-hidden">
+                            {isVideo ? (
+                              <video src={url} controls className="w-full h-full object-contain" />
+                            ) : (
+                              <img
+                                src={url || "/placeholder.svg"}
+                                alt={`Preview ${index + 1}`}
+                                className="w-full h-full object-contain"
+                              />
+                            )}
+                          </div>
+                          <div className="p-3 space-y-2">
+                            <div className="flex items-center text-sm font-medium text-gray-700">
+                              {isVideo ? (
+                                <Film className="h-4 w-4 mr-2 text-blue-500" />
+                              ) : (
+                                <ImageIcon className="h-4 w-4 mr-2 text-green-500" />
+                              )}
+                              <span>
+                                {isVideo ? "Video" : "Image"} {index + 1}
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor={`media-distance-${index}`} className="text-xs text-gray-600">
+                                Viewing Distance
+                              </Label>
+                              <Input
+                                id={`media-distance-${index}`}
+                                value={mediaDistances[index]}
+                                onChange={(e) => handleMediaDistanceChange(index, e.target.value)}
+                                placeholder="e.g., 100m"
+                                className="h-9 text-sm"
+                                disabled={loading}
+                              />
+                            </div>
+                          </div>
+                        </CardContent>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveMedia(index)}
+                          className="absolute top-2 right-2 h-8 w-8 rounded-full bg-white/80 text-red-500 hover:bg-white hover:text-red-600 transition-all opacity-0 group-hover:opacity-100"
+                          aria-label="Remove media"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </Card>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+
+      default:
+        return null
+    }
+  }
+
+  const getMaxStep = () => {
+    return formData.content_type === "Static" ? 4 : 4 // Always 4 steps, but step 2 is skipped for Static
+  }
+
+  const getActualStepNumber = () => {
+    if (formData.content_type === "Static" && currentStep >= 3) {
+      return currentStep - 1 // Adjust for skipped Dynamic Settings step
+    }
+    return currentStep
+  }
+
+  return (
+    <div className="flex min-h-[calc(100vh-theme(spacing.16))] flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8 md:p-10">
+      <div className="mx-auto grid w-full max-w-6xl gap-2">
+        <h1 className="text-3xl font-semibold">Create New Product</h1>
+        <p className="text-muted-foreground">Fill in the details to add a new product to your inventory.</p>
+      </div>
+
+      {/* Step Indicator */}
+      <div className="mx-auto w-full max-w-6xl">
+        <div className="flex items-center justify-between mb-8">
+          {STEPS.filter((step) => (formData.content_type === "Static" ? step.id !== 2 : true)).map(
+            (step, index, filteredSteps) => (
+              <div key={step.id} className="flex items-center">
+                <div
+                  className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
+                    currentStep === step.id
+                      ? "bg-blue-600 border-blue-600 text-white"
+                      : currentStep > step.id || (formData.content_type === "Static" && step.id === 2)
+                        ? "bg-green-600 border-green-600 text-white"
+                        : "bg-white border-gray-300 text-gray-500"
+                  }`}
+                >
+                  {currentStep > step.id || (formData.content_type === "Static" && step.id === 2) ? (
+                    <Check className="w-5 h-5" />
+                  ) : (
+                    <span className="text-sm font-medium">
+                      {formData.content_type === "Static" && step.id > 2 ? step.id - 1 : step.id}
+                    </span>
+                  )}
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-900">{step.title}</p>
+                  <p className="text-sm text-gray-500">{step.description}</p>
+                </div>
+                {index < filteredSteps.length - 1 && (
+                  <div className="flex-1 mx-4">
+                    <div className="h-0.5 bg-gray-300"></div>
                   </div>
-                </div>
-
-                <div>
-                  <Label className="text-sm font-medium">Interests</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {interests.map((interest) => (
-                      <div key={interest} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`interest-${interest}`}
-                          checked={formData.audience.interests.includes(interest)}
-                          onCheckedChange={() => handleArrayToggle("audience", "interests", interest)}
-                        />
-                        <Label htmlFor={`interest-${interest}`} className="text-sm">
-                          {interest}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <Label className="text-sm font-medium">Demographics</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {demographics.map((demo) => (
-                      <div key={demo} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`demo-${demo}`}
-                          checked={formData.audience.demographics.includes(demo)}
-                          onCheckedChange={() => handleArrayToggle("audience", "demographics", demo)}
-                        />
-                        <Label htmlFor={`demo-${demo}`} className="text-sm">
-                          {demo}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                )}
               </div>
-            </div>
+            ),
+          )}
+        </div>
+      </div>
 
-            <div className="space-y-4">
-              <h4 className="font-medium">Traffic Data</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="daily_impressions">Daily Impressions</Label>
-                  <Input
-                    id="daily_impressions"
-                    type="number"
-                    value={formData.traffic_data.daily_impressions}
-                    onChange={(e) =>
-                      handleNestedInputChange("traffic_data", "daily_impressions", Number.parseInt(e.target.value) || 0)
-                    }
-                    placeholder="10000"
-                  />
-                </div>
+      <div className="mx-auto w-full max-w-6xl flex justify-center">
+        <div className="grid gap-6 w-full max-w-2xl">
+          <Card>
+            <CardHeader>
+              <CardTitle>{getStepTitle()}</CardTitle>
+              <CardDescription>{getStepDescription()}</CardDescription>
+            </CardHeader>
+            <CardContent>{renderStepContent()}</CardContent>
+            <CardFooter className="flex justify-between">
+              <Button type="button" variant="outline" onClick={handlePrevious} disabled={currentStep === 1}>
+                <ChevronLeft className="w-4 h-4 mr-2" />
+                Previous
+              </Button>
 
-                <div className="space-y-2">
-                  <Label htmlFor="vehicle_count">Daily Vehicle Count</Label>
-                  <Input
-                    id="vehicle_count"
-                    type="number"
-                    value={formData.traffic_data.vehicle_count}
-                    onChange={(e) =>
-                      handleNestedInputChange("traffic_data", "vehicle_count", Number.parseInt(e.target.value) || 0)
-                    }
-                    placeholder="5000"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium">Peak Hours</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {peakHours.map((hour) => (
-                    <div key={hour} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`peak-${hour}`}
-                        checked={formData.traffic_data.peak_hours.includes(hour)}
-                        onCheckedChange={() => handleArrayToggle("traffic_data", "peak_hours", hour)}
-                      />
-                      <Label htmlFor={`peak-${hour}`} className="text-sm">
-                        {hour}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="font-medium flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Rental Rates
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="daily_rate">Daily Rate ($)</Label>
-                  <Input
-                    id="daily_rate"
-                    type="number"
-                    value={formData.rental_rates.daily}
-                    onChange={(e) =>
-                      handleNestedInputChange("rental_rates", "daily", Number.parseFloat(e.target.value) || 0)
-                    }
-                    placeholder="100"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="weekly_rate">Weekly Rate ($)</Label>
-                  <Input
-                    id="weekly_rate"
-                    type="number"
-                    value={formData.rental_rates.weekly}
-                    onChange={(e) =>
-                      handleNestedInputChange("rental_rates", "weekly", Number.parseFloat(e.target.value) || 0)
-                    }
-                    placeholder="600"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="monthly_rate">Monthly Rate ($)</Label>
-                  <Input
-                    id="monthly_rate"
-                    type="number"
-                    value={formData.rental_rates.monthly}
-                    onChange={(e) =>
-                      handleNestedInputChange("rental_rates", "monthly", Number.parseFloat(e.target.value) || 0)
-                    }
-                    placeholder="2000"
-                  />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Step 4: Media */}
-      {currentStep === 4 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />
-              Media
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                <p className="text-lg font-medium text-gray-900 mb-2">Upload Billboard Media</p>
-                <p className="text-gray-600 mb-4">Add photos and videos of your billboard</p>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*,video/*"
-                  onChange={(e) => e.target.files && handleFileUpload(e.target.files)}
-                  className="hidden"
-                  id="media-upload"
-                />
-                <Label htmlFor="media-upload">
-                  <Button variant="outline" className="cursor-pointer bg-transparent">
-                    Choose Files
-                  </Button>
-                </Label>
-              </div>
-
-              {formData.media.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {formData.media.map((media, index) => (
-                    <div key={index} className="relative group">
-                      <div className="aspect-square rounded-lg overflow-hidden bg-gray-100">
-                        {media.type === "image" ? (
-                          <img
-                            src={media.url || "/placeholder.svg"}
-                            alt="Billboard"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <video src={media.url} className="w-full h-full object-cover" controls />
-                        )}
-                      </div>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => removeMediaFile(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                      <Badge variant="secondary" className="absolute bottom-2 left-2">
-                        {media.type}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
+              {currentStep === getMaxStep() ? (
+                <Button onClick={handleSubmit} disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create Product"
+                  )}
+                </Button>
+              ) : (
+                <Button onClick={handleNext}>
+                  Next
+                  <ChevronRight className="w-4 h-4 ml-2" />
+                </Button>
               )}
-
-              {uploadingFiles.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Uploading files...</p>
-                  {uploadingFiles.map((fileName) => (
-                    <div key={fileName} className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                      <span className="text-sm text-gray-600">{fileName}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Navigation */}
-      <div className="flex justify-between mt-8">
-        <Button variant="outline" onClick={prevStep} disabled={currentStep === 1}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Previous
-        </Button>
-
-        {currentStep < totalSteps ? (
-          <Button onClick={nextStep} disabled={!canProceed()}>
-            Next
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        ) : (
-          <Button onClick={handleSubmit} disabled={isSubmitting || !canProceed()}>
-            {isSubmitting ? "Creating..." : "Create Billboard"}
-          </Button>
-        )}
+            </CardFooter>
+          </Card>
+        </div>
       </div>
     </div>
   )
