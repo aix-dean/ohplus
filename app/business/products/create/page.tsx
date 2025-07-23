@@ -729,8 +729,10 @@ export default function BusinessProductCreatePage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Grouping the new fields under "Additional Details" */}
             <div className="space-y-6">
-              <h4 className="text-lg font-semibold text-gray-800">Structure Details</h4>
+              <h4 className="text-lg font-semibold text-gray-800">Additional Details</h4>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
