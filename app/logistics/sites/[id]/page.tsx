@@ -23,7 +23,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
@@ -58,6 +58,28 @@ interface ServiceAssignment {
   created: any
 }
 
+// Loading skeleton component
+const LoadingSkeleton = () => (
+  <div className="container mx-auto py-4">
+    <div className="animate-pulse">
+      <div className="h-8 bg-gray-200 rounded mb-4"></div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="space-y-4">
+          <div className="h-64 bg-gray-200 rounded"></div>
+          <div className="h-32 bg-gray-200 rounded"></div>
+        </div>
+        <div className="lg:col-span-2 space-y-4">
+          <div className="h-32 bg-gray-200 rounded"></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="h-32 bg-gray-200 rounded"></div>
+            <div className="h-32 bg-gray-200 rounded"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)
+
 export default function SiteDetailsPage({ params }: Props) {
   const [product, setProduct] = useState<any>(null)
   const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([])
@@ -72,24 +94,60 @@ export default function SiteDetailsPage({ params }: Props) {
   const searchParams = useSearchParams()
   const view = searchParams.get("view")
 
+  // Memoize expensive calculations
+  const productData = useMemo(() => {
+    if (!product) return null
+
+    const contentType = (product.content_type || "").toLowerCase()
+    const isStatic = contentType === "static"
+    const width = product.specs_rental?.width || 0
+    const height = product.specs_rental?.height || 0
+    const dimension = width && height ? `${width}ft x ${height}ft` : "Not specified"
+    const location = product.specs_rental?.location || product.light?.location || "Unknown location"
+    const geopoint = product.specs_rental?.geopoint
+      ? `${product.specs_rental.geopoint[0]},${product.specs_rental.geopoint[1]}`
+      : "12.5346567742,14. 09346723"
+    const thumbnailUrl =
+      product.media && product.media.length > 0
+        ? product.media[0].url
+        : isStatic
+          ? "/roadside-billboard.png"
+          : "/led-billboard-1.png"
+    const siteOrientation = product.specs_rental?.site_orientation || "Not specified"
+    const siteOwner = product.site_owner || "Not specified"
+    const landOwner = product.specs_rental?.land_owner || "Not specified"
+
+    return {
+      contentType,
+      isStatic,
+      dimension,
+      location,
+      geopoint,
+      thumbnailUrl,
+      siteOrientation,
+      siteOwner,
+      landOwner,
+    }
+  }, [product])
+
   // Fetch product data and service assignments
   useEffect(() => {
+    let isMounted = true
+
     const fetchData = async () => {
       try {
         setLoading(true)
 
-        // Fetch product data
+        // Fetch product data first (priority)
         const productData = await getProductById(params.id)
+        if (!isMounted) return
+
         if (!productData) {
           notFound()
         }
-        console.log("Product data:", productData)
-        console.log("Site orientation:", productData.specs_rental?.site_orientation)
-        console.log("Site owner:", productData.site_owner)
-        console.log("Land owner:", productData.specs_rental?.land_owner)
         setProduct(productData)
 
-        // Fetch service assignments for this product
+        // Fetch service assignments in parallel (lower priority)
         const assignmentsQuery = query(
           collection(db, "service_assignments"),
           where("projectSiteId", "==", params.id),
@@ -97,8 +155,9 @@ export default function SiteDetailsPage({ params }: Props) {
         )
 
         const assignmentsSnapshot = await getDocs(assignmentsQuery)
-        const assignmentsData: ServiceAssignment[] = []
+        if (!isMounted) return
 
+        const assignmentsData: ServiceAssignment[] = []
         assignmentsSnapshot.forEach((doc) => {
           assignmentsData.push({
             id: doc.id,
@@ -108,41 +167,53 @@ export default function SiteDetailsPage({ params }: Props) {
 
         setServiceAssignments(assignmentsData)
       } catch (err) {
+        if (!isMounted) return
         setError(err as Error)
         console.error("Error fetching data:", err)
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
 
     fetchData()
+
+    return () => {
+      isMounted = false
+    }
   }, [params.id])
 
-  const handleCreateServiceAssignment = () => {
+  const handleCreateServiceAssignment = useCallback(() => {
     router.push(`/logistics/assignments/create?projectSite=${params.id}`)
-  }
+  }, [router, params.id])
+
+  const refreshAssignments = useCallback(async () => {
+    try {
+      const assignmentsQuery = query(
+        collection(db, "service_assignments"),
+        where("projectSiteId", "==", params.id),
+        orderBy("created", "desc"),
+      )
+
+      const assignmentsSnapshot = await getDocs(assignmentsQuery)
+      const assignmentsData: ServiceAssignment[] = []
+
+      assignmentsSnapshot.forEach((doc) => {
+        assignmentsData.push({
+          id: doc.id,
+          ...doc.data(),
+        } as ServiceAssignment)
+      })
+
+      setServiceAssignments(assignmentsData)
+    } catch (err) {
+      console.error("Error refreshing assignments:", err)
+    }
+  }, [params.id])
 
   if (loading) {
-    return (
-      <div className="container mx-auto py-4">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded mb-4"></div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="space-y-4">
-              <div className="h-64 bg-gray-200 rounded"></div>
-              <div className="h-32 bg-gray-200 rounded"></div>
-            </div>
-            <div className="lg:col-span-2 space-y-4">
-              <div className="h-32 bg-gray-200 rounded"></div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="h-32 bg-gray-200 rounded"></div>
-                <div className="h-32 bg-gray-200 rounded"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    return <LoadingSkeleton />
   }
 
   if (error) {
@@ -159,40 +230,42 @@ export default function SiteDetailsPage({ params }: Props) {
     )
   }
 
-  if (!product) {
+  if (!product || !productData) {
     notFound()
   }
 
+  const { isStatic, dimension, location, geopoint, thumbnailUrl, siteOrientation, siteOwner, landOwner } = productData
+
   // Determine if this is a static or dynamic site
-  const contentType = (product.content_type || "").toLowerCase()
-  const isStatic = contentType === "static"
-  const isDynamic = contentType === "dynamic"
+  // const contentType = (product.content_type || "").toLowerCase()
+  // const isStatic = contentType === "static"
+  const isDynamic = !isStatic //contentType === "dynamic"
 
   // Format dimensions
-  const width = product.specs_rental?.width || 0
-  const height = product.specs_rental?.height || 0
-  const dimension = width && height ? `${width}ft x ${height}ft` : "Not specified"
+  // const width = product.specs_rental?.width || 0
+  // const height = product.specs_rental?.height || 0
+  // const dimension = width && height ? `${width}ft x ${height}ft` : "Not specified"
 
   // Get location
-  const location = product.specs_rental?.location || product.light?.location || "Unknown location"
+  // const location = product.specs_rental?.location || product.light?.location || "Unknown location"
 
   // Get geopoint
-  const geopoint = product.specs_rental?.geopoint
-    ? `${product.specs_rental.geopoint[0]},${product.specs_rental.geopoint[1]}`
-    : "12.5346567742,14. 09346723"
+  // const geopoint = product.specs_rental?.geopoint
+  //   ? `${product.specs_rental.geopoint[0]},${product.specs_rental.geopoint[1]}`
+  //   : "12.5346567742,14. 09346723"
 
   // Get the first media item for the thumbnail
-  const thumbnailUrl =
-    product.media && product.media.length > 0
-      ? product.media[0].url
-      : isStatic
-        ? "/roadside-billboard.png"
-        : "/led-billboard-1.png"
+  // const thumbnailUrl =
+  //   product.media && product.media.length > 0
+  //     ? product.media[0].url
+  //     : isStatic
+  //       ? "/roadside-billboard.png"
+  //       : "/led-billboard-1.png"
 
   // Extract the specific fields we need
-  const siteOrientation = product.specs_rental?.site_orientation || "Not specified"
-  const siteOwner = product.site_owner || "Not specified"
-  const landOwner = product.specs_rental?.land_owner || "Not specified"
+  // const siteOrientation = product.specs_rental?.site_orientation || "Not specified"
+  // const siteOwner = product.site_owner || "Not specified"
+  // const landOwner = product.specs_rental?.land_owner || "Not specified"
 
   // Check if we should show specific view content
   const isFromContent = view === "content"
@@ -228,6 +301,7 @@ export default function SiteDetailsPage({ params }: Props) {
                   alt={product.name}
                   fill
                   className="object-cover rounded-md"
+                  priority
                   onError={(e) => {
                     const target = e.target as HTMLImageElement
                     target.src = isStatic ? "/roadside-billboard.png" : "/led-billboard-1.png"
@@ -682,41 +756,13 @@ export default function SiteDetailsPage({ params }: Props) {
         open={detailsDialogOpen}
         onOpenChange={setDetailsDialogOpen}
         assignmentId={selectedAssignmentId}
-        onStatusChange={() => {
-          // Refresh service assignments after status change
-          const fetchAssignments = async () => {
-            try {
-              const assignmentsQuery = query(
-                collection(db, "service_assignments"),
-                where("projectSiteId", "==", params.id),
-                orderBy("created", "desc"),
-              )
-
-              const assignmentsSnapshot = await getDocs(assignmentsQuery)
-              const assignmentsData: ServiceAssignment[] = []
-
-              assignmentsSnapshot.forEach((doc) => {
-                assignmentsData.push({
-                  id: doc.id,
-                  ...doc.data(),
-                } as ServiceAssignment)
-              })
-
-              setServiceAssignments(assignmentsData)
-            } catch (err) {
-              console.error("Error refreshing assignments:", err)
-            }
-          }
-
-          fetchAssignments()
-        }}
+        onStatusChange={refreshAssignments}
       />
       <AlarmSettingDialog open={alarmDialogOpen} onOpenChange={setAlarmDialogOpen} />
       <IlluminationIndexCardDialog
         open={illuminationIndexCardDialogOpen}
         onOpenChange={setIlluminationIndexCardDialogOpen}
         onCreateJO={() => {
-          // Navigate to create service assignment with this site pre-selected
           router.push(`/logistics/assignments/create?projectSite=${params.id}`)
         }}
       />
@@ -724,7 +770,6 @@ export default function SiteDetailsPage({ params }: Props) {
         open={displayIndexCardDialogOpen}
         onOpenChange={setDisplayIndexCardDialogOpen}
         onCreateJO={() => {
-          // Navigate to create service assignment with this site pre-selected
           router.push(`/logistics/assignments/create?projectSite=${params.id}`)
         }}
       />
