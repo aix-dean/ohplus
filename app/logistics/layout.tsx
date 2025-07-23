@@ -1,35 +1,70 @@
 "use client"
 
-import type React from "react"
-import { useAuth } from "@/contexts/auth-context"
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
+import type { ReactNode } from "react"
+import { TopNavigation } from "@/components/top-navigation"
+import { SideNavigation } from "@/components/side-navigation"
+import { Menu, X } from "lucide-react"
+import { useState } from "react"
+import { useResponsive } from "@/hooks/use-responsive"
 
 export default function LogisticsLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
-  const { user, loading } = useAuth()
-  const router = useRouter()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { isMobile, isTablet } = useResponsive()
+  const isSmallScreen = isMobile || isTablet
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login")
-    }
-  }, [user, loading, router])
+  return (
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <TopNavigation />
+      <div className="flex flex-1 relative">
+        {/* Mobile sidebar backdrop */}
+        {isSmallScreen && sidebarOpen && (
+          <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setSidebarOpen(false)} />
+        )}
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        {/* Sidebar */}
+        <div
+          className={`
+          ${isSmallScreen ? "fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out" : "relative"}
+          ${isSmallScreen && !sidebarOpen ? "-translate-x-full" : "translate-x-0"}
+        `}
+        >
+          <SideNavigation />
+
+          {/* Close button for mobile */}
+          {isSmallScreen && sidebarOpen && (
+            <button
+              className="absolute top-4 right-4 p-2 rounded-full bg-white shadow-md"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+
+        {/* Main content */}
+        <main className="flex-1 flex flex-col min-h-0">
+          {/* Mobile sidebar toggle */}
+          {isSmallScreen && (
+            <div className="py-4 px-4 sm:px-6 lg:px-8 bg-gray-50 border-b border-gray-200">
+              <button
+                className="p-2 rounded-md bg-white shadow-sm border border-gray-200"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu size={20} />
+              </button>
+            </div>
+          )}
+
+          {/* Router content area */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="py-6 px-4 sm:px-6 lg:px-8">{children}</div>
+          </div>
+        </main>
       </div>
-    )
-  }
-
-  if (!user) {
-    return null
-  }
-
-  return <>{children}</>
+    </div>
+  )
 }

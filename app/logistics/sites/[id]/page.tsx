@@ -60,7 +60,7 @@ interface ServiceAssignment {
 
 // Loading skeleton component
 const LoadingSkeleton = () => (
-  <div className="container mx-auto py-4">
+  <div className="space-y-4">
     <div className="animate-pulse">
       <div className="h-8 bg-gray-200 rounded mb-4"></div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -218,14 +218,12 @@ export default function SiteDetailsPage({ params }: Props) {
 
   if (error) {
     return (
-      <div className="container mx-auto py-4">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Site</h2>
-          <p className="text-gray-600">{error.message}</p>
-          <Button onClick={() => router.back()} className="mt-4">
-            Go Back
-          </Button>
-        </div>
+      <div className="text-center">
+        <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Site</h2>
+        <p className="text-gray-600">{error.message}</p>
+        <Button onClick={() => router.back()} className="mt-4">
+          Go Back
+        </Button>
       </div>
     )
   }
@@ -236,46 +234,8 @@ export default function SiteDetailsPage({ params }: Props) {
 
   const { isStatic, dimension, location, geopoint, thumbnailUrl, siteOrientation, siteOwner, landOwner } = productData
 
-  // Determine if this is a static or dynamic site
-  // const contentType = (product.content_type || "").toLowerCase()
-  // const isStatic = contentType === "static"
-  const isDynamic = !isStatic //contentType === "dynamic"
-
-  // Format dimensions
-  // const width = product.specs_rental?.width || 0
-  // const height = product.specs_rental?.height || 0
-  // const dimension = width && height ? `${width}ft x ${height}ft` : "Not specified"
-
-  // Get location
-  // const location = product.specs_rental?.location || product.light?.location || "Unknown location"
-
-  // Get geopoint
-  // const geopoint = product.specs_rental?.geopoint
-  //   ? `${product.specs_rental.geopoint[0]},${product.specs_rental.geopoint[1]}`
-  //   : "12.5346567742,14. 09346723"
-
-  // Get the first media item for the thumbnail
-  // const thumbnailUrl =
-  //   product.media && product.media.length > 0
-  //     ? product.media[0].url
-  //     : isStatic
-  //       ? "/roadside-billboard.png"
-  //       : "/led-billboard-1.png"
-
-  // Extract the specific fields we need
-  // const siteOrientation = product.specs_rental?.site_orientation || "Not specified"
-  // const siteOwner = product.site_owner || "Not specified"
-  // const landOwner = product.specs_rental?.land_owner || "Not specified"
-
-  // Check if we should show specific view content
-  const isFromContent = view === "content"
-  const isFromStructure = view === "structure"
-  const isFromCompliance = view === "compliance"
-  const isFromIllumination = view === "illumination"
-  const isFromDisplayHealth = view === "display-health"
-
   return (
-    <div className="container mx-auto py-4 space-y-4">
+    <div className="space-y-4">
       {/* Header */}
       <div className="bg-slate-800 text-white p-4 rounded-lg flex items-center justify-between">
         <h1 className="text-lg font-semibold">Logistics- Site Information</h1>
