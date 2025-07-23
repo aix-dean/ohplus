@@ -1,7 +1,7 @@
 "use client"
 
-import type React from "react"
-import { useState } from "react"
+import type { ReactNode } from "react"
+import { useState, useMemo, Suspense } from "react"
 import { usePathname } from "next/navigation"
 import { TopNavigation } from "@/components/top-navigation"
 import { SideNavigation } from "@/components/side-navigation"
@@ -11,7 +11,7 @@ import { useResponsive } from "@/hooks/use-responsive"
 export default function ClientLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
   const pathname = usePathname()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -20,13 +20,20 @@ export default function ClientLayout({
   const isSmallScreen = isMobile || isTablet
 
   // Skip the layout for login and register pages
-  if (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password") {
+  const shouldSkipLayout = useMemo(() => {
+    return pathname === "/login" || pathname === "/register" || pathname === "/forgot-password"
+  }, [pathname])
+
+  const topNavigation = useMemo(() => <TopNavigation />, [])
+  const sideNavigation = useMemo(() => <SideNavigation />, [])
+
+  if (shouldSkipLayout) {
     return <>{children}</>
   }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      <TopNavigation />
+      {topNavigation}
       <div className="flex flex-1 relative">
         {/* Mobile sidebar backdrop */}
         {isSmallScreen && sidebarOpen && (
@@ -40,7 +47,7 @@ export default function ClientLayout({
           ${isSmallScreen && !sidebarOpen ? "-translate-x-full" : "translate-x-0"}
         `}
         >
-          <SideNavigation />
+          {sideNavigation}
 
           {/* Close button for mobile */}
           {isSmallScreen && sidebarOpen && (
@@ -67,9 +74,19 @@ export default function ClientLayout({
             </div>
           )}
 
-          {/* Router content area */}
+          {/* Router content area with loading optimization */}
           <div className="flex-1 overflow-y-auto">
-            <div className="py-6 px-4 sm:px-6 lg:px-8">{children}</div>
+            <div className="py-6 px-4 sm:px-6 lg:px-8">
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center min-h-[400px]">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                }
+              >
+                {children}
+              </Suspense>
+            </div>
           </div>
         </main>
       </div>
