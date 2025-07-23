@@ -1,133 +1,57 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Search, Filter, MapPin, AlertTriangle, CheckCircle, Clock } from "lucide-react"
-import { AllSites } from "./all-sites"
-import { StaticSites } from "./static-sites"
-import { LEDSites } from "./led-sites"
-import { LEDSitesContent } from "./led-sites-content"
-import { LEDSitesStructure } from "./led-sites-structure"
-import { LEDSitesCompliance } from "./led-sites-compliance"
+import { Plus } from "lucide-react"
+import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
+import AllSitesTab from "./all-sites"
+import { useAuth } from "@/contexts/auth-context"
+import { RouteProtection } from "@/components/route-protection"
 
-export default function LogisticsDashboard() {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedFilter, setSelectedFilter] = useState("all")
+export default function LogisticsDashboardPage() {
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const { user, userData } = useAuth()
+  console.log(JSON.stringify(user))
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-slate-800 text-white p-6 rounded-lg">
-        <h1 className="text-2xl font-bold mb-2">Logistics Dashboard</h1>
-        <p className="text-slate-300">Monitor and manage all site operations</p>
-      </div>
+    <RouteProtection requiredRoles="logistics">
+      <div className="flex-1 overflow-auto relative">
+        <main className="p-4">
+          <div className="flex flex-col gap-4">
+            {/* Header Section */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <h1 className="text-xl md:text-2xl font-bold">
+                {userData?.first_name
+                  ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                  : "Dashboard"}
+              </h1>
+            </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Search sites..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+            {/* Main Content - All Sites */}
+            <AllSitesTab />
+          </div>
+        </main>
+
+        {/* Floating Action Button */}
+        <div className="fixed bottom-8 right-8 z-10">
+          <Button
+            onClick={() => setDialogOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg h-14 px-6"
+            size="lg"
+          >
+            <Plus className="mr-2 h-5 w-5" /> Create Service Assignment
+          </Button>
         </div>
-        <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-          <Filter className="h-4 w-4" />
-          Filters
-        </Button>
+
+        {/* Service Assignment Dialog */}
+        <ServiceAssignmentDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onSuccess={() => {
+            // You could add a success toast notification here
+          }}
+        />
       </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Sites</p>
-                <p className="text-2xl font-bold">156</p>
-              </div>
-              <MapPin className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Active Issues</p>
-                <p className="text-2xl font-bold text-red-600">23</p>
-              </div>
-              <AlertTriangle className="h-8 w-8 text-red-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Operational</p>
-                <p className="text-2xl font-bold text-green-600">133</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Pending Tasks</p>
-                <p className="text-2xl font-bold text-yellow-600">47</p>
-              </div>
-              <Clock className="h-8 w-8 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Sites Tabs */}
-      <Tabs defaultValue="all-sites" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="all-sites">All Sites</TabsTrigger>
-          <TabsTrigger value="static-sites">Static Sites</TabsTrigger>
-          <TabsTrigger value="led-sites">LED Sites</TabsTrigger>
-          <TabsTrigger value="led-content">LED Content</TabsTrigger>
-          <TabsTrigger value="led-structure">LED Structure</TabsTrigger>
-          <TabsTrigger value="led-compliance">LED Compliance</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="all-sites">
-          <AllSites searchTerm={searchTerm} />
-        </TabsContent>
-
-        <TabsContent value="static-sites">
-          <StaticSites searchTerm={searchTerm} />
-        </TabsContent>
-
-        <TabsContent value="led-sites">
-          <LEDSites searchTerm={searchTerm} />
-        </TabsContent>
-
-        <TabsContent value="led-content">
-          <LEDSitesContent searchTerm={searchTerm} />
-        </TabsContent>
-
-        <TabsContent value="led-structure">
-          <LEDSitesStructure searchTerm={searchTerm} />
-        </TabsContent>
-
-        <TabsContent value="led-compliance">
-          <LEDSitesCompliance searchTerm={searchTerm} />
-        </TabsContent>
-      </Tabs>
-    </div>
+    </RouteProtection>
   )
 }

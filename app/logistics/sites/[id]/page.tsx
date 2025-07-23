@@ -60,7 +60,7 @@ interface ServiceAssignment {
 
 // Loading skeleton component
 const LoadingSkeleton = () => (
-  <div className="space-y-4">
+  <div className="container mx-auto py-4">
     <div className="animate-pulse">
       <div className="h-8 bg-gray-200 rounded mb-4"></div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -83,7 +83,6 @@ const LoadingSkeleton = () => (
 export default function SiteDetailsPage({ params }: Props) {
   const [product, setProduct] = useState<any>(null)
   const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([])
-  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
@@ -130,15 +129,18 @@ export default function SiteDetailsPage({ params }: Props) {
     }
   }, [product])
 
-  // Fetch product data and service assignments
+  // Separate loading states
+  const [productLoading, setProductLoading] = useState(true)
+  const [assignmentsLoading, setAssignmentsLoading] = useState(true)
+
+  // Fetch product data and service assignments separately
   useEffect(() => {
     let isMounted = true
 
-    const fetchData = async () => {
+    // Fetch product data immediately (priority)
+    const fetchProduct = async () => {
       try {
-        setLoading(true)
-
-        // Fetch product data first (priority)
+        setProductLoading(true)
         const productData = await getProductById(params.id)
         if (!isMounted) return
 
@@ -146,8 +148,21 @@ export default function SiteDetailsPage({ params }: Props) {
           notFound()
         }
         setProduct(productData)
+      } catch (err) {
+        if (!isMounted) return
+        setError(err as Error)
+        console.error("Error fetching product:", err)
+      } finally {
+        if (isMounted) {
+          setProductLoading(false)
+        }
+      }
+    }
 
-        // Fetch service assignments in parallel (lower priority)
+    // Fetch service assignments separately (lower priority)
+    const fetchAssignments = async () => {
+      try {
+        setAssignmentsLoading(true)
         const assignmentsQuery = query(
           collection(db, "service_assignments"),
           where("projectSiteId", "==", params.id),
@@ -168,16 +183,17 @@ export default function SiteDetailsPage({ params }: Props) {
         setServiceAssignments(assignmentsData)
       } catch (err) {
         if (!isMounted) return
-        setError(err as Error)
-        console.error("Error fetching data:", err)
+        console.error("Error fetching assignments:", err)
       } finally {
         if (isMounted) {
-          setLoading(false)
+          setAssignmentsLoading(false)
         }
       }
     }
 
-    fetchData()
+    // Start both fetches immediately but independently
+    fetchProduct()
+    fetchAssignments()
 
     return () => {
       isMounted = false
@@ -190,6 +206,7 @@ export default function SiteDetailsPage({ params }: Props) {
 
   const refreshAssignments = useCallback(async () => {
     try {
+      setAssignmentsLoading(true)
       const assignmentsQuery = query(
         collection(db, "service_assignments"),
         where("projectSiteId", "==", params.id),
@@ -209,21 +226,26 @@ export default function SiteDetailsPage({ params }: Props) {
       setServiceAssignments(assignmentsData)
     } catch (err) {
       console.error("Error refreshing assignments:", err)
+    } finally {
+      setAssignmentsLoading(false)
     }
   }, [params.id])
 
-  if (loading) {
+  // Update the main loading condition to only check product loading
+  if (productLoading) {
     return <LoadingSkeleton />
   }
 
   if (error) {
     return (
-      <div className="text-center">
-        <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Site</h2>
-        <p className="text-gray-600">{error.message}</p>
-        <Button onClick={() => router.back()} className="mt-4">
-          Go Back
-        </Button>
+      <div className="container mx-auto py-4">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Site</h2>
+          <p className="text-gray-600">{error.message}</p>
+          <Button onClick={() => router.back()} className="mt-4">
+            Go Back
+          </Button>
+        </div>
       </div>
     )
   }
@@ -234,8 +256,46 @@ export default function SiteDetailsPage({ params }: Props) {
 
   const { isStatic, dimension, location, geopoint, thumbnailUrl, siteOrientation, siteOwner, landOwner } = productData
 
+  // Determine if this is a static or dynamic site
+  // const contentType = (product.content_type || "").toLowerCase()
+  // const isStatic = contentType === "static"
+  const isDynamic = !isStatic //contentType === "dynamic"
+
+  // Format dimensions
+  // const width = product.specs_rental?.width || 0
+  // const height = product.specs_rental?.height || 0
+  // const dimension = width && height ? `${width}ft x ${height}ft` : "Not specified"
+
+  // Get location
+  // const location = product.specs_rental?.location || product.light?.location || "Unknown location"
+
+  // Get geopoint
+  // const geopoint = product.specs_rental?.geopoint
+  //   ? `${product.specs_rental.geopoint[0]},${product.specs_rental.geopoint[1]}`
+  //   : "12.5346567742,14. 09346723"
+
+  // Get the first media item for the thumbnail
+  // const thumbnailUrl =
+  //   product.media && product.media.length > 0
+  //     ? product.media[0].url
+  //     : isStatic
+  //       ? "/roadside-billboard.png"
+  //       : "/led-billboard-1.png"
+
+  // Extract the specific fields we need
+  // const siteOrientation = product.specs_rental?.site_orientation || "Not specified"
+  // const siteOwner = product.site_owner || "Not specified"
+  // const landOwner = product.specs_rental?.land_owner || "Not specified"
+
+  // Check if we should show specific view content
+  const isFromContent = view === "content"
+  const isFromStructure = view === "structure"
+  const isFromCompliance = view === "compliance"
+  const isFromIllumination = view === "illumination"
+  const isFromDisplayHealth = view === "display-health"
+
   return (
-    <div className="space-y-4">
+    <div className="container mx-auto py-4 space-y-4">
       {/* Header */}
       <div className="bg-slate-800 text-white p-4 rounded-lg flex items-center justify-between">
         <h1 className="text-lg font-semibold">Logistics- Site Information</h1>
@@ -343,7 +403,21 @@ export default function SiteDetailsPage({ params }: Props) {
               </Button>
             </CardHeader>
             <CardContent>
-              {serviceAssignments.length === 0 ? (
+              {assignmentsLoading ? (
+                <div className="space-y-3">
+                  {Array(3)
+                    .fill(0)
+                    .map((_, i) => (
+                      <div key={i} className="border rounded-lg p-3">
+                        <div className="animate-pulse">
+                          <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+                          <div className="h-3 bg-gray-200 rounded w-16 mb-2"></div>
+                          <div className="h-3 bg-gray-200 rounded w-full"></div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              ) : serviceAssignments.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">No job orders found for this site.</div>
               ) : (
                 <div className="space-y-3">
