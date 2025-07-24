@@ -17,36 +17,9 @@ import {
 import { db } from "@/lib/firebase"
 import { addQuotationToCampaign } from "@/lib/campaign-service"
 import { jsPDF } from "jspdf"
-import { loadImageAsBase64, generateQRCode, getImageDimensions } from "@/lib/pdf-service" // Import getImageDimensions
-
-export interface Quotation {
-  id?: string
-  quotation_number: string
-  quotation_request_id?: string // Add this field
-  product_id: string
-  product_name: string
-  product_location?: string
-  site_code?: string
-  start_date: string
-  end_date: string
-  price: number
-  total_amount: number
-  duration_days: number
-  notes?: string
-  status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed" // Added "viewed" for consistency
-  created: any
-  updated?: any
-  created_by?: string
-  created_by_first_name?: string // Added for user's first name
-  created_by_last_name?: string // Added for user's last name
-  client_name?: string
-  client_email?: string
-  client_id?: string // Added client_id
-  campaignId?: string // Add campaign ID field
-  proposalId?: string // Add proposal ID field
-  valid_until?: any // Added valid_until field
-  seller_id?: string // Added seller_id field for pagination
-}
+import { loadImageAsBase64, generateQRCode, getImageDimensions } from "@/lib/pdf-service"
+import type { QuotationProduct, Quotation } from "@/lib/types/quotation" // Import the updated Quotation type
+import { getProductById as getProductFromFirebase } from "@/lib/firebase-service" // Import the product fetching function
 
 // Create a new quotation
 export async function createQuotation(quotationData: Omit<Quotation, "id">): Promise<string> {
@@ -85,7 +58,35 @@ export async function getQuotationById(quotationId: string): Promise<Quotation |
     const quotationDoc = await getDoc(doc(db, "quotations", quotationId))
 
     if (quotationDoc.exists()) {
-      return { id: quotationDoc.id, ...quotationDoc.data() } as Quotation
+      const data = quotationDoc.data() as Quotation
+      const productsFromQuotation = data.products || []
+
+      // Fetch full product details for each product in the quotation
+      const enrichedProducts: QuotationProduct[] = await Promise.all(
+        productsFromQuotation.map(async (productInQuotation) => {
+          if (productInQuotation.id) {
+            const fullProductDetails = await getProductFromFirebase(productInQuotation.id)
+            if (fullProductDetails) {
+              // Merge existing quotation product data with full product details.
+              // Prioritize quotation-specific fields (like price, notes if they were overridden)
+              // but ensure all detailed fields (media, specs_rental, description, etc.) are present.
+              return {
+                ...fullProductDetails, // Start with all details from the product collection
+                ...productInQuotation, // Overlay with any specific data stored in the quotation's product entry
+                // Ensure price from quotation is used if it exists, otherwise fallback to product price
+                price: productInQuotation.price !== undefined ? productInQuotation.price : fullProductDetails.price,
+              } as QuotationProduct
+            }
+          }
+          return productInQuotation // Return as is if product not found or no ID
+        }),
+      )
+
+      return {
+        id: quotationDoc.id,
+        ...data,
+        products: enrichedProducts,
+      } as Quotation
     }
 
     return null
@@ -131,7 +132,7 @@ export function generateQuotationNumber(): string {
 export function calculateQuotationTotal(
   startDate: string,
   endDate: string,
-  pricePerDay: number,
+  products: QuotationProduct[], // Now accepts an array of products
 ): {
   durationDays: number
   totalAmount: number
@@ -139,7 +140,12 @@ export function calculateQuotationTotal(
   const start = new Date(startDate)
   const end = new Date(endDate)
   const durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-  const totalAmount = Math.max(1, durationDays) * pricePerDay
+
+  let totalAmount = 0
+  products.forEach((product) => {
+    const dailyRate = (product.price || 0) / 30 // Assuming price is monthly
+    totalAmount += dailyRate * Math.max(1, durationDays)
+  })
 
   return {
     durationDays: Math.max(1, durationDays), // Minimum 1 day
@@ -194,43 +200,43 @@ function safeToDate(dateValue: any): Date {
 const addImageToPDF = async (
   pdf: jsPDF,
   imageUrl: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  maxHeight: number,
+  x: number, // Target X for the bounding box
+  y: number, // Target Y for the bounding box
+  targetWidth: number, // Target width for the bounding box
+  targetHeight: number, // Target height for the bounding box
 ) => {
   try {
     const base64 = await loadImageAsBase64(imageUrl)
-    if (!base64) return { width: 0, height: 0 }
+    if (!base64) return { actualWidth: 0, actualHeight: 0, xOffset: 0, yOffset: 0 }
 
     const dimensions = await getImageDimensions(base64)
 
-    // Calculate scaled dimensions to fit within max bounds
-    let { width, height } = dimensions
-    const aspectRatio = width / height
+    const { width: imgWidth, height: imgHeight } = dimensions
+    const aspectRatio = imgWidth / imgHeight
 
-    // Scale to fill the maximum available space
-    if (width > height) {
-      width = maxWidth
-      height = width / aspectRatio
-      if (height > maxHeight) {
-        height = maxHeight
-        width = height * aspectRatio
-      }
+    let finalWidth = targetWidth
+    let finalHeight = targetHeight
+
+    // Scale to fit within targetWidth and targetHeight while preserving aspect ratio
+    if (imgWidth / imgHeight > targetWidth / targetHeight) {
+      // Image is wider than target box aspect ratio
+      finalHeight = targetWidth / aspectRatio
+      finalWidth = targetWidth
     } else {
-      height = maxHeight
-      width = height * aspectRatio
-      if (width > maxWidth) {
-        width = maxWidth
-        height = width / aspectRatio
-      }
+      // Image is taller than target box aspect ratio
+      finalWidth = targetHeight * aspectRatio
+      finalHeight = targetHeight
     }
 
-    pdf.addImage(base64, "JPEG", x, y, width, height)
-    return { width, height }
+    // Calculate offsets to center the image within the target bounding box
+    const xOffset = x + (targetWidth - finalWidth) / 2
+    const yOffset = y + (targetHeight - finalHeight) / 2
+
+    pdf.addImage(base64, "JPEG", xOffset, yOffset, finalWidth, finalHeight)
+    return { actualWidth: finalWidth, actualHeight: finalHeight, xOffset, yOffset }
   } catch (error) {
     console.error("Error adding image to PDF:", error)
-    return { width: 0, height: 0 }
+    return { actualWidth: 0, actualHeight: 0, xOffset: 0, yOffset: 0 }
   }
 }
 
@@ -260,8 +266,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     if (yPosition + requiredHeight > pageHeight - margin) {
       pdf.addPage()
       yPosition = margin
-      // Add QR code and logo to new page as well
-      addHeaderElementsToPage()
+      // Only add header elements on the first page, which is handled by the initial call
     }
   }
 
@@ -298,7 +303,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     }
   }
 
-  // Add header elements to first page
+  // Add header elements ONLY to the first page
   await addHeaderElementsToPage()
   yPosition = Math.max(yPosition, margin + 40) // Ensure content starts below header elements
 
@@ -380,10 +385,11 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.line(margin, yPosition, pageWidth - margin, yPosition)
   yPosition += 5
 
-  const tableStartY = yPosition
   const cellPadding = 3
   const headerRowHeight = 8
   const dataRowHeight = 12 // Increased for multi-line product name
+
+  // Adjusted column widths (removed 'Image' column)
   const colWidths = [
     contentWidth * 0.4, // Product
     contentWidth * 0.15, // Type
@@ -415,45 +421,55 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   })
   yPosition += headerRowHeight
 
-  // Table Row for Product
-  pdf.setFillColor(255, 255, 255) // bg-white
-  pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "F")
-  pdf.setDrawColor(200, 200, 200)
-  pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "S")
-
+  // Table Rows for Products
   pdf.setFontSize(9)
   pdf.setFont("helvetica", "normal")
   pdf.setTextColor(0, 0, 0)
 
-  currentX = margin
-  let productText = safeString(quotation.product_name)
-  if (quotation.site_code) {
-    productText += `\nSite: ${quotation.site_code}`
-  }
-  addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[0] - 2 * cellPadding, 9)
-  currentX += colWidths[0]
-  pdf.text("Rental", currentX + cellPadding, yPosition + dataRowHeight / 2, { baseline: "middle" })
-  currentX += colWidths[1]
-  addText(
-    safeString(quotation.product_location),
-    currentX + cellPadding,
-    yPosition + cellPadding,
-    colWidths[2] - 2 * cellPadding,
-    9,
-  )
-  currentX += colWidths[2]
-  pdf.text(
-    `₱${safeString(quotation.price)}/day`,
-    currentX + colWidths[3] - cellPadding,
-    yPosition + dataRowHeight / 2,
-    {
-      baseline: "middle",
-      align: "right",
-    },
-  )
-  yPosition += dataRowHeight
+  for (const product of quotation.products) {
+    checkNewPage(dataRowHeight + 5) // Check for new page before adding each product row
+    pdf.setFillColor(255, 255, 255) // bg-white
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight + 5, "F") // Adjusted height
+    pdf.setDrawColor(200, 200, 200)
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight + 5, "S")
 
-  // Total Amount Row
+    currentX = margin
+
+    let productText = safeString(product.name)
+    if (product.site_code) {
+      productText += `\nSite: ${product.site_code}`
+    }
+    if (product.description) {
+      productText += `\n${product.description}`
+    }
+    addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[0] - 2 * cellPadding, 9)
+    currentX += colWidths[0]
+    pdf.text(safeString(product.type), currentX + cellPadding, yPosition + (dataRowHeight + 5) / 2, {
+      baseline: "middle",
+    })
+    currentX += colWidths[1]
+    addText(
+      safeString(product.location),
+      currentX + cellPadding,
+      yPosition + cellPadding,
+      colWidths[2] - 2 * cellPadding,
+      9,
+    )
+    currentX += colWidths[2]
+    pdf.text(
+      `₱${safeString(product.price)}/month`, // Display monthly price here
+      currentX + colWidths[3] - cellPadding,
+      yPosition + (dataRowHeight + 5) / 2,
+      {
+        baseline: "middle",
+        align: "right",
+      },
+    )
+    yPosition += dataRowHeight + 5
+  }
+
+  // Total Amount Row - now inside the table
+  checkNewPage(headerRowHeight) // Ensure space for total row
   pdf.setFillColor(243, 244, 246) // bg-gray-50
   pdf.rect(margin, yPosition, contentWidth, headerRowHeight, "F")
   pdf.setDrawColor(200, 200, 200)
@@ -463,10 +479,17 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setFont("helvetica", "bold")
   pdf.setTextColor(37, 99, 235) // Blue color
 
-  pdf.text("Total Amount:", margin + colWidths[0] + colWidths[1] + colWidths[2] - 5, yPosition + headerRowHeight / 2, {
-    baseline: "middle",
-    align: "right",
-  })
+  // Position "Total Amount:" to span Product, Type, Location columns
+  pdf.text(
+    "Total Amount:",
+    margin + colWidths[0] + colWidths[1] + colWidths[2] - 5, // Adjusted X position
+    yPosition + headerRowHeight / 2,
+    {
+      baseline: "middle",
+      align: "right",
+    },
+  )
+  // Position the actual total amount under the Price column
   pdf.text(
     `₱${safeString(quotation.total_amount)}`,
     pageWidth - margin - cellPadding,
@@ -476,7 +499,133 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
       align: "right",
     },
   )
-  yPosition += headerRowHeight + 15
+  yPosition += headerRowHeight + 15 // Add space after the table
+
+  // Product Details Section
+  for (const product of quotation.products) {
+    checkNewPage(60) // Estimate space for title, dimensions, description
+    pdf.setFontSize(12)
+    pdf.setFont("helvetica", "bold")
+    pdf.setTextColor(0, 0, 0)
+    pdf.text(`${safeString(product.name)} Details`, margin, yPosition)
+    yPosition += 5
+    pdf.setLineWidth(0.2)
+    pdf.setDrawColor(200, 200, 200)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 5
+
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+
+    // Dimensions
+    if (product.specs_rental?.width && product.specs_rental?.height) {
+      pdf.text("DIMENSIONS", margin, yPosition)
+      pdf.text(
+        `${safeString(product.specs_rental.width)}m x ${safeString(product.specs_rental.height)}m`,
+        margin + 30,
+        yPosition,
+      )
+      yPosition += 5
+    }
+    // Elevation
+    if (product.specs_rental?.elevation) {
+      pdf.text("ELEVATION", margin, yPosition)
+      pdf.text(`${safeString(product.specs_rental.elevation)}m`, margin + 30, yPosition)
+      yPosition += 5
+    }
+    // Traffic Count
+    if (product.specs_rental?.traffic_count) {
+      pdf.text("TRAFFIC COUNT", margin, yPosition)
+      pdf.text(safeString(product.specs_rental.traffic_count), margin + 30, yPosition)
+      yPosition += 5
+    }
+    // Audience Type(s)
+    if (product.specs_rental?.audience_type) {
+      pdf.text("AUDIENCE TYPE", margin, yPosition)
+      pdf.text(safeString(product.specs_rental.audience_type), margin + 30, yPosition)
+      yPosition += 5
+    } else if (product.specs_rental?.audience_types && product.specs_rental.audience_types.length > 0) {
+      pdf.text("AUDIENCE TYPES", margin, yPosition)
+      pdf.text(product.specs_rental.audience_types.join(", "), margin + 30, yPosition)
+      yPosition += 5
+    }
+    yPosition += 5 // Add some space after specs
+
+    // Description
+    if (product.description) {
+      checkNewPage(20) // Check for description space
+      pdf.setFontSize(9)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("DESCRIPTION", margin, yPosition)
+      yPosition += 5
+      pdf.setFont("helvetica", "normal")
+      yPosition = addText(safeString(product.description), margin, yPosition, contentWidth)
+      yPosition += 5
+    }
+
+    // Media Images
+    if (product.media && product.media.length > 0) {
+      checkNewPage(100) // Estimate space for media title + first row of images
+      pdf.setFontSize(9)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("MEDIA", margin, yPosition)
+      yPosition += 5
+      pdf.setFont("helvetica", "normal")
+
+      const imageGridWidth = contentWidth // Use full content width for image grid
+      const imageCountPerRow = 4
+      const imageSpacing = cellPadding // Spacing between images
+      const calculatedImageWidth = (imageGridWidth - (imageCountPerRow - 1) * imageSpacing) / imageCountPerRow
+      const calculatedImageHeight = calculatedImageWidth * (2 / 3) // Maintain 3:2 aspect ratio for display
+
+      let currentImageX = margin
+      let imagesInRow = 0
+
+      for (const mediaItem of product.media) {
+        if (imagesInRow === imageCountPerRow) {
+          // Start new row after `imageCountPerRow` images
+          yPosition += calculatedImageHeight + imageSpacing
+          currentImageX = margin
+          imagesInRow = 0
+          checkNewPage(calculatedImageHeight + imageSpacing) // Check for new page for the new row
+        }
+
+        if (!mediaItem.isVideo) {
+          // Only display images in PDF
+          await addImageToPDF(
+            pdf,
+            mediaItem.url || "/placeholder.svg?height=200&width=300",
+            currentImageX,
+            yPosition,
+            calculatedImageWidth,
+            calculatedImageHeight,
+          )
+        } else {
+          // Placeholder for video in PDF
+          pdf.setFillColor(230, 230, 230) // Light gray
+          pdf.rect(currentImageX, yPosition, calculatedImageWidth, calculatedImageHeight, "F")
+          pdf.setTextColor(150, 150, 150)
+          pdf.setFontSize(6)
+          pdf.text(
+            "Video Not Supported",
+            currentImageX + calculatedImageWidth / 2,
+            yPosition + calculatedImageHeight / 2,
+            {
+              align: "center",
+              baseline: "middle",
+            },
+          )
+          pdf.setTextColor(0, 0, 0)
+          pdf.setFontSize(9)
+        }
+
+        currentImageX += calculatedImageWidth + imageSpacing
+        imagesInRow++
+      }
+      yPosition += calculatedImageHeight + 10 // Space after last row of images
+    }
+    yPosition += 10 // Space after each product details section
+  }
 
   // Additional Information (Notes)
   if (quotation.notes) {
@@ -490,8 +639,6 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
     yPosition += 5
 
-    pdf.setFontSize(9)
-    pdf.setFont("helvetica", "normal")
     yPosition = addText(quotation.notes, margin, yPosition, contentWidth)
     yPosition += 10
   }
@@ -588,7 +735,8 @@ export async function getQuotationsByCampaignId(campaignId: string): Promise<Quo
     const quotations: Quotation[] = []
 
     querySnapshot.forEach((doc) => {
-      quotations.push({ id: doc.id, ...doc.data() } as Quotation)
+      const data = doc.data()
+      quotations.push({ id: doc.id, ...data, products: data.products || [] } as Quotation)
     })
 
     return quotations
@@ -612,7 +760,8 @@ export async function getQuotationsByCreatedBy(userId: string): Promise<Quotatio
     const quotations: Quotation[] = []
 
     querySnapshot.forEach((doc) => {
-      quotations.push({ id: doc.id, ...doc.data() } as Quotation)
+      const data = doc.data()
+      quotations.push({ id: doc.id, ...data, products: data.products || [] } as Quotation)
     })
 
     return quotations
@@ -646,7 +795,8 @@ export async function getQuotationsPaginated(
   const querySnapshot = await getDocs(q)
   const quotations: any[] = []
   querySnapshot.forEach((doc) => {
-    quotations.push({ id: doc.id, ...doc.data() })
+    const data = doc.data()
+    quotations.push({ id: doc.id, ...data, products: data.products || [] })
   })
 
   const lastVisibleId = querySnapshot.docs[querySnapshot.docs.length - 1] || null
