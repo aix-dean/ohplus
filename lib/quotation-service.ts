@@ -258,22 +258,21 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     pdf.setFontSize(fontSize)
     const lines = pdf.splitTextToSize(text, maxWidth)
     pdf.text(lines, x, y)
-    return y + lines.length * fontSize * 0.3 // Adjust line height multiplier
+    return y + lines.length * fontSize * 0.3
   }
 
   // Helper function to check if we need a new page
   const checkNewPage = (requiredHeight: number) => {
-    if (yPosition + requiredHeight > pageHeight - margin) {
+    if (yPosition + requiredHeight > pageHeight - margin - 20) {
       pdf.addPage()
       yPosition = margin
-      // Only add header elements on the first page, which is handled by the initial call
     }
   }
 
   // Helper function to add QR code and logo to current page
   const addHeaderElementsToPage = async () => {
     try {
-      const qrSize = 25
+      const qrSize = 20
       const qrX = pageWidth - margin - qrSize
       const qrY = margin
 
@@ -286,26 +285,42 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
         pdf.addImage(qrBase64, "PNG", qrX, qrY, qrSize, qrSize)
         pdf.setFontSize(6)
         pdf.setTextColor(100, 100, 100)
-        pdf.text("Scan to view online", qrX, qrY + qrSize + 3)
+        const textWidth = pdf.getTextWidth("Scan to view online")
+        pdf.text("Scan to view online", qrX + (qrSize - textWidth) / 2, qrY + qrSize + 3)
         pdf.setTextColor(0, 0, 0)
       }
 
-      // Add Company Logo
+      // Add Company Logo with proper aspect ratio handling
       const logoUrl = "/oh-plus-logo.png"
       const logoBase64 = await loadImageAsBase64(logoUrl)
       if (logoBase64) {
-        const logoWidth = 30 // Adjust as needed
-        const logoHeight = 10 // Adjust as needed
-        pdf.addImage(logoBase64, "PNG", margin, margin, logoWidth, logoHeight)
+        // Get actual logo dimensions
+        const { width: actualLogoWidth, height: actualLogoHeight } = await getImageDimensions(logoBase64)
+
+        // Calculate proper dimensions maintaining aspect ratio
+        const maxLogoWidth = 35
+        const maxLogoHeight = 12
+        const logoAspectRatio = actualLogoWidth / actualLogoHeight
+
+        let finalLogoWidth = maxLogoWidth
+        let finalLogoHeight = maxLogoWidth / logoAspectRatio
+
+        // If height exceeds max, scale down based on height
+        if (finalLogoHeight > maxLogoHeight) {
+          finalLogoHeight = maxLogoHeight
+          finalLogoWidth = maxLogoHeight * logoAspectRatio
+        }
+
+        pdf.addImage(logoBase64, "PNG", margin, margin, finalLogoWidth, finalLogoHeight)
       }
     } catch (error) {
       console.error("Error adding header elements to PDF:", error)
     }
   }
 
-  // Add header elements ONLY to the first page
+  // Add header elements to the first page
   await addHeaderElementsToPage()
-  yPosition = Math.max(yPosition, margin + 40) // Ensure content starts below header elements
+  yPosition = Math.max(yPosition, margin + 35) // Ensure content starts below header elements
 
   // Header (Quotation Title)
   pdf.setFontSize(20)
@@ -334,14 +349,26 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setLineWidth(0.2)
   pdf.setDrawColor(200, 200, 200)
   pdf.line(margin, yPosition, pageWidth - margin, yPosition)
-  yPosition += 5
+  yPosition += 8
 
   pdf.setFontSize(9)
   pdf.setFont("helvetica", "normal")
   pdf.text(`Created Date: ${formatDate(createdDate)}`, margin, yPosition)
   pdf.text(`Valid Until: ${formatDate(validUntilDate)}`, margin + contentWidth / 2, yPosition)
   yPosition += 5
-  pdf.text(`Total Amount: PHP${safeString(quotation.total_amount)}`, margin, yPosition) // Changed ₱ to PHP
+
+  // Add start and end dates for the rental period
+  if (quotation.start_date) {
+    pdf.text(`Start Date: ${formatDate(quotation.start_date)}`, margin, yPosition)
+  }
+  if (quotation.end_date) {
+    pdf.text(`End Date: ${formatDate(quotation.end_date)}`, margin + contentWidth / 2, yPosition)
+  }
+  if (quotation.start_date || quotation.end_date) {
+    yPosition += 5
+  }
+
+  pdf.text(`Total Amount: PHP${safeString(quotation.total_amount)}`, margin, yPosition)
   yPosition += 10
 
   // Client Information Section
@@ -353,7 +380,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setLineWidth(0.2)
   pdf.setDrawColor(200, 200, 200)
   pdf.line(margin, yPosition, pageWidth - margin, yPosition)
-  yPosition += 5
+  yPosition += 8
 
   pdf.setFontSize(9)
   pdf.setFont("helvetica", "normal")
@@ -372,10 +399,10 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     pdf.text(`Related Campaign ID: ${safeString(quotation.campaignId)}`, margin, yPosition)
     yPosition += 5
   }
-  yPosition += 5
+  yPosition += 10
 
   // Product & Services Section (Manual Table Drawing)
-  checkNewPage(50) // Estimate space for table header + one row
+  checkNewPage(50)
   pdf.setFontSize(12)
   pdf.setFont("helvetica", "bold")
   pdf.text("PRODUCT & SERVICES", margin, yPosition)
@@ -383,18 +410,19 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setLineWidth(0.2)
   pdf.setDrawColor(200, 200, 200)
   pdf.line(margin, yPosition, pageWidth - margin, yPosition)
-  yPosition += 5
+  yPosition += 8
 
   const cellPadding = 3
   const headerRowHeight = 8
-  const dataRowHeight = 12 // Increased for multi-line product name
+  const dataRowHeight = 20 // Increased for images
 
-  // Adjusted column widths (removed 'Image' column)
+  // Column widths including image column
   const colWidths = [
-    contentWidth * 0.4, // Product
+    contentWidth * 0.15, // Image
+    contentWidth * 0.35, // Product
     contentWidth * 0.15, // Type
-    contentWidth * 0.25, // Location
-    contentWidth * 0.2, // Price
+    contentWidth * 0.2, // Location
+    contentWidth * 0.15, // Price
   ]
 
   // Table Headers
@@ -409,13 +437,15 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setTextColor(75, 85, 99)
 
   let currentX = margin
-  pdf.text("Product", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
+  pdf.text("Image", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
   currentX += colWidths[0]
-  pdf.text("Type", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
+  pdf.text("Product", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
   currentX += colWidths[1]
-  pdf.text("Location", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
+  pdf.text("Type", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
   currentX += colWidths[2]
-  pdf.text("Price", currentX + colWidths[3] - cellPadding, yPosition + headerRowHeight / 2, {
+  pdf.text("Location", currentX + cellPadding, yPosition + headerRowHeight / 2, { baseline: "middle" })
+  currentX += colWidths[3]
+  pdf.text("Price", currentX + colWidths[4] - cellPadding, yPosition + headerRowHeight / 2, {
     baseline: "middle",
     align: "right",
   })
@@ -427,49 +457,86 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setTextColor(0, 0, 0)
 
   for (const product of quotation.products) {
-    checkNewPage(dataRowHeight + 5) // Check for new page before adding each product row
+    checkNewPage(dataRowHeight + 5)
     pdf.setFillColor(255, 255, 255) // bg-white
-    pdf.rect(margin, yPosition, contentWidth, dataRowHeight + 5, "F") // Adjusted height
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "F")
     pdf.setDrawColor(200, 200, 200)
-    pdf.rect(margin, yPosition, contentWidth, dataRowHeight + 5, "S")
+    pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "S")
 
     currentX = margin
 
+    // Image column - uniform size for all images
+    const imageSize = 15 // Fixed size for all product images
+    const imageX = currentX + cellPadding
+    const imageY = yPosition + (dataRowHeight - imageSize) / 2
+
+    if (product.media && product.media.length > 0 && product.media[0].url) {
+      try {
+        const imageBase64 = await loadImageAsBase64(product.media[0].url)
+        if (imageBase64) {
+          pdf.addImage(imageBase64, "JPEG", imageX, imageY, imageSize, imageSize)
+        }
+      } catch (error) {
+        // Add placeholder if image fails to load
+        pdf.setFillColor(240, 240, 240)
+        pdf.rect(imageX, imageY, imageSize, imageSize, "F")
+        pdf.setFontSize(6)
+        pdf.setTextColor(150, 150, 150)
+        pdf.text("No Image", imageX + imageSize / 2, imageY + imageSize / 2, { align: "center", baseline: "middle" })
+        pdf.setTextColor(0, 0, 0)
+        pdf.setFontSize(9)
+      }
+    } else {
+      // Add placeholder for missing image
+      pdf.setFillColor(240, 240, 240)
+      pdf.rect(imageX, imageY, imageSize, imageSize, "F")
+      pdf.setFontSize(6)
+      pdf.setTextColor(150, 150, 150)
+      pdf.text("No Image", imageX + imageSize / 2, imageY + imageSize / 2, { align: "center", baseline: "middle" })
+      pdf.setTextColor(0, 0, 0)
+      pdf.setFontSize(9)
+    }
+    currentX += colWidths[0]
+
+    // Product column
     let productText = safeString(product.name)
     if (product.site_code) {
       productText += `\nSite: ${product.site_code}`
     }
-    if (product.description) {
-      productText += `\n${product.description}`
-    }
-    addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[0] - 2 * cellPadding, 9)
-    currentX += colWidths[0]
-    pdf.text(safeString(product.type), currentX + cellPadding, yPosition + (dataRowHeight + 5) / 2, {
+    addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[1] - 2 * cellPadding, 8)
+    currentX += colWidths[1]
+
+    // Type column
+    pdf.text(safeString(product.type), currentX + cellPadding, yPosition + dataRowHeight / 2, {
       baseline: "middle",
     })
-    currentX += colWidths[1]
+    currentX += colWidths[2]
+
+    // Location column
     addText(
       safeString(product.location),
       currentX + cellPadding,
       yPosition + cellPadding,
-      colWidths[2] - 2 * cellPadding,
-      9,
+      colWidths[3] - 2 * cellPadding,
+      8,
     )
-    currentX += colWidths[2]
+    currentX += colWidths[3]
+
+    // Price column
     pdf.text(
-      `PHP${safeString(product.price)}/month`, // Display monthly price here, changed ₱ to PHP
-      currentX + colWidths[3] - cellPadding,
-      yPosition + (dataRowHeight + 5) / 2,
+      `PHP${safeString(product.price)}/month`,
+      currentX + colWidths[4] - cellPadding,
+      yPosition + dataRowHeight / 2,
       {
         baseline: "middle",
         align: "right",
       },
     )
-    yPosition += dataRowHeight + 5
+    yPosition += dataRowHeight
   }
 
-  // Total Amount Row - now inside the table
-  checkNewPage(headerRowHeight) // Ensure space for total row
+  // Total Amount Row
+  checkNewPage(headerRowHeight)
   pdf.setFillColor(243, 244, 246) // bg-gray-50
   pdf.rect(margin, yPosition, contentWidth, headerRowHeight, "F")
   pdf.setDrawColor(200, 200, 200)
@@ -479,19 +546,16 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setFont("helvetica", "bold")
   pdf.setTextColor(37, 99, 235) // Blue color
 
-  // Position "Total Amount:" to span Product, Type, Location columns
+  // Position "Total Amount:" to span most columns
+  const totalLabelX = margin + colWidths[0] + colWidths[1] + colWidths[2] + colWidths[3] - 5
+  pdf.text("Total Amount:", totalLabelX, yPosition + headerRowHeight / 2, {
+    baseline: "middle",
+    align: "right",
+  })
+
+  // Position the actual total amount in the price column
   pdf.text(
-    "Total Amount:",
-    margin + colWidths[0] + colWidths[1] + colWidths[2] - 5, // Adjusted X position
-    yPosition + headerRowHeight / 2,
-    {
-      baseline: "middle",
-      align: "right",
-    },
-  )
-  // Position the actual total amount under the Price column
-  pdf.text(
-    `PHP${safeString(quotation.total_amount)}`, // Changed ₱ to PHP
+    `PHP${safeString(quotation.total_amount)}`,
     pageWidth - margin - cellPadding,
     yPosition + headerRowHeight / 2,
     {
@@ -499,11 +563,11 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
       align: "right",
     },
   )
-  yPosition += headerRowHeight + 15 // Add space after the table
+  yPosition += headerRowHeight + 15
 
   // Product Details Section
   for (const product of quotation.products) {
-    checkNewPage(60) // Estimate space for title, dimensions, description
+    checkNewPage(60)
     pdf.setFontSize(12)
     pdf.setFont("helvetica", "bold")
     pdf.setTextColor(0, 0, 0)
@@ -512,119 +576,128 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     pdf.setLineWidth(0.2)
     pdf.setDrawColor(200, 200, 200)
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
-    yPosition += 5
+    yPosition += 8
 
     pdf.setFontSize(9)
     pdf.setFont("helvetica", "normal")
 
-    // Dimensions
+    // Two column layout for specifications
+    const leftCol = margin
+    const rightCol = margin + contentWidth / 2
+
+    let leftY = yPosition
+    let rightY = yPosition
+
+    // Left column specifications
     if (product.specs_rental?.width && product.specs_rental?.height) {
-      pdf.text("Dimensions:", margin, yPosition) // Changed to "Dimensions:"
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Dimensions:", leftCol, leftY)
+      pdf.setFont("helvetica", "normal")
       pdf.text(
         `${safeString(product.specs_rental.width)}m x ${safeString(product.specs_rental.height)}m`,
-        margin + 30,
-        yPosition,
+        leftCol + 25,
+        leftY,
       )
-      yPosition += 5
+      leftY += 5
     }
-    // Elevation
+
     if (product.specs_rental?.elevation) {
-      pdf.text("Elevation:", margin, yPosition) // Changed to "Elevation:"
-      pdf.text(`${safeString(product.specs_rental.elevation)}m`, margin + 30, yPosition)
-      yPosition += 5
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Elevation:", leftCol, leftY)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(`${safeString(product.specs_rental.elevation)}m`, leftCol + 25, leftY)
+      leftY += 5
     }
-    // Traffic Count
+
+    // Right column specifications
     if (product.specs_rental?.traffic_count) {
-      pdf.text("Traffic Count:", margin, yPosition) // Changed to "Traffic Count:"
-      pdf.text(safeString(product.specs_rental.traffic_count), margin + 30, yPosition)
-      yPosition += 5
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Traffic Count:", rightCol, rightY)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(safeString(product.specs_rental.traffic_count), rightCol + 30, rightY)
+      rightY += 5
     }
-    // Audience Type(s)
+
     if (product.specs_rental?.audience_type) {
-      pdf.text("Audience Type:", margin, yPosition) // Changed to "Audience Type:"
-      pdf.text(safeString(product.specs_rental.audience_type), margin + 30, yPosition)
-      yPosition += 5
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Audience Type:", rightCol, rightY)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(safeString(product.specs_rental.audience_type), rightCol + 30, rightY)
+      rightY += 5
     } else if (product.specs_rental?.audience_types && product.specs_rental.audience_types.length > 0) {
-      pdf.text("Audience Types:", margin, yPosition) // Changed to "Audience Types:"
-      pdf.text(product.specs_rental.audience_types.join(", "), margin + 30, yPosition)
-      yPosition += 5
+      pdf.setFont("helvetica", "bold")
+      pdf.text("Audience Types:", rightCol, rightY)
+      pdf.setFont("helvetica", "normal")
+      rightY = addText(product.specs_rental.audience_types.join(", "), rightCol + 30, rightY, contentWidth / 2 - 30, 9)
+      rightY += 2
     }
-    yPosition += 5 // Add some space after specs
+
+    yPosition = Math.max(leftY, rightY) + 5
 
     // Description
     if (product.description) {
-      checkNewPage(20) // Check for description space
+      checkNewPage(20)
       pdf.setFontSize(9)
       pdf.setFont("helvetica", "bold")
-      pdf.text("Description:", margin, yPosition) // Changed to "Description:"
+      pdf.text("Description:", margin, yPosition)
       yPosition += 5
       pdf.setFont("helvetica", "normal")
-      yPosition = addText(safeString(product.description), margin, yPosition, contentWidth)
+      yPosition = addText(safeString(product.description), margin, yPosition, contentWidth, 9)
       yPosition += 5
     }
 
-    // Media Images
+    // Media Images - uniform grid
     if (product.media && product.media.length > 0) {
-      checkNewPage(100) // Estimate space for media title + first row of images
-      pdf.setFontSize(9)
-      pdf.setFont("helvetica", "bold")
-      pdf.text("Product Images:", margin, yPosition) // Changed to "Product Images:"
-      yPosition += 5
-      pdf.setFont("helvetica", "normal")
+      const imagesToShow = product.media.filter((media) => !media.isVideo) // Only show images in PDF
+      if (imagesToShow.length > 0) {
+        checkNewPage(50)
+        pdf.setFontSize(9)
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Product Images:", margin, yPosition)
+        yPosition += 8
 
-      const imageGridWidth = contentWidth // Use full content width for image grid
-      const imageCountPerRow = 4
-      const imageSpacing = cellPadding // Spacing between images
-      const calculatedImageWidth = (imageGridWidth - (imageCountPerRow - 1) * imageSpacing) / imageCountPerRow
-      const calculatedImageHeight = calculatedImageWidth * (2 / 3) // Maintain 3:2 aspect ratio for display
+        const imagesPerRow = 4
+        const imageSpacing = 3
+        const uniformImageSize = (contentWidth - (imagesPerRow - 1) * imageSpacing) / imagesPerRow
 
-      let currentImageX = margin
-      let imagesInRow = 0
+        let currentImageX = margin
+        let imagesInRow = 0
 
-      for (const mediaItem of product.media) {
-        if (imagesInRow === imageCountPerRow) {
-          // Start new row after `imageCountPerRow` images
-          yPosition += calculatedImageHeight + imageSpacing
-          currentImageX = margin
-          imagesInRow = 0
-          checkNewPage(calculatedImageHeight + imageSpacing) // Check for new page for the new row
-        }
+        for (const mediaItem of imagesToShow) {
+          if (imagesInRow === imagesPerRow) {
+            // Start new row
+            yPosition += uniformImageSize + imageSpacing
+            currentImageX = margin
+            imagesInRow = 0
+            checkNewPage(uniformImageSize + imageSpacing)
+          }
 
-        if (!mediaItem.isVideo) {
-          // Only display images in PDF
-          await addImageToPDF(
-            pdf,
-            mediaItem.url || "/placeholder.svg?height=200&width=300",
-            currentImageX,
-            yPosition,
-            calculatedImageWidth,
-            calculatedImageHeight,
-          )
-        } else {
-          // Placeholder for video in PDF
-          pdf.setFillColor(230, 230, 230) // Light gray
-          pdf.rect(currentImageX, yPosition, calculatedImageWidth, calculatedImageHeight, "F")
-          pdf.setTextColor(150, 150, 150)
-          pdf.setFontSize(6)
-          pdf.text(
-            "Video Not Supported",
-            currentImageX + calculatedImageWidth / 2,
-            yPosition + calculatedImageHeight / 2,
-            {
+          try {
+            const imageBase64 = await loadImageAsBase64(mediaItem.url || "")
+            if (imageBase64) {
+              pdf.addImage(imageBase64, "JPEG", currentImageX, yPosition, uniformImageSize, uniformImageSize)
+            }
+          } catch (error) {
+            // Add placeholder for failed images
+            pdf.setFillColor(240, 240, 240)
+            pdf.rect(currentImageX, yPosition, uniformImageSize, uniformImageSize, "F")
+            pdf.setFontSize(6)
+            pdf.setTextColor(150, 150, 150)
+            pdf.text("Image Error", currentImageX + uniformImageSize / 2, yPosition + uniformImageSize / 2, {
               align: "center",
               baseline: "middle",
-            },
-          )
-          pdf.setTextColor(0, 0, 0)
-          pdf.setFontSize(9)
-        }
+            })
+            pdf.setTextColor(0, 0, 0)
+            pdf.setFontSize(9)
+          }
 
-        currentImageX += calculatedImageWidth + imageSpacing
-        imagesInRow++
+          currentImageX += uniformImageSize + imageSpacing
+          imagesInRow++
+        }
+        yPosition += uniformImageSize + 10
       }
-      yPosition += calculatedImageHeight + 10 // Space after last row of images
     }
-    yPosition += 10 // Space after each product details section
+    yPosition += 10 // Space after each product
   }
 
   // Additional Information (Notes)
@@ -637,9 +710,11 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     pdf.setLineWidth(0.2)
     pdf.setDrawColor(200, 200, 200)
     pdf.line(margin, yPosition, pageWidth - margin, yPosition)
-    yPosition += 5
+    yPosition += 8
 
-    yPosition = addText(quotation.notes, margin, yPosition, contentWidth)
+    pdf.setFontSize(9)
+    pdf.setFont("helvetica", "normal")
+    yPosition = addText(quotation.notes, margin, yPosition, contentWidth, 9)
     yPosition += 10
   }
 
