@@ -24,7 +24,7 @@ import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
 import { useToast } from "@/hooks/use-toast"
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"
+import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 export default function ReportPreviewPage() {
@@ -48,78 +48,23 @@ export default function ReportPreviewPage() {
   }, [])
 
   useEffect(() => {
-    if (user?.uid) {
+    if (user?.company_id) {
       fetchPreparedByName()
     }
-  }, [user?.uid])
+  }, [user?.company_id])
 
   const fetchPreparedByName = async () => {
-    if (!user?.uid) return
+    if (!user?.company_id) return
 
     try {
-      console.log("Fetching user data for uid:", user.uid)
+      console.log("Fetching company data for company_id:", user.company_id)
 
-      // First, get the full user document to access company_id
-      const userDocRef = doc(db, "users", user.uid)
-      const userDoc = await getDoc(userDocRef)
+      const companyDocRef = doc(db, "companies", user.company_id)
+      const companyDoc = await getDoc(companyDocRef)
 
-      if (userDoc.exists()) {
-        const userData = userDoc.data()
-        console.log("User data found:", userData)
-
-        // Try to get company using user's company_id
-        if (userData.company_id) {
-          console.log("Fetching company data for company_id:", userData.company_id)
-
-          const companyDocRef = doc(db, "companies", userData.company_id)
-          const companyDoc = await getDoc(companyDocRef)
-
-          if (companyDoc.exists()) {
-            const companyData = companyDoc.data()
-            console.log("Company data found:", companyData)
-
-            const name =
-              companyData.name ||
-              companyData.contact_person ||
-              companyData.company_name ||
-              userData.display_name ||
-              userData.displayName ||
-              user.displayName ||
-              user.email?.split("@")[0] ||
-              "User"
-
-            setPreparedByName(name)
-            console.log("Set prepared by name to:", name)
-
-            // Set company logo - fallback to OH+ logo if photo_url is empty or unset
-            if (companyData.photo_url && companyData.photo_url.trim() !== "") {
-              console.log("Setting company logo to:", companyData.photo_url)
-              setCompanyLogo(companyData.photo_url)
-            } else {
-              console.log("No company photo_url found, using default OH+ logo")
-              setCompanyLogo("/ohplus-new-logo.png")
-            }
-            return
-          } else {
-            console.log("Company document not found for company_id:", userData.company_id)
-          }
-        } else {
-          console.log("No company_id found in user data")
-        }
-      } else {
-        console.log("User document not found for uid:", user.uid)
-      }
-
-      // Fallback: Query by created_by field (for backward compatibility)
-      console.log("Falling back to created_by query")
-      const companiesRef = collection(db, "companies")
-      const q = query(companiesRef, where("created_by", "==", user.uid))
-      const querySnapshot = await getDocs(q)
-
-      if (!querySnapshot.empty) {
-        const companyDoc = querySnapshot.docs[0]
+      if (companyDoc.exists()) {
         const companyData = companyDoc.data()
-        console.log("Company data found via created_by query:", companyData)
+        console.log("Company data found:", companyData)
 
         const name =
           companyData.name ||
@@ -130,15 +75,18 @@ export default function ReportPreviewPage() {
           "User"
 
         setPreparedByName(name)
+        console.log("Set prepared by name to:", name)
 
+        // Set company logo - fallback to OH+ logo if photo_url is empty or unset
         if (companyData.photo_url && companyData.photo_url.trim() !== "") {
-          console.log("Setting company logo via fallback to:", companyData.photo_url)
+          console.log("Setting company logo to:", companyData.photo_url)
           setCompanyLogo(companyData.photo_url)
         } else {
+          console.log("No company photo_url found, using default OH+ logo")
           setCompanyLogo("/ohplus-new-logo.png")
         }
       } else {
-        console.log("No company found via created_by query, using defaults")
+        console.log("Company document not found for company_id:", user.company_id)
         // Final fallback to user display name or email
         setPreparedByName(user.displayName || user.email?.split("@")[0] || "User")
         setCompanyLogo("/ohplus-new-logo.png")

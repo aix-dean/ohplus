@@ -3,7 +3,7 @@ import type { Proposal } from "@/lib/types/proposal"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import type { ReportData } from "@/lib/report-service"
 import type { JobOrder } from "@/lib/types/job-order"
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"
+import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 // Helper function to load image and convert to base64
@@ -1430,50 +1430,19 @@ export async function generateReportPDF(
     let preparedByName = "User"
 
     // Query companies collection for logo and name
-    if (userData?.uid || report?.createdBy) {
+    if (userData?.company_id || report?.createdBy) {
       try {
-        const userId = userData?.uid || report?.createdBy
-        let companyData = null
+        const companyId = userData?.company_id || report?.createdBy
 
-        console.log("PDF: Fetching user data for uid:", userId)
+        console.log("PDF: Fetching company data for company_id:", companyId)
 
-        // First, get the full user document to access company_id
-        const userDocRef = doc(db, "users", userId)
-        const userDoc = await getDoc(userDocRef)
+        const companyDocRef = doc(db, "companies", companyId)
+        const companyDoc = await getDoc(companyDocRef)
 
-        if (userDoc.exists()) {
-          const fullUserData = userDoc.data()
-          console.log("PDF: User data found:", fullUserData)
+        if (companyDoc.exists()) {
+          const companyData = companyDoc.data()
+          console.log("PDF: Company data found:", companyData)
 
-          // Try to get company using user's company_id
-          if (fullUserData.company_id) {
-            console.log("PDF: Fetching company data for company_id:", fullUserData.company_id)
-
-            const companyDocRef = doc(db, "companies", fullUserData.company_id)
-            const companyDoc = await getDoc(companyDocRef)
-
-            if (companyDoc.exists()) {
-              companyData = companyDoc.data()
-              console.log("PDF: Company data found:", companyData)
-            }
-          }
-        }
-
-        // Fallback: Query by created_by field (for backward compatibility)
-        if (!companyData) {
-          console.log("PDF: Falling back to created_by query")
-          const companiesRef = collection(db, "companies")
-          const q = query(companiesRef, where("created_by", "==", userId))
-          const querySnapshot = await getDocs(q)
-
-          if (!querySnapshot.empty) {
-            const companyDoc = querySnapshot.docs[0]
-            companyData = companyDoc.data()
-            console.log("PDF: Company data found via created_by query:", companyData)
-          }
-        }
-
-        if (companyData) {
           preparedByName =
             companyData.name ||
             companyData.contact_person ||
@@ -1489,7 +1458,7 @@ export async function generateReportPDF(
             console.log("PDF: No company photo_url found, using default OH+ logo")
           }
         } else {
-          console.log("PDF: No company data found, using defaults")
+          console.log("PDF: Company document not found for company_id:", companyId)
           preparedByName = userData?.displayName || userData?.email?.split("@")[0] || "User"
         }
       } catch (error) {
