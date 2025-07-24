@@ -169,9 +169,15 @@ export function SalesChatWidget({
     const otherParticipant = thread.participants.find((p) => p !== user?.uid)
     const displayName = thread.receiver_name || "Customer"
 
+    // Safely access thread.lastMessage.text if it's an object, otherwise use the string directly
+    const lastMessageText =
+      typeof thread.lastMessage === "object" && thread.lastMessage !== null && "text" in thread.lastMessage
+        ? thread.lastMessage.text
+        : String(thread.lastMessage || "")
+
     return (
       displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      thread.lastMessage?.toLowerCase().includes(searchTerm.toLowerCase())
+      lastMessageText.toLowerCase().includes(searchTerm.toLowerCase())
     )
   })
 
@@ -270,7 +276,13 @@ export function SalesChatWidget({
                                   )}
                                 </div>
                               </div>
-                              <p className="text-xs text-muted-foreground truncate">{thread.lastMessage}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {typeof thread.lastMessage === "object" &&
+                                thread.lastMessage !== null &&
+                                "text" in thread.lastMessage
+                                  ? thread.lastMessage.text
+                                  : String(thread.lastMessage || "")}
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -394,7 +406,13 @@ export function SalesChatWidget({
                               </div>
                             )}
 
-                            {message.text && <p className="text-sm">{message.text}</p>}
+                            {message.text && (
+                              <p className="text-sm">
+                                {typeof message.text === "object" && message.text !== null && "text" in message.text
+                                  ? String(message.text.text)
+                                  : String(message.text)}
+                              </p>
+                            )}
 
                             <div className="flex items-center justify-between mt-1">
                               <span className="text-xs opacity-70">
