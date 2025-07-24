@@ -59,8 +59,8 @@ export default function ReportPreviewPage() {
     try {
       console.log("Fetching user data for uid:", user.uid)
 
-      // First, get the full user document to access company_id
-      const userDocRef = doc(db, "users", user.uid)
+      // First, get the user document from iboard_users collection to access company_id
+      const userDocRef = doc(db, "iboard_users", user.uid)
       const userDoc = await getDoc(userDocRef)
 
       if (userDoc.exists()) {
@@ -78,12 +78,12 @@ export default function ReportPreviewPage() {
             const companyData = companyDoc.data()
             console.log("Company data found:", companyData)
 
+            // Use company name or fallback to user data
             const name =
               companyData.name ||
-              companyData.contact_person ||
               companyData.company_name ||
               userData.display_name ||
-              userData.displayName ||
+              userData.first_name + " " + userData.last_name ||
               user.displayName ||
               user.email?.split("@")[0] ||
               "User"
@@ -109,7 +109,11 @@ export default function ReportPreviewPage() {
 
         // If no company_id or company not found, use user data as fallback
         const fallbackName =
-          userData.display_name || userData.displayName || user.displayName || user.email?.split("@")[0] || "User"
+          userData.display_name ||
+          userData.first_name + " " + userData.last_name ||
+          user.displayName ||
+          user.email?.split("@")[0] ||
+          "User"
 
         setPreparedByName(fallbackName)
         setCompanyLogo("/ohplus-new-logo.png")

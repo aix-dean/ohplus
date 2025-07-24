@@ -1437,8 +1437,8 @@ export async function generateReportPDF(
 
         console.log("PDF: Fetching user data for uid:", userId)
 
-        // First, get the full user document to access company_id
-        const userDocRef = doc(db, "users", userId)
+        // First, get the user document from iboard_users collection to access company_id
+        const userDocRef = doc(db, "iboard_users", userId)
         const userDoc = await getDoc(userDocRef)
 
         if (userDoc.exists()) {
@@ -1458,10 +1458,9 @@ export async function generateReportPDF(
 
               preparedByName =
                 companyData.name ||
-                companyData.contact_person ||
                 companyData.company_name ||
                 fullUserData.display_name ||
-                fullUserData.displayName ||
+                fullUserData.first_name + " " + fullUserData.last_name ||
                 userData?.displayName ||
                 userData?.email?.split("@")[0] ||
                 "User"
@@ -1478,7 +1477,7 @@ export async function generateReportPDF(
               // Use user data as fallback
               preparedByName =
                 fullUserData.display_name ||
-                fullUserData.displayName ||
+                fullUserData.first_name + " " + fullUserData.last_name ||
                 userData?.displayName ||
                 userData?.email?.split("@")[0] ||
                 "User"
@@ -1489,7 +1488,7 @@ export async function generateReportPDF(
             // Use user data as fallback
             preparedByName =
               fullUserData.display_name ||
-              fullUserData.displayName ||
+              fullUserData.first_name + " " + fullUserData.last_name ||
               userData?.displayName ||
               userData?.email?.split("@")[0] ||
               "User"
