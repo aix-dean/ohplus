@@ -139,12 +139,53 @@ export default function AccountPage() {
 
     setCompanyLoading(true)
     try {
-      const companiesQuery = query(collection(db, "companies"), where("created_by", "==", user.uid))
-      const companiesSnapshot = await getDocs(companiesQuery)
+      console.log("Current user UID:", user.uid)
+
+      // First try to find company by created_by field
+      let companiesQuery = query(collection(db, "companies"), where("created_by", "==", user.uid))
+      let companiesSnapshot = await getDocs(companiesQuery)
+
+      console.log("Companies found by created_by:", companiesSnapshot.size)
+
+      // If no company found by created_by, try to find by email or other identifiers
+      if (companiesSnapshot.empty && user.email) {
+        console.log("Trying to find company by email:", user.email)
+        companiesQuery = query(collection(db, "companies"), where("email", "==", user.email))
+        companiesSnapshot = await getDocs(companiesQuery)
+        console.log("Companies found by email:", companiesSnapshot.size)
+      }
+
+      // If still no company found, try to find by contact_person email
+      if (companiesSnapshot.empty && user.email) {
+        console.log("Trying to find company by contact_person email")
+        companiesQuery = query(collection(db, "companies"), where("contact_person", "==", user.email))
+        companiesSnapshot = await getDocs(companiesQuery)
+        console.log("Companies found by contact_person:", companiesSnapshot.size)
+      }
+
+      // If still no company found, get all companies and log them for debugging
+      if (companiesSnapshot.empty) {
+        console.log("No companies found, fetching all companies for debugging...")
+        const allCompaniesQuery = query(collection(db, "companies"))
+        const allCompaniesSnapshot = await getDocs(allCompaniesQuery)
+        console.log("Total companies in collection:", allCompaniesSnapshot.size)
+
+        allCompaniesSnapshot.forEach((doc) => {
+          const data = doc.data()
+          console.log("Company document:", {
+            id: doc.id,
+            name: data.name || data.company_name,
+            created_by: data.created_by,
+            email: data.email,
+            contact_person: data.contact_person,
+          })
+        })
+      }
 
       if (!companiesSnapshot.empty) {
         const companyDoc = companiesSnapshot.docs[0]
         const data = companyDoc.data()
+        console.log("Found company data:", data)
 
         const company: CompanyData = {
           id: companyDoc.id,
@@ -170,6 +211,7 @@ export default function AccountPage() {
         setYoutube(company.social_media?.youtube || "")
         setCompanyLogoPreviewUrl(company.photo_url || null)
       } else {
+        console.log("No company found for user")
         setCompanyData(null)
       }
     } catch (error) {

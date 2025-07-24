@@ -67,9 +67,9 @@ export default function ReportPreviewPage() {
 
         // Try to get the name from various possible fields
         const name =
+          companyData.name ||
           companyData.contact_person ||
           companyData.company_name ||
-          companyData.name ||
           user.displayName ||
           user.email?.split("@")[0] ||
           "User"
@@ -386,6 +386,25 @@ export default function ReportPreviewPage() {
     return product.specs_rental?.technology || "Clear Tapes"
   }
 
+  // Helper function to get completion percentage from report data
+  const getCompletionPercentage = (report: ReportData | null) => {
+    if (!report) return 100
+
+    // Check for installationStatus first (this is the actual field name in the database)
+    if (report.installationStatus !== undefined) {
+      const percentage = Number.parseInt(report.installationStatus.toString(), 10)
+      return isNaN(percentage) ? 0 : percentage
+    }
+
+    // Fallback to completionPercentage if it exists
+    if (report.completionPercentage !== undefined) {
+      return report.completionPercentage
+    }
+
+    // Default based on report type
+    return report.reportType === "installation-report" ? 0 : 100
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -591,8 +610,17 @@ export default function ReportPreviewPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <h2 className="text-xl font-bold text-gray-900">Project Status</h2>
-                <div className="bg-green-500 text-white px-3 py-1 rounded text-sm font-medium">
-                  {report.completionPercentage || 100}%
+                <div
+                  className={`text-white px-3 py-1 rounded text-sm font-medium ${(() => {
+                    const percentage = getCompletionPercentage(report)
+
+                    if (percentage >= 90) return "bg-green-500"
+                    if (percentage >= 70) return "bg-yellow-500"
+                    if (percentage >= 50) return "bg-orange-500"
+                    return "bg-red-500"
+                  })()}`}
+                >
+                  {getCompletionPercentage(report)}%
                 </div>
               </div>
 
@@ -634,11 +662,6 @@ export default function ReportPreviewPage() {
                         <div>
                           <span className="font-semibold">Location:</span> {getSiteLocation(product)}
                         </div>
-                        {attachment.fileName && (
-                          <div>
-                            <span className="font-semibold">File:</span> {attachment.fileName}
-                          </div>
-                        )}
                         {attachment.note && (
                           <div>
                             <span className="font-semibold">Note:</span> {attachment.note}
