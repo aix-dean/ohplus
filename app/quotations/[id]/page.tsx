@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { parseISO } from "date-fns"
 import { CheckCircle, XCircle, FileText, Clock, Send, Eye, Download } from "lucide-react"
-import { getQuotationById, type Quotation } from "@/lib/quotation-service"
+import { getQuotationById, generateQuotationPDF, type Quotation } from "@/lib/quotation-service" // Import generateQuotationPDF
 import { useToast } from "@/hooks/use-toast"
 import Image from "next/image"
 
@@ -90,86 +90,6 @@ export default function PublicQuotationPage() {
 
     fetchQuotationData()
   }, [params.id, toast])
-
-  // Effect to inject print styles
-  useEffect(() => {
-    const style = document.createElement("style")
-    style.type = "text/css"
-    style.id = "print-styles" // Add an ID to easily remove it later
-    style.innerHTML = `
-      @media print {
-        /* Hide everything except the document content */
-        body * {
-          visibility: hidden;
-        }
-        
-        /* Show only the printable content */
-        .printable-content,
-        .printable-content * {
-          visibility: visible;
-        }
-        
-        /* Position the printable content */
-        .printable-content {
-          position: absolute;
-          left: 0;
-          top: 0;
-          width: 100%;
-        }
-        
-        /* Hide non-printable elements */
-        .no-print {
-          display: none !important;
-        }
-        
-        /* Remove margins and padding for print */
-        .printable-content {
-          margin: 0;
-          padding: 0;
-          box-shadow: none;
-          border-radius: 0;
-        }
-        
-        /* Ensure proper page breaks */
-        .page-break {
-          page-break-before: always;
-        }
-        
-        /* Remove background colors for print */
-        .printable-content .bg-gray-100,
-        .printable-content .bg-gray-50 {
-          background-color: white !important;
-        }
-        
-        /* Ensure text is black for print */
-        .printable-content * {
-          color: black !important;
-        }
-        
-        /* Keep table borders visible */
-        .printable-content table,
-        .printable-content th,
-        .printable-content td {
-          border: 1px solid #000 !important;
-        }
-        
-        /* Remove browser default headers and footers */
-        @page {
-          margin: 0; /* Set all margins to 0 */
-          size: A4;
-        }
-      }
-    `
-    document.head.appendChild(style)
-
-    return () => {
-      // Clean up the style tag when the component unmounts
-      const existingStyle = document.getElementById("print-styles")
-      if (existingStyle) {
-        document.head.removeChild(existingStyle)
-      }
-    }
-  }, []) // Empty dependency array means this runs once on mount and cleans up on unmount
 
   const getStatusConfig = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -264,6 +184,25 @@ export default function PublicQuotationPage() {
     }
   }
 
+  const handleDownloadPdf = async () => {
+    if (quotation) {
+      try {
+        await generateQuotationPDF(quotation)
+        toast({
+          title: "Success",
+          description: "Quotation PDF downloaded successfully.",
+        })
+      } catch (error) {
+        console.error("Error generating PDF:", error)
+        toast({
+          title: "Error",
+          description: "Failed to download quotation PDF.",
+          variant: "destructive",
+        })
+      }
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -303,8 +242,8 @@ export default function PublicQuotationPage() {
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6">
-      {/* Custom Header for Public View - Hidden in Print */}
-      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm mb-6 no-print">
+      {/* Custom Header for Public View */}
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm mb-6">
         <div className="max-w-[850px] mx-auto px-4 py-2 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Image src="/oh-plus-logo.png" alt="OH+ Logo" width={40} height={40} />
@@ -324,16 +263,16 @@ export default function PublicQuotationPage() {
               {getStatusIcon(quotation.status)}
               <span className="ml-1 capitalize">{quotation.status}</span>
             </Badge>
-            <Button onClick={() => window.print()} size="sm" className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleDownloadPdf} size="sm" className="bg-blue-600 hover:bg-blue-700">
               <Download className="h-4 w-4 mr-2" />
-              Print PDF
+              Download PDF
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Document Container - Printable Content */}
-      <div className="max-w-[850px] mx-auto bg-white shadow-md rounded-sm overflow-hidden printable-content">
+      {/* Document Container */}
+      <div className="max-w-[850px] mx-auto bg-white shadow-md rounded-sm overflow-hidden">
         {/* Document Header */}
         <div className="border-b-2 border-blue-600 p-6 sm:p-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
@@ -545,9 +484,9 @@ export default function PublicQuotationPage() {
             </div>
           ))}
 
-          {/* Action Buttons for Public View - Hidden in Print */}
+          {/* Action Buttons for Public View */}
           {quotation.status?.toLowerCase() === "sent" && (
-            <div className="mb-8 no-print">
+            <div className="mb-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
                 Next Steps
               </h2>
@@ -577,8 +516,8 @@ export default function PublicQuotationPage() {
             </div>
           )}
 
-          {/* Contact Information - Hidden in Print */}
-          <div className="mb-8 no-print">
+          {/* Contact Information */}
+          <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
               Contact Information
             </h2>
