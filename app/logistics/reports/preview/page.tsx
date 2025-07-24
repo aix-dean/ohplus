@@ -57,31 +57,41 @@ export default function ReportPreviewPage() {
     if (!user?.uid) return
 
     try {
-      // First, try to get company using user's company_id if it exists
-      if (user.company_id) {
-        const companyDocRef = doc(db, "companies", user.company_id)
-        const companyDoc = await getDoc(companyDocRef)
+      // First, get the full user document to access company_id
+      const userDocRef = doc(db, "users", user.uid)
+      const userDoc = await getDoc(userDocRef)
 
-        if (companyDoc.exists()) {
-          const companyData = companyDoc.data()
+      if (userDoc.exists()) {
+        const userData = userDoc.data()
 
-          const name =
-            companyData.name ||
-            companyData.contact_person ||
-            companyData.company_name ||
-            user.displayName ||
-            user.email?.split("@")[0] ||
-            "User"
+        // Try to get company using user's company_id
+        if (userData.company_id) {
+          const companyDocRef = doc(db, "companies", userData.company_id)
+          const companyDoc = await getDoc(companyDocRef)
 
-          setPreparedByName(name)
+          if (companyDoc.exists()) {
+            const companyData = companyDoc.data()
 
-          // Set company logo - fallback to OH+ logo if photo_url is empty or unset
-          const logoUrl =
-            companyData.photo_url && companyData.photo_url.trim() !== ""
-              ? companyData.photo_url
-              : "/ohplus-new-logo.png"
-          setCompanyLogo(logoUrl)
-          return
+            const name =
+              companyData.name ||
+              companyData.contact_person ||
+              companyData.company_name ||
+              userData.display_name ||
+              userData.displayName ||
+              user.displayName ||
+              user.email?.split("@")[0] ||
+              "User"
+
+            setPreparedByName(name)
+
+            // Set company logo - fallback to OH+ logo if photo_url is empty or unset
+            const logoUrl =
+              companyData.photo_url && companyData.photo_url.trim() !== ""
+                ? companyData.photo_url
+                : "/ohplus-new-logo.png"
+            setCompanyLogo(logoUrl)
+            return
+          }
         }
       }
 

@@ -1435,13 +1435,21 @@ export async function generateReportPDF(
         const userId = userData?.uid || report?.createdBy
         let companyData = null
 
-        // First, try to get company using user's company_id if it exists
-        if (userData?.company_id) {
-          const companyDocRef = doc(db, "companies", userData.company_id)
-          const companyDoc = await getDoc(companyDocRef)
+        // First, get the full user document to access company_id
+        const userDocRef = doc(db, "users", userId)
+        const userDoc = await getDoc(userDocRef)
 
-          if (companyDoc.exists()) {
-            companyData = companyDoc.data()
+        if (userDoc.exists()) {
+          const fullUserData = userDoc.data()
+
+          // Try to get company using user's company_id
+          if (fullUserData.company_id) {
+            const companyDocRef = doc(db, "companies", fullUserData.company_id)
+            const companyDoc = await getDoc(companyDocRef)
+
+            if (companyDoc.exists()) {
+              companyData = companyDoc.data()
+            }
           }
         }
 
