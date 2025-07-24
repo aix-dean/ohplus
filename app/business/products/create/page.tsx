@@ -973,12 +973,11 @@ export default function BusinessProductCreatePage() {
                           </div>
 
                           {/* Illumination indicators around the preview - evenly distributed */}
-                          <div className="absolute -top-6 left-0 right-0 flex justify-between px-2">
+                          <div className="absolute -top-5 left-0 right-0 flex justify-between px-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_upper_count) || 0,
                             }).map((_, i) => {
                               const totalCount = Number.parseInt(formData.specs_rental.illumination_upper_count) || 0
-                              const totalCols = Number(formData.specs_rental.display_cols)
                               const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
                               const leftPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
 
@@ -991,13 +990,13 @@ export default function BusinessProductCreatePage() {
                                     transform: "translateX(-50%)",
                                   }}
                                 >
-                                  <span className="text-[10px] text-white font-bold">U{i + 1}</span>
+                                  <span className="text-[9px] text-white font-bold">U{i + 1}</span>
                                 </div>
                               )
                             })}
                           </div>
 
-                          <div className="absolute top-0 bottom-0 -left-6 flex flex-col justify-between py-2">
+                          <div className="absolute top-0 bottom-0 -left-5 flex flex-col justify-between py-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_left_count) || 0,
                             }).map((_, i) => {
@@ -1014,13 +1013,13 @@ export default function BusinessProductCreatePage() {
                                     transform: "translateY(-50%)",
                                   }}
                                 >
-                                  <span className="text-[10px] text-white font-bold">L{i + 1}</span>
+                                  <span className="text-[9px] text-white font-bold">L{i + 1}</span>
                                 </div>
                               )
                             })}
                           </div>
 
-                          <div className="absolute top-0 bottom-0 -right-6 flex flex-col justify-between py-2">
+                          <div className="absolute top-0 bottom-0 -right-5 flex flex-col justify-between py-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_right_count) || 0,
                             }).map((_, i) => {
@@ -1037,13 +1036,13 @@ export default function BusinessProductCreatePage() {
                                     transform: "translateY(-50%)",
                                   }}
                                 >
-                                  <span className="text-[10px] text-white font-bold">R{i + 1}</span>
+                                  <span className="text-[9px] text-white font-bold">R{i + 1}</span>
                                 </div>
                               )
                             })}
                           </div>
 
-                          <div className="absolute -bottom-6 left-0 right-0 flex justify-between px-2">
+                          <div className="absolute -bottom-5 left-0 right-0 flex justify-between px-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0,
                             }).map((_, i) => {
@@ -1060,7 +1059,7 @@ export default function BusinessProductCreatePage() {
                                     transform: "translateX(-50%)",
                                   }}
                                 >
-                                  <span className="text-[10px] text-white font-bold">B{i + 1}</span>
+                                  <span className="text-[9px] text-white font-bold">B{i + 1}</span>
                                 </div>
                               )
                             })}
