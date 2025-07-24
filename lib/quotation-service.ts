@@ -341,7 +341,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.text(`Created Date: ${formatDate(createdDate)}`, margin, yPosition)
   pdf.text(`Valid Until: ${formatDate(validUntilDate)}`, margin + contentWidth / 2, yPosition)
   yPosition += 5
-  pdf.text(`Total Amount: ₱${safeString(quotation.total_amount)}`, margin, yPosition)
+  pdf.text(`Total Amount: PHP${safeString(quotation.total_amount)}`, margin, yPosition) // Changed ₱ to PHP
   yPosition += 10
 
   // Client Information Section
@@ -457,7 +457,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     )
     currentX += colWidths[2]
     pdf.text(
-      `₱${safeString(product.price)}/month`, // Display monthly price here
+      `PHP${safeString(product.price)}/month`, // Display monthly price here, changed ₱ to PHP
       currentX + colWidths[3] - cellPadding,
       yPosition + (dataRowHeight + 5) / 2,
       {
@@ -491,7 +491,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   )
   // Position the actual total amount under the Price column
   pdf.text(
-    `₱${safeString(quotation.total_amount)}`,
+    `PHP${safeString(quotation.total_amount)}`, // Changed ₱ to PHP
     pageWidth - margin - cellPadding,
     yPosition + headerRowHeight / 2,
     {
@@ -519,7 +519,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
 
     // Dimensions
     if (product.specs_rental?.width && product.specs_rental?.height) {
-      pdf.text("DIMENSIONS", margin, yPosition)
+      pdf.text("Dimensions:", margin, yPosition) // Changed to "Dimensions:"
       pdf.text(
         `${safeString(product.specs_rental.width)}m x ${safeString(product.specs_rental.height)}m`,
         margin + 30,
@@ -529,23 +529,23 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     }
     // Elevation
     if (product.specs_rental?.elevation) {
-      pdf.text("ELEVATION", margin, yPosition)
+      pdf.text("Elevation:", margin, yPosition) // Changed to "Elevation:"
       pdf.text(`${safeString(product.specs_rental.elevation)}m`, margin + 30, yPosition)
       yPosition += 5
     }
     // Traffic Count
     if (product.specs_rental?.traffic_count) {
-      pdf.text("TRAFFIC COUNT", margin, yPosition)
+      pdf.text("Traffic Count:", margin, yPosition) // Changed to "Traffic Count:"
       pdf.text(safeString(product.specs_rental.traffic_count), margin + 30, yPosition)
       yPosition += 5
     }
     // Audience Type(s)
     if (product.specs_rental?.audience_type) {
-      pdf.text("AUDIENCE TYPE", margin, yPosition)
+      pdf.text("Audience Type:", margin, yPosition) // Changed to "Audience Type:"
       pdf.text(safeString(product.specs_rental.audience_type), margin + 30, yPosition)
       yPosition += 5
     } else if (product.specs_rental?.audience_types && product.specs_rental.audience_types.length > 0) {
-      pdf.text("AUDIENCE TYPES", margin, yPosition)
+      pdf.text("Audience Types:", margin, yPosition) // Changed to "Audience Types:"
       pdf.text(product.specs_rental.audience_types.join(", "), margin + 30, yPosition)
       yPosition += 5
     }
@@ -556,7 +556,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
       checkNewPage(20) // Check for description space
       pdf.setFontSize(9)
       pdf.setFont("helvetica", "bold")
-      pdf.text("DESCRIPTION", margin, yPosition)
+      pdf.text("Description:", margin, yPosition) // Changed to "Description:"
       yPosition += 5
       pdf.setFont("helvetica", "normal")
       yPosition = addText(safeString(product.description), margin, yPosition, contentWidth)
@@ -568,7 +568,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
       checkNewPage(100) // Estimate space for media title + first row of images
       pdf.setFontSize(9)
       pdf.setFont("helvetica", "bold")
-      pdf.text("MEDIA", margin, yPosition)
+      pdf.text("Product Images:", margin, yPosition) // Changed to "Product Images:"
       yPosition += 5
       pdf.setFont("helvetica", "normal")
 
