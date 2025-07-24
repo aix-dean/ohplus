@@ -948,7 +948,7 @@ export default function BusinessProductCreatePage() {
                   {formData.specs_rental.display_rows && formData.specs_rental.display_cols && (
                     <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                       <h5 className="text-sm font-medium text-gray-700 mb-3">Display Preview</h5>
-                      <div className="flex justify-center">
+                      <div className="flex justify-center p-6">
                         <div className="relative">
                           {/* Scrollable container for large grids */}
                           <div className="max-h-96 overflow-auto border border-gray-200 rounded-lg">
@@ -976,95 +976,94 @@ export default function BusinessProductCreatePage() {
                             </div>
                           </div>
 
-                          {/* Illumination indicators around the preview - positioned on the border */}
-                          <div className="absolute -top-2 left-0 right-0 flex justify-between px-2">
+                          {/* Illumination indicators around the preview - smaller and within border */}
+                          <div className="absolute -top-4 left-0 right-0 flex justify-between px-6">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_upper_count) || 0,
                             }).map((_, i) => {
                               const totalCount = Number.parseInt(formData.specs_rental.illumination_upper_count) || 0
-                              const totalCols = Number(formData.specs_rental.display_cols)
-                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
-                              const leftPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
+                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50
+                              const leftPosition = totalCount === 1 ? 50 : i * spacing
 
                               return (
                                 <div
                                   key={i}
-                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute border-2 border-white shadow-sm"
+                                  className="w-3 h-3 bg-orange-500 rounded-full flex items-center justify-center absolute"
                                   style={{
                                     left: `${leftPosition}%`,
                                     transform: "translateX(-50%)",
                                   }}
                                 >
-                                  <span className="text-[10px] text-white font-bold">U{i + 1}</span>
+                                  <span className="text-[8px] text-white font-bold">U{i + 1}</span>
                                 </div>
                               )
                             })}
                           </div>
 
-                          <div className="absolute top-0 bottom-0 -left-2 flex flex-col justify-between py-2">
+                          <div className="absolute top-0 bottom-0 -left-4 flex flex-col justify-between py-6">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_left_count) || 0,
                             }).map((_, i) => {
                               const totalCount = Number.parseInt(formData.specs_rental.illumination_left_count) || 0
-                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
-                              const topPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
+                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50
+                              const topPosition = totalCount === 1 ? 50 : i * spacing
 
                               return (
                                 <div
                                   key={i}
-                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute border-2 border-white shadow-sm"
+                                  className="w-3 h-3 bg-orange-500 rounded-full flex items-center justify-center absolute"
                                   style={{
                                     top: `${topPosition}%`,
                                     transform: "translateY(-50%)",
                                   }}
                                 >
-                                  <span className="text-[10px] text-white font-bold">L{i + 1}</span>
+                                  <span className="text-[8px] text-white font-bold">L{i + 1}</span>
                                 </div>
                               )
                             })}
                           </div>
 
-                          <div className="absolute top-0 bottom-0 -right-2 flex flex-col justify-between py-2">
+                          <div className="absolute top-0 bottom-0 -right-4 flex flex-col justify-between py-6">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_right_count) || 0,
                             }).map((_, i) => {
                               const totalCount = Number.parseInt(formData.specs_rental.illumination_right_count) || 0
-                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
-                              const topPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
+                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50
+                              const topPosition = totalCount === 1 ? 50 : i * spacing
 
                               return (
                                 <div
                                   key={i}
-                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute border-2 border-white shadow-sm"
+                                  className="w-3 h-3 bg-orange-500 rounded-full flex items-center justify-center absolute"
                                   style={{
                                     top: `${topPosition}%`,
                                     transform: "translateY(-50%)",
                                   }}
                                 >
-                                  <span className="text-[10px] text-white font-bold">R{i + 1}</span>
+                                  <span className="text-[8px] text-white font-bold">R{i + 1}</span>
                                 </div>
                               )
                             })}
                           </div>
 
-                          <div className="absolute -bottom-2 left-0 right-0 flex justify-between px-2">
+                          <div className="absolute -bottom-4 left-0 right-0 flex justify-between px-6">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0,
                             }).map((_, i) => {
                               const totalCount = Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0
-                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
-                              const leftPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
+                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50
+                              const leftPosition = totalCount === 1 ? 50 : i * spacing
 
                               return (
                                 <div
                                   key={i}
-                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute border-2 border-white shadow-sm"
+                                  className="w-3 h-3 bg-orange-500 rounded-full flex items-center justify-center absolute"
                                   style={{
                                     left: `${leftPosition}%`,
                                     transform: "translateX(-50%)",
                                   }}
                                 >
-                                  <span className="text-[10px] text-white font-bold">B{i + 1}</span>
+                                  <span className="text-[8px] text-white font-bold">B{i + 1}</span>
                                 </div>
                               )
                             })}
