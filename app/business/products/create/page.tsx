@@ -972,98 +972,104 @@ export default function BusinessProductCreatePage() {
                             </div>
                           </div>
 
-                          {/* Illumination indicators around the preview - evenly distributed */}
-                          <div className="absolute -top-5 left-0 right-0 flex justify-between px-2">
-                            {Array.from({
-                              length: Number.parseInt(formData.specs_rental.illumination_upper_count) || 0,
-                            }).map((_, i) => {
-                              const totalCount = Number.parseInt(formData.specs_rental.illumination_upper_count) || 0
-                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
-                              const leftPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
+                          {/* Illumination indicators around the preview - using absolute positioning for precise placement */}
+                          {/* Upper Metal Halides */}
+                          {Array.from({
+                            length: Number.parseInt(formData.specs_rental.illumination_upper_count) || 0,
+                          }).map((_, i) => {
+                            const totalCount = Number.parseInt(formData.specs_rental.illumination_upper_count) || 0
+                            const gridWidth = Math.min(Number(formData.specs_rental.display_cols) * 48, 432)
+                            const spacing = totalCount > 1 ? gridWidth / (totalCount + 1) : gridWidth / 2
+                            const leftPosition = totalCount === 1 ? gridWidth / 2 : spacing * (i + 1)
 
-                              return (
-                                <div
-                                  key={i}
-                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
-                                  style={{
-                                    left: `${leftPosition}%`,
-                                    transform: "translateX(-50%)",
-                                  }}
-                                >
-                                  <span className="text-[9px] text-white font-bold">U{i + 1}</span>
-                                </div>
-                              )
-                            })}
-                          </div>
+                            return (
+                              <div
+                                key={`upper-${i}`}
+                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                style={{
+                                  top: "-20px",
+                                  left: `${leftPosition}px`,
+                                  transform: "translateX(-50%)",
+                                }}
+                              >
+                                <span className="text-[9px] text-white font-bold">U{i + 1}</span>
+                              </div>
+                            )
+                          })}
 
-                          <div className="absolute top-0 bottom-0 -left-5 flex flex-col justify-between py-2">
-                            {Array.from({
-                              length: Number.parseInt(formData.specs_rental.illumination_left_count) || 0,
-                            }).map((_, i) => {
-                              const totalCount = Number.parseInt(formData.specs_rental.illumination_left_count) || 0
-                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
-                              const topPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
+                          {/* Left Metal Halides */}
+                          {Array.from({
+                            length: Number.parseInt(formData.specs_rental.illumination_left_count) || 0,
+                          }).map((_, i) => {
+                            const totalCount = Number.parseInt(formData.specs_rental.illumination_left_count) || 0
+                            const gridHeight = Number(formData.specs_rental.display_rows) * 48
+                            const spacing = totalCount > 1 ? gridHeight / (totalCount + 1) : gridHeight / 2
+                            const topPosition = totalCount === 1 ? gridHeight / 2 : spacing * (i + 1)
 
-                              return (
-                                <div
-                                  key={i}
-                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
-                                  style={{
-                                    top: `${topPosition}%`,
-                                    transform: "translateY(-50%)",
-                                  }}
-                                >
-                                  <span className="text-[9px] text-white font-bold">L{i + 1}</span>
-                                </div>
-                              )
-                            })}
-                          </div>
+                            return (
+                              <div
+                                key={`left-${i}`}
+                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                style={{
+                                  top: `${topPosition}px`,
+                                  left: "-20px",
+                                  transform: "translateY(-50%)",
+                                }}
+                              >
+                                <span className="text-[9px] text-white font-bold">L{i + 1}</span>
+                              </div>
+                            )
+                          })}
 
-                          <div className="absolute top-0 bottom-0 -right-5 flex flex-col justify-between py-2">
-                            {Array.from({
-                              length: Number.parseInt(formData.specs_rental.illumination_right_count) || 0,
-                            }).map((_, i) => {
-                              const totalCount = Number.parseInt(formData.specs_rental.illumination_right_count) || 0
-                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
-                              const topPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
+                          {/* Right Metal Halides */}
+                          {Array.from({
+                            length: Number.parseInt(formData.specs_rental.illumination_right_count) || 0,
+                          }).map((_, i) => {
+                            const totalCount = Number.parseInt(formData.specs_rental.illumination_right_count) || 0
+                            const gridHeight = Number(formData.specs_rental.display_rows) * 48
+                            const gridWidth = Math.min(Number(formData.specs_rental.display_cols) * 48, 432)
+                            const spacing = totalCount > 1 ? gridHeight / (totalCount + 1) : gridHeight / 2
+                            const topPosition = totalCount === 1 ? gridHeight / 2 : spacing * (i + 1)
 
-                              return (
-                                <div
-                                  key={i}
-                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
-                                  style={{
-                                    top: `${topPosition}%`,
-                                    transform: "translateY(-50%)",
-                                  }}
-                                >
-                                  <span className="text-[9px] text-white font-bold">R{i + 1}</span>
-                                </div>
-                              )
-                            })}
-                          </div>
+                            return (
+                              <div
+                                key={`right-${i}`}
+                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                style={{
+                                  top: `${topPosition}px`,
+                                  left: `${gridWidth + 20}px`,
+                                  transform: "translateY(-50%)",
+                                }}
+                              >
+                                <span className="text-[9px] text-white font-bold">R{i + 1}</span>
+                              </div>
+                            )
+                          })}
 
-                          <div className="absolute -bottom-5 left-0 right-0 flex justify-between px-2">
-                            {Array.from({
-                              length: Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0,
-                            }).map((_, i) => {
-                              const totalCount = Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0
-                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
-                              const leftPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
+                          {/* Bottom Metal Halides */}
+                          {Array.from({
+                            length: Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0,
+                          }).map((_, i) => {
+                            const totalCount = Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0
+                            const gridWidth = Math.min(Number(formData.specs_rental.display_cols) * 48, 432)
+                            const gridHeight = Number(formData.specs_rental.display_rows) * 48
+                            const spacing = totalCount > 1 ? gridWidth / (totalCount + 1) : gridWidth / 2
+                            const leftPosition = totalCount === 1 ? gridWidth / 2 : spacing * (i + 1)
 
-                              return (
-                                <div
-                                  key={i}
-                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
-                                  style={{
-                                    left: `${leftPosition}%`,
-                                    transform: "translateX(-50%)",
-                                  }}
-                                >
-                                  <span className="text-[9px] text-white font-bold">B{i + 1}</span>
-                                </div>
-                              )
-                            })}
-                          </div>
+                            return (
+                              <div
+                                key={`bottom-${i}`}
+                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                style={{
+                                  top: `${gridHeight + 20}px`,
+                                  left: `${leftPosition}px`,
+                                  transform: "translateX(-50%)",
+                                }}
+                              >
+                                <span className="text-[9px] text-white font-bold">B{i + 1}</span>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
 
