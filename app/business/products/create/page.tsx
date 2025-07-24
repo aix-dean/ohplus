@@ -976,8 +976,8 @@ export default function BusinessProductCreatePage() {
                             </div>
                           </div>
 
-                          {/* Illumination indicators around the preview - evenly distributed */}
-                          <div className="absolute -top-8 left-0 right-0 flex justify-between px-2">
+                          {/* Illumination indicators around the preview - positioned on the border */}
+                          <div className="absolute -top-2 left-0 right-0 flex justify-between px-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_upper_count) || 0,
                             }).map((_, i) => {
@@ -989,19 +989,19 @@ export default function BusinessProductCreatePage() {
                               return (
                                 <div
                                   key={i}
-                                  className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute border-2 border-white shadow-sm"
                                   style={{
                                     left: `${leftPosition}%`,
                                     transform: "translateX(-50%)",
                                   }}
                                 >
-                                  <span className="text-xs text-white font-bold">U{i + 1}</span>
+                                  <span className="text-[10px] text-white font-bold">U{i + 1}</span>
                                 </div>
                               )
                             })}
                           </div>
 
-                          <div className="absolute top-0 bottom-0 -left-8 flex flex-col justify-between py-2">
+                          <div className="absolute top-0 bottom-0 -left-2 flex flex-col justify-between py-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_left_count) || 0,
                             }).map((_, i) => {
@@ -1012,19 +1012,19 @@ export default function BusinessProductCreatePage() {
                               return (
                                 <div
                                   key={i}
-                                  className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute border-2 border-white shadow-sm"
                                   style={{
                                     top: `${topPosition}%`,
                                     transform: "translateY(-50%)",
                                   }}
                                 >
-                                  <span className="text-xs text-white font-bold">L{i + 1}</span>
+                                  <span className="text-[10px] text-white font-bold">L{i + 1}</span>
                                 </div>
                               )
                             })}
                           </div>
 
-                          <div className="absolute top-0 bottom-0 -right-8 flex flex-col justify-between py-2">
+                          <div className="absolute top-0 bottom-0 -right-2 flex flex-col justify-between py-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_right_count) || 0,
                             }).map((_, i) => {
@@ -1035,19 +1035,19 @@ export default function BusinessProductCreatePage() {
                               return (
                                 <div
                                   key={i}
-                                  className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute border-2 border-white shadow-sm"
                                   style={{
                                     top: `${topPosition}%`,
                                     transform: "translateY(-50%)",
                                   }}
                                 >
-                                  <span className="text-xs text-white font-bold">R{i + 1}</span>
+                                  <span className="text-[10px] text-white font-bold">R{i + 1}</span>
                                 </div>
                               )
                             })}
                           </div>
 
-                          <div className="absolute -bottom-8 left-0 right-0 flex justify-between px-2">
+                          <div className="absolute -bottom-2 left-0 right-0 flex justify-between px-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0,
                             }).map((_, i) => {
@@ -1058,13 +1058,13 @@ export default function BusinessProductCreatePage() {
                               return (
                                 <div
                                   key={i}
-                                  className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute border-2 border-white shadow-sm"
                                   style={{
                                     left: `${leftPosition}%`,
                                     transform: "translateX(-50%)",
                                   }}
                                 >
-                                  <span className="text-xs text-white font-bold">B{i + 1}</span>
+                                  <span className="text-[10px] text-white font-bold">B{i + 1}</span>
                                 </div>
                               )
                             })}
