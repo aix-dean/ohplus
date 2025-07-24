@@ -117,6 +117,8 @@ export default function BusinessProductCreatePage() {
       structure_contractor: "",
       structure_condition: "",
       structure_last_maintenance: "",
+      illumination_total_wattage: "",
+      illumination_control_system: "",
       illumination_upper_count: "0",
       illumination_left_count: "0",
       illumination_bottom_count: "0",
@@ -133,7 +135,7 @@ export default function BusinessProductCreatePage() {
       display_rows: "2",
       display_cols: "2",
       power_consumption_monthly: "",
-      power_consumption_3months: "",
+      power_consumption_quarterly: "",
     },
     type: "RENTAL",
     status: "PENDING",
@@ -640,6 +642,8 @@ export default function BusinessProductCreatePage() {
           structure_last_maintenance: formData.specs_rental.structure_last_maintenance || null,
           illumination_total_wattage: formData.specs_rental.illumination_total_wattage || null,
           illumination_control_system: formData.specs_rental.illumination_control_system || null,
+          power_consumption_monthly: formData.specs_rental.power_consumption_monthly || null,
+          power_consumption_quarterly: formData.specs_rental.power_consumption_quarterly || null,
         },
       }
 
@@ -1232,7 +1236,7 @@ export default function BusinessProductCreatePage() {
                   )}
                 </div>
 
-                {/* Additional Illumination Details */}
+                {/* Power Consumption Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="power_consumption_monthly">Power Consumption per Month</Label>
@@ -1247,12 +1251,12 @@ export default function BusinessProductCreatePage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="power_consumption_3months">Power Consumption over 3 Months</Label>
+                    <Label htmlFor="power_consumption_quarterly">Power Consumption over 3 Months</Label>
                     <Input
-                      id="power_consumption_3months"
-                      name="specs_rental.power_consumption_3months"
+                      id="power_consumption_quarterly"
+                      name="specs_rental.power_consumption_quarterly"
                       type="number"
-                      value={formData.specs_rental.power_consumption_3months || ""}
+                      value={formData.specs_rental.power_consumption_quarterly || ""}
                       onChange={handleInputChange}
                       placeholder="kWh over 3 months"
                       disabled={loading}
