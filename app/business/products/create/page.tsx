@@ -132,6 +132,8 @@ export default function BusinessProductCreatePage() {
       illumination_right_rows: "1",
       illumination_right_cols: "1",
       quadrant_layout: "2x2",
+      display_rows: "2",
+      display_cols: "2",
     },
     type: "RENTAL",
     status: "PENDING",
@@ -883,150 +885,88 @@ export default function BusinessProductCreatePage() {
 
                 {/* Quadrant Selection */}
                 <div className="space-y-3">
-                  <Label className="text-sm font-medium text-gray-700">Select Display Layout</Label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {/* Single Quadrant */}
-                    <div
-                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${
-                        formData.specs_rental.quadrant_layout === "1x1"
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-gray-300 hover:border-gray-400"
-                      }`}
-                      onClick={() =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          specs_rental: { ...prev.specs_rental, quadrant_layout: "1x1" },
-                        }))
-                      }
-                    >
-                      <div className="aspect-square bg-gray-200 rounded mb-2 flex items-center justify-center">
-                        <span className="text-xs font-medium">Q1</span>
-                      </div>
-                      <p className="text-xs text-center">Single (1x1)</p>
+                  <Label className="text-sm font-medium text-gray-700">Display Layout Configuration</Label>
+
+                  {/* Row and Column Inputs */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="display-rows" className="text-xs text-gray-600">
+                        Rows:
+                      </Label>
+                      <Input
+                        id="display-rows"
+                        type="number"
+                        min="1"
+                        max="6"
+                        value={formData.specs_rental.display_rows || "2"}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            specs_rental: {
+                              ...prev.specs_rental,
+                              display_rows: e.target.value,
+                              quadrant_layout: `${e.target.value}x${prev.specs_rental.display_cols || "2"}`,
+                            },
+                          }))
+                        }
+                        className="w-full h-8 text-sm"
+                        disabled={loading}
+                      />
                     </div>
 
-                    {/* 2x2 Quadrants */}
-                    <div
-                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${
-                        formData.specs_rental.quadrant_layout === "2x2"
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-gray-300 hover:border-gray-400"
-                      }`}
-                      onClick={() =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          specs_rental: { ...prev.specs_rental, quadrant_layout: "2x2" },
-                        }))
-                      }
-                    >
-                      <div className="aspect-square grid grid-cols-2 gap-1 bg-gray-200 rounded mb-2 p-1">
-                        <div className="bg-white rounded flex items-center justify-center">
-                          <span className="text-xs font-medium">Q1</span>
-                        </div>
-                        <div className="bg-white rounded flex items-center justify-center">
-                          <span className="text-xs font-medium">Q2</span>
-                        </div>
-                        <div className="bg-white rounded flex items-center justify-center">
-                          <span className="text-xs font-medium">Q3</span>
-                        </div>
-                        <div className="bg-white rounded flex items-center justify-center">
-                          <span className="text-xs font-medium">Q4</span>
-                        </div>
-                      </div>
-                      <p className="text-xs text-center">Square (2x2)</p>
-                    </div>
-
-                    {/* 2x3 Rectangle */}
-                    <div
-                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${
-                        formData.specs_rental.quadrant_layout === "2x3"
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-gray-300 hover:border-gray-400"
-                      }`}
-                      onClick={() =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          specs_rental: { ...prev.specs_rental, quadrant_layout: "2x3" },
-                        }))
-                      }
-                    >
-                      <div className="aspect-[3/2] grid grid-cols-3 grid-rows-2 gap-1 bg-gray-200 rounded mb-2 p-1">
-                        {[1, 2, 3, 4, 5, 6].map((i) => (
-                          <div key={i} className="bg-white rounded flex items-center justify-center">
-                            <span className="text-xs font-medium">Q{i}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-xs text-center">Rectangle (2x3)</p>
-                    </div>
-
-                    {/* 3x2 Rectangle */}
-                    <div
-                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${
-                        formData.specs_rental.quadrant_layout === "3x2"
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-gray-300 hover:border-gray-400"
-                      }`}
-                      onClick={() =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          specs_rental: { ...prev.specs_rental, quadrant_layout: "3x2" },
-                        }))
-                      }
-                    >
-                      <div className="aspect-[2/3] grid grid-cols-2 grid-rows-3 gap-1 bg-gray-200 rounded mb-2 p-1">
-                        {[1, 2, 3, 4, 5, 6].map((i) => (
-                          <div key={i} className="bg-white rounded flex items-center justify-center">
-                            <span className="text-xs font-medium">Q{i}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-xs text-center">Rectangle (3x2)</p>
+                    <div className="space-y-2">
+                      <Label htmlFor="display-cols" className="text-xs text-gray-600">
+                        Columns:
+                      </Label>
+                      <Input
+                        id="display-cols"
+                        type="number"
+                        min="1"
+                        max="6"
+                        value={formData.specs_rental.display_cols || "2"}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            specs_rental: {
+                              ...prev.specs_rental,
+                              display_cols: e.target.value,
+                              quadrant_layout: `${prev.specs_rental.display_rows || "2"}x${e.target.value}`,
+                            },
+                          }))
+                        }
+                        className="w-full h-8 text-sm"
+                        disabled={loading}
+                      />
                     </div>
                   </div>
 
                   {/* Display Preview */}
-                  {formData.specs_rental.quadrant_layout && (
+                  {formData.specs_rental.display_rows && formData.specs_rental.display_cols && (
                     <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                       <h5 className="text-sm font-medium text-gray-700 mb-3">Display Preview</h5>
                       <div className="flex justify-center">
                         <div className="relative">
-                          {/* Render preview based on selected layout */}
-                          {formData.specs_rental.quadrant_layout === "1x1" && (
-                            <div className="w-32 h-32 bg-white border-2 border-gray-300 rounded flex items-center justify-center">
-                              <span className="text-lg font-medium text-gray-600">Q1</span>
-                            </div>
-                          )}
-
-                          {formData.specs_rental.quadrant_layout === "2x2" && (
-                            <div className="w-32 h-32 grid grid-cols-2 gap-1 bg-gray-300 p-1 rounded">
-                              {[1, 2, 3, 4].map((i) => (
-                                <div key={i} className="bg-white rounded flex items-center justify-center">
-                                  <span className="text-sm font-medium text-gray-600">Q{i}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {formData.specs_rental.quadrant_layout === "2x3" && (
-                            <div className="w-48 h-32 grid grid-cols-3 grid-rows-2 gap-1 bg-gray-300 p-1 rounded">
-                              {[1, 2, 3, 4, 5, 6].map((i) => (
-                                <div key={i} className="bg-white rounded flex items-center justify-center">
-                                  <span className="text-xs font-medium text-gray-600">Q{i}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {formData.specs_rental.quadrant_layout === "3x2" && (
-                            <div className="w-32 h-48 grid grid-cols-2 grid-rows-3 gap-1 bg-gray-300 p-1 rounded">
-                              {[1, 2, 3, 4, 5, 6].map((i) => (
-                                <div key={i} className="bg-white rounded flex items-center justify-center">
-                                  <span className="text-xs font-medium text-gray-600">Q{i}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                          {/* Dynamic preview based on rows and columns */}
+                          <div
+                            className="bg-gray-300 p-1 rounded"
+                            style={{
+                              width: `${Math.min(Number(formData.specs_rental.display_cols) * 32, 192)}px`,
+                              height: `${Math.min(Number(formData.specs_rental.display_rows) * 32, 192)}px`,
+                              display: "grid",
+                              gridTemplateColumns: `repeat(${formData.specs_rental.display_cols}, 1fr)`,
+                              gridTemplateRows: `repeat(${formData.specs_rental.display_rows}, 1fr)`,
+                              gap: "2px",
+                            }}
+                          >
+                            {Array.from({
+                              length:
+                                Number(formData.specs_rental.display_rows) * Number(formData.specs_rental.display_cols),
+                            }).map((_, i) => (
+                              <div key={i} className="bg-white rounded flex items-center justify-center">
+                                <span className="text-xs font-medium text-gray-600">Q{i + 1}</span>
+                              </div>
+                            ))}
+                          </div>
 
                           {/* Illumination indicators around the preview */}
                           <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 flex gap-2">
@@ -1081,6 +1021,22 @@ export default function BusinessProductCreatePage() {
                             ))}
                           </div>
                         </div>
+                      </div>
+
+                      {/* Layout Info */}
+                      <div className="mt-3 text-center">
+                        <p className="text-xs text-gray-600">
+                          Layout: {formData.specs_rental.display_rows}x{formData.specs_rental.display_cols}(
+                          {Number(formData.specs_rental.display_rows) * Number(formData.specs_rental.display_cols)}{" "}
+                          quadrants)
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {Number(formData.specs_rental.display_rows) > Number(formData.specs_rental.display_cols)
+                            ? "Vertical Rectangle"
+                            : Number(formData.specs_rental.display_cols) > Number(formData.specs_rental.display_rows)
+                              ? "Horizontal Rectangle"
+                              : "Square"}
+                        </p>
                       </div>
                     </div>
                   )}
