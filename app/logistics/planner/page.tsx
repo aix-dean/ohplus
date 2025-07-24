@@ -69,11 +69,11 @@ export default function LogisticsPlannerPage() {
 
     try {
       setLoading(true)
-      console.log("Fetching service assignments for license_key:", userData.license_key)
+      console.log("Fetching service assignments for company_id:", userData.company_id)
 
       // Query service assignments from Firestore using project_key instead of project_key
       const assignmentsRef = collection(db, "service_assignments")
-      const q = query(assignmentsRef, where("project_key", "==", userData.license_key), orderBy("createdAt", "desc"))
+      const q = query(assignmentsRef, where("company_id", "==", userData.company_id), orderBy("createdAt", "desc"))
 
       const querySnapshot = await getDocs(q)
       console.log("Found", querySnapshot.size, "service assignments")
@@ -135,7 +135,7 @@ export default function LogisticsPlannerPage() {
       // Fallback query without orderBy in case of index issues
       try {
         const assignmentsRef = collection(db, "service_assignments")
-        const fallbackQuery = query(assignmentsRef, where("project_key", "==", userData.license_key))
+        const fallbackQuery = query(assignmentsRef, where("company_id", "==", userData.company_id))
         const fallbackSnapshot = await getDocs(fallbackQuery)
 
         const fallbackAssignments: ServiceAssignment[] = []
@@ -179,7 +179,7 @@ export default function LogisticsPlannerPage() {
     } finally {
       setLoading(false)
     }
-  }, [userData?.license_key])
+  }, [userData?.license_key, userData?.company_id])
 
   useEffect(() => {
     fetchAssignments()
