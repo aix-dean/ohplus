@@ -30,6 +30,7 @@ import { toast } from "@/components/ui/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/contexts/auth-context"
 import { subscriptionService } from "@/lib/subscription-service"
+import { Timestamp } from "firebase/firestore"
 
 // Audience types for the dropdown
 const AUDIENCE_TYPES = [
@@ -639,9 +640,12 @@ export default function BusinessProductCreatePage() {
           structure_color: formData.specs_rental.structure_color || null,
           structure_contractor: formData.specs_rental.structure_contractor || null,
           structure_condition: formData.specs_rental.structure_condition || null,
-          structure_last_maintenance: formData.specs_rental.structure_last_maintenance || null,
-          illumination_total_wattage: formData.specs_rental.illumination_total_wattage || null,
-          illumination_control_system: formData.specs_rental.illumination_control_system || null,
+          structure_last_maintenance: formData.specs_rental.structure_last_maintenance
+            ? Timestamp.fromDate(new Date(formData.specs_rental.structure_last_maintenance))
+            : null,
+          quadrant_layout: formData.specs_rental.quadrant_layout,
+          display_rows: formData.specs_rental.display_rows,
+          display_cols: formData.specs_rental.display_cols,
           power_consumption_monthly: formData.specs_rental.power_consumption_monthly || null,
           average_power_consumption_3months: formData.specs_rental.average_power_consumption_3months || null,
         },
