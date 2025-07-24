@@ -43,9 +43,9 @@ import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-
 import { Timestamp } from "firebase/firestore" // Import Timestamp for Firebase date handling
 import { Input } from "@/components/ui/input"
 
-// Helper function to generate QR code URL (kept here for consistency with proposal view)
+// Helper function to generate QR code URL - Updated to point to public quotation page
 const generateQRCodeUrl = (quotationId: string) => {
-  const quotationViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/quotations/${quotationId}/accept`
+  const quotationViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}quotations/${quotationId}`
   return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(quotationViewUrl)}`
 }
 
