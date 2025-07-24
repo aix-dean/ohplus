@@ -134,6 +134,8 @@ export default function BusinessProductCreatePage() {
       quadrant_layout: "2x2",
       display_rows: "2",
       display_cols: "2",
+      power_consumption_monthly: "",
+      average_power_consumption_3months: "",
     },
     type: "RENTAL",
     status: "PENDING",
@@ -640,6 +642,8 @@ export default function BusinessProductCreatePage() {
           structure_last_maintenance: formData.specs_rental.structure_last_maintenance || null,
           illumination_total_wattage: formData.specs_rental.illumination_total_wattage || null,
           illumination_control_system: formData.specs_rental.illumination_control_system || null,
+          power_consumption_monthly: formData.specs_rental.power_consumption_monthly || null,
+          average_power_consumption_3months: formData.specs_rental.average_power_consumption_3months || null,
         },
       }
 
@@ -1240,26 +1244,28 @@ export default function BusinessProductCreatePage() {
                 {/* Additional Illumination Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="illumination_total_wattage">Total Wattage</Label>
+                    <Label htmlFor="power_consumption_monthly">Power Consumption (kWh/month)</Label>
                     <Input
-                      id="illumination_total_wattage"
-                      name="specs_rental.illumination_total_wattage"
+                      id="power_consumption_monthly"
+                      name="specs_rental.power_consumption_monthly"
                       type="number"
-                      value={formData.specs_rental.illumination_total_wattage || ""}
+                      value={formData.specs_rental.power_consumption_monthly || ""}
                       onChange={handleInputChange}
-                      placeholder="Total watts"
+                      placeholder="Enter monthly power consumption"
                       disabled={loading}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="illumination_control_system">Control System</Label>
+                    <Label htmlFor="average_power_consumption_3months">
+                      Average Power Consumption (kWh/over last 3 months)
+                    </Label>
                     <Input
-                      id="illumination_control_system"
-                      name="specs_rental.illumination_control_system"
-                      type="text"
-                      value={formData.specs_rental.illumination_control_system || ""}
+                      id="average_power_consumption_3months"
+                      name="specs_rental.average_power_consumption_3months"
+                      type="number"
+                      value={formData.specs_rental.average_power_consumption_3months || ""}
                       onChange={handleInputChange}
-                      placeholder="e.g., Timer, Photocell, Manual"
+                      placeholder="Enter average power consumption over last 3 months"
                       disabled={loading}
                     />
                   </div>
