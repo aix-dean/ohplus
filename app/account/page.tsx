@@ -75,7 +75,6 @@ const formatLocation = (location: any): string => {
 
 interface CompanyData {
   id: string
-  company_name?: string
   name?: string
   company_location?: any // Can be string or object
   address?: any // Can be string or object
@@ -189,7 +188,7 @@ export default function AccountPage() {
 
         const company: CompanyData = {
           id: companyDoc.id,
-          company_name: data.company_name || data.name,
+          name: data.name,
           company_location: data.company_location || data.address,
           company_website: data.company_website || data.website,
           photo_url: data.photo_url,
@@ -203,7 +202,7 @@ export default function AccountPage() {
         }
 
         setCompanyData(company)
-        setCompanyName(company.company_name || "")
+        setCompanyName(company.name || "")
         setCompanyLocation(formatLocation(company.company_location))
         setCompanyWebsite(company.company_website || "")
         setFacebook(company.social_media?.facebook || "")
@@ -364,7 +363,7 @@ export default function AccountPage() {
       // Update company data if it exists
       if (companyData) {
         await updateCompanyData({
-          company_name: companyName,
+          name: companyName,
           company_location: companyLocation,
           company_website: companyWebsite,
           social_media: {
@@ -861,9 +860,7 @@ export default function AccountPage() {
                         </div>
 
                         <div className="flex-1 text-center sm:text-left">
-                          <h2 className="text-xl font-bold text-gray-900">
-                            {companyData?.company_name || "Your Company"}
-                          </h2>
+                          <h2 className="text-xl font-bold text-gray-900">{companyData?.name || "Your Company"}</h2>
                           <p className="mt-0.5 text-base text-gray-600">
                             {projectData?.project_name || "Default Project"}
                           </p>
