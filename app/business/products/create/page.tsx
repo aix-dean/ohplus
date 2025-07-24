@@ -104,6 +104,12 @@ export default function BusinessProductCreatePage() {
       elevation: "",
       height: "",
       width: "",
+      site_orientation: "",
+      land_owner: "",
+      structure_color: "",
+      structure_contractor: "",
+      structure_condition: "",
+      structure_last_maintenance: "",
     },
     type: "RENTAL",
     status: "PENDING",
@@ -583,6 +589,10 @@ export default function BusinessProductCreatePage() {
           userData?.first_name && userData?.last_name
             ? `${userData.first_name} ${userData.last_name}`
             : user?.email || "",
+        site_owner:
+          userData?.first_name && userData?.last_name
+            ? `${userData.first_name} ${userData.last_name}`
+            : user?.displayName || user?.email || "Unknown Owner",
         active: true,
         deleted: false,
         seller_id: user.uid,
@@ -608,6 +618,12 @@ export default function BusinessProductCreatePage() {
           elevation: formData.specs_rental.elevation ? Number.parseFloat(formData.specs_rental.elevation) : null,
           height: formData.specs_rental.height ? Number.parseFloat(formData.specs_rental.height) : null,
           width: formData.specs_rental.width ? Number.parseFloat(formData.specs_rental.width) : null,
+          site_orientation: formData.specs_rental.site_orientation || null,
+          land_owner: formData.specs_rental.land_owner || null,
+          structure_color: formData.specs_rental.structure_color || null,
+          structure_contractor: formData.specs_rental.structure_contractor || null,
+          structure_condition: formData.specs_rental.structure_condition || null,
+          structure_last_maintenance: formData.specs_rental.structure_last_maintenance || null,
         },
       }
 
@@ -712,6 +728,123 @@ export default function BusinessProductCreatePage() {
                   <SelectItem value="Dynamic">Dynamic</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-6">
+              <h4 className="text-lg font-semibold text-gray-800">Structure Details</h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="specs_rental.site_orientation">Site Orientation</Label>
+                  <Select
+                    value={formData.specs_rental.site_orientation || ""}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        specs_rental: {
+                          ...prev.specs_rental,
+                          site_orientation: value,
+                        },
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select site orientation" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="North">North</SelectItem>
+                      <SelectItem value="South">South</SelectItem>
+                      <SelectItem value="East">East</SelectItem>
+                      <SelectItem value="West">West</SelectItem>
+                      <SelectItem value="Northeast">Northeast</SelectItem>
+                      <SelectItem value="Northwest">Northwest</SelectItem>
+                      <SelectItem value="Southeast">Southeast</SelectItem>
+                      <SelectItem value="Southwest">Southwest</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="specs_rental.land_owner">Land Owner</Label>
+                  <Input
+                    id="specs_rental.land_owner"
+                    name="specs_rental.land_owner"
+                    type="text"
+                    value={formData.specs_rental.land_owner || ""}
+                    onChange={handleInputChange}
+                    placeholder="Enter land owner name"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="specs_rental.structure_color">Structure Color</Label>
+                  <Input
+                    id="specs_rental.structure_color"
+                    name="specs_rental.structure_color"
+                    type="text"
+                    value={formData.specs_rental.structure_color || ""}
+                    onChange={handleInputChange}
+                    placeholder="Enter structure color"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="specs_rental.structure_contractor">Structure Contractor</Label>
+                  <Input
+                    id="specs_rental.structure_contractor"
+                    name="specs_rental.structure_contractor"
+                    type="text"
+                    value={formData.specs_rental.structure_contractor || ""}
+                    onChange={handleInputChange}
+                    placeholder="Enter contractor name"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="specs_rental.structure_condition">Structure Condition</Label>
+                  <Select
+                    value={formData.specs_rental.structure_condition || ""}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        specs_rental: {
+                          ...prev.specs_rental,
+                          structure_condition: value,
+                        },
+                      }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select structure condition" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Excellent">Excellent</SelectItem>
+                      <SelectItem value="Good">Good</SelectItem>
+                      <SelectItem value="Fair">Fair</SelectItem>
+                      <SelectItem value="Poor">Poor</SelectItem>
+                      <SelectItem value="Needs Repair">Needs Repair</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="specs_rental.structure_last_maintenance">Last Maintenance Date</Label>
+                  <Input
+                    id="specs_rental.structure_last_maintenance"
+                    name="specs_rental.structure_last_maintenance"
+                    type="date"
+                    value={formData.specs_rental.structure_last_maintenance || ""}
+                    onChange={handleInputChange}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         )
