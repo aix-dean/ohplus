@@ -627,8 +627,9 @@ export default function BusinessProductCreatePage() {
               }
             : null,
         specs_rental: {
-          ...formData.specs_rental,
           audience_types: selectedAudienceTypes,
+          geopoint: formData.specs_rental.geopoint,
+          location: formData.specs_rental.location,
           traffic_count: formData.specs_rental.traffic_count
             ? Number.parseInt(formData.specs_rental.traffic_count)
             : null,
