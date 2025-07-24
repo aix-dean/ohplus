@@ -288,8 +288,8 @@ Best regards,
         description: `Your email has been sent successfully to ${toEmails.join(", ")}.`,
       })
 
-      // Navigate back to report
-      router.push(`/logistics/reports/${reportId}`)
+      // Navigate back to preview
+      router.push(`/logistics/reports/preview`)
     } catch (error) {
       console.error("Error sending email:", error)
       const errorMessage = error instanceof Error ? error.message : "Failed to send email. Please try again."
