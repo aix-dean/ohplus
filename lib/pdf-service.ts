@@ -1435,26 +1435,33 @@ export async function generateReportPDF(
         const userId = userData?.uid || report?.createdBy
         let companyData = null
 
+        console.log("PDF: Fetching user data for uid:", userId)
+
         // First, get the full user document to access company_id
         const userDocRef = doc(db, "users", userId)
         const userDoc = await getDoc(userDocRef)
 
         if (userDoc.exists()) {
           const fullUserData = userDoc.data()
+          console.log("PDF: User data found:", fullUserData)
 
           // Try to get company using user's company_id
           if (fullUserData.company_id) {
+            console.log("PDF: Fetching company data for company_id:", fullUserData.company_id)
+
             const companyDocRef = doc(db, "companies", fullUserData.company_id)
             const companyDoc = await getDoc(companyDocRef)
 
             if (companyDoc.exists()) {
               companyData = companyDoc.data()
+              console.log("PDF: Company data found:", companyData)
             }
           }
         }
 
         // Fallback: Query by created_by field (for backward compatibility)
         if (!companyData) {
+          console.log("PDF: Falling back to created_by query")
           const companiesRef = collection(db, "companies")
           const q = query(companiesRef, where("created_by", "==", userId))
           const querySnapshot = await getDocs(q)
@@ -1462,6 +1469,7 @@ export async function generateReportPDF(
           if (!querySnapshot.empty) {
             const companyDoc = querySnapshot.docs[0]
             companyData = companyDoc.data()
+            console.log("PDF: Company data found via created_by query:", companyData)
           }
         }
 
@@ -1475,13 +1483,17 @@ export async function generateReportPDF(
             "User"
 
           if (companyData.photo_url && companyData.photo_url.trim() !== "") {
+            console.log("PDF: Setting company logo to:", companyData.photo_url)
             companyLogoUrl = companyData.photo_url
+          } else {
+            console.log("PDF: No company photo_url found, using default OH+ logo")
           }
         } else {
+          console.log("PDF: No company data found, using defaults")
           preparedByName = userData?.displayName || userData?.email?.split("@")[0] || "User"
         }
       } catch (error) {
-        console.error("Error querying companies collection:", error)
+        console.error("PDF: Error querying companies collection:", error)
         preparedByName = userData?.displayName || userData?.email?.split("@")[0] || "User"
       }
     }
@@ -1495,6 +1507,7 @@ export async function generateReportPDF(
 
     // Load and add logo
     try {
+      console.log("PDF: Loading logo from:", companyLogoUrl)
       const logoBase64 = await loadImageAsBase64(companyLogoUrl)
       if (logoBase64) {
         const { width: actualLogoWidth, height: actualLogoHeight } = await getImageDimensions(logoBase64)
@@ -1513,9 +1526,12 @@ export async function generateReportPDF(
         const logoOffsetY = (logoSize - finalLogoHeight) / 2
 
         pdf.addImage(logoBase64, "PNG", logoX + logoOffsetX, logoY + logoOffsetY, finalLogoWidth, finalLogoHeight)
+        console.log("PDF: Logo added successfully")
+      } else {
+        console.log("PDF: Failed to load logo, using text fallback")
       }
     } catch (error) {
-      console.error("Error loading logo:", error)
+      console.error("PDF: Error loading logo:", error)
       // Text fallback
       pdf.setFontSize(8)
       pdf.setFont("helvetica", "bold")

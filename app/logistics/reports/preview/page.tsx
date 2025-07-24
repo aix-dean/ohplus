@@ -57,20 +57,26 @@ export default function ReportPreviewPage() {
     if (!user?.uid) return
 
     try {
+      console.log("Fetching user data for uid:", user.uid)
+
       // First, get the full user document to access company_id
       const userDocRef = doc(db, "users", user.uid)
       const userDoc = await getDoc(userDocRef)
 
       if (userDoc.exists()) {
         const userData = userDoc.data()
+        console.log("User data found:", userData)
 
         // Try to get company using user's company_id
         if (userData.company_id) {
+          console.log("Fetching company data for company_id:", userData.company_id)
+
           const companyDocRef = doc(db, "companies", userData.company_id)
           const companyDoc = await getDoc(companyDocRef)
 
           if (companyDoc.exists()) {
             const companyData = companyDoc.data()
+            console.log("Company data found:", companyData)
 
             const name =
               companyData.name ||
@@ -83,19 +89,29 @@ export default function ReportPreviewPage() {
               "User"
 
             setPreparedByName(name)
+            console.log("Set prepared by name to:", name)
 
             // Set company logo - fallback to OH+ logo if photo_url is empty or unset
-            const logoUrl =
-              companyData.photo_url && companyData.photo_url.trim() !== ""
-                ? companyData.photo_url
-                : "/ohplus-new-logo.png"
-            setCompanyLogo(logoUrl)
+            if (companyData.photo_url && companyData.photo_url.trim() !== "") {
+              console.log("Setting company logo to:", companyData.photo_url)
+              setCompanyLogo(companyData.photo_url)
+            } else {
+              console.log("No company photo_url found, using default OH+ logo")
+              setCompanyLogo("/ohplus-new-logo.png")
+            }
             return
+          } else {
+            console.log("Company document not found for company_id:", userData.company_id)
           }
+        } else {
+          console.log("No company_id found in user data")
         }
+      } else {
+        console.log("User document not found for uid:", user.uid)
       }
 
       // Fallback: Query by created_by field (for backward compatibility)
+      console.log("Falling back to created_by query")
       const companiesRef = collection(db, "companies")
       const q = query(companiesRef, where("created_by", "==", user.uid))
       const querySnapshot = await getDocs(q)
@@ -103,6 +119,7 @@ export default function ReportPreviewPage() {
       if (!querySnapshot.empty) {
         const companyDoc = querySnapshot.docs[0]
         const companyData = companyDoc.data()
+        console.log("Company data found via created_by query:", companyData)
 
         const name =
           companyData.name ||
@@ -114,10 +131,14 @@ export default function ReportPreviewPage() {
 
         setPreparedByName(name)
 
-        const logoUrl =
-          companyData.photo_url && companyData.photo_url.trim() !== "" ? companyData.photo_url : "/ohplus-new-logo.png"
-        setCompanyLogo(logoUrl)
+        if (companyData.photo_url && companyData.photo_url.trim() !== "") {
+          console.log("Setting company logo via fallback to:", companyData.photo_url)
+          setCompanyLogo(companyData.photo_url)
+        } else {
+          setCompanyLogo("/ohplus-new-logo.png")
+        }
       } else {
+        console.log("No company found via created_by query, using defaults")
         // Final fallback to user display name or email
         setPreparedByName(user.displayName || user.email?.split("@")[0] || "User")
         setCompanyLogo("/ohplus-new-logo.png")
@@ -560,6 +581,10 @@ export default function ReportPreviewPage() {
                     src={companyLogo || "/placeholder.svg"}
                     alt="Company Logo"
                     className="max-h-full max-w-full object-contain"
+                    onError={(e) => {
+                      console.error("Company logo failed to load:", companyLogo)
+                      setCompanyLogo("/ohplus-new-logo.png")
+                    }}
                   />
                 </div>
               </div>
