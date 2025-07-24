@@ -38,7 +38,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { storage, db } from "@/lib/firebase"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore"
 import { getUserProductsCount } from "@/lib/firebase-service"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
@@ -139,66 +139,94 @@ export default function AccountPage() {
     setCompanyLoading(true)
     try {
       console.log("Current user UID:", user.uid)
+      console.log("User data company_id:", userData?.company_id)
 
-      // First try to find company by created_by field
-      let companiesQuery = query(collection(db, "companies"), where("created_by", "==", user.uid))
-      let companiesSnapshot = await getDocs(companiesQuery)
+      let companyDoc = null
+      let companyData = null
 
-      console.log("Companies found by created_by:", companiesSnapshot.size)
+      // First, try to find company by company_id if it exists in userData
+      if (userData?.company_id) {
+        console.log("Trying to find company by company_id:", userData.company_id)
+        try {
+          const companyDocRef = doc(db, "companies", userData.company_id)
+          const companyDocSnap = await getDoc(companyDocRef)
 
-      // If no company found by created_by, try to find by email or other identifiers
-      if (companiesSnapshot.empty && user.email) {
-        console.log("Trying to find company by email:", user.email)
-        companiesQuery = query(collection(db, "companies"), where("email", "==", user.email))
-        companiesSnapshot = await getDocs(companiesQuery)
-        console.log("Companies found by email:", companiesSnapshot.size)
+          if (companyDocSnap.exists()) {
+            companyDoc = companyDocSnap
+            companyData = companyDocSnap.data()
+            console.log("Company found by company_id:", companyData)
+          } else {
+            console.log("No company found with company_id:", userData.company_id)
+          }
+        } catch (error) {
+          console.error("Error fetching company by company_id:", error)
+        }
       }
 
-      // If still no company found, try to find by contact_person email
-      if (companiesSnapshot.empty && user.email) {
-        console.log("Trying to find company by contact_person email")
-        companiesQuery = query(collection(db, "companies"), where("contact_person", "==", user.email))
-        companiesSnapshot = await getDocs(companiesQuery)
-        console.log("Companies found by contact_person:", companiesSnapshot.size)
-      }
+      // If no company found by company_id, try other methods
+      if (!companyDoc) {
+        // Try to find company by created_by field
+        let companiesQuery = query(collection(db, "companies"), where("created_by", "==", user.uid))
+        let companiesSnapshot = await getDocs(companiesQuery)
 
-      // If still no company found, get all companies and log them for debugging
-      if (companiesSnapshot.empty) {
-        console.log("No companies found, fetching all companies for debugging...")
-        const allCompaniesQuery = query(collection(db, "companies"))
-        const allCompaniesSnapshot = await getDocs(allCompaniesQuery)
-        console.log("Total companies in collection:", allCompaniesSnapshot.size)
+        console.log("Companies found by created_by:", companiesSnapshot.size)
 
-        allCompaniesSnapshot.forEach((doc) => {
-          const data = doc.data()
-          console.log("Company document:", {
-            id: doc.id,
-            name: data.name || data.company_name,
-            created_by: data.created_by,
-            email: data.email,
-            contact_person: data.contact_person,
+        // If no company found by created_by, try to find by email or other identifiers
+        if (companiesSnapshot.empty && user.email) {
+          console.log("Trying to find company by email:", user.email)
+          companiesQuery = query(collection(db, "companies"), where("email", "==", user.email))
+          companiesSnapshot = await getDocs(companiesQuery)
+          console.log("Companies found by email:", companiesSnapshot.size)
+        }
+
+        // If still no company found, try to find by contact_person email
+        if (companiesSnapshot.empty && user.email) {
+          console.log("Trying to find company by contact_person email")
+          companiesQuery = query(collection(db, "companies"), where("contact_person", "==", user.email))
+          companiesSnapshot = await getDocs(companiesQuery)
+          console.log("Companies found by contact_person:", companiesSnapshot.size)
+        }
+
+        // If still no company found, get all companies and log them for debugging
+        if (companiesSnapshot.empty) {
+          console.log("No companies found, fetching all companies for debugging...")
+          const allCompaniesQuery = query(collection(db, "companies"))
+          const allCompaniesSnapshot = await getDocs(allCompaniesQuery)
+          console.log("Total companies in collection:", allCompaniesSnapshot.size)
+
+          allCompaniesSnapshot.forEach((doc) => {
+            const data = doc.data()
+            console.log("Company document:", {
+              id: doc.id,
+              name: data.name || data.company_name,
+              created_by: data.created_by,
+              email: data.email,
+              contact_person: data.contact_person,
+            })
           })
-        })
+        }
+
+        if (!companiesSnapshot.empty) {
+          companyDoc = companiesSnapshot.docs[0]
+          companyData = companyDoc.data()
+          console.log("Found company data:", companyData)
+        }
       }
 
-      if (!companiesSnapshot.empty) {
-        const companyDoc = companiesSnapshot.docs[0]
-        const data = companyDoc.data()
-        console.log("Found company data:", data)
-
+      if (companyDoc && companyData) {
         const company: CompanyData = {
           id: companyDoc.id,
-          name: data.name,
-          company_location: data.company_location || data.address,
-          company_website: data.company_website || data.website,
-          photo_url: data.photo_url,
-          contact_person: data.contact_person,
-          email: data.email,
-          phone: data.phone,
-          social_media: data.social_media || {},
-          created_by: data.created_by,
-          created: data.created?.toDate(),
-          updated: data.updated?.toDate(),
+          name: companyData.name,
+          company_location: companyData.company_location || companyData.address,
+          company_website: companyData.company_website || companyData.website,
+          photo_url: companyData.photo_url,
+          contact_person: companyData.contact_person,
+          email: companyData.email,
+          phone: companyData.phone,
+          social_media: companyData.social_media || {},
+          created_by: companyData.created_by,
+          created: companyData.created?.toDate ? companyData.created.toDate() : companyData.created_at?.toDate(),
+          updated: companyData.updated?.toDate ? companyData.updated.toDate() : companyData.updated_at?.toDate(),
         }
 
         setCompanyData(company)
