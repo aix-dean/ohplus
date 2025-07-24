@@ -45,7 +45,7 @@ import { Input } from "@/components/ui/input"
 
 // Helper function to generate QR code URL - Updated to point to public quotation page
 const generateQRCodeUrl = (quotationId: string) => {
-  const quotationViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}quotations/${quotationId}`
+  const quotationViewUrl = `${window.location.origin}quotations/${quotationId}`
   return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(quotationViewUrl)}`
 }
 
