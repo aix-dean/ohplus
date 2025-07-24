@@ -1158,78 +1158,7 @@ export default function BusinessProductCreatePage() {
                   </div>
 
                   {Number.parseInt(formData.specs_rental.illumination_left_count || "0") > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs text-gray-600">Rows:</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            max="5"
-                            value={formData.specs_rental.illumination_left_rows || "1"}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_left_rows: e.target.value,
-                                },
-                              }))
-                            }
-                            className="w-16 h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs text-gray-600">Columns:</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            max="5"
-                            value={formData.specs_rental.illumination_left_cols || "1"}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_left_cols: e.target.value,
-                                },
-                              }))
-                            }
-                            className="w-16 h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
-                      </div>
-
-                      <div
-                        className="grid gap-2"
-                        style={{
-                          gridTemplateColumns: `repeat(${Number.parseInt(formData.specs_rental.illumination_left_cols || "1")}, 1fr)`,
-                          gridTemplateRows: `repeat(${Number.parseInt(formData.specs_rental.illumination_left_rows || "1")}, 1fr)`,
-                        }}
-                      >
-                        {Array.from({
-                          length: Number.parseInt(formData.specs_rental.illumination_left_count || "0"),
-                        }).map((_, index) => (
-                          <div key={`left-${index}`} className="space-y-1">
-                            <Label htmlFor={`left-${index}`} className="text-xs text-gray-600">
-                              L{index + 1}
-                            </Label>
-                            <Input
-                              id={`left-${index}`}
-                              name={`specs_rental.illumination_left_${index}`}
-                              type="text"
-                              value={formData.specs_rental[`illumination_left_${index}`] || ""}
-                              onChange={handleInputChange}
-                              placeholder="Wattage/Type"
-                              className="h-9 text-sm"
-                              disabled={loading}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <div className="space-y-2"></div>
                   )}
                 </div>
 
@@ -1264,78 +1193,7 @@ export default function BusinessProductCreatePage() {
                   </div>
 
                   {Number.parseInt(formData.specs_rental.illumination_bottom_count || "0") > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs text-gray-600">Rows:</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            max="5"
-                            value={formData.specs_rental.illumination_bottom_rows || "1"}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_bottom_rows: e.target.value,
-                                },
-                              }))
-                            }
-                            className="w-16 h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs text-gray-600">Columns:</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            max="5"
-                            value={formData.specs_rental.illumination_bottom_cols || "1"}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_bottom_cols: e.target.value,
-                                },
-                              }))
-                            }
-                            className="w-16 h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
-                      </div>
-
-                      <div
-                        className="grid gap-2"
-                        style={{
-                          gridTemplateColumns: `repeat(${Number.parseInt(formData.specs_rental.illumination_bottom_cols || "1")}, 1fr)`,
-                          gridTemplateRows: `repeat(${Number.parseInt(formData.specs_rental.illumination_bottom_rows || "1")}, 1fr)`,
-                        }}
-                      >
-                        {Array.from({
-                          length: Number.parseInt(formData.specs_rental.illumination_bottom_count || "0"),
-                        }).map((_, index) => (
-                          <div key={`bottom-${index}`} className="space-y-1">
-                            <Label htmlFor={`bottom-${index}`} className="text-xs text-gray-600">
-                              B{index + 1}
-                            </Label>
-                            <Input
-                              id={`bottom-${index}`}
-                              name={`specs_rental.illumination_bottom_${index}`}
-                              type="text"
-                              value={formData.specs_rental[`illumination_bottom_${index}`] || ""}
-                              onChange={handleInputChange}
-                              placeholder="Wattage/Type"
-                              className="h-9 text-sm"
-                              disabled={loading}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <div className="space-y-2"></div>
                   )}
                 </div>
 
@@ -1370,78 +1228,7 @@ export default function BusinessProductCreatePage() {
                   </div>
 
                   {Number.parseInt(formData.specs_rental.illumination_right_count || "0") > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs text-gray-600">Rows:</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            max="5"
-                            value={formData.specs_rental.illumination_right_rows || "1"}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_right_rows: e.target.value,
-                                },
-                              }))
-                            }
-                            className="w-16 h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Label className="text-xs text-gray-600">Columns:</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            max="5"
-                            value={formData.specs_rental.illumination_right_cols || "1"}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_right_cols: e.target.value,
-                                },
-                              }))
-                            }
-                            className="w-16 h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
-                      </div>
-
-                      <div
-                        className="grid gap-2"
-                        style={{
-                          gridTemplateColumns: `repeat(${Number.parseInt(formData.specs_rental.illumination_right_cols || "1")}, 1fr)`,
-                          gridTemplateRows: `repeat(${Number.parseInt(formData.specs_rental.illumination_right_rows || "1")}, 1fr)`,
-                        }}
-                      >
-                        {Array.from({
-                          length: Number.parseInt(formData.specs_rental.illumination_right_count || "0"),
-                        }).map((_, index) => (
-                          <div key={`right-${index}`} className="space-y-1">
-                            <Label htmlFor={`right-${index}`} className="text-xs text-gray-600">
-                              R{index + 1}
-                            </Label>
-                            <Input
-                              id={`right-${index}`}
-                              name={`specs_rental.illumination_right_${index}`}
-                              type="text"
-                              value={formData.specs_rental[`illumination_right_${index}`] || ""}
-                              onChange={handleInputChange}
-                              placeholder="Wattage/Type"
-                              className="h-9 text-sm"
-                              disabled={loading}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                    <div className="space-y-2"></div>
                   )}
                 </div>
 
