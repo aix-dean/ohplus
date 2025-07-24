@@ -34,9 +34,13 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
     pathname?.startsWith("/onboarding") || // Handle dynamic onboarding path
     pathname?.startsWith("/unauthorized") // Handle unauthorized path
   const isPublicProposal = pathname?.startsWith("/proposals/view/")
-
+  const isPublicQuotation = pathname?.startsWith("/quotations/")
   // If it's a public proposal view, render without navigation and without auth check
   if (isPublicProposal) {
+    return <div className="min-h-screen bg-gray-50">{children}</div>
+  }
+
+  if(isPublicQuotation){
     return <div className="min-h-screen bg-gray-50">{children}</div>
   }
 
