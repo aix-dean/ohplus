@@ -71,7 +71,7 @@ export default function LogisticsPlannerPage() {
       setLoading(true)
       console.log("Fetching service assignments for license_key:", userData.license_key)
 
-      // Query service assignments from Firestore
+      // Query service assignments from Firestore using project_key instead of project_key
       const assignmentsRef = collection(db, "service_assignments")
       const q = query(assignmentsRef, where("project_key", "==", userData.license_key), orderBy("createdAt", "desc"))
 
@@ -96,16 +96,16 @@ export default function LogisticsPlannerPage() {
             ? new Date(data.coveredDateEnd)
             : null
 
-        const createdAt = data.createdAt?.toDate
-          ? data.createdAt.toDate()
-          : data.createdAt
-            ? new Date(data.createdAt)
+        const createdAt = data.created?.toDate
+          ? data.created.toDate()
+          : data.created
+            ? new Date(data.created)
             : new Date()
 
-        const updatedAt = data.updatedAt?.toDate
-          ? data.updatedAt.toDate()
-          : data.updatedAt
-            ? new Date(data.updatedAt)
+        const updatedAt = data.updated?.toDate
+          ? data.updated.toDate()
+          : data.updated
+            ? new Date(data.updated)
             : new Date()
 
         const assignment: ServiceAssignment = {
@@ -116,9 +116,9 @@ export default function LogisticsPlannerPage() {
           serviceType: data.serviceType || data.type || "General Service",
           coveredDateStart,
           coveredDateEnd,
-          status: data.status || "SCHEDULED",
-          location: data.location || data.address || "",
-          notes: data.notes || data.description || "",
+          status: data.status || "PENDING", // Changed from "SCHEDULED" to match your data
+          location: data.projectSiteLocation || data.location || data.address || "",
+          notes: data.message || data.notes || data.description || "", // Use message field from your data
           assignedTo: data.assignedTo || data.assignedToId || "",
           assignedToName: data.assignedToName || data.assignedTo || "Unassigned",
           createdAt,
@@ -162,9 +162,9 @@ export default function LogisticsPlannerPage() {
             serviceType: data.serviceType || data.type || "General Service",
             coveredDateStart,
             coveredDateEnd,
-            status: data.status || "SCHEDULED",
-            location: data.location || data.address || "",
-            notes: data.notes || data.description || "",
+            status: data.status || "PENDING", // Changed from "SCHEDULED" to match your data
+            location: data.projectSiteLocation || data.location || data.address || "",
+            notes: data.message || data.notes || data.description || "", // Use message field from your data
             assignedTo: data.assignedTo || data.assignedToId || "",
             assignedToName: data.assignedToName || data.assignedTo || "Unassigned",
           })
