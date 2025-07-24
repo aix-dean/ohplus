@@ -133,7 +133,7 @@ export function SendProposalDialog({ isOpen, onClose, proposal, onProposalSent }
               <Label htmlFor="from" className="text-right">
                 From
               </Label>
-              <Input id="from" value="OH Plus <noreply@ohplus.ph>" readOnly className="col-span-3" />
+              <Input id="from" value="OH Plus <noreply@resend.dev>" readOnly className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="replyTo" className="text-right">
