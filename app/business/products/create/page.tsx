@@ -134,8 +134,6 @@ export default function BusinessProductCreatePage() {
       quadrant_layout: "2x2",
       display_rows: "2",
       display_cols: "2",
-      power_consumption_monthly: "",
-      power_consumption_quarterly: "",
     },
     type: "RENTAL",
     status: "PENDING",
@@ -642,8 +640,6 @@ export default function BusinessProductCreatePage() {
           structure_last_maintenance: formData.specs_rental.structure_last_maintenance || null,
           illumination_total_wattage: formData.specs_rental.illumination_total_wattage || null,
           illumination_control_system: formData.specs_rental.illumination_control_system || null,
-          power_consumption_monthly: formData.specs_rental.power_consumption_monthly || null,
-          power_consumption_quarterly: formData.specs_rental.power_consumption_quarterly || null,
         },
       }
 
@@ -948,7 +944,7 @@ export default function BusinessProductCreatePage() {
                   {formData.specs_rental.display_rows && formData.specs_rental.display_cols && (
                     <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                       <h5 className="text-sm font-medium text-gray-700 mb-3">Display Preview</h5>
-                      <div className="flex justify-center p-6">
+                      <div className="flex justify-center">
                         <div className="relative">
                           {/* Scrollable container for large grids */}
                           <div className="max-h-96 overflow-auto border border-gray-200 rounded-lg">
@@ -976,94 +972,95 @@ export default function BusinessProductCreatePage() {
                             </div>
                           </div>
 
-                          {/* Illumination indicators around the preview - smaller and within border */}
-                          <div className="absolute -top-4 left-0 right-0 flex justify-between px-6">
+                          {/* Illumination indicators around the preview - evenly distributed */}
+                          <div className="absolute -top-6 left-0 right-0 flex justify-between px-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_upper_count) || 0,
                             }).map((_, i) => {
                               const totalCount = Number.parseInt(formData.specs_rental.illumination_upper_count) || 0
-                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50
-                              const leftPosition = totalCount === 1 ? 50 : i * spacing
+                              const totalCols = Number(formData.specs_rental.display_cols)
+                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
+                              const leftPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
 
                               return (
                                 <div
                                   key={i}
-                                  className="w-3 h-3 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
                                   style={{
                                     left: `${leftPosition}%`,
                                     transform: "translateX(-50%)",
                                   }}
                                 >
-                                  <span className="text-[8px] text-white font-bold">U{i + 1}</span>
+                                  <span className="text-[10px] text-white font-bold">U{i + 1}</span>
                                 </div>
                               )
                             })}
                           </div>
 
-                          <div className="absolute top-0 bottom-0 -left-4 flex flex-col justify-between py-6">
+                          <div className="absolute top-0 bottom-0 -left-6 flex flex-col justify-between py-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_left_count) || 0,
                             }).map((_, i) => {
                               const totalCount = Number.parseInt(formData.specs_rental.illumination_left_count) || 0
-                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50
-                              const topPosition = totalCount === 1 ? 50 : i * spacing
+                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
+                              const topPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
 
                               return (
                                 <div
                                   key={i}
-                                  className="w-3 h-3 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
                                   style={{
                                     top: `${topPosition}%`,
                                     transform: "translateY(-50%)",
                                   }}
                                 >
-                                  <span className="text-[8px] text-white font-bold">L{i + 1}</span>
+                                  <span className="text-[10px] text-white font-bold">L{i + 1}</span>
                                 </div>
                               )
                             })}
                           </div>
 
-                          <div className="absolute top-0 bottom-0 -right-4 flex flex-col justify-between py-6">
+                          <div className="absolute top-0 bottom-0 -right-6 flex flex-col justify-between py-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_right_count) || 0,
                             }).map((_, i) => {
                               const totalCount = Number.parseInt(formData.specs_rental.illumination_right_count) || 0
-                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50
-                              const topPosition = totalCount === 1 ? 50 : i * spacing
+                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
+                              const topPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
 
                               return (
                                 <div
                                   key={i}
-                                  className="w-3 h-3 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
                                   style={{
                                     top: `${topPosition}%`,
                                     transform: "translateY(-50%)",
                                   }}
                                 >
-                                  <span className="text-[8px] text-white font-bold">R{i + 1}</span>
+                                  <span className="text-[10px] text-white font-bold">R{i + 1}</span>
                                 </div>
                               )
                             })}
                           </div>
 
-                          <div className="absolute -bottom-4 left-0 right-0 flex justify-between px-6">
+                          <div className="absolute -bottom-6 left-0 right-0 flex justify-between px-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0,
                             }).map((_, i) => {
                               const totalCount = Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0
-                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50
-                              const leftPosition = totalCount === 1 ? 50 : i * spacing
+                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
+                              const leftPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
 
                               return (
                                 <div
                                   key={i}
-                                  className="w-3 h-3 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                  className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
                                   style={{
                                     left: `${leftPosition}%`,
                                     transform: "translateX(-50%)",
                                   }}
                                 >
-                                  <span className="text-[8px] text-white font-bold">B{i + 1}</span>
+                                  <span className="text-[10px] text-white font-bold">B{i + 1}</span>
                                 </div>
                               )
                             })}
@@ -1235,29 +1232,29 @@ export default function BusinessProductCreatePage() {
                   )}
                 </div>
 
-                {/* Power Consumption Details */}
+                {/* Additional Illumination Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="power_consumption_monthly">Power Consumption per Month</Label>
+                    <Label htmlFor="illumination_total_wattage">Total Wattage</Label>
                     <Input
-                      id="power_consumption_monthly"
-                      name="specs_rental.power_consumption_monthly"
+                      id="illumination_total_wattage"
+                      name="specs_rental.illumination_total_wattage"
                       type="number"
-                      value={formData.specs_rental.power_consumption_monthly || ""}
+                      value={formData.specs_rental.illumination_total_wattage || ""}
                       onChange={handleInputChange}
-                      placeholder="kWh per month"
+                      placeholder="Total watts"
                       disabled={loading}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="power_consumption_quarterly">Power Consumption over 3 Months</Label>
+                    <Label htmlFor="illumination_control_system">Control System</Label>
                     <Input
-                      id="power_consumption_quarterly"
-                      name="specs_rental.power_consumption_quarterly"
-                      type="number"
-                      value={formData.specs_rental.power_consumption_quarterly || ""}
+                      id="illumination_control_system"
+                      name="specs_rental.illumination_control_system"
+                      type="text"
+                      value={formData.specs_rental.illumination_control_system || ""}
                       onChange={handleInputChange}
-                      placeholder="kWh over 3 months"
+                      placeholder="e.g., Timer, Photocell, Manual"
                       disabled={loading}
                     />
                   </div>
