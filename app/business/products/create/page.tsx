@@ -1700,17 +1700,15 @@ export default function BusinessProductCreatePage() {
                 className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
                   currentStep === step.id
                     ? "bg-blue-600 border-blue-600 text-white"
-                    : currentStep > step.id || (formData.content_type === "Static" && step.id === 2)
+                    : currentStep > step.id
                       ? "bg-green-600 border-green-600 text-white"
                       : "bg-white border-gray-300 text-gray-500"
                 }`}
               >
-                {currentStep > step.id || (formData.content_type === "Static" && step.id === 2) ? (
+                {currentStep > step.id ? (
                   <Check className="w-5 h-5" />
                 ) : (
-                  <span className="text-sm font-medium">
-                    {formData.content_type === "Static" && step.id > 2 ? step.id - 1 : step.id}
-                  </span>
+                  <span className="text-sm font-medium">{step.id}</span>
                 )}
               </div>
               <div className="ml-3">
