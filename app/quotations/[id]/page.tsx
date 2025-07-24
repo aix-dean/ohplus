@@ -283,7 +283,7 @@ export default function PublicQuotationPage() {
           
           /* Remove browser default headers and footers */
           @page {
-            margin: 0.5in;
+            margin: 0; /* Set all margins to 0 */
             size: A4;
           }
         }
