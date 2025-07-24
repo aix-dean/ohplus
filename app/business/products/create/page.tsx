@@ -1244,28 +1244,26 @@ export default function BusinessProductCreatePage() {
                 {/* Additional Illumination Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="power_consumption_monthly">Power Consumption (kWh/month)</Label>
+                    <Label htmlFor="power_consumption_monthly">Power Consumption</Label>
                     <Input
                       id="power_consumption_monthly"
                       name="specs_rental.power_consumption_monthly"
                       type="number"
                       value={formData.specs_rental.power_consumption_monthly || ""}
                       onChange={handleInputChange}
-                      placeholder="Enter monthly power consumption"
+                      placeholder="Enter monthly power consumption (kWh/month)"
                       disabled={loading}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="average_power_consumption_3months">
-                      Average Power Consumption (kWh/over last 3 months)
-                    </Label>
+                    <Label htmlFor="average_power_consumption_3months">Average Power Consumption</Label>
                     <Input
                       id="average_power_consumption_3months"
                       name="specs_rental.average_power_consumption_3months"
                       type="number"
                       value={formData.specs_rental.average_power_consumption_3months || ""}
                       onChange={handleInputChange}
-                      placeholder="Enter average power consumption over last 3 months"
+                      placeholder="Enter average power consumption (kWh/over last 3 months)"
                       disabled={loading}
                     />
                   </div>
