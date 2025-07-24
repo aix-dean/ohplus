@@ -946,29 +946,33 @@ export default function BusinessProductCreatePage() {
                       <h5 className="text-sm font-medium text-gray-700 mb-3">Display Preview</h5>
                       <div className="flex justify-center">
                         <div className="relative">
-                          {/* Dynamic preview based on rows and columns */}
-                          <div
-                            className="bg-gray-300 p-2 rounded"
-                            style={{
-                              width: `${Math.min(Number(formData.specs_rental.display_cols) * 48, 432)}px`,
-                              height: `${Math.min(Number(formData.specs_rental.display_rows) * 48, 432)}px`,
-                              display: "grid",
-                              gridTemplateColumns: `repeat(${formData.specs_rental.display_cols}, 1fr)`,
-                              gridTemplateRows: `repeat(${formData.specs_rental.display_rows}, 1fr)`,
-                              gap: "4px",
-                            }}
-                          >
-                            {Array.from({
-                              length:
-                                Number(formData.specs_rental.display_rows) * Number(formData.specs_rental.display_cols),
-                            }).map((_, i) => (
-                              <div key={i} className="bg-white rounded flex items-center justify-center min-h-[40px]">
-                                <span className="text-xs font-medium text-gray-600">Q{i + 1}</span>
-                              </div>
-                            ))}
+                          {/* Scrollable container for large grids */}
+                          <div className="max-h-96 overflow-auto border border-gray-200 rounded-lg">
+                            {/* Dynamic preview based on rows and columns */}
+                            <div
+                              className="bg-gray-300 p-2 rounded"
+                              style={{
+                                width: `${Math.min(Number(formData.specs_rental.display_cols) * 48, 432)}px`,
+                                height: `${Number(formData.specs_rental.display_rows) * 48}px`,
+                                display: "grid",
+                                gridTemplateColumns: `repeat(${formData.specs_rental.display_cols}, 1fr)`,
+                                gridTemplateRows: `repeat(${formData.specs_rental.display_rows}, 1fr)`,
+                                gap: "4px",
+                              }}
+                            >
+                              {Array.from({
+                                length:
+                                  Number(formData.specs_rental.display_rows) *
+                                  Number(formData.specs_rental.display_cols),
+                              }).map((_, i) => (
+                                <div key={i} className="bg-white rounded flex items-center justify-center min-h-[40px]">
+                                  <span className="text-xs font-medium text-gray-600">Q{i + 1}</span>
+                                </div>
+                              ))}
+                            </div>
                           </div>
 
-                          {/* Illumination indicators around the preview */}
+                          {/* Illumination indicators around the preview - positioned relative to scrollable container */}
                           <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 flex gap-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_upper_count) || 0,
@@ -1037,6 +1041,10 @@ export default function BusinessProductCreatePage() {
                               ? "Horizontal Rectangle"
                               : "Square"}
                         </p>
+                        {Number(formData.specs_rental.display_rows) * Number(formData.specs_rental.display_cols) >
+                          20 && (
+                          <p className="text-xs text-blue-600 mt-1">ⓘ Large grid - scroll to view all quadrants</p>
+                        )}
                       </div>
                     </div>
                   )}
