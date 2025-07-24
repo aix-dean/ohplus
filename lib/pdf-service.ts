@@ -3,7 +3,7 @@ import type { Proposal } from "@/lib/types/proposal"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import type { ReportData } from "@/lib/report-service"
 import type { JobOrder } from "@/lib/types/job-order"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 // Helper function to load image and convert to base64
@@ -121,6 +121,142 @@ function formatCurrency(amount: number | string): string {
   const numAmount = typeof amount === "string" ? Number.parseFloat(amount.replace(/[^\d.-]/g, "")) : amount
   const cleanAmount = Math.abs(Number(numAmount) || 0)
   return `PHP${cleanAmount.toLocaleString()}`
+}
+
+// FIXED: Helper function to resolve company logo and prepared by name
+async function resolveCompanyDataForReport(
+  userData?: any,
+  reportCreatedBy?: string,
+): Promise<{ logoUrl: string; preparedByName: string }> {
+  console.log("resolveCompanyDataForReport - userData:", userData)
+  console.log("resolveCompanyDataForReport - reportCreatedBy:", reportCreatedBy)
+
+  let companyLogoUrl = "/ohplus-new-logo.png"
+  let preparedByName = "User"
+
+  try {
+    // Get the user ID to query with
+    const userId = userData?.uid || reportCreatedBy
+
+    if (!userId) {
+      console.log("No user ID available, using defaults")
+      return { logoUrl: companyLogoUrl, preparedByName }
+    }
+
+    // First, try to get user data if not provided
+    let userInfo = userData
+    if (!userInfo && userId) {
+      console.log("Fetching user data from users collection for:", userId)
+      const userDoc = await getDoc(doc(db, "users", userId))
+      if (userDoc.exists()) {
+        userInfo = { uid: userId, ...userDoc.data() }
+        console.log("Retrieved user data:", userInfo)
+      }
+    }
+
+    // Set prepared by name from user data
+    if (userInfo) {
+      preparedByName =
+        userInfo.display_name ||
+        userInfo.displayName ||
+        `${userInfo.first_name || ""} ${userInfo.last_name || ""}`.trim() ||
+        userInfo.email?.split("@")[0] ||
+        "User"
+      console.log("Set preparedByName from user data:", preparedByName)
+    }
+
+    // Now try to get company data
+    let companyData = null
+
+    // Method 1: If user has company_id, fetch company directly
+    if (userInfo?.company_id) {
+      console.log("Fetching company by company_id:", userInfo.company_id)
+      try {
+        const companyDoc = await getDoc(doc(db, "companies", userInfo.company_id))
+        if (companyDoc.exists()) {
+          companyData = companyDoc.data()
+          console.log("Retrieved company data by company_id:", companyData)
+        }
+      } catch (error) {
+        console.error("Error fetching company by company_id:", error)
+      }
+    }
+
+    // Method 2: If no company found, query companies by created_by
+    if (!companyData && userId) {
+      console.log("Querying companies by created_by:", userId)
+      try {
+        const companiesRef = collection(db, "companies")
+        const q = query(companiesRef, where("created_by", "==", userId))
+        const querySnapshot = await getDocs(q)
+
+        if (!querySnapshot.empty) {
+          companyData = querySnapshot.docs[0].data()
+          console.log("Retrieved company data by created_by:", companyData)
+        }
+      } catch (error) {
+        console.error("Error querying companies by created_by:", error)
+      }
+    }
+
+    // Use company data if available
+    if (companyData) {
+      // Update prepared by name with company name if available
+      if (companyData.name) {
+        preparedByName = companyData.name
+        console.log("Updated preparedByName with company name:", preparedByName)
+      } else if (companyData.contact_person) {
+        preparedByName = companyData.contact_person
+        console.log("Updated preparedByName with contact_person:", preparedByName)
+      }
+
+      // Set company logo URL
+      if (companyData.photo_url && companyData.photo_url.trim() !== "") {
+        // Test if the URL is accessible
+        try {
+          const testResponse = await fetch(companyData.photo_url, { method: "HEAD" })
+          if (testResponse.ok) {
+            companyLogoUrl = companyData.photo_url
+            console.log("Using company photo_url:", companyLogoUrl)
+          } else {
+            console.log("Company photo_url not accessible, using default")
+          }
+        } catch (error) {
+          console.log("Error testing company photo_url accessibility:", error)
+        }
+      }
+    }
+
+    // Fallback to company name-based logos if no custom logo
+    if (companyLogoUrl === "/ohplus-new-logo.png" && companyData?.name) {
+      const companyName = companyData.name.toLowerCase().trim()
+
+      const companyLogos: Record<string, string> = {
+        "ai xynergy": "/company-logos/ai-xynergy-logo.png",
+        dedos: "/company-logos/dedos-logo.png",
+        gts: "/company-logos/gts-logo.png",
+        "global tronics": "/company-logos/gts-logo.png",
+        globaltronics: "/globaltronics-logo.png",
+        "summit media": "/summit-media-logo.png",
+        "vistar media": "/vistar-media-logo.png",
+        "moving walls": "/moving-walls-logo.png",
+        "hdi admix": "/hdi-admix-logo.png",
+        broadsign: "/broadsign-logo.png",
+        dooh: "/dooh-logo.png",
+        "ooh shop": "/ooh-shop-logo.png",
+      }
+
+      if (companyLogos[companyName]) {
+        companyLogoUrl = companyLogos[companyName]
+        console.log("Using company name mapping:", companyName, "->", companyLogoUrl)
+      }
+    }
+  } catch (error) {
+    console.error("Error in resolveCompanyDataForReport:", error)
+  }
+
+  console.log("Final resolved data - logoUrl:", companyLogoUrl, "preparedByName:", preparedByName)
+  return { logoUrl: companyLogoUrl, preparedByName }
 }
 
 // Helper function to resolve company logo based on user/company data
@@ -1425,41 +1561,8 @@ export async function generateReportPDF(
     const logoX = pageWidth - margin - logoSize
     const logoY = yPosition - 5
 
-    // Resolve company logo and prepared by name
-    let companyLogoUrl = "/ohplus-new-logo.png"
-    let preparedByName = "User"
-
-    // Query companies collection for logo and name
-    if (userData?.uid || report?.createdBy) {
-      try {
-        const userId = userData?.uid || report?.createdBy
-        const companiesRef = collection(db, "companies")
-        const q = query(companiesRef, where("created_by", "==", userId))
-        const querySnapshot = await getDocs(q)
-
-        if (!querySnapshot.empty) {
-          const companyDoc = querySnapshot.docs[0]
-          const companyData = companyDoc.data()
-
-          preparedByName =
-            companyData.name ||
-            companyData.contact_person ||
-            companyData.company_name ||
-            userData?.displayName ||
-            userData?.email?.split("@")[0] ||
-            "User"
-
-          if (companyData.photo_url && companyData.photo_url.trim() !== "") {
-            companyLogoUrl = companyData.photo_url
-          }
-        } else {
-          preparedByName = userData?.displayName || userData?.email?.split("@")[0] || "User"
-        }
-      } catch (error) {
-        console.error("Error querying companies collection:", error)
-        preparedByName = userData?.displayName || userData?.email?.split("@")[0] || "User"
-      }
-    }
+    // FIXED: Resolve company logo and prepared by name using the new function
+    const { logoUrl: companyLogoUrl, preparedByName } = await resolveCompanyDataForReport(userData, report?.createdBy)
 
     // Add logo container with white background and shadow
     pdf.setFillColor(255, 255, 255)
