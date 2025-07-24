@@ -131,6 +131,7 @@ export default function BusinessProductCreatePage() {
       illumination_bottom_cols: "1",
       illumination_right_rows: "1",
       illumination_right_cols: "1",
+      quadrant_layout: "2x2",
     },
     type: "RENTAL",
     status: "PENDING",
@@ -876,9 +877,216 @@ export default function BusinessProductCreatePage() {
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-800">Static Content Settings</h3>
 
+              {/* Illumination Setup - moved from Site Data */}
               <div className="space-y-4">
-                <h4 className="text-lg font-semibold text-gray-800">Illumination Setup (Metal Halides)</h4>
+                <h4 className="text-lg font-semibold text-gray-800">Display Configuration</h4>
 
+                {/* Quadrant Selection */}
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium text-gray-700">Select Display Layout</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* Single Quadrant */}
+                    <div
+                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${
+                        formData.specs_rental.quadrant_layout === "1x1"
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-300 hover:border-gray-400"
+                      }`}
+                      onClick={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          specs_rental: { ...prev.specs_rental, quadrant_layout: "1x1" },
+                        }))
+                      }
+                    >
+                      <div className="aspect-square bg-gray-200 rounded mb-2 flex items-center justify-center">
+                        <span className="text-xs font-medium">Q1</span>
+                      </div>
+                      <p className="text-xs text-center">Single (1x1)</p>
+                    </div>
+
+                    {/* 2x2 Quadrants */}
+                    <div
+                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${
+                        formData.specs_rental.quadrant_layout === "2x2"
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-300 hover:border-gray-400"
+                      }`}
+                      onClick={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          specs_rental: { ...prev.specs_rental, quadrant_layout: "2x2" },
+                        }))
+                      }
+                    >
+                      <div className="aspect-square grid grid-cols-2 gap-1 bg-gray-200 rounded mb-2 p-1">
+                        <div className="bg-white rounded flex items-center justify-center">
+                          <span className="text-xs font-medium">Q1</span>
+                        </div>
+                        <div className="bg-white rounded flex items-center justify-center">
+                          <span className="text-xs font-medium">Q2</span>
+                        </div>
+                        <div className="bg-white rounded flex items-center justify-center">
+                          <span className="text-xs font-medium">Q3</span>
+                        </div>
+                        <div className="bg-white rounded flex items-center justify-center">
+                          <span className="text-xs font-medium">Q4</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-center">Square (2x2)</p>
+                    </div>
+
+                    {/* 2x3 Rectangle */}
+                    <div
+                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${
+                        formData.specs_rental.quadrant_layout === "2x3"
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-300 hover:border-gray-400"
+                      }`}
+                      onClick={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          specs_rental: { ...prev.specs_rental, quadrant_layout: "2x3" },
+                        }))
+                      }
+                    >
+                      <div className="aspect-[3/2] grid grid-cols-3 grid-rows-2 gap-1 bg-gray-200 rounded mb-2 p-1">
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                          <div key={i} className="bg-white rounded flex items-center justify-center">
+                            <span className="text-xs font-medium">Q{i}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-center">Rectangle (2x3)</p>
+                    </div>
+
+                    {/* 3x2 Rectangle */}
+                    <div
+                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${
+                        formData.specs_rental.quadrant_layout === "3x2"
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-300 hover:border-gray-400"
+                      }`}
+                      onClick={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          specs_rental: { ...prev.specs_rental, quadrant_layout: "3x2" },
+                        }))
+                      }
+                    >
+                      <div className="aspect-[2/3] grid grid-cols-2 grid-rows-3 gap-1 bg-gray-200 rounded mb-2 p-1">
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                          <div key={i} className="bg-white rounded flex items-center justify-center">
+                            <span className="text-xs font-medium">Q{i}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-center">Rectangle (3x2)</p>
+                    </div>
+                  </div>
+
+                  {/* Display Preview */}
+                  {formData.specs_rental.quadrant_layout && (
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                      <h5 className="text-sm font-medium text-gray-700 mb-3">Display Preview</h5>
+                      <div className="flex justify-center">
+                        <div className="relative">
+                          {/* Render preview based on selected layout */}
+                          {formData.specs_rental.quadrant_layout === "1x1" && (
+                            <div className="w-32 h-32 bg-white border-2 border-gray-300 rounded flex items-center justify-center">
+                              <span className="text-lg font-medium text-gray-600">Q1</span>
+                            </div>
+                          )}
+
+                          {formData.specs_rental.quadrant_layout === "2x2" && (
+                            <div className="w-32 h-32 grid grid-cols-2 gap-1 bg-gray-300 p-1 rounded">
+                              {[1, 2, 3, 4].map((i) => (
+                                <div key={i} className="bg-white rounded flex items-center justify-center">
+                                  <span className="text-sm font-medium text-gray-600">Q{i}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {formData.specs_rental.quadrant_layout === "2x3" && (
+                            <div className="w-48 h-32 grid grid-cols-3 grid-rows-2 gap-1 bg-gray-300 p-1 rounded">
+                              {[1, 2, 3, 4, 5, 6].map((i) => (
+                                <div key={i} className="bg-white rounded flex items-center justify-center">
+                                  <span className="text-xs font-medium text-gray-600">Q{i}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {formData.specs_rental.quadrant_layout === "3x2" && (
+                            <div className="w-32 h-48 grid grid-cols-2 grid-rows-3 gap-1 bg-gray-300 p-1 rounded">
+                              {[1, 2, 3, 4, 5, 6].map((i) => (
+                                <div key={i} className="bg-white rounded flex items-center justify-center">
+                                  <span className="text-xs font-medium text-gray-600">Q{i}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Illumination indicators around the preview */}
+                          <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 flex gap-2">
+                            {Array.from({
+                              length: Number.parseInt(formData.specs_rental.illumination_upper_count) || 0,
+                            }).map((_, i) => (
+                              <div
+                                key={i}
+                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center"
+                              >
+                                <span className="text-xs text-white font-bold">U{i + 1}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="absolute top-1/2 -left-6 transform -translate-y-1/2 flex flex-col gap-2">
+                            {Array.from({
+                              length: Number.parseInt(formData.specs_rental.illumination_left_count) || 0,
+                            }).map((_, i) => (
+                              <div
+                                key={i}
+                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center"
+                              >
+                                <span className="text-xs text-white font-bold">L{i + 1}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="absolute top-1/2 -right-6 transform -translate-y-1/2 flex flex-col gap-2">
+                            {Array.from({
+                              length: Number.parseInt(formData.specs_rental.illumination_right_count) || 0,
+                            }).map((_, i) => (
+                              <div
+                                key={i}
+                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center"
+                              >
+                                <span className="text-xs text-white font-bold">R{i + 1}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 flex gap-2">
+                            {Array.from({
+                              length: Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0,
+                            }).map((_, i) => (
+                              <div
+                                key={i}
+                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center"
+                              >
+                                <span className="text-xs text-white font-bold">B{i + 1}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <h4 className="text-lg font-semibold text-gray-800">Illumination Setup (Metal Halides)</h4>
                 {/* Upper Metal Halides */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -887,114 +1095,73 @@ export default function BusinessProductCreatePage() {
                       <Label htmlFor="upper-count" className="text-xs text-gray-600">
                         Count:
                       </Label>
-                      <Select
+                      <Input
+                        id="upper-count"
+                        type="number"
+                        min="0"
+                        max="10"
                         value={formData.specs_rental.illumination_upper_count || "0"}
-                        onValueChange={(value) => {
-                          const count = Number.parseInt(value) || 0
+                        onChange={(e) => {
+                          const count = Number.parseInt(e.target.value) || 0
                           setFormData((prev) => ({
                             ...prev,
                             specs_rental: {
                               ...prev.specs_rental,
                               illumination_upper_count: count.toString(),
-                              // Reset rows and cols when count changes
-                              illumination_upper_rows: count <= 1 ? "1" : count <= 4 ? "2" : count <= 6 ? "2" : "3",
-                              illumination_upper_cols:
-                                count <= 1 ? count.toString() : count <= 4 ? "2" : count <= 6 ? "3" : "3",
                             },
                           }))
                         }}
-                      >
-                        <SelectTrigger className="w-20 h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">0</SelectItem>
-                          <SelectItem value="1">1</SelectItem>
-                          <SelectItem value="2">2</SelectItem>
-                          <SelectItem value="3">3</SelectItem>
-                          <SelectItem value="4">4</SelectItem>
-                          <SelectItem value="5">5</SelectItem>
-                          <SelectItem value="6">6</SelectItem>
-                          <SelectItem value="8">8</SelectItem>
-                          <SelectItem value="9">9</SelectItem>
-                          <SelectItem value="10">10</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        className="w-16 h-8 text-sm"
+                        disabled={loading}
+                      />
                     </div>
                   </div>
 
                   {Number.parseInt(formData.specs_rental.illumination_upper_count || "0") > 0 && (
-                    <div className="space-y-3">
-                      {/* Visual Preview */}
-                      <div className="bg-gray-50 p-4 rounded-lg border">
-                        <Label className="text-xs text-gray-600 mb-2 block">Preview Layout:</Label>
-                        <div className="flex items-center gap-4 mb-3">
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs text-gray-600">Rows:</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="5"
-                              value={formData.specs_rental.illumination_upper_rows || "1"}
-                              onChange={(e) =>
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  specs_rental: {
-                                    ...prev.specs_rental,
-                                    illumination_upper_rows: e.target.value,
-                                  },
-                                }))
-                              }
-                              className="w-16 h-8 text-sm"
-                              disabled={loading}
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs text-gray-600">Columns:</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="5"
-                              value={formData.specs_rental.illumination_upper_cols || "1"}
-                              onChange={(e) =>
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  specs_rental: {
-                                    ...prev.specs_rental,
-                                    illumination_upper_cols: e.target.value,
-                                  },
-                                }))
-                              }
-                              className="w-16 h-8 text-sm"
-                              disabled={loading}
-                            />
-                          </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs text-gray-600">Rows:</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="5"
+                            value={formData.specs_rental.illumination_upper_rows || "1"}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                specs_rental: {
+                                  ...prev.specs_rental,
+                                  illumination_upper_rows: e.target.value,
+                                },
+                              }))
+                            }
+                            className="w-16 h-8 text-sm"
+                            disabled={loading}
+                          />
                         </div>
-
-                        {/* Grid Preview */}
-                        <div className="flex justify-center mb-3">
-                          <div
-                            className="grid gap-1 p-2 bg-white rounded border"
-                            style={{
-                              gridTemplateColumns: `repeat(${Number.parseInt(formData.specs_rental.illumination_upper_cols || "1")}, 1fr)`,
-                              gridTemplateRows: `repeat(${Number.parseInt(formData.specs_rental.illumination_upper_rows || "1")}, 1fr)`,
-                            }}
-                          >
-                            {Array.from({
-                              length: Number.parseInt(formData.specs_rental.illumination_upper_count || "0"),
-                            }).map((_, index) => (
-                              <div
-                                key={`upper-preview-${index}`}
-                                className="w-8 h-8 bg-blue-200 border border-blue-400 rounded flex items-center justify-center text-xs font-medium text-blue-800"
-                              >
-                                U{index + 1}
-                              </div>
-                            ))}
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs text-gray-600">Columns:</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="5"
+                            value={formData.specs_rental.illumination_upper_cols || "1"}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                specs_rental: {
+                                  ...prev.specs_rental,
+                                  illumination_upper_cols: e.target.value,
+                                },
+                              }))
+                            }
+                            className="w-16 h-8 text-sm"
+                            disabled={loading}
+                          />
                         </div>
                       </div>
 
-                      {/* Configuration Inputs */}
                       <div
                         className="grid gap-2"
                         style={{
@@ -1034,107 +1201,70 @@ export default function BusinessProductCreatePage() {
                       <Label htmlFor="left-count" className="text-xs text-gray-600">
                         Count:
                       </Label>
-                      <Select
+                      <Input
+                        id="left-count"
+                        type="number"
+                        min="0"
+                        max="10"
                         value={formData.specs_rental.illumination_left_count || "0"}
-                        onValueChange={(value) => {
-                          const count = Number.parseInt(value) || 0
+                        onChange={(e) => {
+                          const count = Number.parseInt(e.target.value) || 0
                           setFormData((prev) => ({
                             ...prev,
                             specs_rental: {
                               ...prev.specs_rental,
                               illumination_left_count: count.toString(),
-                              illumination_left_rows: count <= 1 ? "1" : count <= 4 ? "2" : count <= 6 ? "2" : "3",
-                              illumination_left_cols:
-                                count <= 1 ? count.toString() : count <= 4 ? "2" : count <= 6 ? "3" : "3",
                             },
                           }))
                         }}
-                      >
-                        <SelectTrigger className="w-20 h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">0</SelectItem>
-                          <SelectItem value="1">1</SelectItem>
-                          <SelectItem value="2">2</SelectItem>
-                          <SelectItem value="3">3</SelectItem>
-                          <SelectItem value="4">4</SelectItem>
-                          <SelectItem value="5">5</SelectItem>
-                          <SelectItem value="6">6</SelectItem>
-                          <SelectItem value="8">8</SelectItem>
-                          <SelectItem value="9">9</SelectItem>
-                          <SelectItem value="10">10</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        className="w-16 h-8 text-sm"
+                        disabled={loading}
+                      />
                     </div>
                   </div>
 
                   {Number.parseInt(formData.specs_rental.illumination_left_count || "0") > 0 && (
-                    <div className="space-y-3">
-                      <div className="bg-gray-50 p-4 rounded-lg border">
-                        <Label className="text-xs text-gray-600 mb-2 block">Preview Layout:</Label>
-                        <div className="flex items-center gap-4 mb-3">
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs text-gray-600">Rows:</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="5"
-                              value={formData.specs_rental.illumination_left_rows || "1"}
-                              onChange={(e) =>
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  specs_rental: {
-                                    ...prev.specs_rental,
-                                    illumination_left_rows: e.target.value,
-                                  },
-                                }))
-                              }
-                              className="w-16 h-8 text-sm"
-                              disabled={loading}
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs text-gray-600">Columns:</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="5"
-                              value={formData.specs_rental.illumination_left_cols || "1"}
-                              onChange={(e) =>
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  specs_rental: {
-                                    ...prev.specs_rental,
-                                    illumination_left_cols: e.target.value,
-                                  },
-                                }))
-                              }
-                              className="w-16 h-8 text-sm"
-                              disabled={loading}
-                            />
-                          </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs text-gray-600">Rows:</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="5"
+                            value={formData.specs_rental.illumination_left_rows || "1"}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                specs_rental: {
+                                  ...prev.specs_rental,
+                                  illumination_left_rows: e.target.value,
+                                },
+                              }))
+                            }
+                            className="w-16 h-8 text-sm"
+                            disabled={loading}
+                          />
                         </div>
-
-                        <div className="flex justify-center mb-3">
-                          <div
-                            className="grid gap-1 p-2 bg-white rounded border"
-                            style={{
-                              gridTemplateColumns: `repeat(${Number.parseInt(formData.specs_rental.illumination_left_cols || "1")}, 1fr)`,
-                              gridTemplateRows: `repeat(${Number.parseInt(formData.specs_rental.illumination_left_rows || "1")}, 1fr)`,
-                            }}
-                          >
-                            {Array.from({
-                              length: Number.parseInt(formData.specs_rental.illumination_left_count || "0"),
-                            }).map((_, index) => (
-                              <div
-                                key={`left-preview-${index}`}
-                                className="w-8 h-8 bg-green-200 border border-green-400 rounded flex items-center justify-center text-xs font-medium text-green-800"
-                              >
-                                L{index + 1}
-                              </div>
-                            ))}
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs text-gray-600">Columns:</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="5"
+                            value={formData.specs_rental.illumination_left_cols || "1"}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                specs_rental: {
+                                  ...prev.specs_rental,
+                                  illumination_left_cols: e.target.value,
+                                },
+                              }))
+                            }
+                            className="w-16 h-8 text-sm"
+                            disabled={loading}
+                          />
                         </div>
                       </div>
 
@@ -1177,107 +1307,70 @@ export default function BusinessProductCreatePage() {
                       <Label htmlFor="bottom-count" className="text-xs text-gray-600">
                         Count:
                       </Label>
-                      <Select
+                      <Input
+                        id="bottom-count"
+                        type="number"
+                        min="0"
+                        max="10"
                         value={formData.specs_rental.illumination_bottom_count || "0"}
-                        onValueChange={(value) => {
-                          const count = Number.parseInt(value) || 0
+                        onChange={(e) => {
+                          const count = Number.parseInt(e.target.value) || 0
                           setFormData((prev) => ({
                             ...prev,
                             specs_rental: {
                               ...prev.specs_rental,
                               illumination_bottom_count: count.toString(),
-                              illumination_bottom_rows: count <= 1 ? "1" : count <= 4 ? "2" : count <= 6 ? "2" : "3",
-                              illumination_bottom_cols:
-                                count <= 1 ? count.toString() : count <= 4 ? "2" : count <= 6 ? "3" : "3",
                             },
                           }))
                         }}
-                      >
-                        <SelectTrigger className="w-20 h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">0</SelectItem>
-                          <SelectItem value="1">1</SelectItem>
-                          <SelectItem value="2">2</SelectItem>
-                          <SelectItem value="3">3</SelectItem>
-                          <SelectItem value="4">4</SelectItem>
-                          <SelectItem value="5">5</SelectItem>
-                          <SelectItem value="6">6</SelectItem>
-                          <SelectItem value="8">8</SelectItem>
-                          <SelectItem value="9">9</SelectItem>
-                          <SelectItem value="10">10</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        className="w-16 h-8 text-sm"
+                        disabled={loading}
+                      />
                     </div>
                   </div>
 
                   {Number.parseInt(formData.specs_rental.illumination_bottom_count || "0") > 0 && (
-                    <div className="space-y-3">
-                      <div className="bg-gray-50 p-4 rounded-lg border">
-                        <Label className="text-xs text-gray-600 mb-2 block">Preview Layout:</Label>
-                        <div className="flex items-center gap-4 mb-3">
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs text-gray-600">Rows:</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="5"
-                              value={formData.specs_rental.illumination_bottom_rows || "1"}
-                              onChange={(e) =>
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  specs_rental: {
-                                    ...prev.specs_rental,
-                                    illumination_bottom_rows: e.target.value,
-                                  },
-                                }))
-                              }
-                              className="w-16 h-8 text-sm"
-                              disabled={loading}
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs text-gray-600">Columns:</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="5"
-                              value={formData.specs_rental.illumination_bottom_cols || "1"}
-                              onChange={(e) =>
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  specs_rental: {
-                                    ...prev.specs_rental,
-                                    illumination_bottom_cols: e.target.value,
-                                  },
-                                }))
-                              }
-                              className="w-16 h-8 text-sm"
-                              disabled={loading}
-                            />
-                          </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs text-gray-600">Rows:</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="5"
+                            value={formData.specs_rental.illumination_bottom_rows || "1"}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                specs_rental: {
+                                  ...prev.specs_rental,
+                                  illumination_bottom_rows: e.target.value,
+                                },
+                              }))
+                            }
+                            className="w-16 h-8 text-sm"
+                            disabled={loading}
+                          />
                         </div>
-
-                        <div className="flex justify-center mb-3">
-                          <div
-                            className="grid gap-1 p-2 bg-white rounded border"
-                            style={{
-                              gridTemplateColumns: `repeat(${Number.parseInt(formData.specs_rental.illumination_bottom_cols || "1")}, 1fr)`,
-                              gridTemplateRows: `repeat(${Number.parseInt(formData.specs_rental.illumination_bottom_rows || "1")}, 1fr)`,
-                            }}
-                          >
-                            {Array.from({
-                              length: Number.parseInt(formData.specs_rental.illumination_bottom_count || "0"),
-                            }).map((_, index) => (
-                              <div
-                                key={`bottom-preview-${index}`}
-                                className="w-8 h-8 bg-orange-200 border border-orange-400 rounded flex items-center justify-center text-xs font-medium text-orange-800"
-                              >
-                                B{index + 1}
-                              </div>
-                            ))}
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs text-gray-600">Columns:</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="5"
+                            value={formData.specs_rental.illumination_bottom_cols || "1"}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                specs_rental: {
+                                  ...prev.specs_rental,
+                                  illumination_bottom_cols: e.target.value,
+                                },
+                              }))
+                            }
+                            className="w-16 h-8 text-sm"
+                            disabled={loading}
+                          />
                         </div>
                       </div>
 
@@ -1320,107 +1413,70 @@ export default function BusinessProductCreatePage() {
                       <Label htmlFor="right-count" className="text-xs text-gray-600">
                         Count:
                       </Label>
-                      <Select
+                      <Input
+                        id="right-count"
+                        type="number"
+                        min="0"
+                        max="10"
                         value={formData.specs_rental.illumination_right_count || "0"}
-                        onValueChange={(value) => {
-                          const count = Number.parseInt(value) || 0
+                        onChange={(e) => {
+                          const count = Number.parseInt(e.target.value) || 0
                           setFormData((prev) => ({
                             ...prev,
                             specs_rental: {
                               ...prev.specs_rental,
                               illumination_right_count: count.toString(),
-                              illumination_right_rows: count <= 1 ? "1" : count <= 4 ? "2" : count <= 6 ? "2" : "3",
-                              illumination_right_cols:
-                                count <= 1 ? count.toString() : count <= 4 ? "2" : count <= 6 ? "3" : "3",
                             },
                           }))
                         }}
-                      >
-                        <SelectTrigger className="w-20 h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="0">0</SelectItem>
-                          <SelectItem value="1">1</SelectItem>
-                          <SelectItem value="2">2</SelectItem>
-                          <SelectItem value="3">3</SelectItem>
-                          <SelectItem value="4">4</SelectItem>
-                          <SelectItem value="5">5</SelectItem>
-                          <SelectItem value="6">6</SelectItem>
-                          <SelectItem value="8">8</SelectItem>
-                          <SelectItem value="9">9</SelectItem>
-                          <SelectItem value="10">10</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        className="w-16 h-8 text-sm"
+                        disabled={loading}
+                      />
                     </div>
                   </div>
 
                   {Number.parseInt(formData.specs_rental.illumination_right_count || "0") > 0 && (
-                    <div className="space-y-3">
-                      <div className="bg-gray-50 p-4 rounded-lg border">
-                        <Label className="text-xs text-gray-600 mb-2 block">Preview Layout:</Label>
-                        <div className="flex items-center gap-4 mb-3">
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs text-gray-600">Rows:</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="5"
-                              value={formData.specs_rental.illumination_right_rows || "1"}
-                              onChange={(e) =>
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  specs_rental: {
-                                    ...prev.specs_rental,
-                                    illumination_right_rows: e.target.value,
-                                  },
-                                }))
-                              }
-                              className="w-16 h-8 text-sm"
-                              disabled={loading}
-                            />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Label className="text-xs text-gray-600">Columns:</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="5"
-                              value={formData.specs_rental.illumination_right_cols || "1"}
-                              onChange={(e) =>
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  specs_rental: {
-                                    ...prev.specs_rental,
-                                    illumination_right_cols: e.target.value,
-                                  },
-                                }))
-                              }
-                              className="w-16 h-8 text-sm"
-                              disabled={loading}
-                            />
-                          </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs text-gray-600">Rows:</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="5"
+                            value={formData.specs_rental.illumination_right_rows || "1"}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                specs_rental: {
+                                  ...prev.specs_rental,
+                                  illumination_right_rows: e.target.value,
+                                },
+                              }))
+                            }
+                            className="w-16 h-8 text-sm"
+                            disabled={loading}
+                          />
                         </div>
-
-                        <div className="flex justify-center mb-3">
-                          <div
-                            className="grid gap-1 p-2 bg-white rounded border"
-                            style={{
-                              gridTemplateColumns: `repeat(${Number.parseInt(formData.specs_rental.illumination_right_cols || "1")}, 1fr)`,
-                              gridTemplateRows: `repeat(${Number.parseInt(formData.specs_rental.illumination_right_rows || "1")}, 1fr)`,
-                            }}
-                          >
-                            {Array.from({
-                              length: Number.parseInt(formData.specs_rental.illumination_right_count || "0"),
-                            }).map((_, index) => (
-                              <div
-                                key={`right-preview-${index}`}
-                                className="w-8 h-8 bg-purple-200 border border-purple-400 rounded flex items-center justify-center text-xs font-medium text-purple-800"
-                              >
-                                R{index + 1}
-                              </div>
-                            ))}
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs text-gray-600">Columns:</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="5"
+                            value={formData.specs_rental.illumination_right_cols || "1"}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                specs_rental: {
+                                  ...prev.specs_rental,
+                                  illumination_right_cols: e.target.value,
+                                },
+                              }))
+                            }
+                            className="w-16 h-8 text-sm"
+                            disabled={loading}
+                          />
                         </div>
                       </div>
 
