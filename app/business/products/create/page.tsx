@@ -972,57 +972,98 @@ export default function BusinessProductCreatePage() {
                             </div>
                           </div>
 
-                          {/* Illumination indicators around the preview - positioned relative to scrollable container */}
-                          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 flex gap-2">
+                          {/* Illumination indicators around the preview - evenly distributed */}
+                          <div className="absolute -top-8 left-0 right-0 flex justify-between px-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_upper_count) || 0,
-                            }).map((_, i) => (
-                              <div
-                                key={i}
-                                className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center"
-                              >
-                                <span className="text-xs text-white font-bold">U{i + 1}</span>
-                              </div>
-                            ))}
+                            }).map((_, i) => {
+                              const totalCount = Number.parseInt(formData.specs_rental.illumination_upper_count) || 0
+                              const totalCols = Number(formData.specs_rental.display_cols)
+                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
+                              const leftPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
+
+                              return (
+                                <div
+                                  key={i}
+                                  className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                  style={{
+                                    left: `${leftPosition}%`,
+                                    transform: "translateX(-50%)",
+                                  }}
+                                >
+                                  <span className="text-xs text-white font-bold">U{i + 1}</span>
+                                </div>
+                              )
+                            })}
                           </div>
 
-                          <div className="absolute top-1/2 -left-8 transform -translate-y-1/2 flex flex-col gap-2">
+                          <div className="absolute top-0 bottom-0 -left-8 flex flex-col justify-between py-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_left_count) || 0,
-                            }).map((_, i) => (
-                              <div
-                                key={i}
-                                className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center"
-                              >
-                                <span className="text-xs text-white font-bold">L{i + 1}</span>
-                              </div>
-                            ))}
+                            }).map((_, i) => {
+                              const totalCount = Number.parseInt(formData.specs_rental.illumination_left_count) || 0
+                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
+                              const topPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
+
+                              return (
+                                <div
+                                  key={i}
+                                  className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                  style={{
+                                    top: `${topPosition}%`,
+                                    transform: "translateY(-50%)",
+                                  }}
+                                >
+                                  <span className="text-xs text-white font-bold">L{i + 1}</span>
+                                </div>
+                              )
+                            })}
                           </div>
 
-                          <div className="absolute top-1/2 -right-8 transform -translate-y-1/2 flex flex-col gap-2">
+                          <div className="absolute top-0 bottom-0 -right-8 flex flex-col justify-between py-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_right_count) || 0,
-                            }).map((_, i) => (
-                              <div
-                                key={i}
-                                className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center"
-                              >
-                                <span className="text-xs text-white font-bold">R{i + 1}</span>
-                              </div>
-                            ))}
+                            }).map((_, i) => {
+                              const totalCount = Number.parseInt(formData.specs_rental.illumination_right_count) || 0
+                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
+                              const topPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
+
+                              return (
+                                <div
+                                  key={i}
+                                  className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                  style={{
+                                    top: `${topPosition}%`,
+                                    transform: "translateY(-50%)",
+                                  }}
+                                >
+                                  <span className="text-xs text-white font-bold">R{i + 1}</span>
+                                </div>
+                              )
+                            })}
                           </div>
 
-                          <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2">
+                          <div className="absolute -bottom-8 left-0 right-0 flex justify-between px-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0,
-                            }).map((_, i) => (
-                              <div
-                                key={i}
-                                className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center"
-                              >
-                                <span className="text-xs text-white font-bold">B{i + 1}</span>
-                              </div>
-                            ))}
+                            }).map((_, i) => {
+                              const totalCount = Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0
+                              const spacing = totalCount > 1 ? 100 / (totalCount - 1) : 50 // Percentage spacing
+                              const leftPosition = totalCount === 1 ? 50 : i * spacing // Center single item, distribute multiple
+
+                              return (
+                                <div
+                                  key={i}
+                                  className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center absolute"
+                                  style={{
+                                    left: `${leftPosition}%`,
+                                    transform: "translateX(-50%)",
+                                  }}
+                                >
+                                  <span className="text-xs text-white font-bold">B{i + 1}</span>
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
                       </div>
