@@ -1244,7 +1244,7 @@ export default function BusinessProductCreatePage() {
                 {/* Additional Illumination Details */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="power_consumption_monthly">Power Consumption</Label>
+                    <Label htmlFor="power_consumption_monthly">Power Consumption (Monthly)</Label>
                     <Input
                       id="power_consumption_monthly"
                       name="specs_rental.power_consumption_monthly"
@@ -1256,7 +1256,7 @@ export default function BusinessProductCreatePage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="average_power_consumption_3months">Average Power Consumption</Label>
+                    <Label htmlFor="average_power_consumption_3months">Ave. Power Consumption (3 Months)</Label>
                     <Input
                       id="average_power_consumption_3months"
                       name="specs_rental.average_power_consumption_3months"
