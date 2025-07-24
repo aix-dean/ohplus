@@ -1037,7 +1037,7 @@ export default function BusinessProductCreatePage() {
                                 className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
                                 style={{
                                   top: `${topPosition}px`,
-                                  left: `${gridWidth + 20}px`,
+                                  right: "-20px",
                                   transform: "translateY(-50%)",
                                 }}
                               >
@@ -1061,7 +1061,7 @@ export default function BusinessProductCreatePage() {
                                 key={`bottom-${i}`}
                                 className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center absolute"
                                 style={{
-                                  top: `${gridHeight + 20}px`,
+                                  bottom: "-20px",
                                   left: `${leftPosition}px`,
                                   transform: "translateX(-50%)",
                                 }}
