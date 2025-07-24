@@ -65,17 +65,31 @@ export default function LogisticsPlannerPage() {
 
   // Fetch service assignments with actual data
   const fetchAssignments = useCallback(async () => {
-    if (!userData?.license_key) return
+    if (!userData?.company_id) {
+      console.log("No company_id found in userData:", userData)
+      return
+    }
 
     try {
       setLoading(true)
       console.log("Fetching service assignments for company_id:", userData.company_id)
 
-      // Query service assignments from Firestore using project_key instead of project_key
+      // Query service assignments from Firestore using company_id
       const assignmentsRef = collection(db, "service_assignments")
-      const q = query(assignmentsRef, where("company_id", "==", userData.company_id), orderBy("createdAt", "desc"))
 
-      const querySnapshot = await getDocs(q)
+      // Try with orderBy first
+      let q = query(assignmentsRef, where("company_id", "==", userData.company_id), orderBy("created", "desc"))
+
+      let querySnapshot
+      try {
+        querySnapshot = await getDocs(q)
+      } catch (orderByError) {
+        console.log("OrderBy failed, trying without orderBy:", orderByError)
+        // Fallback without orderBy
+        q = query(assignmentsRef, where("company_id", "==", userData.company_id))
+        querySnapshot = await getDocs(q)
+      }
+
       console.log("Found", querySnapshot.size, "service assignments")
 
       const fetchedAssignments: ServiceAssignment[] = []
@@ -83,30 +97,63 @@ export default function LogisticsPlannerPage() {
         const data = doc.data()
         console.log("Processing assignment:", doc.id, data)
 
-        // Convert Firestore timestamps to Date objects with proper handling
-        const coveredDateStart = data.coveredDateStart?.toDate
-          ? data.coveredDateStart.toDate()
-          : data.coveredDateStart
-            ? new Date(data.coveredDateStart)
-            : null
+        // Convert Firestore timestamps to Date objects with better error handling
+        let coveredDateStart: Date | null = null
+        let coveredDateEnd: Date | null = null
 
-        const coveredDateEnd = data.coveredDateEnd?.toDate
-          ? data.coveredDateEnd.toDate()
-          : data.coveredDateEnd
-            ? new Date(data.coveredDateEnd)
-            : null
+        try {
+          if (data.coveredDateStart) {
+            if (data.coveredDateStart.toDate) {
+              coveredDateStart = data.coveredDateStart.toDate()
+            } else if (data.coveredDateStart.seconds) {
+              coveredDateStart = new Date(data.coveredDateStart.seconds * 1000)
+            } else {
+              coveredDateStart = new Date(data.coveredDateStart)
+            }
+          }
 
-        const createdAt = data.created?.toDate
-          ? data.created.toDate()
-          : data.created
-            ? new Date(data.created)
-            : new Date()
+          if (data.coveredDateEnd) {
+            if (data.coveredDateEnd.toDate) {
+              coveredDateEnd = data.coveredDateEnd.toDate()
+            } else if (data.coveredDateEnd.seconds) {
+              coveredDateEnd = new Date(data.coveredDateEnd.seconds * 1000)
+            } else {
+              coveredDateEnd = new Date(data.coveredDateEnd)
+            }
+          }
+        } catch (dateError) {
+          console.error("Error parsing dates for assignment:", doc.id, dateError)
+        }
 
-        const updatedAt = data.updated?.toDate
-          ? data.updated.toDate()
-          : data.updated
-            ? new Date(data.updated)
-            : new Date()
+        let createdAt: Date = new Date()
+        try {
+          if (data.created) {
+            if (data.created.toDate) {
+              createdAt = data.created.toDate()
+            } else if (data.created.seconds) {
+              createdAt = new Date(data.created.seconds * 1000)
+            } else {
+              createdAt = new Date(data.created)
+            }
+          }
+        } catch (createdError) {
+          console.error("Error parsing created date:", createdError)
+        }
+
+        let updatedAt: Date = new Date()
+        try {
+          if (data.updated) {
+            if (data.updated.toDate) {
+              updatedAt = data.updated.toDate()
+            } else if (data.updated.seconds) {
+              updatedAt = new Date(data.updated.seconds * 1000)
+            } else {
+              updatedAt = new Date(data.updated)
+            }
+          }
+        } catch (updatedError) {
+          console.error("Error parsing updated date:", updatedError)
+        }
 
         const assignment: ServiceAssignment = {
           id: doc.id,
@@ -116,70 +163,38 @@ export default function LogisticsPlannerPage() {
           serviceType: data.serviceType || data.type || "General Service",
           coveredDateStart,
           coveredDateEnd,
-          status: data.status || "PENDING", // Changed from "SCHEDULED" to match your data
+          status: data.status || "PENDING",
           location: data.projectSiteLocation || data.location || data.address || "",
-          notes: data.message || data.notes || data.description || "", // Use message field from your data
+          notes: data.message || data.notes || data.description || "",
           assignedTo: data.assignedTo || data.assignedToId || "",
           assignedToName: data.assignedToName || data.assignedTo || "Unassigned",
           createdAt,
           updatedAt,
         }
 
+        console.log("Processed assignment:", {
+          id: assignment.id,
+          saNumber: assignment.saNumber,
+          projectSiteName: assignment.projectSiteName,
+          serviceType: assignment.serviceType,
+          coveredDateStart: assignment.coveredDateStart,
+          coveredDateEnd: assignment.coveredDateEnd,
+          status: assignment.status,
+        })
+
         fetchedAssignments.push(assignment)
       })
 
-      console.log("Processed assignments:", fetchedAssignments)
+      console.log("Total processed assignments:", fetchedAssignments.length)
+      console.log("All assignments:", fetchedAssignments)
       setAssignments(fetchedAssignments)
     } catch (error) {
       console.error("Error fetching service assignments:", error)
-      // Fallback query without orderBy in case of index issues
-      try {
-        const assignmentsRef = collection(db, "service_assignments")
-        const fallbackQuery = query(assignmentsRef, where("company_id", "==", userData.company_id))
-        const fallbackSnapshot = await getDocs(fallbackQuery)
-
-        const fallbackAssignments: ServiceAssignment[] = []
-        fallbackSnapshot.forEach((doc) => {
-          const data = doc.data()
-
-          const coveredDateStart = data.coveredDateStart?.toDate
-            ? data.coveredDateStart.toDate()
-            : data.coveredDateStart
-              ? new Date(data.coveredDateStart)
-              : null
-
-          const coveredDateEnd = data.coveredDateEnd?.toDate
-            ? data.coveredDateEnd.toDate()
-            : data.coveredDateEnd
-              ? new Date(data.coveredDateEnd)
-              : null
-
-          fallbackAssignments.push({
-            id: doc.id,
-            saNumber: data.saNumber || `SA-${doc.id.slice(-6)}`,
-            projectSiteId: data.projectSiteId || data.siteId || "",
-            projectSiteName: data.projectSiteName || data.siteName || data.location || "Unknown Site",
-            serviceType: data.serviceType || data.type || "General Service",
-            coveredDateStart,
-            coveredDateEnd,
-            status: data.status || "PENDING", // Changed from "SCHEDULED" to match your data
-            location: data.projectSiteLocation || data.location || data.address || "",
-            notes: data.message || data.notes || data.description || "", // Use message field from your data
-            assignedTo: data.assignedTo || data.assignedToId || "",
-            assignedToName: data.assignedToName || data.assignedTo || "Unassigned",
-          })
-        })
-
-        console.log("Fallback assignments:", fallbackAssignments)
-        setAssignments(fallbackAssignments)
-      } catch (fallbackError) {
-        console.error("Fallback query also failed:", fallbackError)
-        setAssignments([])
-      }
+      setAssignments([])
     } finally {
       setLoading(false)
     }
-  }, [userData?.license_key, userData?.company_id])
+  }, [userData])
 
   useEffect(() => {
     fetchAssignments()
@@ -279,9 +294,13 @@ export default function LogisticsPlannerPage() {
 
   // Filter assignments based on current view and search term
   const getFilteredAssignments = () => {
-    if (!assignments || assignments.length === 0) return []
+    if (!assignments || assignments.length === 0) {
+      console.log("No assignments to filter")
+      return []
+    }
 
     let filtered = [...assignments]
+    console.log("Starting with", filtered.length, "assignments")
 
     // Apply search filter if any
     if (searchTerm) {
@@ -295,21 +314,41 @@ export default function LogisticsPlannerPage() {
           assignment.assignedToName?.toLowerCase().includes(term) ||
           assignment.notes?.toLowerCase().includes(term),
       )
+      console.log("After search filter:", filtered.length, "assignments")
     }
 
     // Filter based on current view and date range
     switch (view) {
       case "month":
-        return filtered.filter((assignment) => {
-          if (!assignment.coveredDateEnd && !assignment.coveredDateStart) return false
+        const monthFiltered = filtered.filter((assignment) => {
+          if (!assignment.coveredDateEnd && !assignment.coveredDateStart) {
+            console.log("Assignment has no dates:", assignment.saNumber)
+            return false
+          }
 
-          const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
-          return (
+          // Use coveredDateStart for filtering since that's when the assignment begins
+          const assignmentDate = assignment.coveredDateStart || assignment.coveredDateEnd
+          const matches =
             assignmentDate &&
             assignmentDate.getMonth() === currentDate.getMonth() &&
             assignmentDate.getFullYear() === currentDate.getFullYear()
+
+          console.log(
+            "Assignment",
+            assignment.saNumber,
+            "date:",
+            assignmentDate,
+            "current month/year:",
+            currentDate.getMonth(),
+            currentDate.getFullYear(),
+            "matches:",
+            matches,
           )
+          return matches
         })
+        console.log("Month view filtered assignments:", monthFiltered.length)
+        return monthFiltered
+
       case "week":
         const weekStart = new Date(currentDate)
         weekStart.setDate(currentDate.getDate() - currentDate.getDay())
@@ -319,12 +358,21 @@ export default function LogisticsPlannerPage() {
         weekEnd.setDate(weekStart.getDate() + 7)
         weekEnd.setHours(23, 59, 59, 999)
 
+        console.log("Week range:", weekStart, "to", weekEnd)
+
         return filtered.filter((assignment) => {
           if (!assignment.coveredDateEnd && !assignment.coveredDateStart) return false
 
-          const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
-          return assignmentDate && assignmentDate >= weekStart && assignmentDate < weekEnd
+          // Check if assignment overlaps with the week
+          const startDate = assignment.coveredDateStart
+          const endDate = assignment.coveredDateEnd
+
+          // Assignment overlaps if it starts before week ends and ends after week starts
+          const overlaps = startDate && startDate < weekEnd && endDate && endDate >= weekStart
+          console.log("Assignment", assignment.saNumber, "overlaps week:", overlaps)
+          return overlaps
         })
+
       case "day":
         const dayStart = new Date(currentDate)
         dayStart.setHours(0, 0, 0, 0)
@@ -335,9 +383,14 @@ export default function LogisticsPlannerPage() {
         return filtered.filter((assignment) => {
           if (!assignment.coveredDateEnd && !assignment.coveredDateStart) return false
 
-          const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
-          return assignmentDate && assignmentDate >= dayStart && assignmentDate < dayEnd
+          // Check if assignment overlaps with the day
+          const startDate = assignment.coveredDateStart
+          const endDate = assignment.coveredDateEnd
+
+          const overlaps = startDate && startDate < dayEnd && endDate && endDate >= dayStart
+          return overlaps
         })
+
       case "hour":
         const hourStart = new Date(currentDate)
         hourStart.setMinutes(0, 0, 0)
@@ -348,16 +401,13 @@ export default function LogisticsPlannerPage() {
         return filtered.filter((assignment) => {
           if (!assignment.coveredDateEnd && !assignment.coveredDateStart) return false
 
-          const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
-          return (
-            assignmentDate &&
-            ((assignmentDate >= hourStart && assignmentDate < hourEnd) ||
-              (assignment.coveredDateStart &&
-                assignment.coveredDateStart < hourStart &&
-                assignment.coveredDateEnd &&
-                assignment.coveredDateEnd > hourStart))
-          )
+          const startDate = assignment.coveredDateStart
+          const endDate = assignment.coveredDateEnd
+
+          const overlaps = startDate && startDate < hourEnd && endDate && endDate >= hourStart
+          return overlaps
         })
+
       case "minute":
         const minuteStart = new Date(currentDate)
         minuteStart.setSeconds(0, 0)
@@ -368,15 +418,11 @@ export default function LogisticsPlannerPage() {
         return filtered.filter((assignment) => {
           if (!assignment.coveredDateEnd && !assignment.coveredDateStart) return false
 
-          const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
-          return (
-            assignmentDate &&
-            ((assignmentDate >= minuteStart && assignmentDate < minuteEnd) ||
-              (assignment.coveredDateStart &&
-                assignment.coveredDateStart < minuteStart &&
-                assignment.coveredDateEnd &&
-                assignment.coveredDateEnd > minuteStart))
-          )
+          const startDate = assignment.coveredDateStart
+          const endDate = assignment.coveredDateEnd
+
+          const overlaps = startDate && startDate < minuteEnd && endDate && endDate >= minuteStart
+          return overlaps
         })
     }
 
@@ -461,6 +507,7 @@ export default function LogisticsPlannerPage() {
   // Render calendar based on current view
   const renderCalendar = () => {
     const filteredAssignments = getFilteredAssignments()
+    console.log("Rendering calendar with", filteredAssignments.length, "filtered assignments")
 
     switch (view) {
       case "month":
@@ -488,16 +535,43 @@ export default function LogisticsPlannerPage() {
       .fill(null)
       .concat([...Array(daysInMonth)].map((_, i) => i + 1))
 
-    // Group assignments by day
+    // Group assignments by day - check if assignment spans multiple days
     const assignmentsByDay: { [key: number]: ServiceAssignment[] } = {}
     assignments.forEach((assignment) => {
-      const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
-      if (!assignmentDate) return
+      const startDate = assignment.coveredDateStart
+      const endDate = assignment.coveredDateEnd
 
-      const day = assignmentDate.getDate()
-      if (!assignmentsByDay[day]) assignmentsByDay[day] = []
-      assignmentsByDay[day].push(assignment)
+      if (!startDate && !endDate) return
+
+      // If we have both start and end dates, show assignment on all days it spans
+      if (startDate && endDate) {
+        const currentMonth = new Date(year, month, 1)
+        const nextMonth = new Date(year, month + 1, 1)
+
+        // Find all days this assignment spans within the current month
+        const checkDate = new Date(Math.max(startDate.getTime(), currentMonth.getTime()))
+        const endCheck = new Date(Math.min(endDate.getTime(), nextMonth.getTime() - 1))
+
+        while (checkDate <= endCheck) {
+          if (checkDate.getMonth() === month && checkDate.getFullYear() === year) {
+            const day = checkDate.getDate()
+            if (!assignmentsByDay[day]) assignmentsByDay[day] = []
+            assignmentsByDay[day].push(assignment)
+          }
+          checkDate.setDate(checkDate.getDate() + 1)
+        }
+      } else {
+        // Single date assignment
+        const assignmentDate = startDate || endDate
+        if (assignmentDate && assignmentDate.getMonth() === month && assignmentDate.getFullYear() === year) {
+          const day = assignmentDate.getDate()
+          if (!assignmentsByDay[day]) assignmentsByDay[day] = []
+          assignmentsByDay[day].push(assignment)
+        }
+      }
     })
+
+    console.log("Assignments by day:", assignmentsByDay)
 
     return (
       <div className="grid grid-cols-7 gap-1 mt-4">
@@ -592,12 +666,25 @@ export default function LogisticsPlannerPage() {
     // Group assignments by day
     const assignmentsByDay: { [key: string]: ServiceAssignment[] } = {}
     assignments.forEach((assignment) => {
-      const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
-      if (!assignmentDate) return
+      const startDate = assignment.coveredDateStart
+      const endDate = assignment.coveredDateEnd
 
-      const day = assignmentDate.toDateString()
-      if (!assignmentsByDay[day]) assignmentsByDay[day] = []
-      assignmentsByDay[day].push(assignment)
+      if (!startDate && !endDate) return
+
+      // Show assignment on all days it spans within the week
+      days.forEach((day) => {
+        const dayStart = new Date(day)
+        dayStart.setHours(0, 0, 0, 0)
+        const dayEnd = new Date(day)
+        dayEnd.setHours(23, 59, 59, 999)
+
+        const overlaps = startDate && startDate <= dayEnd && endDate && endDate >= dayStart
+        if (overlaps) {
+          const dayKey = day.toDateString()
+          if (!assignmentsByDay[dayKey]) assignmentsByDay[dayKey] = []
+          assignmentsByDay[dayKey].push(assignment)
+        }
+      })
     })
 
     return (
@@ -695,12 +782,24 @@ export default function LogisticsPlannerPage() {
     // Group assignments by hour
     const assignmentsByHour: { [key: number]: ServiceAssignment[] } = {}
     assignments.forEach((assignment) => {
-      const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
-      if (!assignmentDate) return
+      const startDate = assignment.coveredDateStart
+      const endDate = assignment.coveredDateEnd
 
-      const hour = assignmentDate.getHours()
-      if (!assignmentsByHour[hour]) assignmentsByHour[hour] = []
-      assignmentsByHour[hour].push(assignment)
+      if (!startDate && !endDate) return
+
+      // Show assignment on all hours it spans
+      for (let hour = 0; hour < 24; hour++) {
+        const hourStart = new Date(currentDate)
+        hourStart.setHours(hour, 0, 0, 0)
+        const hourEnd = new Date(currentDate)
+        hourEnd.setHours(hour, 59, 59, 999)
+
+        const overlaps = startDate && startDate <= hourEnd && endDate && endDate >= hourStart
+        if (overlaps) {
+          if (!assignmentsByHour[hour]) assignmentsByHour[hour] = []
+          assignmentsByHour[hour].push(assignment)
+        }
+      }
     })
 
     return (
@@ -816,19 +915,14 @@ export default function LogisticsPlannerPage() {
               time.setMinutes(interval, 0, 0)
 
               const intervalAssignments = assignments.filter((assignment) => {
-                const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
-                if (!assignmentDate) return false
+                const startDate = assignment.coveredDateStart
+                const endDate = assignment.coveredDateEnd
+                if (!startDate && !endDate) return false
 
                 const intervalEnd = new Date(time)
                 intervalEnd.setMinutes(time.getMinutes() + 5)
 
-                return (
-                  (assignmentDate >= time && assignmentDate < intervalEnd) ||
-                  (assignment.coveredDateStart &&
-                    assignment.coveredDateStart < time &&
-                    assignment.coveredDateEnd &&
-                    assignment.coveredDateEnd > time)
-                )
+                return startDate && startDate <= intervalEnd && endDate && endDate >= time
               })
 
               const isCurrentInterval =
@@ -922,19 +1016,14 @@ export default function LogisticsPlannerPage() {
               time.setMinutes(minute, 0, 0)
 
               const minuteAssignments = assignments.filter((assignment) => {
-                const assignmentDate = assignment.coveredDateEnd || assignment.coveredDateStart
-                if (!assignmentDate) return false
+                const startDate = assignment.coveredDateStart
+                const endDate = assignment.coveredDateEnd
+                if (!startDate && !endDate) return false
 
                 const minuteEnd = new Date(time)
                 minuteEnd.setMinutes(time.getMinutes() + 1)
 
-                return (
-                  (assignmentDate >= time && assignmentDate < minuteEnd) ||
-                  (assignment.coveredDateStart &&
-                    assignment.coveredDateStart < time &&
-                    assignment.coveredDateEnd &&
-                    assignment.coveredDateEnd > time)
-                )
+                return startDate && startDate <= minuteEnd && endDate && endDate >= time
               })
 
               const isCurrentMinute =
@@ -1001,6 +1090,17 @@ export default function LogisticsPlannerPage() {
           <h1 className="text-2xl font-bold">Logistics Calendar</h1>
           <div className="text-sm text-gray-500">{assignments.length} service assignments loaded</div>
         </div>
+
+        {/* Debug info */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="bg-gray-100 p-2 rounded text-xs">
+            <div>Company ID: {userData?.company_id}</div>
+            <div>Current Date: {currentDate.toISOString()}</div>
+            <div>View: {view}</div>
+            <div>Total Assignments: {assignments.length}</div>
+            <div>Filtered Assignments: {getFilteredAssignments().length}</div>
+          </div>
+        )}
 
         {/* Calendar controls */}
         <Card>
