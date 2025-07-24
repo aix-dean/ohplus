@@ -897,7 +897,7 @@ export default function BusinessProductCreatePage() {
                         id="display-rows"
                         type="number"
                         min="1"
-                        max="6"
+                        max="9"
                         value={formData.specs_rental.display_rows || "2"}
                         onChange={(e) =>
                           setFormData((prev) => ({
@@ -922,7 +922,7 @@ export default function BusinessProductCreatePage() {
                         id="display-cols"
                         type="number"
                         min="1"
-                        max="6"
+                        max="9"
                         value={formData.specs_rental.display_cols || "2"}
                         onChange={(e) =>
                           setFormData((prev) => ({
@@ -948,73 +948,73 @@ export default function BusinessProductCreatePage() {
                         <div className="relative">
                           {/* Dynamic preview based on rows and columns */}
                           <div
-                            className="bg-gray-300 p-1 rounded"
+                            className="bg-gray-300 p-2 rounded"
                             style={{
-                              width: `${Math.min(Number(formData.specs_rental.display_cols) * 32, 192)}px`,
-                              height: `${Math.min(Number(formData.specs_rental.display_rows) * 32, 192)}px`,
+                              width: `${Math.min(Number(formData.specs_rental.display_cols) * 48, 432)}px`,
+                              height: `${Math.min(Number(formData.specs_rental.display_rows) * 48, 432)}px`,
                               display: "grid",
                               gridTemplateColumns: `repeat(${formData.specs_rental.display_cols}, 1fr)`,
                               gridTemplateRows: `repeat(${formData.specs_rental.display_rows}, 1fr)`,
-                              gap: "2px",
+                              gap: "4px",
                             }}
                           >
                             {Array.from({
                               length:
                                 Number(formData.specs_rental.display_rows) * Number(formData.specs_rental.display_cols),
                             }).map((_, i) => (
-                              <div key={i} className="bg-white rounded flex items-center justify-center">
+                              <div key={i} className="bg-white rounded flex items-center justify-center min-h-[40px]">
                                 <span className="text-xs font-medium text-gray-600">Q{i + 1}</span>
                               </div>
                             ))}
                           </div>
 
                           {/* Illumination indicators around the preview */}
-                          <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 flex gap-2">
+                          <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 flex gap-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_upper_count) || 0,
                             }).map((_, i) => (
                               <div
                                 key={i}
-                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center"
+                                className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center"
                               >
                                 <span className="text-xs text-white font-bold">U{i + 1}</span>
                               </div>
                             ))}
                           </div>
 
-                          <div className="absolute top-1/2 -left-6 transform -translate-y-1/2 flex flex-col gap-2">
+                          <div className="absolute top-1/2 -left-8 transform -translate-y-1/2 flex flex-col gap-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_left_count) || 0,
                             }).map((_, i) => (
                               <div
                                 key={i}
-                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center"
+                                className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center"
                               >
                                 <span className="text-xs text-white font-bold">L{i + 1}</span>
                               </div>
                             ))}
                           </div>
 
-                          <div className="absolute top-1/2 -right-6 transform -translate-y-1/2 flex flex-col gap-2">
+                          <div className="absolute top-1/2 -right-8 transform -translate-y-1/2 flex flex-col gap-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_right_count) || 0,
                             }).map((_, i) => (
                               <div
                                 key={i}
-                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center"
+                                className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center"
                               >
                                 <span className="text-xs text-white font-bold">R{i + 1}</span>
                               </div>
                             ))}
                           </div>
 
-                          <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 flex gap-2">
+                          <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 flex gap-2">
                             {Array.from({
                               length: Number.parseInt(formData.specs_rental.illumination_bottom_count) || 0,
                             }).map((_, i) => (
                               <div
                                 key={i}
-                                className="w-4 h-4 bg-orange-500 rounded-full flex items-center justify-center"
+                                className="w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center"
                               >
                                 <span className="text-xs text-white font-bold">B{i + 1}</span>
                               </div>
@@ -1024,13 +1024,13 @@ export default function BusinessProductCreatePage() {
                       </div>
 
                       {/* Layout Info */}
-                      <div className="mt-3 text-center">
-                        <p className="text-xs text-gray-600">
-                          Layout: {formData.specs_rental.display_rows}x{formData.specs_rental.display_cols}(
+                      <div className="mt-4 text-center">
+                        <p className="text-sm text-gray-600 font-medium">
+                          Layout: {formData.specs_rental.display_rows}x{formData.specs_rental.display_cols} (
                           {Number(formData.specs_rental.display_rows) * Number(formData.specs_rental.display_cols)}{" "}
                           quadrants)
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 mt-1">
                           {Number(formData.specs_rental.display_rows) > Number(formData.specs_rental.display_cols)
                             ? "Vertical Rectangle"
                             : Number(formData.specs_rental.display_cols) > Number(formData.specs_rental.display_rows)
