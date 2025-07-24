@@ -24,7 +24,7 @@ import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
 import { useToast } from "@/hooks/use-toast"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 export default function ReportPreviewPage() {
@@ -57,6 +57,35 @@ export default function ReportPreviewPage() {
     if (!user?.uid) return
 
     try {
+      // First, try to get company using user's company_id if it exists
+      if (user.company_id) {
+        const companyDocRef = doc(db, "companies", user.company_id)
+        const companyDoc = await getDoc(companyDocRef)
+
+        if (companyDoc.exists()) {
+          const companyData = companyDoc.data()
+
+          const name =
+            companyData.name ||
+            companyData.contact_person ||
+            companyData.company_name ||
+            user.displayName ||
+            user.email?.split("@")[0] ||
+            "User"
+
+          setPreparedByName(name)
+
+          // Set company logo - fallback to OH+ logo if photo_url is empty or unset
+          const logoUrl =
+            companyData.photo_url && companyData.photo_url.trim() !== ""
+              ? companyData.photo_url
+              : "/ohplus-new-logo.png"
+          setCompanyLogo(logoUrl)
+          return
+        }
+      }
+
+      // Fallback: Query by created_by field (for backward compatibility)
       const companiesRef = collection(db, "companies")
       const q = query(companiesRef, where("created_by", "==", user.uid))
       const querySnapshot = await getDocs(q)
@@ -65,7 +94,6 @@ export default function ReportPreviewPage() {
         const companyDoc = querySnapshot.docs[0]
         const companyData = companyDoc.data()
 
-        // Try to get the name from various possible fields
         const name =
           companyData.name ||
           companyData.contact_person ||
@@ -76,12 +104,11 @@ export default function ReportPreviewPage() {
 
         setPreparedByName(name)
 
-        // Set company logo - fallback to OH+ logo if photo_url is empty or unset
         const logoUrl =
           companyData.photo_url && companyData.photo_url.trim() !== "" ? companyData.photo_url : "/ohplus-new-logo.png"
         setCompanyLogo(logoUrl)
       } else {
-        // Fallback to user display name or email
+        // Final fallback to user display name or email
         setPreparedByName(user.displayName || user.email?.split("@")[0] || "User")
         setCompanyLogo("/ohplus-new-logo.png")
       }
