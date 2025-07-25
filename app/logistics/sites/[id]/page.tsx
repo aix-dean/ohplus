@@ -432,14 +432,16 @@ export default function SiteDetailsPage({ params }: Props) {
                     </div>
                   </div>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full bg-transparent"
-                    onClick={() => setIlluminationIndexCardDialogOpen(true)}
-                  >
-                    View Index Card
-                  </Button>
+                  <div className="flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="bg-transparent"
+                      onClick={() => setIlluminationIndexCardDialogOpen(true)}
+                    >
+                      View Index Card
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
