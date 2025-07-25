@@ -387,6 +387,7 @@ export default function AllSitesTab() {
                 setSelectedSiteId(siteId)
                 setReportDialogOpen(true)
               }}
+              router={router}
             />
           ))}
         </div>
@@ -470,7 +471,11 @@ export default function AllSitesTab() {
 }
 
 // Unified Site Card that matches the exact reference design
-function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
+function UnifiedSiteCard({
+  site,
+  onCreateReport,
+  router,
+}: { site: any; onCreateReport: (siteId: string) => void; router: any }) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -478,7 +483,7 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
   }
 
   const handleCardClick = () => {
-    window.location.href = `/logistics/sites/${site.id}`
+    router.push(`/logistics/sites/${site.id}`)
   }
 
   return (
