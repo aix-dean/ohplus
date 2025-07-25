@@ -143,6 +143,7 @@ export default function BusinessProductCreatePage() {
       illumination_right_lighting_specs: "",
       security: "",
       caretaker: "",
+      lights_on_time: "",
     },
     type: "RENTAL",
     status: "PENDING",
@@ -667,6 +668,7 @@ export default function BusinessProductCreatePage() {
           illumination_right_lighting_specs: formData.specs_rental.illumination_right_lighting_specs || null,
           security: formData.specs_rental.security || null,
           caretaker: formData.specs_rental.caretaker || null,
+          lights_on_time: formData.specs_rental.lights_on_time || null,
         },
       }
 
@@ -938,6 +940,27 @@ export default function BusinessProductCreatePage() {
           return (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-800">Static Content Settings</h3>
+
+              {/* Lights On Time Setting */}
+              <div className="space-y-4">
+                <h4 className="text-lg font-semibold text-gray-800">Operating Schedule</h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="lights_on_time">Lights ON Time</Label>
+                    <Input
+                      id="lights_on_time"
+                      name="specs_rental.lights_on_time"
+                      type="time"
+                      value={formData.specs_rental.lights_on_time || ""}
+                      onChange={handleInputChange}
+                      placeholder="Select time when lights turn on"
+                      disabled={loading}
+                    />
+                    <p className="text-xs text-gray-500">Set the time when illumination lights turn on everyday</p>
+                  </div>
+                </div>
+              </div>
 
               {/* Illumination Setup - moved from Site Data */}
               <div className="space-y-4">
