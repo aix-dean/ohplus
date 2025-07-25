@@ -137,14 +137,6 @@ export default function BusinessProductCreatePage() {
       display_cols: "2",
       power_consumption_monthly: "",
       average_power_consumption_3months: "",
-      illumination_upper_wattage: "",
-      illumination_upper_lumens: "",
-      illumination_left_wattage: "",
-      illumination_left_lumens: "",
-      illumination_bottom_wattage: "",
-      illumination_bottom_lumens: "",
-      illumination_right_wattage: "",
-      illumination_right_lumens: "",
       illumination_upper_lighting_specs: "",
       illumination_left_lighting_specs: "",
       illumination_bottom_lighting_specs: "",
@@ -661,14 +653,6 @@ export default function BusinessProductCreatePage() {
           display_cols: formData.specs_rental.display_cols,
           power_consumption_monthly: formData.specs_rental.power_consumption_monthly || null,
           average_power_consumption_3months: formData.specs_rental.average_power_consumption_3months || null,
-          illumination_upper_wattage: formData.specs_rental.illumination_upper_wattage || null,
-          illumination_upper_lumens: formData.specs_rental.illumination_upper_lumens || null,
-          illumination_left_wattage: formData.specs_rental.illumination_left_wattage || null,
-          illumination_left_lumens: formData.specs_rental.illumination_left_lumens || null,
-          illumination_bottom_wattage: formData.specs_rental.illumination_bottom_wattage || null,
-          illumination_bottom_lumens: formData.specs_rental.illumination_bottom_lumens || null,
-          illumination_right_wattage: formData.specs_rental.illumination_right_wattage || null,
-          illumination_right_lumens: formData.specs_rental.illumination_right_lumens || null,
           illumination_upper_lighting_specs: formData.specs_rental.illumination_upper_lighting_specs || null,
           illumination_left_lighting_specs: formData.specs_rental.illumination_left_lighting_specs || null,
           illumination_bottom_lighting_specs: formData.specs_rental.illumination_bottom_lighting_specs || null,
@@ -1278,75 +1262,27 @@ export default function BusinessProductCreatePage() {
                   {Number.parseInt(formData.specs_rental.illumination_upper_count || "0") > 0 && (
                     <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
                       <h6 className="text-sm font-medium text-gray-700">Upper Metal Halides Details</h6>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="upper-wattage" className="text-xs text-gray-600">
-                            Wattage per Unit (W):
-                          </Label>
-                          <Input
-                            id="upper-wattage"
-                            type="number"
-                            min="0"
-                            value={formData.specs_rental.illumination_upper_wattage || ""}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_upper_wattage: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="e.g., 400"
-                            className="h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="upper-lumens" className="text-xs text-gray-600">
-                            Lumens per Unit:
-                          </Label>
-                          <Input
-                            id="upper-lumens"
-                            type="number"
-                            min="0"
-                            value={formData.specs_rental.illumination_upper_lumens || ""}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_upper_lumens: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="e.g., 36000"
-                            className="h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="upper-lighting-specs" className="text-xs text-gray-600">
-                            Lighting Specs:
-                          </Label>
-                          <Input
-                            id="upper-lighting-specs"
-                            type="text"
-                            value={formData.specs_rental.illumination_upper_lighting_specs || ""}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_upper_lighting_specs: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="e.g., Metal Halide 400W, IP65"
-                            className="h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="upper-lighting-specs" className="text-sm text-gray-600">
+                          Lighting Specs:
+                        </Label>
+                        <Input
+                          id="upper-lighting-specs"
+                          type="text"
+                          value={formData.specs_rental.illumination_upper_lighting_specs || ""}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              specs_rental: {
+                                ...prev.specs_rental,
+                                illumination_upper_lighting_specs: e.target.value,
+                              },
+                            }))
+                          }
+                          placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
+                          className="text-sm"
+                          disabled={loading}
+                        />
                       </div>
                     </div>
                   )}
@@ -1355,75 +1291,27 @@ export default function BusinessProductCreatePage() {
                   {Number.parseInt(formData.specs_rental.illumination_left_count || "0") > 0 && (
                     <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
                       <h6 className="text-sm font-medium text-gray-700">Left Metal Halides Details</h6>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="left-wattage" className="text-xs text-gray-600">
-                            Wattage per Unit (W):
-                          </Label>
-                          <Input
-                            id="left-wattage"
-                            type="number"
-                            min="0"
-                            value={formData.specs_rental.illumination_left_wattage || ""}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_left_wattage: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="e.g., 400"
-                            className="h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="left-lumens" className="text-xs text-gray-600">
-                            Lumens per Unit:
-                          </Label>
-                          <Input
-                            id="left-lumens"
-                            type="number"
-                            min="0"
-                            value={formData.specs_rental.illumination_left_lumens || ""}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_left_lumens: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="e.g., 36000"
-                            className="h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="left-lighting-specs" className="text-xs text-gray-600">
-                            Lighting Specs:
-                          </Label>
-                          <Input
-                            id="left-lighting-specs"
-                            type="text"
-                            value={formData.specs_rental.illumination_left_lighting_specs || ""}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_left_lighting_specs: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="e.g., Metal Halide 400W, IP65"
-                            className="h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="left-lighting-specs" className="text-sm text-gray-600">
+                          Lighting Specs:
+                        </Label>
+                        <Input
+                          id="left-lighting-specs"
+                          type="text"
+                          value={formData.specs_rental.illumination_left_lighting_specs || ""}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              specs_rental: {
+                                ...prev.specs_rental,
+                                illumination_left_lighting_specs: e.target.value,
+                              },
+                            }))
+                          }
+                          placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
+                          className="text-sm"
+                          disabled={loading}
+                        />
                       </div>
                     </div>
                   )}
@@ -1432,75 +1320,27 @@ export default function BusinessProductCreatePage() {
                   {Number.parseInt(formData.specs_rental.illumination_bottom_count || "0") > 0 && (
                     <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
                       <h6 className="text-sm font-medium text-gray-700">Bottom Metal Halides Details</h6>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="bottom-wattage" className="text-xs text-gray-600">
-                            Wattage per Unit (W):
-                          </Label>
-                          <Input
-                            id="bottom-wattage"
-                            type="number"
-                            min="0"
-                            value={formData.specs_rental.illumination_bottom_wattage || ""}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_bottom_wattage: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="e.g., 400"
-                            className="h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="bottom-lumens" className="text-xs text-gray-600">
-                            Lumens per Unit:
-                          </Label>
-                          <Input
-                            id="bottom-lumens"
-                            type="number"
-                            min="0"
-                            value={formData.specs_rental.illumination_bottom_lumens || ""}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_bottom_lumens: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="e.g., 36000"
-                            className="h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="bottom-lighting-specs" className="text-xs text-gray-600">
-                            Lighting Specs:
-                          </Label>
-                          <Input
-                            id="bottom-lighting-specs"
-                            type="text"
-                            value={formData.specs_rental.illumination_bottom_lighting_specs || ""}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_bottom_lighting_specs: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="e.g., Metal Halide 400W, IP65"
-                            className="h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="bottom-lighting-specs" className="text-sm text-gray-600">
+                          Lighting Specs:
+                        </Label>
+                        <Input
+                          id="bottom-lighting-specs"
+                          type="text"
+                          value={formData.specs_rental.illumination_bottom_lighting_specs || ""}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              specs_rental: {
+                                ...prev.specs_rental,
+                                illumination_bottom_lighting_specs: e.target.value,
+                              },
+                            }))
+                          }
+                          placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
+                          className="text-sm"
+                          disabled={loading}
+                        />
                       </div>
                     </div>
                   )}
@@ -1509,119 +1349,27 @@ export default function BusinessProductCreatePage() {
                   {Number.parseInt(formData.specs_rental.illumination_right_count || "0") > 0 && (
                     <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
                       <h6 className="text-sm font-medium text-gray-700">Right Metal Halides Details</h6>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="right-wattage" className="text-xs text-gray-600">
-                            Wattage per Unit (W):
-                          </Label>
-                          <Input
-                            id="right-wattage"
-                            type="number"
-                            min="0"
-                            value={formData.specs_rental.illumination_right_wattage || ""}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_right_wattage: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="e.g., 400"
-                            className="h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="right-lumens" className="text-xs text-gray-600">
-                            Lumens per Unit:
-                          </Label>
-                          <Input
-                            id="right-lumens"
-                            type="number"
-                            min="0"
-                            value={formData.specs_rental.illumination_right_lumens || ""}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_right_lumens: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="e.g., 36000"
-                            className="h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="right-lighting-specs" className="text-xs text-gray-600">
-                            Lighting Specs:
-                          </Label>
-                          <Input
-                            id="right-lighting-specs"
-                            type="text"
-                            value={formData.specs_rental.illumination_right_lighting_specs || ""}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                specs_rental: {
-                                  ...prev.specs_rental,
-                                  illumination_right_lighting_specs: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="e.g., Metal Halide 400W, IP65"
-                            className="h-8 text-sm"
-                            disabled={loading}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Total Wattage Summary */}
-                  {(Number.parseInt(formData.specs_rental.illumination_upper_count || "0") > 0 ||
-                    Number.parseInt(formData.specs_rental.illumination_left_count || "0") > 0 ||
-                    Number.parseInt(formData.specs_rental.illumination_bottom_count || "0") > 0 ||
-                    Number.parseInt(formData.specs_rental.illumination_right_count || "0") > 0) && (
-                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                      <h6 className="text-sm font-medium text-blue-800 mb-2">Total Illumination Summary</h6>
-                      <div className="text-sm text-blue-700">
-                        <div>
-                          <span className="font-medium">Total Metal Halides:</span>{" "}
-                          {Number.parseInt(formData.specs_rental.illumination_upper_count || "0") +
-                            Number.parseInt(formData.specs_rental.illumination_left_count || "0") +
-                            Number.parseInt(formData.specs_rental.illumination_bottom_count || "0") +
-                            Number.parseInt(formData.specs_rental.illumination_right_count || "0")}{" "}
-                          units
-                        </div>
-                        <div>
-                          <span className="font-medium">Total Wattage:</span>{" "}
-                          {Number.parseInt(formData.specs_rental.illumination_upper_count || "0") *
-                            Number.parseInt(formData.specs_rental.illumination_upper_wattage || "0") +
-                            Number.parseInt(formData.specs_rental.illumination_left_count || "0") *
-                              Number.parseInt(formData.specs_rental.illumination_left_wattage || "0") +
-                            Number.parseInt(formData.specs_rental.illumination_bottom_count || "0") *
-                              Number.parseInt(formData.specs_rental.illumination_bottom_wattage || "0") +
-                            Number.parseInt(formData.specs_rental.illumination_right_count || "0") *
-                              Number.parseInt(formData.specs_rental.illumination_right_wattage || "0")}{" "}
-                          W
-                        </div>
-                        <div>
-                          <span className="font-medium">Total Lumens:</span>{" "}
-                          {Number.parseInt(formData.specs_rental.illumination_upper_count || "0") *
-                            Number.parseInt(formData.specs_rental.illumination_upper_lumens || "0") +
-                            Number.parseInt(formData.specs_rental.illumination_left_count || "0") *
-                              Number.parseInt(formData.specs_rental.illumination_left_lumens || "0") +
-                            Number.parseInt(formData.specs_rental.illumination_bottom_count || "0") *
-                              Number.parseInt(formData.specs_rental.illumination_bottom_lumens || "0") +
-                            Number.parseInt(formData.specs_rental.illumination_right_count || "0") *
-                              Number.parseInt(formData.specs_rental.illumination_right_lumens || "0")}{" "}
-                          lumens
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="right-lighting-specs" className="text-sm text-gray-600">
+                          Lighting Specs:
+                        </Label>
+                        <Input
+                          id="right-lighting-specs"
+                          type="text"
+                          value={formData.specs_rental.illumination_right_lighting_specs || ""}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              specs_rental: {
+                                ...prev.specs_rental,
+                                illumination_right_lighting_specs: e.target.value,
+                              },
+                            }))
+                          }
+                          placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
+                          className="text-sm"
+                          disabled={loading}
+                        />
                       </div>
                     </div>
                   )}
