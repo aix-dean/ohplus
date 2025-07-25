@@ -652,10 +652,10 @@ export default function SiteDetailsPage({ params }: Props) {
               <CardContent>
                 <div className="space-y-2 text-sm">
                   <div>
-                    <span className="font-medium">Security:</span> {product.crew?.security || ""}
+                    <span className="font-medium">Security:</span> {product.specs_rental?.security || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Caretaker:</span> {product.crew?.caretaker || ""}
+                    <span className="font-medium">Caretaker:</span> {product.specs_rental?.caretaker || ""}
                   </div>
                 </div>
                 <Button variant="outline" size="sm" className="mt-3 bg-transparent">
