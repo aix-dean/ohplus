@@ -335,47 +335,120 @@ export default function SiteDetailsPage({ params }: Props) {
 
           {/* Site Data Grid - Updated to include Display card */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Illumination - Top Left */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base flex items-center">
-                  <Zap className="h-4 w-4 mr-2" />
-                  Illumination
-                </CardTitle>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => console.log("Edit illumination clicked")}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setAlarmDialogOpen(true)
-                      }}
-                    >
-                      <Bell className="mr-2 h-4 w-4" />
-                      Alarm Settings
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-start gap-4">
-                  {/* Left side - Date and Power info */}
-                  <div className="flex-1 space-y-3">
+            {/* Illumination - Show only for Static sites */}
+            {isStatic && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base flex items-center">
+                    <Zap className="h-4 w-4 mr-2" />
+                    Illumination
+                  </CardTitle>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => console.log("Edit illumination clicked")}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setAlarmDialogOpen(true)
+                        }}
+                      >
+                        <Bell className="mr-2 h-4 w-4" />
+                        Alarm Settings
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-start gap-4">
+                    {/* Left side - Date and Power info */}
+                    <div className="flex-1 space-y-3">
+                      <div className="text-sm">
+                        <div className="font-medium">July 3, 2020 (Tues), 2:00 pm</div>
+                        <div className="text-gray-600 text-xs">Lights ON at 6:00pm everyday</div>
+                      </div>
+
+                      <div className="space-y-1 text-sm">
+                        <div>
+                          <span className="font-medium">Power Consumption:</span> 150 kWh/month
+                        </div>
+                        <div>
+                          <span className="font-medium">Average Power Consumption:</span> 160 kWh over last 3 months
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right side - Illumination details */}
+                    <div className="space-y-1 text-sm min-w-[200px]">
+                      <div>
+                        <span className="font-medium">Upper:</span> 5: 240 Lux metal halides
+                      </div>
+                      <div>
+                        <span className="font-medium">Lower:</span> 5: 240 Lux metal halides
+                      </div>
+                      <div>
+                        <span className="font-medium">Side (Left):</span> N/A
+                      </div>
+                      <div>
+                        <span className="font-medium">Side (Right):</span> N/A
+                      </div>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 w-full bg-transparent"
+                    onClick={() => setIlluminationIndexCardDialogOpen(true)}
+                  >
+                    View Index Card
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Display - Show only for Dynamic sites */}
+            {isDynamic && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base flex items-center">
+                    <Sun className="h-4 w-4 mr-2" />
+                    Display
+                  </CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
                     <div className="text-sm">
-                      <div className="font-medium">July 3, 2020 (Tues), 2:00 pm</div>
-                      <div className="text-gray-600 text-xs">Lights ON at 6:00pm everyday</div>
+                      <div className="font-medium">July 1, 2025 (Tue), 2:00 pm</div>
+                      <div className="text-gray-600 text-xs">
+                        <span className="font-medium">Operating Time:</span> 6:00 pm to 11:00 pm
+                      </div>
                     </div>
 
                     <div className="space-y-1 text-sm">
+                      <div>
+                        <span className="font-medium">Brightness:</span>
+                        <div className="text-xs text-gray-600 ml-2">
+                          7:00 am-3:00 pm (20%)
+                          <br />
+                          3:00 pm-11:00 pm (100%)
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-medium">Spots in a loop:</span> 10 spots
+                      </div>
+                      <div>
+                        <span className="font-medium">Service Life:</span> 3 years, 8 months, and 10 days
+                      </div>
                       <div>
                         <span className="font-medium">Power Consumption:</span> 150 kWh/month
                       </div>
@@ -385,88 +458,19 @@ export default function SiteDetailsPage({ params }: Props) {
                     </div>
                   </div>
 
-                  {/* Right side - Illumination details */}
-                  <div className="space-y-1 text-sm min-w-[200px]">
-                    <div>
-                      <span className="font-medium">Upper:</span> 5: 240 Lux metal halides
-                    </div>
-                    <div>
-                      <span className="font-medium">Lower:</span> 5: 240 Lux metal halides
-                    </div>
-                    <div>
-                      <span className="font-medium">Side (Left):</span> N/A
-                    </div>
-                    <div>
-                      <span className="font-medium">Side (Right):</span> N/A
-                    </div>
-                  </div>
-                </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 w-full bg-transparent"
+                    onClick={() => setDisplayIndexCardDialogOpen(true)}
+                  >
+                    View Index Card
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4 w-full bg-transparent"
-                  onClick={() => setIlluminationIndexCardDialogOpen(true)}
-                >
-                  View Index Card
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Display - Top Middle */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base flex items-center">
-                  <Sun className="h-4 w-4 mr-2" />
-                  Display
-                </CardTitle>
-                <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="text-sm">
-                    <div className="font-medium">July 1, 2025 (Tue), 2:00 pm</div>
-                    <div className="text-gray-600 text-xs">
-                      <span className="font-medium">Operating Time:</span> 6:00 pm to 11:00 pm
-                    </div>
-                  </div>
-
-                  <div className="space-y-1 text-sm">
-                    <div>
-                      <span className="font-medium">Brightness:</span>
-                      <div className="text-xs text-gray-600 ml-2">
-                        7:00 am-3:00 pm (20%)
-                        <br />
-                        3:00 pm-11:00 pm (100%)
-                      </div>
-                    </div>
-                    <div>
-                      <span className="font-medium">Spots in a loop:</span> 10 spots
-                    </div>
-                    <div>
-                      <span className="font-medium">Service Life:</span> 3 years, 8 months, and 10 days
-                    </div>
-                    <div>
-                      <span className="font-medium">Power Consumption:</span> 150 kWh/month
-                    </div>
-                    <div>
-                      <span className="font-medium">Average Power Consumption:</span> 160 kWh over last 3 months
-                    </div>
-                  </div>
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4 w-full bg-transparent"
-                  onClick={() => setDisplayIndexCardDialogOpen(true)}
-                >
-                  View Index Card
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Compliance - Top Right */}
+            {/* Compliance - Always show */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center">
@@ -500,7 +504,7 @@ export default function SiteDetailsPage({ params }: Props) {
               </CardContent>
             </Card>
 
-            {/* Structure - Bottom Left */}
+            {/* Structure - Always show */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center">
@@ -535,7 +539,7 @@ export default function SiteDetailsPage({ params }: Props) {
               </CardContent>
             </Card>
 
-            {/* Content - Bottom Right */}
+            {/* Content - Always show */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center">
