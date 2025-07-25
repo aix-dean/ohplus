@@ -1114,11 +1114,14 @@ export default function BusinessProductCreatePage() {
                 </div>
 
                 <h4 className="text-lg font-semibold text-gray-800">Illumination Setup (Metal Halides)</h4>
+
                 {/* Upper Metal Halides */}
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium text-gray-700">Upper Metal Halides</Label>
-                    <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-12 gap-4 items-end">
+                    <div className="col-span-3">
+                      <Label className="text-sm font-medium text-gray-700">Upper Metal Halides</Label>
+                    </div>
+                    <div className="col-span-2">
                       <Label htmlFor="upper-count" className="text-xs text-gray-600">
                         Count:
                       </Label>
@@ -1138,22 +1141,44 @@ export default function BusinessProductCreatePage() {
                             },
                           }))
                         }}
-                        className="w-16 h-8 text-sm"
+                        className="w-full h-8 text-sm"
                         disabled={loading}
                       />
                     </div>
+                    <div className="col-span-7">
+                      <Label htmlFor="upper-lighting-specs" className="text-xs text-gray-600">
+                        Lighting Specs:
+                      </Label>
+                      <Input
+                        id="upper-lighting-specs"
+                        type="text"
+                        value={formData.specs_rental.illumination_upper_lighting_specs || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            specs_rental: {
+                              ...prev.specs_rental,
+                              illumination_upper_lighting_specs: e.target.value,
+                            },
+                          }))
+                        }
+                        placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
+                        className="h-8 text-sm"
+                        disabled={
+                          loading || Number.parseInt(formData.specs_rental.illumination_upper_count || "0") === 0
+                        }
+                      />
+                    </div>
                   </div>
-
-                  {Number.parseInt(formData.specs_rental.illumination_upper_count || "0") > 0 && (
-                    <div className="space-y-2"></div>
-                  )}
                 </div>
 
                 {/* Left Metal Halides */}
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium text-gray-700">Left Metal Halides</Label>
-                    <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-12 gap-4 items-end">
+                    <div className="col-span-3">
+                      <Label className="text-sm font-medium text-gray-700">Left Metal Halides</Label>
+                    </div>
+                    <div className="col-span-2">
                       <Label htmlFor="left-count" className="text-xs text-gray-600">
                         Count:
                       </Label>
@@ -1173,22 +1198,44 @@ export default function BusinessProductCreatePage() {
                             },
                           }))
                         }}
-                        className="w-16 h-8 text-sm"
+                        className="w-full h-8 text-sm"
                         disabled={loading}
                       />
                     </div>
+                    <div className="col-span-7">
+                      <Label htmlFor="left-lighting-specs" className="text-xs text-gray-600">
+                        Lighting Specs:
+                      </Label>
+                      <Input
+                        id="left-lighting-specs"
+                        type="text"
+                        value={formData.specs_rental.illumination_left_lighting_specs || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            specs_rental: {
+                              ...prev.specs_rental,
+                              illumination_left_lighting_specs: e.target.value,
+                            },
+                          }))
+                        }
+                        placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
+                        className="h-8 text-sm"
+                        disabled={
+                          loading || Number.parseInt(formData.specs_rental.illumination_left_count || "0") === 0
+                        }
+                      />
+                    </div>
                   </div>
-
-                  {Number.parseInt(formData.specs_rental.illumination_left_count || "0") > 0 && (
-                    <div className="space-y-2"></div>
-                  )}
                 </div>
 
                 {/* Bottom Metal Halides */}
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium text-gray-700">Bottom Metal Halides</Label>
-                    <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-12 gap-4 items-end">
+                    <div className="col-span-3">
+                      <Label className="text-sm font-medium text-gray-700">Bottom Metal Halides</Label>
+                    </div>
+                    <div className="col-span-2">
                       <Label htmlFor="bottom-count" className="text-xs text-gray-600">
                         Count:
                       </Label>
@@ -1208,22 +1255,44 @@ export default function BusinessProductCreatePage() {
                             },
                           }))
                         }}
-                        className="w-16 h-8 text-sm"
+                        className="w-full h-8 text-sm"
                         disabled={loading}
                       />
                     </div>
+                    <div className="col-span-7">
+                      <Label htmlFor="bottom-lighting-specs" className="text-xs text-gray-600">
+                        Lighting Specs:
+                      </Label>
+                      <Input
+                        id="bottom-lighting-specs"
+                        type="text"
+                        value={formData.specs_rental.illumination_bottom_lighting_specs || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            specs_rental: {
+                              ...prev.specs_rental,
+                              illumination_bottom_lighting_specs: e.target.value,
+                            },
+                          }))
+                        }
+                        placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
+                        className="h-8 text-sm"
+                        disabled={
+                          loading || Number.parseInt(formData.specs_rental.illumination_bottom_count || "0") === 0
+                        }
+                      />
+                    </div>
                   </div>
-
-                  {Number.parseInt(formData.specs_rental.illumination_bottom_count || "0") > 0 && (
-                    <div className="space-y-2"></div>
-                  )}
                 </div>
 
                 {/* Right Metal Halides */}
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm font-medium text-gray-700">Right Metal Halides</Label>
-                    <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-12 gap-4 items-end">
+                    <div className="col-span-3">
+                      <Label className="text-sm font-medium text-gray-700">Right Metal Halides</Label>
+                    </div>
+                    <div className="col-span-2">
                       <Label htmlFor="right-count" className="text-xs text-gray-600">
                         Count:
                       </Label>
@@ -1243,136 +1312,35 @@ export default function BusinessProductCreatePage() {
                             },
                           }))
                         }}
-                        className="w-16 h-8 text-sm"
+                        className="w-full h-8 text-sm"
                         disabled={loading}
                       />
                     </div>
+                    <div className="col-span-7">
+                      <Label htmlFor="right-lighting-specs" className="text-xs text-gray-600">
+                        Lighting Specs:
+                      </Label>
+                      <Input
+                        id="right-lighting-specs"
+                        type="text"
+                        value={formData.specs_rental.illumination_right_lighting_specs || ""}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            specs_rental: {
+                              ...prev.specs_rental,
+                              illumination_right_lighting_specs: e.target.value,
+                            },
+                          }))
+                        }
+                        placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
+                        className="h-8 text-sm"
+                        disabled={
+                          loading || Number.parseInt(formData.specs_rental.illumination_right_count || "0") === 0
+                        }
+                      />
+                    </div>
                   </div>
-
-                  {Number.parseInt(formData.specs_rental.illumination_right_count || "0") > 0 && (
-                    <div className="space-y-2"></div>
-                  )}
-                </div>
-
-                {/* Metal Halides Details */}
-                <div className="space-y-6 mt-6">
-                  <h5 className="text-base font-semibold text-gray-700">Metal Halides Configuration</h5>
-
-                  {/* Upper Metal Halides Details */}
-                  {Number.parseInt(formData.specs_rental.illumination_upper_count || "0") > 0 && (
-                    <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
-                      <h6 className="text-sm font-medium text-gray-700">Upper Metal Halides Details</h6>
-                      <div className="space-y-2">
-                        <Label htmlFor="upper-lighting-specs" className="text-sm text-gray-600">
-                          Lighting Specs:
-                        </Label>
-                        <Input
-                          id="upper-lighting-specs"
-                          type="text"
-                          value={formData.specs_rental.illumination_upper_lighting_specs || ""}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              specs_rental: {
-                                ...prev.specs_rental,
-                                illumination_upper_lighting_specs: e.target.value,
-                              },
-                            }))
-                          }
-                          placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
-                          className="text-sm"
-                          disabled={loading}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Left Metal Halides Details */}
-                  {Number.parseInt(formData.specs_rental.illumination_left_count || "0") > 0 && (
-                    <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
-                      <h6 className="text-sm font-medium text-gray-700">Left Metal Halides Details</h6>
-                      <div className="space-y-2">
-                        <Label htmlFor="left-lighting-specs" className="text-sm text-gray-600">
-                          Lighting Specs:
-                        </Label>
-                        <Input
-                          id="left-lighting-specs"
-                          type="text"
-                          value={formData.specs_rental.illumination_left_lighting_specs || ""}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              specs_rental: {
-                                ...prev.specs_rental,
-                                illumination_left_lighting_specs: e.target.value,
-                              },
-                            }))
-                          }
-                          placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
-                          className="text-sm"
-                          disabled={loading}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Bottom Metal Halides Details */}
-                  {Number.parseInt(formData.specs_rental.illumination_bottom_count || "0") > 0 && (
-                    <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
-                      <h6 className="text-sm font-medium text-gray-700">Bottom Metal Halides Details</h6>
-                      <div className="space-y-2">
-                        <Label htmlFor="bottom-lighting-specs" className="text-sm text-gray-600">
-                          Lighting Specs:
-                        </Label>
-                        <Input
-                          id="bottom-lighting-specs"
-                          type="text"
-                          value={formData.specs_rental.illumination_bottom_lighting_specs || ""}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              specs_rental: {
-                                ...prev.specs_rental,
-                                illumination_bottom_lighting_specs: e.target.value,
-                              },
-                            }))
-                          }
-                          placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
-                          className="text-sm"
-                          disabled={loading}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Right Metal Halides Details */}
-                  {Number.parseInt(formData.specs_rental.illumination_right_count || "0") > 0 && (
-                    <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
-                      <h6 className="text-sm font-medium text-gray-700">Right Metal Halides Details</h6>
-                      <div className="space-y-2">
-                        <Label htmlFor="right-lighting-specs" className="text-sm text-gray-600">
-                          Lighting Specs:
-                        </Label>
-                        <Input
-                          id="right-lighting-specs"
-                          type="text"
-                          value={formData.specs_rental.illumination_right_lighting_specs || ""}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              specs_rental: {
-                                ...prev.specs_rental,
-                                illumination_right_lighting_specs: e.target.value,
-                              },
-                            }))
-                          }
-                          placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
-                          className="text-sm"
-                          disabled={loading}
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Additional Illumination Details */}
