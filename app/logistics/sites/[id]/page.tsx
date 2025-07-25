@@ -416,11 +416,19 @@ export default function SiteDetailsPage({ params }: Props) {
 
                   {/* Power Consumption */}
                   <div className="border-t pt-3">
-                    <div className="text-sm">
-                      <span className="font-medium">Power Consumption:</span>{" "}
-                      <span className="text-green-600">
-                        {product.specs_rental?.average_power_consumption_3months || "344"} kWh/month
-                      </span>
+                    <div className="text-sm space-y-1">
+                      <div>
+                        <span className="font-medium">Power Consumption:</span>{" "}
+                        <span className="text-green-600">
+                          {product.specs_rental?.average_power_consumption_3months || "344"} kWh/month
+                        </span>
+                      </div>
+                      <div>
+                        <span className="font-medium">Average (3 months):</span>{" "}
+                        <span className="text-blue-600">
+                          {product.specs_rental?.average_power_consumption_3months || "344"} kWh/month
+                        </span>
+                      </div>
                     </div>
                   </div>
 
