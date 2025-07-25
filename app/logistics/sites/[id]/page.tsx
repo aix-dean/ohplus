@@ -741,6 +741,7 @@ export default function SiteDetailsPage({ params }: Props) {
       <IlluminationIndexCardDialog
         open={illuminationIndexCardDialogOpen}
         onOpenChange={setIlluminationIndexCardDialogOpen}
+        product={product}
         onCreateJO={() => {
           // Navigate to create service assignment with this site pre-selected
           router.push(`/logistics/assignments/create?projectSite=${params.id}`)
