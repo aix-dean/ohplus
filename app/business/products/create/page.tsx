@@ -653,6 +653,12 @@ export default function BusinessProductCreatePage() {
           display_cols: formData.specs_rental.display_cols,
           power_consumption_monthly: formData.specs_rental.power_consumption_monthly || null,
           average_power_consumption_3months: formData.specs_rental.average_power_consumption_3months || null,
+          // Add the individual count fields
+          illumination_upper_count: formData.specs_rental.illumination_upper_count || "0",
+          illumination_left_count: formData.specs_rental.illumination_left_count || "0",
+          illumination_bottom_count: formData.specs_rental.illumination_bottom_count || "0",
+          illumination_right_count: formData.specs_rental.illumination_right_count || "0",
+          // Keep the lighting specs as well
           illumination_upper_lighting_specs: formData.specs_rental.illumination_upper_lighting_specs || null,
           illumination_left_lighting_specs: formData.specs_rental.illumination_left_lighting_specs || null,
           illumination_bottom_lighting_specs: formData.specs_rental.illumination_bottom_lighting_specs || null,
