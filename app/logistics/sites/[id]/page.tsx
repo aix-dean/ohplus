@@ -290,13 +290,14 @@ export default function SiteDetailsPage({ params }: Props) {
                     <span className="font-medium">Geopoint:</span> {geopoint}
                   </div>
                   <div>
-                    <span className="font-medium">Site Orientation:</span> {product.site_orientation || ""}
+                    <span className="font-medium">Site Orientation:</span>{" "}
+                    {product.specs_rental?.site_orientation || ""}
                   </div>
                   <div>
                     <span className="font-medium">Site Owner:</span> {product.site_owner || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Land Owner:</span> {product.land_owner || ""}
+                    <span className="font-medium">Land Owner:</span> {product.specs_rental?.land_owner || ""}
                   </div>
                 </div>
               </div>
