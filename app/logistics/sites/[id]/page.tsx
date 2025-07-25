@@ -548,16 +548,17 @@ export default function SiteDetailsPage({ params }: Props) {
               <CardContent>
                 <div className="space-y-2 text-sm">
                   <div>
-                    <span className="font-medium">Color:</span> {product.structure?.color || ""}
+                    <span className="font-medium">Color:</span> {product.specs_rental?.structure_color || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Contractor:</span> {product.structure?.contractor || ""}
+                    <span className="font-medium">Contractor:</span> {product.specs_rental?.structure_contractor || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Condition:</span> {product.structure?.condition || ""}
+                    <span className="font-medium">Condition:</span> {product.specs_rental?.structure_condition || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Last Maintenance:</span> {product.structure?.last_maintenance || ""}
+                    <span className="font-medium">Last Maintenance:</span>{" "}
+                    {product.specs_rental?.structure_last_maintenance || ""}
                   </div>
                 </div>
                 <div className="flex gap-2 mt-3">
