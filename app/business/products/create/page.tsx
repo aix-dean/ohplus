@@ -1121,30 +1121,6 @@ export default function BusinessProductCreatePage() {
                     <div className="col-span-3">
                       <Label className="text-sm font-medium text-gray-700">Upper Metal Halides</Label>
                     </div>
-                    <div className="col-span-2">
-                      <Label htmlFor="upper-count" className="text-xs text-gray-600">
-                        Count:
-                      </Label>
-                      <Input
-                        id="upper-count"
-                        type="number"
-                        min="0"
-                        max="10"
-                        value={formData.specs_rental.illumination_upper_count || "0"}
-                        onChange={(e) => {
-                          const count = Number.parseInt(e.target.value) || 0
-                          setFormData((prev) => ({
-                            ...prev,
-                            specs_rental: {
-                              ...prev.specs_rental,
-                              illumination_upper_count: count.toString(),
-                            },
-                          }))
-                        }}
-                        className="w-full h-8 text-sm"
-                        disabled={loading}
-                      />
-                    </div>
                     <div className="col-span-7">
                       <Label htmlFor="upper-lighting-specs" className="text-xs text-gray-600">
                         Lighting Specs:
@@ -1169,6 +1145,30 @@ export default function BusinessProductCreatePage() {
                         }
                       />
                     </div>
+                    <div className="col-span-2">
+                      <Label htmlFor="upper-count" className="text-xs text-gray-600">
+                        Count:
+                      </Label>
+                      <Input
+                        id="upper-count"
+                        type="number"
+                        min="0"
+                        max="10"
+                        value={formData.specs_rental.illumination_upper_count || "0"}
+                        onChange={(e) => {
+                          const count = Number.parseInt(e.target.value) || 0
+                          setFormData((prev) => ({
+                            ...prev,
+                            specs_rental: {
+                              ...prev.specs_rental,
+                              illumination_upper_count: count.toString(),
+                            },
+                          }))
+                        }}
+                        className="w-full h-8 text-sm"
+                        disabled={loading}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1177,30 +1177,6 @@ export default function BusinessProductCreatePage() {
                   <div className="grid grid-cols-12 gap-4 items-end">
                     <div className="col-span-3">
                       <Label className="text-sm font-medium text-gray-700">Left Metal Halides</Label>
-                    </div>
-                    <div className="col-span-2">
-                      <Label htmlFor="left-count" className="text-xs text-gray-600">
-                        Count:
-                      </Label>
-                      <Input
-                        id="left-count"
-                        type="number"
-                        min="0"
-                        max="10"
-                        value={formData.specs_rental.illumination_left_count || "0"}
-                        onChange={(e) => {
-                          const count = Number.parseInt(e.target.value) || 0
-                          setFormData((prev) => ({
-                            ...prev,
-                            specs_rental: {
-                              ...prev.specs_rental,
-                              illumination_left_count: count.toString(),
-                            },
-                          }))
-                        }}
-                        className="w-full h-8 text-sm"
-                        disabled={loading}
-                      />
                     </div>
                     <div className="col-span-7">
                       <Label htmlFor="left-lighting-specs" className="text-xs text-gray-600">
@@ -1226,6 +1202,30 @@ export default function BusinessProductCreatePage() {
                         }
                       />
                     </div>
+                    <div className="col-span-2">
+                      <Label htmlFor="left-count" className="text-xs text-gray-600">
+                        Count:
+                      </Label>
+                      <Input
+                        id="left-count"
+                        type="number"
+                        min="0"
+                        max="10"
+                        value={formData.specs_rental.illumination_left_count || "0"}
+                        onChange={(e) => {
+                          const count = Number.parseInt(e.target.value) || 0
+                          setFormData((prev) => ({
+                            ...prev,
+                            specs_rental: {
+                              ...prev.specs_rental,
+                              illumination_left_count: count.toString(),
+                            },
+                          }))
+                        }}
+                        className="w-full h-8 text-sm"
+                        disabled={loading}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1234,30 +1234,6 @@ export default function BusinessProductCreatePage() {
                   <div className="grid grid-cols-12 gap-4 items-end">
                     <div className="col-span-3">
                       <Label className="text-sm font-medium text-gray-700">Bottom Metal Halides</Label>
-                    </div>
-                    <div className="col-span-2">
-                      <Label htmlFor="bottom-count" className="text-xs text-gray-600">
-                        Count:
-                      </Label>
-                      <Input
-                        id="bottom-count"
-                        type="number"
-                        min="0"
-                        max="10"
-                        value={formData.specs_rental.illumination_bottom_count || "0"}
-                        onChange={(e) => {
-                          const count = Number.parseInt(e.target.value) || 0
-                          setFormData((prev) => ({
-                            ...prev,
-                            specs_rental: {
-                              ...prev.specs_rental,
-                              illumination_bottom_count: count.toString(),
-                            },
-                          }))
-                        }}
-                        className="w-full h-8 text-sm"
-                        disabled={loading}
-                      />
                     </div>
                     <div className="col-span-7">
                       <Label htmlFor="bottom-lighting-specs" className="text-xs text-gray-600">
@@ -1283,6 +1259,30 @@ export default function BusinessProductCreatePage() {
                         }
                       />
                     </div>
+                    <div className="col-span-2">
+                      <Label htmlFor="bottom-count" className="text-xs text-gray-600">
+                        Count:
+                      </Label>
+                      <Input
+                        id="bottom-count"
+                        type="number"
+                        min="0"
+                        max="10"
+                        value={formData.specs_rental.illumination_bottom_count || "0"}
+                        onChange={(e) => {
+                          const count = Number.parseInt(e.target.value) || 0
+                          setFormData((prev) => ({
+                            ...prev,
+                            specs_rental: {
+                              ...prev.specs_rental,
+                              illumination_bottom_count: count.toString(),
+                            },
+                          }))
+                        }}
+                        className="w-full h-8 text-sm"
+                        disabled={loading}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1291,30 +1291,6 @@ export default function BusinessProductCreatePage() {
                   <div className="grid grid-cols-12 gap-4 items-end">
                     <div className="col-span-3">
                       <Label className="text-sm font-medium text-gray-700">Right Metal Halides</Label>
-                    </div>
-                    <div className="col-span-2">
-                      <Label htmlFor="right-count" className="text-xs text-gray-600">
-                        Count:
-                      </Label>
-                      <Input
-                        id="right-count"
-                        type="number"
-                        min="0"
-                        max="10"
-                        value={formData.specs_rental.illumination_right_count || "0"}
-                        onChange={(e) => {
-                          const count = Number.parseInt(e.target.value) || 0
-                          setFormData((prev) => ({
-                            ...prev,
-                            specs_rental: {
-                              ...prev.specs_rental,
-                              illumination_right_count: count.toString(),
-                            },
-                          }))
-                        }}
-                        className="w-full h-8 text-sm"
-                        disabled={loading}
-                      />
                     </div>
                     <div className="col-span-7">
                       <Label htmlFor="right-lighting-specs" className="text-xs text-gray-600">
@@ -1338,6 +1314,30 @@ export default function BusinessProductCreatePage() {
                         disabled={
                           loading || Number.parseInt(formData.specs_rental.illumination_right_count || "0") === 0
                         }
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Label htmlFor="right-count" className="text-xs text-gray-600">
+                        Count:
+                      </Label>
+                      <Input
+                        id="right-count"
+                        type="number"
+                        min="0"
+                        max="10"
+                        value={formData.specs_rental.illumination_right_count || "0"}
+                        onChange={(e) => {
+                          const count = Number.parseInt(e.target.value) || 0
+                          setFormData((prev) => ({
+                            ...prev,
+                            specs_rental: {
+                              ...prev.specs_rental,
+                              illumination_right_count: count.toString(),
+                            },
+                          }))
+                        }}
+                        className="w-full h-8 text-sm"
+                        disabled={loading}
                       />
                     </div>
                   </div>
