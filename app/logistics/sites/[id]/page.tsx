@@ -372,8 +372,23 @@ export default function SiteDetailsPage({ params }: Props) {
                     {/* Left side - Date and Power info */}
                     <div className="flex-1 space-y-3">
                       <div className="text-sm">
-                        <div className="font-medium">July 3, 2020 (Tues), 2:00 pm</div>
-                        <div className="text-gray-600 text-xs">Lights ON at 6:00pm everyday</div>
+                        <div className="font-medium">
+                          {new Date().toLocaleDateString("en-US", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                            weekday: "short",
+                          })}
+                          ,{" "}
+                          {new Date().toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true,
+                          })}
+                        </div>
+                        <div className="text-gray-600 text-xs">
+                          Lights ON at {product.specs_rental?.lights_on_time || "6:00pm"} everyday
+                        </div>
                       </div>
 
                       <div className="space-y-1 text-sm">
@@ -386,6 +401,14 @@ export default function SiteDetailsPage({ params }: Props) {
                           {product.specs_rental?.average_power_consumption_3months || "Not specified"} kWh over last 3
                           months
                         </div>
+                        <div>
+                          <span className="font-medium">Voltage:</span>{" "}
+                          {product.specs_rental?.voltage || "Not specified"}V
+                        </div>
+                        <div>
+                          <span className="font-medium">Wattage:</span>{" "}
+                          {product.specs_rental?.wattage || "Not specified"}W
+                        </div>
                       </div>
                     </div>
 
@@ -393,19 +416,23 @@ export default function SiteDetailsPage({ params }: Props) {
                     <div className="space-y-1 text-sm min-w-[200px]">
                       <div>
                         <span className="font-medium">Upper:</span>{" "}
-                        {product.specs_rental?.illumination_upper_count || "0"} metal halides
+                        {product.specs_rental?.illumination_upper_count || "0"} -{" "}
+                        {product.specs_rental?.illumination_upper_specs || "metal halides"}
                       </div>
                       <div>
                         <span className="font-medium">Lower:</span>{" "}
-                        {product.specs_rental?.illumination_bottom_count || "0"} metal halides
+                        {product.specs_rental?.illumination_bottom_count || "0"} -{" "}
+                        {product.specs_rental?.illumination_bottom_specs || "metal halides"}
                       </div>
                       <div>
                         <span className="font-medium">Side (Left):</span>{" "}
-                        {product.specs_rental?.illumination_left_count || "0"} metal halides
+                        {product.specs_rental?.illumination_left_count || "0"} -{" "}
+                        {product.specs_rental?.illumination_left_specs || "metal halides"}
                       </div>
                       <div>
                         <span className="font-medium">Side (Right):</span>{" "}
-                        {product.specs_rental?.illumination_right_count || "0"} metal halides
+                        {product.specs_rental?.illumination_right_count || "0"} -{" "}
+                        {product.specs_rental?.illumination_right_specs || "metal halides"}
                       </div>
                     </div>
                   </div>
