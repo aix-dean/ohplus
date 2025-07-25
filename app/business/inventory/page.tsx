@@ -420,51 +420,61 @@ export default function BusinessInventoryPage() {
             <span className="text-lg font-semibold">+ Add Site</span>
           </Card>
 
-          {loading && products.length === 0 ? (
-            // Show simple loading state instead of skeleton cards
-            <div className="col-span-full flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            products.map((product) => (
-              <Card
-                key={product.id}
-                className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
-                onClick={() => handleViewDetails(product.id)}
-              >
-                <div className="h-48 bg-gray-200 relative">
-                  <Image
-                    src={
-                      product.media && product.media.length > 0
-                        ? product.media[0].url
-                        : "/abstract-geometric-sculpture.png"
-                    }
-                    alt={product.name || "Product image"}
-                    fill
-                    className="object-cover"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.src = "/abstract-geometric-sculpture.png"
-                      target.className = "opacity-50"
-                    }}
-                  />
-                </div>
-
-                <CardContent className="p-4">
-                  <div className="flex flex-col">
-                    <h3 className="font-semibold line-clamp-1">{product.name}</h3>
-                    <div className="mt-2 text-sm font-medium text-green-700">
-                      ₱{Number(product.price).toLocaleString()}
+          {loading && products.length === 0
+            ? // Show shimmer skeleton cards in grid layout
+              Array.from({ length: 8 }).map((_, index) => (
+                <Card key={`shimmer-${index}`} className="overflow-hidden border border-gray-200 shadow-md rounded-xl">
+                  <div className="h-48 bg-gray-200 animate-pulse" />
+                  <CardContent className="p-4">
+                    <div className="space-y-3">
+                      <div className="h-4 bg-gray-200 rounded animate-pulse" />
+                      <div className="h-4 bg-gray-200 rounded w-2/3 animate-pulse" />
+                      <div className="flex items-center space-x-2">
+                        <div className="h-3 w-3 bg-gray-200 rounded animate-pulse" />
+                        <div className="h-3 bg-gray-200 rounded w-3/4 animate-pulse" />
+                      </div>
                     </div>
-                    <div className="mt-1 text-xs text-gray-500 flex items-center">
-                      <MapPin size={12} className="mr-1 flex-shrink-0" />
-                      <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
-                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            : products.map((product) => (
+                <Card
+                  key={product.id}
+                  className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
+                  onClick={() => handleViewDetails(product.id)}
+                >
+                  <div className="h-48 bg-gray-200 relative">
+                    <Image
+                      src={
+                        product.media && product.media.length > 0
+                          ? product.media[0].url
+                          : "/abstract-geometric-sculpture.png"
+                      }
+                      alt={product.name || "Product image"}
+                      fill
+                      className="object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.src = "/abstract-geometric-sculpture.png"
+                        target.className = "opacity-50"
+                      }}
+                    />
                   </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
+
+                  <CardContent className="p-4">
+                    <div className="flex flex-col">
+                      <h3 className="font-semibold line-clamp-1">{product.name}</h3>
+                      <div className="mt-2 text-sm font-medium text-green-700">
+                        ₱{Number(product.price).toLocaleString()}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500 flex items-center">
+                        <MapPin size={12} className="mr-1 flex-shrink-0" />
+                        <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
         </ResponsiveCardGrid>
 
         {/* Show empty state message when no products and not loading */}
