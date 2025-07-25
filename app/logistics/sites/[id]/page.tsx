@@ -378,10 +378,13 @@ export default function SiteDetailsPage({ params }: Props) {
 
                       <div className="space-y-1 text-sm">
                         <div>
-                          <span className="font-medium">Power Consumption:</span> 150 kWh/month
+                          <span className="font-medium">Power Consumption:</span>{" "}
+                          {product.specs_rental?.power_consumption_monthly || "Not specified"} kWh/month
                         </div>
                         <div>
-                          <span className="font-medium">Average Power Consumption:</span> 160 kWh over last 3 months
+                          <span className="font-medium">Average Power Consumption:</span>{" "}
+                          {product.specs_rental?.average_power_consumption_3months || "Not specified"} kWh over last 3
+                          months
                         </div>
                       </div>
                     </div>
@@ -389,16 +392,20 @@ export default function SiteDetailsPage({ params }: Props) {
                     {/* Right side - Illumination details */}
                     <div className="space-y-1 text-sm min-w-[200px]">
                       <div>
-                        <span className="font-medium">Upper:</span> 5: 240 Lux metal halides
+                        <span className="font-medium">Upper:</span>{" "}
+                        {product.specs_rental?.illumination_upper_count || "0"} metal halides
                       </div>
                       <div>
-                        <span className="font-medium">Lower:</span> 5: 240 Lux metal halides
+                        <span className="font-medium">Lower:</span>{" "}
+                        {product.specs_rental?.illumination_bottom_count || "0"} metal halides
                       </div>
                       <div>
-                        <span className="font-medium">Side (Left):</span> N/A
+                        <span className="font-medium">Side (Left):</span>{" "}
+                        {product.specs_rental?.illumination_left_count || "0"} metal halides
                       </div>
                       <div>
-                        <span className="font-medium">Side (Right):</span> N/A
+                        <span className="font-medium">Side (Right):</span>{" "}
+                        {product.specs_rental?.illumination_right_count || "0"} metal halides
                       </div>
                     </div>
                   </div>
