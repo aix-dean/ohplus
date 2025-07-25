@@ -175,7 +175,7 @@ export default function SiteDetailsPage({ params }: Props) {
   // Get geopoint
   const geopoint = product.specs_rental?.geopoint
     ? `${product.specs_rental.geopoint[0]},${product.specs_rental.geopoint[1]}`
-    : "12.5346567742,14. 09346723"
+    : "12.5346567742,14.09346723"
 
   // Get the first media item for the thumbnail
   const thumbnailUrl =
@@ -334,87 +334,84 @@ export default function SiteDetailsPage({ params }: Props) {
           </Card>
 
           {/* Site Data Grid - Updated to include Display card */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Illumination - Show only for Static sites */}
-            {isStatic && (
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-base flex items-center">
-                    <Zap className="h-4 w-4 mr-2" />
-                    Illumination
-                  </CardTitle>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => console.log("Edit illumination clicked")}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          setAlarmDialogOpen(true)
-                        }}
-                      >
-                        <Bell className="mr-2 h-4 w-4" />
-                        Alarm Settings
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-start gap-4">
-                    {/* Left side - Date and Power info */}
-                    <div className="flex-1 space-y-3">
-                      <div className="text-sm">
-                        <div className="font-medium">
-                          {new Date().toLocaleDateString("en-US", {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                            weekday: "short",
-                          })}
-                          ,{" "}
-                          {new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
-                        </div>
-                        <div className="text-gray-600 text-xs">
-                          Lights ON at {product.specs_rental?.lights_on_time || "6:00pm"} everyday
-                        </div>
+          {/* Illumination - Show only for Static sites - Full width */}
+          {isStatic && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base flex items-center">
+                  <Zap className="h-4 w-4 mr-2" />
+                  Illumination
+                </CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => console.log("Edit illumination clicked")}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setAlarmDialogOpen(true)
+                      }}
+                    >
+                      <Bell className="mr-2 h-4 w-4" />
+                      Alarm Settings
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-start gap-4">
+                  {/* Left side - Date and Power info */}
+                  <div className="flex-1 space-y-3">
+                    <div className="text-sm">
+                      <div className="font-medium">
+                        {new Date().toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                          weekday: "short",
+                        })}
+                        , {new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
                       </div>
-
-                      <div className="space-y-1 text-sm">
-                        <div>
-                          <span className="font-medium">Power Consumption:</span>{" "}
-                          {product.specs_rental?.average_power_consumption_3months || "344"} kWh/month
-                        </div>
+                      <div className="text-gray-600 text-xs">
+                        Lights ON at {product.specs_rental?.lights_on_time || "6:00pm"} everyday
                       </div>
                     </div>
 
-                    {/* Right side - Illumination details in single row */}
-                    <div className="text-sm min-w-[200px]">
-                      <div className="flex flex-wrap gap-x-4 gap-y-1">
-                        <span>
-                          <span className="font-medium">Upper:</span>{" "}
-                          {product.specs_rental?.illumination_upper_lighting_specs || "0 - metal halides"}
-                        </span>
-                        <span>
-                          <span className="font-medium">Lower:</span>{" "}
-                          {product.specs_rental?.illumination_bottom_lighting_specs || "0 - metal halides"}
-                        </span>
-                        <span>
-                          <span className="font-medium">Side (Left):</span>{" "}
-                          {product.specs_rental?.illumination_left_lighting_specs || "0 - metal halides"}
-                        </span>
-                        <span>
-                          <span className="font-medium">Side (Right):</span>{" "}
-                          {product.specs_rental?.illumination_right_lighting_specs || "0 - metal halides"}
-                        </span>
+                    <div className="space-y-1 text-sm">
+                      <div>
+                        <span className="font-medium">Power Consumption:</span>{" "}
+                        {product.specs_rental?.average_power_consumption_3months || "344"} kWh/month
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Right side - Illumination details in single row */}
+                  <div className="text-sm min-w-[200px]">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                      <span>
+                        <span className="font-medium">Upper:</span>{" "}
+                        {product.specs_rental?.illumination_upper_lighting_specs || "0 - metal halides"}
+                      </span>
+                      <span>
+                        <span className="font-medium">Lower:</span>{" "}
+                        {product.specs_rental?.illumination_bottom_lighting_specs || "0 - metal halides"}
+                      </span>
+                      <span>
+                        <span className="font-medium">Side (Left):</span>{" "}
+                        {product.specs_rental?.illumination_left_lighting_specs || "0 - metal halides"}
+                      </span>
+                      <span>
+                        <span className="font-medium">Side (Right):</span>{" "}
+                        {product.specs_rental?.illumination_right_lighting_specs || "0 - metal halides"}
+                      </span>
                     </div>
                   </div>
 
@@ -426,10 +423,13 @@ export default function SiteDetailsPage({ params }: Props) {
                   >
                     View Index Card
                   </Button>
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
+          {/* Site Data Grid - Updated layout without Illumination */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Display - Show only for Dynamic sites */}
             {isDynamic && (
               <Card>
