@@ -415,7 +415,15 @@ export default function SiteDetailsPage({ params }: Props) {
                       , {new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
                     </div>
                     <div className="text-gray-600 text-xs">
-                      Lights ON at {product.specs_rental?.lights_on_time || "6:00pm"} everyday
+                      Lights ON at{" "}
+                      {product.specs_rental?.lights_on_time
+                        ? new Date(`2000-01-01T${product.specs_rental.lights_on_time}`).toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true,
+                          })
+                        : "6:00 PM"}{" "}
+                      everyday
                     </div>
                   </div>
 
