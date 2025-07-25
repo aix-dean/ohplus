@@ -145,6 +145,10 @@ export default function BusinessProductCreatePage() {
       illumination_bottom_lumens: "",
       illumination_right_wattage: "",
       illumination_right_lumens: "",
+      illumination_upper_lighting_specs: "",
+      illumination_left_lighting_specs: "",
+      illumination_bottom_lighting_specs: "",
+      illumination_right_lighting_specs: "",
     },
     type: "RENTAL",
     status: "PENDING",
@@ -665,6 +669,10 @@ export default function BusinessProductCreatePage() {
           illumination_bottom_lumens: formData.specs_rental.illumination_bottom_lumens || null,
           illumination_right_wattage: formData.specs_rental.illumination_right_wattage || null,
           illumination_right_lumens: formData.specs_rental.illumination_right_lumens || null,
+          illumination_upper_lighting_specs: formData.specs_rental.illumination_upper_lighting_specs || null,
+          illumination_left_lighting_specs: formData.specs_rental.illumination_left_lighting_specs || null,
+          illumination_bottom_lighting_specs: formData.specs_rental.illumination_bottom_lighting_specs || null,
+          illumination_right_lighting_specs: formData.specs_rental.illumination_right_lighting_specs || null,
         },
       }
 
@@ -1270,7 +1278,7 @@ export default function BusinessProductCreatePage() {
                   {Number.parseInt(formData.specs_rental.illumination_upper_count || "0") > 0 && (
                     <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
                       <h6 className="text-sm font-medium text-gray-700">Upper Metal Halides Details</h6>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="upper-wattage" className="text-xs text-gray-600">
                             Wattage per Unit (W):
@@ -1317,6 +1325,28 @@ export default function BusinessProductCreatePage() {
                             disabled={loading}
                           />
                         </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="upper-lighting-specs" className="text-xs text-gray-600">
+                            Lighting Specs:
+                          </Label>
+                          <Input
+                            id="upper-lighting-specs"
+                            type="text"
+                            value={formData.specs_rental.illumination_upper_lighting_specs || ""}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                specs_rental: {
+                                  ...prev.specs_rental,
+                                  illumination_upper_lighting_specs: e.target.value,
+                                },
+                              }))
+                            }
+                            placeholder="e.g., Metal Halide 400W, IP65"
+                            className="h-8 text-sm"
+                            disabled={loading}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1325,7 +1355,7 @@ export default function BusinessProductCreatePage() {
                   {Number.parseInt(formData.specs_rental.illumination_left_count || "0") > 0 && (
                     <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
                       <h6 className="text-sm font-medium text-gray-700">Left Metal Halides Details</h6>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="left-wattage" className="text-xs text-gray-600">
                             Wattage per Unit (W):
@@ -1372,6 +1402,28 @@ export default function BusinessProductCreatePage() {
                             disabled={loading}
                           />
                         </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="left-lighting-specs" className="text-xs text-gray-600">
+                            Lighting Specs:
+                          </Label>
+                          <Input
+                            id="left-lighting-specs"
+                            type="text"
+                            value={formData.specs_rental.illumination_left_lighting_specs || ""}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                specs_rental: {
+                                  ...prev.specs_rental,
+                                  illumination_left_lighting_specs: e.target.value,
+                                },
+                              }))
+                            }
+                            placeholder="e.g., Metal Halide 400W, IP65"
+                            className="h-8 text-sm"
+                            disabled={loading}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1380,7 +1432,7 @@ export default function BusinessProductCreatePage() {
                   {Number.parseInt(formData.specs_rental.illumination_bottom_count || "0") > 0 && (
                     <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
                       <h6 className="text-sm font-medium text-gray-700">Bottom Metal Halides Details</h6>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="bottom-wattage" className="text-xs text-gray-600">
                             Wattage per Unit (W):
@@ -1427,6 +1479,28 @@ export default function BusinessProductCreatePage() {
                             disabled={loading}
                           />
                         </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="bottom-lighting-specs" className="text-xs text-gray-600">
+                            Lighting Specs:
+                          </Label>
+                          <Input
+                            id="bottom-lighting-specs"
+                            type="text"
+                            value={formData.specs_rental.illumination_bottom_lighting_specs || ""}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                specs_rental: {
+                                  ...prev.specs_rental,
+                                  illumination_bottom_lighting_specs: e.target.value,
+                                },
+                              }))
+                            }
+                            placeholder="e.g., Metal Halide 400W, IP65"
+                            className="h-8 text-sm"
+                            disabled={loading}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1435,7 +1509,7 @@ export default function BusinessProductCreatePage() {
                   {Number.parseInt(formData.specs_rental.illumination_right_count || "0") > 0 && (
                     <div className="space-y-3 p-4 bg-gray-50 rounded-lg">
                       <h6 className="text-sm font-medium text-gray-700">Right Metal Halides Details</h6>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="right-wattage" className="text-xs text-gray-600">
                             Wattage per Unit (W):
@@ -1478,6 +1552,28 @@ export default function BusinessProductCreatePage() {
                               }))
                             }
                             placeholder="e.g., 36000"
+                            className="h-8 text-sm"
+                            disabled={loading}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="right-lighting-specs" className="text-xs text-gray-600">
+                            Lighting Specs:
+                          </Label>
+                          <Input
+                            id="right-lighting-specs"
+                            type="text"
+                            value={formData.specs_rental.illumination_right_lighting_specs || ""}
+                            onChange={(e) =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                specs_rental: {
+                                  ...prev.specs_rental,
+                                  illumination_right_lighting_specs: e.target.value,
+                                },
+                              }))
+                            }
+                            placeholder="e.g., Metal Halide 400W, IP65"
                             className="h-8 text-sm"
                             disabled={loading}
                           />
