@@ -1129,15 +1129,18 @@ export default function BusinessProductCreatePage() {
                         id="upper-lighting-specs"
                         type="text"
                         value={formData.specs_rental.illumination_upper_lighting_specs || ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const specs = e.target.value
+                          const count = Number.parseInt(formData.specs_rental.illumination_upper_count || "0")
                           setFormData((prev) => ({
                             ...prev,
                             specs_rental: {
                               ...prev.specs_rental,
-                              illumination_upper_lighting_specs: e.target.value,
+                              illumination_upper_lighting_specs:
+                                count > 0 ? `${count} ${specs.replace(/^\d+\s*/, "")}` : specs,
                             },
                           }))
-                        }
+                        }}
                         placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
                         className="h-8 text-sm"
                         disabled={
@@ -1162,6 +1165,11 @@ export default function BusinessProductCreatePage() {
                             specs_rental: {
                               ...prev.specs_rental,
                               illumination_upper_count: count.toString(),
+                              // Also update the lighting specs to include the count
+                              illumination_upper_lighting_specs:
+                                count > 0
+                                  ? `${count} ${prev.specs_rental.illumination_upper_lighting_specs?.replace(/^\d+\s*/, "") || "metal-halides"}`
+                                  : "",
                             },
                           }))
                         }}
@@ -1186,15 +1194,18 @@ export default function BusinessProductCreatePage() {
                         id="left-lighting-specs"
                         type="text"
                         value={formData.specs_rental.illumination_left_lighting_specs || ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const specs = e.target.value
+                          const count = Number.parseInt(formData.specs_rental.illumination_left_count || "0")
                           setFormData((prev) => ({
                             ...prev,
                             specs_rental: {
                               ...prev.specs_rental,
-                              illumination_left_lighting_specs: e.target.value,
+                              illumination_left_lighting_specs:
+                                count > 0 ? `${count} ${specs.replace(/^\d+\s*/, "")}` : specs,
                             },
                           }))
-                        }
+                        }}
                         placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
                         className="h-8 text-sm"
                         disabled={
@@ -1219,6 +1230,10 @@ export default function BusinessProductCreatePage() {
                             specs_rental: {
                               ...prev.specs_rental,
                               illumination_left_count: count.toString(),
+                              illumination_left_lighting_specs:
+                                count > 0
+                                  ? `${count} ${prev.specs_rental.illumination_left_lighting_specs?.replace(/^\d+\s*/, "") || "metal-halides"}`
+                                  : "",
                             },
                           }))
                         }}
@@ -1243,15 +1258,18 @@ export default function BusinessProductCreatePage() {
                         id="bottom-lighting-specs"
                         type="text"
                         value={formData.specs_rental.illumination_bottom_lighting_specs || ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const specs = e.target.value
+                          const count = Number.parseInt(formData.specs_rental.illumination_bottom_count || "0")
                           setFormData((prev) => ({
                             ...prev,
                             specs_rental: {
                               ...prev.specs_rental,
-                              illumination_bottom_lighting_specs: e.target.value,
+                              illumination_bottom_lighting_specs:
+                                count > 0 ? `${count} ${specs.replace(/^\d+\s*/, "")}` : specs,
                             },
                           }))
-                        }
+                        }}
                         placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
                         className="h-8 text-sm"
                         disabled={
@@ -1276,6 +1294,10 @@ export default function BusinessProductCreatePage() {
                             specs_rental: {
                               ...prev.specs_rental,
                               illumination_bottom_count: count.toString(),
+                              illumination_bottom_lighting_specs:
+                                count > 0
+                                  ? `${count} ${prev.specs_rental.illumination_bottom_lighting_specs?.replace(/^\d+\s*/, "") || "metal-halides"}`
+                                  : "",
                             },
                           }))
                         }}
@@ -1300,15 +1322,18 @@ export default function BusinessProductCreatePage() {
                         id="right-lighting-specs"
                         type="text"
                         value={formData.specs_rental.illumination_right_lighting_specs || ""}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const specs = e.target.value
+                          const count = Number.parseInt(formData.specs_rental.illumination_right_count || "0")
                           setFormData((prev) => ({
                             ...prev,
                             specs_rental: {
                               ...prev.specs_rental,
-                              illumination_right_lighting_specs: e.target.value,
+                              illumination_right_lighting_specs:
+                                count > 0 ? `${count} ${specs.replace(/^\d+\s*/, "")}` : specs,
                             },
                           }))
-                        }
+                        }}
                         placeholder="e.g., Metal Halide 400W, IP65, 36000 lumens"
                         className="h-8 text-sm"
                         disabled={
@@ -1333,6 +1358,10 @@ export default function BusinessProductCreatePage() {
                             specs_rental: {
                               ...prev.specs_rental,
                               illumination_right_count: count.toString(),
+                              illumination_right_lighting_specs:
+                                count > 0
+                                  ? `${count} ${prev.specs_rental.illumination_right_lighting_specs?.replace(/^\d+\s*/, "") || "metal-halides"}`
+                                  : "",
                             },
                           }))
                         }}
