@@ -24,11 +24,30 @@ export function IlluminationIndexCardDialog({
     onOpenChange(false)
   }
 
-  // Get illumination data from product
-  const upperCount = Number.parseInt(product?.specs_rental?.illumination_upper_count || "0")
-  const leftCount = Number.parseInt(product?.specs_rental?.illumination_left_count || "0")
-  const bottomCount = Number.parseInt(product?.specs_rental?.illumination_bottom_count || "0")
-  const rightCount = Number.parseInt(product?.specs_rental?.illumination_right_count || "0")
+  // Helper function to extract count from lighting specs string
+  const extractCountFromSpecs = (specs: string): number => {
+    if (!specs) return 0
+    // Extract number from strings like "4 metal-halides" or "255 Lux metal halides"
+    const match = specs.match(/(\d+)/)
+    return match ? Number.parseInt(match[1]) : 0
+  }
+
+  // Get illumination data from product - try both count fields and lighting specs
+  const upperCount = product?.specs_rental?.illumination_upper_count
+    ? Number.parseInt(product.specs_rental.illumination_upper_count)
+    : extractCountFromSpecs(product?.specs_rental?.illumination_upper_lighting_specs || "")
+
+  const leftCount = product?.specs_rental?.illumination_left_count
+    ? Number.parseInt(product.specs_rental.illumination_left_count)
+    : extractCountFromSpecs(product?.specs_rental?.illumination_left_lighting_specs || "")
+
+  const bottomCount = product?.specs_rental?.illumination_bottom_count
+    ? Number.parseInt(product.specs_rental.illumination_bottom_count)
+    : extractCountFromSpecs(product?.specs_rental?.illumination_bottom_lighting_specs || "")
+
+  const rightCount = product?.specs_rental?.illumination_right_count
+    ? Number.parseInt(product.specs_rental.illumination_right_count)
+    : extractCountFromSpecs(product?.specs_rental?.illumination_right_lighting_specs || "")
 
   // Get display layout from product
   const displayRows = Number.parseInt(product?.specs_rental?.display_rows || "2")
