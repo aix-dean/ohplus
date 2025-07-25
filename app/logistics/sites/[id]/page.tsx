@@ -395,23 +395,25 @@ export default function SiteDetailsPage({ params }: Props) {
                       </div>
                     </div>
 
-                    {/* Right side - Illumination details */}
-                    <div className="space-y-1 text-sm min-w-[200px]">
-                      <div>
-                        <span className="font-medium">Upper:</span>{" "}
-                        {product.specs_rental?.illumination_upper_lighting_specs || "0 - metal halides"}
-                      </div>
-                      <div>
-                        <span className="font-medium">Lower:</span>{" "}
-                        {product.specs_rental?.illumination_bottom_lighting_specs || "0 - metal halides"}
-                      </div>
-                      <div>
-                        <span className="font-medium">Side (Left):</span>{" "}
-                        {product.specs_rental?.illumination_left_lighting_specs || "0 - metal halides"}
-                      </div>
-                      <div>
-                        <span className="font-medium">Side (Right):</span>{" "}
-                        {product.specs_rental?.illumination_right_lighting_specs || "0 - metal halides"}
+                    {/* Right side - Illumination details in single row */}
+                    <div className="text-sm min-w-[200px]">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1">
+                        <span>
+                          <span className="font-medium">Upper:</span>{" "}
+                          {product.specs_rental?.illumination_upper_lighting_specs || "0 - metal halides"}
+                        </span>
+                        <span>
+                          <span className="font-medium">Lower:</span>{" "}
+                          {product.specs_rental?.illumination_bottom_lighting_specs || "0 - metal halides"}
+                        </span>
+                        <span>
+                          <span className="font-medium">Side (Left):</span>{" "}
+                          {product.specs_rental?.illumination_left_lighting_specs || "0 - metal halides"}
+                        </span>
+                        <span>
+                          <span className="font-medium">Side (Right):</span>{" "}
+                          {product.specs_rental?.illumination_right_lighting_specs || "0 - metal halides"}
+                        </span>
                       </div>
                     </div>
                   </div>
