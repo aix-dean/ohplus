@@ -78,16 +78,20 @@ export function IlluminationIndexCardDialog({
           {/* Illumination Information */}
           <div className="mb-4 grid grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="font-medium">Upper:</span> {upperCount} metal-halides
+              <span className="font-medium">Upper:</span>{" "}
+              {product?.specs_rental?.illumination_upper_lighting_specs || "0 metal-halides"}
             </div>
             <div>
-              <span className="font-medium">Left:</span> {leftCount} metal-halides
+              <span className="font-medium">Left:</span>{" "}
+              {product?.specs_rental?.illumination_left_lighting_specs || "0 metal-halides"}
             </div>
             <div>
-              <span className="font-medium">Bottom:</span> {bottomCount} metal-halides
+              <span className="font-medium">Bottom:</span>{" "}
+              {product?.specs_rental?.illumination_bottom_lighting_specs || "0 metal-halides"}
             </div>
             <div>
-              <span className="font-medium">Right:</span> {rightCount} metal-halides
+              <span className="font-medium">Right:</span>{" "}
+              {product?.specs_rental?.illumination_right_lighting_specs || "0 metal-halides"}
             </div>
           </div>
 
