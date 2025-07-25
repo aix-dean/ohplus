@@ -33,6 +33,41 @@ import { AlarmSettingDialog } from "@/components/alarm-setting-dialog"
 import { IlluminationIndexCardDialog } from "@/components/illumination-index-card-dialog"
 import { DisplayIndexCardDialog } from "@/components/display-index-card-dialog"
 
+// Helper function to convert Firebase timestamp to readable date
+const formatFirebaseDate = (timestamp: any): string => {
+  if (!timestamp) return ""
+
+  try {
+    // Check if it's a Firebase Timestamp object
+    if (timestamp && typeof timestamp === "object" && timestamp.seconds) {
+      const date = new Date(timestamp.seconds * 1000)
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    }
+
+    // If it's already a string or Date, handle accordingly
+    if (typeof timestamp === "string") {
+      return timestamp
+    }
+
+    if (timestamp instanceof Date) {
+      return timestamp.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    }
+
+    return ""
+  } catch (error) {
+    console.error("Error formatting date:", error)
+    return ""
+  }
+}
+
 type Props = {
   params: { id: string }
 }
@@ -558,7 +593,7 @@ export default function SiteDetailsPage({ params }: Props) {
                   </div>
                   <div>
                     <span className="font-medium">Last Maintenance:</span>{" "}
-                    {product.specs_rental?.structure_last_maintenance || ""}
+                    {formatFirebaseDate(product.specs_rental?.structure_last_maintenance)}
                   </div>
                 </div>
                 <div className="flex gap-2 mt-3">
@@ -590,7 +625,7 @@ export default function SiteDetailsPage({ params }: Props) {
                     {product.content_schedule.map((content, index) => (
                       <div key={index}>
                         <span className="font-medium">
-                          {content.start_date} - {content.end_date}:
+                          {formatFirebaseDate(content.start_date)} - {formatFirebaseDate(content.end_date)}:
                         </span>{" "}
                         {content.name}
                       </div>
