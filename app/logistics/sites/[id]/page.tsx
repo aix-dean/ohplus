@@ -416,31 +416,30 @@ export default function SiteDetailsPage({ params }: Props) {
 
                   {/* Power Consumption */}
                   <div className="border-t pt-3">
-                    <div className="text-sm space-y-1">
-                      <div>
-                        <span className="font-medium">Power Consumption:</span>{" "}
-                        <span className="text-green-600">
-                          {product.specs_rental?.average_power_consumption_3months || "344"} kWh/month
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm space-x-4">
+                        <span>
+                          <span className="font-medium">Power Consumption:</span>{" "}
+                          <span className="text-green-600">
+                            {product.specs_rental?.average_power_consumption_3months || "344"} kWh/month
+                          </span>
+                        </span>
+                        <span>
+                          <span className="font-medium">Average (3 months):</span>{" "}
+                          <span className="text-blue-600">
+                            {product.specs_rental?.average_power_consumption_3months || "344"} kWh/month
+                          </span>
                         </span>
                       </div>
-                      <div>
-                        <span className="font-medium">Average (3 months):</span>{" "}
-                        <span className="text-blue-600">
-                          {product.specs_rental?.average_power_consumption_3months || "344"} kWh/month
-                        </span>
-                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-transparent"
+                        onClick={() => setIlluminationIndexCardDialogOpen(true)}
+                      >
+                        View Index Card
+                      </Button>
                     </div>
-                  </div>
-
-                  <div className="flex justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="bg-transparent"
-                      onClick={() => setIlluminationIndexCardDialogOpen(true)}
-                    >
-                      View Index Card
-                    </Button>
                   </div>
                 </div>
               </CardContent>
