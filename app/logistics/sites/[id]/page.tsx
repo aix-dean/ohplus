@@ -367,50 +367,59 @@ export default function SiteDetailsPage({ params }: Props) {
                 </DropdownMenu>
               </CardHeader>
               <CardContent>
-                <div className="flex items-start gap-4">
-                  {/* Left side - Date and Power info */}
-                  <div className="flex-1 space-y-3">
-                    <div className="text-sm">
-                      <div className="font-medium">
-                        {new Date().toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                          weekday: "short",
-                        })}
-                        , {new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
-                      </div>
-                      <div className="text-gray-600 text-xs">
-                        Lights ON at {product.specs_rental?.lights_on_time || "6:00pm"} everyday
-                      </div>
+                <div className="space-y-4">
+                  {/* Date and Time Section */}
+                  <div className="text-sm">
+                    <div className="font-medium">
+                      {new Date().toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        weekday: "short",
+                      })}
+                      , {new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
                     </div>
+                    <div className="text-gray-600 text-xs">
+                      Lights ON at {product.specs_rental?.lights_on_time || "6:00pm"} everyday
+                    </div>
+                  </div>
 
-                    <div className="space-y-1 text-sm">
+                  {/* Illumination Specifications */}
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                       <div>
-                        <span className="font-medium">Power Consumption:</span>{" "}
-                        {product.specs_rental?.average_power_consumption_3months || "344"} kWh/month
+                        <span className="font-medium text-gray-700">Upper:</span>
+                        <div className="text-blue-600">
+                          {product.specs_rental?.illumination_upper_lighting_specs || "0 - metal halides"}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Lower:</span>
+                        <div className="text-blue-600">
+                          {product.specs_rental?.illumination_bottom_lighting_specs || "0 - metal halides"}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Side (Left):</span>
+                        <div className="text-blue-600">
+                          {product.specs_rental?.illumination_left_lighting_specs || "0 - metal halides"}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Side (Right):</span>
+                        <div className="text-blue-600">
+                          {product.specs_rental?.illumination_right_lighting_specs || "0 - metal halides"}
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Right side - Illumination details in single row */}
-                  <div className="text-sm min-w-[200px]">
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      <span>
-                        <span className="font-medium">Upper:</span>{" "}
-                        {product.specs_rental?.illumination_upper_lighting_specs || "0 - metal halides"}
-                      </span>
-                      <span>
-                        <span className="font-medium">Lower:</span>{" "}
-                        {product.specs_rental?.illumination_bottom_lighting_specs || "0 - metal halides"}
-                      </span>
-                      <span>
-                        <span className="font-medium">Side (Left):</span>{" "}
-                        {product.specs_rental?.illumination_left_lighting_specs || "0 - metal halides"}
-                      </span>
-                      <span>
-                        <span className="font-medium">Side (Right):</span>{" "}
-                        {product.specs_rental?.illumination_right_lighting_specs || "0 - metal halides"}
+                  {/* Power Consumption */}
+                  <div className="border-t pt-3">
+                    <div className="text-sm">
+                      <span className="font-medium">Power Consumption:</span>{" "}
+                      <span className="text-green-600">
+                        {product.specs_rental?.average_power_consumption_3months || "344"} kWh/month
                       </span>
                     </div>
                   </div>
@@ -418,7 +427,7 @@ export default function SiteDetailsPage({ params }: Props) {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="mt-4 w-full bg-transparent"
+                    className="w-full bg-transparent"
                     onClick={() => setIlluminationIndexCardDialogOpen(true)}
                   >
                     View Index Card
@@ -553,8 +562,11 @@ export default function SiteDetailsPage({ params }: Props) {
                 </div>
               </CardContent>
             </Card>
+          </div>
 
-            {/* Content - Always show */}
+          {/* Content and Crew - Single row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Content */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center">
@@ -583,31 +595,31 @@ export default function SiteDetailsPage({ params }: Props) {
                 </Button>
               </CardContent>
             </Card>
-          </div>
 
-          {/* Crew - Full width */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center">
-                <Users className="h-4 w-4 mr-2" />
-                Crew
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <div>
-                  <span className="font-medium">Security:</span> {product.crew?.security || ""}
+            {/* Crew */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center">
+                  <Users className="h-4 w-4 mr-2" />
+                  Crew
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <span className="font-medium">Security:</span> {product.crew?.security || ""}
+                  </div>
+                  <div>
+                    <span className="font-medium">Caretaker:</span> {product.crew?.caretaker || ""}
+                  </div>
                 </div>
-                <div>
-                  <span className="font-medium">Caretaker:</span> {product.crew?.caretaker || ""}
-                </div>
-              </div>
-              <Button variant="outline" size="sm" className="mt-3 bg-transparent">
-                <History className="h-4 w-4 mr-2" />
-                View History
-              </Button>
-            </CardContent>
-          </Card>
+                <Button variant="outline" size="sm" className="mt-3 bg-transparent">
+                  <History className="h-4 w-4 mr-2" />
+                  View History
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Issues - Full width */}
           <Card>
