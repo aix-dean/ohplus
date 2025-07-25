@@ -1,16 +1,8 @@
 "use client"
 
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-
-import { DialogFooter } from "@/components/ui/dialog"
-
-import { DialogTitle } from "@/components/ui/dialog"
-
-import { DialogHeader } from "@/components/ui/dialog"
-
-import { DialogContent } from "@/components/ui/dialog"
-
-import { Dialog } from "@/components/ui/dialog"
+import { X } from "lucide-react"
 
 interface IlluminationIndexCardDialogProps {
   open: boolean
