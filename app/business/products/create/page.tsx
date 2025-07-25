@@ -141,6 +141,8 @@ export default function BusinessProductCreatePage() {
       illumination_left_lighting_specs: "",
       illumination_bottom_lighting_specs: "",
       illumination_right_lighting_specs: "",
+      security: "",
+      caretaker: "",
     },
     type: "RENTAL",
     status: "PENDING",
@@ -663,6 +665,8 @@ export default function BusinessProductCreatePage() {
           illumination_left_lighting_specs: formData.specs_rental.illumination_left_lighting_specs || null,
           illumination_bottom_lighting_specs: formData.specs_rental.illumination_bottom_lighting_specs || null,
           illumination_right_lighting_specs: formData.specs_rental.illumination_right_lighting_specs || null,
+          security: formData.specs_rental.security || null,
+          caretaker: formData.specs_rental.caretaker || null,
         },
       }
 
@@ -888,6 +892,39 @@ export default function BusinessProductCreatePage() {
                     type="date"
                     value={formData.specs_rental.structure_last_maintenance || ""}
                     onChange={handleInputChange}
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Crew Information */}
+            <div className="space-y-6">
+              <h4 className="text-lg font-semibold text-gray-800">Crew Information</h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="specs_rental.security">Security</Label>
+                  <Input
+                    id="specs_rental.security"
+                    name="specs_rental.security"
+                    type="text"
+                    value={formData.specs_rental.security || ""}
+                    onChange={handleInputChange}
+                    placeholder="Enter security personnel name"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="specs_rental.caretaker">Caretaker</Label>
+                  <Input
+                    id="specs_rental.caretaker"
+                    name="specs_rental.caretaker"
+                    type="text"
+                    value={formData.specs_rental.caretaker || ""}
+                    onChange={handleInputChange}
+                    placeholder="Enter caretaker name"
                     disabled={loading}
                   />
                 </div>
