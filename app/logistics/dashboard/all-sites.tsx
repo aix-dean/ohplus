@@ -18,11 +18,15 @@ const ITEMS_PER_PAGE = 8
 
 interface AllSitesTabProps {
   searchQuery?: string
-  filterBy?: string
+  contentTypeFilter?: string
   viewMode?: "grid" | "list"
 }
 
-export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMode = "grid" }: AllSitesTabProps) {
+export default function AllSitesTab({
+  searchQuery = "",
+  contentTypeFilter = "All",
+  viewMode = "grid",
+}: AllSitesTabProps) {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -124,7 +128,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
     setPageCache(new Map())
     fetchTotalCount()
     fetchProducts(1, true)
-  }, [searchQuery, filterBy])
+  }, [searchQuery, contentTypeFilter])
 
   // Load initial data and count
   useEffect(() => {
@@ -203,15 +207,14 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
     return pageNumbers
   }
 
-  // Filter products based on filterBy prop
+  // Filter products based on contentTypeFilter prop
   const filteredProducts = products.filter((product) => {
-    if (filterBy === "All") return true
-    if (filterBy === "Active") return product.status === "ACTIVE" || product.status === "OCCUPIED"
-    if (filterBy === "Inactive") return product.status !== "ACTIVE" && product.status !== "OCCUPIED"
-    if (filterBy === "Open") return product.status === "ACTIVE" || product.status === "AVAILABLE"
-    if (filterBy === "Occupied") return product.status === "OCCUPIED"
-    if (filterBy === "Pending") return product.status === "PENDING" || product.status === "INSTALLATION"
-    if (filterBy === "Maintenance") return product.status === "MAINTENANCE" || product.status === "REPAIR"
+    // Content type filter
+    if (contentTypeFilter !== "All") {
+      if (contentTypeFilter === "Static") return product.content_type === "Static" || product.content_type === "static"
+      else if (contentTypeFilter === "Dynamic")
+        return product.content_type === "Dynamic" || product.content_type === "dynamic"
+    }
     return true
   })
 
@@ -316,11 +319,11 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
           </div>
           <h3 className="text-lg font-medium mb-2">No sites found</h3>
           <p className="text-gray-500 mb-4">
-            {searchQuery || filterBy !== "All"
+            {searchQuery || contentTypeFilter !== "All"
               ? "No sites match your search criteria. Try adjusting your search terms or filters."
               : "There are no sites in the system yet."}
           </p>
-          {(searchQuery || filterBy !== "All") && (
+          {(searchQuery || contentTypeFilter !== "All") && (
             <Button variant="outline" onClick={() => window.location.reload()}>
               Clear Filters
             </Button>
