@@ -741,6 +741,9 @@ function SalesDashboardContent() {
           client_name: selectedClientForProposal.contactPerson,
           client_email: selectedClientForProposal.email,
           client_id: selectedClientForProposal.id,
+          client_designation: selectedClientForProposal.designation || "", // Add client designation
+          client_address: selectedClientForProposal.address || "", // Add client address
+          client_phone: selectedClientForProposal.phone || "", // Add client phone
         }
 
         console.log("Final quotationData object being sent:", quotationData)
