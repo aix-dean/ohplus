@@ -23,7 +23,7 @@ export default function LogisticsDashboardPage() {
 
   return (
     <RouteProtection requiredRoles="logistics">
-      <div className="flex-1 overflow-auto relative bg-gray-50">
+      <div className="flex-1 overflow-auto relative">
         <main className="p-6">
           <div className="flex flex-col gap-6">
             {/* Header Section */}
