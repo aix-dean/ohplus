@@ -210,6 +210,8 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
     if (filterBy === "Inactive") return product.status !== "ACTIVE" && product.status !== "OCCUPIED"
     if (filterBy === "Open") return product.status === "ACTIVE" || product.status === "AVAILABLE"
     if (filterBy === "Occupied") return product.status === "OCCUPIED"
+    if (filterBy === "Static") return product.content_type === "static"
+    if (filterBy === "Dynamic") return product.content_type === "dynamic"
     return true
   })
 

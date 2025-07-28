@@ -72,6 +72,8 @@ export default function LogisticsDashboardPage() {
                     <SelectItem value="Inactive">Inactive</SelectItem>
                     <SelectItem value="Open">Open</SelectItem>
                     <SelectItem value="Occupied">Occupied</SelectItem>
+                    <SelectItem value="Static">Static</SelectItem>
+                    <SelectItem value="Dynamic">Dynamic</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
