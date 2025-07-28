@@ -967,25 +967,28 @@ export default function CreateJobOrderPage() {
 
                         <div className="space-y-2">
                           <Label className="text-sm text-gray-800">Deadline</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              type="date"
-                              value={form.deadline ? format(form.deadline, "yyyy-MM-dd") : ""}
-                              onChange={(e) => {
-                                const date = e.target.value ? new Date(e.target.value) : undefined
-                                handleFormUpdate(index, "deadline", date)
-                              }}
-                              className="flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9"
-                              required
-                            />
-                            <Button
-                              variant="outline"
-                              className="h-9 px-3 text-sm text-gray-800 border-gray-300 hover:bg-gray-50 bg-transparent"
-                              onClick={() => setShowComingSoonDialog(true)}
-                            >
-                              Timeline
-                            </Button>
-                          </div>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
+                                  !form.deadline && "text-gray-500",
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                                {form.deadline ? format(form.deadline, "PPP") : <span>Pick a date</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                mode="single"
+                                selected={form.deadline}
+                                onSelect={(date) => handleFormUpdate(index, "deadline", date)}
+                                fromDate={new Date()} // Disable past dates
+                              />
+                            </PopoverContent>
+                          </Popover>
                         </div>
 
                         <div className="space-y-2">
@@ -1140,25 +1143,32 @@ export default function CreateJobOrderPage() {
 
                   <div className="space-y-2">
                     <Label className="text-sm text-gray-800">Deadline</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        type="date"
-                        value={jobOrderForms[0]?.deadline ? format(jobOrderForms[0].deadline, "yyyy-MM-dd") : ""}
-                        onChange={(e) => {
-                          const date = e.target.value ? new Date(e.target.value) : undefined
-                          handleFormUpdate(0, "deadline", date)
-                        }}
-                        className="flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9"
-                        required
-                      />
-                      <Button
-                        variant="outline"
-                        className="h-9 px-3 text-sm text-gray-800 border-gray-300 hover:bg-gray-50 bg-transparent"
-                        onClick={() => setShowComingSoonDialog(true)}
-                      >
-                        Timeline
-                      </Button>
-                    </div>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
+                            !jobOrderForms[0]?.deadline && "text-gray-500",
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                          {jobOrderForms[0]?.deadline ? (
+                            format(jobOrderForms[0].deadline, "PPP")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={jobOrderForms[0]?.deadline}
+                          onSelect={(date) => handleFormUpdate(0, "deadline", date)}
+                          fromDate={new Date()} // Disable past dates
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   <div className="space-y-2">
