@@ -725,6 +725,24 @@ export default function QuotationDetailsPage() {
                   </Label>
                   <p className="text-base text-gray-900">{safeString(currentQuotation.client_email)}</p>
                 </div>
+                {currentQuotation.client_designation && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500 mb-2">Designation</Label>
+                    <p className="text-base text-gray-900">{safeString(currentQuotation.client_designation)}</p>
+                  </div>
+                )}
+                {currentQuotation.client_phone && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500 mb-2">Phone</Label>
+                    <p className="text-base text-gray-900">{safeString(currentQuotation.client_phone)}</p>
+                  </div>
+                )}
+                {currentQuotation.client_address && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-500 mb-2">Address</Label>
+                    <p className="text-base text-gray-900">{safeString(currentQuotation.client_address)}</p>
+                  </div>
+                )}
                 {currentQuotation.quotation_request_id && (
                   <div>
                     <Label className="text-sm font-medium text-gray-500 mb-2">Related Request ID</Label>
@@ -784,7 +802,8 @@ export default function QuotationDetailsPage() {
                             src={
                               item.media_url ||
                               item.media?.[0]?.url ||
-                              "/placeholder.svg?height=64&width=64&query=product"
+                              "/placeholder.svg?height=64&width=64&query=product" ||
+                              "/placeholder.svg"
                             }
                             alt={item.name}
                             className="w-16 h-16 object-cover rounded-sm"

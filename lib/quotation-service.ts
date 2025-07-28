@@ -355,7 +355,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setFont("helvetica", "normal")
   pdf.setTextColor(0, 0, 0)
   pdf.text(`Quotation No: ${quotation.quotation_number}`, margin, yPosition)
-  yPosition +=5
+  yPosition += 5
 
   pdf.setLineWidth(0.3)
   pdf.setDrawColor(37, 99, 235) // Blue line
@@ -408,6 +408,10 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   clientInfoHeight += 5 // Section title spacing
   clientInfoHeight += 8 // Line spacing
   clientInfoHeight += 5 // Client Name / Email
+  if (quotation.client_designation) clientInfoHeight += 5
+  if (quotation.client_phone) clientInfoHeight += 5
+  if (quotation.client_address)
+    clientInfoHeight += calculateTextHeight(safeString(quotation.client_address), contentWidth / 2, 9) + 5
   if (quotation.quotation_request_id) clientInfoHeight += 5
   if (quotation.proposalId) clientInfoHeight += 5
   if (quotation.campaignId) clientInfoHeight += 5
@@ -429,6 +433,21 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.text(`Client Name: ${safeString(quotation.client_name)}`, margin, yPosition)
   pdf.text(`Client Email: ${safeString(quotation.client_email)}`, margin + contentWidth / 2, yPosition)
   yPosition += 5
+
+  if (quotation.client_designation) {
+    pdf.text(`Designation: ${safeString(quotation.client_designation)}`, margin, yPosition)
+    yPosition += 5
+  }
+  if (quotation.client_phone) {
+    pdf.text(`Phone: ${safeString(quotation.client_phone)}`, margin, yPosition)
+    yPosition += 5
+  }
+  if (quotation.client_address) {
+    pdf.text(`Address:`, margin, yPosition)
+    yPosition = addText(safeString(quotation.client_address), margin + 15, yPosition, contentWidth - 15, 9)
+    yPosition += 5
+  }
+
   if (quotation.quotation_request_id) {
     pdf.text(`Related Request ID: ${safeString(quotation.quotation_request_id)}`, margin, yPosition)
     yPosition += 5
