@@ -122,6 +122,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
   useEffect(() => {
     setCurrentPage(1)
     setPageCache(new Map())
+    fetchTotalCount()
     fetchProducts(1, true)
   }, [searchQuery, filterBy])
 
@@ -202,7 +203,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
     return pageNumbers
   }
 
-  // Filter products based on filterBy and contentTypeFilter props
+  // Filter products based on filterBy prop
   const filteredProducts = products.filter((product) => {
     if (filterBy === "All") return true
     if (filterBy === "Active") return product.status === "ACTIVE" || product.status === "OCCUPIED"
