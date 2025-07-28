@@ -67,9 +67,9 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[420px] max-h-[80vh] overflow-y-auto p-0">
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto p-0">
         {/* Header */}
-        <DialogHeader className="p-4 pb-3">
+        <DialogHeader className="p-6 pb-4">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-xl font-semibold">Send Report</DialogTitle>
             <Button variant="ghost" size="icon" onClick={onClose} className="h-6 w-6 rounded-full">
@@ -78,9 +78,9 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
           </div>
         </DialogHeader>
 
-        <div className="px-6 pb-4">
+        <div className="px-6 pb-6">
           {/* Report Preview */}
-          <div className="flex items-center gap-3 mb-3">
+          <div className="flex items-center gap-4 mb-4">
             <div className="relative w-16 h-20 flex-shrink-0 bg-blue-50 rounded border">
               {/* Report thumbnail placeholder */}
               <div className="absolute inset-0 flex items-center justify-center">
@@ -101,9 +101,9 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
           </div>
 
           {/* Link Section */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="flex items-center space-x-2">
-              <Input value={reportViewUrl} readOnly className="flex-1 text-sm" placeholder="Report link" />
+              <Input value={reportViewUrl} readOnly className="flex-1 text-sm pr-2" placeholder="Report link" />
               <Button
                 variant="outline"
                 size="sm"
@@ -115,10 +115,10 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
               </Button>
             </div>
 
-            <Separator className="my-3" />
+            <Separator className="my-4" />
 
             {/* Sharing Options */}
-            <div className="grid grid-cols-4 gap-4 text-center">
+            <div className="grid grid-cols-4 gap-6 text-center">
               {/* Email */}
               <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={handleEmailOption}>
                 <Button
