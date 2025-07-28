@@ -4,7 +4,17 @@ import type React from "react"
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
-import { ArrowLeft, CalendarIcon, Plus, Loader2, AlertCircle, FileText, ImageIcon, XCircle, Package } from 'lucide-react'
+import {
+  ArrowLeft,
+  CalendarIcon,
+  Plus,
+  Loader2,
+  AlertCircle,
+  FileText,
+  ImageIcon,
+  XCircle,
+  Package,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -64,33 +74,33 @@ export default function CreateJobOrderPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Shared compliance states
-  const [signedQuotationFile, setSignedQuotationFile = useState<File | null>(null)
-  const [signedQuotationUrl, setSignedQuotationUrl = useState<string | null>(null)
-  const [uploadingSignedQuotation, setUploadingSignedQuotation = useState(false)
-  const [signedQuotationError, setSignedQuotationError = useState<string | null>(null)
+  const [signedQuotationFile, setSignedQuotationFile] = useState<File | null>(null)
+  const [signedQuotationUrl, setSignedQuotationUrl] = useState<string | null>(null)
+  const [uploadingSignedQuotation, setUploadingSignedQuotation] = useState(false)
+  const [signedQuotationError, setSignedQuotationError] = useState<string | null>(null)
 
-  const [poMoFile, setPoMoFile = useState<File | null>(null)
-  const [poMoUrl, setPoMoUrl = useState<string | null>(null)
-  const [uploadingPoMo, setUploadingPoMo = useState(false)
-  const [poMoError, setPoMoError = useState<string | null>(null)
+  const [poMoFile, setPoMoFile] = useState<File | null>(null)
+  const [poMoUrl, setPoMoUrl] = useState<string | null>(null)
+  const [uploadingPoMo, setUploadingPoMo] = useState(false)
+  const [poMoError, setPoMoError] = useState<string | null>(null)
 
-  const [projectFaFile, setProjectFaFile = useState<File | null>(null)
-  const [projectFaUrl, setProjectFaUrl = useState<string | null>(null)
-  const [uploadingProjectFa, setUploadingProjectFa = useState(false)
-  const [projectFaError, setProjectFaError = useState<string | null>(null)
+  const [projectFaFile, setProjectFaFile] = useState<File | null>(null)
+  const [projectFaUrl, setProjectFaUrl] = useState<string | null>(null)
+  const [uploadingProjectFa, setUploadingProjectFa] = useState(false)
+  const [projectFaError, setProjectFaError] = useState<string | null>(null)
 
   // Form data for each product
-  const [jobOrderForms, setJobOrderForms = useState<JobOrderFormData[]>([])
+  const [jobOrderForms, setJobOrderForms] = useState<JobOrderFormData[]>([])
 
   // Success dialog states
-  const [showJobOrderSuccessDialog, setShowJobOrderSuccessDialog = useState(false)
-  const [createdJoIds, setCreatedJoIds = useState<string[]>([])
+  const [showJobOrderSuccessDialog, setShowJobOrderSuccessDialog] = useState(false)
+  const [createdJoIds, setCreatedJoIds] = useState<string[]>([])
 
   // Coming soon dialog state
-  const [showComingSoonDialog, setShowComingSoonDialog = useState(false)
+  const [showComingSoonDialog, setShowComingSoonDialog] = useState(false)
 
   // Active tab for multi-product forms
-  const [activeTab, setActiveTab = useState("0")
+  const [activeTab, setActiveTab] = useState("0")
 
   // Calculate derived values using useMemo - these will always be called
   const quotationItems = useMemo(() => {
@@ -137,7 +147,6 @@ export default function CreateJobOrderPage() {
     if (hasItems) {
       // Multiple products from quotation.items
       return quotationItems.map((item: any) => {
-
         console.log(`items ${JSON.stringify(item)}`)
         const monthlyRate = item.price || 0
         console.log(`monthly ${monthlyRate}`)
@@ -544,7 +553,6 @@ export default function CreateJobOrderPage() {
             title: "Error",
             description: "Quotation or Product details not found. Please ensure they exist.",
             variant: "destructive",
-            duration: 5000,
           })
           router.push("/sales/job-orders/select-quotation")
         }
@@ -673,7 +681,7 @@ export default function CreateJobOrderPage() {
                       />
                       <div className="flex-1">
                         <p className="font-semibold text-sm">{productTotal.siteCode}</p>
-                        <p className="text-xs text-gray-600 truncate overflow-hidden whitespace-nowrap">{productTotal.productName}</p>
+                        <p className="text-xs text-gray-600">{productTotal.productName}</p>
                         <p className="text-xs text-gray-500">{formatCurrency(productTotal.monthlyRate)}/month</p>
                       </div>
                     </div>
@@ -890,7 +898,11 @@ export default function CreateJobOrderPage() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {quotationItems.map((item: any, index: number) => (
-                  <TabsTrigger key={index} value={index.toString()} className="text-xs max-w-[150px] truncate">
+                  <TabsTrigger
+                    key={index}
+                    value={index.toString()}
+                    className="text-xs max-w-[150px] truncate overflow-hidden whitespace-nowrap"
+                  >
                     {item.site_code || `Site ${index + 1}`}
                   </TabsTrigger>
                 ))}
@@ -914,7 +926,7 @@ export default function CreateJobOrderPage() {
                             height={24}
                             className="rounded object-cover"
                           />
-                          <span className="truncate overflow-hidden whitespace-nowrap">{item.product_name}</span>
+                          <span className="truncate">{item.product_name}</span>
                           <Badge variant="outline" className="text-xs">
                             {item.site_code || `Site ${index + 1}`}
                           </Badge>
