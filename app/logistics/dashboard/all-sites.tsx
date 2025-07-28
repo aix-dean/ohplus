@@ -7,23 +7,39 @@ import { useToast } from "@/hooks/use-toast"
 import { getPaginatedUserProducts, getUserProductsCount, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Loader2, LayoutGrid, List, AlertCircle, Search } from "lucide-react"
+import { ChevronLeft, ChevronRight, Loader2, AlertCircle, Bell } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { CreateReportDialog } from "@/components/create-report-dialog"
+import { JobOrdersListDialog } from "@/components/job-orders-list-dialog"
+
+// Direct Firebase imports for job order fetching
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
 
-export default function AllSitesTab() {
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+interface AllSitesTabProps {
+  searchQuery?: string
+  contentTypeFilter?: string
+  viewMode?: "grid" | "list"
+}
+
+export default function AllSitesTab({
+  searchQuery = "",
+  contentTypeFilter = "All",
+  viewMode = "grid",
+}: AllSitesTabProps) {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
+  const [jobOrderCounts, setJobOrderCounts] = useState<Record<string, number>>({})
+
+  const { toast } = useToast()
+  const { userData } = useAuth()
+  const router = useRouter()
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -41,38 +57,66 @@ export default function AllSitesTab() {
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
   const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
-  const { toast } = useToast()
-  const { userData } = useAuth()
-  const router = useRouter()
+  // Job Orders dialog state
+  const [jobOrdersDialogOpen, setJobOrdersDialogOpen] = useState(false)
+  const [selectedSiteForJO, setSelectedSiteForJO] = useState<{
+    id: string
+    name: string
+  }>({ id: "", name: "" })
 
-  const currentDate = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })
+  // Simplified direct job order fetching function
+  const fetchJobOrderCountsDirectly = useCallback(async () => {
+    if (!userData?.company_id) {
+      console.log("No company_id available")
+      return
+    }
 
-  const currentTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  })
+    try {
+      console.log("=== FETCHING JOB ORDERS ===")
+      console.log("Company ID:", userData.company_id)
 
-  // Debounce search term
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm)
-    }, 500)
+      // Query job orders collection directly
+      const jobOrdersRef = collection(db, "job_orders")
+      const q = query(jobOrdersRef, where("company_id", "==", userData.company_id))
 
-    return () => clearTimeout(timer)
-  }, [searchTerm])
+      console.log("Executing Firestore query...")
+      const querySnapshot = await getDocs(q)
 
-  // Reset pagination when search term changes
-  useEffect(() => {
-    setCurrentPage(1)
-    setPageCache(new Map())
-    fetchTotalCount()
-    fetchProducts(1, true)
-  }, [debouncedSearchTerm])
+      console.log(`Found ${querySnapshot.size} job orders total`)
+
+      const counts: Record<string, number> = {}
+      const allJobOrders: any[] = []
+
+      querySnapshot.forEach((doc) => {
+        const jobOrder = { id: doc.id, ...doc.data() }
+        allJobOrders.push(jobOrder)
+
+        console.log("Job Order:", {
+          id: doc.id,
+          product_id: jobOrder.product_id,
+          siteName: jobOrder.siteName,
+          status: jobOrder.status,
+          company_id: jobOrder.company_id,
+        })
+
+        if (jobOrder.product_id) {
+          counts[jobOrder.product_id] = (counts[jobOrder.product_id] || 0) + 1
+          console.log(`Incremented count for product ${jobOrder.product_id} to ${counts[jobOrder.product_id]}`)
+        } else {
+          console.log("Job order missing product_id:", jobOrder)
+        }
+      })
+
+      console.log("=== FINAL JO COUNTS ===")
+      console.log("Counts object:", counts)
+      console.log("All job orders:", allJobOrders)
+
+      setJobOrderCounts(counts)
+    } catch (error) {
+      console.error("Error fetching job orders directly:", error)
+      setJobOrderCounts({})
+    }
+  }, [userData?.company_id])
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
@@ -82,7 +126,7 @@ export default function AllSitesTab() {
     try {
       const count = await getUserProductsCount(userData?.company_id, {
         active: true,
-        searchTerm: debouncedSearchTerm,
+        searchTerm: searchQuery,
       })
 
       setTotalItems(count)
@@ -92,7 +136,7 @@ export default function AllSitesTab() {
     } finally {
       setLoadingCount(false)
     }
-  }, [userData?.company_id, debouncedSearchTerm])
+  }, [userData?.company_id, searchQuery])
 
   // Fetch products for the current page
   const fetchProducts = useCallback(
@@ -118,7 +162,12 @@ export default function AllSitesTab() {
 
         const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, {
           active: true,
-          searchTerm: debouncedSearchTerm,
+          searchTerm: searchQuery,
+        })
+
+        console.log("=== FETCHED PRODUCTS ===")
+        result.items.forEach((product) => {
+          console.log(`Product: ${product.name} (ID: ${product.id})`)
         })
 
         setProducts(result.items)
@@ -142,16 +191,25 @@ export default function AllSitesTab() {
         setLoadingMore(false)
       }
     },
-    [userData?.company_id, lastDoc, pageCache, debouncedSearchTerm],
+    [userData?.company_id, lastDoc, pageCache, searchQuery],
   )
+
+  // Reset pagination when search or filter changes
+  useEffect(() => {
+    setCurrentPage(1)
+    setPageCache(new Map())
+    fetchTotalCount()
+    fetchProducts(1, true)
+  }, [searchQuery, contentTypeFilter])
 
   // Load initial data and count
   useEffect(() => {
     if (userData?.company_id) {
       fetchProducts(1)
       fetchTotalCount()
+      fetchJobOrderCountsDirectly()
     }
-  }, [userData?.company_id, fetchProducts, fetchTotalCount])
+  }, [userData?.company_id, fetchProducts, fetchTotalCount, fetchJobOrderCountsDirectly])
 
   // Load data when page changes
   useEffect(() => {
@@ -159,6 +217,15 @@ export default function AllSitesTab() {
       fetchProducts(currentPage)
     }
   }, [currentPage, fetchProducts, userData?.company_id])
+
+  // Debug effect to log JO counts when they change
+  useEffect(() => {
+    console.log("=== JO COUNTS UPDATED ===")
+    console.log("Current jobOrderCounts state:", jobOrderCounts)
+    Object.entries(jobOrderCounts).forEach(([productId, count]) => {
+      console.log(`Product ${productId}: ${count} JOs`)
+    })
+  }, [jobOrderCounts])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -222,6 +289,17 @@ export default function AllSitesTab() {
     return pageNumbers
   }
 
+  // Filter products based on contentTypeFilter prop
+  const filteredProducts = products.filter((product) => {
+    // Content type filter
+    if (contentTypeFilter !== "All") {
+      if (contentTypeFilter === "Static") return product.content_type === "Static" || product.content_type === "static"
+      else if (contentTypeFilter === "Dynamic")
+        return product.content_type === "Dynamic" || product.content_type === "dynamic"
+    }
+    return true
+  })
+
   // Convert product to site format for display
   const productToSite = (product: Product) => {
     // Determine status color based on product status
@@ -230,10 +308,6 @@ export default function AllSitesTab() {
     if (product.status === "VACANT" || product.status === "AVAILABLE") statusColor = "green"
     if (product.status === "MAINTENANCE" || product.status === "REPAIR") statusColor = "red"
     if (product.status === "PENDING" || product.status === "INSTALLATION") statusColor = "orange"
-
-    // Get notifications count (placeholder logic - replace with real logic)
-    const notifications =
-      product.status === "MAINTENANCE" ? 3 : product.status === "PENDING" ? 1 : Math.random() > 0.7 ? 1 : 0
 
     // Get image from product media or use placeholder
     const image =
@@ -262,17 +336,25 @@ export default function AllSitesTab() {
       product.address ||
       "Address not specified"
 
+    // Get JO count for this site using the product ID
+    const joCount = jobOrderCounts[product.id || ""] || 0
+
+    console.log(`=== SITE CONVERSION ===`)
+    console.log(`Product: ${product.name} (ID: ${product.id})`)
+    console.log(`JO Count from state: ${joCount}`)
+    console.log(`Available counts:`, Object.keys(jobOrderCounts))
+
     return {
       id: product.id,
-      name: product.name || `Site ${product.id.substring(0, 8)}`,
+      name: product.name || `Site ${product.id?.substring(0, 8)}`,
       status: product.status || "UNKNOWN",
       statusColor,
       image,
-      notifications,
       address,
       contentType: product.content_type || "static",
       healthPercentage,
-      siteCode: product.site_code || product.id.substring(0, 8),
+      siteCode: product.site_code || product.id?.substring(0, 8),
+      joCount,
       operationalStatus:
         product.status === "ACTIVE" || product.status === "OCCUPIED"
           ? "Operational"
@@ -282,6 +364,12 @@ export default function AllSitesTab() {
               ? "Pending Setup"
               : "Inactive",
     }
+  }
+
+  // Handle JO count click
+  const handleJOCountClick = (siteId: string, siteName: string) => {
+    setSelectedSiteForJO({ id: siteId, name: siteName })
+    setJobOrdersDialogOpen(true)
   }
 
   // Show loading if no user
@@ -295,47 +383,27 @@ export default function AllSitesTab() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* Date, Search and View Toggle */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="text-sm text-gray-600 font-medium">
-          {currentDate}, {currentTime}
-        </div>
-
-        <div className="flex flex-1 max-w-md mx-auto md:mx-0">
-          <div className="relative w-full">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              type="search"
-              placeholder="Search sites..."
-              className="pl-8 w-full"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          <div className="border rounded-md p-1 flex">
-            <Button
-              variant={viewMode === "grid" ? "default" : "ghost"}
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setViewMode("grid")}
-            >
-              <LayoutGrid size={18} />
-            </Button>
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setViewMode("list")}
-            >
-              <List size={18} />
+    <div className="flex flex-col gap-5 p-6 bg-transparent min-h-screen">
+      {/* Debug Panel - Remove this in production */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
+          <h4 className="font-bold text-yellow-800 mb-2">Debug Info</h4>
+          <div className="text-sm text-yellow-700">
+            <p>
+              <strong>Company ID:</strong> {userData?.company_id}
+            </p>
+            <p>
+              <strong>Total JO Counts:</strong> {Object.keys(jobOrderCounts).length}
+            </p>
+            <p>
+              <strong>JO Counts:</strong> {JSON.stringify(jobOrderCounts, null, 2)}
+            </p>
+            <Button size="sm" onClick={fetchJobOrderCountsDirectly} className="mt-2">
+              Refresh JO Counts
             </Button>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Loading State */}
       {loading && (
@@ -357,40 +425,57 @@ export default function AllSitesTab() {
       )}
 
       {/* Empty State */}
-      {!loading && !error && products.length === 0 && (
+      {!loading && !error && filteredProducts.length === 0 && (
         <div className="bg-gray-50 border border-gray-200 border-dashed rounded-md p-8 text-center">
           <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <AlertCircle size={24} className="text-gray-400" />
           </div>
           <h3 className="text-lg font-medium mb-2">No sites found</h3>
           <p className="text-gray-500 mb-4">
-            {debouncedSearchTerm
-              ? "No sites match your search criteria. Try adjusting your search terms."
+            {searchQuery || contentTypeFilter !== "All"
+              ? "No sites match your search criteria. Try adjusting your search terms or filters."
               : "There are no sites in the system yet."}
           </p>
-          {debouncedSearchTerm && (
-            <Button variant="outline" onClick={() => setSearchTerm("")}>
-              Clear Search
+          {(searchQuery || contentTypeFilter !== "All") && (
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Clear Filters
             </Button>
           )}
         </div>
       )}
-
-      {/* Site Grid */}
-      {!loading && !error && products.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 mt-4">
-          {products.map((product) => (
-            <UnifiedSiteCard
-              key={product.id}
-              site={productToSite(product)}
-              onCreateReport={(siteId) => {
-                setSelectedSiteId(siteId)
-                setReportDialogOpen(true)
-              }}
-              router={router}
-            />
-          ))}
-        </div>
+      {/* Site Display - Grid or List View */}
+      {!loading && !error && filteredProducts.length > 0 && (
+        <>
+          {viewMode === "grid" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+              {filteredProducts.map((product) => (
+                <UnifiedSiteCard
+                  key={product.id}
+                  site={productToSite(product)}
+                  onCreateReport={(siteId) => {
+                    setSelectedSiteId(siteId)
+                    setReportDialogOpen(true)
+                  }}
+                  onJOCountClick={handleJOCountClick}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredProducts.map((product) => (
+                <UnifiedSiteListItem
+                  key={product.id}
+                  site={productToSite(product)}
+                  onCreateReport={(siteId) => {
+                    setSelectedSiteId(siteId)
+                    setReportDialogOpen(true)
+                  }}
+                  onJOCountClick={handleJOCountClick}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Loading More Indicator */}
@@ -404,7 +489,7 @@ export default function AllSitesTab() {
       )}
 
       {/* Pagination Controls */}
-      {!loading && !error && products.length > 0 && (
+      {!loading && !error && filteredProducts.length > 0 && (
         <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
           <div className="text-sm text-gray-500 flex items-center">
             {loadingCount ? (
@@ -466,6 +551,15 @@ export default function AllSitesTab() {
 
       {/* Report Dialog */}
       <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
+
+      {/* Job Orders Dialog */}
+      <JobOrdersListDialog
+        open={jobOrdersDialogOpen}
+        onOpenChange={setJobOrdersDialogOpen}
+        siteId={selectedSiteForJO.id}
+        siteName={selectedSiteForJO.name}
+        companyId={userData?.company_id || ""}
+      />
     </div>
   )
 }
@@ -474,12 +568,25 @@ export default function AllSitesTab() {
 function UnifiedSiteCard({
   site,
   onCreateReport,
-  router,
-}: { site: any; onCreateReport: (siteId: string) => void; router: any }) {
+  onJOCountClick,
+}: {
+  site: any
+  onCreateReport: (siteId: string) => void
+  onJOCountClick: (siteId: string, siteName: string) => void
+}) {
+
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     onCreateReport(site.id)
+  }
+
+  const handleJOClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (site.joCount > 0) {
+      onJOCountClick(site.id, site.name)
+    }
   }
 
   const handleCardClick = () => {
@@ -487,112 +594,272 @@ function UnifiedSiteCard({
   }
 
   return (
-    <Card
-      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full"
-      onClick={handleCardClick}
-    >
-      <div className="relative h-32 bg-gray-200">
-        <Image
-          src={site.image || "/placeholder.svg"}
-          alt={site.name}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
-            target.className = "opacity-50 object-contain"
-          }}
-        />
+    <div className="p-3 bg-gray-200 rounded-xl">
+      <Card
+        className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full"
+        onClick={handleCardClick}
+      >
+        <div className="relative h-32 bg-gray-200">
+          <Image
+            src={site.image || "/placeholder.svg"}
+            alt={site.name}
+            fill
+            className="object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
+              target.className = "opacity-50 object-contain"
+            }}
+          />
 
-        {/* Status Badge - Bottom Left */}
-        <div className="absolute bottom-2 left-2">
-          <div className="px-2 py-1 rounded text-xs font-bold text-white" style={{ backgroundColor: "#38b6ff" }}>
-            {site.operationalStatus === "Operational"
-              ? "OPEN"
-              : site.operationalStatus === "Under Maintenance"
-                ? "MAINTENANCE"
-                : site.operationalStatus === "Pending Setup"
-                  ? "PENDING"
-                  : "CLOSED"}
-          </div>
-        </div>
-      </div>
-
-      <CardContent className="p-3">
-        <div className="flex flex-col gap-2">
-          {/* Site Code */}
-          <div className="text-xs text-gray-500 uppercase tracking-wide">{site.siteCode}</div>
-
-          {/* Site Name with Badge */}
-          <div className="flex items-center gap-2">
-            <h3 className="font-bold text-sm text-gray-900 truncate">{site.name}</h3>
-            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0">
-              {site.contentType === "dynamic" ? "M" : "S"}
+          {/* Status Badge - Bottom Left */}
+          <div className="absolute bottom-2 left-2">
+            <div className="px-2 py-1 rounded text-xs font-bold text-white" style={{ backgroundColor: "#38b6ff" }}>
+              {site.operationalStatus === "Operational"
+                ? "OPEN"
+                : site.operationalStatus === "Under Maintenance"
+                  ? "MAINTENANCE"
+                  : site.operationalStatus === "Pending Setup"
+                    ? "PENDING"
+                    : "CLOSED"}
             </div>
           </div>
+        </div>
 
-          {/* Site Information */}
-          <div className="space-y-1 text-xs">
-            <div className="flex flex-col">
-              <span className="text-black">
-                <span className="font-bold">Operation:</span>
-                <span
-                  className={`ml-1 ${
-                    site.operationalStatus === "Operational"
-                      ? "text-black"
-                      : site.operationalStatus === "Under Maintenance"
+        <CardContent className="p-3">
+          <div className="flex flex-col gap-2">
+            {/* Site Code */}
+            <div className="text-xs text-gray-500 uppercase tracking-wide">{site.siteCode}</div>
+
+            {/* Site Name with Badge */}
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-sm text-gray-900 truncate">{site.name}</h3>
+              <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0">
+                {site.contentType === "dynamic" ? "M" : "S"}
+              </div>
+            </div>
+
+            {/* Site Information */}
+            <div className="space-y-1 text-xs">
+              <div className="flex flex-col">
+                <span className="text-black">
+                  <span className="font-bold">Operation:</span>
+                  <span
+                    className={`ml-1 ${
+                      site.operationalStatus === "Operational"
                         ? "text-black"
-                        : site.operationalStatus === "Pending Setup"
+                        : site.operationalStatus === "Under Maintenance"
                           ? "text-black"
-                          : "text-black"
-                  }`}
+                          : site.operationalStatus === "Pending Setup"
+                            ? "text-black"
+                            : "text-black"
+                    }`}
+                  >
+                    {site.operationalStatus === "Operational"
+                      ? "Active"
+                      : site.operationalStatus === "Under Maintenance"
+                        ? "Maintenance"
+                        : site.operationalStatus === "Pending Setup"
+                          ? "Pending"
+                          : "Inactive"}
+                  </span>
+                </span>
+              </div>
+
+              <div className="flex flex-col">
+                <span className="text-black">
+                  <span className="font-bold">Display Health:</span>
+                  <span className="ml-1" style={{ color: "#00bf63" }}>
+                    {site.healthPercentage > 90
+                      ? "100%"
+                      : site.healthPercentage > 80
+                        ? "90%"
+                        : site.healthPercentage > 60
+                          ? "75%"
+                          : "50%"}
+                  </span>
+                </span>
+              </div>
+            </div>
+
+            {/* JO Notification */}
+            <div className="flex items-center gap-1 text-xs">
+              <Bell className="h-3 w-3 text-gray-400" />
+              {site.joCount > 0 ? (
+                <button
+                  onClick={handleJOClick}
+                  className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
+                >
+                  JO ({site.joCount})
+                </button>
+              ) : (
+                <span className="text-gray-600">None</span>
+              )}
+              {/* Debug info - remove in production */}
+              {process.env.NODE_ENV === "development" && (
+                <span className="text-red-500 ml-2">
+                  [Debug: ID={site.id?.substring(0, 8)}, Count={site.joCount}]
+                </span>
+              )}
+            </div>
+
+            {/* Create Report Button */}
+            <Button
+              variant="secondary"
+              className="mt-3 w-full h-8 text-xs border-0 text-white hover:text-white rounded-md font-medium"
+              style={{ backgroundColor: "#0f76ff" }}
+              onClick={handleCreateReport}
+            >
+              Create Report
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// List view component for sites
+function UnifiedSiteListItem({
+  site,
+  onCreateReport,
+  onJOCountClick,
+}: {
+  site: any
+  onCreateReport: (siteId: string) => void
+  onJOCountClick: (siteId: string, siteName: string) => void
+}) {
+  const handleCreateReport = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onCreateReport(site.id)
+  }
+
+  const handleJOClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (site.joCount > 0) {
+      onJOCountClick(site.id, site.name)
+    }
+  }
+
+  const handleCardClick = () => {
+    window.location.href = `/logistics/sites/${site.id}`
+  }
+
+  return (
+    <div className="p-3 bg-gray-200 rounded-xl">
+      <Card
+        className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full"
+        onClick={handleCardClick}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-center gap-4">
+            {/* Site Image */}
+            <div className="relative w-20 h-20 bg-gray-200 rounded-lg flex-shrink-0">
+              <Image
+                src={site.image || "/placeholder.svg"}
+                alt={site.name}
+                fill
+                className="object-cover rounded-lg"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
+                  target.className = "opacity-50 object-contain rounded-lg"
+                }}
+              />
+              {/* Status Badge */}
+              <div className="absolute bottom-1 left-1">
+                <div
+                  className="px-1.5 py-0.5 rounded text-xs font-bold text-white"
+                  style={{ backgroundColor: "#38b6ff" }}
                 >
                   {site.operationalStatus === "Operational"
-                    ? "Active"
+                    ? "OPEN"
                     : site.operationalStatus === "Under Maintenance"
-                      ? "Maintenance"
+                      ? "MAINT"
                       : site.operationalStatus === "Pending Setup"
-                        ? "Pending"
-                        : "Inactive"}
-                </span>
-              </span>
+                        ? "PEND"
+                        : "CLOSED"}
+                </div>
+              </div>
             </div>
 
-            <div className="flex flex-col">
-              <span className="text-black">
-                <span className="font-bold">Display Health:</span>
-                <span className="ml-1" style={{ color: "#00bf63" }}>
-                  {site.healthPercentage > 90
-                    ? "100%"
-                    : site.healthPercentage > 80
-                      ? "90%"
-                      : site.healthPercentage > 60
-                        ? "75%"
-                        : "50%"}
-                </span>
-              </span>
+            {/* Site Information */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="text-xs text-gray-500 uppercase tracking-wide">{site.siteCode}</div>
+                <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold">
+                  {site.contentType === "dynamic" ? "M" : "S"}
+                </div>
+              </div>
+
+              <h3 className="font-bold text-lg text-gray-900 mb-2 truncate">{site.name}</h3>
+
+              <div className="grid grid-cols-2 gap-4 text-sm mb-2">
+                <div>
+                  <span className="font-bold text-gray-700">Operation:</span>
+                  <div className="text-gray-600">
+                    {site.operationalStatus === "Operational"
+                      ? "Active"
+                      : site.operationalStatus === "Under Maintenance"
+                        ? "Maintenance"
+                        : site.operationalStatus === "Pending Setup"
+                          ? "Pending"
+                          : "Inactive"}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="font-bold text-gray-700">Display Health:</span>
+                  <div style={{ color: "#00bf63" }}>
+                    {site.healthPercentage > 90
+                      ? "100%"
+                      : site.healthPercentage > 80
+                        ? "90%"
+                        : site.healthPercentage > 60
+                          ? "75%"
+                          : "50%"}
+                  </div>
+                </div>
+              </div>
+
+              {/* JO Notification */}
+              <div className="flex items-center gap-1 text-sm">
+                <Bell className="h-4 w-4 text-gray-400" />
+                {site.joCount > 0 ? (
+                  <button
+                    onClick={handleJOClick}
+                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
+                  >
+                    JO ({site.joCount})
+                  </button>
+                ) : (
+                  <span className="text-gray-600">None</span>
+                )}
+                {/* Debug info - remove in production */}
+                {process.env.NODE_ENV === "development" && (
+                  <span className="text-red-500 ml-2">
+                    [Debug: ID={site.id?.substring(0, 8)}, Count={site.joCount}]
+                  </span>
+                )}
+              </div>
             </div>
 
-            <div className="flex flex-col">
-              <span className="text-black">
-                <span className="font-bold">Compliance:</span>
-                <span className="ml-1 text-black">
-                  {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}
-                </span>
-              </span>
+            {/* Create Report Button */}
+            <div className="flex-shrink-0">
+              <Button
+                variant="secondary"
+                className="h-10 px-6 text-sm border-0 text-white hover:text-white rounded-md font-medium"
+                style={{ backgroundColor: "#0f76ff" }}
+                onClick={handleCreateReport}
+              >
+                Create Report
+              </Button>
             </div>
           </div>
-
-          {/* Create Report Button */}
-          <Button
-            variant="secondary"
-            className="mt-3 w-full h-8 text-xs bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
-            onClick={handleCreateReport}
-          >
-            Create Report
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
