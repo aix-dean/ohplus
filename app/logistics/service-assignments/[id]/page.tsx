@@ -256,7 +256,7 @@ export default function ServiceAssignmentDetailsPage() {
         ? assignment.coveredDateStart.toDate()
         : new Date(assignment.coveredDateStart)
       const endDate = assignment.coveredDateEnd.toDate
-        ? assignment.coveredDateEnd.toDate
+        ? assignment.coveredDateEnd.toDate()
         : new Date(assignment.coveredDateEnd)
       const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
@@ -297,7 +297,7 @@ export default function ServiceAssignmentDetailsPage() {
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center justify-between mb-6">
         <Button
           variant="ghost"
           size="sm"
