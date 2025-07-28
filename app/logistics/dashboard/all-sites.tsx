@@ -7,9 +7,8 @@ import { useToast } from "@/hooks/use-toast"
 import { getPaginatedUserProducts, getUserProductsCount, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Loader2, LayoutGrid, List, AlertCircle, Search } from "lucide-react"
+import { ChevronLeft, ChevronRight, Loader2, AlertCircle } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { CreateReportDialog } from "@/components/create-report-dialog"
@@ -18,12 +17,9 @@ import { CreateReportDialog } from "@/components/create-report-dialog"
 const ITEMS_PER_PAGE = 8
 
 export default function AllSitesTab() {
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("")
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -45,35 +41,6 @@ export default function AllSitesTab() {
   const { userData } = useAuth()
   const router = useRouter()
 
-  const currentDate = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })
-
-  const currentTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  })
-
-  // Debounce search term
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm)
-    }, 500)
-
-    return () => clearTimeout(timer)
-  }, [searchTerm])
-
-  // Reset pagination when search term changes
-  useEffect(() => {
-    setCurrentPage(1)
-    setPageCache(new Map())
-    fetchTotalCount()
-    fetchProducts(1, true)
-  }, [debouncedSearchTerm])
-
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
     if (!userData?.company_id) return
@@ -82,7 +49,6 @@ export default function AllSitesTab() {
     try {
       const count = await getUserProductsCount(userData?.company_id, {
         active: true,
-        searchTerm: debouncedSearchTerm,
       })
 
       setTotalItems(count)
@@ -92,7 +58,7 @@ export default function AllSitesTab() {
     } finally {
       setLoadingCount(false)
     }
-  }, [userData?.company_id, debouncedSearchTerm])
+  }, [userData?.company_id])
 
   // Fetch products for the current page
   const fetchProducts = useCallback(
@@ -118,7 +84,6 @@ export default function AllSitesTab() {
 
         const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, {
           active: true,
-          searchTerm: debouncedSearchTerm,
         })
 
         setProducts(result.items)
@@ -142,7 +107,7 @@ export default function AllSitesTab() {
         setLoadingMore(false)
       }
     },
-    [userData?.company_id, lastDoc, pageCache, debouncedSearchTerm],
+    [userData?.company_id, lastDoc, pageCache],
   )
 
   // Load initial data and count
@@ -295,48 +260,7 @@ export default function AllSitesTab() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      {/* Date, Search and View Toggle */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="text-sm text-gray-600 font-medium">
-          {currentDate}, {currentTime}
-        </div>
-
-        <div className="flex flex-1 max-w-md mx-auto md:mx-0">
-          <div className="relative w-full">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              type="search"
-              placeholder="Search sites..."
-              className="pl-8 w-full"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          <div className="border rounded-md p-1 flex">
-            <Button
-              variant={viewMode === "grid" ? "default" : "ghost"}
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setViewMode("grid")}
-            >
-              <LayoutGrid size={18} />
-            </Button>
-            <Button
-              variant={viewMode === "list" ? "default" : "ghost"}
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setViewMode("list")}
-            >
-              <List size={18} />
-            </Button>
-          </div>
-        </div>
-      </div>
-
+    <div className="flex flex-col gap-5 p-6">
       {/* Loading State */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-12">
@@ -363,22 +287,13 @@ export default function AllSitesTab() {
             <AlertCircle size={24} className="text-gray-400" />
           </div>
           <h3 className="text-lg font-medium mb-2">No sites found</h3>
-          <p className="text-gray-500 mb-4">
-            {debouncedSearchTerm
-              ? "No sites match your search criteria. Try adjusting your search terms."
-              : "There are no sites in the system yet."}
-          </p>
-          {debouncedSearchTerm && (
-            <Button variant="outline" onClick={() => setSearchTerm("")}>
-              Clear Search
-            </Button>
-          )}
+          <p className="text-gray-500 mb-4">There are no sites in the system yet.</p>
         </div>
       )}
 
       {/* Site Grid */}
       {!loading && !error && products.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
           {products.map((product) => (
             <UnifiedSiteCard
               key={product.id}
