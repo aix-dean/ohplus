@@ -183,6 +183,9 @@ export default function SalesQuotationsPage() {
                   <TableRow className="bg-gray-50 border-b border-gray-200">
                     <TableHead className="font-semibold text-gray-900 py-3">Date</TableHead>
                     <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
+                    <TableHead className="font-semibold text-gray-900 py-3">Client Address</TableHead>
+                    <TableHead className="font-semibold text-gray-900 py-3">Client Phone</TableHead>
+                    <TableHead className="font-semibold text-gray-900 py-3">Client Designation</TableHead>
                     <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
                     <TableHead className="font-semibold text-gray-900 py-3">Amount</TableHead>
                     <TableHead className="font-semibold text-gray-900 py-3">Reference</TableHead>
@@ -198,6 +201,15 @@ export default function SalesQuotationsPage() {
                         </TableCell>
                         <TableCell className="py-3">
                           <Skeleton className="h-4 w-32" />
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <Skeleton className="h-4 w-48" />
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <Skeleton className="h-4 w-28" />
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <Skeleton className="h-4 w-36" />
                         </TableCell>
                         <TableCell className="py-3">
                           <Skeleton className="h-4 w-20" />
@@ -220,6 +232,9 @@ export default function SalesQuotationsPage() {
                       <TableRow className="bg-gray-50 border-b border-gray-200">
                         <TableHead className="font-semibold text-gray-900 py-3">Date</TableHead>
                         <TableHead className="font-semibold text-gray-900 py-3">Client</TableHead>
+                        <TableHead className="font-semibold text-gray-900 py-3">Client Address</TableHead>
+                        <TableHead className="font-semibold text-gray-900 py-3">Client Phone</TableHead>
+                        <TableHead className="font-semibold text-gray-900 py-3">Client Designation</TableHead>
                         <TableHead className="font-semibold text-gray-900 py-3">Status</TableHead>
                         <TableHead className="font-semibold text-gray-900 py-3">Amount</TableHead>
                         <TableHead className="font-semibold text-gray-900 py-3">Reference</TableHead>
@@ -234,6 +249,15 @@ export default function SalesQuotationsPage() {
                         >
                           <TableCell className="py-3 text-sm text-gray-700">{formatDate(quotation.created)}</TableCell>
                           <TableCell className="py-3 text-sm text-gray-700">{quotation.client_name || "N/A"}</TableCell>
+                          <TableCell className="py-3 text-sm text-gray-700">
+                            {quotation.client_address || "N/A"}
+                          </TableCell>
+                          <TableCell className="py-3 text-sm text-gray-700">
+                            {quotation.client_phone || "N/A"}
+                          </TableCell>
+                          <TableCell className="py-3 text-sm text-gray-700">
+                            {quotation.client_designation || "N/A"}
+                          </TableCell>
                           <TableCell className="py-3">
                             <Badge
                               variant="outline"
