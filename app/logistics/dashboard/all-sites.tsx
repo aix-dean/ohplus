@@ -5,9 +5,6 @@ import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { getPaginatedUserProducts, getUserProductsCount, type Product } from "@/lib/firebase-service"
-import { getJobOrdersByCompanyId } from "@/lib/job-order-service"
-// Add fallback import
-// import { getJobOrdersByCompanyId } from "@/lib/job-order-service-backup"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -16,7 +13,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { CreateReportDialog } from "@/components/create-report-dialog"
 
-// Add this import at the top of the file
+// Direct Firebase imports for job order fetching
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
@@ -59,66 +56,53 @@ export default function AllSitesTab({
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
   const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
-  // Add this debug section right after the JO count state
-  useEffect(() => {
-    if (process.env.NODE_ENV === "development" && userData?.company_id) {
-      console.log("Debug: JO Counts", jobOrderCounts)
-      console.log("Company ID:", userData.company_id)
-    }
-  }, [jobOrderCounts, userData?.company_id])
-
-  // Fetch job orders and count them by product_id (site)
-  const fetchJobOrderCounts = useCallback(async () => {
-    if (!userData?.company_id) return
-
-    try {
-      console.log("Fetching job orders for company:", userData.company_id) // Debug log
-      const jobOrders = await getJobOrdersByCompanyId(userData.company_id)
-      console.log("Fetched job orders:", jobOrders) // Debug log
-
-      const counts: Record<string, number> = {}
-
-      // Count job orders by product_id (which matches the product document ID)
-      jobOrders.forEach((jo) => {
-        console.log("Processing JO:", jo.product_id, jo.status) // Debug log
-        if (jo.product_id) {
-          counts[jo.product_id] = (counts[jo.product_id] || 0) + 1
-        }
-      })
-
-      console.log("Final JO counts:", counts) // Debug log
-      setJobOrderCounts(counts)
-    } catch (error) {
-      console.error("Error fetching job order counts:", error)
-      // Set empty counts on error to prevent undefined behavior
-      setJobOrderCounts({})
-    }
-  }, [userData?.company_id])
-
-  // Add this alternative function after the existing fetchJobOrderCounts
+  // Simplified direct job order fetching function
   const fetchJobOrderCountsDirectly = useCallback(async () => {
-    if (!userData?.company_id) return
+    if (!userData?.company_id) {
+      console.log("No company_id available")
+      return
+    }
 
     try {
-      console.log("Fetching job orders directly for company:", userData.company_id)
+      console.log("=== FETCHING JOB ORDERS ===")
+      console.log("Company ID:", userData.company_id)
 
-      // Query job orders directly from Firestore
+      // Query job orders collection directly
       const jobOrdersRef = collection(db, "job_orders")
       const q = query(jobOrdersRef, where("company_id", "==", userData.company_id))
+
+      console.log("Executing Firestore query...")
       const querySnapshot = await getDocs(q)
 
+      console.log(`Found ${querySnapshot.size} job orders total`)
+
       const counts: Record<string, number> = {}
+      const allJobOrders: any[] = []
 
       querySnapshot.forEach((doc) => {
-        const jobOrder = doc.data()
-        console.log("Direct JO fetch - Processing:", jobOrder.product_id, jobOrder.status)
+        const jobOrder = { id: doc.id, ...doc.data() }
+        allJobOrders.push(jobOrder)
+
+        console.log("Job Order:", {
+          id: doc.id,
+          product_id: jobOrder.product_id,
+          siteName: jobOrder.siteName,
+          status: jobOrder.status,
+          company_id: jobOrder.company_id,
+        })
 
         if (jobOrder.product_id) {
           counts[jobOrder.product_id] = (counts[jobOrder.product_id] || 0) + 1
+          console.log(`Incremented count for product ${jobOrder.product_id} to ${counts[jobOrder.product_id]}`)
+        } else {
+          console.log("Job order missing product_id:", jobOrder)
         }
       })
 
-      console.log("Direct fetch - Final JO counts:", counts)
+      console.log("=== FINAL JO COUNTS ===")
+      console.log("Counts object:", counts)
+      console.log("All job orders:", allJobOrders)
+
       setJobOrderCounts(counts)
     } catch (error) {
       console.error("Error fetching job orders directly:", error)
@@ -173,6 +157,11 @@ export default function AllSitesTab({
           searchTerm: searchQuery,
         })
 
+        console.log("=== FETCHED PRODUCTS ===")
+        result.items.forEach((product) => {
+          console.log(`Product: ${product.name} (ID: ${product.id})`)
+        })
+
         setProducts(result.items)
         setLastDoc(result.lastDoc)
         setHasMore(result.hasMore)
@@ -210,14 +199,9 @@ export default function AllSitesTab({
     if (userData?.company_id) {
       fetchProducts(1)
       fetchTotalCount()
-
-      // Try the service function first, then fallback to direct fetch
-      fetchJobOrderCounts().catch(() => {
-        console.log("Service function failed, trying direct fetch...")
-        fetchJobOrderCountsDirectly()
-      })
+      fetchJobOrderCountsDirectly()
     }
-  }, [userData?.company_id, fetchProducts, fetchTotalCount, fetchJobOrderCounts, fetchJobOrderCountsDirectly])
+  }, [userData?.company_id, fetchProducts, fetchTotalCount, fetchJobOrderCountsDirectly])
 
   // Load data when page changes
   useEffect(() => {
@@ -225,6 +209,15 @@ export default function AllSitesTab({
       fetchProducts(currentPage)
     }
   }, [currentPage, fetchProducts, userData?.company_id])
+
+  // Debug effect to log JO counts when they change
+  useEffect(() => {
+    console.log("=== JO COUNTS UPDATED ===")
+    console.log("Current jobOrderCounts state:", jobOrderCounts)
+    Object.entries(jobOrderCounts).forEach(([productId, count]) => {
+      console.log(`Product ${productId}: ${count} JOs`)
+    })
+  }, [jobOrderCounts])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -338,6 +331,11 @@ export default function AllSitesTab({
     // Get JO count for this site using the product ID
     const joCount = jobOrderCounts[product.id || ""] || 0
 
+    console.log(`=== SITE CONVERSION ===`)
+    console.log(`Product: ${product.name} (ID: ${product.id})`)
+    console.log(`JO Count from state: ${joCount}`)
+    console.log(`Available counts:`, Object.keys(jobOrderCounts))
+
     return {
       id: product.id,
       name: product.name || `Site ${product.id?.substring(0, 8)}`,
@@ -372,6 +370,27 @@ export default function AllSitesTab({
 
   return (
     <div className="flex flex-col gap-5 p-6 bg-transparent min-h-screen">
+      {/* Debug Panel - Remove this in production */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
+          <h4 className="font-bold text-yellow-800 mb-2">Debug Info</h4>
+          <div className="text-sm text-yellow-700">
+            <p>
+              <strong>Company ID:</strong> {userData?.company_id}
+            </p>
+            <p>
+              <strong>Total JO Counts:</strong> {Object.keys(jobOrderCounts).length}
+            </p>
+            <p>
+              <strong>JO Counts:</strong> {JSON.stringify(jobOrderCounts, null, 2)}
+            </p>
+            <Button size="sm" onClick={fetchJobOrderCountsDirectly} className="mt-2">
+              Refresh JO Counts
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Loading State */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-12">
@@ -626,6 +645,12 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             <div className="flex items-center gap-1 text-xs">
               <Bell className="h-3 w-3 text-gray-400" />
               <span className="text-gray-600">{site.joCount > 0 ? `JO (${site.joCount})` : "None"}</span>
+              {/* Debug info - remove in production */}
+              {process.env.NODE_ENV === "development" && (
+                <span className="text-red-500 ml-2">
+                  [Debug: ID={site.id?.substring(0, 8)}, Count={site.joCount}]
+                </span>
+              )}
             </div>
 
             {/* Create Report Button */}
@@ -737,6 +762,12 @@ function UnifiedSiteListItem({ site, onCreateReport }: { site: any; onCreateRepo
               <div className="flex items-center gap-1 text-sm">
                 <Bell className="h-4 w-4 text-gray-400" />
                 <span className="text-gray-600">{site.joCount > 0 ? `JO (${site.joCount})` : "None"}</span>
+                {/* Debug info - remove in production */}
+                {process.env.NODE_ENV === "development" && (
+                  <span className="text-red-500 ml-2">
+                    [Debug: ID={site.id?.substring(0, 8)}, Count={site.joCount}]
+                  </span>
+                )}
               </div>
             </div>
 
