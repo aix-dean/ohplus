@@ -19,16 +19,10 @@ const ITEMS_PER_PAGE = 8
 interface AllSitesTabProps {
   searchQuery?: string
   filterBy?: string
-  contentTypeFilter?: string
   viewMode?: "grid" | "list"
 }
 
-export default function AllSitesTab({
-  searchQuery = "",
-  filterBy = "All",
-  contentTypeFilter = "All",
-  viewMode = "grid",
-}: AllSitesTabProps) {
+export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMode = "grid" }: AllSitesTabProps) {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -128,9 +122,8 @@ export default function AllSitesTab({
   useEffect(() => {
     setCurrentPage(1)
     setPageCache(new Map())
-    fetchTotalCount()
     fetchProducts(1, true)
-  }, [searchQuery, filterBy, contentTypeFilter])
+  }, [searchQuery, filterBy])
 
   // Load initial data and count
   useEffect(() => {
@@ -211,29 +204,14 @@ export default function AllSitesTab({
 
   // Filter products based on filterBy and contentTypeFilter props
   const filteredProducts = products.filter((product) => {
-    // Status filter
-    let statusMatch = true
-    if (filterBy !== "All") {
-      if (filterBy === "Active") statusMatch = product.status === "ACTIVE" || product.status === "OCCUPIED"
-      else if (filterBy === "Inactive") statusMatch = product.status !== "ACTIVE" && product.status !== "OCCUPIED"
-      else if (filterBy === "Open") statusMatch = product.status === "ACTIVE" || product.status === "AVAILABLE"
-      else if (filterBy === "Occupied") statusMatch = product.status === "OCCUPIED"
-      else if (filterBy === "Pending") statusMatch = product.status === "PENDING" || product.status === "INSTALLATION"
-      else if (filterBy === "Maintenance") statusMatch = product.status === "MAINTENANCE" || product.status === "REPAIR"
-      else statusMatch = true
-    }
-
-    // Content type filter
-    let contentTypeMatch = true
-    if (contentTypeFilter !== "All") {
-      if (contentTypeFilter === "Static")
-        contentTypeMatch = product.content_type === "Static" || product.content_type === "static"
-      else if (contentTypeFilter === "Dynamic")
-        contentTypeMatch = product.content_type === "Dynamic" || product.content_type === "dynamic"
-      else contentTypeMatch = true
-    }
-
-    return statusMatch && contentTypeMatch
+    if (filterBy === "All") return true
+    if (filterBy === "Active") return product.status === "ACTIVE" || product.status === "OCCUPIED"
+    if (filterBy === "Inactive") return product.status !== "ACTIVE" && product.status !== "OCCUPIED"
+    if (filterBy === "Open") return product.status === "ACTIVE" || product.status === "AVAILABLE"
+    if (filterBy === "Occupied") return product.status === "OCCUPIED"
+    if (filterBy === "Pending") return product.status === "PENDING" || product.status === "INSTALLATION"
+    if (filterBy === "Maintenance") return product.status === "MAINTENANCE" || product.status === "REPAIR"
+    return true
   })
 
   // Convert product to site format for display
@@ -337,11 +315,11 @@ export default function AllSitesTab({
           </div>
           <h3 className="text-lg font-medium mb-2">No sites found</h3>
           <p className="text-gray-500 mb-4">
-            {searchQuery || filterBy !== "All" || contentTypeFilter !== "All"
+            {searchQuery || filterBy !== "All"
               ? "No sites match your search criteria. Try adjusting your search terms or filters."
               : "There are no sites in the system yet."}
           </p>
-          {(searchQuery || filterBy !== "All" || contentTypeFilter !== "All") && (
+          {(searchQuery || filterBy !== "All") && (
             <Button variant="outline" onClick={() => window.location.reload()}>
               Clear Filters
             </Button>
