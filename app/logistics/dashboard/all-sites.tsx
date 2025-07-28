@@ -6,6 +6,8 @@ import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { getPaginatedUserProducts, getUserProductsCount, type Product } from "@/lib/firebase-service"
 import { getJobOrdersByCompanyId } from "@/lib/job-order-service"
+// Add fallback import
+// import { getJobOrdersByCompanyId } from "@/lib/job-order-service-backup"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -13,6 +15,10 @@ import { ChevronLeft, ChevronRight, Loader2, AlertCircle, Bell } from "lucide-re
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { CreateReportDialog } from "@/components/create-report-dialog"
+
+// Add this import at the top of the file
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
@@ -33,6 +39,10 @@ export default function AllSitesTab({
   const [error, setError] = useState<string | null>(null)
   const [jobOrderCounts, setJobOrderCounts] = useState<Record<string, number>>({})
 
+  const { toast } = useToast()
+  const { userData } = useAuth()
+  const router = useRouter()
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
@@ -49,40 +59,70 @@ export default function AllSitesTab({
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
   const [selectedSiteId, setSelectedSiteId] = useState<string>("")
 
-  const { toast } = useToast()
-  const { userData } = useAuth()
-  const router = useRouter()
+  // Add this debug section right after the JO count state
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development" && userData?.company_id) {
+      console.log("Debug: JO Counts", jobOrderCounts)
+      console.log("Company ID:", userData.company_id)
+    }
+  }, [jobOrderCounts, userData?.company_id])
 
   // Fetch job orders and count them by product_id (site)
   const fetchJobOrderCounts = useCallback(async () => {
     if (!userData?.company_id) return
 
     try {
-      console.log("Fetching job orders for company:", userData.company_id)
+      console.log("Fetching job orders for company:", userData.company_id) // Debug log
       const jobOrders = await getJobOrdersByCompanyId(userData.company_id)
-      console.log("Fetched job orders:", jobOrders)
+      console.log("Fetched job orders:", jobOrders) // Debug log
 
       const counts: Record<string, number> = {}
 
       // Count job orders by product_id (which matches the product document ID)
       jobOrders.forEach((jo) => {
-        console.log("Processing job order:", {
-          id: jo.id,
-          product_id: jo.product_id,
-          siteName: jo.siteName,
-          status: jo.status,
-        })
-
+        console.log("Processing JO:", jo.product_id, jo.status) // Debug log
         if (jo.product_id) {
           counts[jo.product_id] = (counts[jo.product_id] || 0) + 1
-          console.log(`Incremented count for product ${jo.product_id} to ${counts[jo.product_id]}`)
         }
       })
 
-      console.log("Final job order counts:", counts)
+      console.log("Final JO counts:", counts) // Debug log
       setJobOrderCounts(counts)
     } catch (error) {
       console.error("Error fetching job order counts:", error)
+      // Set empty counts on error to prevent undefined behavior
+      setJobOrderCounts({})
+    }
+  }, [userData?.company_id])
+
+  // Add this alternative function after the existing fetchJobOrderCounts
+  const fetchJobOrderCountsDirectly = useCallback(async () => {
+    if (!userData?.company_id) return
+
+    try {
+      console.log("Fetching job orders directly for company:", userData.company_id)
+
+      // Query job orders directly from Firestore
+      const jobOrdersRef = collection(db, "job_orders")
+      const q = query(jobOrdersRef, where("company_id", "==", userData.company_id))
+      const querySnapshot = await getDocs(q)
+
+      const counts: Record<string, number> = {}
+
+      querySnapshot.forEach((doc) => {
+        const jobOrder = doc.data()
+        console.log("Direct JO fetch - Processing:", jobOrder.product_id, jobOrder.status)
+
+        if (jobOrder.product_id) {
+          counts[jobOrder.product_id] = (counts[jobOrder.product_id] || 0) + 1
+        }
+      })
+
+      console.log("Direct fetch - Final JO counts:", counts)
+      setJobOrderCounts(counts)
+    } catch (error) {
+      console.error("Error fetching job orders directly:", error)
+      setJobOrderCounts({})
     }
   }, [userData?.company_id])
 
@@ -133,10 +173,6 @@ export default function AllSitesTab({
           searchTerm: searchQuery,
         })
 
-        console.log(
-          "Fetched products:",
-          result.items.map((p) => ({ id: p.id, name: p.name })),
-        )
         setProducts(result.items)
         setLastDoc(result.lastDoc)
         setHasMore(result.hasMore)
@@ -174,9 +210,14 @@ export default function AllSitesTab({
     if (userData?.company_id) {
       fetchProducts(1)
       fetchTotalCount()
-      fetchJobOrderCounts()
+
+      // Try the service function first, then fallback to direct fetch
+      fetchJobOrderCounts().catch(() => {
+        console.log("Service function failed, trying direct fetch...")
+        fetchJobOrderCountsDirectly()
+      })
     }
-  }, [userData?.company_id, fetchProducts, fetchTotalCount, fetchJobOrderCounts])
+  }, [userData?.company_id, fetchProducts, fetchTotalCount, fetchJobOrderCounts, fetchJobOrderCountsDirectly])
 
   // Load data when page changes
   useEffect(() => {
@@ -296,8 +337,6 @@ export default function AllSitesTab({
 
     // Get JO count for this site using the product ID
     const joCount = jobOrderCounts[product.id || ""] || 0
-
-    console.log(`Product ${product.id} (${product.name}) has ${joCount} job orders`)
 
     return {
       id: product.id,
