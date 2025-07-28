@@ -5,10 +5,11 @@ import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { getPaginatedUserProducts, getUserProductsCount, type Product } from "@/lib/firebase-service"
+import { getJobOrdersByCompanyId } from "@/lib/job-order-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Loader2, AlertCircle } from "lucide-react"
+import { ChevronLeft, ChevronRight, Loader2, AlertCircle, Bell } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { CreateReportDialog } from "@/components/create-report-dialog"
@@ -30,6 +31,7 @@ export default function AllSitesTab({
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [jobOrderCounts, setJobOrderCounts] = useState<Record<string, number>>({})
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -50,6 +52,29 @@ export default function AllSitesTab({
   const { toast } = useToast()
   const { userData } = useAuth()
   const router = useRouter()
+
+  // Fetch job orders and count them by site
+  const fetchJobOrderCounts = useCallback(async () => {
+    if (!userData?.company_id) return
+
+    try {
+      const jobOrders = await getJobOrdersByCompanyId(userData.company_id)
+      const counts: Record<string, number> = {}
+
+      // Count job orders by site (using quotation_id or site reference)
+      jobOrders.forEach((jo) => {
+        // Assuming job orders have a site reference - adjust based on your data structure
+        const siteId = jo.quotation_id || jo.siteName || jo.siteLocation
+        if (siteId) {
+          counts[siteId] = (counts[siteId] || 0) + 1
+        }
+      })
+
+      setJobOrderCounts(counts)
+    } catch (error) {
+      console.error("Error fetching job order counts:", error)
+    }
+  }, [userData?.company_id])
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
@@ -135,8 +160,9 @@ export default function AllSitesTab({
     if (userData?.company_id) {
       fetchProducts(1)
       fetchTotalCount()
+      fetchJobOrderCounts()
     }
-  }, [userData?.company_id, fetchProducts, fetchTotalCount])
+  }, [userData?.company_id, fetchProducts, fetchTotalCount, fetchJobOrderCounts])
 
   // Load data when page changes
   useEffect(() => {
@@ -227,10 +253,6 @@ export default function AllSitesTab({
     if (product.status === "MAINTENANCE" || product.status === "REPAIR") statusColor = "red"
     if (product.status === "PENDING" || product.status === "INSTALLATION") statusColor = "orange"
 
-    // Get notifications count (placeholder logic - replace with real logic)
-    const notifications =
-      product.status === "MAINTENANCE" ? 3 : product.status === "PENDING" ? 1 : Math.random() > 0.7 ? 1 : 0
-
     // Get image from product media or use placeholder
     const image =
       product.media && product.media.length > 0
@@ -258,17 +280,20 @@ export default function AllSitesTab({
       product.address ||
       "Address not specified"
 
+    // Get JO count for this site
+    const joCount = jobOrderCounts[product.id] || 0
+
     return {
       id: product.id,
       name: product.name || `Site ${product.id.substring(0, 8)}`,
       status: product.status || "UNKNOWN",
       statusColor,
       image,
-      notifications,
       address,
       contentType: product.content_type || "static",
       healthPercentage,
       siteCode: product.site_code || product.id.substring(0, 8),
+      joCount,
       operationalStatus:
         product.status === "ACTIVE" || product.status === "OCCUPIED"
           ? "Operational"
@@ -542,6 +567,12 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
               </div>
             </div>
 
+            {/* JO Notification */}
+            <div className="flex items-center gap-1 text-xs">
+              <Bell className="h-3 w-3 text-gray-400" />
+              <span className="text-gray-600">{site.joCount > 0 ? `JO (${site.joCount})` : "None"}</span>
+            </div>
+
             {/* Create Report Button */}
             <Button
               variant="secondary"
@@ -619,7 +650,7 @@ function UnifiedSiteListItem({ site, onCreateReport }: { site: any; onCreateRepo
 
               <h3 className="font-bold text-lg text-gray-900 mb-2 truncate">{site.name}</h3>
 
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-4 text-sm mb-2">
                 <div>
                   <span className="font-bold text-gray-700">Operation:</span>
                   <div className="text-gray-600">
@@ -645,6 +676,12 @@ function UnifiedSiteListItem({ site, onCreateReport }: { site: any; onCreateRepo
                           : "50%"}
                   </div>
                 </div>
+              </div>
+
+              {/* JO Notification */}
+              <div className="flex items-center gap-1 text-sm">
+                <Bell className="h-4 w-4 text-gray-400" />
+                <span className="text-gray-600">{site.joCount > 0 ? `JO (${site.joCount})` : "None"}</span>
               </div>
             </div>
 
