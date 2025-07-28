@@ -53,7 +53,7 @@ export default function AllSitesTab({
   const { userData } = useAuth()
   const router = useRouter()
 
-  // Fetch job orders and count them by site
+  // Fetch job orders and count them by product_id (site)
   const fetchJobOrderCounts = useCallback(async () => {
     if (!userData?.company_id) return
 
@@ -61,15 +61,14 @@ export default function AllSitesTab({
       const jobOrders = await getJobOrdersByCompanyId(userData.company_id)
       const counts: Record<string, number> = {}
 
-      // Count job orders by site (using quotation_id or site reference)
+      // Count job orders by product_id (which matches the product document ID)
       jobOrders.forEach((jo) => {
-        // Assuming job orders have a site reference - adjust based on your data structure
-        const siteId = jo.quotation_id || jo.siteName || jo.siteLocation
-        if (siteId) {
-          counts[siteId] = (counts[siteId] || 0) + 1
+        if (jo.product_id) {
+          counts[jo.product_id] = (counts[jo.product_id] || 0) + 1
         }
       })
 
+      console.log("Job Order Counts:", counts) // Debug log
       setJobOrderCounts(counts)
     } catch (error) {
       console.error("Error fetching job order counts:", error)
@@ -280,19 +279,19 @@ export default function AllSitesTab({
       product.address ||
       "Address not specified"
 
-    // Get JO count for this site
-    const joCount = jobOrderCounts[product.id] || 0
+    // Get JO count for this site using the product ID
+    const joCount = jobOrderCounts[product.id || ""] || 0
 
     return {
       id: product.id,
-      name: product.name || `Site ${product.id.substring(0, 8)}`,
+      name: product.name || `Site ${product.id?.substring(0, 8)}`,
       status: product.status || "UNKNOWN",
       statusColor,
       image,
       address,
       contentType: product.content_type || "static",
       healthPercentage,
-      siteCode: product.site_code || product.id.substring(0, 8),
+      siteCode: product.site_code || product.id?.substring(0, 8),
       joCount,
       operationalStatus:
         product.status === "ACTIVE" || product.status === "OCCUPIED"
