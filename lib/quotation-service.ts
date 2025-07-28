@@ -460,7 +460,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     pdf.text(`Related Campaign ID: ${safeString(quotation.campaignId)}`, margin, yPosition)
     yPosition += 5
   }
-  yPosition += 10
+  yPosition += 5
 
   // Product & Services Section (Manual Table Drawing)
   let productsTableHeight = 0
