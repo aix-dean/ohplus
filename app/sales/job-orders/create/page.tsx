@@ -124,18 +124,10 @@ export default function CreateJobOrderPage() {
   }, [signedQuotationUrl, poMoUrl, projectFaUrl])
 
   // Calculate duration in months
-  const totalMonths = useMemo(() => {
-    if (!quotationData?.quotation) return 1
-
+  const totalDays = useMemo(() => {
+    if (!quotationData?.quotation) return 0 // Default to 0 days if no quotation data
     const quotation = quotationData.quotation
-    if (quotation.start_date && quotation.end_date) {
-      const start = new Date(quotation.start_date)
-      const end = new Date(quotation.end_date)
-      return Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 30.44))
-    } else if (quotation.duration_days) {
-      return Math.round(quotation.duration_days / 30.44)
-    }
-    return 1
+    return quotation.duration_days || 0 // Use duration_days directly
   }, [quotationData])
 
   // Calculate individual product totals for display
@@ -147,52 +139,39 @@ export default function CreateJobOrderPage() {
     if (hasItems) {
       // Multiple products from quotation.items
       return quotationItems.map((item: any) => {
-        console.log(`items ${JSON.stringify(item)}`)
-        const monthlyRate = item.price || 0
-        console.log(`monthly ${monthlyRate}`)
-        const subtotal = monthlyRate
-        console.log(`total months ${totalMonths}`)
-        const vat = monthlyRate * 0.12
-        const total = subtotal + vat
+        const subtotal = item.item_total_amount || 0 // Use item_total_amount for subtotal
+        const vat = subtotal * 0.12 // Recalculate VAT based on new subtotal
+        const total = subtotal + vat // Recalculate total
 
         return {
           subtotal,
           vat,
           total,
-          monthlyRate,
+          monthlyRate: item.price || 0, // Keep monthlyRate for display if needed
           siteCode: item.site_code || "N/A",
           productName: item.product_name || "N/A",
         }
       })
     } else {
       // Single product from quotation object
-      const monthlyRate = quotation.price || 0
-      const subtotal = monthlyRate
-      const vat = subtotal * 0.12
-      const total = subtotal + vat
+      const subtotal = quotation.item_total_amount || 0 // Use item_total_amount for subtotal
+      const vat = subtotal * 0.12 // Recalculate VAT based on new subtotal
+      const total = subtotal + vat // Recalculate total
 
       return [
         {
           subtotal,
           vat,
           total,
-          monthlyRate,
+          monthlyRate: quotation.price || 0, // Keep monthlyRate for display if needed
           siteCode: quotation.site_code || "N/A",
           productName: quotation.product_name || "N/A",
         },
       ]
     }
-  }, [quotationData, quotationItems, totalMonths, hasItems])
+  }, [quotationData, quotationItems, hasItems])
 
   // Calculate overall totals
-  const overallSubtotal = useMemo(() => {
-    return productTotals.reduce((sum, product) => sum + product.subtotal, 0)
-  }, [productTotals])
-
-  const overallVat = useMemo(() => {
-    return productTotals.reduce((sum, product) => sum + product.vat, 0)
-  }, [productTotals])
-
   const overallTotal = useMemo(() => {
     return productTotals.reduce((sum, product) => sum + product.total, 0)
   }, [productTotals])
@@ -381,17 +360,15 @@ export default function CreateJobOrderPage() {
         let jobOrdersData = []
 
         if (hasItems) {
-          // Multiple products from quotation.items
           jobOrdersData = quotationItems.map((item: any, index: number) => {
             const form = jobOrderForms[index]
             const product = products[index] || {}
 
-            const contractDuration = totalMonths > 0 ? `(${totalMonths} months)` : "N/A"
+            const contractDuration = totalDays > 0 ? `(${totalDays} days)` : "N/A" // Use totalDays
 
-            const monthlyRate = item.price || 0
-            const totalLease = monthlyRate * totalMonths
-            const productVat = monthlyRate * 0.12
-            const productTotal = monthlyRate + productVat
+            const subtotal = item.item_total_amount || 0 // Use item_total_amount
+            const productVat = subtotal * 0.12 // Recalculate VAT
+            const productTotal = subtotal + productVat // Recalculate total
 
             return {
               quotationId: quotation.id,
@@ -417,7 +394,7 @@ export default function CreateJobOrderPage() {
               quotationNumber: quotation.quotation_number,
               clientName: client?.name || "N/A",
               clientCompany: client?.company || "N/A",
-              contractDuration: contractDuration,
+              contractDuration: contractDuration, // Use new contractDuration
               contractPeriodStart: quotation.start_date || "",
               contractPeriodEnd: quotation.end_date || "",
               siteName: item.product_name || product.name || "",
@@ -425,11 +402,11 @@ export default function CreateJobOrderPage() {
               siteType: item.type || product.type || "N/A",
               siteSize: product.specs_rental?.size || product.light?.size || "N/A",
               siteIllumination: product.light?.illumination || "N/A",
-              leaseRatePerMonth: monthlyRate,
-              totalMonths: totalMonths,
-              totalLease: totalLease,
-              vatAmount: productVat,
-              totalAmount: productTotal,
+              leaseRatePerMonth: item.price || 0, // Keep monthlyRate for display if needed
+              totalMonths: totalDays, // This might still be relevant for other calculations, but not for totalLease directly
+              totalLease: subtotal, // totalLease is now the subtotal
+              vatAmount: productVat, // Use recalculated VAT
+              totalAmount: productTotal, // Use recalculated total
               siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
               missingCompliance: missingCompliance,
               product_id: item.product_id || product.id || "",
@@ -441,12 +418,11 @@ export default function CreateJobOrderPage() {
           const form = jobOrderForms[0]
           const product = products[0] || {}
 
-          const contractDuration = totalMonths > 0 ? `(${totalMonths} months)` : "N/A"
+          const contractDuration = totalDays > 0 ? `(${totalDays} days)` : "N/A" // Use totalDays
 
-          const monthlyRate = quotation.price || 0
-          const totalLease = monthlyRate * totalMonths
-          const productVat = monthlyRate * 0.12
-          const productTotal = monthlyRate + productVat
+          const subtotal = quotation.item_total_amount || 0 // Use item_total_amount
+          const productVat = subtotal * 0.12 // Recalculate VAT
+          const productTotal = subtotal + productVat // Recalculate total
 
           jobOrdersData = [
             {
@@ -473,7 +449,7 @@ export default function CreateJobOrderPage() {
               quotationNumber: quotation.quotation_number,
               clientName: client?.name || "N/A",
               clientCompany: client?.company || "N/A",
-              contractDuration: contractDuration,
+              contractDuration: contractDuration, // Use new contractDuration
               contractPeriodStart: quotation.start_date || "",
               contractPeriodEnd: quotation.end_date || "",
               siteName: quotation.product_name || product.name || "",
@@ -481,11 +457,11 @@ export default function CreateJobOrderPage() {
               siteType: product.type || "N/A",
               siteSize: product.specs_rental?.size || product.light?.size || "N/A",
               siteIllumination: product.light?.illumination || "N/A",
-              leaseRatePerMonth: monthlyRate,
-              totalMonths: totalMonths,
-              totalLease: totalLease,
-              vatAmount: productVat,
-              totalAmount: productTotal,
+              leaseRatePerMonth: quotation.price || 0, // Keep monthlyRate for display if needed
+              totalMonths: totalDays, // This might still be relevant for other calculations, but not for totalLease directly
+              totalLease: subtotal, // totalLease is now the subtotal
+              vatAmount: productVat, // Use recalculated VAT
+              totalAmount: productTotal, // Use recalculated total
               siteImageUrl: product.media?.[0]?.url || "/placeholder.svg?height=48&width=48",
               missingCompliance: missingCompliance,
               product_id: quotation.product_id || product.id || "",
@@ -515,7 +491,7 @@ export default function CreateJobOrderPage() {
       hasItems,
       quotationItems,
       jobOrderForms,
-      totalMonths,
+      totalDays,
       signedQuotationUrl,
       poMoUrl,
       projectFaUrl,
@@ -653,8 +629,7 @@ export default function CreateJobOrderPage() {
                 <span className="font-semibold">Client Name:</span> {client?.company || client?.name || "N/A"}
               </p>
               <p className="text-sm">
-                <span className="font-semibold">Contract Duration:</span>{" "}
-                {totalMonths > 0 ? `(${totalMonths} months)` : "N/A"}
+                <span className="font-semibold">Contract Duration:</span> {totalDays > 0 ? `${totalDays} days` : "N/A"}
               </p>
               <p className="text-sm">
                 <span className="font-semibold">Contract Period:</span>{" "}
@@ -693,7 +668,6 @@ export default function CreateJobOrderPage() {
             {/* Totals Section */}
             <div className="space-y-0.5 mt-3">
               {isMultiProduct ? (
-                // Show individual product totals for multiple products
                 <div className="space-y-3">
                   {productTotals.map((productTotal, index) => (
                     <div key={index} className="border-l-2 border-blue-500 pl-3">
@@ -708,27 +682,21 @@ export default function CreateJobOrderPage() {
                     </div>
                   ))}
 
-                  {/* Overall totals */}
+                  {/* Overall totals - ONLY GRAND TOTAL REMAINS */}
                   <div className="border-t border-gray-300 pt-2 mt-3">
-                    <p className="text-sm">
-                      <span className="font-semibold">Overall Subtotal:</span> {formatCurrency(overallSubtotal)}
-                    </p>
-                    <p className="text-sm">
-                      <span className="font-semibold">Overall 12% VAT:</span> {formatCurrency(overallVat)}
-                    </p>
                     <p className="font-bold text-lg mt-1">GRAND TOTAL: {formatCurrency(overallTotal)}</p>
                   </div>
                 </div>
               ) : (
-                // Show single product totals
+                // Single product totals - no change needed here as overall totals were only for multi-product
                 <div>
                   <p className="text-sm">
-                    <span className="font-semibold">Subtotal:</span> {formatCurrency(overallSubtotal)}
+                    <span className="font-semibold">Subtotal:</span> {formatCurrency(productTotals[0].subtotal)}
                   </p>
                   <p className="text-sm">
-                    <span className="font-semibold">12% VAT:</span> {formatCurrency(overallVat)}
+                    <span className="font-semibold">12% VAT:</span> {formatCurrency(productTotals[0].vat)}
                   </p>
-                  <p className="font-bold text-lg mt-1">TOTAL: {formatCurrency(overallTotal)}</p>
+                  <p className="font-bold text-lg mt-1">TOTAL: {formatCurrency(productTotals[0].total)}</p>
                 </div>
               )}
             </div>
