@@ -278,7 +278,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
   // Show loading if no user
   if (!userData?.company_id) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
+      <div className="flex flex-col items-center justify-center py-12 bg-gray-100 min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
         <p className="text-gray-500">Loading user data...</p>
       </div>
@@ -286,7 +286,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
   }
 
   return (
-    <div className="flex flex-col gap-5 p-6">
+    <div className="flex flex-col gap-5 p-6 bg-gray-100 min-h-screen">
       {/* Loading State */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-12">
@@ -391,7 +391,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
               size="sm"
               onClick={goToPreviousPage}
               disabled={currentPage === 1}
-              className="h-8 w-8 p-0 bg-transparent"
+              className="h-8 w-8 p-0 bg-white"
             >
               <ChevronLeft size={16} />
             </Button>
@@ -409,7 +409,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
                     variant={currentPage === page ? "default" : "outline"}
                     size="sm"
                     onClick={() => goToPage(page as number)}
-                    className="h-8 w-8 p-0"
+                    className={`h-8 w-8 p-0 ${currentPage !== page ? "bg-white" : ""}`}
                   >
                     {page}
                   </Button>
@@ -422,7 +422,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
               size="sm"
               onClick={goToNextPage}
               disabled={currentPage >= totalPages}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 bg-white"
             >
               <ChevronRight size={16} />
             </Button>
