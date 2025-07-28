@@ -19,7 +19,7 @@ export interface SpecsRental {
 }
 
 export interface QuotationProduct {
-  id: string
+  product_id: string
   name: string
   location: string
   price: number // Monthly price
