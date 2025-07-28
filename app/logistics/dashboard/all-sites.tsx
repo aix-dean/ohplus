@@ -58,17 +58,28 @@ export default function AllSitesTab({
     if (!userData?.company_id) return
 
     try {
+      console.log("Fetching job orders for company:", userData.company_id)
       const jobOrders = await getJobOrdersByCompanyId(userData.company_id)
+      console.log("Fetched job orders:", jobOrders)
+
       const counts: Record<string, number> = {}
 
       // Count job orders by product_id (which matches the product document ID)
       jobOrders.forEach((jo) => {
+        console.log("Processing job order:", {
+          id: jo.id,
+          product_id: jo.product_id,
+          siteName: jo.siteName,
+          status: jo.status,
+        })
+
         if (jo.product_id) {
           counts[jo.product_id] = (counts[jo.product_id] || 0) + 1
+          console.log(`Incremented count for product ${jo.product_id} to ${counts[jo.product_id]}`)
         }
       })
 
-      console.log("Job Order Counts:", counts) // Debug log
+      console.log("Final job order counts:", counts)
       setJobOrderCounts(counts)
     } catch (error) {
       console.error("Error fetching job order counts:", error)
@@ -122,6 +133,10 @@ export default function AllSitesTab({
           searchTerm: searchQuery,
         })
 
+        console.log(
+          "Fetched products:",
+          result.items.map((p) => ({ id: p.id, name: p.name })),
+        )
         setProducts(result.items)
         setLastDoc(result.lastDoc)
         setHasMore(result.hasMore)
@@ -281,6 +296,8 @@ export default function AllSitesTab({
 
     // Get JO count for this site using the product ID
     const joCount = jobOrderCounts[product.id || ""] || 0
+
+    console.log(`Product ${product.id} (${product.name}) has ${joCount} job orders`)
 
     return {
       id: product.id,
