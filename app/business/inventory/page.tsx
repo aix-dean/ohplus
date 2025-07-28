@@ -421,15 +421,18 @@ export default function BusinessInventoryPage() {
           </Card>
 
           {loading && products.length === 0
-            ? // Show loading cards only when initially loading
-              Array.from({ length: 3 }).map((_, index) => (
-                <Card key={`loading-${index}`} className="overflow-hidden border border-gray-200 shadow-md rounded-xl">
+            ? // Show shimmer skeleton cards in grid layout
+              Array.from({ length: 8 }).map((_, index) => (
+                <Card key={`shimmer-${index}`} className="overflow-hidden border border-gray-200 shadow-md rounded-xl">
                   <div className="h-48 bg-gray-200 animate-pulse" />
                   <CardContent className="p-4">
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div className="h-4 bg-gray-200 rounded animate-pulse" />
-                      <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
-                      <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse" />
+                      <div className="h-4 bg-gray-200 rounded w-2/3 animate-pulse" />
+                      <div className="flex items-center space-x-2">
+                        <div className="h-3 w-3 bg-gray-200 rounded animate-pulse" />
+                        <div className="h-3 bg-gray-200 rounded w-3/4 animate-pulse" />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

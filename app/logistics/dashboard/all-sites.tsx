@@ -443,7 +443,6 @@ export default function AllSitesTab({
           )}
         </div>
       )}
-
       {/* Site Display - Grid or List View */}
       {!loading && !error && filteredProducts.length > 0 && (
         <>
@@ -575,6 +574,7 @@ function UnifiedSiteCard({
   onCreateReport: (siteId: string) => void
   onJOCountClick: (siteId: string, siteName: string) => void
 }) {
+
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -590,7 +590,7 @@ function UnifiedSiteCard({
   }
 
   const handleCardClick = () => {
-    window.location.href = `/logistics/sites/${site.id}`
+    router.push(`/logistics/sites/${site.id}`)
   }
 
   return (
