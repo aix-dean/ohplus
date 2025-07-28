@@ -535,15 +535,6 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
                   </span>
                 </span>
               </div>
-
-              <div className="flex flex-col">
-                <span className="text-black">
-                  <span className="font-bold">Compliance:</span>
-                  <span className="ml-1 text-black">
-                    {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}
-                  </span>
-                </span>
-              </div>
             </div>
 
             {/* Create Report Button */}
@@ -623,7 +614,7 @@ function UnifiedSiteListItem({ site, onCreateReport }: { site: any; onCreateRepo
 
               <h3 className="font-bold text-lg text-gray-900 mb-2 truncate">{site.name}</h3>
 
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="font-bold text-gray-700">Operation:</span>
                   <div className="text-gray-600">
@@ -647,13 +638,6 @@ function UnifiedSiteListItem({ site, onCreateReport }: { site: any; onCreateRepo
                         : site.healthPercentage > 60
                           ? "75%"
                           : "50%"}
-                  </div>
-                </div>
-
-                <div>
-                  <span className="font-bold text-gray-700">Compliance:</span>
-                  <div className="text-gray-600">
-                    {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}
                   </div>
                 </div>
               </div>
