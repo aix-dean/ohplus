@@ -15,6 +15,7 @@ export default function LogisticsDashboardPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [filterBy, setFilterBy] = useState("All")
+  const [contentTypeFilter, setContentTypeFilter] = useState("All")
   const { user, userData } = useAuth()
 
   const clearSearch = () => {
@@ -62,16 +63,32 @@ export default function LogisticsDashboardPage() {
                     </button>
                   )}
                 </div>
+
+                {/* Status Filter */}
                 <Select value={filterBy} onValueChange={setFilterBy}>
-                  <SelectTrigger className="w-24 bg-white border-gray-200">
-                    <SelectValue />
+                  <SelectTrigger className="w-32 bg-white border-gray-200">
+                    <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="All">All</SelectItem>
+                    <SelectItem value="All">All Status</SelectItem>
                     <SelectItem value="Active">Active</SelectItem>
                     <SelectItem value="Inactive">Inactive</SelectItem>
                     <SelectItem value="Open">Open</SelectItem>
                     <SelectItem value="Occupied">Occupied</SelectItem>
+                    <SelectItem value="Pending">Pending</SelectItem>
+                    <SelectItem value="Maintenance">Maintenance</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Content Type Filter */}
+                <Select value={contentTypeFilter} onValueChange={setContentTypeFilter}>
+                  <SelectTrigger className="w-32 bg-white border-gray-200">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All Types</SelectItem>
+                    <SelectItem value="Static">Static</SelectItem>
+                    <SelectItem value="Dynamic">Dynamic</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -99,7 +116,12 @@ export default function LogisticsDashboardPage() {
 
             {/* All Sites Display */}
             <div className="bg-white rounded-lg border border-gray-200">
-              <AllSitesTab searchQuery={searchQuery} filterBy={filterBy} viewMode={viewMode} />
+              <AllSitesTab
+                searchQuery={searchQuery}
+                filterBy={filterBy}
+                contentTypeFilter={contentTypeFilter}
+                viewMode={viewMode}
+              />
             </div>
           </div>
         </main>

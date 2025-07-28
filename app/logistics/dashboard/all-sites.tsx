@@ -19,10 +19,16 @@ const ITEMS_PER_PAGE = 8
 interface AllSitesTabProps {
   searchQuery?: string
   filterBy?: string
+  contentTypeFilter?: string
   viewMode?: "grid" | "list"
 }
 
-export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMode = "grid" }: AllSitesTabProps) {
+export default function AllSitesTab({
+  searchQuery = "",
+  filterBy = "All",
+  contentTypeFilter = "All",
+  viewMode = "grid",
+}: AllSitesTabProps) {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -124,7 +130,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
     setPageCache(new Map())
     fetchTotalCount()
     fetchProducts(1, true)
-  }, [searchQuery, filterBy])
+  }, [searchQuery, filterBy, contentTypeFilter])
 
   // Load initial data and count
   useEffect(() => {
@@ -203,14 +209,31 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
     return pageNumbers
   }
 
-  // Filter products based on filterBy prop
+  // Filter products based on filterBy and contentTypeFilter props
   const filteredProducts = products.filter((product) => {
-    if (filterBy === "All") return true
-    if (filterBy === "Active") return product.status === "ACTIVE" || product.status === "OCCUPIED"
-    if (filterBy === "Inactive") return product.status !== "ACTIVE" && product.status !== "OCCUPIED"
-    if (filterBy === "Open") return product.status === "ACTIVE" || product.status === "AVAILABLE"
-    if (filterBy === "Occupied") return product.status === "OCCUPIED"
-    return true
+    // Status filter
+    let statusMatch = true
+    if (filterBy !== "All") {
+      if (filterBy === "Active") statusMatch = product.status === "ACTIVE" || product.status === "OCCUPIED"
+      else if (filterBy === "Inactive") statusMatch = product.status !== "ACTIVE" && product.status !== "OCCUPIED"
+      else if (filterBy === "Open") statusMatch = product.status === "ACTIVE" || product.status === "AVAILABLE"
+      else if (filterBy === "Occupied") statusMatch = product.status === "OCCUPIED"
+      else if (filterBy === "Pending") statusMatch = product.status === "PENDING" || product.status === "INSTALLATION"
+      else if (filterBy === "Maintenance") statusMatch = product.status === "MAINTENANCE" || product.status === "REPAIR"
+      else statusMatch = true
+    }
+
+    // Content type filter
+    let contentTypeMatch = true
+    if (contentTypeFilter !== "All") {
+      if (contentTypeFilter === "Static")
+        contentTypeMatch = product.content_type === "Static" || product.content_type === "static"
+      else if (contentTypeFilter === "Dynamic")
+        contentTypeMatch = product.content_type === "Dynamic" || product.content_type === "dynamic"
+      else contentTypeMatch = true
+    }
+
+    return statusMatch && contentTypeMatch
   })
 
   // Convert product to site format for display
@@ -286,7 +309,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
   }
 
   return (
-    <>
+    <div className="flex flex-col gap-5 p-6 bg-transparent min-h-screen">
       {/* Loading State */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-12">
@@ -314,11 +337,11 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
           </div>
           <h3 className="text-lg font-medium mb-2">No sites found</h3>
           <p className="text-gray-500 mb-4">
-            {searchQuery || filterBy !== "All"
+            {searchQuery || filterBy !== "All" || contentTypeFilter !== "All"
               ? "No sites match your search criteria. Try adjusting your search terms or filters."
               : "There are no sites in the system yet."}
           </p>
-          {(searchQuery || filterBy !== "All") && (
+          {(searchQuery || filterBy !== "All" || contentTypeFilter !== "All") && (
             <Button variant="outline" onClick={() => window.location.reload()}>
               Clear Filters
             </Button>
@@ -330,7 +353,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
       {!loading && !error && filteredProducts.length > 0 && (
         <>
           {viewMode === "grid" ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 opacity-50">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
               {filteredProducts.map((product) => (
                 <UnifiedSiteCard
                   key={product.id}
@@ -432,7 +455,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
 
       {/* Report Dialog */}
       <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
-    </>
+    </div>
   )
 }
 
