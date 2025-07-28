@@ -252,10 +252,10 @@ const addImageToPDF = async (
 
 // Helper function to calculate text height without drawing
 const calculateTextHeight = (text: string, maxWidth: number, fontSize = 10): number => {
-  const pdf = new jsPDF() // Declare the pdf variable
-  pdf.setFontSize(fontSize) // Ensure font size is set for accurate splitTextToSize
-  const lines = pdf.splitTextToSize(text, maxWidth)
-  return lines.length * fontSize * 0.3
+  const tempPdf = new jsPDF() // Create a temporary jsPDF instance for calculation
+  tempPdf.setFontSize(fontSize)
+  const lines = tempPdf.splitTextToSize(text, maxWidth)
+  return lines.length * fontSize * 0.35 // Adjusted multiplier for better estimation
 }
 
 // Generate PDF for quotation
@@ -276,7 +276,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     pdf.setFontSize(fontSize)
     const lines = pdf.splitTextToSize(text, maxWidth)
     pdf.text(lines, x, y)
-    return y + lines.length * fontSize * 0.3
+    return y + lines.length * fontSize * 0.35 // Adjusted multiplier
   }
 
   // Helper function to check if we need a new page
@@ -285,6 +285,9 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
       // -20 for footer space
       pdf.addPage()
       yPosition = margin
+      // Re-add header elements on new page
+      addHeaderElementsToPage() // Call this without await as it's not critical for layout flow
+      yPosition = Math.max(yPosition, margin + 35) // Ensure content starts below header elements
     }
   }
 
@@ -503,7 +506,6 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setTextColor(0, 0, 0)
 
   for (const item of quotation.items) {
-    // Changed product to item
     checkNewPage(dataRowHeight + 5) // Check for space for the next row
     pdf.setFillColor(255, 255, 255) // bg-white
     pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "F")
@@ -555,42 +557,31 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     currentX += colWidths[0]
 
     // Product column
-    let productText = safeString(item.name) // Changed product to item
+    let productText = safeString(item.name)
     if (item.site_code) {
-      // Changed product to item
-      productText += `\nSite: ${item.site_code}` // Changed product to item
+      productText += `\nSite: ${item.site_code}`
     }
-    // Calculate text height for product column to center vertically
-    const productLines = pdf.splitTextToSize(productText, colWidths[1] - 2 * cellPadding)
-    const productTextHeight = productLines.length * pdf.getFontSize() * 0.3
+    const productTextHeight = calculateTextHeight(productText, colWidths[1] - 2 * cellPadding, 8)
     const productTextY = yPosition + (dataRowHeight - productTextHeight) / 2
-    yPosition = addText(productText, currentX + cellPadding, productTextY, colWidths[1] - 2 * cellPadding, 8)
+    addText(productText, currentX + cellPadding, productTextY, colWidths[1] - 2 * cellPadding, 8)
     currentX += colWidths[1]
 
     // Type column
     pdf.text(safeString(item.type), currentX + cellPadding, yPosition + dataRowHeight / 2, {
-      // Changed product to item
       baseline: "middle",
     })
     currentX += colWidths[2]
 
     // Location column
-    // Calculate text height for location column to center vertically
-    const locationLines = pdf.splitTextToSize(safeString(item.location), colWidths[3] - 2 * cellPadding)
-    const locationTextHeight = locationLines.length * pdf.getFontSize() * 0.3
+    const locationText = safeString(item.location)
+    const locationTextHeight = calculateTextHeight(locationText, colWidths[3] - 2 * cellPadding, 8)
     const locationTextY = yPosition + (dataRowHeight - locationTextHeight) / 2
-    yPosition = addText(
-      safeString(item.location), // Changed product to item
-      currentX + cellPadding,
-      locationTextY,
-      colWidths[3] - 2 * cellPadding,
-      8,
-    )
+    addText(locationText, currentX + cellPadding, locationTextY, colWidths[3] - 2 * cellPadding, 8)
     currentX += colWidths[3]
 
     // Price column
     pdf.text(
-      `PHP${safeString(item.price)}/month`, // Changed product to item
+      `PHP${safeString(item.price)}/month`,
       currentX + colWidths[4] - cellPadding,
       yPosition + dataRowHeight / 2,
       {
@@ -641,53 +632,53 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     estimatedSectionHeight += 8 // Spacing after line
 
     // Estimate height for specifications (left and right columns)
-    let currentSpecHeight = 0
+    let currentSpecHeightLeft = 0
+    let currentSpecHeightRight = 0
     const specFontSize = 9
 
     // Left column specs
     if (item.specs_rental?.width && item.specs_rental?.height) {
-      currentSpecHeight += calculateTextHeight(
+      currentSpecHeightLeft += calculateTextHeight(
         `Dimensions: ${safeString(item.specs_rental.width)}m x ${safeString(item.specs_rental.height)}m`,
         contentWidth / 2 - 25,
         specFontSize,
       )
-      currentSpecHeight += 5 // Line spacing
+      currentSpecHeightLeft += 5 // Line spacing
     }
     if (item.specs_rental?.elevation) {
-      currentSpecHeight += calculateTextHeight(
+      currentSpecHeightLeft += calculateTextHeight(
         `Elevation: ${safeString(item.specs_rental.elevation)}m`,
         contentWidth / 2 - 25,
         specFontSize,
       )
-      currentSpecHeight += 5 // Line spacing
+      currentSpecHeightLeft += 5 // Line spacing
     }
 
     // Right column specs
-    let rightSpecHeight = 0
     if (item.specs_rental?.traffic_count) {
-      rightSpecHeight += calculateTextHeight(
+      currentSpecHeightRight += calculateTextHeight(
         `Traffic Count: ${safeString(item.specs_rental.traffic_count)}`,
         contentWidth / 2 - 30,
         specFontSize,
       )
-      rightSpecHeight += 5 // Line spacing
+      currentSpecHeightRight += 5 // Line spacing
     }
     if (item.specs_rental?.audience_type) {
-      rightSpecHeight += calculateTextHeight(
+      currentSpecHeightRight += calculateTextHeight(
         `Audience Type: ${safeString(item.specs_rental.audience_type)}`,
         contentWidth / 2 - 30,
         specFontSize,
       )
-      rightSpecHeight += 5 // Line spacing
+      currentSpecHeightRight += 5 // Line spacing
     } else if (item.specs_rental?.audience_types && item.specs_rental.audience_types.length > 0) {
-      rightSpecHeight += calculateTextHeight(
+      currentSpecHeightRight += calculateTextHeight(
         item.specs_rental.audience_types.join(", "),
         contentWidth / 2 - 30,
         specFontSize,
       )
-      rightSpecHeight += 5 // Line spacing
+      currentSpecHeightRight += 5 // Line spacing
     }
-    estimatedSectionHeight += Math.max(currentSpecHeight, rightSpecHeight) // Add the max height consumed by specs
+    estimatedSectionHeight += Math.max(currentSpecHeightLeft, currentSpecHeightRight) // Add the max height consumed by specs
 
     estimatedSectionHeight += 5 // Spacing after specs
 
@@ -718,7 +709,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     pdf.setFontSize(12)
     pdf.setFont("helvetica", "bold")
     pdf.setTextColor(0, 0, 0)
-    pdf.text(`${safeString(item.name)} Details`, margin, yPosition) // Changed product to item
+    pdf.text(`${safeString(item.name)} Details`, margin, yPosition)
     yPosition += 5
     pdf.setLineWidth(0.2)
     pdf.setDrawColor(200, 200, 200)
@@ -732,72 +723,96 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     const leftCol = margin
     const rightCol = margin + contentWidth / 2
 
-    let leftY = yPosition
-    let rightY = yPosition
+    const currentYForSpecs = yPosition // Use a single Y for both columns to track max height
 
     // Left column specifications
+    let tempLeftY = currentYForSpecs
     if (item.specs_rental?.width && item.specs_rental?.height) {
       pdf.setFont("helvetica", "bold")
-      pdf.text("Dimensions:", leftCol, leftY)
+      pdf.text("Dimensions:", leftCol, tempLeftY)
       pdf.setFont("helvetica", "normal")
-      leftY = addText(
-        `${safeString(item.specs_rental.width)}m x ${safeString(item.specs_rental.height)}m`, // Changed product to item
+      tempLeftY = addText(
+        `${safeString(item.specs_rental.width)}m x ${safeString(item.specs_rental.height)}m`,
         leftCol + 25,
-        leftY,
+        tempLeftY,
         contentWidth / 2 - 25,
         9,
       )
-      leftY += 5
+      tempLeftY += 5
     }
 
     if (item.specs_rental?.elevation) {
       pdf.setFont("helvetica", "bold")
-      pdf.text("Elevation:", leftCol, leftY)
+      pdf.text("Elevation:", leftCol, tempLeftY)
       pdf.setFont("helvetica", "normal")
-      leftY = addText(`${safeString(item.specs_rental.elevation)}m`, leftCol + 25, leftY, contentWidth / 2 - 25, 9) // Changed product to item
-      leftY += 5
+      tempLeftY = addText(
+        `${safeString(item.specs_rental.elevation)}m`,
+        leftCol + 25,
+        tempLeftY,
+        contentWidth / 2 - 25,
+        9,
+      )
+      tempLeftY += 5
     }
 
     // Right column specifications
+    let tempRightY = currentYForSpecs
     if (item.specs_rental?.traffic_count) {
       pdf.setFont("helvetica", "bold")
-      pdf.text("Traffic Count:", rightCol, rightY)
+      pdf.text("Traffic Count:", rightCol, tempRightY)
       pdf.setFont("helvetica", "normal")
-      rightY = addText(safeString(item.specs_rental.traffic_count), rightCol + 30, rightY, contentWidth / 2 - 30, 9) // Changed product to item
-      rightY += 5
+      tempRightY = addText(
+        safeString(item.specs_rental.traffic_count),
+        rightCol + 30,
+        tempRightY,
+        contentWidth / 2 - 30,
+        9,
+      )
+      tempRightY += 5
     }
 
     if (item.specs_rental?.audience_type) {
       pdf.setFont("helvetica", "bold")
-      pdf.text("Audience Type:", rightCol, rightY)
+      pdf.text("Audience Type:", rightCol, tempRightY)
       pdf.setFont("helvetica", "normal")
-      rightY = addText(safeString(item.specs_rental.audience_type), rightCol + 30, rightY, contentWidth / 2 - 30, 9) // Changed product to item
-      rightY += 5
+      tempRightY = addText(
+        safeString(item.specs_rental.audience_type),
+        rightCol + 30,
+        tempRightY,
+        contentWidth / 2 - 30,
+        9,
+      )
+      tempRightY += 5
     } else if (item.specs_rental?.audience_types && item.specs_rental.audience_types.length > 0) {
       pdf.setFont("helvetica", "bold")
-      pdf.text("Audience Types:", rightCol, rightY)
+      pdf.text("Audience Types:", rightCol, tempRightY)
       pdf.setFont("helvetica", "normal")
-      rightY = addText(item.specs_rental.audience_types.join(", "), rightCol + 30, rightY, contentWidth / 2 - 30, 9) // Changed product to item
-      rightY += 2
+      tempRightY = addText(
+        item.specs_rental.audience_types.join(", "),
+        rightCol + 30,
+        tempRightY,
+        contentWidth / 2 - 30,
+        9,
+      )
+      tempRightY += 2
     }
 
-    yPosition = Math.max(leftY, rightY) + 5
+    yPosition = Math.max(tempLeftY, tempRightY) + 5
 
     // Description
     if (item.description) {
-      checkNewPage(20) // Check for description space
+      checkNewPage(calculateTextHeight(safeString(item.description), contentWidth, 9) + 10) // Check for description space
       pdf.setFontSize(9)
       pdf.setFont("helvetica", "bold")
       pdf.text("Description:", margin, yPosition)
       yPosition += 5
       pdf.setFont("helvetica", "normal")
-      yPosition = addText(safeString(item.description), margin, yPosition, contentWidth, 9) // Changed product to item
+      yPosition = addText(safeString(item.description), margin, yPosition, contentWidth, 9)
       yPosition += 5
     }
 
     // Media Images - uniform grid
     if (item.media && item.media.length > 0) {
-      // Changed product to item
       const imagesToShow = item.media.filter((media) => !media.isVideo) // Only show images in PDF
       if (imagesToShow.length > 0) {
         let imagesSectionHeight = 8 // "Product Images:" label
