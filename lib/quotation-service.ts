@@ -439,7 +439,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     yPosition += 5
   }
   if (quotation.client_phone) {
-    pdf.text(`Phone: ${safeString(quotation.client_phone)}`, margin, yPosition)
+    pdf.text(`Phone: ${safeString(quotation.client_phone)}`,  margin + contentWidth / 2, yPosition)
     yPosition += 5
   }
   if (quotation.client_address) {
