@@ -70,6 +70,8 @@ export default function LogisticsDashboardPage() {
                     <SelectItem value="All">All</SelectItem>
                     <SelectItem value="Active">Active</SelectItem>
                     <SelectItem value="Inactive">Inactive</SelectItem>
+                    <SelectItem value="Open">Open</SelectItem>
+                    <SelectItem value="Occupied">Occupied</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -95,9 +97,9 @@ export default function LogisticsDashboardPage() {
               </div>
             </div>
 
-            {/* Main Content - All Sites */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <AllSitesTab />
+            {/* All Sites Display */}
+            <div className="bg-white rounded-lg border border-gray-200">
+              <AllSitesTab searchQuery={searchQuery} filterBy={filterBy} viewMode={viewMode} />
             </div>
           </div>
         </main>
