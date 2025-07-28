@@ -221,6 +221,362 @@ async function resolveCompanyLogo(userData?: any, projectData?: any): Promise<st
   return "/ohplus-new-logo.png"
 }
 
+// Service Assignment interface for PDF generation
+interface ServiceAssignmentPDFData {
+  saNumber: string
+  projectSiteName: string
+  projectSiteLocation: string
+  serviceType: string
+  assignedTo: string
+  serviceDuration: string
+  priority: string
+  equipmentRequired: string
+  materialSpecs: string
+  crew: string
+  illuminationNits: string
+  gondola: string
+  technology: string
+  sales: string
+  remarks: string
+  requestedBy: {
+    name: string
+    department: string
+  }
+  startDate: Date | null
+  endDate: Date | null
+  alarmDate: Date | null
+  alarmTime: string
+  attachments: { name: string; type: string }[]
+  serviceCost: {
+    crewFee: string
+    overtimeFee: string
+    transpo: string
+    tollFee: string
+    mealAllowance: string
+    otherFees: { name: string; amount: string }[]
+    total: number
+  }
+  status: string
+  created: Date
+}
+
+export async function generateServiceAssignmentPDF(
+  serviceAssignment: ServiceAssignmentPDFData,
+  returnBase64 = false,
+): Promise<string | void> {
+  try {
+    // Create new PDF document
+    const pdf = new jsPDF("p", "mm", "a4")
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 20
+    const contentWidth = pageWidth - margin * 2
+    let yPosition = margin
+
+    // Helper function to add text with word wrapping
+    const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
+      pdf.setFontSize(fontSize)
+      const lines = pdf.splitTextToSize(text, maxWidth)
+      pdf.text(lines, x, y)
+      return y + lines.length * fontSize * 0.3
+    }
+
+    // Helper function to check if we need a new page
+    const checkNewPage = (requiredHeight: number) => {
+      if (yPosition + requiredHeight > pageHeight - margin - 20) {
+        pdf.addPage()
+        yPosition = margin
+      }
+    }
+
+    // Header with company branding
+    pdf.setFillColor(30, 58, 138) // blue-900
+    pdf.rect(0, 0, pageWidth, 25, "F")
+
+    // Add white text for header
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(20)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("SERVICE ASSIGNMENT", margin, 15)
+
+    // Add logistics badge
+    pdf.setFontSize(10)
+    pdf.text("LOGISTICS DEPARTMENT", pageWidth - margin - 50, 15)
+
+    yPosition = 35
+    pdf.setTextColor(0, 0, 0)
+
+    // Service Assignment Title and Number
+    pdf.setFontSize(24)
+    pdf.setFont("helvetica", "bold")
+    pdf.text(`SA# ${serviceAssignment.saNumber}`, margin, yPosition)
+    yPosition += 10
+
+    // Status badge
+    const getStatusColor = (status: string) => {
+      switch (status?.toLowerCase()) {
+        case "completed":
+          return [34, 197, 94] // green
+        case "pending":
+          return [234, 179, 8] // yellow
+        case "approved":
+          return [59, 130, 246] // blue
+        case "draft":
+          return [107, 114, 128] // gray
+        default:
+          return [107, 114, 128] // gray
+      }
+    }
+
+    const statusColor = getStatusColor(serviceAssignment.status)
+    pdf.setFillColor(statusColor[0], statusColor[1], statusColor[2])
+    pdf.rect(margin, yPosition, 25, 8, "F")
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "bold")
+    pdf.text(serviceAssignment.status.toUpperCase(), margin + 2, yPosition + 5)
+    pdf.setTextColor(0, 0, 0)
+
+    yPosition += 20
+
+    // Service Assignment Information Section
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("SERVICE ASSIGNMENT INFORMATION", margin, yPosition)
+    yPosition += 8
+
+    // Draw section separator
+    pdf.setLineWidth(0.5)
+    pdf.setDrawColor(200, 200, 200)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 10
+
+    // Two column layout for service information
+    const leftColumn = margin
+    const rightColumn = margin + contentWidth / 2
+
+    pdf.setFontSize(11)
+    pdf.setFont("helvetica", "normal")
+
+    // Left column
+    let leftY = yPosition
+    const leftColumnData = [
+      { label: "SA Number:", value: serviceAssignment.saNumber },
+      { label: "Project Site:", value: serviceAssignment.projectSiteName },
+      { label: "Location:", value: serviceAssignment.projectSiteLocation || "N/A" },
+      { label: "Service Type:", value: serviceAssignment.serviceType },
+      { label: "Assigned To:", value: serviceAssignment.assignedTo },
+      {
+        label: "Duration:",
+        value: serviceAssignment.serviceDuration ? `${serviceAssignment.serviceDuration} hours` : "N/A",
+      },
+      { label: "Priority:", value: serviceAssignment.priority },
+      { label: "Crew:", value: serviceAssignment.crew || "N/A" },
+    ]
+
+    leftColumnData.forEach((item) => {
+      pdf.setFont("helvetica", "bold")
+      pdf.text(item.label, leftColumn, leftY)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(item.value, leftColumn + 35, leftY)
+      leftY += 6
+    })
+
+    // Right column
+    let rightY = yPosition
+    const rightColumnData = [
+      { label: "Created:", value: serviceAssignment.created.toLocaleDateString() },
+      {
+        label: "Start Date:",
+        value: serviceAssignment.startDate ? serviceAssignment.startDate.toLocaleDateString() : "N/A",
+      },
+      { label: "End Date:", value: serviceAssignment.endDate ? serviceAssignment.endDate.toLocaleDateString() : "N/A" },
+      {
+        label: "Alarm Date:",
+        value: serviceAssignment.alarmDate ? serviceAssignment.alarmDate.toLocaleDateString() : "N/A",
+      },
+      { label: "Alarm Time:", value: serviceAssignment.alarmTime || "N/A" },
+      {
+        label: "Illumination:",
+        value: serviceAssignment.illuminationNits ? `${serviceAssignment.illuminationNits} nits` : "N/A",
+      },
+      { label: "Gondola:", value: serviceAssignment.gondola || "N/A" },
+      { label: "Technology:", value: serviceAssignment.technology || "N/A" },
+    ]
+
+    rightColumnData.forEach((item) => {
+      pdf.setFont("helvetica", "bold")
+      pdf.text(item.label, rightColumn, rightY)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(item.value, rightColumn + 35, rightY)
+      rightY += 6
+    })
+
+    yPosition = Math.max(leftY, rightY) + 10
+
+    // Equipment and Materials Section
+    if (serviceAssignment.equipmentRequired || serviceAssignment.materialSpecs) {
+      checkNewPage(30)
+      pdf.setFontSize(16)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("EQUIPMENT & MATERIALS", margin, yPosition)
+      yPosition += 8
+
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 10
+
+      pdf.setFontSize(11)
+      pdf.setFont("helvetica", "normal")
+
+      if (serviceAssignment.equipmentRequired) {
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Equipment Required:", margin, yPosition)
+        pdf.setFont("helvetica", "normal")
+        yPosition += 5
+        yPosition = addText(serviceAssignment.equipmentRequired, margin, yPosition, contentWidth)
+        yPosition += 5
+      }
+
+      if (serviceAssignment.materialSpecs) {
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Material Specifications:", margin, yPosition)
+        pdf.setFont("helvetica", "normal")
+        yPosition += 5
+        yPosition = addText(serviceAssignment.materialSpecs, margin, yPosition, contentWidth)
+      }
+
+      yPosition += 10
+    }
+
+    // Service Cost Section
+    if (serviceAssignment.serviceCost.total > 0) {
+      checkNewPage(40)
+      pdf.setFontSize(16)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("SERVICE COST BREAKDOWN", margin, yPosition)
+      yPosition += 8
+
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 10
+
+      pdf.setFontSize(11)
+      pdf.setFont("helvetica", "normal")
+
+      const costItems = [
+        { label: "Crew Fee:", value: serviceAssignment.serviceCost.crewFee },
+        { label: "Overtime Fee:", value: serviceAssignment.serviceCost.overtimeFee },
+        { label: "Transportation:", value: serviceAssignment.serviceCost.transpo },
+        { label: "Toll Fee:", value: serviceAssignment.serviceCost.tollFee },
+        { label: "Meal Allowance:", value: serviceAssignment.serviceCost.mealAllowance },
+      ]
+
+      costItems.forEach((item) => {
+        if (item.value && Number.parseFloat(item.value) > 0) {
+          pdf.setFont("helvetica", "bold")
+          pdf.text(item.label, margin, yPosition)
+          pdf.setFont("helvetica", "normal")
+          pdf.text(formatCurrency(Number.parseFloat(item.value)), rightColumn, yPosition)
+          yPosition += 6
+        }
+      })
+
+      // Other fees
+      serviceAssignment.serviceCost.otherFees.forEach((fee) => {
+        if (fee.name && fee.amount && Number.parseFloat(fee.amount) > 0) {
+          pdf.setFont("helvetica", "bold")
+          pdf.text(`${fee.name}:`, margin, yPosition)
+          pdf.setFont("helvetica", "normal")
+          pdf.text(formatCurrency(Number.parseFloat(fee.amount)), rightColumn, yPosition)
+          yPosition += 6
+        }
+      })
+
+      // Total
+      yPosition += 5
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 8
+
+      pdf.setFontSize(14)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("TOTAL COST:", margin, yPosition)
+      pdf.text(formatCurrency(serviceAssignment.serviceCost.total), rightColumn, yPosition)
+      yPosition += 15
+    }
+
+    // Remarks Section
+    if (serviceAssignment.remarks) {
+      checkNewPage(30)
+      pdf.setFontSize(16)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("REMARKS", margin, yPosition)
+      yPosition += 8
+
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 10
+
+      pdf.setFontSize(11)
+      pdf.setFont("helvetica", "normal")
+      yPosition = addText(serviceAssignment.remarks, margin, yPosition, contentWidth)
+      yPosition += 10
+    }
+
+    // Requested By Section
+    checkNewPage(20)
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("REQUESTED BY", margin, yPosition)
+    yPosition += 8
+
+    pdf.setLineWidth(0.5)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 10
+
+    pdf.setFontSize(11)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(`${serviceAssignment.requestedBy.department} - ${serviceAssignment.requestedBy.name}`, margin, yPosition)
+    yPosition += 15
+
+    // Footer
+    checkNewPage(30)
+    yPosition = pageHeight - 40
+
+    // Footer separator
+    pdf.setLineWidth(0.5)
+    pdf.setDrawColor(200, 200, 200)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 10
+
+    // Footer content
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
+    pdf.setTextColor(100, 100, 100)
+
+    pdf.text("Generated by OH Plus Platform - Logistics Department", margin, yPosition)
+    pdf.text(`Generated on ${new Date().toLocaleDateString()}`, margin, yPosition + 5)
+
+    // Company info on the right
+    pdf.text("Smart. Seamless. Scalable.", pageWidth - margin - 50, yPosition)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("OH+", pageWidth - margin - 15, yPosition + 5)
+
+    if (returnBase64) {
+      // Return base64 string for email attachment
+      return pdf.output("datauristring").split(",")[1]
+    } else {
+      // Save the PDF for download
+      const fileName = `service-assignment-${serviceAssignment.saNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
+      pdf.save(fileName)
+    }
+  } catch (error) {
+    console.error("Error generating Service Assignment PDF:", error)
+    throw new Error("Failed to generate Service Assignment PDF")
+  }
+}
+
 export async function generateJobOrderPDF(jobOrder: JobOrder, returnBase64 = false): Promise<string | void> {
   try {
     // Create new PDF document
@@ -1856,94 +2212,16 @@ export async function generateReportPDF(
       month: "2-digit",
       day: "2-digit",
     })
-    const disclaimer = `"All data are based on the latest available records as of ${currentDate}."`
-
-    // Position disclaimer properly on the right
-    const disclaimerMaxWidth = 120
-    const disclaimerX = pageWidth - margin - disclaimerMaxWidth
-    const disclaimerLines = pdf.splitTextToSize(disclaimer, disclaimerMaxWidth)
-
-    // Align disclaimer with the "Prepared by" section
-    pdf.text(disclaimerLines, disclaimerX, footerStartY + 8, {
-      align: "left",
-      maxWidth: disclaimerMaxWidth,
-    })
-
-    // ANGULAR FOOTER - Fixed design and positioning
-    const angularFooterY = pageHeight - 18
-    const angularFooterHeight = 18
-
-    // Clear any existing content in footer area
-    pdf.setFillColor(255, 255, 255)
-    pdf.rect(0, angularFooterY, pageWidth, angularFooterHeight, "F")
-
-    // Left cyan section with proper dimensions
-    const cyanWidth = pageWidth * 0.3
-    const diagonalCutWidth = pageWidth * 0.08
-
-    // Draw cyan rectangle (left side)
-    pdf.setFillColor(52, 211, 235) // cyan-400
-    pdf.rect(0, angularFooterY, cyanWidth - diagonalCutWidth, angularFooterHeight, "F")
-
-    // Draw diagonal connecting part for cyan
-    pdf.triangle(
-      cyanWidth - diagonalCutWidth,
-      angularFooterY,
-      cyanWidth,
-      angularFooterY,
-      cyanWidth - diagonalCutWidth,
-      angularFooterY + angularFooterHeight,
-      "F",
-    )
-
-    // Right blue section
-    pdf.setFillColor(30, 58, 138) // blue-900
-    pdf.rect(cyanWidth, angularFooterY, pageWidth - cyanWidth, angularFooterHeight, "F")
-
-    // Draw diagonal connecting part for blue
-    pdf.triangle(
-      cyanWidth - diagonalCutWidth,
-      angularFooterY + angularFooterHeight,
-      cyanWidth,
-      angularFooterY,
-      cyanWidth,
-      angularFooterY + angularFooterHeight,
-      "F",
-    )
-
-    // Footer text - properly positioned
-    pdf.setTextColor(255, 255, 255)
-    pdf.setFontSize(10)
-    pdf.setFont("helvetica", "normal")
-
-    // "Smart. Seamless. Scalable" text
-    const taglineText = "Smart. Seamless. Scalable"
-    const taglineWidth = pdf.getTextWidth(taglineText)
-    pdf.text(taglineText, pageWidth - margin - taglineWidth - 25, angularFooterY + 10)
-
-    // "OH!" text
-    pdf.setFontSize(16)
-    pdf.setFont("helvetica", "bold")
-    const ohText = "OH!"
-    const ohWidth = pdf.getTextWidth(ohText)
-    pdf.text(ohText, pageWidth - margin - ohWidth - 8, angularFooterY + 12)
-
-    // "+" symbol in cyan color
-    pdf.setTextColor(52, 211, 235) // cyan-400
-    pdf.setFontSize(16)
-    pdf.setFont("helvetica", "normal")
-    pdf.text("+", pageWidth - margin - 3, angularFooterY + 12)
+    pdf.text(`This report was automatically generated on ${currentDate}.`, pageWidth - margin - 70, footerY)
 
     if (returnBase64) {
       return pdf.output("datauristring").split(",")[1]
     } else {
-      const fileName = `report-${getSiteName(report)
-        .replace(/[^a-z0-9]/gi, "_")
-        .toLowerCase()}-${Date.now()}.pdf`
+      const fileName = `report-${report.id}-${Date.now()}.pdf`
       pdf.save(fileName)
     }
   } catch (error) {
-    console.error("Error generating Report PDF:", error)
-    throw new Error("Failed to generate Report PDF")
+    console.error("Error generating report PDF:", error)
+    throw new Error("Failed to generate report PDF")
   }
 }
