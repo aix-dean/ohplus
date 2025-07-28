@@ -451,7 +451,7 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
   }
 
   return (
-    <div className="p-3 bg-gray-200 rounded-xl">
+    <div className="p-3 bg-transparent rounded-xl">
       <Card
         className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full"
         onClick={handleCardClick}
@@ -568,7 +568,7 @@ function UnifiedSiteListItem({ site, onCreateReport }: { site: any; onCreateRepo
   }
 
   return (
-    <div className="p-3 bg-gray-200 rounded-xl">
+    <div className="p-3 bg-transparent rounded-xl">
       <Card
         className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full"
         onClick={handleCardClick}
