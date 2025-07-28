@@ -330,7 +330,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
       {!loading && !error && filteredProducts.length > 0 && (
         <>
           {viewMode === "grid" ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 opacity-50">
               {filteredProducts.map((product) => (
                 <UnifiedSiteCard
                   key={product.id}
