@@ -288,7 +288,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
   }
 
   return (
-    <div className="flex flex-col gap-5 p-6 min-h-screen">
+    <div className="flex flex-col gap-5 p-6 min-h-screen opacity-20">
       {/* Loading State */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-12">
