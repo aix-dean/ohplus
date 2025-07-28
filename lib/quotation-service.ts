@@ -59,33 +59,39 @@ export async function getQuotationById(quotationId: string): Promise<Quotation |
 
     if (quotationDoc.exists()) {
       const data = quotationDoc.data() as Quotation
-      const productsFromQuotation = data.products || []
+      const itemsFromQuotation = data.items || [] // Changed from products to items
 
       // Fetch full product details for each product in the quotation
-      const enrichedProducts: QuotationProduct[] = await Promise.all(
-        productsFromQuotation.map(async (productInQuotation) => {
-          if (productInQuotation.id) {
-            const fullProductDetails = await getProductFromFirebase(productInQuotation.id)
+      const enrichedItems: QuotationProduct[] = await Promise.all(
+        itemsFromQuotation.map(async (itemInQuotation) => {
+          // Changed productInQuotation to itemInQuotation
+          if (itemInQuotation.id) {
+            const fullProductDetails = await getProductFromFirebase(itemInQuotation.id)
             if (fullProductDetails) {
               // Merge existing quotation product data with full product details.
               // Prioritize quotation-specific fields (like price, notes if they were overridden)
               // but ensure all detailed fields (media, specs_rental, description, etc.) are present.
               return {
                 ...fullProductDetails, // Start with all details from the product collection
-                ...productInQuotation, // Overlay with any specific data stored in the quotation's product entry
+                ...itemInQuotation, // Overlay with any specific data stored in the quotation's product entry
                 // Ensure price from quotation is used if it exists, otherwise fallback to product price
-                price: productInQuotation.price !== undefined ? productInQuotation.price : fullProductDetails.price,
+                price: itemInQuotation.price !== undefined ? itemInQuotation.price : fullProductDetails.price,
+                // Populate media_url from the first media item if available
+                media_url:
+                  fullProductDetails.media && fullProductDetails.media.length > 0
+                    ? fullProductDetails.media[0].url
+                    : undefined,
               } as QuotationProduct
             }
           }
-          return productInQuotation // Return as is if product not found or no ID
+          return itemInQuotation // Return as is if product not found or no ID
         }),
       )
 
       return {
         id: quotationDoc.id,
         ...data,
-        products: enrichedProducts,
+        items: enrichedItems, // Changed products to items
       } as Quotation
     }
 
@@ -132,7 +138,7 @@ export function generateQuotationNumber(): string {
 export function calculateQuotationTotal(
   startDate: string,
   endDate: string,
-  products: QuotationProduct[], // Now accepts an array of products
+  items: QuotationProduct[], // Changed from products to items
 ): {
   durationDays: number
   totalAmount: number
@@ -142,9 +148,13 @@ export function calculateQuotationTotal(
   const durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
 
   let totalAmount = 0
-  products.forEach((product) => {
-    const dailyRate = (product.price || 0) / 30 // Assuming price is monthly
-    totalAmount += dailyRate * Math.max(1, durationDays)
+  items.forEach((item) => {
+    // Changed product to item
+    const dailyRate = (item.price || 0) / 30 // Assuming price is monthly
+    const itemTotal = dailyRate * Math.max(1, durationDays)
+    item.item_total_amount = itemTotal // Assign calculated item total amount
+    item.duration_days = Math.max(1, durationDays) // Assign calculated duration days to item
+    totalAmount += itemTotal
   })
 
   return {
@@ -456,7 +466,8 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setFont("helvetica", "normal")
   pdf.setTextColor(0, 0, 0)
 
-  for (const product of quotation.products) {
+  for (const item of quotation.items) {
+    // Changed product to item
     checkNewPage(dataRowHeight + 5)
     pdf.setFillColor(255, 255, 255) // bg-white
     pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "F")
@@ -470,9 +481,12 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     const imageX = currentX + cellPadding
     const imageY = yPosition + (dataRowHeight - imageSize) / 2
 
-    if (product.media && product.media.length > 0 && product.media[0].url) {
+    // Use media_url if available, otherwise fallback to media[0].url
+    const imageUrlToUse = item.media_url || (item.media && item.media.length > 0 ? item.media[0].url : undefined)
+
+    if (imageUrlToUse) {
       try {
-        const imageBase64 = await loadImageAsBase64(product.media[0].url)
+        const imageBase64 = await loadImageAsBase64(imageUrlToUse)
         if (imageBase64) {
           pdf.addImage(imageBase64, "JPEG", imageX, imageY, imageSize, imageSize)
         }
@@ -499,22 +513,24 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     currentX += colWidths[0]
 
     // Product column
-    let productText = safeString(product.name)
-    if (product.site_code) {
-      productText += `\nSite: ${product.site_code}`
+    let productText = safeString(item.name) // Changed product to item
+    if (item.site_code) {
+      // Changed product to item
+      productText += `\nSite: ${item.site_code}` // Changed product to item
     }
     addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[1] - 2 * cellPadding, 8)
     currentX += colWidths[1]
 
     // Type column
-    pdf.text(safeString(product.type), currentX + cellPadding, yPosition + dataRowHeight / 2, {
+    pdf.text(safeString(item.type), currentX + cellPadding, yPosition + dataRowHeight / 2, {
+      // Changed product to item
       baseline: "middle",
     })
     currentX += colWidths[2]
 
     // Location column
     addText(
-      safeString(product.location),
+      safeString(item.location), // Changed product to item
       currentX + cellPadding,
       yPosition + cellPadding,
       colWidths[3] - 2 * cellPadding,
@@ -524,7 +540,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
 
     // Price column
     pdf.text(
-      `PHP${safeString(product.price)}/month`,
+      `PHP${safeString(item.price)}/month`, // Changed product to item
       currentX + colWidths[4] - cellPadding,
       yPosition + dataRowHeight / 2,
       {
@@ -566,12 +582,13 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   yPosition += headerRowHeight + 15
 
   // Product Details Section
-  for (const product of quotation.products) {
+  for (const item of quotation.items) {
+    // Changed product to item
     checkNewPage(60)
     pdf.setFontSize(12)
     pdf.setFont("helvetica", "bold")
     pdf.setTextColor(0, 0, 0)
-    pdf.text(`${safeString(product.name)} Details`, margin, yPosition)
+    pdf.text(`${safeString(item.name)} Details`, margin, yPosition) // Changed product to item
     yPosition += 5
     pdf.setLineWidth(0.2)
     pdf.setDrawColor(200, 200, 200)
@@ -589,66 +606,73 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     let rightY = yPosition
 
     // Left column specifications
-    if (product.specs_rental?.width && product.specs_rental?.height) {
+    if (item.specs_rental?.width && item.specs_rental?.height) {
+      // Changed product to item
       pdf.setFont("helvetica", "bold")
       pdf.text("Dimensions:", leftCol, leftY)
       pdf.setFont("helvetica", "normal")
       pdf.text(
-        `${safeString(product.specs_rental.width)}m x ${safeString(product.specs_rental.height)}m`,
+        `${safeString(item.specs_rental.width)}m x ${safeString(item.specs_rental.height)}m`, // Changed product to item
         leftCol + 25,
         leftY,
       )
       leftY += 5
     }
 
-    if (product.specs_rental?.elevation) {
+    if (item.specs_rental?.elevation) {
+      // Changed product to item
       pdf.setFont("helvetica", "bold")
       pdf.text("Elevation:", leftCol, leftY)
       pdf.setFont("helvetica", "normal")
-      pdf.text(`${safeString(product.specs_rental.elevation)}m`, leftCol + 25, leftY)
+      pdf.text(`${safeString(item.specs_rental.elevation)}m`, leftCol + 25, leftY) // Changed product to item
       leftY += 5
     }
 
     // Right column specifications
-    if (product.specs_rental?.traffic_count) {
+    if (item.specs_rental?.traffic_count) {
+      // Changed product to item
       pdf.setFont("helvetica", "bold")
       pdf.text("Traffic Count:", rightCol, rightY)
       pdf.setFont("helvetica", "normal")
-      pdf.text(safeString(product.specs_rental.traffic_count), rightCol + 30, rightY)
+      pdf.text(safeString(item.specs_rental.traffic_count), rightCol + 30, rightY) // Changed product to item
       rightY += 5
     }
 
-    if (product.specs_rental?.audience_type) {
+    if (item.specs_rental?.audience_type) {
+      // Changed product to item
       pdf.setFont("helvetica", "bold")
       pdf.text("Audience Type:", rightCol, rightY)
       pdf.setFont("helvetica", "normal")
-      pdf.text(safeString(product.specs_rental.audience_type), rightCol + 30, rightY)
+      pdf.text(safeString(item.specs_rental.audience_type), rightCol + 30, rightY) // Changed product to item
       rightY += 5
-    } else if (product.specs_rental?.audience_types && product.specs_rental.audience_types.length > 0) {
+    } else if (item.specs_rental?.audience_types && item.specs_rental.audience_types.length > 0) {
+      // Changed product to item
       pdf.setFont("helvetica", "bold")
       pdf.text("Audience Types:", rightCol, rightY)
       pdf.setFont("helvetica", "normal")
-      rightY = addText(product.specs_rental.audience_types.join(", "), rightCol + 30, rightY, contentWidth / 2 - 30, 9)
+      rightY = addText(item.specs_rental.audience_types.join(", "), rightCol + 30, rightY, contentWidth / 2 - 30, 9) // Changed product to item
       rightY += 2
     }
 
     yPosition = Math.max(leftY, rightY) + 5
 
     // Description
-    if (product.description) {
+    if (item.description) {
+      // Changed product to item
       checkNewPage(20)
       pdf.setFontSize(9)
       pdf.setFont("helvetica", "bold")
       pdf.text("Description:", margin, yPosition)
       yPosition += 5
       pdf.setFont("helvetica", "normal")
-      yPosition = addText(safeString(product.description), margin, yPosition, contentWidth, 9)
+      yPosition = addText(safeString(item.description), margin, yPosition, contentWidth, 9) // Changed product to item
       yPosition += 5
     }
 
     // Media Images - uniform grid
-    if (product.media && product.media.length > 0) {
-      const imagesToShow = product.media.filter((media) => !media.isVideo) // Only show images in PDF
+    if (item.media && item.media.length > 0) {
+      // Changed product to item
+      const imagesToShow = item.media.filter((media) => !media.isVideo) // Only show images in PDF
       if (imagesToShow.length > 0) {
         checkNewPage(50)
         pdf.setFontSize(9)
@@ -811,7 +835,7 @@ export async function getQuotationsByCampaignId(campaignId: string): Promise<Quo
 
     querySnapshot.forEach((doc) => {
       const data = doc.data()
-      quotations.push({ id: doc.id, ...data, products: data.products || [] } as Quotation)
+      quotations.push({ id: doc.id, ...data, items: data.items || [] } as Quotation) // Changed products to items
     })
 
     return quotations
@@ -836,7 +860,7 @@ export async function getQuotationsByCreatedBy(userId: string): Promise<Quotatio
 
     querySnapshot.forEach((doc) => {
       const data = doc.data()
-      quotations.push({ id: doc.id, ...data, products: data.products || [] } as Quotation)
+      quotations.push({ id: doc.id, ...data, items: data.items || [] } as Quotation) // Changed products to items
     })
 
     return quotations
@@ -871,7 +895,7 @@ export async function getQuotationsPaginated(
   const quotations: any[] = []
   querySnapshot.forEach((doc) => {
     const data = doc.data()
-    quotations.push({ id: doc.id, ...data, products: data.products || [] })
+    quotations.push({ id: doc.id, ...data, items: data.items || [] }) // Changed products to items
   })
 
   const lastVisibleId = querySnapshot.docs[querySnapshot.docs.length - 1] || null

@@ -30,6 +30,10 @@ export interface QuotationProduct {
   light?: boolean // Added from image
   media?: MediaItem[] // Added from image
   specs_rental?: SpecsRental // Added from image
+  // New fields from image data model
+  media_url?: string // Added to match image exactly
+  duration_days?: number // Duration specific to this item (if different from overall)
+  item_total_amount?: number // Total amount for this specific item
 }
 
 export interface Quotation {
@@ -39,7 +43,7 @@ export interface Quotation {
   start_date: string
   end_date: string
   total_amount: number
-  duration_days: number
+  duration_days: number // Overall duration for the quotation
   notes?: string
   status: "draft" | "sent" | "accepted" | "rejected" | "expired" | "viewed"
   created: any // Firebase Timestamp
@@ -54,5 +58,5 @@ export interface Quotation {
   proposalId?: string
   valid_until?: any // Firebase Timestamp
   seller_id?: string
-  products: QuotationProduct[] // Array of products
+  items: QuotationProduct[] // Renamed from 'products' to 'items'
 }

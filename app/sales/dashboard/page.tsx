@@ -706,20 +706,21 @@ function SalesDashboardContent() {
         router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
       } else if (actionAfterDateSelection === "quotation") {
         // Prepare products for quotation
-        const quotationProducts: QuotationProduct[] = selectedSites.map((site) => ({
+        const quotationItems: QuotationProduct[] = selectedSites.map((site) => ({
           id: site.id,
           name: site.name,
           location: site.specs_rental?.location || site.light?.location || "N/A",
           price: site.price || 0, // This is the monthly price
           type: site.type || "Unknown",
           site_code: getSiteCode(site) || "N/A",
+          media_url: site.media && site.media.length > 0 ? site.media[0].url : undefined,
         }))
 
         // Calculate total amount for all selected products
         const { durationDays, totalAmount } = calculateQuotationTotal(
           startDate.toISOString(),
           endDate.toISOString(),
-          quotationProducts,
+          quotationItems,
         )
 
         const validUntil = new Date()
@@ -727,7 +728,7 @@ function SalesDashboardContent() {
 
         const quotationData = {
           quotation_number: generateQuotationNumber(),
-          products: quotationProducts, // Pass the array of products
+          items: quotationItems, // Pass the array of products
           start_date: startDate.toISOString(),
           end_date: endDate.toISOString(),
           total_amount: totalAmount,

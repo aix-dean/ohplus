@@ -145,11 +145,11 @@ export default function QuotationDetailsPage() {
 
   // Effect to recalculate total amount whenever relevant fields change in editableQuotation
   useEffect(() => {
-    if (editableQuotation && editableQuotation.products && editableQuotation.start_date && editableQuotation.end_date) {
+    if (editableQuotation && editableQuotation.items && editableQuotation.start_date && editableQuotation.end_date) {
       const { durationDays, totalAmount } = calculateQuotationTotal(
         editableQuotation.start_date,
         editableQuotation.end_date,
-        editableQuotation.products,
+        editableQuotation.items,
       )
 
       setEditableQuotation((prev) => {
@@ -243,7 +243,7 @@ export default function QuotationDetailsPage() {
       const { durationDays, totalAmount } = calculateQuotationTotal(
         startDateObj.toISOString(),
         endDateObj.toISOString(),
-        editableQuotation.products,
+        editableQuotation.items,
       )
 
       // Prepare the data to be sent to the backend
@@ -302,8 +302,8 @@ export default function QuotationDetailsPage() {
   const handleProductPriceChange = (productId: string, newPrice: number) => {
     setEditableQuotation((prev) => {
       if (!prev) return null
-      const updatedProducts = prev.products.map((p) => (p.id === productId ? { ...p, price: newPrice } : p))
-      return { ...prev, products: updatedProducts }
+      const updatedItems = prev.items.map((p) => (p.id === productId ? { ...p, price: newPrice } : p))
+      return { ...prev, items: updatedItems }
     })
   }
 
@@ -771,52 +771,63 @@ export default function QuotationDetailsPage() {
                       <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
                         Price (Monthly)
                       </th>
+                      <th className="py-2 px-4 text-right font-medium text-gray-700 border-b border-gray-300">
+                        Item Total
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {currentQuotation.products.map((product, index) => (
-                      <tr key={product.id || index} className="bg-white">
+                    {currentQuotation.items.map((item, index) => (
+                      <tr key={item.id || index} className="bg-white">
                         <td className="py-3 px-4 border-b border-gray-200">
                           <img
-                            src={product.media?.[0]?.url || "/placeholder.svg?height=64&width=64&query=product"}
-                            alt={product.name}
+                            src={
+                              item.media_url ||
+                              item.media?.[0]?.url ||
+                              "/placeholder.svg?height=64&width=64&query=product"
+                            }
+                            alt={item.name}
                             className="w-16 h-16 object-cover rounded-sm"
                           />
                         </td>
                         <td className="py-3 px-4 border-b border-gray-200">
-                          <div className="font-medium text-gray-900">{safeString(product.name)}</div>
-                          {product.site_code && <div className="text-xs text-gray-500">Site: {product.site_code}</div>}
-                          {product.description && (
-                            <div className="text-xs text-gray-600 mt-1">{safeString(product.description)}</div>
+                          <div className="font-medium text-gray-900">{safeString(item.name)}</div>
+                          {item.site_code && <div className="text-xs text-gray-500">Site: {item.site_code}</div>}
+                          {item.description && (
+                            <div className="text-xs text-gray-600 mt-1">{safeString(item.description)}</div>
                           )}
                         </td>
                         <td className="py-3 px-4 border-b border-gray-200">
                           <span className="inline-block px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
-                            {safeString(product.type)}
+                            {safeString(item.type)}
                           </span>
                         </td>
-                        <td className="py-3 px-4 border-b border-gray-200">{safeString(product.location)}</td>
+                        <td className="py-3 px-4 border-b border-gray-200">{safeString(item.location)}</td>
                         <td className="py-3 px-4 text-right border-b border-gray-200">
                           {isEditing ? (
                             <Input
                               type="number"
-                              name={`product-price-${product.id}`}
-                              value={product.price || ""}
+                              name={`product-price-${item.id}`}
+                              value={item.price || ""}
                               onChange={(e) =>
-                                handleProductPriceChange(product.id, Number.parseFloat(e.target.value) || 0)
+                                handleProductPriceChange(item.id, Number.parseFloat(e.target.value) || 0)
                               }
                               className="w-full text-right"
                               step="0.01"
                             />
                           ) : (
-                            <div className="font-medium text-gray-900">₱{safeString(product.price)}</div>
+                            <div className="font-medium text-gray-900">₱{safeString(item.price)}</div>
                           )}
                           <div className="text-xs text-gray-500">per month</div>
+                        </td>
+                        <td className="py-3 px-4 text-right border-b border-gray-200">
+                          <div className="font-medium text-gray-900">₱{safeString(item.item_total_amount)}</div>
+                          <div className="text-xs text-gray-500">{safeString(item.duration_days)} day(s)</div>
                         </td>
                       </tr>
                     ))}
                     <tr className="bg-gray-50">
-                      <td colSpan={4} className="py-3 px-4 text-right font-medium">
+                      <td colSpan={5} className="py-3 px-4 text-right font-medium">
                         Total Amount:
                       </td>
                       <td className="py-3 px-4 text-right font-bold text-blue-600">
@@ -829,61 +840,61 @@ export default function QuotationDetailsPage() {
             </div>
 
             {/* Product Details */}
-            {currentQuotation.products.map((product, index) => (
-              <div key={product.id || index} className="mb-8">
+            {currentQuotation.items.map((item, index) => (
+              <div key={item.id || index} className="mb-8">
                 <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                  {safeString(product.name)} Details
+                  {safeString(item.name)} Details
                 </h2>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-                  {product.specs_rental?.width && product.specs_rental?.height && (
+                  {item.specs_rental?.width && item.specs_rental?.height && (
                     <div>
                       <Label className="text-sm font-medium text-gray-500 mb-2">Dimensions</Label>
                       <p className="text-base text-gray-900">
-                        {safeString(product.specs_rental.width)}m x {safeString(product.specs_rental.height)}m
+                        {safeString(item.specs_rental.width)}m x {safeString(item.specs_rental.height)}m
                       </p>
                     </div>
                   )}
-                  {product.specs_rental?.elevation && (
+                  {item.specs_rental?.elevation && (
                     <div>
                       <Label className="text-sm font-medium text-gray-500 mb-2">Elevation</Label>
-                      <p className="text-base text-gray-900">{safeString(product.specs_rental.elevation)}m</p>
+                      <p className="text-base text-gray-900">{safeString(item.specs_rental.elevation)}m</p>
                     </div>
                   )}
-                  {product.specs_rental?.traffic_count && (
+                  {item.specs_rental?.traffic_count && (
                     <div>
                       <Label className="text-sm font-medium text-gray-500 mb-2">Traffic Count</Label>
-                      <p className="text-base text-gray-900">{safeString(product.specs_rental.traffic_count)}</p>
+                      <p className="text-base text-gray-900">{safeString(item.specs_rental.traffic_count)}</p>
                     </div>
                   )}
-                  {product.specs_rental?.audience_type && (
+                  {item.specs_rental?.audience_type && (
                     <div>
                       <Label className="text-sm font-medium text-gray-500 mb-2">Audience Type</Label>
-                      <p className="text-base text-gray-900">{safeString(product.specs_rental.audience_type)}</p>
+                      <p className="text-base text-gray-900">{safeString(item.specs_rental.audience_type)}</p>
                     </div>
                   )}
-                  {product.specs_rental?.audience_types && product.specs_rental.audience_types.length > 0 && (
+                  {item.specs_rental?.audience_types && item.specs_rental.audience_types.length > 0 && (
                     <div>
                       <Label className="text-sm font-medium text-gray-500 mb-2">Audience Types</Label>
-                      <p className="text-base text-gray-900">{product.specs_rental.audience_types.join(", ")}</p>
+                      <p className="text-base text-gray-900">{item.specs_rental.audience_types.join(", ")}</p>
                     </div>
                   )}
                 </div>
 
-                {product.description && (
+                {item.description && (
                   <div className="mb-6">
                     <Label className="text-sm font-medium text-gray-500 mb-2">Description</Label>
                     <div className="bg-gray-50 border border-gray-200 rounded-sm p-4">
-                      <p className="text-sm text-gray-700 leading-relaxed">{safeString(product.description)}</p>
+                      <p className="text-sm text-gray-700 leading-relaxed">{safeString(item.description)}</p>
                     </div>
                   </div>
                 )}
 
-                {product.media && product.media.length > 0 && (
+                {item.media && item.media.length > 0 && (
                   <div className="mb-6">
                     <Label className="text-sm font-medium text-gray-500 mb-2">Media</Label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-2">
-                      {product.media.map((mediaItem, mediaIndex) => (
+                      {item.media.map((mediaItem, mediaIndex) => (
                         <div
                           key={mediaIndex}
                           className="relative aspect-video overflow-hidden rounded-sm border border-gray-200"
