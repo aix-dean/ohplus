@@ -210,8 +210,6 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
     if (filterBy === "Inactive") return product.status !== "ACTIVE" && product.status !== "OCCUPIED"
     if (filterBy === "Open") return product.status === "ACTIVE" || product.status === "AVAILABLE"
     if (filterBy === "Occupied") return product.status === "OCCUPIED"
-    if (filterBy === "Static") return product.content_type === "static" || product.content_type === "Static"
-    if (filterBy === "Dynamic") return product.content_type === "dynamic" || product.content_type === "Dynamic"
     return true
   })
 
@@ -288,7 +286,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
   }
 
   return (
-    <div className="flex flex-col gap-5 p-6 min-h-screen opacity-20">
+    <>
       {/* Loading State */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-12">
@@ -434,7 +432,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
 
       {/* Report Dialog */}
       <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
-    </div>
+    </>
   )
 }
 

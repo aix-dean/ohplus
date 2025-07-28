@@ -23,7 +23,7 @@ export default function LogisticsDashboardPage() {
 
   return (
     <RouteProtection requiredRoles="logistics">
-      <div className="flex-1 overflow-auto relative">
+      <div className="flex-1 overflow-auto relative bg-gray-50">
         <main className="p-6">
           <div className="flex flex-col gap-6">
             {/* Header Section */}
@@ -72,8 +72,6 @@ export default function LogisticsDashboardPage() {
                     <SelectItem value="Inactive">Inactive</SelectItem>
                     <SelectItem value="Open">Open</SelectItem>
                     <SelectItem value="Occupied">Occupied</SelectItem>
-                    <SelectItem value="Static">Static</SelectItem>
-                    <SelectItem value="Dynamic">Dynamic</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
