@@ -8,7 +8,7 @@ import { getPaginatedUserProducts, getUserProductsCount, type Product } from "@/
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, Loader2, AlertCircle } from "lucide-react"
+import { ChevronLeft, ChevronRight, Loader2, AlertCircle, LayoutGrid, List } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { CreateReportDialog } from "@/components/create-report-dialog"
@@ -17,6 +17,7 @@ import { CreateReportDialog } from "@/components/create-report-dialog"
 const ITEMS_PER_PAGE = 8
 
 export default function AllSitesTab() {
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -261,6 +262,28 @@ export default function AllSitesTab() {
 
   return (
     <div className="flex flex-col gap-5 p-6">
+      {/* View Toggle */}
+      <div className="flex justify-end">
+        <div className="border rounded-md p-1 flex">
+          <Button
+            variant={viewMode === "grid" ? "default" : "ghost"}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setViewMode("grid")}
+          >
+            <LayoutGrid size={18} />
+          </Button>
+          <Button
+            variant={viewMode === "list" ? "default" : "ghost"}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setViewMode("list")}
+          >
+            <List size={18} />
+          </Button>
+        </div>
+      </div>
+
       {/* Loading State */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-12">
@@ -291,13 +314,20 @@ export default function AllSitesTab() {
         </div>
       )}
 
-      {/* Site Grid */}
+      {/* Site Grid/List */}
       {!loading && !error && products.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+        <div
+          className={
+            viewMode === "grid"
+              ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4"
+              : "flex flex-col gap-4"
+          }
+        >
           {products.map((product) => (
             <UnifiedSiteCard
               key={product.id}
               site={productToSite(product)}
+              viewMode={viewMode}
               onCreateReport={(siteId) => {
                 setSelectedSiteId(siteId)
                 setReportDialogOpen(true)
@@ -384,8 +414,16 @@ export default function AllSitesTab() {
   )
 }
 
-// Unified Site Card that matches the exact reference design
-function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
+// Unified Site Card that supports both grid and list views
+function UnifiedSiteCard({
+  site,
+  viewMode,
+  onCreateReport,
+}: {
+  site: any
+  viewMode: "grid" | "list"
+  onCreateReport: (siteId: string) => void
+}) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -396,6 +434,107 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
     window.location.href = `/logistics/sites/${site.id}`
   }
 
+  if (viewMode === "list") {
+    return (
+      <Card
+        className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full"
+        onClick={handleCardClick}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-center gap-4">
+            {/* Image */}
+            <div className="relative w-24 h-16 bg-gray-200 rounded flex-shrink-0">
+              <Image
+                src={site.image || "/placeholder.svg"}
+                alt={site.name}
+                fill
+                className="object-cover rounded"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
+                  target.className = "opacity-50 object-contain rounded"
+                }}
+              />
+              {/* Status Badge */}
+              <div className="absolute bottom-1 left-1">
+                <div
+                  className="px-1.5 py-0.5 rounded text-xs font-bold text-white"
+                  style={{ backgroundColor: "#38b6ff" }}
+                >
+                  {site.operationalStatus === "Operational"
+                    ? "OPEN"
+                    : site.operationalStatus === "Under Maintenance"
+                      ? "MAINTENANCE"
+                      : site.operationalStatus === "Pending Setup"
+                        ? "PENDING"
+                        : "CLOSED"}
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="text-xs text-gray-500 uppercase tracking-wide">{site.siteCode}</div>
+                <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold">
+                  {site.contentType === "dynamic" ? "M" : "S"}
+                </div>
+              </div>
+
+              <h3 className="font-bold text-sm text-gray-900 truncate mb-2">{site.name}</h3>
+
+              <div className="grid grid-cols-3 gap-4 text-xs">
+                <div>
+                  <span className="font-bold">Operation:</span>
+                  <span className="ml-1 text-black">
+                    {site.operationalStatus === "Operational"
+                      ? "Active"
+                      : site.operationalStatus === "Under Maintenance"
+                        ? "Maintenance"
+                        : site.operationalStatus === "Pending Setup"
+                          ? "Pending"
+                          : "Inactive"}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-bold">Display Health:</span>
+                  <span className="ml-1" style={{ color: "#00bf63" }}>
+                    {site.healthPercentage > 90
+                      ? "100%"
+                      : site.healthPercentage > 80
+                        ? "90%"
+                        : site.healthPercentage > 60
+                          ? "75%"
+                          : "50%"}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-bold">Compliance:</span>
+                  <span className="ml-1 text-black">
+                    {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Button */}
+            <div className="flex-shrink-0">
+              <Button
+                variant="secondary"
+                className="h-8 px-4 text-xs border-0 text-white hover:text-white rounded-md font-medium"
+                style={{ backgroundColor: "#0f76ff" }}
+                onClick={handleCreateReport}
+              >
+                Create Report
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Grid view (default)
   return (
     <Card
       className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full"
