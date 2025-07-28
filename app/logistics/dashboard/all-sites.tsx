@@ -278,7 +278,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
   // Show loading if no user
   if (!userData?.company_id) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 bg-gray-100 min-h-screen">
+      <div className="flex flex-col items-center justify-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
         <p className="text-gray-500">Loading user data...</p>
       </div>
@@ -286,7 +286,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
   }
 
   return (
-    <div className="flex flex-col gap-5 p-6 bg-gray-100 min-h-screen">
+    <div className="flex flex-col gap-5 p-6">
       {/* Loading State */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-12">
@@ -391,7 +391,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
               size="sm"
               onClick={goToPreviousPage}
               disabled={currentPage === 1}
-              className="h-8 w-8 p-0 bg-white"
+              className="h-8 w-8 p-0 bg-transparent"
             >
               <ChevronLeft size={16} />
             </Button>
@@ -409,7 +409,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
                     variant={currentPage === page ? "default" : "outline"}
                     size="sm"
                     onClick={() => goToPage(page as number)}
-                    className={`h-8 w-8 p-0 ${currentPage !== page ? "bg-white" : ""}`}
+                    className="h-8 w-8 p-0"
                   >
                     {page}
                   </Button>
@@ -422,7 +422,7 @@ export default function AllSitesTab({ searchQuery = "", filterBy = "All", viewMo
               size="sm"
               onClick={goToNextPage}
               disabled={currentPage >= totalPages}
-              className="h-8 w-8 p-0 bg-white"
+              className="h-8 w-8 p-0"
             >
               <ChevronRight size={16} />
             </Button>
@@ -449,114 +449,116 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
   }
 
   return (
-    <Card
-      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full"
-      onClick={handleCardClick}
-    >
-      <div className="relative h-32 bg-gray-200">
-        <Image
-          src={site.image || "/placeholder.svg"}
-          alt={site.name}
-          fill
-          className="object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
-            target.className = "opacity-50 object-contain"
-          }}
-        />
+    <div className="bg-gray-200 rounded-xl p-3">
+      <Card
+        className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full"
+        onClick={handleCardClick}
+      >
+        <div className="relative h-32 bg-gray-200">
+          <Image
+            src={site.image || "/placeholder.svg"}
+            alt={site.name}
+            fill
+            className="object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
+              target.className = "opacity-50 object-contain"
+            }}
+          />
 
-        {/* Status Badge - Bottom Left */}
-        <div className="absolute bottom-2 left-2">
-          <div className="px-2 py-1 rounded text-xs font-bold text-white" style={{ backgroundColor: "#38b6ff" }}>
-            {site.operationalStatus === "Operational"
-              ? "OPEN"
-              : site.operationalStatus === "Under Maintenance"
-                ? "MAINTENANCE"
-                : site.operationalStatus === "Pending Setup"
-                  ? "PENDING"
-                  : "CLOSED"}
-          </div>
-        </div>
-      </div>
-
-      <CardContent className="p-3">
-        <div className="flex flex-col gap-2">
-          {/* Site Code */}
-          <div className="text-xs text-gray-500 uppercase tracking-wide">{site.siteCode}</div>
-
-          {/* Site Name with Badge */}
-          <div className="flex items-center gap-2">
-            <h3 className="font-bold text-sm text-gray-900 truncate">{site.name}</h3>
-            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0">
-              {site.contentType === "dynamic" ? "M" : "S"}
+          {/* Status Badge - Bottom Left */}
+          <div className="absolute bottom-2 left-2">
+            <div className="px-2 py-1 rounded text-xs font-bold text-white" style={{ backgroundColor: "#38b6ff" }}>
+              {site.operationalStatus === "Operational"
+                ? "OPEN"
+                : site.operationalStatus === "Under Maintenance"
+                  ? "MAINTENANCE"
+                  : site.operationalStatus === "Pending Setup"
+                    ? "PENDING"
+                    : "CLOSED"}
             </div>
           </div>
+        </div>
 
-          {/* Site Information */}
-          <div className="space-y-1 text-xs">
-            <div className="flex flex-col">
-              <span className="text-black">
-                <span className="font-bold">Operation:</span>
-                <span
-                  className={`ml-1 ${
-                    site.operationalStatus === "Operational"
-                      ? "text-black"
-                      : site.operationalStatus === "Under Maintenance"
+        <CardContent className="p-3">
+          <div className="flex flex-col gap-2">
+            {/* Site Code */}
+            <div className="text-xs text-gray-500 uppercase tracking-wide">{site.siteCode}</div>
+
+            {/* Site Name with Badge */}
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-sm text-gray-900 truncate">{site.name}</h3>
+              <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0">
+                {site.contentType === "dynamic" ? "M" : "S"}
+              </div>
+            </div>
+
+            {/* Site Information */}
+            <div className="space-y-1 text-xs">
+              <div className="flex flex-col">
+                <span className="text-black">
+                  <span className="font-bold">Operation:</span>
+                  <span
+                    className={`ml-1 ${
+                      site.operationalStatus === "Operational"
                         ? "text-black"
-                        : site.operationalStatus === "Pending Setup"
+                        : site.operationalStatus === "Under Maintenance"
                           ? "text-black"
-                          : "text-black"
-                  }`}
-                >
-                  {site.operationalStatus === "Operational"
-                    ? "Active"
-                    : site.operationalStatus === "Under Maintenance"
-                      ? "Maintenance"
-                      : site.operationalStatus === "Pending Setup"
-                        ? "Pending"
-                        : "Inactive"}
+                          : site.operationalStatus === "Pending Setup"
+                            ? "text-black"
+                            : "text-black"
+                    }`}
+                  >
+                    {site.operationalStatus === "Operational"
+                      ? "Active"
+                      : site.operationalStatus === "Under Maintenance"
+                        ? "Maintenance"
+                        : site.operationalStatus === "Pending Setup"
+                          ? "Pending"
+                          : "Inactive"}
+                  </span>
                 </span>
-              </span>
+              </div>
+
+              <div className="flex flex-col">
+                <span className="text-black">
+                  <span className="font-bold">Display Health:</span>
+                  <span className="ml-1" style={{ color: "#00bf63" }}>
+                    {site.healthPercentage > 90
+                      ? "100%"
+                      : site.healthPercentage > 80
+                        ? "90%"
+                        : site.healthPercentage > 60
+                          ? "75%"
+                          : "50%"}
+                  </span>
+                </span>
+              </div>
+
+              <div className="flex flex-col">
+                <span className="text-black">
+                  <span className="font-bold">Compliance:</span>
+                  <span className="ml-1 text-black">
+                    {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}
+                  </span>
+                </span>
+              </div>
             </div>
 
-            <div className="flex flex-col">
-              <span className="text-black">
-                <span className="font-bold">Display Health:</span>
-                <span className="ml-1" style={{ color: "#00bf63" }}>
-                  {site.healthPercentage > 90
-                    ? "100%"
-                    : site.healthPercentage > 80
-                      ? "90%"
-                      : site.healthPercentage > 60
-                        ? "75%"
-                        : "50%"}
-                </span>
-              </span>
-            </div>
-
-            <div className="flex flex-col">
-              <span className="text-black">
-                <span className="font-bold">Compliance:</span>
-                <span className="ml-1 text-black">
-                  {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}
-                </span>
-              </span>
-            </div>
+            {/* Create Report Button */}
+            <Button
+              variant="secondary"
+              className="mt-3 w-full h-8 text-xs border-0 text-white hover:text-white rounded-md font-medium"
+              style={{ backgroundColor: "#0f76ff" }}
+              onClick={handleCreateReport}
+            >
+              Create Report
+            </Button>
           </div>
-
-          {/* Create Report Button */}
-          <Button
-            variant="secondary"
-            className="mt-3 w-full h-8 text-xs border-0 text-white hover:text-white rounded-md font-medium"
-            style={{ backgroundColor: "#0f76ff" }}
-            onClick={handleCreateReport}
-          >
-            Create Report
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
@@ -573,102 +575,104 @@ function UnifiedSiteListItem({ site, onCreateReport }: { site: any; onCreateRepo
   }
 
   return (
-    <Card
-      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full"
-      onClick={handleCardClick}
-    >
-      <CardContent className="p-4">
-        <div className="flex items-center gap-4">
-          {/* Site Image */}
-          <div className="relative w-20 h-20 bg-gray-200 rounded-lg flex-shrink-0">
-            <Image
-              src={site.image || "/placeholder.svg"}
-              alt={site.name}
-              fill
-              className="object-cover rounded-lg"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement
-                target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
-                target.className = "opacity-50 object-contain rounded-lg"
-              }}
-            />
-            {/* Status Badge */}
-            <div className="absolute bottom-1 left-1">
-              <div
-                className="px-1.5 py-0.5 rounded text-xs font-bold text-white"
-                style={{ backgroundColor: "#38b6ff" }}
-              >
-                {site.operationalStatus === "Operational"
-                  ? "OPEN"
-                  : site.operationalStatus === "Under Maintenance"
-                    ? "MAINT"
-                    : site.operationalStatus === "Pending Setup"
-                      ? "PEND"
-                      : "CLOSED"}
-              </div>
-            </div>
-          </div>
-
-          {/* Site Information */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="text-xs text-gray-500 uppercase tracking-wide">{site.siteCode}</div>
-              <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold">
-                {site.contentType === "dynamic" ? "M" : "S"}
-              </div>
-            </div>
-
-            <h3 className="font-bold text-lg text-gray-900 mb-2 truncate">{site.name}</h3>
-
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              <div>
-                <span className="font-bold text-gray-700">Operation:</span>
-                <div className="text-gray-600">
+    <div className="bg-gray-200 rounded-xl p-3">
+      <Card
+        className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white border border-gray-200 rounded-lg w-full"
+        onClick={handleCardClick}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-center gap-4">
+            {/* Site Image */}
+            <div className="relative w-20 h-20 bg-gray-200 rounded-lg flex-shrink-0">
+              <Image
+                src={site.image || "/placeholder.svg"}
+                alt={site.name}
+                fill
+                className="object-cover rounded-lg"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
+                  target.className = "opacity-50 object-contain rounded-lg"
+                }}
+              />
+              {/* Status Badge */}
+              <div className="absolute bottom-1 left-1">
+                <div
+                  className="px-1.5 py-0.5 rounded text-xs font-bold text-white"
+                  style={{ backgroundColor: "#38b6ff" }}
+                >
                   {site.operationalStatus === "Operational"
-                    ? "Active"
+                    ? "OPEN"
                     : site.operationalStatus === "Under Maintenance"
-                      ? "Maintenance"
+                      ? "MAINT"
                       : site.operationalStatus === "Pending Setup"
-                        ? "Pending"
-                        : "Inactive"}
-                </div>
-              </div>
-
-              <div>
-                <span className="font-bold text-gray-700">Display Health:</span>
-                <div style={{ color: "#00bf63" }}>
-                  {site.healthPercentage > 90
-                    ? "100%"
-                    : site.healthPercentage > 80
-                      ? "90%"
-                      : site.healthPercentage > 60
-                        ? "75%"
-                        : "50%"}
-                </div>
-              </div>
-
-              <div>
-                <span className="font-bold text-gray-700">Compliance:</span>
-                <div className="text-gray-600">
-                  {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}
+                        ? "PEND"
+                        : "CLOSED"}
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Create Report Button */}
-          <div className="flex-shrink-0">
-            <Button
-              variant="secondary"
-              className="h-10 px-6 text-sm border-0 text-white hover:text-white rounded-md font-medium"
-              style={{ backgroundColor: "#0f76ff" }}
-              onClick={handleCreateReport}
-            >
-              Create Report
-            </Button>
+            {/* Site Information */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="text-xs text-gray-500 uppercase tracking-wide">{site.siteCode}</div>
+                <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold">
+                  {site.contentType === "dynamic" ? "M" : "S"}
+                </div>
+              </div>
+
+              <h3 className="font-bold text-lg text-gray-900 mb-2 truncate">{site.name}</h3>
+
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="font-bold text-gray-700">Operation:</span>
+                  <div className="text-gray-600">
+                    {site.operationalStatus === "Operational"
+                      ? "Active"
+                      : site.operationalStatus === "Under Maintenance"
+                        ? "Maintenance"
+                        : site.operationalStatus === "Pending Setup"
+                          ? "Pending"
+                          : "Inactive"}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="font-bold text-gray-700">Display Health:</span>
+                  <div style={{ color: "#00bf63" }}>
+                    {site.healthPercentage > 90
+                      ? "100%"
+                      : site.healthPercentage > 80
+                        ? "90%"
+                        : site.healthPercentage > 60
+                          ? "75%"
+                          : "50%"}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="font-bold text-gray-700">Compliance:</span>
+                  <div className="text-gray-600">
+                    {site.operationalStatus === "Operational" ? "Complete" : "Incomplete"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Create Report Button */}
+            <div className="flex-shrink-0">
+              <Button
+                variant="secondary"
+                className="h-10 px-6 text-sm border-0 text-white hover:text-white rounded-md font-medium"
+                style={{ backgroundColor: "#0f76ff" }}
+                onClick={handleCreateReport}
+              >
+                Create Report
+              </Button>
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
