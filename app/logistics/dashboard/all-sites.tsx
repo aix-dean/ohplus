@@ -12,6 +12,7 @@ import { ChevronLeft, ChevronRight, Loader2, AlertCircle, Bell } from "lucide-re
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { CreateReportDialog } from "@/components/create-report-dialog"
+import { JobOrdersListDialog } from "@/components/job-orders-list-dialog"
 
 // Direct Firebase imports for job order fetching
 import { collection, query, where, getDocs } from "firebase/firestore"
@@ -55,6 +56,13 @@ export default function AllSitesTab({
   // Report dialog state
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
   const [selectedSiteId, setSelectedSiteId] = useState<string>("")
+
+  // Job Orders dialog state
+  const [jobOrdersDialogOpen, setJobOrdersDialogOpen] = useState(false)
+  const [selectedSiteForJO, setSelectedSiteForJO] = useState<{
+    id: string
+    name: string
+  }>({ id: "", name: "" })
 
   // Simplified direct job order fetching function
   const fetchJobOrderCountsDirectly = useCallback(async () => {
@@ -358,6 +366,12 @@ export default function AllSitesTab({
     }
   }
 
+  // Handle JO count click
+  const handleJOCountClick = (siteId: string, siteName: string) => {
+    setSelectedSiteForJO({ id: siteId, name: siteName })
+    setJobOrdersDialogOpen(true)
+  }
+
   // Show loading if no user
   if (!userData?.company_id) {
     return (
@@ -443,6 +457,7 @@ export default function AllSitesTab({
                     setSelectedSiteId(siteId)
                     setReportDialogOpen(true)
                   }}
+                  onJOCountClick={handleJOCountClick}
                 />
               ))}
             </div>
@@ -456,6 +471,7 @@ export default function AllSitesTab({
                     setSelectedSiteId(siteId)
                     setReportDialogOpen(true)
                   }}
+                  onJOCountClick={handleJOCountClick}
                 />
               ))}
             </div>
@@ -536,16 +552,41 @@ export default function AllSitesTab({
 
       {/* Report Dialog */}
       <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={selectedSiteId} />
+
+      {/* Job Orders Dialog */}
+      <JobOrdersListDialog
+        open={jobOrdersDialogOpen}
+        onOpenChange={setJobOrdersDialogOpen}
+        siteId={selectedSiteForJO.id}
+        siteName={selectedSiteForJO.name}
+        companyId={userData?.company_id || ""}
+      />
     </div>
   )
 }
 
 // Unified Site Card that matches the exact reference design
-function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
+function UnifiedSiteCard({
+  site,
+  onCreateReport,
+  onJOCountClick,
+}: {
+  site: any
+  onCreateReport: (siteId: string) => void
+  onJOCountClick: (siteId: string, siteName: string) => void
+}) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     onCreateReport(site.id)
+  }
+
+  const handleJOClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (site.joCount > 0) {
+      onJOCountClick(site.id, site.name)
+    }
   }
 
   const handleCardClick = () => {
@@ -644,7 +685,16 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
             {/* JO Notification */}
             <div className="flex items-center gap-1 text-xs">
               <Bell className="h-3 w-3 text-gray-400" />
-              <span className="text-gray-600">{site.joCount > 0 ? `JO (${site.joCount})` : "None"}</span>
+              {site.joCount > 0 ? (
+                <button
+                  onClick={handleJOClick}
+                  className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
+                >
+                  JO ({site.joCount})
+                </button>
+              ) : (
+                <span className="text-gray-600">None</span>
+              )}
               {/* Debug info - remove in production */}
               {process.env.NODE_ENV === "development" && (
                 <span className="text-red-500 ml-2">
@@ -670,11 +720,27 @@ function UnifiedSiteCard({ site, onCreateReport }: { site: any; onCreateReport: 
 }
 
 // List view component for sites
-function UnifiedSiteListItem({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
+function UnifiedSiteListItem({
+  site,
+  onCreateReport,
+  onJOCountClick,
+}: {
+  site: any
+  onCreateReport: (siteId: string) => void
+  onJOCountClick: (siteId: string, siteName: string) => void
+}) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     onCreateReport(site.id)
+  }
+
+  const handleJOClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (site.joCount > 0) {
+      onJOCountClick(site.id, site.name)
+    }
   }
 
   const handleCardClick = () => {
@@ -761,7 +827,16 @@ function UnifiedSiteListItem({ site, onCreateReport }: { site: any; onCreateRepo
               {/* JO Notification */}
               <div className="flex items-center gap-1 text-sm">
                 <Bell className="h-4 w-4 text-gray-400" />
-                <span className="text-gray-600">{site.joCount > 0 ? `JO (${site.joCount})` : "None"}</span>
+                {site.joCount > 0 ? (
+                  <button
+                    onClick={handleJOClick}
+                    className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
+                  >
+                    JO ({site.joCount})
+                  </button>
+                ) : (
+                  <span className="text-gray-600">None</span>
+                )}
                 {/* Debug info - remove in production */}
                 {process.env.NODE_ENV === "development" && (
                   <span className="text-red-500 ml-2">
