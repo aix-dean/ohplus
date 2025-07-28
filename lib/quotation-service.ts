@@ -355,7 +355,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setFont("helvetica", "normal")
   pdf.setTextColor(0, 0, 0)
   pdf.text(`Quotation No: ${quotation.quotation_number}`, margin, yPosition)
-  yPosition += 15
+  yPosition += 10
 
   pdf.setLineWidth(0.3)
   pdf.setDrawColor(37, 99, 235) // Blue line
