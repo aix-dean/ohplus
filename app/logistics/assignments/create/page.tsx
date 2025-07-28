@@ -879,6 +879,27 @@ export default function CreateServiceAssignmentPage() {
             <Button variant="outline" onClick={() => router.push("/logistics/assignments")} type="button">
               Cancel
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                // Save current form data as draft
+                console.log("Saving draft...", formData)
+                // You can implement actual draft saving logic here
+              }}
+              type="button"
+            >
+              Save Draft
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                // Print the current form
+                window.print()
+              }}
+              type="button"
+            >
+              Print
+            </Button>
             <Button onClick={handleSubmit} disabled={loading} variant="default" type="button">
               {loading ? (
                 <>
