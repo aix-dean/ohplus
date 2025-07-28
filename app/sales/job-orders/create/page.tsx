@@ -932,7 +932,7 @@ export default function CreateJobOrderPage() {
                                   handleFormUpdate(index, "dateRequested", date)
                                   handleFormUpdate(index, "dateRequestedError", false)
                                 }}
-                                initialFocus
+                                // Removed initialFocus to ensure it opens to the selected date
                               />
                             </PopoverContent>
                           </Popover>
@@ -1105,7 +1105,7 @@ export default function CreateJobOrderPage() {
                             handleFormUpdate(0, "dateRequested", date)
                             handleFormUpdate(0, "dateRequestedError", false)
                           }}
-                          initialFocus
+                          // Removed initialFocus to ensure it opens to the selected date
                         />
                       </PopoverContent>
                     </Popover>
