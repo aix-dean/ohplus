@@ -424,7 +424,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
 
   const cellPadding = 3
   const headerRowHeight = 8
-  const dataRowHeight = 20 // Increased for images
+  const dataRowHeight = 25 // Increased for better spacing and images
 
   // Column widths including image column
   const colWidths = [
@@ -477,8 +477,8 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     currentX = margin
 
     // Image column - uniform size for all images
-    const imageSize = 15 // Fixed size for all product images
-    const imageX = currentX + cellPadding
+    const imageSize = 20 // Increased image size for better visibility
+    const imageX = currentX + cellPadding + (colWidths[0] - imageSize) / 2 // Center image in column
     const imageY = yPosition + (dataRowHeight - imageSize) / 2
 
     // Use media_url if available, otherwise fallback to media[0].url
@@ -518,7 +518,11 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
       // Changed product to item
       productText += `\nSite: ${item.site_code}` // Changed product to item
     }
-    addText(productText, currentX + cellPadding, yPosition + cellPadding, colWidths[1] - 2 * cellPadding, 8)
+    // Calculate text height for product column to center vertically
+    const productLines = pdf.splitTextToSize(productText, colWidths[1] - 2 * cellPadding)
+    const productTextHeight = productLines.length * pdf.getFontSize() * 0.3
+    const productTextY = yPosition + (dataRowHeight - productTextHeight) / 2
+    addText(productText, currentX + cellPadding, productTextY, colWidths[1] - 2 * cellPadding, 8)
     currentX += colWidths[1]
 
     // Type column
@@ -529,10 +533,14 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     currentX += colWidths[2]
 
     // Location column
+    // Calculate text height for location column to center vertically
+    const locationLines = pdf.splitTextToSize(safeString(item.location), colWidths[3] - 2 * cellPadding)
+    const locationTextHeight = locationLines.length * pdf.getFontSize() * 0.3
+    const locationTextY = yPosition + (dataRowHeight - locationTextHeight) / 2
     addText(
       safeString(item.location), // Changed product to item
       currentX + cellPadding,
-      yPosition + cellPadding,
+      locationTextY,
       colWidths[3] - 2 * cellPadding,
       8,
     )
@@ -579,7 +587,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
       align: "right",
     },
   )
-  yPosition += headerRowHeight + 15
+  yPosition += headerRowHeight + 10 // Reduced spacing after total amount
 
   // Product Details Section
   for (const item of quotation.items) {
@@ -721,7 +729,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
         yPosition += uniformImageSize + 10
       }
     }
-    yPosition += 10 // Space after each product
+    yPosition += 15 // Increased space after each product details section
   }
 
   // Additional Information (Notes)
