@@ -250,6 +250,14 @@ const addImageToPDF = async (
   }
 }
 
+// Helper function to calculate text height without drawing
+const calculateTextHeight = (text: string, maxWidth: number, fontSize = 10): number => {
+  const pdf = new jsPDF() // Declare the pdf variable
+  pdf.setFontSize(fontSize) // Ensure font size is set for accurate splitTextToSize
+  const lines = pdf.splitTextToSize(text, maxWidth)
+  return lines.length * fontSize * 0.3
+}
+
 // Generate PDF for quotation
 export async function generateQuotationPDF(quotation: Quotation): Promise<void> {
   const pdf = new jsPDF("p", "mm", "a4")
@@ -263,7 +271,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   const createdDate = safeToDate(quotation.created)
   const validUntilDate = safeToDate(quotation.valid_until)
 
-  // Helper function to add text with word wrapping
+  // Helper function to add text with word wrapping and return new yPosition
   const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
     pdf.setFontSize(fontSize)
     const lines = pdf.splitTextToSize(text, maxWidth)
@@ -274,6 +282,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   // Helper function to check if we need a new page
   const checkNewPage = (requiredHeight: number) => {
     if (yPosition + requiredHeight > pageHeight - margin - 20) {
+      // -20 for footer space
       pdf.addPage()
       yPosition = margin
     }
@@ -351,7 +360,17 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   yPosition += 10
 
   // Quotation Information Section
-  checkNewPage(30)
+  let quotationInfoHeight = 0
+  quotationInfoHeight += 5 // Section title spacing
+  quotationInfoHeight += 8 // Line spacing
+  quotationInfoHeight += 5 // Created Date / Valid Until
+  if (quotation.start_date || quotation.end_date) {
+    quotationInfoHeight += 5 // Start Date / End Date
+  }
+  quotationInfoHeight += 5 // Total Amount
+  quotationInfoHeight += 10 // Spacing after section
+  checkNewPage(quotationInfoHeight)
+
   pdf.setFontSize(12)
   pdf.setFont("helvetica", "bold")
   pdf.text("QUOTATION INFORMATION", margin, yPosition)
@@ -382,7 +401,16 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   yPosition += 10
 
   // Client Information Section
-  checkNewPage(30)
+  let clientInfoHeight = 0
+  clientInfoHeight += 5 // Section title spacing
+  clientInfoHeight += 8 // Line spacing
+  clientInfoHeight += 5 // Client Name / Email
+  if (quotation.quotation_request_id) clientInfoHeight += 5
+  if (quotation.proposalId) clientInfoHeight += 5
+  if (quotation.campaignId) clientInfoHeight += 5
+  clientInfoHeight += 10 // Spacing after section
+  checkNewPage(clientInfoHeight)
+
   pdf.setFontSize(12)
   pdf.setFont("helvetica", "bold")
   pdf.text("CLIENT INFORMATION", margin, yPosition)
@@ -394,6 +422,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
 
   pdf.setFontSize(9)
   pdf.setFont("helvetica", "normal")
+
   pdf.text(`Client Name: ${safeString(quotation.client_name)}`, margin, yPosition)
   pdf.text(`Client Email: ${safeString(quotation.client_email)}`, margin + contentWidth / 2, yPosition)
   yPosition += 5
@@ -412,7 +441,14 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   yPosition += 10
 
   // Product & Services Section (Manual Table Drawing)
-  checkNewPage(50)
+  let productsTableHeight = 0
+  productsTableHeight += 5 // Section title spacing
+  productsTableHeight += 8 // Line spacing
+  productsTableHeight += 8 // Header row height
+  productsTableHeight += quotation.items.length * 25 // Data rows (25mm per row)
+  productsTableHeight += 15 // Spacing after table
+  checkNewPage(productsTableHeight)
+
   pdf.setFontSize(12)
   pdf.setFont("helvetica", "bold")
   pdf.text("PRODUCT & SERVICES", margin, yPosition)
@@ -468,7 +504,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
 
   for (const item of quotation.items) {
     // Changed product to item
-    checkNewPage(dataRowHeight + 5)
+    checkNewPage(dataRowHeight + 5) // Check for space for the next row
     pdf.setFillColor(255, 255, 255) // bg-white
     pdf.rect(margin, yPosition, contentWidth, dataRowHeight, "F")
     pdf.setDrawColor(200, 200, 200)
@@ -496,7 +532,10 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
         pdf.rect(imageX, imageY, imageSize, imageSize, "F")
         pdf.setFontSize(6)
         pdf.setTextColor(150, 150, 150)
-        pdf.text("No Image", imageX + imageSize / 2, imageY + imageSize / 2, { align: "center", baseline: "middle" })
+        pdf.text("No Image", imageX + imageSize / 2, imageY + imageSize / 2, {
+          align: "center",
+          baseline: "middle",
+        })
         pdf.setTextColor(0, 0, 0)
         pdf.setFontSize(9)
       }
@@ -506,7 +545,10 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
       pdf.rect(imageX, imageY, imageSize, imageSize, "F")
       pdf.setFontSize(6)
       pdf.setTextColor(150, 150, 150)
-      pdf.text("No Image", imageX + imageSize / 2, imageY + imageSize / 2, { align: "center", baseline: "middle" })
+      pdf.text("No Image", imageX + imageSize / 2, imageY + imageSize / 2, {
+        align: "center",
+        baseline: "middle",
+      })
       pdf.setTextColor(0, 0, 0)
       pdf.setFontSize(9)
     }
@@ -522,7 +564,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     const productLines = pdf.splitTextToSize(productText, colWidths[1] - 2 * cellPadding)
     const productTextHeight = productLines.length * pdf.getFontSize() * 0.3
     const productTextY = yPosition + (dataRowHeight - productTextHeight) / 2
-    addText(productText, currentX + cellPadding, productTextY, colWidths[1] - 2 * cellPadding, 8)
+    yPosition = addText(productText, currentX + cellPadding, productTextY, colWidths[1] - 2 * cellPadding, 8)
     currentX += colWidths[1]
 
     // Type column
@@ -537,7 +579,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     const locationLines = pdf.splitTextToSize(safeString(item.location), colWidths[3] - 2 * cellPadding)
     const locationTextHeight = locationLines.length * pdf.getFontSize() * 0.3
     const locationTextY = yPosition + (dataRowHeight - locationTextHeight) / 2
-    addText(
+    yPosition = addText(
       safeString(item.location), // Changed product to item
       currentX + cellPadding,
       locationTextY,
@@ -591,8 +633,88 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
 
   // Product Details Section
   for (const item of quotation.items) {
-    // Changed product to item
-    checkNewPage(60)
+    let estimatedSectionHeight = 0
+
+    // Estimate height for title and separator
+    estimatedSectionHeight += 12 // Title font size 12, roughly 12mm height
+    estimatedSectionHeight += 5 // Line height
+    estimatedSectionHeight += 8 // Spacing after line
+
+    // Estimate height for specifications (left and right columns)
+    let currentSpecHeight = 0
+    const specFontSize = 9
+
+    // Left column specs
+    if (item.specs_rental?.width && item.specs_rental?.height) {
+      currentSpecHeight += calculateTextHeight(
+        `Dimensions: ${safeString(item.specs_rental.width)}m x ${safeString(item.specs_rental.height)}m`,
+        contentWidth / 2 - 25,
+        specFontSize,
+      )
+      currentSpecHeight += 5 // Line spacing
+    }
+    if (item.specs_rental?.elevation) {
+      currentSpecHeight += calculateTextHeight(
+        `Elevation: ${safeString(item.specs_rental.elevation)}m`,
+        contentWidth / 2 - 25,
+        specFontSize,
+      )
+      currentSpecHeight += 5 // Line spacing
+    }
+
+    // Right column specs
+    let rightSpecHeight = 0
+    if (item.specs_rental?.traffic_count) {
+      rightSpecHeight += calculateTextHeight(
+        `Traffic Count: ${safeString(item.specs_rental.traffic_count)}`,
+        contentWidth / 2 - 30,
+        specFontSize,
+      )
+      rightSpecHeight += 5 // Line spacing
+    }
+    if (item.specs_rental?.audience_type) {
+      rightSpecHeight += calculateTextHeight(
+        `Audience Type: ${safeString(item.specs_rental.audience_type)}`,
+        contentWidth / 2 - 30,
+        specFontSize,
+      )
+      rightSpecHeight += 5 // Line spacing
+    } else if (item.specs_rental?.audience_types && item.specs_rental.audience_types.length > 0) {
+      rightSpecHeight += calculateTextHeight(
+        item.specs_rental.audience_types.join(", "),
+        contentWidth / 2 - 30,
+        specFontSize,
+      )
+      rightSpecHeight += 5 // Line spacing
+    }
+    estimatedSectionHeight += Math.max(currentSpecHeight, rightSpecHeight) // Add the max height consumed by specs
+
+    estimatedSectionHeight += 5 // Spacing after specs
+
+    // Description
+    if (item.description) {
+      estimatedSectionHeight += 5 // "Description:" label
+      estimatedSectionHeight += calculateTextHeight(safeString(item.description), contentWidth, 9)
+      estimatedSectionHeight += 5 // Spacing after description
+    }
+
+    // Media Images
+    if (item.media && item.media.length > 0) {
+      const imagesToShow = item.media.filter((media) => !media.isVideo)
+      if (imagesToShow.length > 0) {
+        estimatedSectionHeight += 8 // "Product Images:" label
+        const imagesPerRow = 4
+        const imageSpacing = 3
+        const uniformImageSize = (contentWidth - (imagesPerRow - 1) * imageSpacing) / imagesPerRow
+        const numRows = Math.ceil(imagesToShow.length / imagesPerRow)
+        estimatedSectionHeight += numRows * (uniformImageSize + imageSpacing)
+        estimatedSectionHeight += 10 // Spacing after images
+      }
+    }
+    estimatedSectionHeight += 15 // Final spacing after each product details section
+
+    checkNewPage(estimatedSectionHeight)
+
     pdf.setFontSize(12)
     pdf.setFont("helvetica", "bold")
     pdf.setTextColor(0, 0, 0)
@@ -615,46 +737,43 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
 
     // Left column specifications
     if (item.specs_rental?.width && item.specs_rental?.height) {
-      // Changed product to item
       pdf.setFont("helvetica", "bold")
       pdf.text("Dimensions:", leftCol, leftY)
       pdf.setFont("helvetica", "normal")
-      pdf.text(
+      leftY = addText(
         `${safeString(item.specs_rental.width)}m x ${safeString(item.specs_rental.height)}m`, // Changed product to item
         leftCol + 25,
         leftY,
+        contentWidth / 2 - 25,
+        9,
       )
       leftY += 5
     }
 
     if (item.specs_rental?.elevation) {
-      // Changed product to item
       pdf.setFont("helvetica", "bold")
       pdf.text("Elevation:", leftCol, leftY)
       pdf.setFont("helvetica", "normal")
-      pdf.text(`${safeString(item.specs_rental.elevation)}m`, leftCol + 25, leftY) // Changed product to item
+      leftY = addText(`${safeString(item.specs_rental.elevation)}m`, leftCol + 25, leftY, contentWidth / 2 - 25, 9) // Changed product to item
       leftY += 5
     }
 
     // Right column specifications
     if (item.specs_rental?.traffic_count) {
-      // Changed product to item
       pdf.setFont("helvetica", "bold")
       pdf.text("Traffic Count:", rightCol, rightY)
       pdf.setFont("helvetica", "normal")
-      pdf.text(safeString(item.specs_rental.traffic_count), rightCol + 30, rightY) // Changed product to item
+      rightY = addText(safeString(item.specs_rental.traffic_count), rightCol + 30, rightY, contentWidth / 2 - 30, 9) // Changed product to item
       rightY += 5
     }
 
     if (item.specs_rental?.audience_type) {
-      // Changed product to item
       pdf.setFont("helvetica", "bold")
       pdf.text("Audience Type:", rightCol, rightY)
       pdf.setFont("helvetica", "normal")
-      pdf.text(safeString(item.specs_rental.audience_type), rightCol + 30, rightY) // Changed product to item
+      rightY = addText(safeString(item.specs_rental.audience_type), rightCol + 30, rightY, contentWidth / 2 - 30, 9) // Changed product to item
       rightY += 5
     } else if (item.specs_rental?.audience_types && item.specs_rental.audience_types.length > 0) {
-      // Changed product to item
       pdf.setFont("helvetica", "bold")
       pdf.text("Audience Types:", rightCol, rightY)
       pdf.setFont("helvetica", "normal")
@@ -666,8 +785,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
 
     // Description
     if (item.description) {
-      // Changed product to item
-      checkNewPage(20)
+      checkNewPage(20) // Check for description space
       pdf.setFontSize(9)
       pdf.setFont("helvetica", "bold")
       pdf.text("Description:", margin, yPosition)
@@ -682,15 +800,19 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
       // Changed product to item
       const imagesToShow = item.media.filter((media) => !media.isVideo) // Only show images in PDF
       if (imagesToShow.length > 0) {
-        checkNewPage(50)
+        let imagesSectionHeight = 8 // "Product Images:" label
+        const imagesPerRow = 4
+        const imageSpacing = 3
+        const uniformImageSize = (contentWidth - (imagesPerRow - 1) * imageSpacing) / imagesPerRow
+        const numRows = Math.ceil(imagesToShow.length / imagesPerRow)
+        imagesSectionHeight += numRows * (uniformImageSize + imageSpacing)
+        imagesSectionHeight += 10 // Spacing after images
+        checkNewPage(imagesSectionHeight)
+
         pdf.setFontSize(9)
         pdf.setFont("helvetica", "bold")
         pdf.text("Product Images:", margin, yPosition)
         yPosition += 8
-
-        const imagesPerRow = 4
-        const imageSpacing = 3
-        const uniformImageSize = (contentWidth - (imagesPerRow - 1) * imageSpacing) / imagesPerRow
 
         let currentImageX = margin
         let imagesInRow = 0
@@ -701,7 +823,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
             yPosition += uniformImageSize + imageSpacing
             currentImageX = margin
             imagesInRow = 0
-            checkNewPage(uniformImageSize + imageSpacing)
+            checkNewPage(uniformImageSize + imageSpacing) // Check for space for the new row
           }
 
           try {
@@ -734,7 +856,12 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
 
   // Additional Information (Notes)
   if (quotation.notes) {
-    checkNewPage(30)
+    let notesSectionHeight = 5 // Section title spacing
+    notesSectionHeight += 8 // Line spacing
+    notesSectionHeight += calculateTextHeight(quotation.notes, contentWidth, 9)
+    notesSectionHeight += 10 // Spacing after notes
+    checkNewPage(notesSectionHeight)
+
     pdf.setFontSize(12)
     pdf.setFont("helvetica", "bold")
     pdf.text("ADDITIONAL INFORMATION", margin, yPosition)
