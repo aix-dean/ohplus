@@ -67,7 +67,7 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto p-0">
+      <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto p-0">
         {/* Header */}
         <DialogHeader className="p-6 pb-4">
           <div className="flex items-center justify-between">
