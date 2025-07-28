@@ -985,7 +985,7 @@ export default function CreateJobOrderPage() {
                                 mode="single"
                                 selected={form.deadline}
                                 onSelect={(date) => handleFormUpdate(index, "deadline", date)}
-                                fromDate={new Date()} // Disable past dates
+                                disabled={{ before: new Date() }} // Disable past dates
                               />
                             </PopoverContent>
                           </Popover>
@@ -1165,7 +1165,7 @@ export default function CreateJobOrderPage() {
                           mode="single"
                           selected={jobOrderForms[0]?.deadline}
                           onSelect={(date) => handleFormUpdate(0, "deadline", date)}
-                          fromDate={new Date()} // Disable past dates
+                          disabled={{ before: new Date() }} // Disable past dates
                         />
                       </PopoverContent>
                     </Popover>
