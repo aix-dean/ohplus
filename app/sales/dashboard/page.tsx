@@ -707,7 +707,7 @@ function SalesDashboardContent() {
       } else if (actionAfterDateSelection === "quotation") {
         // Prepare products for quotation
         const quotationItems: QuotationProduct[] = selectedSites.map((site) => ({
-          id: site.id,
+          product_id: site.id,
           name: site.name,
           location: site.specs_rental?.location || site.light?.location || "N/A",
           price: site.price || 0, // This is the monthly price
