@@ -1,420 +1,389 @@
 "use client"
 
-import { useState } from "react"
-import { useToast } from "@/hooks/use-toast"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import type React from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CalendarIcon, MapPin, Loader2, Building, Mail, Phone } from "lucide-react"
 import { format } from "date-fns"
+import { CalendarIcon, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service"
-import type { Proposal } from "@/lib/types/proposal"
-import Image from "next/image"
+import { toast } from "@/hooks/use-toast"
+import {
+  createQuotation,
+  generateQuotationNumber,
+  calculateQuotationTotal,
+  type QuotationProduct,
+} from "@/lib/quotation-service"
+import { getAllClients, type Client } from "@/lib/client-service" // Import getAllClients and Client type
+import { getProducts, type Product } from "@/lib/firebase-service" // Import getProducts and Product type
+import { useAuth } from "@/contexts/auth-context" // Import useAuth
+import { X } from "lucide-react" // Import X for product removal button
+import { Badge } from "@/components/ui/badge" // Import Badge for displaying selected products
 
 interface GenerateQuotationDialogProps {
   isOpen: boolean
   onClose: () => void
-  proposal: Proposal
-  onQuotationGenerated: (quotationId: string) => void
+  onQuotationCreated: (quotationId: string) => void
+  initialClientId?: string
+  initialProductIds?: string[]
 }
 
 export function GenerateQuotationDialog({
   isOpen,
   onClose,
-  proposal,
-  onQuotationGenerated,
+  onQuotationCreated,
+  initialClientId,
+  initialProductIds,
 }: GenerateQuotationDialogProps) {
-  const { toast } = useToast()
-
-  // Form state
-  const [selectedProductId, setSelectedProductId] = useState<string>(proposal.products[0]?.id || "")
-  const [quotationNumber] = useState(generateQuotationNumber())
-  const [startDate, setStartDate] = useState<Date>(new Date())
-  const [endDate, setEndDate] = useState<Date>(() => {
-    const date = new Date()
-    date.setDate(date.getDate() + 30) // Default 30 days
-    return date
+  const { user } = useAuth()
+  const [loading, setLoading] = useState(false)
+  const [clients, setClients] = useState<Client[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>(initialProductIds || [])
+  const [startDate, setStartDate] = useState<Date | undefined>(new Date())
+  const [endDate, setEndDate] = useState<Date | undefined>(new Date())
+  const [validUntil, setValidUntil] = useState<Date | undefined>(() => {
+    const today = new Date()
+    today.setDate(today.getDate() + 5) // Default to 5 days from now
+    return today
   })
-  const [customPrice, setCustomPrice] = useState<string>("")
-  const [notes, setNotes] = useState(proposal.notes || "")
-  const [isGenerating, setIsGenerating] = useState(false)
+  const [notes, setNotes] = useState("")
+  const [totalAmount, setTotalAmount] = useState(0)
+  const [durationDays, setDurationDays] = useState(0)
 
-  // Get selected product
-  const selectedProduct = proposal.products.find((p) => p.id === selectedProductId)
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true)
+      try {
+        const fetchedClients = await getAllClients()
+        setClients(fetchedClients)
 
-  // Calculate pricing
-  const basePrice = selectedProduct ? selectedProduct.price : 0
-  const finalPrice = customPrice ? Number.parseFloat(customPrice) || basePrice : basePrice
-  const { durationDays, totalAmount } = calculateQuotationTotal(
-    startDate.toISOString().split("T")[0],
-    endDate.toISOString().split("T")[0],
-    finalPrice,
-  )
+        const fetchedProducts = await getProducts()
+        setProducts(fetchedProducts)
 
-  const handleGenerateQuotation = async () => {
-    if (!selectedProduct) {
+        if (initialClientId) {
+          const client = fetchedClients.find((c) => c.id === initialClientId)
+          if (client) {
+            setSelectedClient(client)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching data for quotation dialog:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load clients or products.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+    if (isOpen) {
+      fetchData()
+    }
+  }, [isOpen, initialClientId, toast])
+
+  useEffect(() => {
+    if (startDate && endDate && selectedProductIds.length > 0) {
+      const selectedProducts = products.filter((p) => selectedProductIds.includes(p.id))
+      const quotationProducts: QuotationProduct[] = selectedProducts.map((p) => ({
+        product_id: p.id,
+        name: p.name,
+        location: p.location,
+        price: p.price || 0,
+        site_code: p.site_code,
+        type: p.type,
+        description: p.description,
+        health_percentage: p.health_percentage,
+        light: p.light,
+        media: p.media,
+        specs_rental: p.specs_rental,
+        media_url: p.media && p.media.length > 0 ? p.media[0].url : undefined,
+        duration_days: 0, // Will be calculated by service
+        item_total_amount: 0, // Will be calculated by service
+      }))
+
+      const { durationDays, totalAmount } = calculateQuotationTotal(
+        startDate.toISOString(),
+        endDate.toISOString(),
+        quotationProducts,
+      )
+      setDurationDays(durationDays)
+      setTotalAmount(totalAmount)
+    } else {
+      setDurationDays(0)
+      setTotalAmount(0)
+    }
+  }, [startDate, endDate, selectedProductIds, products])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedClient || selectedProductIds.length === 0 || !startDate || !endDate || !validUntil) {
       toast({
-        title: "No product selected",
-        description: "Please select a product for the quotation.",
+        title: "Missing Information",
+        description: "Please select a client, at least one product, and valid dates.",
         variant: "destructive",
       })
       return
     }
 
-    if (!startDate || !endDate) {
-      toast({
-        title: "Missing dates",
-        description: "Please select both start and end dates.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    if (endDate <= startDate) {
-      toast({
-        title: "Invalid date range",
-        description: "End date must be after start date.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    setIsGenerating(true)
+    setLoading(true)
     try {
-      const quotationData = {
+      const quotationNumber = generateQuotationNumber()
+      const selectedProducts = products.filter((p) => selectedProductIds.includes(p.id))
+
+      const quotationProducts: QuotationProduct[] = selectedProducts.map((p) => ({
+        product_id: p.id,
+        name: p.name,
+        location: p.location,
+        price: p.price || 0,
+        site_code: p.site_code,
+        type: p.type,
+        description: p.description,
+        health_percentage: p.health_percentage,
+        light: p.light,
+        media: p.media,
+        specs_rental: p.specs_rental,
+        media_url: p.media && p.media.length > 0 ? p.media[0].url : undefined,
+        duration_days: 0, // Will be calculated by service
+        item_total_amount: 0, // Will be calculated by service
+      }))
+
+      const { durationDays: calculatedDurationDays, totalAmount: calculatedTotalAmount } = calculateQuotationTotal(
+        startDate.toISOString(),
+        endDate.toISOString(),
+        quotationProducts,
+      )
+
+      const newQuotationData = {
         quotation_number: quotationNumber,
-        product_id: selectedProduct.id,
-        product_name: selectedProduct.name,
-        product_location: selectedProduct.location,
-        site_code: selectedProduct.site_code || "",
-        start_date: startDate.toISOString().split("T")[0],
-        end_date: endDate.toISOString().split("T")[0],
-        price: finalPrice,
-        total_amount: totalAmount,
-        duration_days: durationDays,
-        notes: notes.trim(),
-        status: "draft" as const,
-        created_by: "current_user",
-        client_name: proposal.client.contactPerson,
-        client_email: proposal.client.email,
+        client_id: selectedClient.id,
+        client_name: selectedClient.name,
+        client_email: selectedClient.email,
+        client_designation: selectedClient.designation || "", // Include designation
+        client_address: selectedClient.address || "", // Include address
+        client_phone: selectedClient.phone || "", // Include phone
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        valid_until: validUntil.toISOString(),
+        total_amount: calculatedTotalAmount,
+        duration_days: calculatedDurationDays,
+        notes: notes,
+        status: "draft", // Default status
+        created_by: user?.uid || "unknown",
+        created_by_first_name: user?.displayName?.split(" ")[0] || "Unknown",
+        created_by_last_name: user?.displayName?.split(" ").slice(1).join(" ") || "",
+        seller_id: user?.uid || "unknown", // Assuming seller_id is the current user's ID
+        items: quotationProducts,
       }
 
-      const quotationId = await createQuotation(quotationData)
-
+      const quotationId = await createQuotation(newQuotationData)
       toast({
-        title: "Quotation Generated Successfully!",
-        description: `Quotation ${quotationNumber} has been created and is ready to be sent to the client.`,
+        title: "Success",
+        description: `Quotation ${quotationNumber} created successfully!`,
       })
-
-      onQuotationGenerated(quotationId)
-      handleClose()
+      onQuotationCreated(quotationId)
+      onClose()
     } catch (error) {
-      console.error("Error generating quotation:", error)
+      console.error("Error creating quotation:", error)
       toast({
         title: "Error",
-        description: "Failed to generate quotation. Please try again.",
+        description: "Failed to create quotation. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setIsGenerating(false)
+      setLoading(false)
     }
   }
 
-  const resetForm = () => {
-    setSelectedProductId(proposal.products[0]?.id || "")
-    setStartDate(new Date())
-    const defaultEndDate = new Date()
-    defaultEndDate.setDate(defaultEndDate.getDate() + 30)
-    setEndDate(defaultEndDate)
-    setCustomPrice("")
-    setNotes(proposal.notes || "")
-  }
-
-  const handleClose = () => {
-    resetForm()
-    onClose()
-  }
-
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Generate Quotation from Proposal</DialogTitle>
+          <DialogTitle>Generate New Quotation</DialogTitle>
         </DialogHeader>
+        <form onSubmit={handleSubmit} className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="client" className="text-right">
+              Client
+            </Label>
+            <Select
+              onValueChange={(clientId) => setSelectedClient(clients.find((c) => c.id === clientId) || null)}
+              value={selectedClient?.id || ""}
+              disabled={loading}
+            >
+              <SelectTrigger className="col-span-3">
+                <SelectValue placeholder="Select a client" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.company} ({client.name})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="space-y-6">
-          {/* Proposal Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Proposal Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Proposal Title</Label>
-                  <p className="text-base font-semibold">{proposal.title}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-500">Quotation Number</Label>
-                  <p className="text-base font-mono">{quotationNumber}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-center space-x-2">
-                  <Building className="h-4 w-4 text-gray-400" />
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500">Company</Label>
-                    <p className="text-base">{proposal.client.company}</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Mail className="h-4 w-4 text-gray-400" />
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500">Contact</Label>
-                    <p className="text-base">{proposal.client.contactPerson}</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Phone className="h-4 w-4 text-gray-400" />
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500">Email</Label>
-                    <p className="text-base">{proposal.client.email}</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Product Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Select Product</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="product">Product *</Label>
-                <Select value={selectedProductId} onValueChange={setSelectedProductId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a product" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {proposal.products.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-medium">{product.name}</span>
-                          <span className="text-sm text-gray-500">- {product.location}</span>
-                          <Badge variant="outline" className="text-xs">
-                            ₱{product.price.toLocaleString()}
-                          </Badge>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Selected Product Details */}
-              {selectedProduct && (
-                <div className="border rounded-lg p-4 bg-gray-50">
-                  <div className="flex items-start gap-4">
-                    <div className="h-16 w-16 bg-gray-200 rounded overflow-hidden flex-shrink-0">
-                      {selectedProduct.media && selectedProduct.media.length > 0 ? (
-                        <Image
-                          src={selectedProduct.media[0].url || "/placeholder.svg"}
-                          alt={selectedProduct.name}
-                          width={64}
-                          height={64}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center bg-gray-100">
-                          <MapPin size={20} className="text-gray-400" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium">{selectedProduct.name}</h4>
-                      <p className="text-sm text-gray-600">{selectedProduct.location}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="outline">{selectedProduct.type}</Badge>
-                        {selectedProduct.site_code && <Badge variant="outline">{selectedProduct.site_code}</Badge>}
-                      </div>
-                      {selectedProduct.specs_rental && (
-                        <div className="mt-2 text-xs text-gray-600">
-                          {selectedProduct.specs_rental.traffic_count && (
-                            <span>Traffic: {selectedProduct.specs_rental.traffic_count.toLocaleString()}/day • </span>
-                          )}
-                          {selectedProduct.specs_rental.height && selectedProduct.specs_rental.width && (
-                            <span>
-                              Size: {selectedProduct.specs_rental.height}m × {selectedProduct.specs_rental.width}m
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-green-700">₱{selectedProduct.price.toLocaleString()}</div>
-                      <div className="text-xs text-gray-500">per day</div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Rental Period & Pricing */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Rental Period & Pricing</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="startDate">Start Date *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="products" className="text-right">
+              Products
+            </Label>
+            <Select
+              onValueChange={(productId) => {
+                setSelectedProductIds((prev) =>
+                  prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId],
+                )
+              }}
+              value={selectedProductIds[0] || ""} // Display first selected product or empty
+              disabled={loading}
+            >
+              <SelectTrigger className="col-span-3">
+                <SelectValue placeholder="Select products" />
+              </SelectTrigger>
+              <SelectContent>
+                {products.map((product) => (
+                  <SelectItem key={product.id} value={product.id}>
+                    {product.name} ({product.location})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {selectedProductIds.length > 0 && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <div className="col-span-1"></div>
+              <div className="col-span-3 flex flex-wrap gap-2">
+                {selectedProductIds.map((id) => {
+                  const product = products.find((p) => p.id === id)
+                  return (
+                    <Badge key={id} variant="secondary" className="flex items-center gap-1">
+                      {product?.name}
                       <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !startDate && "text-muted-foreground",
-                        )}
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-0.5"
+                        onClick={() => setSelectedProductIds((prev) => prev.filter((pid) => pid !== id))}
                       >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {startDate ? format(startDate, "PPP") : <span>Pick start date</span>}
+                        <X className="h-3 w-3" />
                       </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={startDate}
-                        onSelect={(date) => date && setStartDate(date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="endDate">End Date *</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !endDate && "text-muted-foreground",
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {endDate ? format(endDate, "PPP") : <span>Pick end date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={endDate}
-                        onSelect={(date) => date && setEndDate(date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                    </Badge>
+                  )
+                })}
               </div>
+            </div>
+          )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="customPrice">Custom Price per Day (Optional)</Label>
-                  <Input
-                    id="customPrice"
-                    type="number"
-                    value={customPrice}
-                    onChange={(e) => setCustomPrice(e.target.value)}
-                    placeholder={`Default: ₱${basePrice.toLocaleString()}`}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Leave empty to use the original price of ₱{basePrice.toLocaleString()}
-                  </p>
-                </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="startDate" className="text-right">
+              Start Date
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "col-span-3 justify-start text-left font-normal",
+                    !startDate && "text-muted-foreground",
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {startDate ? format(startDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus />
+              </PopoverContent>
+            </Popover>
+          </div>
 
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-500">Duration</Label>
-                  <div className="p-3 bg-gray-50 rounded-md">
-                    <p className="text-lg font-semibold">{durationDays} days</p>
-                    <p className="text-sm text-gray-600">
-                      {startDate && endDate && format(startDate, "MMM d")} - {endDate && format(endDate, "MMM d, yyyy")}
-                    </p>
-                  </div>
-                </div>
-              </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="endDate" className="text-right">
+              End Date
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn("col-span-3 justify-start text-left font-normal", !endDate && "text-muted-foreground")}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus />
+              </PopoverContent>
+            </Popover>
+          </div>
 
-              {/* Pricing Summary */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Price per day:</span>
-                    <span>₱{finalPrice.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Duration:</span>
-                    <span>{durationDays} days</span>
-                  </div>
-                  <Separator />
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Total Amount:</span>
-                    <span className="text-green-700">₱{totalAmount.toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="validUntil" className="text-right">
+              Valid Until
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "col-span-3 justify-start text-left font-normal",
+                    !validUntil && "text-muted-foreground",
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {validUntil ? format(validUntil, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar mode="single" selected={validUntil} onSelect={setValidUntil} initialFocus />
+              </PopoverContent>
+            </Popover>
+          </div>
 
-          {/* Additional Notes */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Additional Notes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add any additional notes or terms for this quotation"
-                  rows={4}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="notes" className="text-right">
+              Notes
+            </Label>
+            <Input
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="col-span-3"
+              placeholder="Any additional notes for the quotation"
+            />
+          </div>
 
-          {/* Action Buttons */}
-          <div className="flex justify-between">
-            <Button variant="outline" onClick={handleClose} disabled={isGenerating}>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right">Duration</Label>
+            <div className="col-span-3 text-lg font-semibold">{durationDays} day(s)</div>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right">Total Amount</Label>
+            <div className="col-span-3 text-xl font-bold text-blue-600">₱{totalAmount.toLocaleString()}</div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button onClick={handleGenerateQuotation} disabled={isGenerating} className="min-w-[160px]">
-              {isGenerating ? (
+            <Button type="submit" disabled={loading}>
+              {loading ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating...
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...
                 </>
               ) : (
                 "Generate Quotation"
               )}
             </Button>
-          </div>
-        </div>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )
