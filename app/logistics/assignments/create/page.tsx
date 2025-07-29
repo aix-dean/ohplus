@@ -10,7 +10,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Plus, FileText, Video, Loader2, ArrowLeft, Printer, Download } from "lucide-react"
 import { format } from "date-fns"
 import type { Product } from "@/lib/firebase-service"
-import { addDoc, collection, serverTimestamp, query, where, orderBy, limit, getDocs } from "firebase/firestore"
+import {
+  addDoc,
+  collection,
+  serverTimestamp,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  doc,
+  getDoc,
+  updateDoc,
+} from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -34,6 +46,8 @@ export default function CreateServiceAssignmentPage() {
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [createdSaNumber, setCreatedSaNumber] = useState("")
   const [generatingPDF, setGeneratingPDF] = useState(false)
+  const [isEditingDraft, setIsEditingDraft] = useState(false)
+  const [draftId, setDraftId] = useState<string | null>(null)
 
   // Form data state
   const [formData, setFormData] = useState({
@@ -104,6 +118,75 @@ export default function CreateServiceAssignmentPage() {
     fetchProducts()
   }, [])
 
+  // Load draft data if editing
+  useEffect(() => {
+    const loadDraft = async () => {
+      const draftParam = searchParams.get("draft")
+      if (draftParam) {
+        try {
+          setDraftId(draftParam)
+          const draftDoc = await getDoc(doc(db, "service_assignments", draftParam))
+
+          if (draftDoc.exists()) {
+            const draftData = draftDoc.data()
+            setIsEditingDraft(true)
+
+            // Load the draft data into form
+            setFormData({
+              projectSite: draftData.projectSiteId || "",
+              serviceType: draftData.serviceType || "",
+              assignedTo: draftData.assignedTo || "",
+              serviceDuration: draftData.serviceDuration || "",
+              priority: draftData.priority || "",
+              equipmentRequired: draftData.equipmentRequired || "",
+              materialSpecs: draftData.materialSpecs || "",
+              crew: draftData.crew || "",
+              illuminationNits: draftData.illuminationNits || "",
+              gondola: draftData.gondola || "",
+              technology: draftData.technology || "",
+              sales: draftData.sales || "",
+              remarks: draftData.remarks || "",
+              message: draftData.message || "",
+              startDate: draftData.coveredDateStart?.toDate() || null,
+              endDate: draftData.coveredDateEnd?.toDate() || null,
+              alarmDate: draftData.alarmDate?.toDate() || null,
+              alarmTime: draftData.alarmTime || "",
+              attachments: draftData.attachments || [],
+              serviceCost: draftData.serviceCost || {
+                crewFee: "",
+                overtimeFee: "",
+                transpo: "",
+                tollFee: "",
+                mealAllowance: "",
+                otherFees: [],
+                total: 0,
+              },
+            })
+
+            // Set the SA number from draft
+            setSaNumber(draftData.saNumber || "")
+
+            // Set date inputs
+            if (draftData.coveredDateStart) {
+              setStartDateInput(format(draftData.coveredDateStart.toDate(), "yyyy-MM-dd"))
+            }
+            if (draftData.coveredDateEnd) {
+              setEndDateInput(format(draftData.coveredDateEnd.toDate(), "yyyy-MM-dd"))
+            }
+            if (draftData.alarmDate) {
+              setAlarmDateInput(format(draftData.alarmDate.toDate(), "yyyy-MM-dd"))
+            }
+          }
+        } catch (error) {
+          console.error("Error loading draft:", error)
+          alert("Error loading draft")
+        }
+      }
+    }
+
+    loadDraft()
+  }, [searchParams])
+
   // Handle form input changes
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -155,7 +238,7 @@ export default function CreateServiceAssignmentPage() {
       setLoading(true)
       const selectedProduct = products.find((p) => p.id === formData.projectSite)
 
-      await addDoc(collection(db, "service_assignments"), {
+      const assignmentData = {
         saNumber,
         projectSiteId: formData.projectSite,
         projectSiteName: selectedProduct?.name || "",
@@ -184,18 +267,93 @@ export default function CreateServiceAssignmentPage() {
         alarmTime: formData.alarmTime,
         attachments: formData.attachments,
         serviceCost: formData.serviceCost,
-        status: "Pending",
-        created: serverTimestamp(),
+        status: "Pending", // Always set to Pending when submitting
         updated: serverTimestamp(),
         project_key: userData?.license_key || "",
         company_id: userData?.company_id || null,
-      })
+      }
+
+      if (isEditingDraft && draftId) {
+        // Update existing draft to pending
+        await updateDoc(doc(db, "service_assignments", draftId), assignmentData)
+      } else {
+        // Create new assignment
+        await addDoc(collection(db, "service_assignments"), {
+          ...assignmentData,
+          created: serverTimestamp(),
+        })
+      }
 
       // Show success dialog
       setCreatedSaNumber(saNumber)
       setShowSuccessDialog(true)
     } catch (error) {
       console.error("Error creating service assignment:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Add this new function after the handleSubmit function
+  const handleSaveDraft = async () => {
+    if (!user) return
+
+    try {
+      setLoading(true)
+      const selectedProduct = products.find((p) => p.id === formData.projectSite)
+
+      const draftData = {
+        saNumber,
+        projectSiteId: formData.projectSite,
+        projectSiteName: selectedProduct?.name || "",
+        projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
+        serviceType: formData.serviceType,
+        assignedTo: formData.assignedTo,
+        serviceDuration: formData.serviceDuration,
+        priority: formData.priority,
+        equipmentRequired: formData.equipmentRequired,
+        materialSpecs: formData.materialSpecs,
+        crew: formData.crew,
+        illuminationNits: formData.illuminationNits,
+        gondola: formData.gondola,
+        technology: formData.technology,
+        sales: formData.sales,
+        remarks: formData.remarks,
+        requestedBy: {
+          id: user.uid,
+          name: user.displayName || "Unknown User",
+          department: "LOGISTICS",
+        },
+        message: formData.message,
+        coveredDateStart: formData.startDate,
+        coveredDateEnd: formData.endDate,
+        alarmDate: formData.alarmDate,
+        alarmTime: formData.alarmTime,
+        attachments: formData.attachments,
+        serviceCost: formData.serviceCost,
+        status: "Draft",
+        updated: serverTimestamp(),
+        project_key: userData?.license_key || "",
+        company_id: userData?.company_id || null,
+      }
+
+      if (isEditingDraft && draftId) {
+        // Update existing draft
+        await updateDoc(doc(db, "service_assignments", draftId), draftData)
+        alert("Draft updated successfully!")
+      } else {
+        // Create new draft
+        await addDoc(collection(db, "service_assignments"), {
+          ...draftData,
+          created: serverTimestamp(),
+        })
+        alert("Service assignment saved as draft successfully!")
+      }
+
+      router.push("/logistics/assignments")
+    } catch (error) {
+      console.error("Error saving draft:", error)
+      alert("Error saving draft. Please try again.")
     } finally {
       setLoading(false)
     }
@@ -418,7 +576,9 @@ export default function CreateServiceAssignmentPage() {
     <div className="container mx-auto py-4 space-y-4">
       {/* Header */}
       <div className="bg-slate-800 text-white p-4 rounded-lg flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Create Service Assignment</h1>
+        <h1 className="text-lg font-semibold">
+          {isEditingDraft ? "Edit Service Assignment Draft" : "Create Service Assignment"}
+        </h1>
         <Link href="/logistics/assignments" className="inline-flex items-center text-sm text-white/80 hover:text-white">
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back to Assignments
@@ -945,15 +1105,7 @@ export default function CreateServiceAssignmentPage() {
             <Button variant="outline" onClick={() => router.push("/logistics/assignments")} type="button">
               Cancel
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                // Save current form data as draft
-                console.log("Saving draft...", formData)
-                // You can implement actual draft saving logic here
-              }}
-              type="button"
-            >
+            <Button variant="outline" onClick={handleSaveDraft} disabled={loading} type="button">
               Save Draft
             </Button>
             <Button variant="outline" onClick={() => handleGeneratePDF("print")} disabled={generatingPDF} type="button">

@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 
 interface ServiceAssignment {
   id: string
@@ -34,6 +35,7 @@ interface ServiceAssignmentsTableProps {
 }
 
 export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: ServiceAssignmentsTableProps) {
+  const router = useRouter()
   const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -70,6 +72,8 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
         return "bg-yellow-100 text-yellow-800"
       case "cancelled":
         return "bg-red-100 text-red-800"
+      case "draft":
+        return "bg-orange-100 text-orange-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
@@ -130,13 +134,23 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
                   {assignment.created ? format(new Date(assignment.created.toDate()), "MMM d, yyyy") : "Unknown"}
                 </TableCell>
                 <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onSelectAssignment && onSelectAssignment(assignment.id)}
-                  >
-                    View
-                  </Button>
+                  {assignment.status === "Draft" ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/logistics/assignments/create?draft=${assignment.id}`)}
+                    >
+                      Continue Editing
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onSelectAssignment && onSelectAssignment(assignment.id)}
+                    >
+                      View
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))
