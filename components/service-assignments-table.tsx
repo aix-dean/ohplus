@@ -79,10 +79,6 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
     }
   }
 
-  const handleContinueEditing = (assignmentId: string) => {
-    router.push(`/logistics/assignments/create?draft=${assignmentId}`)
-  }
-
   if (loading) {
     return <div className="flex justify-center p-8">Loading assignments...</div>
   }
@@ -138,28 +134,23 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: Servi
                   {assignment.created ? format(new Date(assignment.created.toDate()), "MMM d, yyyy") : "Unknown"}
                 </TableCell>
                 <TableCell>
-                  <div className="flex gap-2">
-                    {assignment.status === "Draft" ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleContinueEditing(assignment.id)
-                        }}
-                      >
-                        Continue Editing
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onSelectAssignment && onSelectAssignment(assignment.id)}
-                      >
-                        View
-                      </Button>
-                    )}
-                  </div>
+                  {assignment.status === "Draft" ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/logistics/assignments/create?draft=${assignment.id}`)}
+                    >
+                      Continue Editing
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onSelectAssignment && onSelectAssignment(assignment.id)}
+                    >
+                      View
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))

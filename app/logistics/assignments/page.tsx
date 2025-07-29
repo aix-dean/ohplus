@@ -13,7 +13,7 @@ export default function ServiceAssignmentsPage() {
   const { userData } = useAuth()
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
 
-  const handleSelectAssignment = async (id: string) => {
+  const handleSelectAssignment = async (id) => {
     router.push(`/logistics/service-assignments/${id}`)
   }
 
