@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import Image from "next/image"
+import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
 
 interface ServiceAssignment {
   id: string
@@ -140,6 +141,80 @@ export default function ServiceAssignmentDetailsPage() {
     }
   }
 
+  const handleDownloadPDF = async () => {
+    try {
+      // Prepare the service assignment data for PDF generation
+      const serviceAssignmentData = {
+        saNumber: assignment.saNumber || assignment.id.substring(0, 8),
+        projectSiteName: assignment.projectSiteName || "N/A",
+        projectSiteLocation: assignment.projectSiteLocation || "N/A",
+        serviceType: assignment.serviceType || "N/A",
+        assignedTo: assignment.assignedTo || "N/A",
+        serviceDuration: assignment.serviceDuration || "N/A",
+        priority: assignment.priority || "Normal",
+        equipmentRequired: assignment.equipmentRequired || "N/A",
+        materialSpecs: assignment.materialSpecs || "N/A",
+        crew: assignment.crew || assignment.assignedTo || "N/A",
+        illuminationNits: assignment.illuminationNits || "N/A",
+        gondola: assignment.gondola || "N/A",
+        technology: assignment.technology || "N/A",
+        sales: assignment.sales || "N/A",
+        remarks: assignment.remarks || assignment.message || "No remarks provided.",
+        requestedBy: {
+          name: assignment.requestedBy?.name || "Unknown User",
+          department: assignment.requestedBy?.department || "Department not specified",
+        },
+        startDate: assignment.coveredDateStart
+          ? assignment.coveredDateStart.toDate
+            ? assignment.coveredDateStart.toDate()
+            : new Date(assignment.coveredDateStart)
+          : null,
+        endDate: assignment.coveredDateEnd
+          ? assignment.coveredDateEnd.toDate
+            ? assignment.coveredDateEnd.toDate()
+            : new Date(assignment.coveredDateEnd)
+          : null,
+        alarmDate: assignment.alarmDate
+          ? assignment.alarmDate.toDate
+            ? assignment.alarmDate.toDate()
+            : new Date(assignment.alarmDate)
+          : null,
+        alarmTime: assignment.alarmTime || "N/A",
+        attachments: assignment.attachments || [],
+        serviceCost: {
+          crewFee: assignment.serviceCost?.crewFee || "0",
+          overtimeFee: assignment.serviceCost?.overtimeFee || "0",
+          transpo: assignment.serviceCost?.transpo || "0",
+          tollFee: assignment.serviceCost?.tollFee || "0",
+          mealAllowance: assignment.serviceCost?.mealAllowance || "0",
+          otherFees: assignment.serviceCost?.otherFees || [],
+          total: assignment.serviceCost?.total || 0,
+        },
+        status: assignment.status || "Pending",
+        created: assignment.created
+          ? assignment.created.toDate
+            ? assignment.created.toDate()
+            : new Date(assignment.created)
+          : new Date(),
+      }
+
+      // Generate and download the PDF
+      await generateServiceAssignmentPDF(serviceAssignmentData, false)
+
+      toast({
+        title: "PDF Downloaded",
+        description: "Service assignment PDF has been generated and downloaded successfully.",
+      })
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   const formatDate = (date: any) => {
     if (!date) return "Not specified"
     try {
@@ -222,7 +297,7 @@ export default function ServiceAssignmentDetailsPage() {
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center justify-between mb-6">
         <Button
           variant="ghost"
           size="sm"
@@ -231,6 +306,16 @@ export default function ServiceAssignmentDetailsPage() {
         >
           <ArrowLeft className="h-4 w-4" />
           Service Assignment
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleDownloadPDF}
+          className="flex items-center gap-2 bg-transparent"
+        >
+          <Download className="h-4 w-4" />
+          Download PDF
         </Button>
       </div>
 

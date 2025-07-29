@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, FileText, Video, Loader2, ArrowLeft } from "lucide-react"
+import { Plus, FileText, Video, Loader2, ArrowLeft, Printer, Download } from "lucide-react"
 import { format } from "date-fns"
 import type { Product } from "@/lib/firebase-service"
 import { addDoc, collection, serverTimestamp, query, where, orderBy, limit, getDocs } from "firebase/firestore"
@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-success-dialog"
+import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
 
 // Service types as provided
 const SERVICE_TYPES = ["Roll up", "Roll down", "Change Material", "Repair", "Maintenance", "Monitoring", "Spot Booking"]
@@ -32,6 +33,7 @@ export default function CreateServiceAssignmentPage() {
   const [saNumber, setSaNumber] = useState("")
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [createdSaNumber, setCreatedSaNumber] = useState("")
+  const [generatingPDF, setGeneratingPDF] = useState(false)
 
   // Form data state
   const [formData, setFormData] = useState({
@@ -335,6 +337,70 @@ export default function CreateServiceAssignmentPage() {
     // Generate new SA number
     const randomNum = Math.floor(100000 + Math.random() * 900000)
     setSaNumber(randomNum.toString())
+  }
+
+  // Handle PDF generation and print/download
+  const handleGeneratePDF = async (action: "print" | "download") => {
+    try {
+      setGeneratingPDF(true)
+
+      // Create service assignment data structure for PDF
+      const selectedProduct = products.find((p) => p.id === formData.projectSite)
+      const serviceAssignmentData = {
+        saNumber,
+        projectSiteName: selectedProduct?.name || "",
+        projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
+        serviceType: formData.serviceType,
+        assignedTo: formData.assignedTo,
+        serviceDuration: formData.serviceDuration,
+        priority: formData.priority,
+        equipmentRequired: formData.equipmentRequired,
+        materialSpecs: formData.materialSpecs,
+        crew: formData.crew,
+        illuminationNits: formData.illuminationNits,
+        gondola: formData.gondola,
+        technology: formData.technology,
+        sales: formData.sales,
+        remarks: formData.remarks,
+        requestedBy: {
+          name:
+            userData?.first_name && userData?.last_name
+              ? `${userData.first_name} ${userData.last_name}`
+              : user?.displayName || "Unknown User",
+          department: "LOGISTICS",
+        },
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        alarmDate: formData.alarmDate,
+        alarmTime: formData.alarmTime,
+        attachments: formData.attachments,
+        serviceCost: {
+          ...formData.serviceCost,
+          total: calculateServiceCostTotal(),
+        },
+        status: "Draft",
+        created: new Date(),
+      }
+
+      if (action === "print") {
+        // Check if browser supports printing
+        if (window.print) {
+          // Generate PDF and open in new window for printing
+          await generateServiceAssignmentPDF(serviceAssignmentData, false)
+        } else {
+          // Fallback to download if print not supported
+          await generateServiceAssignmentPDF(serviceAssignmentData, false)
+        }
+      } else {
+        // Download PDF
+        await generateServiceAssignmentPDF(serviceAssignmentData, false)
+      }
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+      // You could add a toast notification here
+    } finally {
+      setGeneratingPDF(false)
+    }
   }
 
   if (fetchingProducts) {
@@ -878,6 +944,48 @@ export default function CreateServiceAssignmentPage() {
           <div className="flex gap-4 pt-6">
             <Button variant="outline" onClick={() => router.push("/logistics/assignments")} type="button">
               Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                // Save current form data as draft
+                console.log("Saving draft...", formData)
+                // You can implement actual draft saving logic here
+              }}
+              type="button"
+            >
+              Save Draft
+            </Button>
+            <Button variant="outline" onClick={() => handleGeneratePDF("print")} disabled={generatingPDF} type="button">
+              {generatingPDF ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleGeneratePDF("download")}
+              disabled={generatingPDF}
+              type="button"
+            >
+              {generatingPDF ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download PDF
+                </>
+              )}
             </Button>
             <Button onClick={handleSubmit} disabled={loading} variant="default" type="button">
               {loading ? (
