@@ -34,7 +34,8 @@ interface CostEstimateClientData {
   company: string
   phone?: string
   address?: string
-  designation?: string // Added designation here
+  designation?: string
+  industry?: string // Ensure industry is included here
 }
 
 interface CostEstimateSiteData {
@@ -209,7 +210,8 @@ export async function createDirectCostEstimate(
         company: clientData.company,
         phone: clientData.phone || "",
         address: clientData.address || "",
-        designation: clientData.designation || "", // Ensure designation is included here
+        designation: clientData.designation || "",
+        industry: clientData.industry || "", // Ensure industry is included here
       },
       lineItems,
       totalAmount,
