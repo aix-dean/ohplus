@@ -28,5 +28,6 @@ export interface CostEstimate {
   createdBy: string // User ID of who created it
   startDate?: Date | null // New field
   endDate?: Date | null // New field
+  durationDays?: number | null // New field for duration in days
   validUntil?: Date | null // Add this new field
 }

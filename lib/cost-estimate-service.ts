@@ -118,6 +118,12 @@ export async function createCostEstimateFromProposal(
 
     const costEstimateNumber = `CE${Date.now()}` // Generate CE + currentmillis
 
+    let durationDays = null
+    if (options?.startDate && options?.endDate) {
+      const diffTime = Math.abs(options.endDate.getTime() - options.startDate.getTime())
+      durationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    }
+
     const newCostEstimateRef = await addDoc(collection(db, COST_ESTIMATES_COLLECTION), {
       proposalId: proposal.id,
       costEstimateNumber: costEstimateNumber, // Store the new number
@@ -133,6 +139,7 @@ export async function createCostEstimateFromProposal(
       createdBy: userId,
       startDate: options?.startDate || null, // Store new dates
       endDate: options?.endDate || null, // Store new dates
+      durationDays: durationDays, // Store duration in days
       validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Set valid for 30 days
     })
 
@@ -199,6 +206,12 @@ export async function createDirectCostEstimate(
 
     const costEstimateNumber = `CE${Date.now()}` // Generate CE + currentmillis
 
+    let durationDays = null
+    if (options?.startDate && options?.endDate) {
+      const diffTime = Math.abs(options.endDate.getTime() - options.startDate.getTime())
+      durationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    }
+
     const newCostEstimateRef = await addDoc(collection(db, COST_ESTIMATES_COLLECTION), {
       proposalId: null, // No associated proposal
       costEstimateNumber: costEstimateNumber, // Store the new number
@@ -223,6 +236,7 @@ export async function createDirectCostEstimate(
       createdBy: userId,
       startDate: options?.startDate || null, // Store new dates
       endDate: options?.endDate || null, // Store new dates
+      durationDays: durationDays, // Store duration in days
       validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Set valid for 30 days
     })
 
@@ -308,6 +322,7 @@ export async function getCostEstimatesByProposalId(proposalId: string): Promise<
         createdBy: data.createdBy,
         startDate: data.startDate?.toDate() || null, // Retrieve new dates
         endDate: data.endDate?.toDate() || null, // Retrieve new dates
+        durationDays: data.durationDays || null, // Retrieve duration in days
         validUntil: data.validUntil?.toDate() || null, // Retrieve new dates
       } as CostEstimate
     })
@@ -344,6 +359,7 @@ export async function getCostEstimate(id: string): Promise<CostEstimate | null> 
       createdBy: data.createdBy,
       startDate: data.startDate?.toDate() || null, // Retrieve new dates
       endDate: data.endDate?.toDate() || null, // Retrieve new dates
+      durationDays: data.durationDays || null, // Retrieve duration in days
       validUntil: data.validUntil?.toDate() || null, // Retrieve new dates
     } as CostEstimate
   } catch (error) {
@@ -403,6 +419,7 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
         createdBy: data.createdBy,
         startDate: data.startDate?.toDate() || null, // Retrieve new dates
         endDate: data.endDate?.toDate() || null, // Retrieve new dates
+        durationDays: data.durationDays || null, // Retrieve duration in days
         validUntil: data.validUntil?.toDate() || null, // Retrieve new dates
       } as CostEstimate
     })
@@ -461,6 +478,7 @@ export async function getPaginatedCostEstimates(
         createdBy: data.createdBy,
         startDate: data.startDate?.toDate() || null,
         endDate: data.endDate?.toDate() || null,
+        durationDays: data.durationDays || null, // Retrieve duration in days
         validUntil: data.validUntil?.toDate() || null,
       } as CostEstimate
     })
@@ -510,9 +528,10 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
         createdAt: data.createdAt?.toDate(),
         updatedAt: data.updatedAt?.toDate(),
         createdBy: data.createdBy,
-        startDate: data.startDate?.toDate() || null,
-        endDate: data.endDate?.toDate() || null,
-        validUntil: data.validUntil?.toDate() || null,
+        startDate: data.startDate?.toDate() || null, // Retrieve new dates
+        endDate: data.endDate?.toDate() || null, // Retrieve new dates
+        durationDays: data.durationDays || null, // Retrieve duration in days
+        validUntil: data.validUntil?.toDate() || null, // Retrieve new dates
       } as CostEstimate
     })
   } catch (error) {
