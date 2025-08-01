@@ -481,7 +481,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   yPosition += 2
 
   const cellPadding = 3
-  const headerRowHeight = 8
+  const headerRowHeight = 5
   const dataRowHeight = 25 // Increased for better spacing and images
 
   // Column widths including image column
