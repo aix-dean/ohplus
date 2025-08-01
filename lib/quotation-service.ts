@@ -544,12 +544,12 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
       try {
         const imageBase64 = await loadImageAsBase64(imageUrlToUse)
         if (imageBase64) {
-          pdf.addImage(imageBase64, "JPEG", imageX, imageY, 55, 40)
+          pdf.addImage(imageBase64, "JPEG", imageX, imageY, imageSize, imageSize)
         }
       } catch (error) {
         // Add placeholder if image fails to load
         pdf.setFillColor(240, 240, 240)
-        pdf.rect(imageX, imageY, 55, 40, "F")
+        pdf.rect(imageX, imageY, imageSize, imageSize, "F")
         pdf.setFontSize(6)
         pdf.setTextColor(150, 150, 150)
         pdf.text("No Image", imageX + imageSize / 2, imageY + imageSize / 2, {
