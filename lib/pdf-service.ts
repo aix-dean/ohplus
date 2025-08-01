@@ -1208,7 +1208,7 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
               }
 
               // Calculate position for current image
-              const imageX = margin + 5 + currentCol * (finalImageWidth + imageSpacing)
+              const imageX = margin + 2 + currentCol * (finalImageWidth + imageSpacing)
               const imageY = rowStartY
               if (media.url) {
                     try {
