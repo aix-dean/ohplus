@@ -1469,7 +1469,6 @@ export async function generateCostEstimatePDF(
       pdf.text("Start Date:", leftColumn, yPosition)
       pdf.setFont("helvetica", "normal")
       pdf.text(startDate.toLocaleDateString(), leftColumn + 25, yPosition)
-      yPosition += 6
     }
 
     if (endDate) {
