@@ -683,7 +683,7 @@ function SalesDashboardContent() {
           email: selectedClientForProposal.email,
           company: selectedClientForProposal.company,
           phone: selectedClientForProposal.phone,
-          designation: selectedClientForProposal.designation
+          designation: selectedClientForProposal.designation,
           address: selectedClientForProposal.address,
         }
 
