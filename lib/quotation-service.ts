@@ -474,11 +474,11 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   pdf.setFontSize(12)
   pdf.setFont("helvetica", "bold")
   pdf.text("PRODUCT & SERVICES", margin, yPosition)
-  yPosition += 5
+  yPosition += 2
   pdf.setLineWidth(0.2)
   pdf.setDrawColor(200, 200, 200)
   pdf.line(margin, yPosition, pageWidth - margin, yPosition)
-  yPosition += 8
+  yPosition += 2
 
   const cellPadding = 3
   const headerRowHeight = 8
