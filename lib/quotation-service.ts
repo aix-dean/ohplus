@@ -841,6 +841,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
         const numRows = Math.ceil(imagesToShow.length / imagesPerRow)
         imagesSectionHeight += numRows * (uniformImageSize + imageSpacing)
         imagesSectionHeight += 10 // Spacing after images
+        console.log(`image section height: ${imagesSectionHeight}`)
         checkNewPage(imagesSectionHeight)
 
         pdf.setFontSize(9)
