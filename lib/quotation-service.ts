@@ -608,7 +608,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
         align: "right",
       },
     )
-    yPosition += dataRowHeight
+    yPosition += 15
   }
 
   // Total Amount Row
