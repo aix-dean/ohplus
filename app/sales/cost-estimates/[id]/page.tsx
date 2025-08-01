@@ -782,49 +782,6 @@ export default function CostEstimateDetailsPage() {
                     <p className="text-base text-gray-900">{costEstimate.client.industry || "N/A"}</p>
                   )}
                 </div>
-                <div>
-                  <Label htmlFor="client.targetAudience" className="text-sm font-medium text-gray-500 mb-2">
-                    Target Audience
-                  </Label>
-                  {isEditing ? (
-                    <Input
-                      id="client.targetAudience"
-                      name="client.targetAudience"
-                      value={editableCostEstimate.client.targetAudience || ""}
-                      onChange={handleChange}
-                      className="mt-1"
-                    />
-                  ) : (
-                    <p className="text-base text-gray-900">{costEstimate.client.targetAudience || "N/A"}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="client.companyLogoUrl" className="text-sm font-medium text-gray-500 mb-2">
-                    Company Logo URL
-                  </Label>
-                  {isEditing ? (
-                    <Input
-                      id="client.companyLogoUrl"
-                      name="client.companyLogoUrl"
-                      value={editableCostEstimate.client.companyLogoUrl || ""}
-                      onChange={handleChange}
-                      placeholder="Enter logo URL"
-                      className="mt-1"
-                    />
-                  ) : (
-                    <div className="flex items-center gap-2 mt-1">
-                      {costEstimate.client.companyLogoUrl ? (
-                        <img
-                          src={costEstimate.client.companyLogoUrl || "/placeholder.svg"}
-                          alt="Company Logo"
-                          className="h-8 w-auto max-w-[100px] object-contain"
-                        />
-                      ) : (
-                        <span className="text-gray-500">No logo provided</span>
-                      )}
-                    </div>
-                  )}
-                </div>
               </div>
 
               {(costEstimate.client.address || isEditing) && (
