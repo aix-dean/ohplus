@@ -34,6 +34,8 @@ interface CostEstimateClientData {
   company: string
   phone?: string
   address?: string
+  designation?: string
+  industry?: string // Ensure industry is included here
 }
 
 interface CostEstimateSiteData {
@@ -201,7 +203,16 @@ export async function createDirectCostEstimate(
       proposalId: null, // No associated proposal
       costEstimateNumber: costEstimateNumber, // Store the new number
       title: `Cost Estimate for ${clientData.company || clientData.name}`,
-      client: clientData,
+      client: {
+        id: clientData.id,
+        name: clientData.name,
+        email: clientData.email,
+        company: clientData.company,
+        phone: clientData.phone || "",
+        address: clientData.address || "",
+        designation: clientData.designation || "",
+        industry: clientData.industry || "", // Ensure industry is included here
+      },
       lineItems,
       totalAmount,
       status: "draft",

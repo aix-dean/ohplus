@@ -683,7 +683,9 @@ function SalesDashboardContent() {
           email: selectedClientForProposal.email,
           company: selectedClientForProposal.company,
           phone: selectedClientForProposal.phone,
+          designation: selectedClientForProposal.designation,
           address: selectedClientForProposal.address,
+          industry: selectedClientForProposal.industry,
         }
 
         const sitesData = selectedSites.map((site) => ({

@@ -1201,56 +1201,24 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
             for (let imgIndex = 0; imgIndex < imagesToShow.length; imgIndex++) {
               const media = imagesToShow[imgIndex]
 
-              // Calculate position for current image
-              const imageX = margin + 5 + currentCol * (finalImageWidth + imageSpacing)
-              const imageY = rowStartY
-
               // Check if we need a new page for this row
               if (currentCol === 0) {
                 checkNewPage(finalImageHeight + 15)
                 rowStartY = yPosition
               }
 
-              // Ensure image doesn't exceed right margin
-              if (imageX + finalImageWidth > pageWidth - margin) {
-                // Start new row if image would exceed margin
-                currentRow++
-                currentCol = 0
-                yPosition = rowStartY + finalImageHeight + imageSpacing
-                rowStartY = yPosition
-
-                // Check if we need a new page for the new row
-                checkNewPage(finalImageHeight + 15)
-                rowStartY = yPosition
-
-                // Recalculate position for new row
-                const newImageX = margin + 5 + currentCol * (finalImageWidth + imageSpacing)
-                const newImageY = rowStartY
-
-                if (media.url) {
-                  try {
-                    const base64 = await loadImageAsBase64(media.url)
-                    if (base64) {
-                      // Use UNIFORM dimensions for ALL images - no aspect ratio calculation
-                      pdf.addImage(base64, "JPEG", newImageX, newImageY, finalImageWidth, finalImageHeight)
+              // Calculate position for current image
+              const imageX = margin + currentCol * (finalImageWidth + imageSpacing)
+              const imageY = rowStartY
+              if (media.url) {
+                    try {
+                      const base64 = await loadImageAsBase64(media.url)
+                      if (base64) {
+                        pdf.addImage(base64, "JPEG", imageX, imageY, finalImageWidth, finalImageHeight)
+                      }
+                    } catch (error) {
+                      console.error("Error adding product image:", error)
                     }
-                  } catch (error) {
-                    console.error("Error adding product image:", error)
-                  }
-                }
-              } else {
-                // Add image at current position with UNIFORM dimensions
-                if (media.url) {
-                  try {
-                    const base64 = await loadImageAsBase64(media.url)
-                    if (base64) {
-                      // Use UNIFORM dimensions for ALL images - no aspect ratio calculation
-                      pdf.addImage(base64, "JPEG", imageX, imageY, finalImageWidth, finalImageHeight)
-                    }
-                  } catch (error) {
-                    console.error("Error adding product image:", error)
-                  }
-                }
               }
 
               // Move to next column
@@ -1258,10 +1226,8 @@ export async function generateProposalPDF(proposal: Proposal, returnBase64 = fal
 
               // Check if we need to start a new row
               if (currentCol >= imagesPerRow) {
-                currentRow++
                 currentCol = 0
                 yPosition = rowStartY + finalImageHeight + imageSpacing
-                rowStartY = yPosition
               }
             }
 
@@ -1503,7 +1469,6 @@ export async function generateCostEstimatePDF(
       pdf.text("Start Date:", leftColumn, yPosition)
       pdf.setFont("helvetica", "normal")
       pdf.text(startDate.toLocaleDateString(), leftColumn + 25, yPosition)
-      yPosition += 6
     }
 
     if (endDate) {
