@@ -283,6 +283,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
   const checkNewPage = (requiredHeight: number) => {
     if (yPosition + requiredHeight > pageHeight - margin - 20) {
       // -20 for footer space
+      console.log(`yPostion: ${yPosition}, page Height: ${pageHeight}`)
       pdf.addPage()
       yPosition = margin
       // Re-add header elements on new page
