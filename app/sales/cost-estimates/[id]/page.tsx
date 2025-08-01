@@ -709,12 +709,12 @@ export default function CostEstimateDetailsPage() {
                     <Input
                       id="client.contactPerson"
                       name="client.contactPerson"
-                      value={editableCostEstimate.client.contactPerson}
+                      value={editableCostEstimate.client.name}
                       onChange={handleChange}
                       className="mt-1"
                     />
                   ) : (
-                    <p className="text-base text-gray-900">{costEstimate.client.contactPerson}</p>
+                    <p className="text-base text-gray-900">{costEstimate.client.name}</p>
                   )}
                 </div>
                 <div>
