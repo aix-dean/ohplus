@@ -679,10 +679,11 @@ function SalesDashboardContent() {
       if (actionAfterDateSelection === "cost_estimate") {
         const clientData = {
           id: selectedClientForProposal.id,
-          name: selectedClientForProposal.contactPerson,
+          name: selectedClientForProposal.name,
           email: selectedClientForProposal.email,
           company: selectedClientForProposal.company,
           phone: selectedClientForProposal.phone,
+          designation: selectedClientForProposal.designation
           address: selectedClientForProposal.address,
         }
 
