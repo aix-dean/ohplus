@@ -676,7 +676,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
       align: "right",
     },
   )
-  yPosition += headerRowHeight + 10 // Reduced spacing after total amount
+  yPosition += headerRowHeight + 5 // Reduced spacing after total amount
 
   // Product Details Section
   for (const item of quotation.items) {
@@ -758,7 +758,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
         estimatedSectionHeight += 10 // Spacing after images
       }
     }
-    estimatedSectionHeight += 15 // Final spacing after each product details section
+    estimatedSectionHeight += 10 // Final spacing after each product details section
 
     checkNewPage(estimatedSectionHeight)
 
@@ -924,7 +924,7 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
         yPosition += uniformImageSize + 10
       }
     }
-    yPosition += 15 // Increased space after each product details section
+    yPosition += 10 // Increased space after each product details section
   }
 
   // Additional Information (Notes)
