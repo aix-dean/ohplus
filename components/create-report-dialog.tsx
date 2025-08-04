@@ -40,6 +40,7 @@ interface AttachmentData {
   fileType?: string
 }
 
+
 interface JobOrder {
   id: string
   joNumber: string
@@ -422,7 +423,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       })
       return
     }
-
     // Remove this block:
     // if (!selectedJO) {
     //   toast({
@@ -652,7 +652,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                 className="h-9 text-sm"
               />
             </div>
-
             {/* Team - Only show for installation reports */}
             {reportType === "installation-report" && (
               <div className="space-y-2">
@@ -720,7 +719,6 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                 )}
               </div>
             )}
-
             {/* Installation Report Specific Fields */}
             {reportType === "installation-report" && (
               <>
