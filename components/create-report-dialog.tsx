@@ -519,16 +519,10 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             {/* Booking Information Section */}
             <div className="bg-gray-100 p-3 rounded-lg space-y-1">
               <div className="text-base">
-                <span className="font-medium">Site:</span> {product?.name || "Loading..."}
+                <span className="font-medium">JO Number:</span> JO-2025-001234
               </div>
               <div className="text-base">
-                <span className="font-medium">Client:</span> Summit Media
-              </div>
-              <div className="text-base">
-                <span className="font-medium">Booking:</span> May 20 - June 20, 2025
-              </div>
-              <div className="text-base">
-                <span className="font-medium">Sales:</span> {user?.displayName || user?.email || "Current User"}
+                <span className="font-medium">Sales:</span> {user?.displayName || "John Patrick Masan"}
               </div>
             </div>
 
