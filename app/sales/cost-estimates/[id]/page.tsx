@@ -675,6 +675,14 @@ export default function CostEstimateDetailsPage() {
                   <h3 className="text-sm font-medium text-gray-500 mb-2">Total Amount</h3>
                   <p className="text-base font-semibold text-gray-900">₱{costEstimate.totalAmount.toLocaleString()}</p>
                 </div>
+                {costEstimate.durationDays !== null && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">Duration</h3>
+                    <p className="text-base text-gray-900">
+                      {costEstimate.durationDays} day{costEstimate.durationDays !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
