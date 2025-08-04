@@ -50,6 +50,7 @@ export type Proposal = {
   id: string
   title: string
   description?: string
+  proposalNumber?: string // Add proposal number field
   client: ProposalClient
   products: ProposalProduct[]
   totalAmount: number
@@ -57,6 +58,7 @@ export type Proposal = {
   notes?: string
   customMessage?: string
   createdBy: string
+  companyId?: string | null // Add company_id field
   campaignId?: string | null
   status:
     | "draft"

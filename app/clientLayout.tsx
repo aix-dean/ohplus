@@ -33,7 +33,7 @@ export default function ClientLayout({
           <div className="fixed inset-0 bg-black/30 z-40" onClick={() => setSidebarOpen(false)} />
         )}
 
-        {/* Sidebar */}
+        {/* Sidebar - only render once */}
         <div
           className={`
           ${isSmallScreen ? "fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out" : "relative"}
@@ -42,10 +42,10 @@ export default function ClientLayout({
         >
           <SideNavigation />
 
-          {/* Close button for mobile */}
+          {/* Close button for mobile - only show when sidebar is open on mobile */}
           {isSmallScreen && sidebarOpen && (
             <button
-              className="absolute top-4 right-4 p-2 rounded-full bg-white shadow-md"
+              className="absolute top-4 right-4 p-2 rounded-full bg-white shadow-md z-60"
               onClick={() => setSidebarOpen(false)}
             >
               <X size={18} />

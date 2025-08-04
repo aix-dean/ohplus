@@ -13,13 +13,12 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
-  Calendar,
+  CalendarIcon,
   CheckCircle2,
   ArrowLeft,
   Filter,
   AlertCircle,
   Search,
-  CheckCircle,
   PlusCircle,
   Calculator,
   FileText,
@@ -58,7 +57,9 @@ import { createDirectCostEstimate } from "@/lib/cost-estimate-service" // Import
 import { createQuotation, generateQuotationNumber, calculateQuotationTotal } from "@/lib/quotation-service" // Imports for Quotation creation
 import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton
 import { CollabPartnerDialog } from "@/components/collab-partner-dialog"
-// Removed: import { SelectQuotationDialog } from "@/components/select-quotation-dialog"
+import { RouteProtection } from "@/components/route-protection"
+import type { QuotationProduct } from "@/lib/types/quotation"
+import { CheckCircle } from "lucide-react"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -132,9 +133,8 @@ function SalesDashboardContent() {
   const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false)
   const [actionAfterDateSelection, setActionAfterDateSelection] = useState<"cost_estimate" | "quotation" | null>(null)
   const [isCreatingDocument, setIsCreatingDocument] = useState(false) // New loading state for document creation
-  const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
 
-  // Removed: const [isSelectQuotationDialogOpen, setIsSelectQuotationDialogOpen] = useState(false)
+  const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
 
   // On mobile, default to grid view
   useEffect(() => {
@@ -231,11 +231,11 @@ function SalesDashboardContent() {
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
-    if (!user?.uid) return
+    if (!userData?.company_id) return
 
     setLoadingCount(true)
     try {
-      const count = await getUserProductsCount(user.uid, { active: true })
+      const count = await getUserProductsCount(userData?.company_id, { active: true })
       setTotalItems(count)
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
@@ -248,12 +248,12 @@ function SalesDashboardContent() {
     } finally {
       setLoadingCount(false)
     }
-  }, [user, toast])
+  }, [userData, toast])
 
   // Fetch products for the current page
   const fetchProducts = useCallback(
     async (page: number) => {
-      if (!user?.uid) return
+      if (!userData?.company_id) return
 
       // Check if we have this page in cache
       if (pageCache.has(page)) {
@@ -277,7 +277,7 @@ function SalesDashboardContent() {
         // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
-        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, { active: true })
+        const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, { active: true })
 
         setProducts(result.items)
         setLastDoc(result.lastDoc)
@@ -315,23 +315,23 @@ function SalesDashboardContent() {
         setLoadingMore(false)
       }
     },
-    [user, lastDoc, pageCache, toast, checkOngoingBookings],
+    [userData, lastDoc, pageCache, toast, checkOngoingBookings],
   )
 
   // Load initial data and count
   useEffect(() => {
-    if (user?.uid) {
+    if (userData?.company_id) {
       fetchProducts(1)
       fetchTotalCount()
     }
-  }, [user, fetchProducts, fetchTotalCount])
+  }, [userData?.company_id, fetchProducts, fetchTotalCount])
 
   // Load data when page changes
   useEffect(() => {
-    if (user?.uid && currentPage > 0) {
+    if (userData?.company_id && currentPage > 0) {
       fetchProducts(currentPage)
     }
-  }, [currentPage, fetchProducts, user])
+  }, [currentPage, fetchProducts, userData?.company_id])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -503,6 +503,7 @@ function SalesDashboardContent() {
       phone: client.phone || "",
       address: client.address || "",
       industry: client.industry || "",
+      designation: client.designation || "", // Add designation field
       targetAudience: "", // These might need to be fetched or added later
       campaignObjective: "", // These might need to be fetched or added later
     })
@@ -552,7 +553,7 @@ function SalesDashboardContent() {
       return
     }
 
-    if (!user?.uid) {
+    if (!user?.uid || !userData?.company_id) {
       toast({
         title: "Authentication Required",
         description: "Please log in to create a proposal.",
@@ -569,6 +570,7 @@ function SalesDashboardContent() {
       const proposalId = await createProposal(proposalTitle, selectedClientForProposal, selectedProducts, user.uid, {
         // You can add notes or custom messages here if needed
         // notes: "Generated from dashboard selection",
+        companyId: userData.company_id, // Add company_id to the proposal creation
       })
 
       toast({
@@ -681,7 +683,9 @@ function SalesDashboardContent() {
           email: selectedClientForProposal.email,
           company: selectedClientForProposal.company,
           phone: selectedClientForProposal.phone,
+          designation: selectedClientForProposal.designation,
           address: selectedClientForProposal.address,
+          industry: selectedClientForProposal.industry,
         }
 
         const sitesData = selectedSites.map((site) => ({
@@ -703,45 +707,47 @@ function SalesDashboardContent() {
         })
         router.push(`/sales/cost-estimates/${newCostEstimateId}`) // Navigate to view page
       } else if (actionAfterDateSelection === "quotation") {
-        // For simplicity, let's assume the quotation is for the first selected site
-        const firstSite = selectedSites[0]
-        if (!firstSite) {
-          throw new Error("No site selected for quotation.")
-        }
+        // Prepare products for quotation
+        const quotationItems: QuotationProduct[] = selectedSites.map((site) => ({
+          product_id: site.id,
+          name: site.name,
+          location: site.specs_rental?.location || site.light?.location || "N/A",
+          price: site.price || 0, // This is the monthly price
+          type: site.type || "Unknown",
+          site_code: getSiteCode(site) || "N/A",
+          media_url: site.media && site.media.length > 0 ? site.media[0].url : undefined,
+        }))
 
+        // Calculate total amount for all selected products
         const { durationDays, totalAmount } = calculateQuotationTotal(
           startDate.toISOString(),
           endDate.toISOString(),
-          firstSite.price || 0,
+          quotationItems,
         )
 
-        // Log userData to debug
-        console.log("User Data from AuthContext:", userData)
-        console.log("First Name from userData:", userData?.first_name)
-        console.log("Last Name from userData:", userData?.last_name)
+        const validUntil = new Date()
+        validUntil.setDate(validUntil.getDate() + 5) // Valid for 5 days
 
         const quotationData = {
           quotation_number: generateQuotationNumber(),
-          product_id: firstSite.id,
-          product_name: firstSite.name,
-          product_location: firstSite.specs_rental?.location || firstSite.light?.location || "N/A",
-          site_code: getSiteCode(firstSite) || "N/A",
+          items: quotationItems, // Pass the array of products
           start_date: startDate.toISOString(),
           end_date: endDate.toISOString(),
-          price: firstSite.price || 0,
           total_amount: totalAmount,
+          valid_until: validUntil,
           duration_days: durationDays,
           status: "draft" as const, // Default status
           created_by: user.uid,
-          created_by_first_name: userData?.first_name || "", // Add first name
-          created_by_last_name: userData?.last_name || "", // Add last name
+          created_by_first_name: userData?.first_name || "",
+          created_by_last_name: userData?.last_name || "",
           client_name: selectedClientForProposal.contactPerson,
           client_email: selectedClientForProposal.email,
-          client_id: selectedClientForProposal.id, // ADDED THIS LINE
-          // campaignId and proposalId can be added if applicable, but not directly from this flow
+          client_id: selectedClientForProposal.id,
+          client_designation: selectedClientForProposal.designation || "", // Add client designation
+          client_address: selectedClientForProposal.address || "", // Add client address
+          client_phone: selectedClientForProposal.phone || "", // Add client phone
         }
 
-        // Log the final quotationData object before sending
         console.log("Final quotationData object being sent:", quotationData)
 
         const newQuotationId = await createQuotation(quotationData)
@@ -752,7 +758,7 @@ function SalesDashboardContent() {
         })
         router.push(`/sales/quotations/${newQuotationId}`) // Navigate to the new internal quotation view page
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating document:", error)
       toast({
         title: "Error",
@@ -837,7 +843,9 @@ function SalesDashboardContent() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex flex-col gap-2">
                 <h1 className="text-xl md:text-2xl font-bold">
-                  {userData?.first_name ? `${userData.first_name}'s Dashboard` : "Dashboard"}
+                  {userData?.first_name
+                    ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                    : "Dashboard"}
                 </h1>
                 {/* Conditionally hide the SearchBox when in proposalCreationMode or ceQuoteMode */}
                 {!(proposalCreationMode || ceQuoteMode) && (
@@ -1302,7 +1310,7 @@ function SalesDashboardContent() {
                                 {product.type?.toLowerCase() === "rental" &&
                                   (productsWithBookings[product.id] ? (
                                     <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                                      <Calendar className="mr-1 h-3 w-3" /> Booked
+                                      <CalendarIcon className="mr-1 h-3 w-3" /> Booked
                                     </Badge>
                                   ) : (
                                     <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
@@ -1504,26 +1512,22 @@ function SalesDashboardContent() {
           })
         }}
       />
-
-      {/* Removed: Select Quotation Dialog for Job Order */}
-      {/* <SelectQuotationDialog
-        isOpen={isSelectQuotationDialogOpen}
-        onClose={() => setIsSelectQuotationDialogOpen(false)}
-      /> */}
     </div>
   )
 }
 
-export default function SalesDashboard() {
+export default function SalesDashboardPage() {
   const { user } = useAuth()
 
   return (
-    <div>
-      <SalesDashboardContent />
+    <RouteProtection requiredRoles="sales">
+      <div>
+        <SalesDashboardContent />
 
-      {/* Render SalesChatWidget without the floating button */}
-      <SalesChatWidget />
-    </div>
+        {/* Render SalesChatWidget without the floating button */}
+        <SalesChatWidget />
+      </div>
+    </RouteProtection>
   )
 }
 

@@ -1,46 +1,27 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, X, Settings, LogOut, User, Bell } from "lucide-react"
+import { Menu, X, Settings, LogOut, User, Bell, ArrowLeft } from "lucide-react"
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useIsAdmin } from "@/hooks/use-is-admin"
-import { doc, getDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
 
 export function TopNavigation() {
   const [isOpen, setIsOpen] = useState(false)
-  const [profileOpen, setProfileOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const [currentTime, setCurrentTime] = useState(new Date())
 
-  const { user, userData, signOut } = useAuth()
+  const { user, userData, logout } = useAuth()
   const { unreadCount } = useUnreadMessages()
   const isAdmin = useIsAdmin()
 
-  const profileRef = useRef<HTMLDivElement>(null)
-
   useEffect(() => {
     setIsOpen(false)
-    setProfileOpen(false)
   }, [pathname])
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
-        setProfileOpen(false)
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -75,6 +56,9 @@ export function TopNavigation() {
     if (path === "/settings/subscription") return "Settings - Subscription"
     if (path === "/help") return "Help & Support"
     if (path === "/features") return "Features"
+
+    // Add this new check for business section
+    if (pathname.startsWith("/business")) return "Business Developer"
 
     if (segments[0]) {
       const section = segments[0].charAt(0).toUpperCase() + segments[0].slice(1)
@@ -147,13 +131,35 @@ export function TopNavigation() {
   const isAdminSection = pathname.startsWith("/admin")
   const isAccountPage = pathname === "/account" // New check for account page
 
-  const navBgColor = isSalesSection ? "bg-[#ff3333]" : "bg-[#0a1433]"
+  const navBgColor = isSalesSection
+    ? "bg-[#ff3333]"
+    : isAdminSection
+      ? "bg-[#6b46c1]"
+      : isCmsSection
+        ? "bg-[#f97316]"
+        : "bg-[#0a1433]"
 
-  const diagonalBgColor = isSalesSection ? "bg-[#ffcccc]" : "bg-[#38b6ff]"
+  const diagonalBgColor = isSalesSection
+    ? "bg-[#ffcccc]"
+    : isAdminSection
+      ? "bg-[#c4b5fd]"
+      : isCmsSection
+        ? "bg-[#fed7aa]"
+        : "bg-[#38b6ff]"
 
   const handleMobileNavigation = (href: string) => {
     router.push(href)
     setIsOpen(false)
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      router.push("/login")
+    } catch (error: any) {
+      console.error("Logout error:", error)
+      // You could add toast notification here if needed
+    }
   }
 
   return (
@@ -167,7 +173,16 @@ export function TopNavigation() {
         <div className="top-nav-content">
           <div className="top-nav-left">
             <div className="top-nav-logo flex items-center">
-              <h1 className="text-xl font-semibold text-white">{pageTitle}</h1>
+              <button
+                onClick={() => router.back()}
+                className="mr-3 p-2 rounded-full text-white hover:text-gray-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+                aria-label="Go back"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <h1 className="text-xl font-semibold text-white">
+                {pageTitle == "Admin - Subscriptions" ? "Admin - Plan Profile" : pageTitle}
+              </h1>
             </div>
             <div className="top-nav-links hidden md:flex"></div>
           </div>
@@ -191,66 +206,31 @@ export function TopNavigation() {
                     </span>
                   )}
                 </button>
-                {/* Profile dropdown */}
-                <div className="ml-3 relative z-10" ref={profileRef}>
-                  {" "}
-                  {/* Added relative z-10 */}
+                {/* Profile button */}
+                <div className="ml-3 relative z-10">
+                  <Link href="/account">
+                    <button
+                      type="button"
+                      className="max-w-xs bg-white rounded-full flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary hover:ring-4 transition-all"
+                    >
+                      <span className="sr-only">Go to profile</span>
+                      <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
+                        <User className="h-5 w-5 text-gray-500" />
+                      </div>
+                    </button>
+                  </Link>
+                </div>
+                {/* Logout button */}
+                <div className="ml-3 relative z-10">
                   <button
                     type="button"
-                    className="max-w-xs bg-white rounded-full flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-                    id="user-menu-button"
-                    aria-expanded={profileOpen}
-                    aria-haspopup="true"
-                    onClick={() => {
-                      setProfileOpen(!profileOpen)
-                    }}
+                    onClick={handleLogout}
+                    className="bg-white rounded-lg px-3 py-2 flex items-center text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary hover:bg-gray-50 transition-all"
+                    aria-label="Sign out"
                   >
-                    <span className="sr-only">Open user menu</span>
-                    <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                      <User className="h-5 w-5 text-gray-500" />
-                    </div>
+                    <LogOut className="h-4 w-4 text-gray-700" />
+                    <span className="ml-2 text-sm font-medium text-gray-700">Logout</span>
                   </button>
-                  {/* Profile dropdown menu */}
-                  {profileOpen && (
-                    <div
-                      className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
-                      role="menu"
-                      aria-orientation="vertical"
-                      aria-labelledby="user-menu-button"
-                    >
-                      <div className="py-1">
-                        <Link
-                          href="/account"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setProfileOpen(false)}
-                        >
-                          Your Profile
-                        </Link>
-                        <Link
-                          href="/settings"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                          onClick={() => setProfileOpen(false)}
-                        >
-                          Settings
-                        </Link>
-                        {isAdmin && (
-                          <Link
-                            href="/admin"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            onClick={() => setProfileOpen(false)}
-                          >
-                            Admin
-                          </Link>
-                        )}
-                        <button
-                          onClick={signOut}
-                          className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          Sign out
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -317,7 +297,7 @@ export function TopNavigation() {
                 )}
 
                 <button
-                  onClick={signOut}
+                  onClick={handleLogout}
                   className="w-full text-left py-3 px-4 rounded-md flex items-center text-gray-700"
                 >
                   <LogOut className="mr-3 h-5 w-5" />

@@ -1,65 +1,118 @@
 "use client"
 
 import { useState } from "react"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import StaticSitesTab from "./static-sites"
-import LEDSitesTab from "./led-sites"
-import AllSitesTab from "./all-sites" // Import the new component
 import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Search, List, Grid3X3, X } from "lucide-react"
 import { ServiceAssignmentDialog } from "@/components/service-assignment-dialog"
+import AllSitesTab from "./all-sites"
+import { useAuth } from "@/contexts/auth-context"
+import { RouteProtection } from "@/components/route-protection"
 
-// Update the page title
 export default function LogisticsDashboardPage() {
-  const [siteType, setSiteType] = useState<"static" | "led" | "all">("static")
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [contentTypeFilter, setContentTypeFilter] = useState("All")
+  const { user, userData } = useAuth()
+
+  const clearSearch = () => {
+    setSearchQuery("")
+  }
 
   return (
-    <div className="flex-1 overflow-auto relative">
-      <main className="p-4">
-        <div className="flex flex-col gap-4">
-          {/* Site Type Tabs */}
-          <Tabs defaultValue="static" className="w-full" onValueChange={(value) => setSiteType(value as any)}>
-            <TabsList className="grid w-[350px] grid-cols-3">
-              <TabsTrigger value="static">Static Sites</TabsTrigger>
-              <TabsTrigger value="led">LED Sites</TabsTrigger>
-              <TabsTrigger value="all">All Sites</TabsTrigger>
-            </TabsList>
+    <RouteProtection requiredRoles="logistics">
+      <div className="flex-1 overflow-auto relative bg-gray-50">
+        <main className="p-6">
+          <div className="flex flex-col gap-6">
+            {/* Header Section */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <h1 className="text-2xl font-bold text-gray-900">
+                {userData?.first_name
+                  ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                  : "Dashboard"}
+              </h1>
+              <Button
+                onClick={() => setDialogOpen(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2"
+              >
+                Service Assignment
+              </Button>
+            </div>
 
-            <TabsContent value="static" className="mt-4">
-              <StaticSitesTab />
-            </TabsContent>
+            {/* Controls Section */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              {/* Search and Filter */}
+              <div className="flex items-center gap-4 flex-1">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Search sites..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 pr-10 bg-white border-gray-200"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={clearSearch}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
 
-            <TabsContent value="led" className="mt-4">
-              <LEDSitesTab />
-            </TabsContent>
+                {/* Content Type Filter */}
+                <Select value={contentTypeFilter} onValueChange={setContentTypeFilter}>
+                  <SelectTrigger className="w-32 bg-white border-gray-200">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All Types</SelectItem>
+                    <SelectItem value="Static">Static</SelectItem>
+                    <SelectItem value="Dynamic">Dynamic</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <TabsContent value="all" className="mt-4">
-              <AllSitesTab />
-            </TabsContent>
-          </Tabs>
-        </div>
-      </main>
+              {/* View Toggle */}
+              <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1">
+                <Button
+                  variant={viewMode === "list" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  className="h-8 w-8 p-0"
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === "grid" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("grid")}
+                  className="h-8 w-8 p-0"
+                >
+                  <Grid3X3 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
 
-      {/* Floating Action Button */}
-      <div className="fixed bottom-8 right-8 z-10">
-        <Button
-          onClick={() => setDialogOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg h-14 px-6"
-          size="lg"
-        >
-          <Plus className="mr-2 h-5 w-5" /> Create Service Assignment
-        </Button>
+            {/* All Sites Display */}
+            <div className="bg-white rounded-lg border border-gray-200">
+              <AllSitesTab searchQuery={searchQuery} contentTypeFilter={contentTypeFilter} viewMode={viewMode} />
+            </div>
+          </div>
+        </main>
+
+        {/* Service Assignment Dialog */}
+        <ServiceAssignmentDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onSuccess={() => {
+            // You could add a success toast notification here
+          }}
+        />
       </div>
-
-      {/* Service Assignment Dialog */}
-      <ServiceAssignmentDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onSuccess={() => {
-          // You could add a success toast notification here
-        }}
-      />
-    </div>
+    </RouteProtection>
   )
 }

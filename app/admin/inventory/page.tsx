@@ -24,6 +24,7 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
+import { subscriptionService } from "@/lib/subscription-service"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -58,11 +59,16 @@ export default function AdminInventoryPage() {
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
-    if (!user?.uid) return
+    if (!userData?.company_id) {
+      setTotalItems(0)
+      setTotalPages(1)
+      setLoadingCount(false)
+      return
+    }
 
     setLoadingCount(true)
     try {
-      const count = await getUserProductsCount(user.uid, { active: true })
+      const count = await getUserProductsCount(userData?.company_id, { active: true })
       setTotalItems(count)
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
@@ -75,18 +81,27 @@ export default function AdminInventoryPage() {
     } finally {
       setLoadingCount(false)
     }
-  }, [user, toast])
+  }, [userData, toast])
 
   // Fetch products for the current page
   const fetchProducts = useCallback(
     async (page: number) => {
-      if (!user?.uid) return
+      if (!userData?.company_id) {
+        setProducts([])
+        setLastDoc(null)
+        setHasMore(false)
+        setLoading(false)
+        setLoadingMore(false)
+        return
+      }
 
       // Check if we have this page in cache
       if (pageCache.has(page)) {
         const cachedData = pageCache.get(page)!
         setProducts(cachedData.items)
         setLastDoc(cachedData.lastDoc)
+        setLoading(false)
+        setLoadingMore(false)
         return
       }
 
@@ -99,7 +114,7 @@ export default function AdminInventoryPage() {
         // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
-        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, { active: true })
+        const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, { active: true })
 
         setProducts(result.items)
         setLastDoc(result.lastDoc)
@@ -118,7 +133,7 @@ export default function AdminInventoryPage() {
         console.error("Error fetching products:", error)
         toast({
           title: "Error",
-          description: "Failed to load product count. Please try again.",
+          description: "Failed to load products. Please try again.",
           variant: "destructive",
         })
       } finally {
@@ -126,23 +141,21 @@ export default function AdminInventoryPage() {
         setLoadingMore(false)
       }
     },
-    [user, lastDoc, pageCache, toast],
+    [userData?.company_id, lastDoc, pageCache, toast],
   )
 
   // Load initial data and count
   useEffect(() => {
-    if (user?.uid) {
-      fetchProducts(1)
-      fetchTotalCount()
-    }
-  }, [user, fetchProducts, fetchTotalCount])
+    fetchProducts(1)
+    fetchTotalCount()
+  }, [userData?.company_id, fetchProducts, fetchTotalCount])
 
   // Load data when page changes
   useEffect(() => {
-    if (user?.uid && currentPage > 0) {
+    if (currentPage > 0) {
       fetchProducts(currentPage)
     }
-  }, [currentPage, fetchProducts, user])
+  }, [currentPage, fetchProducts])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -251,70 +264,142 @@ export default function AdminInventoryPage() {
   }
 
   const handleViewDetails = (productId: string) => {
-    router.push(`/admin/products/${productId}`)
+    router.push(`/admin/inventory/${productId}`)
   }
 
-  const handleAddSiteClick = () => {
+  const handleAddSiteClick = async () => {
+    console.log("handleAddSiteClick: Starting subscription check")
+    console.log("userData:", { company_id: userData?.company_id, license_key: userData?.license_key })
+
     // Check if user has company_id first
     if (!userData?.company_id) {
+      console.log("No company_id found, showing company registration dialog")
       setShowCompanyDialog(true)
       return
     }
 
+    // Query subscription by company ID
+    let currentSubscription = null
+    try {
+      console.log("Fetching subscription for company_id:", userData.company_id)
+      currentSubscription = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
+      console.log("Current subscription:", currentSubscription)
+    } catch (error) {
+      console.error("Error fetching subscription:", error)
+      setSubscriptionLimitMessage("Error fetching subscription data. Please try again or contact support.")
+      setShowSubscriptionLimitDialog(true)
+      return
+    }
+
+    // Check if user has license key
     if (!userData?.license_key) {
-      setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
+      console.log("No license key found")
+      setSubscriptionLimitMessage("No active license found. Please choose a subscription plan to get started.")
       setShowSubscriptionLimitDialog(true)
       return
     }
 
-    if (!subscriptionData || subscriptionData.status !== "active") {
+    // Check if subscription exists and is active
+    if (!currentSubscription) {
+      console.log("No subscription found")
+      setSubscriptionLimitMessage("No active subscription found. Please choose a plan to start adding sites.")
+      setShowSubscriptionLimitDialog(true)
+      return
+    }
+
+    if (currentSubscription.status !== "active") {
+      console.log("Subscription not active, status:", currentSubscription.status)
       setSubscriptionLimitMessage(
-        "Your current subscription is not active. Please activate or upgrade your plan to add more sites.",
+        `Your subscription is ${currentSubscription.status}. Please activate your subscription to continue.`,
       )
       setShowSubscriptionLimitDialog(true)
       return
     }
 
-    if (totalItems >= subscriptionData.maxProducts) {
+    // Check product limit
+    console.log("Checking product limit:", { totalItems, maxProducts: currentSubscription.maxProducts })
+    if (totalItems >= currentSubscription.maxProducts) {
+      console.log("Product limit reached")
       setSubscriptionLimitMessage(
-        `You have reached the maximum number of sites allowed by your current plan (${subscriptionData.maxProducts}). Please upgrade your subscription to add more sites.`,
+        `You've reached your plan limit of ${currentSubscription.maxProducts} sites. Upgrade your plan to add more sites.`,
       )
       setShowSubscriptionLimitDialog(true)
       return
     }
 
+    console.log("All checks passed, redirecting to create product")
     router.push("/admin/products/create")
   }
 
   const handleCompanyRegistrationSuccess = async () => {
+    console.log("Company registration successful, refreshing user data")
     await refreshUserData()
     setShowCompanyDialog(false)
 
-    // Check subscription after company registration
-    if (!userData?.license_key) {
-      setSubscriptionLimitMessage("You need an active subscription to add sites. Please choose a plan to get started.")
-      setShowSubscriptionLimitDialog(true)
-      return
-    }
+    // Wait a bit for userData to update
+    setTimeout(async () => {
+      // Query subscription by company ID after company registration
+      let currentSubscription = null
+      try {
+        if (userData?.company_id) {
+          console.log("Fetching subscription after company registration for company_id:", userData.company_id)
+          currentSubscription = await subscriptionService.getSubscriptionByCompanyId(userData.company_id)
+          console.log("Subscription after company registration:", currentSubscription)
+        }
+      } catch (error) {
+        console.error("Error fetching subscription after company registration:", error)
+      }
 
-    if (!subscriptionData || subscriptionData.status !== "active") {
-      setSubscriptionLimitMessage(
-        "Your current subscription is not active. Please activate or upgrade your plan to add more sites.",
-      )
-      setShowSubscriptionLimitDialog(true)
-      return
-    }
+      // Check subscription after company registration
+      if (!userData?.license_key) {
+        console.log("No license key after company registration")
+        setSubscriptionLimitMessage(
+          "Company registered successfully! Now choose a subscription plan to start adding sites.",
+        )
+        setShowSubscriptionLimitDialog(true)
+        return
+      }
 
-    if (totalItems >= subscriptionData.maxProducts) {
-      setSubscriptionLimitMessage(
-        `You have reached the maximum number of sites allowed by your current plan (${subscriptionData.maxProducts}). Please upgrade your subscription to add more sites.`,
-      )
-      setShowSubscriptionLimitDialog(true)
-      return
-    }
+      if (!currentSubscription) {
+        console.log("No subscription found after company registration")
+        setSubscriptionLimitMessage(
+          "Company registered successfully! Please choose a subscription plan to start adding sites.",
+        )
+        setShowSubscriptionLimitDialog(true)
+        return
+      }
 
-    // Only redirect if all subscription checks pass
-    router.push("/admin/products/create")
+      if (currentSubscription.status !== "active") {
+        console.log("Subscription not active after company registration, status:", currentSubscription.status)
+        setSubscriptionLimitMessage(
+          `Company registered successfully! Your subscription is ${currentSubscription.status}. Please activate it to continue.`,
+        )
+        setShowSubscriptionLimitDialog(true)
+        return
+      }
+
+      if (totalItems >= currentSubscription.maxProducts) {
+        console.log("Product limit reached after company registration")
+        setSubscriptionLimitMessage(
+          `Company registered successfully! You've reached your plan limit of ${currentSubscription.maxProducts} sites. Upgrade your plan to add more sites.`,
+        )
+        setShowSubscriptionLimitDialog(true)
+        return
+      }
+
+      // Only redirect if all subscription checks pass
+      console.log("All checks passed after company registration, redirecting to create product")
+      router.push("/admin/products/create")
+    }, 1000) // Wait 1 second for userData to refresh
+  }
+
+  // Show loading only on initial load
+  if (loading && products.length === 0 && userData === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
@@ -323,63 +408,92 @@ export default function AdminInventoryPage() {
         <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
       </div>
 
-      {loading ? (
-        <div className="flex min-h-screen items-center justify-center bg-gray-50">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        </div>
-      ) : (
-        <div className="grid gap-6">
-          {/* Product List */}
-          <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
-            {/* The "+ Add Site" card is now the first item in the grid */}
-            <Card
-              className="w-full min-h-[284px] flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
-              onClick={handleAddSiteClick}
-            >
-              <Plus className="h-8 w-8 mb-2" />
-              <span className="text-lg font-semibold">+ Add Site</span>
-            </Card>
+      <div className="grid gap-6">
+        {/* Product List */}
+        <ResponsiveCardGrid mobileColumns={1} tabletColumns={2} desktopColumns={4} gap="md">
+          {/* The "+ Add Site" card is now the first item in the grid */}
+          <Card
+            className="w-full min-h-[284px] flex flex-col items-center justify-center cursor-pointer bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 text-gray-600 hover:bg-gray-200 transition-colors"
+            onClick={handleAddSiteClick}
+          >
+            <Plus className="h-8 w-8 mb-2" />
+            <span className="text-lg font-semibold">+ Add Site</span>
+          </Card>
 
-            {products.map((product) => (
-              <Card
-                key={product.id}
-                className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
-              >
-                <div className="h-48 bg-gray-200 relative">
-                  <Image
-                    src={
-                      product.media && product.media.length > 0
-                        ? product.media[0].url
-                        : "/abstract-geometric-sculpture.png"
-                    }
-                    alt={product.name || "Product image"}
-                    fill
-                    className="object-cover"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement
-                      target.src = "/abstract-geometric-sculpture.png"
-                      target.className = "opacity-50"
-                    }}
-                  />
-                </div>
-
-                <CardContent className="p-4">
-                  <div className="flex flex-col">
-                    <h3 className="font-semibold line-clamp-1">{product.name}</h3>
-                    <div className="mt-2 text-sm font-medium text-green-700">
-                      ₱{Number(product.price).toLocaleString()}
+          {loading && products.length === 0
+            ? // Show loading cards only when initially loading
+              Array.from({ length: 3 }).map((_, index) => (
+                <Card key={`loading-${index}`} className="overflow-hidden border border-gray-200 shadow-md rounded-xl">
+                  <div className="h-48 bg-gray-200 animate-pulse" />
+                  <CardContent className="p-4">
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded animate-pulse" />
+                      <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse" />
+                      <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse" />
                     </div>
-                    <div className="mt-1 text-xs text-gray-500 flex items-center">
-                      <MapPin size={12} className="mr-1 flex-shrink-0" />
-                      <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
-                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            : products.map((product) => (
+                <Card
+                  key={product.id}
+                  className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
+                  onClick={() => handleViewDetails(product.id)}
+                >
+                  <div className="h-48 bg-gray-200 relative">
+                    <Image
+                      src={
+                        product.media && product.media.length > 0
+                          ? product.media[0].url
+                          : "/abstract-geometric-sculpture.png"
+                      }
+                      alt={product.name || "Product image"}
+                      fill
+                      className="object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.src = "/abstract-geometric-sculpture.png"
+                        target.className = "opacity-50"
+                      }}
+                    />
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </ResponsiveCardGrid>
 
-          {/* Pagination Controls */}
+                  <CardContent className="p-4">
+                    <div className="flex flex-col">
+                      <h3 className="font-semibold line-clamp-1">{product.name}</h3>
+                      <div className="mt-2 text-sm font-medium text-green-700">
+                        ₱{Number(product.price).toLocaleString()}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-500 flex items-center">
+                        <MapPin size={12} className="mr-1 flex-shrink-0" />
+                        <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+        </ResponsiveCardGrid>
+
+        {/* Show empty state message when no products and not loading */}
+        {!loading && products.length === 0 && userData?.company_id && (
+          <div className="text-center py-12">
+            <div className="text-gray-500 text-lg mb-2">No sites found</div>
+            <div className="text-gray-400 text-sm">Click the "Add Site" button above to create your first site.</div>
+          </div>
+        )}
+
+        {/* Show company setup message when no company_id */}
+        {!loading && !userData?.company_id && (
+          <div className="text-center py-12">
+            <div className="text-gray-500 text-lg mb-2">Welcome to your inventory!</div>
+            <div className="text-gray-400 text-sm">
+              Click the "Add Site" button above to set up your company and create your first site.
+            </div>
+          </div>
+        )}
+
+        {/* Pagination Controls - Only show if there are products or multiple pages */}
+        {(products.length > 0 || totalPages > 1) && (
           <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
             <div className="text-sm text-gray-500 flex items-center">
               {loadingCount ? (
@@ -437,8 +551,8 @@ export default function AdminInventoryPage() {
               </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog
@@ -454,7 +568,7 @@ export default function AdminInventoryPage() {
       <Dialog open={showSubscriptionLimitDialog} onOpenChange={setShowSubscriptionLimitDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Subscription Required</DialogTitle>
+            <DialogTitle>🎯 Let's Get You Started!</DialogTitle>
             <DialogDescription>{subscriptionLimitMessage}</DialogDescription>
           </DialogHeader>
           <DialogFooter>

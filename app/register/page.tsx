@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import type React from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
@@ -9,6 +10,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FirebaseError } from "firebase/app"
+import { Eye, EyeOff } from "lucide-react"
+import { query, collection, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("")
@@ -17,19 +21,60 @@ export default function RegisterPage() {
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [middleName, setMiddleName] = useState("")
-  const [phoneNumber, setPhoneNumber] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("+63 ")
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [invitationRole, setInvitationRole] = useState<string | null>(null)
+  const [loadingInvitation, setLoadingInvitation] = useState(false)
 
-  const { register } = useAuth()
+  const { register, user, userData, getRoleDashboardPath } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
   // Get organization code from URL parameters
   const orgCode = searchParams.get("orgCode")
 
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (user) {
+      router.push("/admin/dashboard")
+    }
+  }, [user, router])
+
+  // Fetch invitation details when code is present
+  useEffect(() => {
+    const fetchInvitationDetails = async () => {
+      if (!orgCode) return
+
+      setLoadingInvitation(true)
+      try {
+        const invitationQuery = query(collection(db, "invitation_codes"), where("code", "==", orgCode))
+        const invitationSnapshot = await getDocs(invitationQuery)
+
+        if (!invitationSnapshot.empty) {
+          const invitationDoc = invitationSnapshot.docs[0]
+          const invitationData = invitationDoc.data()
+
+          if (invitationData.role) {
+            setInvitationRole(invitationData.role)
+          }
+        } else {
+          setErrorMessage("Invalid invitation code.")
+        }
+      } catch (error) {
+        console.error("Error fetching invitation details:", error)
+        setErrorMessage("Error loading invitation details.")
+      } finally {
+        setLoadingInvitation(false)
+      }
+    }
+
+    fetchInvitationDetails()
+  }, [orgCode])
+
   const getFriendlyErrorMessage = (error: unknown): string => {
-    console.error("Raw error during registration:", error)
     if (error instanceof FirebaseError) {
       switch (error.code) {
         case "auth/email-already-in-use":
@@ -49,11 +94,59 @@ export default function RegisterPage() {
     return "An unknown error occurred. Please try again."
   }
 
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+
+    if (!value.startsWith("+63 ")) {
+      setPhoneNumber("+63 ")
+      return
+    }
+
+    const numbersOnly = value.slice(4).replace(/\D/g, "")
+    if (numbersOnly.length <= 10) {
+      setPhoneNumber("+63 " + numbersOnly)
+    }
+  }
+
+  const isPhoneNumberValid = () => {
+    const numbersOnly = phoneNumber.slice(4).replace(/\D/g, "")
+    return numbersOnly.length === 10
+  }
+
+  const passwordCriteria = {
+    minLength: password.length >= 8,
+    hasLowerCase: /[a-z]/.test(password),
+    hasUpperCase: /[A-Z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    hasSpecialChar: /[^a-zA-Z0-9]/.test(password),
+  }
+
+  const passwordStrengthScore = Object.values(passwordCriteria).filter(Boolean).length
+
+  const getBarColorClass = (score: number) => {
+    if (score === 0) return "bg-gray-300"
+    if (score <= 2) return "bg-red-500"
+    if (score <= 4) return "bg-yellow-500"
+    return "bg-green-500"
+  }
+
+  const getStrengthText = (score: number) => {
+    if (score === 0) return "Enter a password"
+    if (score <= 2) return "Weak"
+    if (score <= 4) return "Moderate"
+    return "Strong"
+  }
+
   const handleRegister = async () => {
     setErrorMessage(null)
 
     if (!firstName || !lastName || !email || !phoneNumber || !password || !confirmPassword) {
       setErrorMessage("Please fill in all required fields.")
+      return
+    }
+
+    if (!isPhoneNumberValid()) {
+      setErrorMessage("Phone number must be exactly 10 digits after +63.")
       return
     }
 
@@ -63,6 +156,7 @@ export default function RegisterPage() {
     }
 
     setLoading(true)
+
     try {
       await register(
         {
@@ -78,24 +172,58 @@ export default function RegisterPage() {
           company_location: "",
         },
         password,
-        orgCode || undefined, // Pass the organization code if available
+        orgCode || undefined,
       )
-      setErrorMessage(null)
-      const redirectUrl = orgCode
-        ? "/admin/dashboard?registered=true&joined_org=true"
-        : "/admin/dashboard?registered=true"
-      router.push(redirectUrl)
+
+      // Registration successful - redirect will be handled by useEffect
+      // The redirect logic will be handled after userData is loaded
     } catch (error: unknown) {
+      console.error("Registration failed:", error)
       setErrorMessage(getFriendlyErrorMessage(error))
     } finally {
       setLoading(false)
     }
   }
 
+  // Role-based navigation after registration
+  useEffect(() => {
+    console.log("Register navigation useEffect triggered")
+    console.log("user:", !!user)
+    console.log("userData:", userData)
+    console.log("loading:", loading)
+
+    if (user && userData && !loading) {
+      console.log("userData.roles:", userData.roles)
+
+      // Check if user is in onboarding
+      if (userData.onboarding) {
+        console.log("User is in onboarding, redirecting to onboarding flow")
+        return
+      }
+
+      // Only use the roles array from user_roles collection
+      if (userData.roles && userData.roles.length > 0) {
+        console.log("Using roles from user_roles collection:", userData.roles)
+        const dashboardPath = getRoleDashboardPath(userData.roles)
+
+        if (dashboardPath) {
+          console.log("Navigating to:", dashboardPath)
+          router.push(dashboardPath)
+        } else {
+          console.log("No dashboard path found for roles, redirecting to unauthorized")
+          router.push("/unauthorized")
+        }
+      } else {
+        console.log("No roles found in user_roles collection, redirecting to unauthorized")
+        router.push("/unauthorized")
+      }
+    }
+  }, [user, userData, loading, router, getRoleDashboardPath])
+
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen flex-col lg:flex-row">
       {/* Left Panel - Image */}
-      <div className="relative hidden w-[40%] items-center justify-center bg-gray-900 lg:flex">
+      <div className="relative hidden w-full items-center justify-center bg-gray-900 sm:flex lg:w-[40%]">
         <Image
           src="/registration-background.png"
           alt="Background"
@@ -106,8 +234,8 @@ export default function RegisterPage() {
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex w-full items-center justify-center bg-white p-8 dark:bg-gray-950 lg:w-[60%]">
-        <Card className="w-full max-w-md border-none shadow-none">
+      <div className="flex w-full items-center justify-center bg-white p-4 dark:bg-gray-950 sm:p-6 lg:w-[60%] lg:p-8">
+        <Card className="w-full max-w-md border-none shadow-none sm:max-w-lg">
           <CardHeader className="space-y-1 text-left">
             <div className="flex items-center justify-between">
               <CardTitle className="text-3xl font-bold">
@@ -122,12 +250,21 @@ export default function RegisterPage() {
                 <p className="text-sm text-blue-800">
                   <strong>Organization Code:</strong> {orgCode}
                 </p>
+                {loadingInvitation && <p className="text-sm text-blue-600 mt-1">Loading invitation details...</p>}
+                {invitationRole && (
+                  <p className="text-sm text-green-800 mt-1">
+                    <strong>Assigned Role:</strong> {invitationRole}
+                  </p>
+                )}
+                {!loadingInvitation && !invitationRole && orgCode && (
+                  <p className="text-sm text-gray-600 mt-1">No specific role assigned</p>
+                )}
               </div>
             )}
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">First Name</Label>
                   <Input
@@ -162,11 +299,15 @@ export default function RegisterPage() {
                 <Label htmlFor="phoneNumber">Cellphone number</Label>
                 <Input
                   id="phoneNumber"
-                  placeholder="+63 9XX XXX XXXX"
+                  placeholder="+63 9XXXXXXXXX"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  onChange={handlePhoneNumberChange}
+                  className={!isPhoneNumberValid() && phoneNumber.length > 4 ? "border-red-500" : ""}
                   required
                 />
+                {!isPhoneNumberValid() && phoneNumber.length > 4 && (
+                  <p className="text-xs text-red-500">Phone number must be exactly 10 digits after +63</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
@@ -181,23 +322,85 @@ export default function RegisterPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                    <span className="sr-only">{showPassword ? "Hide password" : "Show password"}</span>
+                  </button>
+                </div>
+                <div className="mt-2">
+                  <div className="flex gap-1 h-1">
+                    {[...Array(5)].map((_, i) => (
+                      <div
+                        key={i}
+                        className={`flex-1 ${
+                          i < passwordStrengthScore ? getBarColorClass(passwordStrengthScore) : "bg-gray-300"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    {getStrengthText(passwordStrengthScore)}
+                  </p>
+                  {passwordStrengthScore < 5 && password.length > 0 && (
+                    <ul className="list-inside text-sm mt-1">
+                      {!passwordCriteria.minLength && (
+                        <li className="text-red-500">Password should be at least 8 characters long</li>
+                      )}
+                      {!passwordCriteria.hasLowerCase && (
+                        <li className="text-red-500">Password should contain at least one lowercase letter</li>
+                      )}
+                      {!passwordCriteria.hasUpperCase && (
+                        <li className="text-red-500">Password should contain at least one uppercase letter</li>
+                      )}
+                      {!passwordCriteria.hasNumber && (
+                        <li className="text-red-500">Password should contain at least one number</li>
+                      )}
+                      {!passwordCriteria.hasSpecialChar && (
+                        <li className="text-red-500">Password should contain at least one special character</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                    <span className="sr-only">{showConfirmPassword ? "Hide password" : "Show password"}</span>
+                  </button>
+                </div>
               </div>
               <p className="text-center text-xs text-gray-500 dark:text-gray-400">
                 By signing up, I hereby acknowledge that I have read, understood, and agree to abide by the{" "}
@@ -218,15 +421,9 @@ export default function RegisterPage() {
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                 type="submit"
                 onClick={handleRegister}
-                disabled={loading}
+                disabled={loading || loadingInvitation}
               >
-                {loading
-                  ? orgCode
-                    ? "Joining Organization..."
-                    : "Signing Up..."
-                  : orgCode
-                    ? "Join Organization"
-                    : "Sign Up"}
+                {loading ? (orgCode ? "Joining..." : "Signing Up...") : orgCode ? "Join Organization" : "Sign Up"}
               </Button>
             </div>
 

@@ -7,7 +7,6 @@ import { AlertCircle, Search, Loader2, ChevronLeft, ChevronRight } from "lucide-
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { getPaginatedUserProducts, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
@@ -316,7 +315,7 @@ export default function LEDSitesTab() {
       ) : (
         <>
           {/* LED Sites Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 mt-4">
             {products.map((product) => {
               const site = productToSite(product)
               return (
@@ -411,7 +410,7 @@ export default function LEDSitesTab() {
   )
 }
 
-// LED Site Card component
+// LED Site Card that matches the exact reference design
 function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -423,18 +422,12 @@ function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (sit
     window.location.href = `/logistics/sites/${site.id}`
   }
 
-  // Mock data for demonstration - in real app, this would come from the product data
-  const mockAssignmentCount = Math.floor(Math.random() * 10) + 1
-  const mockContent = "Lilo and Stitch"
-  const mockIllumination = "ON"
-  const mockCompliance = "Complete"
-
   return (
     <Card
-      className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white"
+      className="overflow-hidden cursor-pointer border border-gray-200 shadow-sm rounded-lg transition-all hover:shadow-lg bg-white w-full"
       onClick={handleCardClick}
     >
-      <div className="relative h-48 bg-gray-200">
+      <div className="relative h-32 bg-gray-200">
         <Image
           src={site.image || "/placeholder.svg"}
           alt={site.name}
@@ -447,54 +440,53 @@ function LEDSiteCard({ site, onCreateReport }: { site: any; onCreateReport: (sit
           }}
         />
 
-        {/* Assignment Count Badge - Top Right */}
-        <div className="absolute top-2 right-2 bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-          {mockAssignmentCount}
-        </div>
-
         {/* Status Badge - Bottom Left */}
         <div className="absolute bottom-2 left-2">
-          <Badge
-            className={`
-              text-xs font-medium px-2 py-1 rounded
-              ${site.statusColor === "green" ? "bg-green-500 text-white" : ""}
-              ${site.statusColor === "blue" ? "bg-blue-500 text-white" : ""}
-              ${site.statusColor === "red" ? "bg-red-500 text-white" : ""}
-              ${site.statusColor === "orange" ? "bg-orange-500 text-white" : ""}
-            `}
-          >
-            {site.status}
-          </Badge>
+          <div className="px-2 py-1 rounded text-xs font-bold text-white" style={{ backgroundColor: "#38b6ff" }}>
+            {site.status === "ACTIVE" ? "OPEN" : site.status}
+          </div>
         </div>
       </div>
 
-      <CardContent className="p-4">
-        <div className="flex flex-col gap-1">
-          {/* Site ID */}
-          <div className="text-sm text-gray-500 font-medium">{site.id}</div>
+      <CardContent className="p-3">
+        <div className="flex flex-col gap-2">
+          {/* Site Code */}
+          <div className="text-xs text-gray-500 uppercase tracking-wide">{site.id}</div>
 
-          {/* Site Name */}
-          <h3 className="font-semibold text-lg">{site.name}</h3>
+          {/* Site Name with Badge */}
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-sm text-gray-900 truncate">{site.name}</h3>
+            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0">M</div>
+          </div>
 
-          {/* Site Details */}
-          <div className="mt-2 space-y-1">
-            <div className="text-sm">
-              <span className="font-medium">Content:</span> <span className="text-gray-600">{mockContent}</span>
+          {/* Site Information */}
+          <div className="space-y-1 text-xs">
+            <div className="flex flex-col">
+              <span className="text-black">
+                <span className="font-bold">Operation:</span>
+                <span className="ml-1 text-black">{site.status === "ACTIVE" ? "Active" : site.status}</span>
+              </span>
             </div>
-            <div className="text-sm">
-              <span className="font-medium">Illumination:</span>{" "}
-              <span className="text-green-600 font-medium">{mockIllumination}</span>
+            <div className="flex flex-col">
+              <span className="text-black">
+                <span className="font-bold">Display Health:</span>
+                <span className="ml-1" style={{ color: "#00bf63" }}>
+                  100%
+                </span>
+              </span>
             </div>
-            <div className="text-sm">
-              <span className="font-medium">Compliance:</span>{" "}
-              <span className="text-green-600 font-medium">{mockCompliance}</span>
+            <div className="flex flex-col">
+              <span className="text-black">
+                <span className="font-bold">Compliance:</span>
+                <span className="ml-1 text-black">Complete</span>
+              </span>
             </div>
           </div>
 
           {/* Create Report Button */}
           <Button
-            variant="outline"
-            className="mt-4 w-full rounded-md bg-gray-50 text-gray-800 hover:bg-gray-100 border-gray-200"
+            variant="secondary"
+            className="mt-3 w-full h-8 text-xs bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
             onClick={handleCreateReport}
           >
             Create Report

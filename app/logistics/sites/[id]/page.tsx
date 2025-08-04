@@ -33,6 +33,41 @@ import { AlarmSettingDialog } from "@/components/alarm-setting-dialog"
 import { IlluminationIndexCardDialog } from "@/components/illumination-index-card-dialog"
 import { DisplayIndexCardDialog } from "@/components/display-index-card-dialog"
 
+// Helper function to convert Firebase timestamp to readable date
+const formatFirebaseDate = (timestamp: any): string => {
+  if (!timestamp) return ""
+
+  try {
+    // Check if it's a Firebase Timestamp object
+    if (timestamp && typeof timestamp === "object" && timestamp.seconds) {
+      const date = new Date(timestamp.seconds * 1000)
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    }
+
+    // If it's already a string or Date, handle accordingly
+    if (typeof timestamp === "string") {
+      return timestamp
+    }
+
+    if (timestamp instanceof Date) {
+      return timestamp.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    }
+
+    return ""
+  } catch (error) {
+    console.error("Error formatting date:", error)
+    return ""
+  }
+}
+
 type Props = {
   params: { id: string }
 }
@@ -175,7 +210,7 @@ export default function SiteDetailsPage({ params }: Props) {
   // Get geopoint
   const geopoint = product.specs_rental?.geopoint
     ? `${product.specs_rental.geopoint[0]},${product.specs_rental.geopoint[1]}`
-    : "12.5346567742,14. 09346723"
+    : "12.5346567742,14.09346723"
 
   // Get the first media item for the thumbnail
   const thumbnailUrl =
@@ -255,13 +290,14 @@ export default function SiteDetailsPage({ params }: Props) {
                     <span className="font-medium">Geopoint:</span> {geopoint}
                   </div>
                   <div>
-                    <span className="font-medium">Site Orientation:</span> {product.site_orientation || ""}
+                    <span className="font-medium">Site Orientation:</span>{" "}
+                    {product.specs_rental?.site_orientation || ""}
                   </div>
                   <div>
                     <span className="font-medium">Site Owner:</span> {product.site_owner || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Land Owner:</span> {product.land_owner || ""}
+                    <span className="font-medium">Land Owner:</span> {product.specs_rental?.land_owner || ""}
                   </div>
                 </div>
               </div>
@@ -334,8 +370,8 @@ export default function SiteDetailsPage({ params }: Props) {
           </Card>
 
           {/* Site Data Grid - Updated to include Display card */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Illumination - Top Left */}
+          {/* Illumination - Show only for Static sites - Full width */}
+          {isStatic && (
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-base flex items-center">
@@ -367,15 +403,129 @@ export default function SiteDetailsPage({ params }: Props) {
                 </DropdownMenu>
               </CardHeader>
               <CardContent>
-                <div className="flex items-start gap-4">
-                  {/* Left side - Date and Power info */}
-                  <div className="flex-1 space-y-3">
+                <div className="space-y-4">
+                  {/* Date and Time Section */}
+                  <div className="text-sm">
+                    <div className="font-medium">
+                      {new Date().toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        weekday: "short",
+                      })}
+                      , {new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}
+                    </div>
+                    <div className="text-gray-600 text-xs">
+                      Lights ON at{" "}
+                      {product.specs_rental?.lights_on_time
+                        ? new Date(`2000-01-01T${product.specs_rental.lights_on_time}`).toLocaleTimeString("en-US", {
+                            hour: "numeric",
+                            minute: "2-digit",
+                            hour12: true,
+                          })
+                        : "6:00 PM"}{" "}
+                      everyday
+                    </div>
+                  </div>
+
+                  {/* Illumination Specifications */}
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium text-gray-700">Upper:</span>
+                        <div className="text-blue-600">
+                          {product.specs_rental?.illumination_upper_lighting_specs || "0 - metal halides"}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Lower:</span>
+                        <div className="text-blue-600">
+                          {product.specs_rental?.illumination_bottom_lighting_specs || "0 - metal halides"}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Side (Left):</span>
+                        <div className="text-blue-600">
+                          {product.specs_rental?.illumination_left_lighting_specs || "0 - metal halides"}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-medium text-gray-700">Side (Right):</span>
+                        <div className="text-blue-600">
+                          {product.specs_rental?.illumination_right_lighting_specs || "0 - metal halides"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Power Consumption */}
+                  <div className="border-t pt-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm space-x-4">
+                        <span>
+                          <span className="font-medium">Power Consumption:</span>{" "}
+                          <span className="text-green-600">
+                            {product.specs_rental?.average_power_consumption_3months || "344"} kWh/month
+                          </span>
+                        </span>
+                        <span>
+                          <span className="font-medium">Average (3 months):</span>{" "}
+                          <span className="text-blue-600">
+                            {product.specs_rental?.average_power_consumption_3months || "344"} kWh/month
+                          </span>
+                        </span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-transparent"
+                        onClick={() => setIlluminationIndexCardDialogOpen(true)}
+                      >
+                        View Index Card
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Site Data Grid - Updated layout without Illumination */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Display - Show only for Dynamic sites */}
+            {isDynamic && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base flex items-center">
+                    <Sun className="h-4 w-4 mr-2" />
+                    Display
+                  </CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
                     <div className="text-sm">
-                      <div className="font-medium">July 3, 2020 (Tues), 2:00 pm</div>
-                      <div className="text-gray-600 text-xs">Lights ON at 6:00pm everyday</div>
+                      <div className="font-medium">July 1, 2025 (Tue), 2:00 pm</div>
+                      <div className="text-gray-600 text-xs">
+                        <span className="font-medium">Operating Time:</span> 6:00 pm to 11:00 pm
+                      </div>
                     </div>
 
                     <div className="space-y-1 text-sm">
+                      <div>
+                        <span className="font-medium">Brightness:</span>
+                        <div className="text-xs text-gray-600 ml-2">
+                          7:00 am-3:00 pm (20%)
+                          <br />
+                          3:00 pm-11:00 pm (100%)
+                        </div>
+                      </div>
+                      <div>
+                        <span className="font-medium">Spots in a loop:</span> 10 spots
+                      </div>
+                      <div>
+                        <span className="font-medium">Service Life:</span> 3 years, 8 months, and 10 days
+                      </div>
                       <div>
                         <span className="font-medium">Power Consumption:</span> 150 kWh/month
                       </div>
@@ -385,88 +535,19 @@ export default function SiteDetailsPage({ params }: Props) {
                     </div>
                   </div>
 
-                  {/* Right side - Illumination details */}
-                  <div className="space-y-1 text-sm min-w-[200px]">
-                    <div>
-                      <span className="font-medium">Upper:</span> 5: 240 Lux metal halides
-                    </div>
-                    <div>
-                      <span className="font-medium">Lower:</span> 5: 240 Lux metal halides
-                    </div>
-                    <div>
-                      <span className="font-medium">Side (Left):</span> N/A
-                    </div>
-                    <div>
-                      <span className="font-medium">Side (Right):</span> N/A
-                    </div>
-                  </div>
-                </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 w-full bg-transparent"
+                    onClick={() => setDisplayIndexCardDialogOpen(true)}
+                  >
+                    View Index Card
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4 w-full bg-transparent"
-                  onClick={() => setIlluminationIndexCardDialogOpen(true)}
-                >
-                  View Index Card
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Display - Top Middle */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base flex items-center">
-                  <Sun className="h-4 w-4 mr-2" />
-                  Display
-                </CardTitle>
-                <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="text-sm">
-                    <div className="font-medium">July 1, 2025 (Tue), 2:00 pm</div>
-                    <div className="text-gray-600 text-xs">
-                      <span className="font-medium">Operating Time:</span> 6:00 pm to 11:00 pm
-                    </div>
-                  </div>
-
-                  <div className="space-y-1 text-sm">
-                    <div>
-                      <span className="font-medium">Brightness:</span>
-                      <div className="text-xs text-gray-600 ml-2">
-                        7:00 am-3:00 pm (20%)
-                        <br />
-                        3:00 pm-11:00 pm (100%)
-                      </div>
-                    </div>
-                    <div>
-                      <span className="font-medium">Spots in a loop:</span> 10 spots
-                    </div>
-                    <div>
-                      <span className="font-medium">Service Life:</span> 3 years, 8 months, and 10 days
-                    </div>
-                    <div>
-                      <span className="font-medium">Power Consumption:</span> 150 kWh/month
-                    </div>
-                    <div>
-                      <span className="font-medium">Average Power Consumption:</span> 160 kWh over last 3 months
-                    </div>
-                  </div>
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-4 w-full bg-transparent"
-                  onClick={() => setDisplayIndexCardDialogOpen(true)}
-                >
-                  View Index Card
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Compliance - Top Right */}
+            {/* Compliance - Always show */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center">
@@ -500,7 +581,7 @@ export default function SiteDetailsPage({ params }: Props) {
               </CardContent>
             </Card>
 
-            {/* Structure - Bottom Left */}
+            {/* Structure - Always show */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center">
@@ -511,16 +592,17 @@ export default function SiteDetailsPage({ params }: Props) {
               <CardContent>
                 <div className="space-y-2 text-sm">
                   <div>
-                    <span className="font-medium">Color:</span> {product.structure?.color || ""}
+                    <span className="font-medium">Color:</span> {product.specs_rental?.structure_color || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Contractor:</span> {product.structure?.contractor || ""}
+                    <span className="font-medium">Contractor:</span> {product.specs_rental?.structure_contractor || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Condition:</span> {product.structure?.condition || ""}
+                    <span className="font-medium">Condition:</span> {product.specs_rental?.structure_condition || ""}
                   </div>
                   <div>
-                    <span className="font-medium">Last Maintenance:</span> {product.structure?.last_maintenance || ""}
+                    <span className="font-medium">Last Maintenance:</span>{" "}
+                    {formatFirebaseDate(product.specs_rental?.structure_last_maintenance)}
                   </div>
                 </div>
                 <div className="flex gap-2 mt-3">
@@ -534,8 +616,11 @@ export default function SiteDetailsPage({ params }: Props) {
                 </div>
               </CardContent>
             </Card>
+          </div>
 
-            {/* Content - Bottom Right */}
+          {/* Content and Crew - Single row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Content */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center">
@@ -549,7 +634,7 @@ export default function SiteDetailsPage({ params }: Props) {
                     {product.content_schedule.map((content, index) => (
                       <div key={index}>
                         <span className="font-medium">
-                          {content.start_date} - {content.end_date}:
+                          {formatFirebaseDate(content.start_date)} - {formatFirebaseDate(content.end_date)}:
                         </span>{" "}
                         {content.name}
                       </div>
@@ -564,31 +649,31 @@ export default function SiteDetailsPage({ params }: Props) {
                 </Button>
               </CardContent>
             </Card>
-          </div>
 
-          {/* Crew - Full width */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center">
-                <Users className="h-4 w-4 mr-2" />
-                Crew
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 text-sm">
-                <div>
-                  <span className="font-medium">Security:</span> {product.crew?.security || ""}
+            {/* Crew */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center">
+                  <Users className="h-4 w-4 mr-2" />
+                  Crew
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <span className="font-medium">Security:</span> {product.specs_rental?.security || ""}
+                  </div>
+                  <div>
+                    <span className="font-medium">Caretaker:</span> {product.specs_rental?.caretaker || ""}
+                  </div>
                 </div>
-                <div>
-                  <span className="font-medium">Caretaker:</span> {product.crew?.caretaker || ""}
-                </div>
-              </div>
-              <Button variant="outline" size="sm" className="mt-3 bg-transparent">
-                <History className="h-4 w-4 mr-2" />
-                View History
-              </Button>
-            </CardContent>
-          </Card>
+                <Button variant="outline" size="sm" className="mt-3 bg-transparent">
+                  <History className="h-4 w-4 mr-2" />
+                  View History
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Issues - Full width */}
           <Card>
@@ -701,6 +786,7 @@ export default function SiteDetailsPage({ params }: Props) {
       <IlluminationIndexCardDialog
         open={illuminationIndexCardDialogOpen}
         onOpenChange={setIlluminationIndexCardDialogOpen}
+        product={product}
         onCreateJO={() => {
           // Navigate to create service assignment with this site pre-selected
           router.push(`/logistics/assignments/create?projectSite=${params.id}`)

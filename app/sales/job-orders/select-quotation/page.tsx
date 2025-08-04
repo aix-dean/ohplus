@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Loader2, Search, FileText, CheckCircle, ArrowLeft } from "lucide-react"
+import { Loader2, Search, FileText, CheckCircle, ArrowLeft, Package } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { getQuotationsForSelection } from "@/lib/job-order-service"
 import type { Quotation } from "@/lib/types/quotation"
 import { cn } from "@/lib/utils"
 import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 
 export default function SelectQuotationPage() {
   const { user } = useAuth()
@@ -64,6 +65,20 @@ export default function SelectQuotationPage() {
     setSelectedQuotation(quotation)
   }
 
+  const getProductCount = (quotation: Quotation): number => {
+    if (quotation.items && Array.isArray(quotation.items)) {
+      return quotation.items.length
+    }
+    return 1 // Single product
+  }
+
+  const getProductNames = (quotation: Quotation): string => {
+    if (quotation.items && Array.isArray(quotation.items)) {
+      return quotation.items.map((item: any) => item.site_code).join(", ")
+    }
+    return quotation.site_code || "N/A"
+  }
+
   const handleConfirm = () => {
     if (selectedQuotation) {
       router.push(`/sales/job-orders/create?quotationId=${selectedQuotation.id}`)
@@ -107,35 +122,51 @@ export default function SelectQuotationPage() {
         ) : (
           <ScrollArea className="flex-1 pr-4 -mr-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredQuotations.map((quotation) => (
-                <Card
-                  key={quotation.id}
-                  className={cn(
-                    "flex flex-col p-4 border rounded-lg cursor-pointer transition-colors",
-                    selectedQuotation?.id === quotation.id
-                      ? "border-blue-500 bg-blue-50 shadow-md"
-                      : "hover:bg-gray-50",
-                  )}
-                  onClick={() => handleSelect(quotation)}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="font-semibold text-base">{quotation.quotation_number}</p>
-                    {selectedQuotation?.id === quotation.id && <CheckCircle className="h-5 w-5 text-blue-600" />}
-                  </div>
-                  <p className="text-sm text-gray-700 mb-1">Client: {quotation.client_name}</p>
-                  <p className="text-sm text-gray-700 mb-1">Site: {quotation.product_name}</p>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Sales:{" "}
-                    {quotation.created_by_first_name || quotation.created_by_last_name
-                      ? `${quotation.created_by_first_name || ""} ${quotation.created_by_last_name || ""}`.trim()
-                      : "N/A"}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-auto">
-                    Created:{" "}
-                    {quotation.created ? new Date(quotation.created.seconds * 1000).toLocaleDateString() : "N/A"}
-                  </p>
-                </Card>
-              ))}
+              {filteredQuotations.map((quotation) => {
+                const productCount = getProductCount(quotation)
+                const isMultiProduct = productCount > 1
+
+                return (
+                  <Card
+                    key={quotation.id}
+                    className={cn(
+                      "flex flex-col p-4 border rounded-lg cursor-pointer transition-colors",
+                      selectedQuotation?.id === quotation.id
+                        ? "border-blue-500 bg-blue-50 shadow-md"
+                        : "hover:bg-gray-50",
+                    )}
+                    onClick={() => handleSelect(quotation)}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-semibold text-base">{quotation.quotation_number}</p>
+                      <div className="flex items-center gap-2">
+                        {isMultiProduct && (
+                          <Badge variant="secondary" className="text-xs">
+                            <Package className="h-3 w-3 mr-1" />
+                            {productCount} Products
+                          </Badge>
+                        )}
+                        {selectedQuotation?.id === quotation.id && <CheckCircle className="h-5 w-5 text-blue-600" />}
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-700 mb-1">Client: {quotation.client_name}</p>
+                    <p className="text-sm text-gray-700 mb-1 line-clamp-2">
+                      {isMultiProduct ? "Products: " : "Site: "}
+                      {getProductNames(quotation)}
+                    </p>
+                    <p className="text-sm text-gray-600 mb-2">
+                      Sales:{" "}
+                      {quotation.created_by_first_name || quotation.created_by_last_name
+                        ? `${quotation.created_by_first_name || ""} ${quotation.created_by_last_name || ""}`.trim()
+                        : "N/A"}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-auto">
+                      Created:{" "}
+                      {quotation.created ? new Date(quotation.created.seconds * 1000).toLocaleDateString() : "N/A"}
+                    </p>
+                  </Card>
+                )
+              })}
             </div>
           </ScrollArea>
         )}
@@ -144,7 +175,10 @@ export default function SelectQuotationPage() {
             Cancel
           </Button>
           <Button onClick={handleConfirm} disabled={!selectedQuotation}>
-            <FileText className="mr-2 h-4 w-4" /> Create Job Order
+            <FileText className="mr-2 h-4 w-4" />
+            {selectedQuotation && getProductCount(selectedQuotation) > 1
+              ? `Create ${getProductCount(selectedQuotation)} Job Orders`
+              : "Create Job Order"}
           </Button>
         </div>
       </Card>

@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, query, orderBy, onSnapshot } from "firebase/firestore"
+import { collection, query, orderBy, onSnapshot, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 
 interface ServiceAssignment {
   id: string
@@ -25,18 +26,26 @@ interface ServiceAssignment {
   coveredDateStart: any
   coveredDateEnd: any
   created: any
+  company_id: string
 }
 
 interface ServiceAssignmentsTableProps {
   onSelectAssignment?: (id: string) => void
+  companyId?: string
 }
 
-export function ServiceAssignmentsTable({ onSelectAssignment }: ServiceAssignmentsTableProps) {
+export function ServiceAssignmentsTable({ onSelectAssignment, companyId }: ServiceAssignmentsTableProps) {
+  const router = useRouter()
   const [assignments, setAssignments] = useState<ServiceAssignment[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const q = query(collection(db, "service_assignments"), orderBy("created", "desc"))
+    let q = query(collection(db, "service_assignments"), orderBy("created", "desc"))
+
+    // Filter by company_id if provided
+    if (companyId) {
+      q = query(collection(db, "service_assignments"), where("company_id", "==", companyId), orderBy("created", "desc"))
+    }
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const assignmentsData: ServiceAssignment[] = []
@@ -51,7 +60,7 @@ export function ServiceAssignmentsTable({ onSelectAssignment }: ServiceAssignmen
     })
 
     return () => unsubscribe()
-  }, [])
+  }, [companyId])
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -63,6 +72,8 @@ export function ServiceAssignmentsTable({ onSelectAssignment }: ServiceAssignmen
         return "bg-yellow-100 text-yellow-800"
       case "cancelled":
         return "bg-red-100 text-red-800"
+      case "draft":
+        return "bg-orange-100 text-orange-800"
       default:
         return "bg-gray-100 text-gray-800"
     }
@@ -123,13 +134,23 @@ export function ServiceAssignmentsTable({ onSelectAssignment }: ServiceAssignmen
                   {assignment.created ? format(new Date(assignment.created.toDate()), "MMM d, yyyy") : "Unknown"}
                 </TableCell>
                 <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onSelectAssignment && onSelectAssignment(assignment.id)}
-                  >
-                    View
-                  </Button>
+                  {assignment.status === "Draft" ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/logistics/assignments/create?draft=${assignment.id}`)}
+                    >
+                      Continue Editing
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onSelectAssignment && onSelectAssignment(assignment.id)}
+                    >
+                      View
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))

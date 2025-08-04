@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -7,15 +9,28 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Plus, FileText, Video, Loader2, ArrowLeft } from "lucide-react"
+import { Plus, FileText, Video, Loader2, ArrowLeft, Printer, Download } from "lucide-react"
 import { format } from "date-fns"
 import type { Product } from "@/lib/firebase-service"
-import { addDoc, collection, serverTimestamp, query, where, orderBy, limit, getDocs } from "firebase/firestore"
+import {
+  addDoc,
+  collection,
+  serverTimestamp,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  doc,
+  getDoc,
+  updateDoc,
+} from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-success-dialog"
+import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
 
 // Service types as provided
 const SERVICE_TYPES = ["Roll up", "Roll down", "Change Material", "Repair", "Maintenance", "Monitoring", "Spot Booking"]
@@ -32,6 +47,9 @@ export default function CreateServiceAssignmentPage() {
   const [saNumber, setSaNumber] = useState("")
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [createdSaNumber, setCreatedSaNumber] = useState("")
+  const [generatingPDF, setGeneratingPDF] = useState(false)
+  const [isEditingDraft, setIsEditingDraft] = useState(false)
+  const [draftId, setDraftId] = useState<string | null>(null)
 
   // Form data state
   const [formData, setFormData] = useState({
@@ -53,7 +71,7 @@ export default function CreateServiceAssignmentPage() {
     endDate: null as Date | null,
     alarmDate: null as Date | null,
     alarmTime: "",
-    attachments: [] as { name: string; type: string }[],
+    attachments: [] as { name: string; type: string; file?: File }[],
     // Add service cost fields
     serviceCost: {
       crewFee: "",
@@ -102,6 +120,75 @@ export default function CreateServiceAssignmentPage() {
     fetchProducts()
   }, [])
 
+  // Load draft data if editing
+  useEffect(() => {
+    const loadDraft = async () => {
+      const draftParam = searchParams.get("draft")
+      if (draftParam) {
+        try {
+          setDraftId(draftParam)
+          const draftDoc = await getDoc(doc(db, "service_assignments", draftParam))
+
+          if (draftDoc.exists()) {
+            const draftData = draftDoc.data()
+            setIsEditingDraft(true)
+
+            // Load the draft data into form
+            setFormData({
+              projectSite: draftData.projectSiteId || "",
+              serviceType: draftData.serviceType || "",
+              assignedTo: draftData.assignedTo || "",
+              serviceDuration: draftData.serviceDuration || "",
+              priority: draftData.priority || "",
+              equipmentRequired: draftData.equipmentRequired || "",
+              materialSpecs: draftData.materialSpecs || "",
+              crew: draftData.crew || "",
+              illuminationNits: draftData.illuminationNits || "",
+              gondola: draftData.gondola || "",
+              technology: draftData.technology || "",
+              sales: draftData.sales || "",
+              remarks: draftData.remarks || "",
+              message: draftData.message || "",
+              startDate: draftData.coveredDateStart?.toDate() || null,
+              endDate: draftData.coveredDateEnd?.toDate() || null,
+              alarmDate: draftData.alarmDate?.toDate() || null,
+              alarmTime: draftData.alarmTime || "",
+              attachments: draftData.attachments || [],
+              serviceCost: draftData.serviceCost || {
+                crewFee: "",
+                overtimeFee: "",
+                transpo: "",
+                tollFee: "",
+                mealAllowance: "",
+                otherFees: [],
+                total: 0,
+              },
+            })
+
+            // Set the SA number from draft
+            setSaNumber(draftData.saNumber || "")
+
+            // Set date inputs
+            if (draftData.coveredDateStart) {
+              setStartDateInput(format(draftData.coveredDateStart.toDate(), "yyyy-MM-dd"))
+            }
+            if (draftData.coveredDateEnd) {
+              setEndDateInput(format(draftData.coveredDateEnd.toDate(), "yyyy-MM-dd"))
+            }
+            if (draftData.alarmDate) {
+              setAlarmDateInput(format(draftData.alarmDate.toDate(), "yyyy-MM-dd"))
+            }
+          }
+        } catch (error) {
+          console.error("Error loading draft:", error)
+          alert("Error loading draft")
+        }
+      }
+    }
+
+    loadDraft()
+  }, [searchParams])
+
   // Handle form input changes
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -145,6 +232,57 @@ export default function CreateServiceAssignmentPage() {
     }
   }
 
+  // Handle file upload
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files) return
+
+    const newAttachments: { name: string; type: string; file: File }[] = []
+
+    Array.from(files).forEach((file) => {
+      // Check file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`File ${file.name} is too large. Maximum size is 10MB.`)
+        return
+      }
+
+      newAttachments.push({
+        name: file.name,
+        type: file.type,
+        file: file,
+      })
+    })
+
+    if (newAttachments.length > 0) {
+      setFormData((prev) => ({
+        ...prev,
+        attachments: [...prev.attachments, ...newAttachments],
+      }))
+    }
+
+    // Reset the input
+    event.target.value = ""
+  }
+
+  // Remove attachment
+  const removeAttachment = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      attachments: prev.attachments.filter((_, i) => i !== index),
+    }))
+  }
+
+  // Convert attachments to Firestore-compatible format
+  const convertAttachmentsForFirestore = (attachments: { name: string; type: string; file?: File }[]) => {
+    return attachments.map((attachment) => ({
+      name: attachment.name,
+      type: attachment.type,
+      // Remove the file object as it's not serializable
+      size: attachment.file?.size || 0,
+      lastModified: attachment.file?.lastModified || Date.now(),
+    }))
+  }
+
   // Handle form submission
   const handleSubmit = async () => {
     if (!user) return
@@ -153,7 +291,7 @@ export default function CreateServiceAssignmentPage() {
       setLoading(true)
       const selectedProduct = products.find((p) => p.id === formData.projectSite)
 
-      await addDoc(collection(db, "service_assignments"), {
+      const assignmentData = {
         saNumber,
         projectSiteId: formData.projectSite,
         projectSiteName: selectedProduct?.name || "",
@@ -180,14 +318,24 @@ export default function CreateServiceAssignmentPage() {
         coveredDateEnd: formData.endDate,
         alarmDate: formData.alarmDate,
         alarmTime: formData.alarmTime,
-        attachments: formData.attachments,
+        attachments: convertAttachmentsForFirestore(formData.attachments),
         serviceCost: formData.serviceCost,
-        status: "Pending",
-        created: serverTimestamp(),
+        status: "Pending", // Always set to Pending when submitting
         updated: serverTimestamp(),
         project_key: userData?.license_key || "",
-        company_id: userData?.company_id || null, // Add company_id from userData
-      })
+        company_id: userData?.company_id || null,
+      }
+
+      if (isEditingDraft && draftId) {
+        // Update existing draft to pending
+        await updateDoc(doc(db, "service_assignments", draftId), assignmentData)
+      } else {
+        // Create new assignment
+        await addDoc(collection(db, "service_assignments"), {
+          ...assignmentData,
+          created: serverTimestamp(),
+        })
+      }
 
       // Show success dialog
       setCreatedSaNumber(saNumber)
@@ -199,17 +347,69 @@ export default function CreateServiceAssignmentPage() {
     }
   }
 
-  // Handle attachment addition
-  const addAttachment = (type: string) => {
-    const newAttachment = {
-      name: type === "pdf" ? "Document.pdf" : "Video.mp4",
-      type,
-    }
+  // Add this new function after the handleSubmit function
+  const handleSaveDraft = async () => {
+    if (!user) return
 
-    setFormData((prev) => ({
-      ...prev,
-      attachments: [...prev.attachments, newAttachment],
-    }))
+    try {
+      setLoading(true)
+      const selectedProduct = products.find((p) => p.id === formData.projectSite)
+
+      const draftData = {
+        saNumber,
+        projectSiteId: formData.projectSite,
+        projectSiteName: selectedProduct?.name || "",
+        projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
+        serviceType: formData.serviceType,
+        assignedTo: formData.assignedTo,
+        serviceDuration: formData.serviceDuration,
+        priority: formData.priority,
+        equipmentRequired: formData.equipmentRequired,
+        materialSpecs: formData.materialSpecs,
+        crew: formData.crew,
+        illuminationNits: formData.illuminationNits,
+        gondola: formData.gondola,
+        technology: formData.technology,
+        sales: formData.sales,
+        remarks: formData.remarks,
+        requestedBy: {
+          id: user.uid,
+          name: user.displayName || "Unknown User",
+          department: "LOGISTICS",
+        },
+        message: formData.message,
+        coveredDateStart: formData.startDate,
+        coveredDateEnd: formData.endDate,
+        alarmDate: formData.alarmDate,
+        alarmTime: formData.alarmTime,
+        attachments: convertAttachmentsForFirestore(formData.attachments),
+        serviceCost: formData.serviceCost,
+        status: "Draft",
+        updated: serverTimestamp(),
+        project_key: userData?.license_key || "",
+        company_id: userData?.company_id || null,
+      }
+
+      if (isEditingDraft && draftId) {
+        // Update existing draft
+        await updateDoc(doc(db, "service_assignments", draftId), draftData)
+        alert("Draft updated successfully!")
+      } else {
+        // Create new draft
+        await addDoc(collection(db, "service_assignments"), {
+          ...draftData,
+          created: serverTimestamp(),
+        })
+        alert("Service assignment saved as draft successfully!")
+      }
+
+      router.push("/logistics/assignments")
+    } catch (error) {
+      console.error("Error saving draft:", error)
+      alert("Error saving draft. Please try again.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   // Generate time options
@@ -337,6 +537,70 @@ export default function CreateServiceAssignmentPage() {
     setSaNumber(randomNum.toString())
   }
 
+  // Handle PDF generation and print/download
+  const handleGeneratePDF = async (action: "print" | "download") => {
+    try {
+      setGeneratingPDF(true)
+
+      // Create service assignment data structure for PDF
+      const selectedProduct = products.find((p) => p.id === formData.projectSite)
+      const serviceAssignmentData = {
+        saNumber,
+        projectSiteName: selectedProduct?.name || "",
+        projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
+        serviceType: formData.serviceType,
+        assignedTo: formData.assignedTo,
+        serviceDuration: formData.serviceDuration,
+        priority: formData.priority,
+        equipmentRequired: formData.equipmentRequired,
+        materialSpecs: formData.materialSpecs,
+        crew: formData.crew,
+        illuminationNits: formData.illuminationNits,
+        gondola: formData.gondola,
+        technology: formData.technology,
+        sales: formData.sales,
+        remarks: formData.remarks,
+        requestedBy: {
+          name:
+            userData?.first_name && userData?.last_name
+              ? `${userData.first_name} ${userData.last_name}`
+              : user?.displayName || "Unknown User",
+          department: "LOGISTICS",
+        },
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        alarmDate: formData.alarmDate,
+        alarmTime: formData.alarmTime,
+        attachments: formData.attachments,
+        serviceCost: {
+          ...formData.serviceCost,
+          total: calculateServiceCostTotal(),
+        },
+        status: "Draft",
+        created: new Date(),
+      }
+
+      if (action === "print") {
+        // Check if browser supports printing
+        if (window.print) {
+          // Generate PDF and open in new window for printing
+          await generateServiceAssignmentPDF(serviceAssignmentData, false)
+        } else {
+          // Fallback to download if print not supported
+          await generateServiceAssignmentPDF(serviceAssignmentData, false)
+        }
+      } else {
+        // Download PDF
+        await generateServiceAssignmentPDF(serviceAssignmentData, false)
+      }
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+      // You could add a toast notification here
+    } finally {
+      setGeneratingPDF(false)
+    }
+  }
+
   if (fetchingProducts) {
     return (
       <div className="container mx-auto py-4">
@@ -352,7 +616,9 @@ export default function CreateServiceAssignmentPage() {
     <div className="container mx-auto py-4 space-y-4">
       {/* Header */}
       <div className="bg-slate-800 text-white p-4 rounded-lg flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Create Service Assignment</h1>
+        <h1 className="text-lg font-semibold">
+          {isEditingDraft ? "Edit Service Assignment Draft" : "Create Service Assignment"}
+        </h1>
         <Link href="/logistics/assignments" className="inline-flex items-center text-sm text-white/80 hover:text-white">
           <ArrowLeft className="mr-1 h-4 w-4" />
           Back to Assignments
@@ -823,19 +1089,33 @@ export default function CreateServiceAssignmentPage() {
               {formData.attachments.map((attachment, index) => (
                 <div
                   key={index}
-                  className="border rounded-md p-4 w-[120px] h-[120px] flex flex-col items-center justify-center"
+                  className="border rounded-md p-4 w-[120px] h-[120px] flex flex-col items-center justify-center relative group"
                 >
-                  {attachment.type === "pdf" ? (
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(index)}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+                  >
+                    ×
+                  </button>
+                  {attachment.type.includes("pdf") ? (
                     <>
                       <div className="w-12 h-12 bg-red-500 text-white flex items-center justify-center rounded-md mb-2">
                         <FileText size={24} />
                       </div>
                       <span className="text-xs text-center truncate w-full">{attachment.name}</span>
                     </>
-                  ) : (
+                  ) : attachment.type.includes("video") ? (
                     <>
                       <div className="w-12 h-12 bg-gray-200 flex items-center justify-center rounded-md mb-2">
                         <Video size={24} className="text-gray-500" />
+                      </div>
+                      <span className="text-xs text-center truncate w-full">{attachment.name}</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-12 h-12 bg-blue-500 text-white flex items-center justify-center rounded-md mb-2">
+                        <FileText size={24} />
                       </div>
                       <span className="text-xs text-center truncate w-full">{attachment.name}</span>
                     </>
@@ -843,41 +1123,61 @@ export default function CreateServiceAssignmentPage() {
                 </div>
               ))}
 
-              <button
-                type="button"
-                onClick={() => addAttachment("pdf")}
-                className="border rounded-md p-4 w-[120px] h-[120px] flex flex-col items-center justify-center hover:bg-gray-50"
-              >
-                <div className="w-12 h-12 bg-red-500 text-white flex items-center justify-center rounded-md mb-2">
-                  <FileText size={24} />
-                </div>
-                <span className="text-xs">Add PDF</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => addAttachment("video")}
-                className="border rounded-md p-4 w-[120px] h-[120px] flex flex-col items-center justify-center hover:bg-gray-50"
-              >
-                <div className="w-12 h-12 bg-gray-200 flex items-center justify-center rounded-md mb-2">
-                  <Video size={24} className="text-gray-500" />
-                </div>
-                <span className="text-xs">Add Video</span>
-              </button>
-
-              <button
-                type="button"
-                className="border rounded-md p-4 w-[120px] h-[120px] flex items-center justify-center hover:bg-gray-50"
-              >
-                <Plus size={24} className="text-gray-400" />
-              </button>
+              <label className="border-2 border-dashed border-gray-300 rounded-md p-4 w-[120px] h-[120px] flex flex-col items-center justify-center hover:bg-gray-50 cursor-pointer">
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Plus size={24} className="text-gray-400 mb-2" />
+                <span className="text-xs text-center text-gray-500">Add Files</span>
+              </label>
             </div>
+            <p className="text-xs text-gray-500">
+              Supported formats: PDF, DOC, XLS, PPT, TXT, JPG, PNG, MP4, MOV, AVI (Max 10MB each)
+            </p>
           </div>
 
           {/* Action Buttons */}
           <div className="flex gap-4 pt-6">
             <Button variant="outline" onClick={() => router.push("/logistics/assignments")} type="button">
               Cancel
+            </Button>
+            <Button variant="outline" onClick={handleSaveDraft} disabled={loading} type="button">
+              Save Draft
+            </Button>
+            <Button variant="outline" onClick={() => handleGeneratePDF("print")} disabled={generatingPDF} type="button">
+              {generatingPDF ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Printer className="mr-2 h-4 w-4" />
+                  Print
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleGeneratePDF("download")}
+              disabled={generatingPDF}
+              type="button"
+            >
+              {generatingPDF ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download PDF
+                </>
+              )}
             </Button>
             <Button onClick={handleSubmit} disabled={loading} variant="default" type="button">
               {loading ? (

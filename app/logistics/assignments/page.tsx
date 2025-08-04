@@ -6,9 +6,11 @@ import { ServiceAssignmentsTable } from "@/components/service-assignments-table"
 import { Plus, Filter, Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 
 export default function ServiceAssignmentsPage() {
   const router = useRouter()
+  const { userData } = useAuth()
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
 
   const handleSelectAssignment = async (id) => {
@@ -42,7 +44,7 @@ export default function ServiceAssignmentsPage() {
           </Button>
         </div>
 
-        <ServiceAssignmentsTable onSelectAssignment={handleSelectAssignment} />
+        <ServiceAssignmentsTable onSelectAssignment={handleSelectAssignment} companyId={userData?.company_id} />
       </main>
     </div>
   )

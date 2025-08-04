@@ -22,9 +22,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton" // Import Skeleton component
-import { QuotationsList } from "@/components/quotations-list"
-// Removed: import { CostEstimatesList } from "@/components/cost-estimates-list"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export default function BookingsPage() {
   const { user } = useAuth()
@@ -35,7 +33,7 @@ export default function BookingsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
   const [pageSnapshots, setPageSnapshots] = useState<QueryDocumentSnapshot<DocumentData>[]>([])
-  const [activeTab, setActiveTab] = useState("bookings")
+  const [activeTab, setActiveTab] = useState("bookings") // Keep activeTab for consistency, though only one tab now
 
   const router = useRouter()
 
@@ -172,12 +170,8 @@ export default function BookingsPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
         <Tabs defaultValue="bookings" onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            {" "}
-            {/* Changed from grid-cols-3 to grid-cols-2 */}
+          <TabsList className="grid w-full grid-cols-1">
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
-            <TabsTrigger value="quotations">Quotations</TabsTrigger>
-            {/* Removed: <TabsTrigger value="cost-estimates">Cost Estimates</TabsTrigger> */}
           </TabsList>
 
           <TabsContent value="bookings" className="mt-6">
@@ -302,25 +296,6 @@ export default function BookingsPage() {
               </div>
             </div>
           </TabsContent>
-
-          <TabsContent value="quotations" className="mt-6">
-            {user?.uid ? (
-              <QuotationsList userId={user.uid} />
-            ) : (
-              <p className="text-center py-10">Please log in to view your quotations.</p>
-            )}
-          </TabsContent>
-
-          {/* Removed: Cost Estimates Tab Content */}
-          {/*
-          <TabsContent value="cost-estimates" className="mt-6">
-            {user?.uid ? (
-              <CostEstimatesList userId={user.uid} />
-            ) : (
-              <p className="text-center py-10">Please log in to view your cost estimates.</p>
-            )}
-          </TabsContent>
-          */}
         </Tabs>
       </div>
 

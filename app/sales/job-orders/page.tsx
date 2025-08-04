@@ -272,12 +272,13 @@ export default function JobOrdersPage() {
           </Card>
         )}
 
-        <Link href="/sales/job-orders/create" className="fixed bottom-6 right-6 z-10">
-          <Button size="lg" className="rounded-full shadow-lg px-6 py-3 text-lg">
+   
+          <Button
+             onClick={() => router.push("/sales/job-orders/select-quotation")} 
+           size="lg" className="rounded-full shadow-lg px-6 py-3 text-lg">
             <Plus className="mr-2 h-5 w-5" />
             Create JO
           </Button>
-        </Link>
       </div>
     </div>
   )

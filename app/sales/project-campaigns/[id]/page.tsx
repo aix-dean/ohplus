@@ -195,7 +195,15 @@ export default function CampaignDetailsPage() {
           <ChevronRight className="h-3 w-3" />
           <span className="font-medium text-gray-900">Project Campaign Details</span>
         </div>
-
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start hover:bg-gray-50 hover:border-gray-200 transition-colors"
+                  onClick={() => router.push("/sales/project-campaigns")}
+                >
+                  <ArrowLeft className="h-3 w-3 mr-2" />
+                  Back to Project Campaigns
+                </Button>
         {/* Header Card */}
         <Card className="border shadow-sm mb-6 overflow-hidden">
           <div className="bg-blue-600 p-4">
@@ -416,35 +424,6 @@ export default function CampaignDetailsPage() {
 
           {/* Right Column */}
           <div className="space-y-6">
-            {/* Quick Actions */}
-            <Card className="border shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base font-bold text-gray-900">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {campaign.proposalId && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-start hover:bg-blue-50 hover:border-blue-200 transition-colors"
-                    onClick={() => router.push(`/sales/proposals/${campaign.proposalId}`)}
-                  >
-                    <FileText className="h-3 w-3 mr-2" />
-                    View Proposal
-                  </Button>
-                )}
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full justify-start hover:bg-gray-50 hover:border-gray-200 transition-colors"
-                  onClick={() => router.push("/sales/project-campaigns")}
-                >
-                  <ArrowLeft className="h-3 w-3 mr-2" />
-                  Back to Project Campaigns
-                </Button>
-              </CardContent>
-            </Card>
 
             {/* Campaign Details */}
             <Card className="border shadow-sm">

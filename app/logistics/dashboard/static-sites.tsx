@@ -17,7 +17,6 @@ import { useAuth } from "@/contexts/auth-context"
 import { CreateReportDialog } from "@/components/create-report-dialog"
 import Image from "next/image"
 import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 8
@@ -328,7 +327,7 @@ export default function StaticSitesTab() {
 
       {/* Site Grid */}
       {!loading && !error && products.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mt-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 mt-4">
           {products.map((product) => {
             const site = productToSite(product)
 
@@ -443,7 +442,7 @@ export default function StaticSitesTab() {
   )
 }
 
-// Update the SiteCard component to fetch its own service assignments
+// Static Site Card that matches the exact reference design
 function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId: string) => void }) {
   const [activeAssignments, setActiveAssignments] = useState<ServiceAssignment[]>([])
   const [isLoadingAssignments, setIsLoadingAssignments] = useState(true)
@@ -478,77 +477,73 @@ function SiteCard({ site, onCreateReport }: { site: any; onCreateReport: (siteId
 
   return (
     <Card
-      className="erp-card overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg bg-white"
+      className="overflow-hidden cursor-pointer border border-gray-200 shadow-sm rounded-lg transition-all hover:shadow-lg bg-white w-full"
       onClick={handleCardClick}
     >
-      <CardContent className="p-0">
-        <div className="relative h-48 bg-gray-200">
-          <Image
-            src={site.image || "/placeholder.svg"}
-            alt={site.name}
-            fill
-            className="object-cover"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement
-              target.src = "/roadside-billboard.png"
-              target.className = "opacity-50 object-contain"
-            }}
-          />
-          {activeAssignments.length > 0 && (
-            <div className="absolute top-2 right-2 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
-              {activeAssignments.length}
-            </div>
-          )}
-          <div className="absolute bottom-2 left-2">
-            <Badge
-              className={`
-          text-xs font-bold px-2 py-1
-          ${site.statusColor === "green" ? "bg-green-500 text-white" : ""}
-          ${site.statusColor === "blue" ? "bg-blue-500 text-white" : ""}
-          ${site.statusColor === "red" ? "bg-red-500 text-white" : ""}
-          ${site.statusColor === "orange" ? "bg-orange-500 text-white" : ""}
-        `}
-            >
-              {site.status === "ACTIVE" ? "OPEN" : site.status}
-            </Badge>
+      <div className="relative h-32 bg-gray-200">
+        <Image
+          src={site.image || "/placeholder.svg"}
+          alt={site.name}
+          fill
+          className="object-cover"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            target.src = "/roadside-billboard.png"
+            target.className = "opacity-50 object-contain"
+          }}
+        />
+
+        {/* Status Badge - Bottom Left */}
+        <div className="absolute bottom-2 left-2">
+          <div className="px-2 py-1 rounded text-xs font-bold text-white" style={{ backgroundColor: "#38b6ff" }}>
+            {site.status === "ACTIVE" ? "OPEN" : site.status}
           </div>
         </div>
+      </div>
 
-        <div className="p-4">
-          <div className="flex flex-col gap-1">
-            <div className="text-sm font-bold text-gray-800">{site.id}</div>
-            <h3 className="font-semibold text-gray-900">{site.name}</h3>
+      <CardContent className="p-3">
+        <div className="flex flex-col gap-2">
+          {/* Site Code */}
+          <div className="text-xs text-gray-500 uppercase tracking-wide">{site.id}</div>
 
-            <div className="mt-3 space-y-1">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Operation:</span>
-                <span className={`font-medium ${site.status === "ACTIVE" ? "text-green-600" : "text-gray-800"}`}>
-                  {site.status === "ACTIVE" ? "Active" : site.status}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Display Health:</span>
-                <span className="font-medium text-green-600">90%</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Compliance:</span>
-                <span className="font-medium text-red-600">Incomplete (2)</span>
-              </div>
+          {/* Site Name with Badge */}
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-sm text-gray-900 truncate">{site.name}</h3>
+            <div className="bg-purple-500 text-white text-xs px-1.5 py-0.5 rounded font-bold flex-shrink-0">S</div>
+          </div>
+
+          {/* Site Information */}
+          <div className="space-y-1 text-xs">
+            <div className="flex flex-col">
+              <span className="text-black">
+                <span className="font-bold">Operation:</span>
+                <span className="ml-1 text-black">{site.status === "ACTIVE" ? "Active" : site.status}</span>
+              </span>
             </div>
-
-            <div className="mt-4 relative">
-              <Button
-                variant="outline"
-                className="w-full rounded-full bg-gray-100 text-gray-800 hover:bg-gray-200 border-gray-200 font-medium"
-                onClick={handleCreateReport}
-              >
-                Create Report
-              </Button>
-              <div className="absolute -top-1 -right-1 bg-yellow-400 text-black rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-md">
-                20
-              </div>
+            <div className="flex flex-col">
+              <span className="text-black">
+                <span className="font-bold">Display Health:</span>
+                <span className="ml-1" style={{ color: "#00bf63" }}>
+                  100%
+                </span>
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-black">
+                <span className="font-bold">Compliance:</span>
+                <span className="ml-1 text-black">Complete</span>
+              </span>
             </div>
           </div>
+
+          {/* Create Report Button */}
+          <Button
+            variant="secondary"
+            className="mt-3 w-full h-8 text-xs bg-gray-100 hover:bg-gray-200 border-0 text-gray-700 hover:text-gray-900 rounded-md font-medium"
+            onClick={handleCreateReport}
+          >
+            Create Report
+          </Button>
         </div>
       </CardContent>
     </Card>

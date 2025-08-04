@@ -22,59 +22,53 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 // Initialize Firebase Storage
 const storage = getStorage()
 
-// Update the Product interface to include new fields
+// Product interface
 export interface Product {
-  id: string
+  id?: string
   name: string
-  position: number
+  description: string
+  price: number
+  imageUrl?: string
+  active: boolean
+  deleted: boolean
+  created?: any
+  updated?: any
   seller_id: string
   seller_name: string
   company_id?: string | null
+  position: number
+  media?: Array<{
+    url: string
+    distance: string
+    type: string
+    isVideo: boolean
+  }>
+  categories?: string[]
+  category_names?: string[]
+  content_type?: string
+  cms?: {
+    start_time?: string
+    end_time?: string
+    spot_duration?: number
+    loops_per_day?: number
+    spots_per_loop?: number
+  } | null
   specs_rental?: {
     audience_type?: string
     audience_types?: string[]
-    geopoint: [number, number]
+    geopoint?: [number, number]
     location?: string
-    traffic_count?: number
-    elevation?: number
-    height?: number
-    width?: number
+    traffic_count?: number | null
+    elevation?: number | null
+    height?: number | null
+    width?: number | null
   }
-  light?: {
-    location: string
-    name: string
-    operator: string
-  }
-  terminologies?: any
-  status: string
-  type: string
-  updated: string | Timestamp
-  categories?: string[]
-  category_id?: string
-  category_name?: string
-  category_names?: string[]
-  contract?: string
-  contract_template_id?: number
-  created?: string | Timestamp
-  description?: string
-  media?: {
-    distance: string
-    isVideo: boolean
-    type: string
-    url: string
-  }[]
-  active?: boolean
-  ai_logo_tags?: string[]
-  ai_text_tags?: string[]
-  deleted?: boolean
-  date_deleted?: string | Timestamp
-  price?: number | string
-  content_type?: string
-  health_percentage?: number
-  site_code?: string
+  type?: string
+  status?: string
+  position?: number
 }
 
-// Add this interface after the Product interface
+// ServiceAssignment interface
 export interface ServiceAssignment {
   id: string
   saNumber: string
@@ -100,7 +94,7 @@ export interface ServiceAssignment {
   updated: any
 }
 
-// Add the Booking interface after the ServiceAssignment interface
+// Booking interface
 export interface Booking {
   id: string
   product_id: string
@@ -118,7 +112,7 @@ export interface Booking {
   booking_reference?: string
 }
 
-// Add this interface after the Booking interface
+// User interface
 export interface User {
   id: string
   name: string
@@ -130,7 +124,7 @@ export interface User {
   updated?: string | Timestamp
 }
 
-// Add the QuotationRequest interface after the User interface
+// QuotationRequest interface
 export interface QuotationRequest {
   id: string
   company: string
@@ -154,7 +148,7 @@ export interface QuotationRequest {
   updated?: string | Timestamp
 }
 
-// Add the Quotation interface here, consistent with lib/types/quotation.ts
+// Quotation interface
 export interface Quotation {
   id?: string
   quotation_number: string
@@ -183,13 +177,14 @@ export interface Quotation {
   valid_until?: any
 }
 
+// PaginatedResult interface
 export interface PaginatedResult<T> {
   items: T[]
   lastDoc: QueryDocumentSnapshot<DocumentData> | null
   hasMore: boolean
 }
 
-// Re-declare ProjectData to include subscription fields, matching AuthContext's ProjectData
+// ProjectData interface
 export interface ProjectData {
   id: string
   uid: string
@@ -247,7 +242,7 @@ export async function updateProduct(productId: string, productData: Partial<Prod
 export async function getUserProducts(userId: string): Promise<Product[]> {
   try {
     const productsRef = collection(db, "products")
-    const q = query(productsRef, where("seller_id", "==", userId), orderBy("name", "asc"))
+    const q = query(productsRef, where("company_id", "==", userId), orderBy("name", "asc"))
     const querySnapshot = await getDocs(q)
 
     const products: Product[] = []
@@ -267,18 +262,25 @@ export async function getPaginatedUserProducts(
   userId: string,
   itemsPerPage = 16,
   lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
-  options: { searchTerm?: string; active?: boolean } = {},
+  options: { searchTerm?: string; active?: boolean; content_type?: string } = {},
 ): Promise<PaginatedResult<Product>> {
   try {
     const productsRef = collection(db, "products")
-    const { searchTerm = "", active } = options
+    const { searchTerm = "", active, content_type } = options
 
     // Start with basic constraints
-    const constraints: any[] = [where("seller_id", "==", userId), orderBy("name", "asc"), limit(itemsPerPage)]
+    const constraints: any[] = [where("company_id", "==", userId), orderBy("name", "asc"), limit(itemsPerPage)]
 
     // Add active filter if specified
     if (active !== undefined) {
       constraints.unshift(where("active", "==", active))
+    }
+
+    // Add content_type filter if specified (case-insensitive handled client-side due to Firestore limitations)
+    if (content_type) {
+      // Note: Firestore doesn't support case-insensitive queries, so we'll need to handle this client-side
+      // For now, we'll fetch more items and filter client-side
+      constraints[constraints.length - 1] = limit(itemsPerPage * 2) // Fetch more to account for filtering
     }
 
     // Create the query with all constraints
@@ -292,22 +294,28 @@ export async function getPaginatedUserProducts(
     const querySnapshot = await getDocs(q)
 
     // Get the last visible document for next pagination
-    const lastVisible = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null
+    let lastVisible = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null
 
-    // Check if there are more documents to fetch
-    const hasMore = querySnapshot.docs.length === itemsPerPage
-
-    // Convert the documents to Product objects
+    // Convert the documents to Product objects and apply filters
     const products: Product[] = []
     querySnapshot.forEach((doc) => {
       const product = { id: doc.id, ...doc.data() } as Product
+
+      // Apply content_type filter (case-insensitive)
+      if (content_type) {
+        const productContentType = (product.content_type || "").toLowerCase()
+        const filterContentType = content_type.toLowerCase()
+        if (productContentType !== filterContentType) {
+          return // Skip this product
+        }
+      }
 
       // If there's a search term, filter client-side
       if (searchTerm && typeof searchTerm === "string") {
         const searchLower = searchTerm.toLowerCase()
         if (
           product.name?.toLowerCase().includes(searchLower) ||
-          product.light?.location?.toLowerCase().includes(searchLower) ||
+          product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
           product.description?.toLowerCase().includes(searchLower)
         ) {
           products.push(product)
@@ -317,8 +325,20 @@ export async function getPaginatedUserProducts(
       }
     })
 
+    // If we filtered by content_type, we might have fewer items than requested
+    // Adjust pagination accordingly
+    const actualItems = products.slice(0, itemsPerPage)
+    const hasMore = content_type ? products.length > itemsPerPage : querySnapshot.docs.length === itemsPerPage
+
+    // Update lastVisible if we sliced the results
+    if (content_type && actualItems.length > 0) {
+      // Find the last document that corresponds to our last item
+      const lastItemId = actualItems[actualItems.length - 1].id
+      lastVisible = querySnapshot.docs.find((doc) => doc.id === lastItemId) || lastVisible
+    }
+
     return {
-      items: products,
+      items: actualItems,
       lastDoc: lastVisible,
       hasMore,
     }
@@ -335,14 +355,16 @@ export async function getPaginatedUserProducts(
 // Get the total count of products for a user
 export async function getUserProductsCount(
   userId: string,
-  options: { searchTerm?: string; active?: boolean; deleted?: boolean } = {},
+  options: { searchTerm?: string; active?: boolean; deleted?: boolean; content_type?: string } = {},
 ): Promise<number> {
   try {
+    console.log("Getting user products count for userId:", userId, "with options:", options)
+
     const productsRef = collection(db, "products")
-    const { searchTerm = "", active, deleted } = options
+    const { searchTerm = "", active, deleted, content_type } = options
 
     // Start with basic constraints
-    const constraints: any[] = [where("seller_id", "==", userId)]
+    const constraints: any[] = [where("company_id", "==", userId)]
 
     // Add active filter if specified
     if (active !== undefined) {
@@ -356,27 +378,43 @@ export async function getUserProductsCount(
     // Create the query with all constraints
     const q = query(productsRef, ...constraints)
 
-    // If there's a search term, we need to fetch all documents and filter client-side
-    if (searchTerm && typeof searchTerm === "string") {
+    // If there's a search term or content_type filter, we need to fetch all documents and filter client-side
+    if ((searchTerm && typeof searchTerm === "string") || content_type) {
       const querySnapshot = await getDocs(q)
-      const searchLower = searchTerm.toLowerCase()
+      const searchLower = searchTerm ? searchTerm.toLowerCase() : ""
+      const contentTypeLower = content_type ? content_type.toLowerCase() : ""
 
       // Filter documents client-side
       let count = 0
       querySnapshot.forEach((doc) => {
         const product = doc.data() as Product
-        if (
-          product.name?.toLowerCase().includes(searchLower) ||
-          product.light?.location?.toLowerCase().includes(searchLower) ||
-          product.description?.toLowerCase().includes(searchLower)
-        ) {
+
+        // Apply content_type filter if specified
+        if (content_type) {
+          const productContentType = (product.content_type || "").toLowerCase()
+          if (productContentType !== contentTypeLower) {
+            return // Skip this product
+          }
+        }
+
+        // Apply search filter if specified
+        if (searchTerm && typeof searchTerm === "string") {
+          if (
+            product.name?.toLowerCase().includes(searchLower) ||
+            product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
+            product.description?.toLowerCase().includes(searchLower)
+          ) {
+            count++
+          }
+        } else {
           count++
         }
       })
 
+      console.log("User products count (with filters):", count)
       return count
     } else {
-      // If no search term, we can use the more efficient getCountFromServer
+      // If no search term or content_type, we can use the more efficient getCountFromServer
       const snapshot = await getCountFromServer(q)
       return snapshot.data().count
     }
@@ -394,11 +432,15 @@ export async function createProduct(productData: Partial<Product>): Promise<stri
       status: productData.status || "PENDING",
       position: productData.position || 0,
       deleted: productData.deleted !== undefined ? productData.deleted : false,
+      active: productData.active !== undefined ? productData.active : true,
       created: serverTimestamp(),
       updated: serverTimestamp(),
     }
 
+    console.log("Final product data to be saved:", newProduct)
+
     const docRef = await addDoc(collection(db, "products"), newProduct)
+    console.log("Product created with ID:", docRef.id)
 
     return docRef.id
   } catch (error) {
@@ -452,7 +494,7 @@ export async function searchUserProducts(userId: string, searchTerm: string): Pr
     return products.filter(
       (product) =>
         product.name?.toLowerCase().includes(searchLower) ||
-        product.light?.location?.toLowerCase().includes(searchLower) ||
+        product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
         product.description?.toLowerCase().includes(searchLower),
     )
   } catch (error) {
@@ -500,7 +542,6 @@ export async function getProductsByContentType(
         // Check search term match
         return (
           product.name?.toLowerCase().includes(searchLower) ||
-          product.light?.location?.toLowerCase().includes(searchLower) ||
           product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
           product.description?.toLowerCase().includes(searchLower)
         )
@@ -583,7 +624,6 @@ export async function getProductsCountByContentType(contentType: string, searchT
         if (productContentType === contentTypeLower) {
           if (
             product.name?.toLowerCase().includes(searchLower) ||
-            product.light?.location?.toLowerCase().includes(searchLower) ||
             product.specs_rental?.location?.toLowerCase().includes(searchLower) ||
             product.description?.toLowerCase().includes(searchLower)
           ) {
@@ -1127,6 +1167,151 @@ export async function uploadFileToFirebaseStorage(file: File, path: string): Pro
     return downloadURL
   } catch (error) {
     console.error("Error uploading file to Firebase Storage:", error)
+    throw error
+  }
+}
+
+// Get all products
+export const getProducts = async (): Promise<Product[]> => {
+  try {
+    const productsRef = collection(db, "products")
+    const q = query(productsRef, where("deleted", "==", false), orderBy("created", "desc"))
+
+    const querySnapshot = await getDocs(q)
+    const products: Product[] = []
+
+    querySnapshot.forEach((doc) => {
+      products.push({
+        id: doc.id,
+        ...doc.data(),
+      } as Product)
+    })
+
+    return products
+  } catch (error) {
+    console.error("Error getting products:", error)
+    throw error
+  }
+}
+
+// Get products by company
+export const getProductsByCompany = async (companyId: string): Promise<Product[]> => {
+  try {
+    const productsRef = collection(db, "products")
+    const q = query(
+      productsRef,
+      where("company_id", "==", companyId),
+      where("deleted", "==", false),
+      orderBy("created", "desc"),
+    )
+
+    const querySnapshot = await getDocs(q)
+    const products: Product[] = []
+
+    querySnapshot.forEach((doc) => {
+      products.push({
+        id: doc.id,
+        ...doc.data(),
+      } as Product)
+    })
+
+    return products
+  } catch (error) {
+    console.error("Error getting products by company:", error)
+    throw error
+  }
+}
+
+// Get a single product by ID
+export const getProduct = async (id: string): Promise<Product | null> => {
+  try {
+    const docRef = doc(db, "products", id)
+    const docSnap = await getDoc(docRef)
+
+    if (docSnap.exists()) {
+      return {
+        id: docSnap.id,
+        ...docSnap.data(),
+      } as Product
+    } else {
+      return null
+    }
+  } catch (error) {
+    console.error("Error getting product:", error)
+    throw error
+  }
+}
+
+// Update a product
+export const updateProductById = async (id: string, productData: Partial<Product>): Promise<void> => {
+  try {
+    const docRef = doc(db, "products", id)
+    await updateDoc(docRef, {
+      ...productData,
+      updated: serverTimestamp(),
+    })
+  } catch (error) {
+    console.error("Error updating product:", error)
+    throw error
+  }
+}
+
+// Soft delete a product
+export const deleteProductById = async (id: string): Promise<void> => {
+  try {
+    const docRef = doc(db, "products", id)
+    await updateDoc(docRef, {
+      deleted: true,
+      updated: serverTimestamp(),
+    })
+  } catch (error) {
+    console.error("Error deleting product:", error)
+    throw error
+  }
+}
+
+// Get products with pagination
+export const getProductsPaginated = async (limitCount = 10): Promise<Product[]> => {
+  try {
+    const productsRef = collection(db, "products")
+    const q = query(productsRef, where("deleted", "==", false), orderBy("created", "desc"), limit(limitCount))
+
+    const querySnapshot = await getDocs(q)
+    const products: Product[] = []
+
+    querySnapshot.forEach((doc) => {
+      products.push({
+        id: doc.id,
+        ...doc.data(),
+      } as Product)
+    })
+
+    return products
+  } catch (error) {
+    console.error("Error getting paginated products:", error)
+    throw error
+  }
+}
+
+// Search products by name
+export const searchProductsByName = async (searchTerm: string): Promise<Product[]> => {
+  try {
+    const productsRef = collection(db, "products")
+    const q = query(productsRef, where("deleted", "==", false), orderBy("name"))
+
+    const querySnapshot = await getDocs(q)
+    const products: Product[] = []
+
+    querySnapshot.forEach((doc) => {
+      const product = { id: doc.id, ...doc.data() } as Product
+      if (product.name.toLowerCase().includes(searchTerm.toLowerCase())) {
+        products.push(product)
+      }
+    })
+
+    return products
+  } catch (error) {
+    console.error("Error searching products:", error)
     throw error
   }
 }

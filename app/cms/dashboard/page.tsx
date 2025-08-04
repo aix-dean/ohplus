@@ -1,14 +1,13 @@
 "use client"
 
 import type React from "react"
-
+import { RouteProtection } from "@/components/route-protection"
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import {
-  Plus,
   MoreVertical,
   FileText,
   LayoutGrid,
@@ -19,12 +18,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  Clock,
   Search,
-  Monitor,
+  Clock,
   Play,
-  AlertCircle,
-  MapPin,
+  Repeat,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -33,7 +30,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
 import { getPaginatedUserProducts, getUserProductsCount, softDeleteProduct, type Product } from "@/lib/firebase-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 
@@ -62,6 +58,12 @@ const mapProductToContent = (product: Product) => {
     approvalStatus: product.approval_status || "Pending",
     campaignName: product.campaign_name || "Unassigned",
     impressions: product.impressions || 0,
+    // CMS specific fields
+    cms: product.cms || null,
+    productId: product.id?.substring(0, 8).toUpperCase() || "UNKNOWN",
+    location: product.specs_rental?.location || "Unknown Location",
+    operation: product.campaignName || "Unassigned Campaign",
+    displayHealth: product.active ? "ON" : "OFF",
   }
 }
 
@@ -85,38 +87,23 @@ export default function CMSDashboardPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadingCount, setLoadingCount] = useState(false)
 
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
 
   // Navigation handlers for analytics cards
-  const handleNavigateToActiveScreens = () => {
-    // Navigate to active screens page (you can change this to the appropriate route)
-    router.push("/cms/screens/active")
-  }
 
-  const handleNavigateToInactiveScreens = () => {
-    // Navigate to inactive screens page
-    router.push("/cms/screens/inactive")
-  }
-
-  const handleNavigateToWarnings = () => {
-    // Navigate to warnings page
-    router.push("/cms/warnings")
-  }
-
-  const handleNavigateToOrders = () => {
-    // Navigate to orders page
-    router.push("/cms/orders")
-  }
-
-  // Fetch total count of products
+  // Fetch total count of dynamic products
   const fetchTotalCount = useCallback(async () => {
-    if (!user?.uid) return
+    if (!userData?.company_id) return
 
     setLoadingCount(true)
     try {
-      const count = await getUserProductsCount(user.uid, searchTerm)
+      const count = await getUserProductsCount(userData?.company_id, {
+        active: true,
+        content_type: "dynamic",
+        searchTerm,
+      })
       setTotalItems(count)
       setTotalPages(Math.max(1, Math.ceil(count / ITEMS_PER_PAGE)))
     } catch (error) {
@@ -129,12 +116,12 @@ export default function CMSDashboardPage() {
     } finally {
       setLoadingCount(false)
     }
-  }, [user, toast, searchTerm])
+  }, [userData, toast, searchTerm])
 
-  // Fetch products for the current page
+  // Fetch dynamic products for the current page
   const fetchProducts = useCallback(
     async (page: number) => {
-      if (!user?.uid) return
+      if (!userData?.company_id) return
 
       // Check if we have this page in cache
       const cacheKey = `${page}-${searchTerm}`
@@ -154,7 +141,11 @@ export default function CMSDashboardPage() {
         // For subsequent pages, use the last document from the previous page
         const startDoc = isFirstPage ? null : lastDoc
 
-        const result = await getPaginatedUserProducts(user.uid, ITEMS_PER_PAGE, startDoc, searchTerm)
+        const result = await getPaginatedUserProducts(userData?.company_id, ITEMS_PER_PAGE, startDoc, {
+          active: true,
+          content_type: "dynamic",
+          searchTerm,
+        })
 
         setProducts(result.items)
         setLastDoc(result.lastDoc)
@@ -181,7 +172,7 @@ export default function CMSDashboardPage() {
         setLoadingMore(false)
       }
     },
-    [user, lastDoc, pageCache, toast, searchTerm],
+    [userData, lastDoc, pageCache, toast, searchTerm],
   )
 
   // Store products in localStorage for use in breadcrumbs
@@ -202,18 +193,18 @@ export default function CMSDashboardPage() {
 
   // Load initial data and count
   useEffect(() => {
-    if (user?.uid) {
+    if (userData?.company_id) {
       fetchProducts(1)
       fetchTotalCount()
     }
-  }, [user, fetchProducts, fetchTotalCount])
+  }, [userData?.company_id, fetchProducts, fetchTotalCount])
 
   // Load data when page changes
   useEffect(() => {
-    if (user?.uid && currentPage > 0) {
+    if (userData?.company_id && currentPage > 0) {
       fetchProducts(currentPage)
     }
-  }, [currentPage, fetchProducts, user])
+  }, [currentPage, fetchProducts, userData?.company_id])
 
   // Handle search
   const handleSearch = (e: React.FormEvent) => {
@@ -332,33 +323,36 @@ export default function CMSDashboardPage() {
   // Handle edit click
   const handleEditClick = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation()
+    // Store the complete product data for the site page
+    localStorage.setItem(`cms-product-${product.id}`, JSON.stringify(product))
     router.push(`/cms/content/edit/${product.id}`)
   }
 
-  // Handle view details click
-  const handleViewDetails = (productId: string) => {
-    router.push(`/cms/details/${productId}`)
-  }
-
-  // Handle add new content
-  const handleAddContent = () => {
-    router.push("/cms/content/new")
+  // Handle view site details click - Updated to use new site page
+  const handleViewSite = (productId: string) => {
+    // Find the product data to pass along
+    const productData = products.find((p) => p.id === productId)
+    if (productData) {
+      // Store the complete product data for the site page
+      localStorage.setItem(`cms-product-${productId}`, JSON.stringify(productData))
+    }
+    router.push(`/cms/site/${productId}`)
   }
 
   // Use mock data if no products are available from Firebase
   const [useMockData, setUseMockData] = useState(false)
 
   useEffect(() => {
-    if (!loading && products.length === 0 && !user?.uid) {
+    if (!loading && products.length === 0 && !userData?.company_id) {
       setUseMockData(true)
     }
-  }, [loading, products, user])
+  }, [loading, products, userData])
 
   // Mock data for demonstration when no Firebase data is available
   const mockContent = [
     {
       id: "1",
-      title: "Summer Sale Billboard",
+      title: "Bocaue 11",
       type: "Billboard",
       status: "Published",
       author: "John Smith",
@@ -374,10 +368,21 @@ export default function CMSDashboardPage() {
       approvalStatus: "Approved",
       campaignName: "Summer 2023",
       impressions: 45000,
+      productId: "NAN20010",
+      location: "Bocaue 11",
+      operation: "MerryMart",
+      displayHealth: "ON",
+      cms: {
+        start_time: "16:44",
+        end_time: "18:44",
+        spot_duration: 15,
+        loops_per_day: 20,
+        spots_per_loop: 5,
+      },
     },
     {
       id: "2",
-      title: "New Product Launch",
+      title: "EDSA Corner Shaw",
       type: "LED Display",
       status: "Draft",
       author: "Sarah Johnson",
@@ -393,10 +398,21 @@ export default function CMSDashboardPage() {
       approvalStatus: "Pending",
       campaignName: "Q3 Launch",
       impressions: 0,
+      productId: "LED20011",
+      location: "EDSA Corner Shaw",
+      operation: "Jollibee Campaign",
+      displayHealth: "OFF",
+      cms: {
+        start_time: "08:00",
+        end_time: "22:00",
+        spot_duration: 30,
+        loops_per_day: 48,
+        spots_per_loop: 3,
+      },
     },
     {
       id: "3",
-      title: "Holiday Special Promotion",
+      title: "Ayala Triangle",
       type: "LED Display",
       status: "Published",
       author: "Michael Brown",
@@ -412,10 +428,21 @@ export default function CMSDashboardPage() {
       approvalStatus: "Approved",
       campaignName: "Holiday 2023",
       impressions: 28500,
+      productId: "AYA30001",
+      location: "Ayala Triangle",
+      operation: "Samsung Promo",
+      displayHealth: "ON",
+      cms: {
+        start_time: "06:00",
+        end_time: "24:00",
+        spot_duration: 20,
+        loops_per_day: 72,
+        spots_per_loop: 4,
+      },
     },
     {
       id: "4",
-      title: "Brand Awareness Campaign",
+      title: "BGC Central Square",
       type: "Billboard",
       status: "Review",
       author: "Emily Davis",
@@ -431,6 +458,17 @@ export default function CMSDashboardPage() {
       approvalStatus: "In Review",
       campaignName: "Brand Expansion",
       impressions: 0,
+      productId: "BGC40001",
+      location: "BGC Central Square",
+      operation: "Nike Campaign",
+      displayHealth: "ON",
+      cms: {
+        start_time: "07:00",
+        end_time: "23:00",
+        spot_duration: 25,
+        loops_per_day: 32,
+        spots_per_loop: 6,
+      },
     },
   ]
 
@@ -438,339 +476,345 @@ export default function CMSDashboardPage() {
   const content = useMockData ? mockContent : products.map(mapProductToContent)
 
   return (
-    <div className="flex-1 p-4">
-      <div className="flex flex-col gap-3">
-        {/* Header with title and actions */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <h1 className="text-2xl font-bold">Content Management</h1>
-        </div>
+    <RouteProtection requiredRoles="cms">
+      <div className="flex-1 p-4">
+        <div className="flex flex-col gap-3">
+          {/* Header with title and actions */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <h1 className="text-2xl font-bold">
+              {userData?.first_name
+                ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                : "Dashboard"}
+            </h1>
+            <p className="text-muted-foreground">Manage your digital billboard content and campaigns</p>
+          </div>
 
-        {/* Screen Analytics Monitoring */}
-        {!loading && (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-              <Card
-                className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                onClick={handleNavigateToActiveScreens}
-              >
-                <CardContent className="p-3">
-                  <div className="flex justify-between items-start gap-2">
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Active Screens</p>
-                      <h3 className="text-2xl font-bold">42</h3>
-                    </div>
-                    <div className="bg-green-100 p-1.5 rounded-full">
-                      <Monitor className="h-4 w-4 text-green-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+          {/* Analytics Cards */}
 
-              <Card
-                className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                onClick={handleNavigateToInactiveScreens}
-              >
-                <CardContent className="p-3">
-                  <div className="flex justify-between items-start gap-2">
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Inactive Screens</p>
-                      <h3 className="text-2xl font-bold">1,284</h3>
-                    </div>
-                    <div className="bg-blue-100 p-1.5 rounded-full">
-                      <Play className="h-4 w-4 text-blue-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card
-                className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                onClick={handleNavigateToWarnings}
-              >
-                <CardContent className="p-3">
-                  <div className="flex justify-between items-start gap-2">
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Warnings</p>
-                      <h3 className="text-2xl font-bold">3</h3>
-                    </div>
-                    <div className="bg-amber-100 p-1.5 rounded-full">
-                      <AlertCircle className="h-4 w-4 text-amber-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card
-                className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                onClick={handleNavigateToOrders}
-              >
-                <CardContent className="p-3">
-                  <div className="flex justify-between items-start gap-2">
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Pending Orders</p>
-                      <h3 className="text-2xl font-bold">7</h3>
-                    </div>
-                    <div className="bg-purple-100 p-1.5 rounded-full">
-                      <Clock className="h-4 w-4 text-purple-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            <Separator className="my-3" />
-          </>
-        )}
-
-        {/* Search and controls */}
-        {!loading && !useMockData && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
-            <form onSubmit={handleSearch} className="flex w-full sm:w-auto items-center space-x-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search content..."
-                  className="pl-8 w-full sm:w-[250px]"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <Button type="submit" size="sm">
-                Search
+          {/* Search and View Toggle */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <form onSubmit={handleSearch} className="flex gap-2">
+              <Input
+                placeholder="Search content..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full sm:w-80"
+              />
+              <Button type="submit" variant="outline" size="icon">
+                <Search className="h-4 w-4" />
               </Button>
             </form>
-            <div className="flex items-center gap-3">
-              <div className="border rounded-md p-1 flex">
-                <Button
-                  variant={viewMode === "grid" ? "default" : "ghost"}
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setViewMode("grid")}
-                >
-                  <LayoutGrid size={18} />
-                </Button>
-                <Button
-                  variant={viewMode === "list" ? "default" : "ghost"}
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setViewMode("list")}
-                >
-                  <List size={18} />
-                </Button>
-              </div>
-              <Button onClick={handleAddContent} className="flex items-center gap-2">
-                <Plus size={16} />
-                Add Content
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Loading state */}
-        {loading && (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-2 text-lg">Loading content...</span>
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!loading && content.length === 0 && (
-          <div className="text-center py-12 bg-gray-50 rounded-lg border border-dashed">
-            <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <FileText size={24} className="text-gray-400" />
-            </div>
-            <h3 className="text-lg font-medium mb-2">No content yet</h3>
-            <p className="text-gray-500 mb-4">Add your first content item to get started</p>
-            <Button onClick={handleAddContent}>
-              <Plus size={16} className="mr-2" />
-              Add Content
-            </Button>
-          </div>
-        )}
-
-        {/* Grid View */}
-        {!loading && content.length > 0 && viewMode === "grid" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {content.map((item) => (
-              <ContentCard
-                key={item.id}
-                content={item}
-                onView={() => handleViewDetails(item.id)}
-                onEdit={(e) => handleEditClick(useMockData ? item : products.find((p) => p.id === item.id)!, e)}
-                onDelete={(e) => handleDeleteClick(useMockData ? item : products.find((p) => p.id === item.id)!, e)}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* List View */}
-        {!loading && content.length > 0 && viewMode === "list" && (
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[80px]">Thumbnail</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Modified</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {content.map((item) => (
-                  <TableRow
-                    key={item.id}
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => handleViewDetails(item.id)}
-                  >
-                    <TableCell>
-                      <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
-                        <Image
-                          src={item.thumbnail || "/placeholder.svg"}
-                          alt={item.title || "Content thumbnail"}
-                          width={48}
-                          height={48}
-                          className="h-full w-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.src = "/abstract-geometric-sculpture.png"
-                            target.className = "opacity-50"
-                          }}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">{item.title}</TableCell>
-                    <TableCell>{item.type}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={`${
-                          item.status === "Published"
-                            ? "bg-green-50 text-green-700 border-green-200"
-                            : item.status === "Draft"
-                              ? "bg-blue-50 text-blue-700 border-blue-200"
-                              : "bg-amber-50 text-amber-700 border-amber-200"
-                        }`}
-                      >
-                        {item.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{item.dateModified}</TableCell>
-                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) =>
-                            handleEditClick(useMockData ? item : products.find((p) => p.id === item.id)!, e)
-                          }
-                        >
-                          <Edit size={16} />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive"
-                          onClick={(e) =>
-                            handleDeleteClick(useMockData ? item : products.find((p) => p.id === item.id)!, e)
-                          }
-                        >
-                          <Trash2 size={16} />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-
-        {/* Loading More Indicator */}
-        {loadingMore && (
-          <div className="flex justify-center my-4">
-            <div className="flex items-center gap-2">
-              <Loader2 size={18} className="animate-spin" />
-              <span>Loading more...</span>
-            </div>
-          </div>
-        )}
-
-        {/* Pagination Controls */}
-        {!loading && content.length > 0 && (
-          <div className="flex flex-col sm:flex-row justify-between items-center mt-3 gap-4">
-            <div className="text-sm text-gray-500 flex items-center">
-              {loadingCount ? (
-                <div className="flex items-center">
-                  <Loader2 size={14} className="animate-spin mr-2" />
-                  <span>Calculating pages...</span>
-                </div>
-              ) : (
-                <span>
-                  Page {currentPage} of {totalPages} ({totalItems} items)
-                </span>
-              )}
-            </div>
 
             <div className="flex items-center gap-2">
               <Button
-                variant="outline"
+                variant={viewMode === "grid" ? "default" : "outline"}
                 size="sm"
-                onClick={goToPreviousPage}
-                disabled={currentPage === 1}
-                className="h-8 w-8 p-0"
+                onClick={() => setViewMode("grid")}
               >
-                <ChevronLeft size={16} />
+                <LayoutGrid className="h-4 w-4" />
               </Button>
+              <Button
+                variant={viewMode === "list" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("list")}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
 
-              {/* Page numbers */}
-              <div className="flex items-center gap-1">
-                {getPageNumbers().map((page, index) =>
-                  page === "..." ? (
-                    <span key={`ellipsis-${index}`} className="px-2">
-                      ...
-                    </span>
-                  ) : (
-                    <Button
-                      key={`page-${page}`}
-                      variant={currentPage === page ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => goToPage(page as number)}
-                      className="h-8 w-8 p-0"
+          {/* Content Display */}
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : content.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
+              <h3 className="mb-2 text-lg font-semibold">No content found</h3>
+              <p className="text-muted-foreground">
+                {searchTerm ? "No content matches your search criteria." : "No content available."}
+              </p>
+            </div>
+          ) : viewMode === "grid" ? (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {content.map((item) => (
+                <Card key={item.id} className="group cursor-pointer transition-all hover:shadow-md">
+                  <div
+                    onClick={() => {
+                      // Store the original product data, not the mapped content
+                      const originalProduct = products.find((p) => p.id === item.id)
+                      if (originalProduct) {
+                        localStorage.setItem(`cms-product-${item.id}`, JSON.stringify(originalProduct))
+                      }
+                      handleViewSite(item.id)
+                    }}
+                  >
+                    <div className="relative aspect-video overflow-hidden rounded-t-lg">
+                      <Image
+                        src={item.thumbnail || "/placeholder.svg"}
+                        alt={item.title}
+                        fill
+                        className="object-cover transition-transform group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-black/0 transition-colors group-hover:bg-black/10" />
+                      <div className="absolute right-2 top-2">
+                        <Badge variant={item.status === "Published" ? "default" : "secondary"}>{item.status}</Badge>
+                      </div>
+                    </div>
+                    <CardContent className="p-4">
+                      <div className="mb-2 flex items-start justify-between">
+                        <h3 className="font-semibold leading-tight">{item.title}</h3>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={(e) => handleEditClick(item as any, e)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => handleDeleteClick(item as any, e)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                      <div className="space-y-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">ID:</span>
+                          <span>{item.productId}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Location:</span>
+                          <span className="truncate">{item.location}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Operation:</span>
+                          <span className="truncate">{item.operation}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Display:</span>
+                          <Badge variant={item.displayHealth === "ON" ? "default" : "secondary"} className="text-xs">
+                            {item.displayHealth}
+                          </Badge>
+                        </div>
+                        {item.cms && (
+                          <div className="mt-3 space-y-1 border-t pt-2">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-3 w-3" />
+                              <span className="text-xs">
+                                {item.cms.start_time} - {item.cms.end_time}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Play className="h-3 w-3" />
+                              <span className="text-xs">{item.cms.spot_duration}s duration</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Repeat className="h-3 w-3" />
+                              <span className="text-xs">
+                                {item.cms.loops_per_day} loops/day, {item.cms.spots_per_loop} spots/loop
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Content</TableHead>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead>Operation</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Display</TableHead>
+                    <TableHead>Schedule</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {content.map((item) => (
+                    <TableRow
+                      key={item.id}
+                      className="cursor-pointer"
+                      onClick={() => {
+                        // Store the original product data, not the mapped content
+                        const originalProduct = products.find((p) => p.id === item.id)
+                        if (originalProduct) {
+                          localStorage.setItem(`cms-product-${item.id}`, JSON.stringify(originalProduct))
+                        }
+                        handleViewSite(item.id)
+                      }}
                     >
-                      {page}
-                    </Button>
-                  ),
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="relative h-12 w-16 overflow-hidden rounded">
+                            <Image
+                              src={item.thumbnail || "/placeholder.svg"}
+                              alt={item.title}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div>
+                            <div className="font-medium">{item.title}</div>
+                            <div className="text-sm text-muted-foreground">{item.type}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{item.productId}</TableCell>
+                      <TableCell>{item.location}</TableCell>
+                      <TableCell>{item.operation}</TableCell>
+                      <TableCell>
+                        <Badge variant={item.status === "Published" ? "default" : "secondary"}>{item.status}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={item.displayHealth === "ON" ? "default" : "secondary"}>
+                          {item.displayHealth}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {item.cms ? (
+                          <div className="text-sm">
+                            <div>
+                              {item.cms.start_time} - {item.cms.end_time}
+                            </div>
+                            <div className="text-muted-foreground">
+                              {item.cms.spot_duration}s, {item.cms.loops_per_day} loops
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Not scheduled</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleViewSite(item.id)
+                              }}
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Site
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => handleEditClick(item as any, e)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => handleDeleteClick(item as any, e)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
+
+          {/* Pagination */}
+          {!loading && content.length > 0 && totalPages > 1 && (
+            <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+              <div className="text-sm text-muted-foreground">
+                {loadingCount ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading count...
+                  </div>
+                ) : (
+                  `Showing ${(currentPage - 1) * ITEMS_PER_PAGE + 1} to ${Math.min(
+                    currentPage * ITEMS_PER_PAGE,
+                    totalItems,
+                  )} of ${totalItems} items`
                 )}
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={goToNextPage}
-                disabled={currentPage >= totalPages}
-                className="h-8 w-8 p-0"
-              >
-                <ChevronRight size={16} />
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPreviousPage}
+                  disabled={currentPage === 1 || loadingMore}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
 
-      {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        isOpen={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-        onConfirm={handleDeleteConfirm}
-        title="Delete Content"
-        description="This content will be permanently removed. This action cannot be undone."
-        itemName={productToDelete?.name}
-      />
-    </div>
+                <div className="flex items-center gap-1">
+                  {getPageNumbers().map((pageNum, index) => (
+                    <div key={index}>
+                      {pageNum === "..." ? (
+                        <span className="px-2 py-1 text-sm text-muted-foreground">...</span>
+                      ) : (
+                        <Button
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => goToPage(pageNum as number)}
+                          disabled={loadingMore}
+                          className="h-8 w-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextPage}
+                  disabled={currentPage === totalPages || loadingMore}
+                >
+                  {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : <ChevronRight className="h-4 w-4" />}
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Content"
+          description={`Are you sure you want to delete "${productToDelete?.name}"? This action cannot be undone.`}
+        />
+      </div>
+    </RouteProtection>
   )
 }
 
@@ -788,10 +832,10 @@ function ContentCard({
 }) {
   return (
     <Card
-      className="overflow-hidden cursor-pointer transition-all border border-gray-200 shadow-sm hover:shadow-md"
+      className="overflow-hidden cursor-pointer transition-all border border-gray-300 shadow-sm hover:shadow-md rounded-lg bg-white"
       onClick={onView}
     >
-      <div className="h-48 bg-gray-200 relative">
+      <div className="h-32 bg-gray-200 relative">
         <Image
           src={content.thumbnail || "/placeholder.svg"}
           alt={content.title || "Content thumbnail"}
@@ -804,33 +848,37 @@ function ContentCard({
           }}
         />
 
-        {/* Status Badge */}
-        <div className="absolute top-2 left-2 z-10">
+        {/* Status Badge - positioned at bottom left of image */}
+        <div className="absolute bottom-2 left-2 z-10">
           <Badge
-            variant="outline"
             className={`${
               content.status === "Published"
-                ? "bg-green-50 text-green-700 border-green-200"
+                ? "bg-blue-500 text-white border-0 font-medium px-3 py-1"
                 : content.status === "Draft"
-                  ? "bg-blue-50 text-blue-700 border-blue-200"
-                  : "bg-amber-50 text-amber-700 border-amber-200"
+                  ? "bg-orange-500 text-white border-0 font-medium px-3 py-1"
+                  : "bg-gray-500 text-white border-0 font-medium px-3 py-1"
             }`}
           >
-            {content.status}
+            {content.status === "Published" ? "OCCUPIED" : content.status.toUpperCase()}
           </Badge>
         </div>
 
+        {/* Action Menu - top right */}
         <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="icon" className="h-8 w-8 bg-white/80 backdrop-blur-sm">
-                <MoreVertical size={16} />
+              <Button
+                variant="secondary"
+                size="icon"
+                className="h-7 w-7 bg-white/90 backdrop-blur-sm border-0 shadow-sm"
+              >
+                <MoreVertical size={14} />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={onView}>
                 <Eye className="mr-2 h-4 w-4" />
-                View Details
+                View Site
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onEdit}>
                 <Edit className="mr-2 h-4 w-4" />
@@ -845,43 +893,43 @@ function ContentCard({
         </div>
       </div>
 
-      <CardContent className="p-4">
-        <div className="flex flex-col">
-          <h3 className="text-lg font-semibold line-clamp-1 mb-1">{content.title}</h3>
-          <p className="text-sm text-gray-500 mb-2 flex items-center gap-1">
-            <MapPin className="h-3.5 w-3.5" />
-            <span>Edsa corner Aurora Blvd.</span>
-          </p>
+      <CardContent className="p-3">
+        <div className="flex flex-col space-y-2">
+          {/* Title/Location */}
+          <h3 className="text-base font-semibold text-gray-900">{content.title}</h3>
 
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2 text-sm">
-            <div className="flex items-center gap-1 text-gray-600">
-              <Monitor className="h-3.5 w-3.5" />
-              <span>{content.dimensions}</span>
-            </div>
-
-            <div className="flex items-center gap-1 text-gray-600">
-              <Clock className="h-3.5 w-3.5" />
-              <span>{content.duration}</span>
-            </div>
-
-            <div className="flex items-center gap-1 text-gray-600">
-              <FileText className="h-3.5 w-3.5" />
-              <span>{content.format}</span>
-            </div>
-
-            <div className="flex items-center gap-1 text-gray-600">
-              <Badge variant="outline" className="h-5 px-1.5 text-xs">
-                {content.approvalStatus}
-              </Badge>
+          {/* Location Info */}
+          <div className="text-sm text-gray-700">
+            <div className="flex items-center gap-1 mb-1 line-clamp-1">
+              <span>{content.location}</span>
             </div>
           </div>
 
-          <div className="mt-3 pt-3 border-t border-gray-100">
-            <div className="flex justify-between items-center text-xs text-gray-500">
-              <span>Campaign: {content.campaignName}</span>
-              <span>Modified: {content.dateModified}</span>
+          {/* CMS Schedule Info */}
+          {content.cms && (
+            <div className="mt-2 pt-2 border-t border-gray-100">
+              <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                <div className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  <span>
+                    {content.cms.start_time} - {content.cms.end_time}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Play className="h-3 w-3" />
+                  <span>{content.cms.spot_duration}s spots</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Repeat className="h-3 w-3" />
+                  <span>{content.cms.loops_per_day} loops/day</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs">•</span>
+                  <span>{content.cms.spots_per_loop} spots/loop</span>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </CardContent>
     </Card>
