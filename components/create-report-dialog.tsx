@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/use-toast"
 import { getProductById, type Product, uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 interface CreateReportDialogProps {
   open: boolean
@@ -36,6 +38,17 @@ interface AttachmentData {
   fileUrl?: string
   uploading?: boolean
   fileType?: string
+}
+
+interface JobOrder {
+  id: string
+  joNumber: string
+  clientName: string
+  clientCompany: string
+  status: string
+  joType: string
+  siteName: string
+  product_id: string
 }
 
 export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportDialogProps) {
@@ -62,7 +75,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   const router = useRouter()
 
   const [selectedJO, setSelectedJO] = useState("")
-  const [jobOrders, setJobOrders] = useState<any[]>([])
+  const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
   const [loadingJOs, setLoadingJOs] = useState(false)
 
   // Fetch product data when dialog opens
@@ -79,13 +92,27 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   const fetchJobOrders = async () => {
     setLoadingJOs(true)
     try {
-      // Mock job orders data - replace with actual API call
-      const mockJobOrders = [
-        { id: "JO-2025-001234", number: "JO-2025-001234", client: "Summit Media", status: "active" },
-        { id: "JO-2025-001235", number: "JO-2025-001235", client: "Summit Media", status: "active" },
-        { id: "JO-2025-001236", number: "JO-2025-001236", client: "ABC Corp", status: "completed" },
-      ]
-      setJobOrders(mockJobOrders)
+      // Query job orders for this specific site/product
+      const jobOrdersRef = collection(db, "job_orders")
+      const q = query(jobOrdersRef, where("product_id", "==", siteId))
+      const querySnapshot = await getDocs(q)
+
+      const fetchedJobOrders: JobOrder[] = []
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        fetchedJobOrders.push({
+          id: doc.id,
+          joNumber: data.joNumber || "N/A",
+          clientName: data.clientName || "Unknown Client",
+          clientCompany: data.clientCompany || "",
+          status: data.status || "unknown",
+          joType: data.joType || "General",
+          siteName: data.siteName || "Unknown Site",
+          product_id: data.product_id || "",
+        })
+      })
+
+      setJobOrders(fetchedJobOrders)
     } catch (error) {
       console.error("Error fetching job orders:", error)
       toast({
@@ -429,6 +456,9 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
     setLoading(true)
     try {
+      // Find the selected job order data
+      const selectedJobOrder = jobOrders.find((jo) => jo.joNumber === selectedJO)
+
       // Build the report data for preview (without saving to Firebase)
       const reportData: any = {
         id: `preview-${Date.now()}`, // Temporary ID for preview
@@ -436,13 +466,10 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         siteName: product.name || "Unknown Site",
         companyId: projectData?.company_id || userData?.company_id || projectData?.project_id || userData?.project_id,
         sellerId: product.seller_id || user.uid,
-        client: "Summit Media", // This would come from booking data in real implementation
-        clientId: "summit-media-id", // This would come from booking data
-        bookingDates: {
-          start: "2025-05-20", // This would come from booking data
-          end: "2025-06-20",
-        },
-        breakdate: "2025-05-20",
+        client: selectedJobOrder?.clientCompany || "Unknown Client",
+        clientId: selectedJobOrder?.clientName || "unknown-client-id",
+        joNumber: selectedJO,
+        joType: selectedJobOrder?.joType || "General",
         sales: user.displayName || user.email || "Unknown User",
         reportType,
         date,
@@ -577,10 +604,14 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                     <SelectItem value="loading" disabled>
                       Loading job orders...
                     </SelectItem>
+                  ) : jobOrders.length === 0 ? (
+                    <SelectItem value="no-jos" disabled>
+                      No job orders found for this site
+                    </SelectItem>
                   ) : (
                     jobOrders.map((jo) => (
-                      <SelectItem key={jo.id} value={jo.number}>
-                        {jo.number} - {jo.client}
+                      <SelectItem key={jo.id} value={jo.joNumber}>
+                        {jo.joNumber} - {jo.clientCompany} ({jo.joType})
                       </SelectItem>
                     ))
                   )}
