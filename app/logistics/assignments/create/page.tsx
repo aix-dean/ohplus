@@ -31,7 +31,6 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-success-dialog"
 import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
-import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 
 // Service types as provided
 const SERVICE_TYPES = ["Roll up", "Roll down", "Change Material", "Repair", "Maintenance", "Monitoring", "Spot Booking"]
@@ -273,6 +272,17 @@ export default function CreateServiceAssignmentPage() {
     }))
   }
 
+  // Convert attachments to Firestore-compatible format
+  const convertAttachmentsForFirestore = (attachments: { name: string; type: string; file?: File }[]) => {
+    return attachments.map((attachment) => ({
+      name: attachment.name,
+      type: attachment.type,
+      // Remove the file object as it's not serializable
+      size: attachment.file?.size || 0,
+      lastModified: attachment.file?.lastModified || Date.now(),
+    }))
+  }
+
   // Handle form submission
   const handleSubmit = async () => {
     if (!user) return
@@ -280,34 +290,6 @@ export default function CreateServiceAssignmentPage() {
     try {
       setLoading(true)
       const selectedProduct = products.find((p) => p.id === formData.projectSite)
-
-      // 1. Upload attachments to Firebase Storage and get URLs
-      const uploadedAttachments = await Promise.all(
-        formData.attachments.map(async (attachment) => {
-          if (attachment.file) {
-            try {
-              const downloadURL = await uploadFileToFirebaseStorage(
-                attachment.file,
-                `service_assignment_attachments/${saNumber}/`,
-              )
-              return { name: attachment.name, type: attachment.type, url: downloadURL }
-            } catch (uploadError) {
-              console.error("Error uploading file:", attachment.name, uploadError)
-              alert(`Error uploading file: ${attachment.name}. Please try again.`)
-              return null // or handle the error as needed
-            }
-          } else {
-            return attachment // Keep existing URLs
-          }
-        }),
-      )
-
-      // 2. Filter out any nulls (failed uploads)
-      const validAttachments = uploadedAttachments.filter((attachment) => attachment !== null) as {
-        name: string
-        type: string
-        url: string
-      }[]
 
       const assignmentData = {
         saNumber,
@@ -336,7 +318,7 @@ export default function CreateServiceAssignmentPage() {
         coveredDateEnd: formData.endDate,
         alarmDate: formData.alarmDate,
         alarmTime: formData.alarmTime,
-        attachments: validAttachments, // Use the new attachment URLs
+        attachments: convertAttachmentsForFirestore(formData.attachments),
         serviceCost: formData.serviceCost,
         status: "Pending", // Always set to Pending when submitting
         updated: serverTimestamp(),
@@ -400,7 +382,7 @@ export default function CreateServiceAssignmentPage() {
         coveredDateEnd: formData.endDate,
         alarmDate: formData.alarmDate,
         alarmTime: formData.alarmTime,
-        attachments: formData.attachments,
+        attachments: convertAttachmentsForFirestore(formData.attachments),
         serviceCost: formData.serviceCost,
         status: "Draft",
         updated: serverTimestamp(),
