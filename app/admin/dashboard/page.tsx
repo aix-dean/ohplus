@@ -1,273 +1,361 @@
-"use client"
+"use client" // Convert to client component
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect, useState } from "react"
+import { useSearchParams, useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context" // Assuming useAuth provides user data
+import { RegistrationSuccessDialog } from "@/components/registration-success-dialog" // Import the dialog
+import { RouteProtection } from "@/components/route-protection"
+
+// Existing imports and content of app/admin/dashboard/page.tsx
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
-import {
-  Users,
-  FileText,
-  Package,
-  BarChart3,
-  TrendingUp,
-  AlertTriangle,
-  Monitor,
-  Shield,
-  Settings,
-  Database,
-  Activity,
-} from "lucide-react"
+import { Badge } from "@/components/ui/badge" // Added missing Badge
 
-export default function AdminDashboard() {
-  const systemStats = [
-    { title: "Total Users", value: "1,234", change: "+12%", icon: Users, color: "text-blue-600" },
-    { title: "Active Projects", value: "89", change: "+5%", icon: FileText, color: "text-green-600" },
-    { title: "Inventory Items", value: "2,456", change: "-2%", icon: Package, color: "text-purple-600" },
-    { title: "System Health", value: "98.5%", change: "+0.5%", icon: Activity, color: "text-orange-600" },
-  ]
+export default function AdminDashboardPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const { user, userData } = useAuth() // Get user data from auth context
 
-  const recentActivities = [
-    { action: "New user registered", user: "John Doe", time: "2 minutes ago", type: "user" },
-    { action: "System backup completed", user: "System", time: "1 hour ago", type: "system" },
-    { action: "Inventory updated", user: "Jane Smith", time: "3 hours ago", type: "inventory" },
-    { action: "Security scan completed", user: "Security Bot", time: "6 hours ago", type: "security" },
-  ]
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
 
-  const departmentLinks = [
+  useEffect(() => {
+    const registeredParam = searchParams.get("registered")
+    const dialogShownKey = "registrationSuccessDialogShown"
+
+    if (registeredParam === "true" && !sessionStorage.getItem(dialogShownKey)) {
+      setShowSuccessDialog(true)
+      sessionStorage.setItem(dialogShownKey, "true") // Mark as shown for this session
+      // Remove the query parameter immediately
+      router.replace("/admin/dashboard", undefined)
+    }
+  }, [searchParams, router])
+
+  const handleCloseSuccessDialog = () => {
+    setShowSuccessDialog(false)
+    // No need to remove query param here, it's already done in useEffect
+  }
+
+  // Existing content from app/admin/dashboard/page.tsx
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedDate, setSelectedDate] = useState("Jun 2025")
+
+  // Define a type for department data
+  interface Department {
+    id: string
+    name: string
+    headerColor: string // Tailwind class name for header background
+    contentBgColor: string // New: Tailwind class name for content background
+    members: string[]
+    metricLabel?: string
+    metricValue?: string
+    badgeCount?: number
+    href?: string
+    isAvailable?: boolean
+  }
+
+  // Department Card Component
+  function DepartmentCard({
+    department,
+  }: {
+    department: Department
+  }) {
+    const cardContent = (
+      <>
+        <CardHeader
+          className={cn(
+            "relative p-4 rounded-t-lg",
+            department.isAvailable !== false ? department.headerColor : "bg-gray-400",
+            department.isAvailable === false && "grayscale",
+          )}
+        >
+          <CardTitle
+            className={cn(
+              "text-white text-lg font-semibold flex justify-between items-center",
+              department.isAvailable === false && "opacity-60",
+            )}
+          >
+            {department.name}
+            {department.badgeCount !== undefined && (
+              <Badge
+                className={cn(
+                  "bg-white text-gray-800 rounded-full px-2 py-0.5 text-xs font-bold",
+                  department.isAvailable === false && "opacity-60",
+                )}
+              >
+                {department.badgeCount}
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent
+          className={cn(
+            "p-4 rounded-b-lg flex flex-col justify-between flex-grow",
+            department.isAvailable !== false ? department.contentBgColor : "bg-gray-100",
+            department.isAvailable === false && "grayscale",
+          )}
+        >
+          <div>
+            {department.members.map((member, index) => (
+              <p
+                key={index}
+                className={cn(
+                  "text-sm text-gray-700 flex items-center gap-1",
+                  department.isAvailable === false && "opacity-60",
+                )}
+              >
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    department.isAvailable !== false ? "bg-green-500" : "bg-gray-400",
+                  )}
+                />
+                {member}
+              </p>
+            ))}
+            {department.metricLabel && department.metricValue && (
+              <div className={cn("mt-4 text-sm", department.isAvailable === false && "opacity-60")}>
+                <p className="text-gray-500">{department.metricLabel}</p>
+                <p className="font-bold text-gray-800">{department.metricValue}</p>
+              </div>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            className={cn(
+              "mt-4 w-full bg-transparent",
+              department.isAvailable === false && "opacity-60 cursor-not-allowed",
+            )}
+            disabled={department.isAvailable === false}
+          >
+            <Plus className="mr-2 h-4 w-4" /> Add Widget
+          </Button>
+        </CardContent>
+      </>
+    )
+
+    if (department.href && department.isAvailable !== false) {
+      return (
+        <Link href={department.href} passHref>
+          <Card className="h-full flex flex-col overflow-hidden cursor-pointer hover:shadow-lg transition-shadow">
+            {cardContent}
+          </Card>
+        </Link>
+      )
+    }
+
+    return (
+      <Card
+        className={cn("h-full flex flex-col overflow-hidden", department.isAvailable === false && "cursor-not-allowed")}
+      >
+        {cardContent}
+      </Card>
+    )
+  }
+
+  const departmentData: Department[] = [
     {
-      title: "Sales Department",
-      description: "Manage sales operations and customer relations",
+      id: "sales",
+      name: "Sales",
+      headerColor: "bg-department-sales-red",
+      contentBgColor: "bg-card-content-sales",
+      members: [],
+      badgeCount: 2,
       href: "/sales/dashboard",
-      icon: BarChart3,
-      color: "bg-blue-50 text-blue-600 border-blue-200",
+      isAvailable: true,
     },
     {
-      title: "Logistics Department",
-      description: "Oversee logistics and service assignments",
+      id: "logistics",
+      name: "Logistics/ Operations",
+      headerColor: "bg-department-logistics-blue",
+      contentBgColor: "bg-card-content-logistics",
+      members: [],
+      badgeCount: 1,
       href: "/logistics/dashboard",
-      icon: Package,
-      color: "bg-green-50 text-green-600 border-green-200",
+      isAvailable: true,
     },
     {
-      title: "CMS Department",
-      description: "Content management and digital displays",
+      id: "creatives",
+      name: "Creatives/Contents",
+      headerColor: "bg-department-creatives-orange",
+      contentBgColor: "bg-card-content-creatives",
+      members: [],
       href: "/cms/dashboard",
-      icon: Monitor,
-      color: "bg-purple-50 text-purple-600 border-purple-200",
+      isAvailable: true,
     },
     {
-      title: "IT Department",
-      description: "IT infrastructure and system management",
+      id: "accounting",
+      name: "Accounting",
+      headerColor: "bg-department-accounting-purple",
+      contentBgColor: "bg-card-content-accounting",
+      members: [],
+      isAvailable: false,
+    },
+    {
+      id: "treasury",
+      name: "Treasury",
+      headerColor: "bg-department-treasury-green",
+      contentBgColor: "bg-card-content-treasury",
+      members: [],
+      isAvailable: false,
+    },
+    {
+      id: "it",
+      name: "I.T.",
+      headerColor: "bg-department-it-teal",
+      contentBgColor: "bg-card-content-it",
+      members: [],
       href: "/it",
-      icon: Settings,
-      color: "bg-orange-50 text-orange-600 border-orange-200",
+      isAvailable: true,
     },
     {
-      title: "Business Operations",
-      description: "Business analytics and financial oversight",
-      href: "/business/dashboard",
-      icon: TrendingUp,
-      color: "bg-indigo-50 text-indigo-600 border-indigo-200",
+      id: "fleet",
+      name: "Fleet",
+      headerColor: "bg-department-fleet-gray",
+      contentBgColor: "bg-card-content-fleet",
+      members: [],
+      isAvailable: false,
+    },
+    {
+      id: "finance",
+      name: "Finance",
+      headerColor: "bg-department-finance-green",
+      contentBgColor: "bg-card-content-finance",
+      members: [],
+      isAvailable: false,
+    },
+    {
+      id: "media",
+      name: "Media/ Procurement",
+      headerColor: "bg-department-media-lightblue",
+      contentBgColor: "bg-card-content-media",
+      members: [],
+      isAvailable: false,
+    },
+    {
+      id: "businessDev",
+      name: "Business Dev.",
+      headerColor: "bg-department-businessdev-darkpurple",
+      contentBgColor: "bg-card-content-businessdev",
+      members: [],
+      href: "/business/inventory",
+      isAvailable: true,
+    },
+    {
+      id: "legal",
+      name: "Legal",
+      headerColor: "bg-department-legal-darkred",
+      contentBgColor: "bg-card-content-legal",
+      members: [],
+      badgeCount: 2,
+      isAvailable: false,
+    },
+    {
+      id: "corporate",
+      name: "Corporate",
+      headerColor: "bg-department-corporate-lightblue",
+      contentBgColor: "bg-card-content-corporate",
+      members: [],
+      badgeCount: 1,
+      isAvailable: false,
+    },
+    {
+      id: "hr",
+      name: "Human Resources",
+      headerColor: "bg-department-hr-pink",
+      contentBgColor: "bg-card-content-hr",
+      members: [],
+      badgeCount: 1,
+      isAvailable: false,
+    },
+    {
+      id: "specialTeam",
+      name: "Special Team",
+      headerColor: "bg-department-specialteam-lightpurple",
+      contentBgColor: "bg-card-content-specialteam",
+      members: [],
+      isAvailable: false,
+    },
+    {
+      id: "marketing",
+      name: "Marketing",
+      headerColor: "bg-department-marketing-red",
+      contentBgColor: "bg-card-content-marketing",
+      members: [],
+      isAvailable: false,
     },
   ]
 
-  const systemAlerts = [
-    { message: "Server maintenance scheduled for tonight", type: "info", time: "1 hour ago" },
-    { message: "High CPU usage detected on web server", type: "warning", time: "3 hours ago" },
-    { message: "Backup completed successfully", type: "success", time: "6 hours ago" },
-  ]
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case "user":
-        return <Users className="h-4 w-4" />
-      case "system":
-        return <Settings className="h-4 w-4" />
-      case "inventory":
-        return <Package className="h-4 w-4" />
-      case "security":
-        return <Shield className="h-4 w-4" />
-      default:
-        return <Activity className="h-4 w-4" />
-    }
-  }
-
-  const getAlertColor = (type: string) => {
-    switch (type) {
-      case "success":
-        return "text-green-600 bg-green-50 border-green-200"
-      case "warning":
-        return "text-yellow-600 bg-yellow-50 border-yellow-200"
-      case "error":
-        return "text-red-600 bg-red-50 border-red-200"
-      default:
-        return "text-blue-600 bg-blue-50 border-blue-200"
-    }
-  }
+  // Filter departments based on search term
+  const filteredDepartments = departmentData.filter((department) => {
+    const lowerCaseSearchTerm = searchTerm.toLowerCase()
+    return (
+      department.name.toLowerCase().includes(lowerCaseSearchTerm) ||
+      department.members.some((member) => member.toLowerCase().includes(lowerCaseSearchTerm))
+    )
+  })
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-600 mt-1">System overview and management center</p>
-        </div>
-        <div className="flex space-x-2">
-          <Button variant="outline" size="sm">
-            <Database className="h-4 w-4 mr-2" />
-            System Status
-          </Button>
-          <Button size="sm">
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
-        </div>
-      </div>
-
-      {/* System Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {systemStats.map((stat) => {
-          const Icon = stat.icon
-          return (
-            <Card key={stat.title}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                <Icon className={`h-4 w-4 ${stat.color}`} />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="text-xs text-muted-foreground">
-                  <span className={stat.change.startsWith("+") ? "text-green-600" : "text-red-600"}>{stat.change}</span>{" "}
-                  from last month
-                </p>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
-
-      {/* Department Links */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Department Access</CardTitle>
-          <CardDescription>Quick access to different department dashboards</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {departmentLinks.map((dept) => {
-              const Icon = dept.icon
-              return (
-                <Link key={dept.title} href={dept.href}>
-                  <Card className={`cursor-pointer transition-all hover:shadow-md border-2 ${dept.color}`}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center space-x-3">
-                        <Icon className="h-6 w-6" />
-                        <CardTitle className="text-lg">{dept.title}</CardTitle>
-                      </div>
-                      <CardDescription className="text-sm">{dept.description}</CardDescription>
-                    </CardHeader>
-                  </Card>
-                </Link>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activities */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Activity className="h-5 w-5 mr-2" />
-              Recent Activities
-            </CardTitle>
-            <CardDescription>Latest system activities and user actions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentActivities.map((activity, index) => (
-                <div key={index} className="flex items-center space-x-3 p-3 border rounded-lg">
-                  <div className="flex-shrink-0">{getActivityIcon(activity.type)}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{activity.action}</p>
-                    <p className="text-xs text-gray-500">by {activity.user}</p>
-                  </div>
-                  <div className="text-xs text-gray-400">{activity.time}</div>
-                </div>
-              ))}
-            </div>
-            <Button variant="outline" className="w-full mt-4 bg-transparent">
-              View All Activities
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* System Alerts */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <AlertTriangle className="h-5 w-5 mr-2" />
-              System Alerts
-            </CardTitle>
-            <CardDescription>Important system notifications and alerts</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {systemAlerts.map((alert, index) => (
-                <div key={index} className={`p-3 border rounded-lg ${getAlertColor(alert.type)}`}>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">{alert.message}</p>
-                    <span className="text-xs">{alert.time}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <Button variant="outline" className="w-full mt-4 bg-transparent">
-              View All Alerts
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* System Performance */}
-      <Card>
-        <CardHeader>
-          <CardTitle>System Performance</CardTitle>
-          <CardDescription>Real-time system resource usage and performance metrics</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Server Load</span>
-                <span>45%</span>
+    <RouteProtection requiredRoles="admin">
+      <div className="flex-1 p-4 md:p-6">
+        <div className="flex flex-col gap-6">
+          {/* Header Section */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h1 className="text-xl md:text-2xl font-bold">
+              {userData?.first_name
+                ? `${userData.first_name.charAt(0).toUpperCase()}${userData.first_name.slice(1).toLowerCase()}'s Dashboard`
+                : "Dashboard"}
+            </h1>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-grow">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search..."
+                  className="w-full rounded-lg bg-background pl-8"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
-              <Progress value={45} className="h-2" />
-              <p className="text-xs text-gray-500">Normal load</p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Memory Usage</span>
-                <span>68%</span>
-              </div>
-              <Progress value={68} className="h-2" />
-              <p className="text-xs text-gray-500">Moderate usage</p>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Storage Usage</span>
-                <span>82%</span>
-              </div>
-              <Progress value={82} className="h-2" />
-              <p className="text-xs text-yellow-600">High usage - consider cleanup</p>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                    {selectedDate} <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setSelectedDate("Jan 2025")}>Jan 2025</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSelectedDate("Feb 2025")}>Feb 2025</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSelectedDate("Mar 2025")}>Mar 2025</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSelectedDate("Apr 2025")}>Apr 2025</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSelectedDate("May 2025")}>May 2025</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setSelectedDate("Jun 2025")}>Jun 2025</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+
+          {/* Department Cards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredDepartments.map((department) => (
+              <DepartmentCard key={department.id} department={department} />
+            ))}
+          </div>
+        </div>
+
+        {/* Registration Success Dialog */}
+        <RegistrationSuccessDialog
+          isOpen={showSuccessDialog}
+          firstName={user?.first_name || ""} // Pass the user's first name
+          onClose={handleCloseSuccessDialog}
+        />
+      </div>
+    </RouteProtection>
   )
 }
+
+// Dummy imports for existing content to avoid errors. Replace with actual imports if needed.
+import { Search, ChevronDown, Plus } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
