@@ -181,7 +181,7 @@ export function TopNavigation() {
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <h1 className="text-xl font-semibold text-white">
-                {pageTitle == "Admin - Subscriptions" ? "Admin - Plan Profile" : pageTitle}
+                {pageTitle == "Admin - Subscriptions" ? "Admin - Plan Profile" : pageTitle.replace(/\bIt\b/g, "I.T")}
               </h1>
             </div>
             <div className="top-nav-links hidden md:flex"></div>
