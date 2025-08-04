@@ -564,71 +564,73 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
               />
             </div>
 
-            {/* Team */}
-            <div className="space-y-2">
-              <Label htmlFor="team" className="text-sm font-semibold text-gray-900">
-                Team:
-              </Label>
-              {showNewTeamInput ? (
-                <div className="flex gap-1">
-                  <Input
-                    placeholder="Enter team name"
-                    value={newTeamName}
-                    onChange={(e) => setNewTeamName(e.target.value)}
-                    className="flex-1 h-9 text-sm"
-                  />
-                  <Button
-                    onClick={handleCreateNewTeam}
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 h-9 px-3 text-xs"
-                  >
-                    Add
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setShowNewTeamInput(false)
-                      setNewTeamName("")
-                    }}
-                    size="sm"
-                    variant="outline"
-                    className="h-9 px-3 text-xs"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              ) : (
-                <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Select team" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingTeams ? (
-                      <SelectItem value="loading" disabled>
-                        Loading teams...
-                      </SelectItem>
-                    ) : (
-                      <>
-                        {teams.map((team) => (
-                          <SelectItem key={team.id} value={team.id}>
-                            {team.name}
-                          </SelectItem>
-                        ))}
-                        <SelectItem
-                          value="create-new"
-                          onSelect={() => setShowNewTeamInput(true)}
-                          className="text-blue-600 font-medium"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Plus className="h-4 w-4" />
-                            Create New Team
-                          </div>
+            {/* Team - Only show for installation reports */}
+            {reportType === "installation-report" && (
+              <div className="space-y-2">
+                <Label htmlFor="team" className="text-sm font-semibold text-gray-900">
+                  Team:
+                </Label>
+                {showNewTeamInput ? (
+                  <div className="flex gap-1">
+                    <Input
+                      placeholder="Enter team name"
+                      value={newTeamName}
+                      onChange={(e) => setNewTeamName(e.target.value)}
+                      className="flex-1 h-9 text-sm"
+                    />
+                    <Button
+                      onClick={handleCreateNewTeam}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 h-9 px-3 text-xs"
+                    >
+                      Add
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowNewTeamInput(false)
+                        setNewTeamName("")
+                      }}
+                      size="sm"
+                      variant="outline"
+                      className="h-9 px-3 text-xs"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="Select team" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {loadingTeams ? (
+                        <SelectItem value="loading" disabled>
+                          Loading teams...
                         </SelectItem>
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
+                      ) : (
+                        <>
+                          {teams.map((team) => (
+                            <SelectItem key={team.id} value={team.id}>
+                              {team.name}
+                            </SelectItem>
+                          ))}
+                          <SelectItem
+                            value="create-new"
+                            onSelect={() => setShowNewTeamInput(true)}
+                            className="text-blue-600 font-medium"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Plus className="h-4 w-4" />
+                              Create New Team
+                            </div>
+                          </SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            )}
 
             {/* Installation Report Specific Fields */}
             {reportType === "installation-report" && (
