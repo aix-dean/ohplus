@@ -457,6 +457,7 @@ export default function AllSitesTab({
                     setReportDialogOpen(true)
                   }}
                   onJOCountClick={handleJOCountClick}
+                  router={router}
                 />
               ))}
             </div>
@@ -569,12 +570,13 @@ function UnifiedSiteCard({
   site,
   onCreateReport,
   onJOCountClick,
+  router,
 }: {
   site: any
   onCreateReport: (siteId: string) => void
   onJOCountClick: (siteId: string, siteName: string) => void
+  router: any
 }) {
-
   const handleCreateReport = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()

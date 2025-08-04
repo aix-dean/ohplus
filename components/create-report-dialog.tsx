@@ -14,6 +14,8 @@ import { useToast } from "@/hooks/use-toast"
 import { getProductById, type Product, uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 interface CreateReportDialogProps {
   open: boolean
@@ -36,6 +38,18 @@ interface AttachmentData {
   fileUrl?: string
   uploading?: boolean
   fileType?: string
+}
+
+
+interface JobOrder {
+  id: string
+  joNumber: string
+  clientName: string
+  clientCompany: string
+  status: string
+  joType: string
+  siteName: string
+  product_id: string
 }
 
 export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportDialogProps) {
@@ -61,15 +75,56 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   const { user, userData, projectData } = useAuth()
   const router = useRouter()
 
+  const [selectedJO, setSelectedJO] = useState("")
+  const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
+  const [loadingJOs, setLoadingJOs] = useState(false)
+
   // Fetch product data when dialog opens
   useEffect(() => {
     if (open && siteId) {
       fetchProductData()
       fetchTeams()
+      fetchJobOrders()
       // Auto-fill date with current date
       setDate(new Date().toISOString().split("T")[0])
     }
   }, [open, siteId])
+
+  const fetchJobOrders = async () => {
+    setLoadingJOs(true)
+    try {
+      // Query job orders for this specific site/product
+      const jobOrdersRef = collection(db, "job_orders")
+      const q = query(jobOrdersRef, where("product_id", "==", siteId))
+      const querySnapshot = await getDocs(q)
+
+      const fetchedJobOrders: JobOrder[] = []
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        fetchedJobOrders.push({
+          id: doc.id,
+          joNumber: data.joNumber || "N/A",
+          clientName: data.clientName || "Unknown Client",
+          clientCompany: data.clientCompany || "",
+          status: data.status || "unknown",
+          joType: data.joType || "General",
+          siteName: data.siteName || "Unknown Site",
+          product_id: data.product_id || "",
+        })
+      })
+
+      setJobOrders(fetchedJobOrders)
+    } catch (error) {
+      console.error("Error fetching job orders:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load job orders",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingJOs(false)
+    }
+  }
 
   const fetchProductData = async () => {
     try {
@@ -368,6 +423,15 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       })
       return
     }
+    // Remove this block:
+    // if (!selectedJO) {
+    //   toast({
+    //     title: "Error",
+    //     description: "Please select a Job Order",
+    //     variant: "destructive",
+    //   })
+    //   return
+    // }
 
     // Check if at least one attachment has a file with fileUrl
     const hasValidAttachments = attachments.some((att) => att.file && att.fileUrl)
@@ -393,6 +457,9 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
 
     setLoading(true)
     try {
+      // Find the selected job order data
+      const selectedJobOrder = selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null
+
       // Build the report data for preview (without saving to Firebase)
       const reportData: any = {
         id: `preview-${Date.now()}`, // Temporary ID for preview
@@ -400,13 +467,10 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         siteName: product.name || "Unknown Site",
         companyId: projectData?.company_id || userData?.company_id || projectData?.project_id || userData?.project_id,
         sellerId: product.seller_id || user.uid,
-        client: "Summit Media", // This would come from booking data in real implementation
-        clientId: "summit-media-id", // This would come from booking data
-        bookingDates: {
-          start: "2025-05-20", // This would come from booking data
-          end: "2025-06-20",
-        },
-        breakdate: "2025-05-20",
+        client: selectedJobOrder?.clientCompany || "No Client",
+        clientId: selectedJobOrder?.clientName || "no-client-id",
+        joNumber: selectedJO === "none" ? null : selectedJO,
+        joType: selectedJobOrder?.joType || "General",
         sales: user.displayName || user.email || "Unknown User",
         reportType,
         date,
@@ -480,6 +544,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       setReportType("completion-report")
       setDate("")
       setSelectedTeam("")
+      setSelectedJO("")
       setAttachments([{ note: "" }, { note: "" }])
       setStatus("")
       setTimeline("on-time")
@@ -519,17 +584,41 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             {/* Booking Information Section */}
             <div className="bg-gray-100 p-3 rounded-lg space-y-1">
               <div className="text-base">
-                <span className="font-medium">Site:</span> {product?.name || "Loading..."}
+                <span className="font-medium">JO#:</span> {selectedJO === "none" ? "None" : selectedJO || "Select JO"}
               </div>
               <div className="text-base">
-                <span className="font-medium">Client:</span> Summit Media
+                <span className="font-medium">Sales:</span> {user?.displayName || "John Patrick Masan"}
               </div>
-              <div className="text-base">
-                <span className="font-medium">Booking:</span> May 20 - June 20, 2025
-              </div>
-              <div className="text-base">
-                <span className="font-medium">Sales:</span> {user?.displayName || user?.email || "Current User"}
-              </div>
+            </div>
+
+            {/* JO Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="jo" className="text-sm font-semibold text-gray-900">
+                Job Order:
+              </Label>
+              <Select value={selectedJO} onValueChange={setSelectedJO}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Select Job Order" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {loadingJOs ? (
+                    <SelectItem value="loading" disabled>
+                      Loading job orders...
+                    </SelectItem>
+                  ) : jobOrders.length === 0 ? (
+                    <SelectItem value="no-jos" disabled>
+                      No job orders found for this site
+                    </SelectItem>
+                  ) : (
+                    jobOrders.map((jo) => (
+                      <SelectItem key={jo.id} value={jo.joNumber}>
+                        {jo.joNumber} - {jo.clientCompany} ({jo.joType})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Report Type */}
@@ -563,73 +652,73 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
                 className="h-9 text-sm"
               />
             </div>
-
-            {/* Team */}
-            <div className="space-y-2">
-              <Label htmlFor="team" className="text-sm font-semibold text-gray-900">
-                Team:
-              </Label>
-              {showNewTeamInput ? (
-                <div className="flex gap-1">
-                  <Input
-                    placeholder="Enter team name"
-                    value={newTeamName}
-                    onChange={(e) => setNewTeamName(e.target.value)}
-                    className="flex-1 h-9 text-sm"
-                  />
-                  <Button
-                    onClick={handleCreateNewTeam}
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 h-9 px-3 text-xs"
-                  >
-                    Add
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setShowNewTeamInput(false)
-                      setNewTeamName("")
-                    }}
-                    size="sm"
-                    variant="outline"
-                    className="h-9 px-3 text-xs"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              ) : (
-                <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-                  <SelectTrigger className="h-9 text-sm">
-                    <SelectValue placeholder="Select team" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingTeams ? (
-                      <SelectItem value="loading" disabled>
-                        Loading teams...
-                      </SelectItem>
-                    ) : (
-                      <>
-                        {teams.map((team) => (
-                          <SelectItem key={team.id} value={team.id}>
-                            {team.name}
-                          </SelectItem>
-                        ))}
-                        <SelectItem
-                          value="create-new"
-                          onSelect={() => setShowNewTeamInput(true)}
-                          className="text-blue-600 font-medium"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Plus className="h-4 w-4" />
-                            Create New Team
-                          </div>
+            {/* Team - Only show for installation reports */}
+            {reportType === "installation-report" && (
+              <div className="space-y-2">
+                <Label htmlFor="team" className="text-sm font-semibold text-gray-900">
+                  Team:
+                </Label>
+                {showNewTeamInput ? (
+                  <div className="flex gap-1">
+                    <Input
+                      placeholder="Enter team name"
+                      value={newTeamName}
+                      onChange={(e) => setNewTeamName(e.target.value)}
+                      className="flex-1 h-9 text-sm"
+                    />
+                    <Button
+                      onClick={handleCreateNewTeam}
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 h-9 px-3 text-xs"
+                    >
+                      Add
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowNewTeamInput(false)
+                        setNewTeamName("")
+                      }}
+                      size="sm"
+                      variant="outline"
+                      className="h-9 px-3 text-xs"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="Select team" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {loadingTeams ? (
+                        <SelectItem value="loading" disabled>
+                          Loading teams...
                         </SelectItem>
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
+                      ) : (
+                        <>
+                          {teams.map((team) => (
+                            <SelectItem key={team.id} value={team.id}>
+                              {team.name}
+                            </SelectItem>
+                          ))}
+                          <SelectItem
+                            value="create-new"
+                            onSelect={() => setShowNewTeamInput(true)}
+                            className="text-blue-600 font-medium"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Plus className="h-4 w-4" />
+                              Create New Team
+                            </div>
+                          </SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            )}
             {/* Installation Report Specific Fields */}
             {reportType === "installation-report" && (
               <>
