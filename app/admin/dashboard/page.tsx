@@ -205,7 +205,7 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-it-teal",
       contentBgColor: "bg-card-content-it",
       members: [],
-      isAvailable: false,
+      isAvailable: true,
     },
     {
       id: "fleet",
