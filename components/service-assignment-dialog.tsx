@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import type React from "react"
+
+import { useState, useEffect, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -50,7 +52,7 @@ export function ServiceAssignmentDialog({
     endDate: null as Date | null,
     alarmDate: null as Date | null,
     alarmTime: "",
-    attachments: [] as { name: string; type: string }[],
+    attachments: [] as { name: string; type: string; file?: File }[],
   })
 
   // Date input strings for direct input
@@ -180,16 +182,36 @@ export function ServiceAssignmentDialog({
     }
   }
 
-  // Handle attachment addition
-  const addAttachment = (type: string) => {
-    const newAttachment = {
-      name: type === "pdf" ? "Document.pdf" : "Video.mp4",
-      type,
-    }
+  // Add this import at the top with other imports
+
+  // Replace the addAttachment function with this:
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files) return
+
+    const newAttachments = Array.from(files).map((file) => ({
+      name: file.name,
+      type: file.type.includes("pdf") ? "pdf" : file.type.includes("video") ? "video" : "file",
+      file: file, // Store the actual file object
+    }))
 
     setFormData((prev) => ({
       ...prev,
-      attachments: [...prev.attachments, newAttachment],
+      attachments: [...prev.attachments, ...newAttachments],
+    }))
+
+    // Reset the input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  const removeAttachment = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      attachments: prev.attachments.filter((_, i) => i !== index),
     }))
   }
 
@@ -471,6 +493,7 @@ export function ServiceAssignmentDialog({
                 </div>
               </div>
 
+              {/* Replace the entire attachments section in the form with: */}
               <div className="grid grid-cols-4 items-start gap-3">
                 <Label className="text-right text-sm font-medium pt-2">Attachments:</Label>
                 <div className="col-span-3">
@@ -478,55 +501,66 @@ export function ServiceAssignmentDialog({
                     {formData.attachments.map((attachment, index) => (
                       <div
                         key={index}
-                        className="border rounded-md p-2 w-[100px] h-[100px] flex flex-col items-center justify-center"
+                        className="border rounded-md p-2 w-[100px] h-[100px] flex flex-col items-center justify-center relative group"
                       >
                         {attachment.type === "pdf" ? (
                           <>
                             <div className="w-12 h-12 bg-red-500 text-white flex items-center justify-center rounded-md mb-2">
                               <FileText size={24} />
                             </div>
-                            <span className="text-xs text-center truncate w-full">{attachment.name}</span>
+                            <span className="text-xs text-center truncate w-full" title={attachment.name}>
+                              {attachment.name}
+                            </span>
                           </>
-                        ) : (
+                        ) : attachment.type === "video" ? (
                           <>
                             <div className="w-12 h-12 bg-gray-200 flex items-center justify-center rounded-md mb-2">
                               <Video size={24} className="text-gray-500" />
                             </div>
-                            <span className="text-xs text-center truncate w-full">{attachment.name}</span>
+                            <span className="text-xs text-center truncate w-full" title={attachment.name}>
+                              {attachment.name}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-12 h-12 bg-blue-500 text-white flex items-center justify-center rounded-md mb-2">
+                              <FileText size={24} />
+                            </div>
+                            <span className="text-xs text-center truncate w-full" title={attachment.name}>
+                              {attachment.name}
+                            </span>
                           </>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(index)}
+                          className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          ×
+                        </button>
                       </div>
                     ))}
 
                     <button
                       type="button"
-                      onClick={() => addAttachment("pdf")}
-                      className="border rounded-md p-2 w-[100px] h-[100px] flex flex-col items-center justify-center hover:bg-gray-50"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border-2 border-dashed border-gray-300 rounded-md p-2 w-[100px] h-[100px] flex flex-col items-center justify-center hover:bg-gray-50 hover:border-gray-400 transition-colors"
                     >
-                      <div className="w-12 h-12 bg-red-500 text-white flex items-center justify-center rounded-md mb-2">
-                        <FileText size={24} />
-                      </div>
-                      <span className="text-xs">Add PDF</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => addAttachment("video")}
-                      className="border rounded-md p-2 w-[100px] h-[100px] flex flex-col items-center justify-center hover:bg-gray-50"
-                    >
-                      <div className="w-12 h-12 bg-gray-200 flex items-center justify-center rounded-md mb-2">
-                        <Video size={24} className="text-gray-500" />
-                      </div>
-                      <span className="text-xs">Add Video</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className="border rounded-md p-2 w-[100px] h-[100px] flex flex-col items-center justify-center hover:bg-gray-50"
-                    >
-                      <Plus size={24} className="text-gray-400" />
+                      <Plus size={24} className="text-gray-400 mb-2" />
+                      <span className="text-xs text-gray-500">Add File</span>
                     </button>
                   </div>
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".pdf,.mp4,.mov,.avi,.jpg,.jpeg,.png,.doc,.docx"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+
+                  <p className="text-xs text-gray-500 mt-2">Supported formats: PDF, Video files, Images, Documents</p>
                 </div>
               </div>
             </div>
