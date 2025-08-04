@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -69,7 +71,7 @@ export default function CreateServiceAssignmentPage() {
     endDate: null as Date | null,
     alarmDate: null as Date | null,
     alarmTime: "",
-    attachments: [] as { name: string; type: string }[],
+    attachments: [] as { name: string; type: string; file?: File }[],
     // Add service cost fields
     serviceCost: {
       crewFee: "",
@@ -230,6 +232,46 @@ export default function CreateServiceAssignmentPage() {
     }
   }
 
+  // Handle file upload
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files) return
+
+    const newAttachments: { name: string; type: string; file: File }[] = []
+
+    Array.from(files).forEach((file) => {
+      // Check file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`File ${file.name} is too large. Maximum size is 10MB.`)
+        return
+      }
+
+      newAttachments.push({
+        name: file.name,
+        type: file.type,
+        file: file,
+      })
+    })
+
+    if (newAttachments.length > 0) {
+      setFormData((prev) => ({
+        ...prev,
+        attachments: [...prev.attachments, ...newAttachments],
+      }))
+    }
+
+    // Reset the input
+    event.target.value = ""
+  }
+
+  // Remove attachment
+  const removeAttachment = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      attachments: prev.attachments.filter((_, i) => i !== index),
+    }))
+  }
+
   // Handle form submission
   const handleSubmit = async () => {
     if (!user) return
@@ -357,19 +399,6 @@ export default function CreateServiceAssignmentPage() {
     } finally {
       setLoading(false)
     }
-  }
-
-  // Handle attachment addition
-  const addAttachment = (type: string) => {
-    const newAttachment = {
-      name: type === "pdf" ? "Document.pdf" : "Video.mp4",
-      type,
-    }
-
-    setFormData((prev) => ({
-      ...prev,
-      attachments: [...prev.attachments, newAttachment],
-    }))
   }
 
   // Generate time options
@@ -1049,19 +1078,33 @@ export default function CreateServiceAssignmentPage() {
               {formData.attachments.map((attachment, index) => (
                 <div
                   key={index}
-                  className="border rounded-md p-4 w-[120px] h-[120px] flex flex-col items-center justify-center"
+                  className="border rounded-md p-4 w-[120px] h-[120px] flex flex-col items-center justify-center relative group"
                 >
-                  {attachment.type === "pdf" ? (
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(index)}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+                  >
+                    ×
+                  </button>
+                  {attachment.type.includes("pdf") ? (
                     <>
                       <div className="w-12 h-12 bg-red-500 text-white flex items-center justify-center rounded-md mb-2">
                         <FileText size={24} />
                       </div>
                       <span className="text-xs text-center truncate w-full">{attachment.name}</span>
                     </>
-                  ) : (
+                  ) : attachment.type.includes("video") ? (
                     <>
                       <div className="w-12 h-12 bg-gray-200 flex items-center justify-center rounded-md mb-2">
                         <Video size={24} className="text-gray-500" />
+                      </div>
+                      <span className="text-xs text-center truncate w-full">{attachment.name}</span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-12 h-12 bg-blue-500 text-white flex items-center justify-center rounded-md mb-2">
+                        <FileText size={24} />
                       </div>
                       <span className="text-xs text-center truncate w-full">{attachment.name}</span>
                     </>
@@ -1069,35 +1112,21 @@ export default function CreateServiceAssignmentPage() {
                 </div>
               ))}
 
-              <button
-                type="button"
-                onClick={() => addAttachment("pdf")}
-                className="border rounded-md p-4 w-[120px] h-[120px] flex flex-col items-center justify-center hover:bg-gray-50"
-              >
-                <div className="w-12 h-12 bg-red-500 text-white flex items-center justify-center rounded-md mb-2">
-                  <FileText size={24} />
-                </div>
-                <span className="text-xs">Add PDF</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => addAttachment("video")}
-                className="border rounded-md p-4 w-[120px] h-[120px] flex flex-col items-center justify-center hover:bg-gray-50"
-              >
-                <div className="w-12 h-12 bg-gray-200 flex items-center justify-center rounded-md mb-2">
-                  <Video size={24} className="text-gray-500" />
-                </div>
-                <span className="text-xs">Add Video</span>
-              </button>
-
-              <button
-                type="button"
-                className="border rounded-md p-4 w-[120px] h-[120px] flex items-center justify-center hover:bg-gray-50"
-              >
-                <Plus size={24} className="text-gray-400" />
-              </button>
+              <label className="border-2 border-dashed border-gray-300 rounded-md p-4 w-[120px] h-[120px] flex flex-col items-center justify-center hover:bg-gray-50 cursor-pointer">
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Plus size={24} className="text-gray-400 mb-2" />
+                <span className="text-xs text-center text-gray-500">Add Files</span>
+              </label>
             </div>
+            <p className="text-xs text-gray-500">
+              Supported formats: PDF, DOC, XLS, PPT, TXT, JPG, PNG, MP4, MOV, AVI (Max 10MB each)
+            </p>
           </div>
 
           {/* Action Buttons */}
