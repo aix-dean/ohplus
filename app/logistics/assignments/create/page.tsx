@@ -272,6 +272,17 @@ export default function CreateServiceAssignmentPage() {
     }))
   }
 
+  // Convert attachments to Firestore-compatible format
+  const convertAttachmentsForFirestore = (attachments: { name: string; type: string; file?: File }[]) => {
+    return attachments.map((attachment) => ({
+      name: attachment.name,
+      type: attachment.type,
+      // Remove the file object as it's not serializable
+      size: attachment.file?.size || 0,
+      lastModified: attachment.file?.lastModified || Date.now(),
+    }))
+  }
+
   // Handle form submission
   const handleSubmit = async () => {
     if (!user) return
@@ -307,7 +318,7 @@ export default function CreateServiceAssignmentPage() {
         coveredDateEnd: formData.endDate,
         alarmDate: formData.alarmDate,
         alarmTime: formData.alarmTime,
-        attachments: formData.attachments,
+        attachments: convertAttachmentsForFirestore(formData.attachments),
         serviceCost: formData.serviceCost,
         status: "Pending", // Always set to Pending when submitting
         updated: serverTimestamp(),
@@ -371,7 +382,7 @@ export default function CreateServiceAssignmentPage() {
         coveredDateEnd: formData.endDate,
         alarmDate: formData.alarmDate,
         alarmTime: formData.alarmTime,
-        attachments: formData.attachments,
+        attachments: convertAttachmentsForFirestore(formData.attachments),
         serviceCost: formData.serviceCost,
         status: "Draft",
         updated: serverTimestamp(),
