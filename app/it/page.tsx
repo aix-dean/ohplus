@@ -3,7 +3,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 import {
   Server,
   Shield,
@@ -11,28 +10,17 @@ import {
   Wifi,
   HardDrive,
   Monitor,
+  Smartphone,
   AlertTriangle,
   CheckCircle,
   Clock,
-  Users,
-  Settings,
-  Activity,
 } from "lucide-react"
 
-export default function ITDepartmentPage() {
+export default function ITPage() {
   return (
-    <div className="flex-1 space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">IT Department</h1>
-          <p className="text-muted-foreground">System monitoring, infrastructure management, and technical support</p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Badge variant="outline" className="text-green-600 border-green-600">
-            <CheckCircle className="w-3 h-3 mr-1" />
-            All Systems Operational
-          </Badge>
-        </div>
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <div className="flex items-center justify-between space-y-2">
+        <h2 className="text-3xl font-bold tracking-tight">IT Department</h2>
       </div>
 
       {/* System Status Overview */}
@@ -43,36 +31,11 @@ export default function ITDepartmentPage() {
             <Server className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">98.9%</div>
-            <p className="text-xs text-muted-foreground">Uptime this month</p>
-            <Progress value={98.9} className="mt-2" />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Security</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">Secure</div>
-            <p className="text-xs text-muted-foreground">No threats detected</p>
-            <div className="flex items-center mt-2">
-              <CheckCircle className="w-3 h-3 text-green-600 mr-1" />
-              <span className="text-xs">Last scan: 2 hours ago</span>
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              <span className="text-2xl font-bold">Online</span>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Storage</CardTitle>
-            <HardDrive className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">67%</div>
-            <p className="text-xs text-muted-foreground">Used of 10TB total</p>
-            <Progress value={67} className="mt-2" />
+            <p className="text-xs text-muted-foreground">All systems operational</p>
           </CardContent>
         </Card>
 
@@ -82,112 +45,108 @@ export default function ITDepartmentPage() {
             <Wifi className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">Stable</div>
-            <p className="text-xs text-muted-foreground">Average latency: 12ms</p>
-            <div className="flex items-center mt-2">
-              <Activity className="w-3 h-3 text-green-600 mr-1" />
-              <span className="text-xs">Bandwidth: 85% available</span>
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              <span className="text-2xl font-bold">Stable</span>
             </div>
+            <p className="text-xs text-muted-foreground">99.9% uptime</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Security</CardTitle>
+            <Shield className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="h-4 w-4 text-yellow-500" />
+              <span className="text-2xl font-bold">Alert</span>
+            </div>
+            <p className="text-xs text-muted-foreground">2 pending updates</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Storage</CardTitle>
+            <HardDrive className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              <span className="text-2xl font-bold">78%</span>
+            </div>
+            <p className="text-xs text-muted-foreground">Used capacity</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Active Tickets */}
+      {/* Recent Tickets */}
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <AlertTriangle className="w-5 h-5 mr-2" />
-              Active Support Tickets
-            </CardTitle>
-            <CardDescription>Current IT support requests</CardDescription>
+            <CardTitle>Recent Support Tickets</CardTitle>
+            <CardDescription>Latest IT support requests</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                <div>
-                  <p className="font-medium">Email server slow response</p>
-                  <p className="text-sm text-muted-foreground">Sales Department - High Priority</p>
-                </div>
+            <div className="flex items-center space-x-4">
+              <Monitor className="h-8 w-8 text-blue-500" />
+              <div className="flex-1 space-y-1">
+                <p className="text-sm font-medium">Display not working - Sales Dept</p>
+                <p className="text-xs text-muted-foreground">Reported 2 hours ago</p>
               </div>
               <Badge variant="destructive">High</Badge>
             </div>
-
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                <div>
-                  <p className="font-medium">Printer connectivity issues</p>
-                  <p className="text-sm text-muted-foreground">Logistics - Medium Priority</p>
-                </div>
+            <div className="flex items-center space-x-4">
+              <Wifi className="h-8 w-8 text-green-500" />
+              <div className="flex-1 space-y-1">
+                <p className="text-sm font-medium">WiFi connectivity issues</p>
+                <p className="text-xs text-muted-foreground">Reported 4 hours ago</p>
               </div>
               <Badge variant="secondary">Medium</Badge>
             </div>
-
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <div>
-                  <p className="font-medium">Software license renewal</p>
-                  <p className="text-sm text-muted-foreground">Admin - Low Priority</p>
-                </div>
+            <div className="flex items-center space-x-4">
+              <Smartphone className="h-8 w-8 text-yellow-500" />
+              <div className="flex-1 space-y-1">
+                <p className="text-sm font-medium">Mobile app login issues</p>
+                <p className="text-xs text-muted-foreground">Reported 6 hours ago</p>
               </div>
               <Badge variant="outline">Low</Badge>
             </div>
-
-            <Button className="w-full bg-transparent" variant="outline">
-              View All Tickets
-            </Button>
           </CardContent>
         </Card>
 
-        {/* System Maintenance */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <Settings className="w-5 h-5 mr-2" />
-              Scheduled Maintenance
-            </CardTitle>
-            <CardDescription>Upcoming system maintenance windows</CardDescription>
+            <CardTitle>System Maintenance</CardTitle>
+            <CardDescription>Scheduled maintenance tasks</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center space-x-3">
-                <Clock className="w-4 h-4 text-blue-500" />
-                <div>
-                  <p className="font-medium">Database backup optimization</p>
-                  <p className="text-sm text-muted-foreground">Tonight, 2:00 AM - 4:00 AM</p>
-                </div>
+            <div className="flex items-center space-x-4">
+              <Clock className="h-8 w-8 text-blue-500" />
+              <div className="flex-1 space-y-1">
+                <p className="text-sm font-medium">Database backup</p>
+                <p className="text-xs text-muted-foreground">Scheduled for tonight 2:00 AM</p>
               </div>
-              <Badge variant="outline">Scheduled</Badge>
+              <Badge>Scheduled</Badge>
             </div>
-
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center space-x-3">
-                <Clock className="w-4 h-4 text-orange-500" />
-                <div>
-                  <p className="font-medium">Security patches deployment</p>
-                  <p className="text-sm text-muted-foreground">This weekend, Sunday 6:00 AM</p>
-                </div>
+            <div className="flex items-center space-x-4">
+              <Server className="h-8 w-8 text-green-500" />
+              <div className="flex-1 space-y-1">
+                <p className="text-sm font-medium">Server updates</p>
+                <p className="text-xs text-muted-foreground">This weekend</p>
               </div>
-              <Badge variant="secondary">Upcoming</Badge>
+              <Badge variant="secondary">Planned</Badge>
             </div>
-
-            <div className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex items-center space-x-3">
-                <Clock className="w-4 h-4 text-green-500" />
-                <div>
-                  <p className="font-medium">Network infrastructure upgrade</p>
-                  <p className="text-sm text-muted-foreground">Next month, planned downtime</p>
-                </div>
+            <div className="flex items-center space-x-4">
+              <Shield className="h-8 w-8 text-red-500" />
+              <div className="flex-1 space-y-1">
+                <p className="text-sm font-medium">Security patches</p>
+                <p className="text-xs text-muted-foreground">Next week</p>
               </div>
-              <Badge variant="outline">Planned</Badge>
+              <Badge variant="destructive">Critical</Badge>
             </div>
-
-            <Button className="w-full bg-transparent" variant="outline">
-              Schedule Maintenance
-            </Button>
           </CardContent>
         </Card>
       </div>
@@ -199,77 +158,23 @@ export default function ITDepartmentPage() {
           <CardDescription>Common IT management tasks</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-            <Button variant="outline" className="flex flex-col items-center p-4 h-auto bg-transparent">
-              <Users className="w-6 h-6 mb-2" />
-              <span className="text-sm">User Management</span>
+          <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+            <Button variant="outline" className="justify-start bg-transparent">
+              <Server className="mr-2 h-4 w-4" />
+              Server Management
             </Button>
-
-            <Button variant="outline" className="flex flex-col items-center p-4 h-auto bg-transparent">
-              <Database className="w-6 h-6 mb-2" />
-              <span className="text-sm">Database Admin</span>
+            <Button variant="outline" className="justify-start bg-transparent">
+              <Database className="mr-2 h-4 w-4" />
+              Database Admin
             </Button>
-
-            <Button variant="outline" className="flex flex-col items-center p-4 h-auto bg-transparent">
-              <Monitor className="w-6 h-6 mb-2" />
-              <span className="text-sm">System Monitor</span>
+            <Button variant="outline" className="justify-start bg-transparent">
+              <Shield className="mr-2 h-4 w-4" />
+              Security Center
             </Button>
-
-            <Button variant="outline" className="flex flex-col items-center p-4 h-auto bg-transparent">
-              <Shield className="w-6 h-6 mb-2" />
-              <span className="text-sm">Security Center</span>
+            <Button variant="outline" className="justify-start bg-transparent">
+              <Monitor className="mr-2 h-4 w-4" />
+              Device Management
             </Button>
-
-            <Button variant="outline" className="flex flex-col items-center p-4 h-auto bg-transparent">
-              <HardDrive className="w-6 h-6 mb-2" />
-              <span className="text-sm">Backup Manager</span>
-            </Button>
-
-            <Button variant="outline" className="flex flex-col items-center p-4 h-auto bg-transparent">
-              <Settings className="w-6 h-6 mb-2" />
-              <span className="text-sm">System Config</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>Latest system events and changes</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-center space-x-3 text-sm">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-muted-foreground">2 hours ago</span>
-              <span>Security scan completed successfully</span>
-            </div>
-
-            <div className="flex items-center space-x-3 text-sm">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span className="text-muted-foreground">4 hours ago</span>
-              <span>Database backup completed</span>
-            </div>
-
-            <div className="flex items-center space-x-3 text-sm">
-              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-              <span className="text-muted-foreground">6 hours ago</span>
-              <span>New user account created for John Doe</span>
-            </div>
-
-            <div className="flex items-center space-x-3 text-sm">
-              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-              <span className="text-muted-foreground">8 hours ago</span>
-              <span>System update applied to web servers</span>
-            </div>
-
-            <div className="flex items-center space-x-3 text-sm">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span className="text-muted-foreground">Yesterday</span>
-              <span>Network performance optimization completed</span>
-            </div>
           </div>
         </CardContent>
       </Card>
