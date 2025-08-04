@@ -1,7 +1,4 @@
-"use client"
-
 import type React from "react"
-
 import { SideNavigation } from "@/components/side-navigation"
 
 export default function ITLayout({
