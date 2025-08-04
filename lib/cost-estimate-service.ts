@@ -25,6 +25,7 @@ interface CreateCostEstimateOptions {
   sendEmail?: boolean
   startDate?: Date // New field
   endDate?: Date // New field
+  customLineItems?: CostEstimateLineItem[] // Allow passing custom line items
 }
 
 interface CostEstimateClientData {
@@ -62,6 +63,15 @@ function generateCostEstimatePassword(): string {
   return password
 }
 
+// Calculate duration in days
+function calculateDurationDays(startDate: Date | null, endDate: Date | null): number | null {
+  if (startDate && endDate) {
+    const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  }
+  return null
+}
+
 // Create a new cost estimate from a proposal
 export async function createCostEstimateFromProposal(
   proposal: Proposal,
@@ -69,60 +79,60 @@ export async function createCostEstimateFromProposal(
   options?: CreateCostEstimateOptions,
 ): Promise<string> {
   try {
-    const lineItems: CostEstimateLineItem[] = []
+    const durationDays = calculateDurationDays(options?.startDate || null, options?.endDate || null)
     let totalAmount = 0
+    const lineItems: CostEstimateLineItem[] = options?.customLineItems || []
 
-    // Add line items for each product in the proposal
-    proposal.products.forEach((product) => {
-      const price = typeof product.price === "number" ? product.price : 0
-      lineItems.push({
-        id: product.id,
-        description: product.name,
-        quantity: 1,
-        unitPrice: price,
-        total: price,
-        category: product.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental", // Categorize based on type
-        notes: `Location: ${product.location}`,
+    // If customLineItems are not provided, generate them from proposal products
+    if (!options?.customLineItems || options.customLineItems.length === 0) {
+      proposal.products.forEach((product) => {
+        const pricePerDay = (typeof product.price === "number" ? product.price : 0) / 30
+        const calculatedTotalPrice = durationDays ? pricePerDay * durationDays : product.price // Use original price if no duration
+        lineItems.push({
+          id: product.id,
+          description: product.name,
+          quantity: 1,
+          unitPrice: product.price, // Keep original unit price for reference
+          total: calculatedTotalPrice,
+          category: product.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
+          notes: `Location: ${product.location}`,
+        })
       })
-      totalAmount += price
-    })
 
-    // Add default cost categories (can be customized later)
-    lineItems.push({
-      id: "production-cost",
-      description: "Production Cost (Tarpaulin/LED Content)",
-      quantity: 1,
-      unitPrice: 0, // To be filled by user
-      total: 0,
-      category: "Production",
-      notes: "Estimated cost for content production.",
-    })
-    lineItems.push({
-      id: "installation-cost",
-      description: "Installation/Dismantling Fees",
-      quantity: 1,
-      unitPrice: 0, // To be filled by user
-      total: 0,
-      category: "Installation",
-      notes: "Estimated cost for installation and dismantling.",
-    })
-    lineItems.push({
-      id: "maintenance-cost",
-      description: "Maintenance & Monitoring",
-      quantity: 1,
-      unitPrice: 0, // To be filled by user
-      total: 0,
-      category: "Maintenance",
-      notes: "Estimated cost for ongoing maintenance and monitoring.",
-    })
+      // Add default cost categories if not using custom line items
+      lineItems.push({
+        id: "production-cost",
+        description: "Production Cost (Tarpaulin/LED Content)",
+        quantity: 1,
+        unitPrice: 0,
+        total: 0,
+        category: "Production",
+        notes: "Estimated cost for content production.",
+      })
+      lineItems.push({
+        id: "installation-cost",
+        description: "Installation/Dismantling Fees",
+        quantity: 1,
+        unitPrice: 0,
+        total: 0,
+        category: "Installation",
+        notes: "Estimated cost for installation and dismantling.",
+      })
+      lineItems.push({
+        id: "maintenance-cost",
+        description: "Maintenance & Monitoring",
+        quantity: 1,
+        unitPrice: 0,
+        total: 0,
+        category: "Maintenance",
+        notes: "Estimated cost for ongoing maintenance and monitoring.",
+      })
+    }
+
+    // Recalculate total amount based on final line items
+    totalAmount = lineItems.reduce((sum, item) => sum + item.total, 0)
 
     const costEstimateNumber = `CE${Date.now()}` // Generate CE + currentmillis
-
-    let durationDays = null
-    if (options?.startDate && options?.endDate) {
-      const diffTime = Math.abs(options.endDate.getTime() - options.startDate.getTime())
-      durationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    }
 
     const newCostEstimateRef = await addDoc(collection(db, COST_ESTIMATES_COLLECTION), {
       proposalId: proposal.id,
@@ -158,59 +168,60 @@ export async function createDirectCostEstimate(
   options?: CreateCostEstimateOptions,
 ): Promise<string> {
   try {
-    const lineItems: CostEstimateLineItem[] = []
+    const durationDays = calculateDurationDays(options?.startDate || null, options?.endDate || null)
     let totalAmount = 0
+    const lineItems: CostEstimateLineItem[] = options?.customLineItems || []
 
-    // Add line items for each selected site
-    sitesData.forEach((site) => {
-      lineItems.push({
-        id: site.id,
-        description: site.name,
-        quantity: 1,
-        unitPrice: site.price,
-        total: site.price,
-        category: site.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
-        notes: `Location: ${site.location}`,
+    // If customLineItems are not provided, generate them from sitesData
+    if (!options?.customLineItems || options.customLineItems.length === 0) {
+      sitesData.forEach((site) => {
+        const pricePerDay = site.price / 30
+        const calculatedTotalPrice = durationDays ? pricePerDay * durationDays : site.price // Use original price if no duration
+        lineItems.push({
+          id: site.id,
+          description: site.name,
+          quantity: 1,
+          unitPrice: site.price, // Keep original unit price for reference
+          total: calculatedTotalPrice,
+          category: site.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
+          notes: `Location: ${site.location}`,
+        })
       })
-      totalAmount += site.price
-    })
 
-    // Add default cost categories
-    lineItems.push({
-      id: "production-cost",
-      description: "Production Cost (Tarpaulin/LED Content)",
-      quantity: 1,
-      unitPrice: 0,
-      total: 0,
-      category: "Production",
-      notes: "Estimated cost for content production.",
-    })
-    lineItems.push({
-      id: "installation-cost",
-      description: "Installation/Dismantling Fees",
-      quantity: 1,
-      unitPrice: 0,
-      total: 0,
-      category: "Installation",
-      notes: "Estimated cost for installation and dismantling.",
-    })
-    lineItems.push({
-      id: "maintenance-cost",
-      description: "Maintenance & Monitoring",
-      quantity: 1,
-      unitPrice: 0,
-      total: 0,
-      category: "Maintenance",
-      notes: "Estimated cost for ongoing maintenance and monitoring.",
-    })
+      // Add default cost categories if not using custom line items
+      lineItems.push({
+        id: "production-cost",
+        description: "Production Cost (Tarpaulin/LED Content)",
+        quantity: 1,
+        unitPrice: 0,
+        total: 0,
+        category: "Production",
+        notes: "Estimated cost for content production.",
+      })
+      lineItems.push({
+        id: "installation-cost",
+        description: "Installation/Dismantling Fees",
+        quantity: 1,
+        unitPrice: 0,
+        total: 0,
+        category: "Installation",
+        notes: "Estimated cost for installation and dismantling.",
+      })
+      lineItems.push({
+        id: "maintenance-cost",
+        description: "Maintenance & Monitoring",
+        quantity: 1,
+        unitPrice: 0,
+        total: 0,
+        category: "Maintenance",
+        notes: "Estimated cost for ongoing maintenance and monitoring.",
+      })
+    }
+
+    // Recalculate total amount based on final line items
+    totalAmount = lineItems.reduce((sum, item) => sum + item.total, 0)
 
     const costEstimateNumber = `CE${Date.now()}` // Generate CE + currentmillis
-
-    let durationDays = null
-    if (options?.startDate && options?.endDate) {
-      const diffTime = Math.abs(options.endDate.getTime() - options.startDate.getTime())
-      durationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    }
 
     const newCostEstimateRef = await addDoc(collection(db, COST_ESTIMATES_COLLECTION), {
       proposalId: null, // No associated proposal
@@ -528,8 +539,8 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
         createdAt: data.createdAt?.toDate(),
         updatedAt: data.updatedAt?.toDate(),
         createdBy: data.createdBy,
-        startDate: data.startDate?.toDate() || null, // Retrieve new dates
-        endDate: data.endDate?.toDate() || null, // Retrieve new dates
+        startDate: data.startDate?.toDate() || null,
+        endDate: data.endDate?.toDate() || null,
         durationDays: data.durationDays || null, // Retrieve duration in days
         validUntil: data.validUntil?.toDate() || null, // Retrieve new dates
       } as CostEstimate

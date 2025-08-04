@@ -11,6 +11,11 @@ import { createCostEstimateFromProposal } from "@/lib/cost-estimate-service"
 import type { Proposal } from "@/lib/types/proposal"
 import type { CostEstimateLineItem } from "@/lib/types/cost-estimate"
 import { useToast } from "@/hooks/use-toast"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
+import { Label } from "@/components/ui/label"
 
 export default function CreateCostEstimatePage() {
   const params = useParams()
@@ -21,6 +26,8 @@ export default function CreateCostEstimatePage() {
   const [saving, setSaving] = useState(false)
   const [lineItems, setLineItems] = useState<CostEstimateLineItem[]>([])
   const [notes, setNotes] = useState("")
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined)
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined)
 
   useEffect(() => {
     async function fetchProposal() {
@@ -39,8 +46,8 @@ export default function CreateCostEstimatePage() {
               description: `${product.name} - ${product.location}`,
               quantity: 1,
               unitPrice: product.price,
-              totalPrice: product.price,
-              category: "media_cost" as const,
+              total: product.price, // Initial total, will be recalculated based on duration
+              category: "media_cost",
             }))
 
             // Add standard categories
@@ -50,16 +57,16 @@ export default function CreateCostEstimatePage() {
                 description: "Creative Design & Production",
                 quantity: 1,
                 unitPrice: 0,
-                totalPrice: 0,
-                category: "production_cost" as const,
+                total: 0,
+                category: "production_cost",
               },
               {
                 id: `item_${initialItems.length + 2}`,
                 description: "Installation & Setup",
                 quantity: 1,
                 unitPrice: 0,
-                totalPrice: 0,
-                category: "installation_cost" as const,
+                total: 0,
+                category: "installation_cost",
               },
             )
 
@@ -81,13 +88,51 @@ export default function CreateCostEstimatePage() {
     fetchProposal()
   }, [params.id, toast])
 
+  // Recalculate line item totals when dates change
+  useEffect(() => {
+    if (startDate && endDate) {
+      const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
+      const durationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+
+      setLineItems((currentItems) =>
+        currentItems.map((item) => {
+          if (item.category === "media_cost" && item.unitPrice > 0) {
+            const pricePerDay = item.unitPrice / 30
+            return { ...item, total: pricePerDay * durationDays }
+          }
+          return item
+        }),
+      )
+    } else {
+      // If dates are cleared, revert media costs to original unit price
+      setLineItems((currentItems) =>
+        currentItems.map((item) => {
+          if (item.category === "media_cost" && proposal) {
+            const originalProduct = proposal.products.find((p) => p.id === item.id)
+            if (originalProduct) {
+              return { ...item, total: originalProduct.price }
+            }
+          }
+          return item
+        }),
+      )
+    }
+  }, [startDate, endDate, proposal])
+
   const updateLineItem = (id: string, field: keyof CostEstimateLineItem, value: any) => {
     setLineItems((items) =>
       items.map((item) => {
         if (item.id === id) {
           const updated = { ...item, [field]: value }
           if (field === "quantity" || field === "unitPrice") {
-            updated.totalPrice = updated.quantity * updated.unitPrice
+            // If unitPrice or quantity changes, recalculate total based on duration if dates are set
+            if (startDate && endDate && item.category === "media_cost") {
+              const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
+              const durationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+              updated.total = (updated.unitPrice / 30) * updated.quantity * durationDays
+            } else {
+              updated.total = updated.quantity * updated.unitPrice
+            }
           }
           return updated
         }
@@ -102,8 +147,8 @@ export default function CreateCostEstimatePage() {
       description: "",
       quantity: 1,
       unitPrice: 0,
-      totalPrice: 0,
-      category: "other" as const,
+      total: 0,
+      category: "other",
     }
     setLineItems([...lineItems, newItem])
   }
@@ -121,6 +166,8 @@ export default function CreateCostEstimatePage() {
         notes,
         customLineItems: lineItems,
         sendEmail: sendToClient,
+        startDate: startDate,
+        endDate: endDate,
       })
 
       // Update proposal status
@@ -145,10 +192,13 @@ export default function CreateCostEstimatePage() {
     }
   }
 
-  const subtotal = lineItems.reduce((sum, item) => sum + item.totalPrice, 0)
+  const subtotal = lineItems.reduce((sum, item) => sum + item.total, 0)
   const taxRate = 0.12
   const taxAmount = subtotal * taxRate
   const totalAmount = subtotal + taxAmount
+
+  const durationDays =
+    startDate && endDate ? Math.ceil(Math.abs(endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) : null
 
   if (loading) {
     return (
@@ -199,6 +249,50 @@ export default function CreateCostEstimatePage() {
           </div>
         </div>
 
+        {/* Duration Dates */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Campaign Duration</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="startDate">Start Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn("w-full justify-start text-left font-normal", !startDate && "text-muted-foreground")}
+                  >
+                    {startDate ? format(startDate, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div>
+              <Label htmlFor="endDate">End Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn("w-full justify-start text-left font-normal", !endDate && "text-muted-foreground")}
+                  >
+                    {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={endDate} onSelect={setEndDate} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          {durationDays !== null && (
+            <p className="mt-4 text-sm text-gray-600">
+              Duration: {durationDays} day{durationDays !== 1 ? "s" : ""}
+            </p>
+          )}
+        </div>
+
         {/* Line Items */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -236,7 +330,7 @@ export default function CreateCostEstimatePage() {
                   />
                 </div>
                 <div className="col-span-2">
-                  <div className="text-right font-medium">₱{item.totalPrice.toLocaleString()}</div>
+                  <div className="text-right font-medium">₱{item.total.toLocaleString()}</div>
                 </div>
                 <div className="col-span-1">
                   <Button
