@@ -423,14 +423,15 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       return
     }
 
-    if (!selectedJO) {
-      toast({
-        title: "Error",
-        description: "Please select a Job Order",
-        variant: "destructive",
-      })
-      return
-    }
+    // Remove this block:
+    // if (!selectedJO) {
+    //   toast({
+    //     title: "Error",
+    //     description: "Please select a Job Order",
+    //     variant: "destructive",
+    //   })
+    //   return
+    // }
 
     // Check if at least one attachment has a file with fileUrl
     const hasValidAttachments = attachments.some((att) => att.file && att.fileUrl)
@@ -457,7 +458,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
     setLoading(true)
     try {
       // Find the selected job order data
-      const selectedJobOrder = jobOrders.find((jo) => jo.joNumber === selectedJO)
+      const selectedJobOrder = selectedJO !== "none" ? jobOrders.find((jo) => jo.joNumber === selectedJO) : null
 
       // Build the report data for preview (without saving to Firebase)
       const reportData: any = {
@@ -466,9 +467,9 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
         siteName: product.name || "Unknown Site",
         companyId: projectData?.company_id || userData?.company_id || projectData?.project_id || userData?.project_id,
         sellerId: product.seller_id || user.uid,
-        client: selectedJobOrder?.clientCompany || "Unknown Client",
-        clientId: selectedJobOrder?.clientName || "unknown-client-id",
-        joNumber: selectedJO,
+        client: selectedJobOrder?.clientCompany || "No Client",
+        clientId: selectedJobOrder?.clientName || "no-client-id",
+        joNumber: selectedJO === "none" ? null : selectedJO,
         joType: selectedJobOrder?.joType || "General",
         sales: user.displayName || user.email || "Unknown User",
         reportType,
@@ -583,7 +584,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             {/* Booking Information Section */}
             <div className="bg-gray-100 p-3 rounded-lg space-y-1">
               <div className="text-base">
-                <span className="font-medium">JO#:</span> {selectedJO || "Select JO"}
+                <span className="font-medium">JO#:</span> {selectedJO === "none" ? "None" : selectedJO || "Select JO"}
               </div>
               <div className="text-base">
                 <span className="font-medium">Sales:</span> {user?.displayName || "John Patrick Masan"}
@@ -593,13 +594,14 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             {/* JO Selection */}
             <div className="space-y-2">
               <Label htmlFor="jo" className="text-sm font-semibold text-gray-900">
-                Job Order: <span className="text-red-500">*</span>
+                Job Order:
               </Label>
               <Select value={selectedJO} onValueChange={setSelectedJO}>
                 <SelectTrigger className="h-9 text-sm">
                   <SelectValue placeholder="Select Job Order" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
                   {loadingJOs ? (
                     <SelectItem value="loading" disabled>
                       Loading job orders...
