@@ -24,11 +24,9 @@ import {
   CloudRain,
   Cog,
   Monitor,
-  Server,
-  Shield,
-  Activity,
-  Wifi,
+  Computer,
   Database,
+  Wifi,
   HardDrive,
 } from "lucide-react"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
@@ -58,7 +56,7 @@ const navigationItems = [
       { title: "Dashboard", href: "/sales/dashboard", icon: LayoutDashboard },
       { title: "Project Tracker", href: "/sales/project-campaigns", icon: TrendingUp },
       { title: "Proposals", href: "/sales/proposals", icon: FileCheck },
-      { title: "Quotations", href: "/sales/quotations-list", icon: FileText }, // Added new item for Quotations
+      { title: "Quotations", href: "/sales/quotations-list", icon: FileText },
       { title: "Bookings", href: "/sales/bookings", icon: BookOpen },
       { title: "JOs", href: "/sales/job-orders", icon: ClipboardList },
       { title: "Clients", href: "/sales/clients", icon: Users },
@@ -79,6 +77,19 @@ const navigationItems = [
     ],
   },
   {
+    section: "it",
+    title: "IT Department",
+    icon: Computer,
+    items: [
+      { title: "Dashboard", href: "/it", icon: LayoutDashboard },
+      { title: "System Monitor", href: "/it/system-monitor", icon: Monitor },
+      { title: "User Management", href: "/it/users", icon: Users },
+      { title: "Security Center", href: "/it/security", icon: ShieldCheck },
+      { title: "Support Tickets", href: "/it/tickets", icon: AlertTriangle },
+      { title: "Maintenance", href: "/it/maintenance", icon: Settings },
+    ],
+  },
+  {
     section: "cms",
     title: "CMS",
     icon: FileText,
@@ -86,17 +97,6 @@ const navigationItems = [
       { title: "Dashboard", href: "/cms/dashboard", icon: LayoutDashboard },
       { title: "Planner", href: "/cms/planner", icon: Calendar },
       { title: "Orders", href: "/cms/orders", icon: FileText },
-    ],
-  },
-  {
-    section: "it",
-    title: "IT",
-    icon: Monitor,
-    items: [
-      { title: "Dashboard", href: "/it", icon: LayoutDashboard },
-      { title: "Infrastructure", href: "/it/infrastructure", icon: Server },
-      { title: "Security", href: "/it/security", icon: Shield },
-      { title: "Support", href: "/it/support", icon: Users },
     ],
   },
   {
@@ -534,11 +534,13 @@ export function SideNavigation() {
             {/* Notification Section */}
             <div className="bg-gradient-to-br from-indigo-400 to-indigo-500 rounded-lg p-3 text-white">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Notification</h3>
+                <h3 className="text-sm font-medium">System Alerts</h3>
               </div>
               <div className="space-y-2">
                 <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                  <div className="w-8 h-8 bg-white/30 rounded-full flex items-center justify-center">
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="h-2 bg-white/40 rounded-full mb-1"></div>
                     <div className="h-2 bg-white/30 rounded-full w-3/4"></div>
@@ -546,7 +548,9 @@ export function SideNavigation() {
                   <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
                 <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-white/30 rounded-full"></div>
+                  <div className="w-8 h-8 bg-white/30 rounded-full flex items-center justify-center">
+                    <Monitor className="w-4 h-4" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="h-2 bg-white/40 rounded-full mb-1"></div>
                     <div className="h-2 bg-white/30 rounded-full w-2/3"></div>
@@ -567,8 +571,8 @@ export function SideNavigation() {
               <div className="p-1">
                 {[
                   { title: "Dashboard", href: "/it", icon: LayoutDashboard },
-                  { title: "System Monitor", href: "/it/monitor", icon: Activity },
-                  { title: "Alerts", href: "/it/alerts", icon: AlertTriangle },
+                  { title: "System Monitor", href: "/it/system-monitor", icon: Monitor },
+                  { title: "Support Tickets", href: "/it/tickets", icon: AlertTriangle },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
@@ -598,12 +602,12 @@ export function SideNavigation() {
               </div>
               <div className="p-1">
                 {[
-                  { title: "Infrastructure", href: "/it/infrastructure", icon: Server },
-                  { title: "Security", href: "/it/security", icon: Shield },
-                  { title: "Support Tickets", href: "/it/support", icon: Users },
-                  { title: "Network Management", href: "/it/network", icon: Wifi },
+                  { title: "User Management", href: "/it/users", icon: Users },
+                  { title: "Security Center", href: "/it/security", icon: ShieldCheck },
                   { title: "Database Admin", href: "/it/database", icon: Database },
-                  { title: "Backup & Recovery", href: "/it/backup", icon: HardDrive },
+                  { title: "Network Config", href: "/it/network", icon: Wifi },
+                  { title: "Backup Manager", href: "/it/backup", icon: HardDrive },
+                  { title: "Maintenance", href: "/it/maintenance", icon: Settings },
                 ].map((item) => {
                   const Icon = item.icon
                   const active = isActive(pathname, item.href)
@@ -629,7 +633,7 @@ export function SideNavigation() {
             {/* Intelligence Section */}
             <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
               <div className="flex items-center space-x-2 mb-3">
-                <h3 className="text-sm font-medium">Intelligence</h3>
+                <h3 className="text-sm font-medium">System Intelligence</h3>
                 <Sparkles className="h-4 w-4" />
               </div>
               <div className="relative">
@@ -760,7 +764,7 @@ export function SideNavigation() {
 
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
               <div className="px-3 py-2 border-b border-gray-100">
-                <h3 className="text-sm font-medium text-gray-700">To Go</h3>
+                <h3 className="text-sm font-medium text-gray-700">To Do</h3>
               </div>
               <div className="p-1">
                 {[

@@ -205,7 +205,6 @@ export default function AdminDashboardPage() {
       headerColor: "bg-department-it-teal",
       contentBgColor: "bg-card-content-it",
       members: [],
-      href: "/it",
       isAvailable: true,
     },
     {

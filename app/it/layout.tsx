@@ -7,7 +7,7 @@ export default function ITLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-[calc(100vh-64px)]">
       <SideNavigation />
       <main className="flex-1 overflow-y-auto">{children}</main>
     </div>
