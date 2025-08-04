@@ -165,7 +165,7 @@ export default function CampaignDetailsPage() {
             </p>
             <Button
               onClick={() => router.push("/sales/project-campaigns")}
-              className="bg-blue-600 left-0 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
+              className="bg-blue-600 left-0 w-10 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Project Campaigns
