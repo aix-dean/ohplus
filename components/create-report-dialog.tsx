@@ -61,15 +61,42 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
   const { user, userData, projectData } = useAuth()
   const router = useRouter()
 
+  const [selectedJO, setSelectedJO] = useState("")
+  const [jobOrders, setJobOrders] = useState<any[]>([])
+  const [loadingJOs, setLoadingJOs] = useState(false)
+
   // Fetch product data when dialog opens
   useEffect(() => {
     if (open && siteId) {
       fetchProductData()
       fetchTeams()
+      fetchJobOrders()
       // Auto-fill date with current date
       setDate(new Date().toISOString().split("T")[0])
     }
   }, [open, siteId])
+
+  const fetchJobOrders = async () => {
+    setLoadingJOs(true)
+    try {
+      // Mock job orders data - replace with actual API call
+      const mockJobOrders = [
+        { id: "JO-2025-001234", number: "JO-2025-001234", client: "Summit Media", status: "active" },
+        { id: "JO-2025-001235", number: "JO-2025-001235", client: "Summit Media", status: "active" },
+        { id: "JO-2025-001236", number: "JO-2025-001236", client: "ABC Corp", status: "completed" },
+      ]
+      setJobOrders(mockJobOrders)
+    } catch (error) {
+      console.error("Error fetching job orders:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load job orders",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingJOs(false)
+    }
+  }
 
   const fetchProductData = async () => {
     try {
@@ -369,6 +396,15 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       return
     }
 
+    if (!selectedJO) {
+      toast({
+        title: "Error",
+        description: "Please select a Job Order",
+        variant: "destructive",
+      })
+      return
+    }
+
     // Check if at least one attachment has a file with fileUrl
     const hasValidAttachments = attachments.some((att) => att.file && att.fileUrl)
     if (!hasValidAttachments) {
@@ -480,6 +516,7 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
       setReportType("completion-report")
       setDate("")
       setSelectedTeam("")
+      setSelectedJO("")
       setAttachments([{ note: "" }, { note: "" }])
       setStatus("")
       setTimeline("on-time")
@@ -519,11 +556,36 @@ export function CreateReportDialog({ open, onOpenChange, siteId }: CreateReportD
             {/* Booking Information Section */}
             <div className="bg-gray-100 p-3 rounded-lg space-y-1">
               <div className="text-base">
-                <span className="font-medium">JO#:</span> JO-2025-001234
+                <span className="font-medium">JO#:</span> {selectedJO || "Select JO"}
               </div>
               <div className="text-base">
                 <span className="font-medium">Sales:</span> {user?.displayName || "John Patrick Masan"}
               </div>
+            </div>
+
+            {/* JO Selection */}
+            <div className="space-y-2">
+              <Label htmlFor="jo" className="text-sm font-semibold text-gray-900">
+                Job Order: <span className="text-red-500">*</span>
+              </Label>
+              <Select value={selectedJO} onValueChange={setSelectedJO}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Select Job Order" />
+                </SelectTrigger>
+                <SelectContent>
+                  {loadingJOs ? (
+                    <SelectItem value="loading" disabled>
+                      Loading job orders...
+                    </SelectItem>
+                  ) : (
+                    jobOrders.map((jo) => (
+                      <SelectItem key={jo.id} value={jo.number}>
+                        {jo.number} - {jo.client}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Report Type */}
