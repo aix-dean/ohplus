@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -193,11 +194,11 @@ const categoryIcons = {
 }
 
 export default function ITInventoryPage() {
+  const router = useRouter()
   const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory)
   const [searchTerm, setSearchTerm] = useState("")
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
   const [formData, setFormData] = useState<Partial<InventoryItem>>({
     type: "hardware",
@@ -228,45 +229,6 @@ export default function ITInventoryPage() {
 
     return { total, active, maintenance, totalValue }
   }, [inventory])
-
-  const handleCreate = () => {
-    if (!formData.name || !formData.category || !formData.vendor) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      })
-      return
-    }
-
-    const newItem: InventoryItem = {
-      id: Date.now().toString(),
-      name: formData.name!,
-      type: formData.type as "hardware" | "software",
-      category: formData.category!,
-      status: formData.status as any,
-      location: formData.location || "",
-      assignedTo: formData.assignedTo || "",
-      purchaseDate: formData.purchaseDate || "",
-      warrantyExpiry: formData.warrantyExpiry || "",
-      cost: formData.cost || 0,
-      vendor: formData.vendor!,
-      description: formData.description || "",
-      serialNumber: formData.serialNumber,
-      specifications: formData.specifications,
-      licenseKey: formData.licenseKey,
-      version: formData.version,
-    }
-
-    setInventory([...inventory, newItem])
-    setFormData({ type: "hardware", status: "active" })
-    setIsCreateDialogOpen(false)
-
-    toast({
-      title: "Success",
-      description: "Inventory item created successfully",
-    })
-  }
 
   const handleEdit = (item: InventoryItem) => {
     setEditingItem(item)
@@ -307,9 +269,8 @@ export default function ITInventoryPage() {
     })
   }
 
-  const resetForm = () => {
-    setFormData({ type: "hardware", status: "active" })
-    setEditingItem(null)
+  const handleAddNew = () => {
+    router.push("/it/inventory/new")
   }
 
   return (
@@ -319,213 +280,10 @@ export default function ITInventoryPage() {
           <h1 className="text-3xl font-bold">IT Inventory Management</h1>
           <p className="text-muted-foreground">Manage your hardware and software assets</p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={resetForm}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Item
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Add New Inventory Item</DialogTitle>
-              <DialogDescription>Create a new hardware or software inventory item</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name || ""}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Enter item name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="type">Type *</Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value) => setFormData({ ...formData, type: value as "hardware" | "software" })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="hardware">Hardware</SelectItem>
-                      <SelectItem value="software">Software</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category *</Label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) => setFormData({ ...formData, category: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => setFormData({ ...formData, status: value as any })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                      <SelectItem value="maintenance">Maintenance</SelectItem>
-                      <SelectItem value="retired">Retired</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="location">Location</Label>
-                  <Input
-                    id="location"
-                    value={formData.location || ""}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    placeholder="Enter location"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="assignedTo">Assigned To</Label>
-                  <Input
-                    id="assignedTo"
-                    value={formData.assignedTo || ""}
-                    onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
-                    placeholder="Enter assigned person/team"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="purchaseDate">Purchase Date</Label>
-                  <Input
-                    id="purchaseDate"
-                    type="date"
-                    value={formData.purchaseDate || ""}
-                    onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="warrantyExpiry">Warranty Expiry</Label>
-                  <Input
-                    id="warrantyExpiry"
-                    type="date"
-                    value={formData.warrantyExpiry || ""}
-                    onChange={(e) => setFormData({ ...formData, warrantyExpiry: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cost">Cost ($)</Label>
-                  <Input
-                    id="cost"
-                    type="number"
-                    value={formData.cost || ""}
-                    onChange={(e) => setFormData({ ...formData, cost: Number.parseFloat(e.target.value) || 0 })}
-                    placeholder="Enter cost"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="vendor">Vendor *</Label>
-                  <Input
-                    id="vendor"
-                    value={formData.vendor || ""}
-                    onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
-                    placeholder="Enter vendor name"
-                  />
-                </div>
-              </div>
-
-              {formData.type === "hardware" && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="serialNumber">Serial Number</Label>
-                    <Input
-                      id="serialNumber"
-                      value={formData.serialNumber || ""}
-                      onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
-                      placeholder="Enter serial number"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="specifications">Specifications</Label>
-                    <Input
-                      id="specifications"
-                      value={formData.specifications || ""}
-                      onChange={(e) => setFormData({ ...formData, specifications: e.target.value })}
-                      placeholder="Enter specifications"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {formData.type === "software" && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="licenseKey">License Key</Label>
-                    <Input
-                      id="licenseKey"
-                      value={formData.licenseKey || ""}
-                      onChange={(e) => setFormData({ ...formData, licenseKey: e.target.value })}
-                      placeholder="Enter license key"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="version">Version</Label>
-                    <Input
-                      id="version"
-                      value={formData.version || ""}
-                      onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-                      placeholder="Enter version"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description || ""}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Enter description"
-                  rows={3}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreate}>Create Item</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <Button onClick={handleAddNew}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Item
+        </Button>
       </div>
 
       {/* Stats Cards */}
