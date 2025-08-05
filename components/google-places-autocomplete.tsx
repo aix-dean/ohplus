@@ -1,142 +1,207 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
-
-interface Prediction {
-  place_id: string
-  description: string
-}
+import { cn } from "@/lib/utils"
+import { MapPin, Loader2 } from "lucide-react"
 
 interface GooglePlacesAutocompleteProps {
   value: string
   onChange: (value: string) => void
-  className?: string
   placeholder?: string
-  required?: boolean
+  className?: string
+  enableMap?: boolean
+  mapHeight?: string
+}
+
+declare global {
+  interface Window {
+    google: any
+    initMap: () => void
+  }
 }
 
 export function GooglePlacesAutocomplete({
   value,
   onChange,
+  placeholder = "Enter location...",
   className,
-  placeholder = "Enter an address",
-  required = false,
+  enableMap = false,
+  mapHeight = "200px",
 }: GooglePlacesAutocompleteProps) {
-  const [predictions, setPredictions] = useState<Prediction[]>([])
-  const [showPredictions, setShowPredictions] = useState(false)
-  const [loading, setLoading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const mapRef = useRef<HTMLDivElement>(null)
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [map, setMap] = useState<any>(null)
+  const [marker, setMarker] = useState<any>(null)
+  const [autocomplete, setAutocomplete] = useState<any>(null)
 
-  // Handle input change
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    onChange(value)
-
-    // Clear any existing debounce timer
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current)
-    }
-
-    if (value.length > 2) {
-      // Debounce the API call to avoid too many requests
-      setLoading(true)
-      debounceTimerRef.current = setTimeout(() => {
-        fetchPredictions(value)
-      }, 300)
-    } else {
-      setPredictions([])
-      setShowPredictions(false)
-      setLoading(false)
-    }
-  }
-
-  // Fetch predictions from our server API
-  const fetchPredictions = async (input: string) => {
-    try {
-      setLoading(true)
-      const response = await fetch(`/api/places/autocomplete?input=${encodeURIComponent(input)}`)
-      const data = await response.json()
-
-      if (data.predictions) {
-        setPredictions(data.predictions)
-        setShowPredictions(true)
-      } else {
-        setPredictions([])
-        setShowPredictions(false)
-
-        // Log error if present but don't show to user
-        if (data.error_message) {
-          console.warn("Places API warning:", data.error_message)
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching predictions:", error)
-      setPredictions([])
-      setShowPredictions(false)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  // Handle prediction selection
-  const handlePredictionClick = (prediction: Prediction) => {
-    onChange(prediction.description)
-    setPredictions([])
-    setShowPredictions(false)
-  }
-
-  // Close predictions when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (inputRef.current && !inputRef.current.contains(event.target as Node)) {
-        setShowPredictions(false)
+    const loadGoogleMaps = () => {
+      if (window.google && window.google.maps) {
+        setIsLoaded(true)
+        setIsLoading(false)
+        return
       }
+
+      if (document.querySelector('script[src*="maps.googleapis.com"]')) {
+        const checkGoogle = setInterval(() => {
+          if (window.google && window.google.maps) {
+            setIsLoaded(true)
+            setIsLoading(false)
+            clearInterval(checkGoogle)
+          }
+        }, 100)
+        return
+      }
+
+      const script = document.createElement("script")
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places&callback=initMap`
+      script.async = true
+      script.defer = true
+
+      window.initMap = () => {
+        setIsLoaded(true)
+        setIsLoading(false)
+      }
+
+      document.head.appendChild(script)
     }
 
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
+    loadGoogleMaps()
   }, [])
 
-  // Clean up any timers when component unmounts
   useEffect(() => {
+    if (!isLoaded || !inputRef.current) return
+
+    // Initialize autocomplete
+    const autocompleteInstance = new window.google.maps.places.Autocomplete(inputRef.current, {
+      types: ["establishment", "geocode"],
+      fields: ["place_id", "geometry", "name", "formatted_address"],
+    })
+
+    setAutocomplete(autocompleteInstance)
+
+    // Initialize map if enabled
+    if (enableMap && mapRef.current) {
+      const mapInstance = new window.google.maps.Map(mapRef.current, {
+        center: { lat: 14.5995, lng: 120.9842 }, // Default to Manila, Philippines
+        zoom: 13,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+      })
+
+      const markerInstance = new window.google.maps.Marker({
+        map: mapInstance,
+        draggable: true,
+      })
+
+      setMap(mapInstance)
+      setMarker(markerInstance)
+
+      // Handle marker drag
+      markerInstance.addListener("dragend", () => {
+        const position = markerInstance.getPosition()
+        const geocoder = new window.google.maps.Geocoder()
+
+        geocoder.geocode({ location: position }, (results: any, status: any) => {
+          if (status === "OK" && results[0]) {
+            onChange(results[0].formatted_address)
+            if (inputRef.current) {
+              inputRef.current.value = results[0].formatted_address
+            }
+          }
+        })
+      })
+
+      // Handle map click
+      mapInstance.addListener("click", (event: any) => {
+        const position = event.latLng
+        markerInstance.setPosition(position)
+
+        const geocoder = new window.google.maps.Geocoder()
+        geocoder.geocode({ location: position }, (results: any, status: any) => {
+          if (status === "OK" && results[0]) {
+            onChange(results[0].formatted_address)
+            if (inputRef.current) {
+              inputRef.current.value = results[0].formatted_address
+            }
+          }
+        })
+      })
+    }
+
+    // Handle place selection
+    autocompleteInstance.addListener("place_changed", () => {
+      const place = autocompleteInstance.getPlace()
+
+      if (!place.geometry || !place.geometry.location) {
+        return
+      }
+
+      const address = place.formatted_address || place.name || ""
+      onChange(address)
+
+      // Update map if enabled
+      if (enableMap && map && marker) {
+        const location = place.geometry.location
+        map.setCenter(location)
+        map.setZoom(17)
+        marker.setPosition(location)
+      }
+    })
+
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current)
+      if (autocompleteInstance) {
+        window.google.maps.event.clearInstanceListeners(autocompleteInstance)
       }
     }
-  }, [])
+  }, [isLoaded, enableMap, onChange])
+
+  // Set initial value
+  useEffect(() => {
+    if (inputRef.current && value !== inputRef.current.value) {
+      inputRef.current.value = value
+    }
+  }, [value])
+
+  if (isLoading) {
+    return (
+      <div className={cn("relative", className)}>
+        <Input placeholder="Loading Google Maps..." disabled className="pr-10" />
+        <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className={cn("relative", className)}>
+        <Input placeholder="Google Maps failed to load" disabled className="pr-10" />
+        <MapPin className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
-    <div className="relative" ref={inputRef}>
-      <Input
-        type="text"
-        value={value}
-        onChange={handleInputChange}
-        placeholder={placeholder}
-        className={className}
-        required={required}
-      />
-      {loading && (
-        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-          <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
-        </div>
-      )}
-      {showPredictions && predictions.length > 0 && (
-        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-          {predictions.map((prediction) => (
-            <div
-              key={prediction.place_id}
-              className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-              onClick={() => handlePredictionClick(prediction)}
-            >
-              {prediction.description}
-            </div>
-          ))}
+    <div className="space-y-3">
+      <div className={cn("relative", className)}>
+        <Input ref={inputRef} placeholder={placeholder} className="pr-10" onChange={(e) => onChange(e.target.value)} />
+        <MapPin className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      </div>
+
+      {enableMap && (
+        <div className="space-y-2">
+          <div
+            ref={mapRef}
+            style={{ height: mapHeight }}
+            className="w-full rounded-md border border-input bg-background"
+          />
+          <p className="text-xs text-muted-foreground">
+            Click on the map or drag the marker to select the exact location
+          </p>
         </div>
       )}
     </div>

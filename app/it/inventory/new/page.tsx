@@ -592,15 +592,19 @@ export default function NewInventoryItemPage() {
                     <Label htmlFor="storeLocation" className="text-base font-medium">
                       Store Location
                     </Label>
-                    <GooglePlacesAutocomplete
-                      value={formData.storeLocation}
-                      onChange={(value) => setFormData({ ...formData, storeLocation: value })}
-                      placeholder="Enter store address or location"
-                      className="h-12 text-base"
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Physical address of the store where you made the purchase
-                    </p>
+                    <div className="space-y-2">
+                      <GooglePlacesAutocomplete
+                        value={formData.storeLocation}
+                        onChange={(value) => setFormData({ ...formData, storeLocation: value })}
+                        placeholder="Search for store location..."
+                        className="h-12 text-base"
+                        enableMap={true}
+                        mapHeight="300px"
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Search and select the exact location of the store on the map
+                      </p>
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -829,9 +833,9 @@ export default function NewInventoryItemPage() {
                           <span className="text-sm text-muted-foreground">{formData.storeName || "Not specified"}</span>
                         </div>
                         {formData.vendorType === "physical" && (
-                          <div className="flex justify-between items-center py-2 border-b border-muted">
+                          <div className="flex justify-between items-start py-2 border-b border-muted">
                             <span className="text-sm font-medium">Store Location:</span>
-                            <span className="text-sm text-muted-foreground">
+                            <span className="text-sm text-muted-foreground text-right max-w-xs">
                               {formData.storeLocation || "Not specified"}
                             </span>
                           </div>
