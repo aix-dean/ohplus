@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useRef, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -36,6 +38,7 @@ export function GooglePlacesAutocomplete({
   const [map, setMap] = useState<any>(null)
   const [marker, setMarker] = useState<any>(null)
   const [autocomplete, setAutocomplete] = useState<any>(null)
+  const [geocoder, setGeocoder] = useState<any>(null)
 
   useEffect(() => {
     const loadGoogleMaps = () => {
@@ -72,6 +75,25 @@ export function GooglePlacesAutocomplete({
     loadGoogleMaps()
   }, [])
 
+  // Function to geocode an address and update the map
+  const geocodeAddress = (address: string) => {
+    if (!geocoder || !map || !marker || !address.trim()) return
+
+    geocoder.geocode({ address: address }, (results: any, status: any) => {
+      if (status === "OK" && results[0]) {
+        const location = results[0].geometry.location
+        map.setCenter(location)
+        map.setZoom(17)
+        marker.setPosition(location)
+        marker.setVisible(true)
+      } else {
+        console.warn("Geocoding failed:", status)
+        // Hide marker if geocoding fails
+        marker.setVisible(false)
+      }
+    })
+  }
+
   useEffect(() => {
     if (!isLoaded || !inputRef.current) return
 
@@ -82,6 +104,10 @@ export function GooglePlacesAutocomplete({
     })
 
     setAutocomplete(autocompleteInstance)
+
+    // Initialize geocoder
+    const geocoderInstance = new window.google.maps.Geocoder()
+    setGeocoder(geocoderInstance)
 
     // Initialize map if enabled
     if (enableMap && mapRef.current) {
@@ -96,6 +122,7 @@ export function GooglePlacesAutocomplete({
       const markerInstance = new window.google.maps.Marker({
         map: mapInstance,
         draggable: true,
+        visible: false, // Initially hidden until location is set
       })
 
       setMap(mapInstance)
@@ -104,9 +131,8 @@ export function GooglePlacesAutocomplete({
       // Handle marker drag
       markerInstance.addListener("dragend", () => {
         const position = markerInstance.getPosition()
-        const geocoder = new window.google.maps.Geocoder()
 
-        geocoder.geocode({ location: position }, (results: any, status: any) => {
+        geocoderInstance.geocode({ location: position }, (results: any, status: any) => {
           if (status === "OK" && results[0]) {
             onChange(results[0].formatted_address)
             if (inputRef.current) {
@@ -120,9 +146,9 @@ export function GooglePlacesAutocomplete({
       mapInstance.addListener("click", (event: any) => {
         const position = event.latLng
         markerInstance.setPosition(position)
+        markerInstance.setVisible(true)
 
-        const geocoder = new window.google.maps.Geocoder()
-        geocoder.geocode({ location: position }, (results: any, status: any) => {
+        geocoderInstance.geocode({ location: position }, (results: any, status: any) => {
           if (status === "OK" && results[0]) {
             onChange(results[0].formatted_address)
             if (inputRef.current) {
@@ -133,7 +159,7 @@ export function GooglePlacesAutocomplete({
       })
     }
 
-    // Handle place selection
+    // Handle place selection from autocomplete
     autocompleteInstance.addListener("place_changed", () => {
       const place = autocompleteInstance.getPlace()
 
@@ -150,6 +176,7 @@ export function GooglePlacesAutocomplete({
         map.setCenter(location)
         map.setZoom(17)
         marker.setPosition(location)
+        marker.setVisible(true)
       }
     })
 
@@ -160,12 +187,32 @@ export function GooglePlacesAutocomplete({
     }
   }, [isLoaded, enableMap, onChange])
 
-  // Set initial value
+  // Set initial value and geocode if map is enabled
   useEffect(() => {
     if (inputRef.current && value !== inputRef.current.value) {
       inputRef.current.value = value
     }
-  }, [value])
+
+    // If map is enabled and we have a value, geocode it
+    if (enableMap && value && isLoaded && geocoder) {
+      geocodeAddress(value)
+    }
+  }, [value, enableMap, isLoaded, geocoder])
+
+  // Handle manual input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value
+    onChange(newValue)
+
+    // Debounce geocoding for manual input
+    if (enableMap && newValue.trim()) {
+      const timeoutId = setTimeout(() => {
+        geocodeAddress(newValue)
+      }, 1000) // Wait 1 second after user stops typing
+
+      return () => clearTimeout(timeoutId)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -188,7 +235,13 @@ export function GooglePlacesAutocomplete({
   return (
     <div className="space-y-3">
       <div className={cn("relative", className)}>
-        <Input ref={inputRef} placeholder={placeholder} className="pr-10" onChange={(e) => onChange(e.target.value)} />
+        <Input
+          ref={inputRef}
+          placeholder={placeholder}
+          className="pr-10"
+          onChange={handleInputChange}
+          defaultValue={value}
+        />
         <MapPin className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
       </div>
 
