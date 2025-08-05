@@ -381,7 +381,7 @@ export default function NewInventoryItemPage() {
                         <SelectValue placeholder={loadingUsers ? "Loading users..." : "Select a user"} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">
+                        <SelectItem value="unassigned">
                           <span className="text-muted-foreground">Unassigned</span>
                         </SelectItem>
                         {users.map((user) => (
