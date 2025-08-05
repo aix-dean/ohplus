@@ -131,6 +131,17 @@ export default function NewInventoryItemPage() {
     version: "",
   })
 
+  const [users, setUsers] = useState([
+    { id: "1", name: "John Doe", email: "john.doe@company.com", department: "IT" },
+    { id: "2", name: "Jane Smith", email: "jane.smith@company.com", department: "HR" },
+    { id: "3", name: "Mike Johnson", email: "mike.johnson@company.com", department: "Finance" },
+    { id: "4", name: "Sarah Wilson", email: "sarah.wilson@company.com", department: "Marketing" },
+    { id: "5", name: "David Brown", email: "david.brown@company.com", department: "Sales" },
+    { id: "6", name: "Lisa Davis", email: "lisa.davis@company.com", department: "Operations" },
+    { id: "7", name: "Tom Anderson", email: "tom.anderson@company.com", department: "IT" },
+    { id: "8", name: "Emily Taylor", email: "emily.taylor@company.com", department: "Administration" },
+  ])
+
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
@@ -312,13 +323,26 @@ export default function NewInventoryItemPage() {
                     <Label htmlFor="assignedTo" className="text-base font-medium">
                       Assigned To
                     </Label>
-                    <Input
-                      id="assignedTo"
+                    <Select
                       value={formData.assignedTo}
-                      onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
-                      placeholder="e.g., John Doe"
-                      className="h-12 text-base"
-                    />
+                      onValueChange={(value) => setFormData({ ...formData, assignedTo: value })}
+                    >
+                      <SelectTrigger className="h-12 text-base">
+                        <SelectValue placeholder="Select a user" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users.map((user) => (
+                          <SelectItem key={user.id} value={user.name}>
+                            <div className="flex flex-col">
+                              <span>{user.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {user.email} • {user.department}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
