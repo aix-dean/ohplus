@@ -771,7 +771,7 @@ export default function NewInventoryItemPage() {
             <Card className="border-2 border-dashed border-purple-200 bg-purple-50/30">
               <CardContent className="p-8 space-y-6">
                 {formData.type === "hardware" ? (
-                  <>
+                  <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-3">
                         <Label htmlFor="serialNumber" className="text-base font-medium">
@@ -801,9 +801,9 @@ export default function NewInventoryItemPage() {
                       </div>
                     </div>
 
-                    {/* Category-specific fields for hardware */}
+                    {/* Category-specific specifications */}
                     {formData.category === "Desktop Computer" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Processor</Label>
                           <Input placeholder="e.g., Intel Core i7-12700K" className="h-12 text-base" />
@@ -818,71 +818,116 @@ export default function NewInventoryItemPage() {
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Graphics Card</Label>
-                          <Input placeholder="e.g., NVIDIA RTX 4060" className="h-12 text-base" />
+                          <Input placeholder="e.g., NVIDIA RTX 3060" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Operating System</Label>
+                          <Input placeholder="e.g., Windows 11 Pro" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Form Factor</Label>
+                          <Input placeholder="e.g., Mid Tower" className="h-12 text-base" />
                         </div>
                       </div>
                     )}
 
                     {formData.category === "Laptop" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Processor</Label>
-                          <Input placeholder="e.g., Intel Core i5-1235U" className="h-12 text-base" />
+                          <Input placeholder="e.g., Intel Core i7-1260P" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">RAM</Label>
-                          <Input placeholder="e.g., 8GB DDR4" className="h-12 text-base" />
+                          <Input placeholder="e.g., 16GB LPDDR5" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Storage</Label>
-                          <Input placeholder="e.g., 256GB SSD" className="h-12 text-base" />
+                          <Input placeholder="e.g., 512GB PCIe SSD" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
-                          <Label className="text-base font-medium">Screen Size</Label>
-                          <Input placeholder="e.g., 15.6 inches" className="h-12 text-base" />
+                          <Label className="text-base font-medium">Display</Label>
+                          <Input placeholder="e.g., 14-inch FHD IPS" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Graphics</Label>
+                          <Input placeholder="e.g., Intel Iris Xe" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Battery Life</Label>
-                          <Input placeholder="e.g., 8 hours" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Weight</Label>
-                          <Input placeholder="e.g., 2.1 kg" className="h-12 text-base" />
+                          <Input placeholder="e.g., Up to 10 hours" className="h-12 text-base" />
                         </div>
                       </div>
                     )}
 
                     {formData.category === "Smartphone" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">
-                          <Label className="text-base font-medium">Operating System</Label>
-                          <Input placeholder="e.g., Android 14" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Screen Size</Label>
-                          <Input placeholder="e.g., 6.1 inches" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Storage</Label>
-                          <Input placeholder="e.g., 128GB" className="h-12 text-base" />
+                          <Label className="text-base font-medium">Processor</Label>
+                          <Input placeholder="e.g., Snapdragon 8 Gen 2" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">RAM</Label>
-                          <Input placeholder="e.g., 6GB" className="h-12 text-base" />
+                          <Input placeholder="e.g., 8GB" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Storage</Label>
+                          <Input placeholder="e.g., 256GB" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Display</Label>
+                          <Input placeholder="e.g., 6.7-inch AMOLED" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Camera</Label>
-                          <Input placeholder="e.g., 48MP main, 12MP ultra-wide" className="h-12 text-base" />
+                          <Input placeholder="e.g., 108MP Triple Camera" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Battery</Label>
-                          <Input placeholder="e.g., 4000mAh" className="h-12 text-base" />
+                          <Input placeholder="e.g., 5000mAh" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Operating System</Label>
+                          <Input placeholder="e.g., Android 13" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Network</Label>
+                          <Input placeholder="e.g., 5G, Wi-Fi 6" className="h-12 text-base" />
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.category === "Server" && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Processor</Label>
+                          <Input placeholder="e.g., Intel Xeon Silver 4314" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">RAM</Label>
+                          <Input placeholder="e.g., 64GB DDR4 ECC" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Storage</Label>
+                          <Input placeholder="e.g., 2x 1TB NVMe SSD" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">RAID Configuration</Label>
+                          <Input placeholder="e.g., RAID 1" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Network Ports</Label>
+                          <Input placeholder="e.g., 4x 1GbE" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Power Supply</Label>
+                          <Input placeholder="e.g., 750W Redundant" className="h-12 text-base" />
                         </div>
                       </div>
                     )}
 
                     {formData.category === "Monitor" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Screen Size</Label>
                           <Input placeholder="e.g., 27 inches" className="h-12 text-base" />
@@ -904,72 +949,43 @@ export default function NewInventoryItemPage() {
                           <Input placeholder="e.g., HDMI, DisplayPort, USB-C" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
-                          <Label className="text-base font-medium">Response Time</Label>
-                          <Input placeholder="e.g., 1ms" className="h-12 text-base" />
+                          <Label className="text-base font-medium">Color Gamut</Label>
+                          <Input placeholder="e.g., 99% sRGB" className="h-12 text-base" />
                         </div>
                       </div>
                     )}
 
                     {formData.category === "Printer" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Print Technology</Label>
-                          <Input placeholder="e.g., Inkjet, Laser" className="h-12 text-base" />
+                          <Input placeholder="e.g., Laser, Inkjet" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Print Speed</Label>
-                          <Input placeholder="e.g., 20 ppm (black), 15 ppm (color)" className="h-12 text-base" />
+                          <Input placeholder="e.g., 30 ppm" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
-                          <Label className="text-base font-medium">Max Resolution</Label>
-                          <Input placeholder="e.g., 4800 x 1200 dpi" className="h-12 text-base" />
+                          <Label className="text-base font-medium">Print Resolution</Label>
+                          <Input placeholder="e.g., 1200x1200 dpi" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Paper Size</Label>
-                          <Input placeholder="e.g., A4, Letter, Legal" className="h-12 text-base" />
+                          <Input placeholder="e.g., A4, Letter" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Connectivity</Label>
-                          <Input placeholder="e.g., Wi-Fi, Ethernet, USB" className="h-12 text-base" />
+                          <Input placeholder="e.g., USB, Ethernet, Wi-Fi" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
-                          <Label className="text-base font-medium">Functions</Label>
-                          <Input placeholder="e.g., Print, Scan, Copy, Fax" className="h-12 text-base" />
-                        </div>
-                      </div>
-                    )}
-
-                    {formData.category === "Server" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Processor</Label>
-                          <Input placeholder="e.g., Intel Xeon Silver 4314" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">RAM</Label>
-                          <Input placeholder="e.g., 32GB DDR4 ECC" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Storage</Label>
-                          <Input placeholder="e.g., 2x 1TB SAS HDD" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Form Factor</Label>
-                          <Input placeholder="e.g., 1U Rackmount" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Network Ports</Label>
-                          <Input placeholder="e.g., 4x Gigabit Ethernet" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Power Supply</Label>
-                          <Input placeholder="e.g., 550W Redundant" className="h-12 text-base" />
+                          <Label className="text-base font-medium">Monthly Duty Cycle</Label>
+                          <Input placeholder="e.g., 50,000 pages" className="h-12 text-base" />
                         </div>
                       </div>
                     )}
 
                     {formData.category === "Network Switch" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Port Count</Label>
                           <Input placeholder="e.g., 24 ports" className="h-12 text-base" />
@@ -979,26 +995,26 @@ export default function NewInventoryItemPage() {
                           <Input placeholder="e.g., Gigabit Ethernet" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
-                          <Label className="text-base font-medium">Management</Label>
-                          <Input placeholder="e.g., Managed, Unmanaged" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">PoE Support</Label>
-                          <Input placeholder="e.g., PoE+, 370W budget" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
                           <Label className="text-base font-medium">Switching Capacity</Label>
                           <Input placeholder="e.g., 48 Gbps" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
-                          <Label className="text-base font-medium">Form Factor</Label>
-                          <Input placeholder="e.g., Desktop, Rackmount" className="h-12 text-base" />
+                          <Label className="text-base font-medium">MAC Address Table</Label>
+                          <Input placeholder="e.g., 8K entries" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Power Consumption</Label>
+                          <Input placeholder="e.g., 25W" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Management</Label>
+                          <Input placeholder="e.g., Web-based, SNMP" className="h-12 text-base" />
                         </div>
                       </div>
                     )}
 
                     {formData.category === "Router" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Wi-Fi Standard</Label>
                           <Input placeholder="e.g., Wi-Fi 6 (802.11ax)" className="h-12 text-base" />
@@ -1013,21 +1029,58 @@ export default function NewInventoryItemPage() {
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Ethernet Ports</Label>
-                          <Input placeholder="e.g., 4x Gigabit LAN, 1x WAN" className="h-12 text-base" />
+                          <Input placeholder="e.g., 4x Gigabit LAN" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Antennas</Label>
                           <Input placeholder="e.g., 4x External" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
-                          <Label className="text-base font-medium">Coverage Area</Label>
-                          <Input placeholder="e.g., Up to 2000 sq ft" className="h-12 text-base" />
+                          <Label className="text-base font-medium">Security</Label>
+                          <Input placeholder="e.g., WPA3, Firewall" className="h-12 text-base" />
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.category === "Tablet" && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Processor</Label>
+                          <Input placeholder="e.g., Apple M2" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">RAM</Label>
+                          <Input placeholder="e.g., 8GB" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Storage</Label>
+                          <Input placeholder="e.g., 256GB" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Display</Label>
+                          <Input placeholder="e.g., 11-inch Liquid Retina" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Camera</Label>
+                          <Input placeholder="e.g., 12MP Wide" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Battery Life</Label>
+                          <Input placeholder="e.g., Up to 10 hours" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Connectivity</Label>
+                          <Input placeholder="e.g., Wi-Fi 6, Bluetooth 5.0" className="h-12 text-base" />
+                        </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Operating System</Label>
+                          <Input placeholder="e.g., iPadOS 16" className="h-12 text-base" />
                         </div>
                       </div>
                     )}
 
                     {formData.category === "Storage Device" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Storage Type</Label>
                           <Input placeholder="e.g., SSD, HDD, NVMe" className="h-12 text-base" />
@@ -1038,11 +1091,7 @@ export default function NewInventoryItemPage() {
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Interface</Label>
-                          <Input placeholder="e.g., SATA III, USB 3.0, PCIe" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Form Factor</Label>
-                          <Input placeholder="e.g., 2.5 inch, M.2" className="h-12 text-base" />
+                          <Input placeholder="e.g., SATA III, USB 3.0" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Read Speed</Label>
@@ -1052,178 +1101,71 @@ export default function NewInventoryItemPage() {
                           <Label className="text-base font-medium">Write Speed</Label>
                           <Input placeholder="e.g., 530 MB/s" className="h-12 text-base" />
                         </div>
+                        <div className="space-y-3">
+                          <Label className="text-base font-medium">Form Factor</Label>
+                          <Input placeholder="e.g., 2.5-inch, M.2" className="h-12 text-base" />
+                        </div>
                       </div>
                     )}
 
-                    {formData.category === "Tablet" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
+                    {formData.category === "UPS" && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">
-                          <Label className="text-base font-medium">Operating System</Label>
-                          <Input placeholder="e.g., iPadOS 17, Android 13" className="h-12 text-base" />
+                          <Label className="text-base font-medium">Power Rating</Label>
+                          <Input placeholder="e.g., 1500VA / 900W" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
-                          <Label className="text-base font-medium">Screen Size</Label>
-                          <Input placeholder="e.g., 10.9 inches" className="h-12 text-base" />
+                          <Label className="text-base font-medium">Battery Type</Label>
+                          <Input placeholder="e.g., Sealed Lead Acid" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
-                          <Label className="text-base font-medium">Resolution</Label>
-                          <Input placeholder="e.g., 2360 x 1640" className="h-12 text-base" />
+                          <Label className="text-base font-medium">Runtime</Label>
+                          <Input placeholder="e.g., 15 minutes at full load" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
-                          <Label className="text-base font-medium">Storage</Label>
-                          <Input placeholder="e.g., 64GB, 256GB" className="h-12 text-base" />
+                          <Label className="text-base font-medium">Output Outlets</Label>
+                          <Input placeholder="e.g., 8x NEMA 5-15R" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
-                          <Label className="text-base font-medium">Connectivity</Label>
-                          <Input placeholder="e.g., Wi-Fi 6, Cellular" className="h-12 text-base" />
+                          <Label className="text-base font-medium">Input Voltage</Label>
+                          <Input placeholder="e.g., 120V AC" className="h-12 text-base" />
                         </div>
                         <div className="space-y-3">
-                          <Label className="text-base font-medium">Battery Life</Label>
-                          <Input placeholder="e.g., 10 hours" className="h-12 text-base" />
+                          <Label className="text-base font-medium">Communication</Label>
+                          <Input placeholder="e.g., USB, Serial" className="h-12 text-base" />
                         </div>
                       </div>
                     )}
-                  </>
+                  </div>
                 ) : (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <Label htmlFor="licenseKey" className="text-base font-medium">
-                          License Key
-                        </Label>
-                        <Input
-                          id="licenseKey"
-                          value={formData.licenseKey || ""}
-                          onChange={(e) => setFormData({ ...formData, licenseKey: e.target.value })}
-                          placeholder="e.g., XXXXX-XXXXX-XXXXX-XXXXX"
-                          className="h-12 text-base font-mono"
-                        />
-                        <p className="text-sm text-muted-foreground">Software license or activation key</p>
-                      </div>
-                      <div className="space-y-3">
-                        <Label htmlFor="version" className="text-base font-medium">
-                          Version
-                        </Label>
-                        <Input
-                          id="version"
-                          value={formData.version || ""}
-                          onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-                          placeholder="e.g., 2024.1.0"
-                          className="h-12 text-base"
-                        />
-                        <p className="text-sm text-muted-foreground">Current software version</p>
-                      </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label htmlFor="licenseKey" className="text-base font-medium">
+                        License Key
+                      </Label>
+                      <Input
+                        id="licenseKey"
+                        value={formData.licenseKey || ""}
+                        onChange={(e) => setFormData({ ...formData, licenseKey: e.target.value })}
+                        placeholder="e.g., XXXXX-XXXXX-XXXXX-XXXXX"
+                        className="h-12 text-base font-mono"
+                      />
+                      <p className="text-sm text-muted-foreground">Software license or activation key</p>
                     </div>
-
-                    {/* Category-specific fields for software */}
-                    {formData.category === "Operating System" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Architecture</Label>
-                          <Input placeholder="e.g., 64-bit, ARM64" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Edition</Label>
-                          <Input placeholder="e.g., Professional, Home, Enterprise" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Build Number</Label>
-                          <Input placeholder="e.g., 22621.2715" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">System Requirements</Label>
-                          <Input placeholder="e.g., 4GB RAM, 64GB Storage" className="h-12 text-base" />
-                        </div>
-                      </div>
-                    )}
-
-                    {formData.category === "Productivity Suite" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Applications Included</Label>
-                          <Input placeholder="e.g., Word, Excel, PowerPoint, Outlook" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Subscription Type</Label>
-                          <Input placeholder="e.g., Annual, Monthly, Perpetual" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">User Licenses</Label>
-                          <Input placeholder="e.g., 5 users, Single user" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Cloud Storage</Label>
-                          <Input placeholder="e.g., 1TB OneDrive" className="h-12 text-base" />
-                        </div>
-                      </div>
-                    )}
-
-                    {formData.category === "Design Software" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Software Type</Label>
-                          <Input
-                            placeholder="e.g., Vector Graphics, Photo Editing, 3D Modeling"
-                            className="h-12 text-base"
-                          />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Supported Formats</Label>
-                          <Input placeholder="e.g., PSD, AI, SVG, PNG, JPG" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">System Requirements</Label>
-                          <Input placeholder="e.g., 8GB RAM, Graphics Card" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">License Type</Label>
-                          <Input placeholder="e.g., Creative Cloud, Perpetual" className="h-12 text-base" />
-                        </div>
-                      </div>
-                    )}
-
-                    {formData.category === "Security Software" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Protection Type</Label>
-                          <Input placeholder="e.g., Antivirus, Firewall, Anti-malware" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Real-time Protection</Label>
-                          <Input placeholder="e.g., Yes, No" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Device Coverage</Label>
-                          <Input placeholder="e.g., 3 devices, 10 devices" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Additional Features</Label>
-                          <Input placeholder="e.g., VPN, Password Manager, Backup" className="h-12 text-base" />
-                        </div>
-                      </div>
-                    )}
-
-                    {formData.category === "Database Software" && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Database Type</Label>
-                          <Input placeholder="e.g., Relational, NoSQL, Graph" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Max Database Size</Label>
-                          <Input placeholder="e.g., 10GB, Unlimited" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Concurrent Users</Label>
-                          <Input placeholder="e.g., 50 users, Unlimited" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Supported Platforms</Label>
-                          <Input placeholder="e.g., Windows, Linux, macOS" className="h-12 text-base" />
-                        </div>
-                      </div>
-                    )}
-                  </>
+                    <div className="space-y-3">
+                      <Label htmlFor="version" className="text-base font-medium">
+                        Version
+                      </Label>
+                      <Input
+                        id="version"
+                        value={formData.version || ""}
+                        onChange={(e) => setFormData({ ...formData, version: e.target.value })}
+                        placeholder="e.g., 2024.1.0"
+                        className="h-12 text-base"
+                      />
+                      <p className="text-sm text-muted-foreground">Current software version</p>
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
