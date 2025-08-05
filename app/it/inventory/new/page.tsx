@@ -22,6 +22,7 @@ import {
   Eye,
   HardDrive,
   Monitor,
+  Globe,
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -41,6 +42,8 @@ interface FormData {
   vendorType: "physical" | "online"
   storeName: string
   storeLocation: string
+  websiteName: string
+  websiteUrl: string
   purchaseDate: string
   warrantyExpiry: string
   cost: string
@@ -178,6 +181,8 @@ export default function NewInventoryItemPage() {
     vendorType: "physical",
     storeName: "",
     storeLocation: "",
+    websiteName: "",
+    websiteUrl: "",
     purchaseDate: "",
     warrantyExpiry: "",
     cost: "",
@@ -547,6 +552,8 @@ export default function NewInventoryItemPage() {
                           ...formData,
                           vendorType: value,
                           storeLocation: value === "online" ? "" : formData.storeLocation,
+                          websiteName: value === "physical" ? "" : formData.websiteName,
+                          websiteUrl: value === "physical" ? "" : formData.websiteUrl,
                         })
                       }
                     >
@@ -562,7 +569,7 @@ export default function NewInventoryItemPage() {
                         </SelectItem>
                         <SelectItem value="online">
                           <div className="flex items-center space-x-2">
-                            <Monitor className="h-4 w-4" />
+                            <Globe className="h-4 w-4" />
                             <span>Online Store</span>
                           </div>
                         </SelectItem>
@@ -604,6 +611,41 @@ export default function NewInventoryItemPage() {
                       <p className="text-sm text-muted-foreground">
                         Search and select the exact location of the store on the map
                       </p>
+                    </div>
+                  </div>
+                )}
+
+                {formData.vendorType === "online" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label htmlFor="websiteName" className="text-base font-medium">
+                        Website Name
+                      </Label>
+                      <Input
+                        id="websiteName"
+                        value={formData.websiteName}
+                        onChange={(e) => setFormData({ ...formData, websiteName: e.target.value })}
+                        placeholder="e.g., Amazon, eBay, Shopee"
+                        className="h-12 text-base"
+                      />
+                      <p className="text-sm text-muted-foreground">Name of the online store or marketplace</p>
+                    </div>
+                    <div className="space-y-3">
+                      <Label htmlFor="websiteUrl" className="text-base font-medium">
+                        Website URL
+                      </Label>
+                      <div className="relative">
+                        <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                        <Input
+                          id="websiteUrl"
+                          type="url"
+                          value={formData.websiteUrl}
+                          onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
+                          placeholder="https://www.example.com"
+                          className="h-12 text-base pl-10"
+                        />
+                      </div>
+                      <p className="text-sm text-muted-foreground">Full URL of the online store</p>
                     </div>
                   </div>
                 )}
@@ -839,6 +881,33 @@ export default function NewInventoryItemPage() {
                               {formData.storeLocation || "Not specified"}
                             </span>
                           </div>
+                        )}
+                        {formData.vendorType === "online" && (
+                          <>
+                            <div className="flex justify-between items-center py-2 border-b border-muted">
+                              <span className="text-sm font-medium">Website Name:</span>
+                              <span className="text-sm text-muted-foreground">
+                                {formData.websiteName || "Not specified"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-start py-2 border-b border-muted">
+                              <span className="text-sm font-medium">Website URL:</span>
+                              <span className="text-sm text-muted-foreground text-right max-w-xs break-all">
+                                {formData.websiteUrl ? (
+                                  <a
+                                    href={formData.websiteUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:text-blue-800 underline"
+                                  >
+                                    {formData.websiteUrl}
+                                  </a>
+                                ) : (
+                                  "Not specified"
+                                )}
+                              </span>
+                            </div>
+                          </>
                         )}
                         <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Assigned To:</span>
