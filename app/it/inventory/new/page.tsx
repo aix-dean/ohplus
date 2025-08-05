@@ -58,7 +58,7 @@ interface User {
   license_key?: string
 }
 
-const categories = [
+const hardwareCategories = [
   "Desktop Computer",
   "Laptop",
   "Server",
@@ -69,13 +69,41 @@ const categories = [
   "Monitor",
   "Smartphone",
   "Tablet",
+  "Storage Device",
+  "Keyboard",
+  "Mouse",
+  "Webcam",
+  "Headset",
+  "Projector",
+  "Scanner",
+  "UPS",
+  "Cable",
+  "Docking Station",
+]
+
+const softwareCategories = [
   "Operating System",
   "Productivity Suite",
   "Design Software",
   "Security Software",
   "Database Software",
   "Development Tools",
+  "Antivirus",
+  "Backup Software",
+  "Communication Software",
+  "Project Management",
+  "Accounting Software",
+  "CRM Software",
+  "ERP Software",
+  "Media Software",
+  "Browser",
+  "Utility Software",
 ]
+
+// Helper function to get categories based on item type
+const getCategoriesForType = (type: "hardware" | "software") => {
+  return type === "hardware" ? hardwareCategories : softwareCategories
+}
 
 // Replace the static steps array with this dynamic one
 const getAllSteps = () => [
@@ -349,16 +377,17 @@ export default function NewInventoryItemPage() {
                       onValueChange={(value) => setFormData({ ...formData, category: value })}
                     >
                       <SelectTrigger className="h-12 text-base">
-                        <SelectValue placeholder="Select a category" />
+                        <SelectValue placeholder={`Select a ${formData.type} category`} />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map((category) => (
+                        {getCategoriesForType(formData.type).map((category) => (
                           <SelectItem key={category} value={category}>
                             {category}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-sm text-muted-foreground">Choose from {formData.type} specific categories</p>
                   </div>
                   <div className="space-y-3">
                     <Label htmlFor="brand" className="text-base font-medium">
