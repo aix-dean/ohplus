@@ -12,11 +12,30 @@ export default function NewInventoryItemLoading() {
         </div>
       </div>
 
-      <div className="space-y-6">
+      {/* Stepper Skeleton */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className="flex items-center">
+              <div className="flex flex-col items-center">
+                <Skeleton className="w-10 h-10 rounded-full" />
+                <div className="mt-2 text-center space-y-1">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-3 w-24 hidden md:block" />
+                </div>
+              </div>
+              {index < 4 && <Skeleton className="flex-1 h-0.5 mx-4" />}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Form Content Skeleton */}
+      <div className="mb-8">
         <Card>
           <CardHeader>
             <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-4 w-80" />
+            <Skeleton className="h-4 w-96" />
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -44,57 +63,19 @@ export default function NewInventoryItemLoading() {
               <Skeleton className="h-10 w-full" />
             </div>
             <div className="space-y-2">
-              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-20" />
               <Skeleton className="h-20 w-full" />
             </div>
           </CardContent>
         </Card>
+      </div>
 
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-56" />
-            <Skeleton className="h-4 w-96" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-72" />
-            <Skeleton className="h-4 w-80" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="flex justify-end space-x-4">
+      {/* Navigation Buttons Skeleton */}
+      <div className="flex justify-between">
+        <Skeleton className="h-10 w-24" />
+        <div className="flex space-x-2">
           <Skeleton className="h-10 w-20" />
-          <Skeleton className="h-10 w-32" />
+          <Skeleton className="h-10 w-20" />
         </div>
       </div>
     </div>
