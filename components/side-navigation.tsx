@@ -704,6 +704,38 @@ export function SideNavigation() {
               </div>
             </div>
 
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+              <div className="px-3 py-2 border-b border-gray-100">
+                <h3 className="text-sm font-medium text-gray-700">To Do</h3>
+              </div>
+              <div className="p-1">
+                {[
+                  { title: "Documents", href: "/admin/documents", icon: FileText },
+                  { title: "Inventory", href: "/admin/inventory", icon: Package },
+                  { title: "User Management", href: "/admin/user-management", icon: Users },
+                  { title: "Plan Profile", href: "/admin/subscriptions", icon: FileText },
+                ].map((item) => {
+                  const Icon = item.icon
+                  const active = isActive(pathname, item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
+                        active
+                          ? "bg-gray-100 text-gray-900 font-medium"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                      )}
+                    >
+                      <Icon className={cn("h-4 w-4 mr-3", active ? "text-gray-700" : "text-gray-500")} />
+                      <span className="flex-1">{item.title}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+
             {/* Intelligence Section */}
             <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white">
               <div className="flex items-center space-x-2 mb-3">
