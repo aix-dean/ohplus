@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,6 +25,9 @@ import {
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/contexts/auth-context"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 interface FormData {
   name: string
@@ -131,16 +134,48 @@ export default function NewInventoryItemPage() {
     version: "",
   })
 
-  const [users, setUsers] = useState([
-    { id: "1", name: "John Doe", email: "john.doe@company.com", department: "IT" },
-    { id: "2", name: "Jane Smith", email: "jane.smith@company.com", department: "HR" },
-    { id: "3", name: "Mike Johnson", email: "mike.johnson@company.com", department: "Finance" },
-    { id: "4", name: "Sarah Wilson", email: "sarah.wilson@company.com", department: "Marketing" },
-    { id: "5", name: "David Brown", email: "david.brown@company.com", department: "Sales" },
-    { id: "6", name: "Lisa Davis", email: "lisa.davis@company.com", department: "Operations" },
-    { id: "7", name: "Tom Anderson", email: "tom.anderson@company.com", department: "IT" },
-    { id: "8", name: "Emily Taylor", email: "emily.taylor@company.com", department: "Administration" },
-  ])
+  // Remove the mock users state and replace with:
+  const { userData } = useAuth()
+  const [users, setUsers] = useState<Array<{ id: string; displayName: string; email: string; department?: string }>>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
+
+  // Add useEffect to fetch users
+  useEffect(() => {
+    async function fetchUsers() {
+      if (!userData?.license_key) return
+
+      try {
+        setLoadingUsers(true)
+        const usersRef = collection(db, "iboard_users")
+        const q = query(usersRef, where("license_key", "==", userData.license_key))
+        const querySnapshot = await getDocs(q)
+
+        const fetchedUsers: Array<{ id: string; displayName: string; email: string; department?: string }> = []
+        querySnapshot.forEach((doc) => {
+          const user = doc.data()
+          fetchedUsers.push({
+            id: doc.id,
+            displayName: user.displayName || user.email || "Unknown User",
+            email: user.email || "",
+            department: user.department || "Not specified",
+          })
+        })
+
+        setUsers(fetchedUsers)
+      } catch (error) {
+        console.error("Error fetching users:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load users. Please try again.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoadingUsers(false)
+      }
+    }
+
+    fetchUsers()
+  }, [userData])
 
   const validateStep = (step: number): boolean => {
     switch (step) {
@@ -326,15 +361,16 @@ export default function NewInventoryItemPage() {
                     <Select
                       value={formData.assignedTo}
                       onValueChange={(value) => setFormData({ ...formData, assignedTo: value })}
+                      disabled={loadingUsers}
                     >
                       <SelectTrigger className="h-12 text-base">
-                        <SelectValue placeholder="Select a user" />
+                        <SelectValue placeholder={loadingUsers ? "Loading users..." : "Select a user"} />
                       </SelectTrigger>
                       <SelectContent>
                         {users.map((user) => (
-                          <SelectItem key={user.id} value={user.name}>
+                          <SelectItem key={user.id} value={user.displayName}>
                             <div className="flex flex-col">
-                              <span>{user.name}</span>
+                              <span>{user.displayName}</span>
                               <span className="text-xs text-muted-foreground">
                                 {user.email} • {user.department}
                               </span>
