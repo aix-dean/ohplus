@@ -77,7 +77,8 @@ const categories = [
   "Development Tools",
 ]
 
-const steps = [
+// Replace the static steps array with this dynamic one
+const getAllSteps = () => [
   {
     id: 1,
     title: "Basic Info",
@@ -105,6 +106,7 @@ const steps = [
     description: "Specifications",
     icon: Settings,
     color: "bg-purple-500",
+    showFor: "hardware", // Only show for hardware
   },
   {
     id: 5,
@@ -114,6 +116,12 @@ const steps = [
     color: "bg-indigo-500",
   },
 ]
+
+const getVisibleSteps = (itemType: "hardware" | "software") => {
+  return getAllSteps()
+    .filter((step) => !step.showFor || step.showFor === itemType)
+    .map((step, index) => ({ ...step, id: index + 1 })) // Renumber steps
+}
 
 const statusColors = {
   active: "bg-green-100 text-green-800 border-green-200",
@@ -146,6 +154,8 @@ export default function NewInventoryItemPage() {
     licenseKey: "",
     version: "",
   })
+
+  const visibleSteps = getVisibleSteps(formData.type)
 
   // Fetch users by company_id
   useEffect(() => {
@@ -191,6 +201,14 @@ export default function NewInventoryItemPage() {
     fetchUsers()
   }, [userData?.company_id])
 
+  // Add this useEffect after the existing useEffect
+  useEffect(() => {
+    // Reset to step 1 when item type changes to avoid being on a non-existent step
+    if (currentStep > getVisibleSteps(formData.type).length) {
+      setCurrentStep(1)
+    }
+  }, [formData.type, currentStep])
+
   // Helper function to get user display name from uid
   const getUserDisplayName = (uid: string) => {
     if (uid === "unassigned") return "Unassigned"
@@ -224,7 +242,7 @@ export default function NewInventoryItemPage() {
       return
     }
 
-    if (currentStep < steps.length) {
+    if (currentStep < visibleSteps.length) {
       setCurrentStep(currentStep + 1)
     }
   }
@@ -258,8 +276,12 @@ export default function NewInventoryItemPage() {
   }
 
   const renderStepContent = () => {
-    switch (currentStep) {
-      case 1:
+    const currentStepData = visibleSteps[currentStep - 1]
+    if (!currentStepData) return null
+
+    // Map the step title to the appropriate content
+    switch (currentStepData.title) {
+      case "Basic Info":
         return (
           <div className="space-y-8">
             <div className="text-center space-y-2">
@@ -466,7 +488,7 @@ export default function NewInventoryItemPage() {
           </div>
         )
 
-      case 2:
+      case "Location":
         return (
           <div className="space-y-8">
             <div className="text-center space-y-2">
@@ -499,7 +521,7 @@ export default function NewInventoryItemPage() {
           </div>
         )
 
-      case 3:
+      case "Financial":
         return (
           <div className="space-y-8">
             <div className="text-center space-y-2">
@@ -560,7 +582,7 @@ export default function NewInventoryItemPage() {
           </div>
         )
 
-      case 4:
+      case "Technical":
         return (
           <div className="space-y-8">
             <div className="text-center space-y-2">
@@ -639,7 +661,7 @@ export default function NewInventoryItemPage() {
           </div>
         )
 
-      case 5:
+      case "Review":
         return (
           <div className="space-y-8">
             <div className="text-center space-y-2">
@@ -813,11 +835,11 @@ export default function NewInventoryItemPage() {
             <Separator orientation="vertical" className="h-6" />
             <div>
               <h1 className="text-3xl font-bold text-slate-900">Add New Item</h1>
-              <p className="text-slate-600">Create a new inventory item in {steps.length} simple steps</p>
+              <p className="text-slate-600">Create a new inventory item in {visibleSteps.length} simple steps</p>
             </div>
           </div>
           <Badge variant="outline" className="text-sm px-3 py-1">
-            Step {currentStep} of {steps.length}
+            Step {currentStep} of {visibleSteps.length}
           </Badge>
         </div>
 
@@ -828,11 +850,11 @@ export default function NewInventoryItemPage() {
             <div className="absolute top-8 left-8 right-8 h-0.5 bg-slate-200 -z-10">
               <div
                 className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500 ease-out"
-                style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
+                style={{ width: `${((currentStep - 1) / (visibleSteps.length - 1)) * 100}%` }}
               />
             </div>
 
-            {steps.map((step, index) => {
+            {visibleSteps.map((step, index) => {
               const Icon = step.icon
               const isCompleted = currentStep > step.id
               const isCurrent = currentStep === step.id
@@ -900,7 +922,7 @@ export default function NewInventoryItemPage() {
             <Button type="button" variant="ghost" onClick={handleCancel}>
               Cancel
             </Button>
-            {currentStep < steps.length ? (
+            {currentStep < visibleSteps.length ? (
               <Button type="button" onClick={handleNext} className="shadow-sm">
                 Next Step
                 <ArrowRight className="h-4 w-4 ml-2" />
