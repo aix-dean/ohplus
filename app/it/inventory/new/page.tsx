@@ -191,6 +191,14 @@ export default function NewInventoryItemPage() {
     fetchUsers()
   }, [userData?.company_id])
 
+  // Helper function to get user display name from uid
+  const getUserDisplayName = (uid: string) => {
+    if (uid === "unassigned") return "Unassigned"
+    const user = users.find((u) => u.uid === uid)
+    if (!user) return "Unknown User"
+    return `${user.first_name} ${user.last_name}`.trim() || user.email
+  }
+
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
@@ -385,7 +393,7 @@ export default function NewInventoryItemPage() {
                           <span className="text-muted-foreground">Unassigned</span>
                         </SelectItem>
                         {users.map((user) => (
-                          <SelectItem key={user.uid} value={`${user.first_name} ${user.last_name}`.trim()}>
+                          <SelectItem key={user.uid} value={user.uid}>
                             <div className="flex flex-col">
                               <span>{`${user.first_name} ${user.last_name}`.trim() || user.email}</span>
                               <span className="text-xs text-muted-foreground">{user.email}</span>
@@ -707,7 +715,9 @@ export default function NewInventoryItemPage() {
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Assigned To:</span>
-                          <span className="text-sm text-muted-foreground">{formData.assignedTo || "Unassigned"}</span>
+                          <span className="text-sm text-muted-foreground">
+                            {getUserDisplayName(formData.assignedTo) || "Unassigned"}
+                          </span>
                         </div>
                       </div>
                     </div>
