@@ -77,7 +77,7 @@ export function GooglePlacesAutocomplete({
 
   // Function to geocode an address and update the map
   const geocodeAddress = (address: string) => {
-    if (!geocoder || !map || !marker || !address.trim()) return
+    if (!geocoder || !address.trim() || !map || !marker) return
 
     geocoder.geocode({ address: address }, (results: any, status: any) => {
       if (status === "OK" && results[0]) {
@@ -87,8 +87,7 @@ export function GooglePlacesAutocomplete({
         marker.setPosition(location)
         marker.setVisible(true)
       } else {
-        console.warn("Geocoding failed:", status)
-        // Hide marker if geocoding fails
+        // If geocoding fails, hide the marker
         marker.setVisible(false)
       }
     })
@@ -97,6 +96,10 @@ export function GooglePlacesAutocomplete({
   useEffect(() => {
     if (!isLoaded || !inputRef.current) return
 
+    // Initialize geocoder
+    const geocoderInstance = new window.google.maps.Geocoder()
+    setGeocoder(geocoderInstance)
+
     // Initialize autocomplete
     const autocompleteInstance = new window.google.maps.places.Autocomplete(inputRef.current, {
       types: ["establishment", "geocode"],
@@ -104,10 +107,6 @@ export function GooglePlacesAutocomplete({
     })
 
     setAutocomplete(autocompleteInstance)
-
-    // Initialize geocoder
-    const geocoderInstance = new window.google.maps.Geocoder()
-    setGeocoder(geocoderInstance)
 
     // Initialize map if enabled
     if (enableMap && mapRef.current) {
@@ -122,7 +121,7 @@ export function GooglePlacesAutocomplete({
       const markerInstance = new window.google.maps.Marker({
         map: mapInstance,
         draggable: true,
-        visible: false, // Initially hidden until location is set
+        visible: false, // Initially hidden until we have a location
       })
 
       setMap(mapInstance)
@@ -134,9 +133,10 @@ export function GooglePlacesAutocomplete({
 
         geocoderInstance.geocode({ location: position }, (results: any, status: any) => {
           if (status === "OK" && results[0]) {
-            onChange(results[0].formatted_address)
+            const newAddress = results[0].formatted_address
+            onChange(newAddress)
             if (inputRef.current) {
-              inputRef.current.value = results[0].formatted_address
+              inputRef.current.value = newAddress
             }
           }
         })
@@ -150,13 +150,21 @@ export function GooglePlacesAutocomplete({
 
         geocoderInstance.geocode({ location: position }, (results: any, status: any) => {
           if (status === "OK" && results[0]) {
-            onChange(results[0].formatted_address)
+            const newAddress = results[0].formatted_address
+            onChange(newAddress)
             if (inputRef.current) {
-              inputRef.current.value = results[0].formatted_address
+              inputRef.current.value = newAddress
             }
           }
         })
       })
+
+      // If we already have a value, geocode it
+      if (value.trim()) {
+        setTimeout(() => {
+          geocodeAddress(value)
+        }, 100)
+      }
     }
 
     // Handle place selection from autocomplete
@@ -185,21 +193,9 @@ export function GooglePlacesAutocomplete({
         window.google.maps.event.clearInstanceListeners(autocompleteInstance)
       }
     }
-  }, [isLoaded, enableMap, onChange])
+  }, [isLoaded, enableMap])
 
-  // Set initial value and geocode if map is enabled
-  useEffect(() => {
-    if (inputRef.current && value !== inputRef.current.value) {
-      inputRef.current.value = value
-    }
-
-    // If map is enabled and we have a value, geocode it
-    if (enableMap && value && isLoaded && geocoder) {
-      geocodeAddress(value)
-    }
-  }, [value, enableMap, isLoaded, geocoder])
-
-  // Handle manual input changes
+  // Handle manual input changes (when user types directly)
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
     onChange(newValue)
@@ -213,6 +209,20 @@ export function GooglePlacesAutocomplete({
       return () => clearTimeout(timeoutId)
     }
   }
+
+  // Update map when value changes externally
+  useEffect(() => {
+    if (enableMap && value.trim() && geocoder) {
+      geocodeAddress(value)
+    }
+  }, [value, geocoder, enableMap])
+
+  // Set input value when prop changes
+  useEffect(() => {
+    if (inputRef.current && value !== inputRef.current.value) {
+      inputRef.current.value = value
+    }
+  }, [value])
 
   if (isLoading) {
     return (
