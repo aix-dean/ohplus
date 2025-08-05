@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,18 +25,22 @@ import {
 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/contexts/auth-context"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 interface FormData {
   name: string
   type: "hardware" | "software"
   category: string
-  status: "active" | "inactive" | "maintenance" | "retired"
-  location: string
+  brand: string
+  department: string
   assignedTo: string
+  condition: "excellent" | "good" | "fair" | "poor" | "damaged"
+  location: string
   purchaseDate: string
   warrantyExpiry: string
   cost: string
-  vendor: string
   description: string
   serialNumber?: string
   specifications?: string
@@ -44,7 +48,17 @@ interface FormData {
   version?: string
 }
 
-const categories = [
+interface User {
+  id: string
+  uid: string
+  first_name: string
+  last_name: string
+  email: string
+  company_id?: string
+  license_key?: string
+}
+
+const hardwareCategories = [
   "Desktop Computer",
   "Laptop",
   "Server",
@@ -55,15 +69,44 @@ const categories = [
   "Monitor",
   "Smartphone",
   "Tablet",
+  "Storage Device",
+  "Keyboard",
+  "Mouse",
+  "Webcam",
+  "Headset",
+  "Projector",
+  "Scanner",
+  "UPS",
+  "Cable",
+  "Docking Station",
+]
+
+const softwareCategories = [
   "Operating System",
   "Productivity Suite",
   "Design Software",
   "Security Software",
   "Database Software",
   "Development Tools",
+  "Antivirus",
+  "Backup Software",
+  "Communication Software",
+  "Project Management",
+  "Accounting Software",
+  "CRM Software",
+  "ERP Software",
+  "Media Software",
+  "Browser",
+  "Utility Software",
 ]
 
-const steps = [
+// Helper function to get categories based on item type
+const getCategoriesForType = (type: "hardware" | "software") => {
+  return type === "hardware" ? hardwareCategories : softwareCategories
+}
+
+// Replace the static steps array with this dynamic one
+const getAllSteps = () => [
   {
     id: 1,
     title: "Basic Info",
@@ -91,6 +134,7 @@ const steps = [
     description: "Specifications",
     icon: Settings,
     color: "bg-purple-500",
+    showFor: "hardware", // Only show for hardware
   },
   {
     id: 5,
@@ -101,6 +145,12 @@ const steps = [
   },
 ]
 
+const getVisibleSteps = (itemType: "hardware" | "software") => {
+  return getAllSteps()
+    .filter((step) => !step.showFor || step.showFor === itemType)
+    .map((step, index) => ({ ...step, id: index + 1 })) // Renumber steps
+}
+
 const statusColors = {
   active: "bg-green-100 text-green-800 border-green-200",
   inactive: "bg-gray-100 text-gray-800 border-gray-200",
@@ -110,18 +160,22 @@ const statusColors = {
 
 export default function NewInventoryItemPage() {
   const router = useRouter()
+  const { userData } = useAuth()
   const [currentStep, setCurrentStep] = useState(1)
+  const [users, setUsers] = useState<User[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
   const [formData, setFormData] = useState<FormData>({
     name: "",
     type: "hardware",
     category: "",
-    status: "active",
-    location: "",
+    brand: "",
+    department: "",
     assignedTo: "",
+    condition: "excellent",
+    location: "",
     purchaseDate: "",
     warrantyExpiry: "",
     cost: "",
-    vendor: "",
     description: "",
     serialNumber: "",
     specifications: "",
@@ -129,10 +183,72 @@ export default function NewInventoryItemPage() {
     version: "",
   })
 
+  const visibleSteps = getVisibleSteps(formData.type)
+
+  // Fetch users by company_id
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!userData?.company_id) return
+
+      setLoadingUsers(true)
+      try {
+        console.log("Fetching users for company_id:", userData.company_id)
+
+        const usersRef = collection(db, "iboard_users")
+        const q = query(usersRef, where("company_id", "==", userData.company_id))
+        const querySnapshot = await getDocs(q)
+
+        const fetchedUsers: User[] = []
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          fetchedUsers.push({
+            id: doc.id,
+            uid: data.uid,
+            first_name: data.first_name || "",
+            last_name: data.last_name || "",
+            email: data.email || "",
+            company_id: data.company_id,
+            license_key: data.license_key,
+          })
+        })
+
+        console.log("Fetched users:", fetchedUsers)
+        setUsers(fetchedUsers)
+      } catch (error) {
+        console.error("Error fetching users:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load users",
+          variant: "destructive",
+        })
+      } finally {
+        setLoadingUsers(false)
+      }
+    }
+
+    fetchUsers()
+  }, [userData?.company_id])
+
+  // Add this useEffect after the existing useEffect
+  useEffect(() => {
+    // Reset to step 1 when item type changes to avoid being on a non-existent step
+    if (currentStep > getVisibleSteps(formData.type).length) {
+      setCurrentStep(1)
+    }
+  }, [formData.type, currentStep])
+
+  // Helper function to get user display name from uid
+  const getUserDisplayName = (uid: string) => {
+    if (uid === "unassigned") return "Unassigned"
+    const user = users.find((u) => u.uid === uid)
+    if (!user) return "Unknown User"
+    return `${user.first_name} ${user.last_name}`.trim() || user.email
+  }
+
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        return !!(formData.name && formData.category && formData.vendor)
+        return !!(formData.name && formData.category && formData.brand && formData.department)
       case 2:
         return true // Optional fields
       case 3:
@@ -154,7 +270,7 @@ export default function NewInventoryItemPage() {
       return
     }
 
-    if (currentStep < steps.length) {
+    if (currentStep < visibleSteps.length) {
       setCurrentStep(currentStep + 1)
     }
   }
@@ -169,7 +285,7 @@ export default function NewInventoryItemPage() {
     if (!validateStep(1)) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields (Name, Category, Vendor)",
+        description: "Please fill in all required fields (Name, Category, Brand, Department)",
         variant: "destructive",
       })
       return
@@ -188,8 +304,12 @@ export default function NewInventoryItemPage() {
   }
 
   const renderStepContent = () => {
-    switch (currentStep) {
-      case 1:
+    const currentStepData = visibleSteps[currentStep - 1]
+    if (!currentStepData) return null
+
+    // Map the step title to the appropriate content
+    switch (currentStepData.title) {
+      case "Basic Info":
         return (
           <div className="space-y-8">
             <div className="text-center space-y-2">
@@ -257,68 +377,126 @@ export default function NewInventoryItemPage() {
                       onValueChange={(value) => setFormData({ ...formData, category: value })}
                     >
                       <SelectTrigger className="h-12 text-base">
-                        <SelectValue placeholder="Select a category" />
+                        <SelectValue placeholder={`Select a ${formData.type} category`} />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map((category) => (
+                        {getCategoriesForType(formData.type).map((category) => (
                           <SelectItem key={category} value={category}>
                             {category}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-sm text-muted-foreground">Choose from {formData.type} specific categories</p>
                   </div>
                   <div className="space-y-3">
-                    <Label htmlFor="status" className="text-base font-medium">
-                      Status
+                    <Label htmlFor="brand" className="text-base font-medium">
+                      Brand *
+                    </Label>
+                    <Input
+                      id="brand"
+                      value={formData.brand}
+                      onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                      placeholder="e.g., Dell, Microsoft, Apple"
+                      className="h-12 text-base"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label htmlFor="department" className="text-base font-medium">
+                      Department *
                     </Label>
                     <Select
-                      value={formData.status}
-                      onValueChange={(value: "active" | "inactive" | "maintenance" | "retired") =>
-                        setFormData({ ...formData, status: value })
-                      }
+                      value={formData.department}
+                      onValueChange={(value) => setFormData({ ...formData, department: value })}
                     >
                       <SelectTrigger className="h-12 text-base">
-                        <SelectValue />
+                        <SelectValue placeholder="Select a department" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="active">
-                          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                            Active
-                          </Badge>
+                        <SelectItem value="IT">IT Department</SelectItem>
+                        <SelectItem value="HR">Human Resources</SelectItem>
+                        <SelectItem value="Finance">Finance</SelectItem>
+                        <SelectItem value="Marketing">Marketing</SelectItem>
+                        <SelectItem value="Sales">Sales</SelectItem>
+                        <SelectItem value="Operations">Operations</SelectItem>
+                        <SelectItem value="Administration">Administration</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-3">
+                    <Label htmlFor="assignedTo" className="text-base font-medium">
+                      Assigned To
+                    </Label>
+                    <Select
+                      value={formData.assignedTo}
+                      onValueChange={(value) => setFormData({ ...formData, assignedTo: value })}
+                      disabled={loadingUsers}
+                    >
+                      <SelectTrigger className="h-12 text-base">
+                        <SelectValue placeholder={loadingUsers ? "Loading users..." : "Select a user"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unassigned">
+                          <span className="text-muted-foreground">Unassigned</span>
                         </SelectItem>
-                        <SelectItem value="inactive">
-                          <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-200">
-                            Inactive
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="maintenance">
-                          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                            Maintenance
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="retired">
-                          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-                            Retired
-                          </Badge>
-                        </SelectItem>
+                        {users.map((user) => (
+                          <SelectItem key={user.uid} value={user.uid}>
+                            <div className="flex flex-col">
+                              <span>{`${user.first_name} ${user.last_name}`.trim() || user.email}</span>
+                              <span className="text-xs text-muted-foreground">{user.email}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <Label htmlFor="vendor" className="text-base font-medium">
-                    Vendor *
+                  <Label htmlFor="condition" className="text-base font-medium">
+                    Condition
                   </Label>
-                  <Input
-                    id="vendor"
-                    value={formData.vendor}
-                    onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
-                    placeholder="e.g., Dell, Microsoft, Apple"
-                    className="h-12 text-base"
-                    required
-                  />
+                  <Select
+                    value={formData.condition}
+                    onValueChange={(value: "excellent" | "good" | "fair" | "poor" | "damaged") =>
+                      setFormData({ ...formData, condition: value })
+                    }
+                  >
+                    <SelectTrigger className="h-12 text-base">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="excellent">
+                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+                          Excellent
+                        </Badge>
+                      </SelectItem>
+                      <SelectItem value="good">
+                        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                          Good
+                        </Badge>
+                      </SelectItem>
+                      <SelectItem value="fair">
+                        <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                          Fair
+                        </Badge>
+                      </SelectItem>
+                      <SelectItem value="poor">
+                        <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+                          Poor
+                        </Badge>
+                      </SelectItem>
+                      <SelectItem value="damaged">
+                        <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                          Damaged
+                        </Badge>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-3">
@@ -339,7 +517,7 @@ export default function NewInventoryItemPage() {
           </div>
         )
 
-      case 2:
+      case "Location":
         return (
           <div className="space-y-8">
             <div className="text-center space-y-2">
@@ -366,26 +544,13 @@ export default function NewInventoryItemPage() {
                     />
                     <p className="text-sm text-muted-foreground">Specify the physical location of this item</p>
                   </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="assignedTo" className="text-base font-medium">
-                      Assigned To
-                    </Label>
-                    <Input
-                      id="assignedTo"
-                      value={formData.assignedTo}
-                      onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
-                      placeholder="e.g., John Doe, IT Department"
-                      className="h-12 text-base"
-                    />
-                    <p className="text-sm text-muted-foreground">Person or team responsible for this item</p>
-                  </div>
                 </div>
               </CardContent>
             </Card>
           </div>
         )
 
-      case 3:
+      case "Financial":
         return (
           <div className="space-y-8">
             <div className="text-center space-y-2">
@@ -446,7 +611,7 @@ export default function NewInventoryItemPage() {
           </div>
         )
 
-      case 4:
+      case "Technical":
         return (
           <div className="space-y-8">
             <div className="text-center space-y-2">
@@ -525,7 +690,7 @@ export default function NewInventoryItemPage() {
           </div>
         )
 
-      case 5:
+      case "Review":
         return (
           <div className="space-y-8">
             <div className="text-center space-y-2">
@@ -541,9 +706,6 @@ export default function NewInventoryItemPage() {
                 <CardTitle className="flex items-center space-x-2">
                   <Package className="h-5 w-5" />
                   <span>{formData.name || "Unnamed Item"}</span>
-                  <Badge variant="outline" className={cn("ml-auto", statusColors[formData.status])}>
-                    {formData.status}
-                  </Badge>
                 </CardTitle>
                 <CardDescription>{formData.description || "No description provided"}</CardDescription>
               </CardHeader>
@@ -566,8 +728,29 @@ export default function NewInventoryItemPage() {
                           <span className="text-sm text-muted-foreground">{formData.category || "Not specified"}</span>
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Vendor:</span>
-                          <span className="text-sm text-muted-foreground">{formData.vendor || "Not specified"}</span>
+                          <span className="text-sm font-medium">Brand:</span>
+                          <span className="text-sm text-muted-foreground">{formData.brand || "Not specified"}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-muted">
+                          <span className="text-sm font-medium">Department:</span>
+                          <span className="text-sm text-muted-foreground">
+                            {formData.department || "Not specified"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-muted">
+                          <span className="text-sm font-medium">Condition:</span>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              formData.condition === "excellent" && "bg-green-100 text-green-800 border-green-200",
+                              formData.condition === "good" && "bg-blue-100 text-blue-800 border-blue-200",
+                              formData.condition === "fair" && "bg-yellow-100 text-yellow-800 border-yellow-200",
+                              formData.condition === "poor" && "bg-orange-100 text-orange-800 border-orange-200",
+                              formData.condition === "damaged" && "bg-red-100 text-red-800 border-red-200",
+                            )}
+                          >
+                            {formData.condition}
+                          </Badge>
                         </div>
                       </div>
                     </div>
@@ -584,7 +767,7 @@ export default function NewInventoryItemPage() {
                         <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Assigned To:</span>
                           <span className="text-sm text-muted-foreground">
-                            {formData.assignedTo || "Not specified"}
+                            {getUserDisplayName(formData.assignedTo) || "Unassigned"}
                           </span>
                         </div>
                       </div>
@@ -681,11 +864,11 @@ export default function NewInventoryItemPage() {
             <Separator orientation="vertical" className="h-6" />
             <div>
               <h1 className="text-3xl font-bold text-slate-900">Add New Item</h1>
-              <p className="text-slate-600">Create a new inventory item in {steps.length} simple steps</p>
+              <p className="text-slate-600">Create a new inventory item in {visibleSteps.length} simple steps</p>
             </div>
           </div>
           <Badge variant="outline" className="text-sm px-3 py-1">
-            Step {currentStep} of {steps.length}
+            Step {currentStep} of {visibleSteps.length}
           </Badge>
         </div>
 
@@ -696,11 +879,11 @@ export default function NewInventoryItemPage() {
             <div className="absolute top-8 left-8 right-8 h-0.5 bg-slate-200 -z-10">
               <div
                 className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500 ease-out"
-                style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
+                style={{ width: `${((currentStep - 1) / (visibleSteps.length - 1)) * 100}%` }}
               />
             </div>
 
-            {steps.map((step, index) => {
+            {visibleSteps.map((step, index) => {
               const Icon = step.icon
               const isCompleted = currentStep > step.id
               const isCurrent = currentStep === step.id
@@ -768,7 +951,7 @@ export default function NewInventoryItemPage() {
             <Button type="button" variant="ghost" onClick={handleCancel}>
               Cancel
             </Button>
-            {currentStep < steps.length ? (
+            {currentStep < visibleSteps.length ? (
               <Button type="button" onClick={handleNext} className="shadow-sm">
                 Next Step
                 <ArrowRight className="h-4 w-4 ml-2" />
