@@ -31,10 +31,9 @@ interface FormData {
   type: "hardware" | "software"
   category: string
   brand: string
-  store: string
   department: string
   assignedTo: string
-  condition: "new" | "good" | "fair" | "poor" | "damaged"
+  condition: "excellent" | "good" | "fair" | "poor" | "damaged"
   location: string
   purchaseDate: string
   warrantyExpiry: string
@@ -110,14 +109,6 @@ const statusColors = {
   retired: "bg-red-100 text-red-800 border-red-200",
 }
 
-const conditionColors = {
-  new: "bg-blue-100 text-blue-800 border-blue-200",
-  good: "bg-green-100 text-green-800 border-green-200",
-  fair: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  poor: "bg-orange-100 text-orange-800 border-orange-200",
-  damaged: "bg-red-100 text-red-800 border-red-200",
-}
-
 export default function NewInventoryItemPage() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
@@ -126,10 +117,9 @@ export default function NewInventoryItemPage() {
     type: "hardware",
     category: "",
     brand: "",
-    store: "",
     department: "",
     assignedTo: "",
-    condition: "new",
+    condition: "excellent",
     location: "",
     purchaseDate: "",
     warrantyExpiry: "",
@@ -144,14 +134,7 @@ export default function NewInventoryItemPage() {
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        return !!(
-          formData.name &&
-          formData.category &&
-          formData.brand &&
-          formData.store &&
-          formData.department &&
-          formData.assignedTo
-        )
+        return !!(formData.name && formData.category && formData.brand && formData.department)
       case 2:
         return true // Optional fields
       case 3:
@@ -188,7 +171,7 @@ export default function NewInventoryItemPage() {
     if (!validateStep(1)) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields (Name, Category, Brand, Store, Department, Assigned To)",
+        description: "Please fill in all required fields (Name, Category, Brand, Department)",
         variant: "destructive",
       })
       return
@@ -304,37 +287,30 @@ export default function NewInventoryItemPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
-                    <Label htmlFor="store" className="text-base font-medium">
-                      Store *
-                    </Label>
-                    <Input
-                      id="store"
-                      value={formData.store}
-                      onChange={(e) => setFormData({ ...formData, store: e.target.value })}
-                      placeholder="e.g., Main Office, Branch A"
-                      className="h-12 text-base"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-3">
                     <Label htmlFor="department" className="text-base font-medium">
                       Department *
                     </Label>
-                    <Input
-                      id="department"
+                    <Select
                       value={formData.department}
-                      onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                      placeholder="e.g., IT Department, Sales"
-                      className="h-12 text-base"
-                      required
-                    />
+                      onValueChange={(value) => setFormData({ ...formData, department: value })}
+                    >
+                      <SelectTrigger className="h-12 text-base">
+                        <SelectValue placeholder="Select a department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="IT">IT Department</SelectItem>
+                        <SelectItem value="HR">Human Resources</SelectItem>
+                        <SelectItem value="Finance">Finance</SelectItem>
+                        <SelectItem value="Marketing">Marketing</SelectItem>
+                        <SelectItem value="Sales">Sales</SelectItem>
+                        <SelectItem value="Operations">Operations</SelectItem>
+                        <SelectItem value="Administration">Administration</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <Label htmlFor="assignedTo" className="text-base font-medium">
-                      Assigned To *
+                      Assigned To
                     </Label>
                     <Input
                       id="assignedTo"
@@ -342,51 +318,51 @@ export default function NewInventoryItemPage() {
                       onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
                       placeholder="e.g., John Doe"
                       className="h-12 text-base"
-                      required
                     />
                   </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="condition" className="text-base font-medium">
-                      Condition
-                    </Label>
-                    <Select
-                      value={formData.condition}
-                      onValueChange={(value: "new" | "good" | "fair" | "poor" | "damaged") =>
-                        setFormData({ ...formData, condition: value })
-                      }
-                    >
-                      <SelectTrigger className="h-12 text-base">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="new">
-                          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                            New
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="good">
-                          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                            Good
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="fair">
-                          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                            Fair
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="poor">
-                          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
-                            Poor
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="damaged">
-                          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-                            Damaged
-                          </Badge>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label htmlFor="condition" className="text-base font-medium">
+                    Condition
+                  </Label>
+                  <Select
+                    value={formData.condition}
+                    onValueChange={(value: "excellent" | "good" | "fair" | "poor" | "damaged") =>
+                      setFormData({ ...formData, condition: value })
+                    }
+                  >
+                    <SelectTrigger className="h-12 text-base">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="excellent">
+                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+                          Excellent
+                        </Badge>
+                      </SelectItem>
+                      <SelectItem value="good">
+                        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                          Good
+                        </Badge>
+                      </SelectItem>
+                      <SelectItem value="fair">
+                        <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                          Fair
+                        </Badge>
+                      </SelectItem>
+                      <SelectItem value="poor">
+                        <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+                          Poor
+                        </Badge>
+                      </SelectItem>
+                      <SelectItem value="damaged">
+                        <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                          Damaged
+                        </Badge>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-3">
@@ -414,24 +390,41 @@ export default function NewInventoryItemPage() {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
                 <MapPin className="h-8 w-8 text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold">Location Details</h2>
-              <p className="text-muted-foreground">Specify the physical location of this item</p>
+              <h2 className="text-2xl font-bold">Location & Assignment</h2>
+              <p className="text-muted-foreground">Where is this item located and who is responsible for it?</p>
             </div>
 
             <Card className="border-2 border-dashed border-green-200 bg-green-50/30">
               <CardContent className="p-8 space-y-6">
-                <div className="space-y-3">
-                  <Label htmlFor="location" className="text-base font-medium">
-                    Physical Location
-                  </Label>
-                  <Input
-                    id="location"
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    placeholder="e.g., Office Floor 2, Room 201"
-                    className="h-12 text-base"
-                  />
-                  <p className="text-sm text-muted-foreground">Specify the exact physical location of this item</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label htmlFor="location" className="text-base font-medium">
+                      Physical Location
+                    </Label>
+                    <Input
+                      id="location"
+                      value={formData.location}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      placeholder="e.g., Office Floor 2, Room 201"
+                      className="h-12 text-base"
+                    />
+                    <p className="text-sm text-muted-foreground">Specify the physical location of this item</p>
+                  </div>
+                  {/*
+                  <div className="space-y-3">
+                    <Label htmlFor="assignedTo" className="text-base font-medium">
+                      Assigned To
+                    </Label>
+                    <Input
+                      id="assignedTo"
+                      value={formData.assignedTo}
+                      onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                      placeholder="e.g., John Doe, IT Department"
+                      className="h-12 text-base"
+                    />
+                    <p className="text-sm text-muted-foreground">Person or team responsible for this item</p>
+                  </div>
+                  */}
                 </div>
               </CardContent>
             </Card>
@@ -594,9 +587,9 @@ export default function NewInventoryItemPage() {
                 <CardTitle className="flex items-center space-x-2">
                   <Package className="h-5 w-5" />
                   <span>{formData.name || "Unnamed Item"}</span>
-                  <Badge variant="outline" className={cn("ml-auto", conditionColors[formData.condition])}>
-                    {formData.condition}
-                  </Badge>
+                  {/*<Badge variant="outline" className={cn("ml-auto", statusColors[formData.status])}>
+                    {formData.status}
+                  </Badge>*/}
                 </CardTitle>
                 <CardDescription>{formData.description || "No description provided"}</CardDescription>
               </CardHeader>
@@ -623,32 +616,43 @@ export default function NewInventoryItemPage() {
                           <span className="text-sm text-muted-foreground">{formData.brand || "Not specified"}</span>
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Store:</span>
-                          <span className="text-sm text-muted-foreground">{formData.store || "Not specified"}</span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Department:</span>
                           <span className="text-sm text-muted-foreground">
                             {formData.department || "Not specified"}
                           </span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-muted">
+                          <span className="text-sm font-medium">Condition:</span>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              formData.condition === "excellent" && "bg-green-100 text-green-800 border-green-200",
+                              formData.condition === "good" && "bg-blue-100 text-blue-800 border-blue-200",
+                              formData.condition === "fair" && "bg-yellow-100 text-yellow-800 border-yellow-200",
+                              formData.condition === "poor" && "bg-orange-100 text-orange-800 border-orange-200",
+                              formData.condition === "damaged" && "bg-red-100 text-red-800 border-red-200",
+                            )}
+                          >
+                            {formData.condition}
+                          </Badge>
                         </div>
                       </div>
                     </div>
 
                     <div>
                       <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                        Assignment & Location
+                        Location & Assignment
                       </h4>
                       <div className="space-y-3">
+                        <div className="flex justify-between items-center py-2 border-b border-muted">
+                          <span className="text-sm font-medium">Location:</span>
+                          <span className="text-sm text-muted-foreground">{formData.location || "Not specified"}</span>
+                        </div>
                         <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Assigned To:</span>
                           <span className="text-sm text-muted-foreground">
                             {formData.assignedTo || "Not specified"}
                           </span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Location:</span>
-                          <span className="text-sm text-muted-foreground">{formData.location || "Not specified"}</span>
                         </div>
                       </div>
                     </div>
