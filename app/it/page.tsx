@@ -171,9 +171,11 @@ export default function ITPage() {
               <Shield className="mr-2 h-4 w-4" />
               Security Center
             </Button>
-            <Button variant="outline" className="justify-start bg-transparent">
-              <Monitor className="mr-2 h-4 w-4" />
-              Device Management
+            <Button variant="outline" className="justify-start bg-transparent" asChild>
+              <a href="/it/inventory">
+                <Monitor className="mr-2 h-4 w-4" />
+                Device Management
+              </a>
             </Button>
           </div>
         </CardContent>
