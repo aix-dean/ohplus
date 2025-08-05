@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
 
 interface FormData {
   name: string
@@ -37,7 +38,9 @@ interface FormData {
   department: string
   assignedTo: string
   condition: "excellent" | "good" | "fair" | "poor" | "damaged"
-  location: string
+  vendorType: "physical" | "online"
+  storeName: string
+  storeLocation: string
   purchaseDate: string
   warrantyExpiry: string
   cost: string
@@ -116,8 +119,8 @@ const getAllSteps = () => [
   },
   {
     id: 2,
-    title: "Location",
-    description: "Assignment",
+    title: "Vendor Information",
+    description: "Store details",
     icon: MapPin,
     color: "bg-green-500",
   },
@@ -172,7 +175,9 @@ export default function NewInventoryItemPage() {
     department: "",
     assignedTo: "",
     condition: "excellent",
-    location: "",
+    vendorType: "physical",
+    storeName: "",
+    storeLocation: "",
     purchaseDate: "",
     warrantyExpiry: "",
     cost: "",
@@ -517,34 +522,87 @@ export default function NewInventoryItemPage() {
           </div>
         )
 
-      case "Location":
+      case "Vendor Information":
         return (
           <div className="space-y-8">
             <div className="text-center space-y-2">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
                 <MapPin className="h-8 w-8 text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold">Location & Assignment</h2>
-              <p className="text-muted-foreground">Where is this item located and who is responsible for it?</p>
+              <h2 className="text-2xl font-bold">Vendor Information</h2>
+              <p className="text-muted-foreground">Where did you purchase this item from?</p>
             </div>
 
             <Card className="border-2 border-dashed border-green-200 bg-green-50/30">
               <CardContent className="p-8 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
-                    <Label htmlFor="location" className="text-base font-medium">
-                      Physical Location
+                    <Label htmlFor="vendorType" className="text-base font-medium">
+                      Store Type
+                    </Label>
+                    <Select
+                      value={formData.vendorType}
+                      onValueChange={(value: "physical" | "online") =>
+                        setFormData({
+                          ...formData,
+                          vendorType: value,
+                          storeLocation: value === "online" ? "" : formData.storeLocation,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-12 text-base">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="physical">
+                          <div className="flex items-center space-x-2">
+                            <MapPin className="h-4 w-4" />
+                            <span>Physical Store</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="online">
+                          <div className="flex items-center space-x-2">
+                            <Monitor className="h-4 w-4" />
+                            <span>Online Store</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-sm text-muted-foreground">
+                      Choose whether you purchased from a physical or online store
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    <Label htmlFor="storeName" className="text-base font-medium">
+                      Store Name
                     </Label>
                     <Input
-                      id="location"
-                      value={formData.location}
-                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                      placeholder="e.g., Office Floor 2, Room 201"
+                      id="storeName"
+                      value={formData.storeName}
+                      onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
+                      placeholder="e.g., Best Buy, Amazon, CDR King"
                       className="h-12 text-base"
                     />
-                    <p className="text-sm text-muted-foreground">Specify the physical location of this item</p>
+                    <p className="text-sm text-muted-foreground">Name of the store or vendor</p>
                   </div>
                 </div>
+
+                {formData.vendorType === "physical" && (
+                  <div className="space-y-3">
+                    <Label htmlFor="storeLocation" className="text-base font-medium">
+                      Store Location
+                    </Label>
+                    <GooglePlacesAutocomplete
+                      value={formData.storeLocation}
+                      onChange={(value) => setFormData({ ...formData, storeLocation: value })}
+                      placeholder="Enter store address or location"
+                      className="h-12 text-base"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Physical address of the store where you made the purchase
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -757,13 +815,27 @@ export default function NewInventoryItemPage() {
 
                     <div>
                       <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                        Location & Assignment
+                        Vendor & Assignment
                       </h4>
                       <div className="space-y-3">
                         <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Location:</span>
-                          <span className="text-sm text-muted-foreground">{formData.location || "Not specified"}</span>
+                          <span className="text-sm font-medium">Store Type:</span>
+                          <Badge variant="secondary" className="capitalize">
+                            {formData.vendorType === "physical" ? "Physical Store" : "Online Store"}
+                          </Badge>
                         </div>
+                        <div className="flex justify-between items-center py-2 border-b border-muted">
+                          <span className="text-sm font-medium">Store Name:</span>
+                          <span className="text-sm text-muted-foreground">{formData.storeName || "Not specified"}</span>
+                        </div>
+                        {formData.vendorType === "physical" && (
+                          <div className="flex justify-between items-center py-2 border-b border-muted">
+                            <span className="text-sm font-medium">Store Location:</span>
+                            <span className="text-sm text-muted-foreground">
+                              {formData.storeLocation || "Not specified"}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Assigned To:</span>
                           <span className="text-sm text-muted-foreground">
