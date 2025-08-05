@@ -30,13 +30,15 @@ interface FormData {
   name: string
   type: "hardware" | "software"
   category: string
-  status: "active" | "inactive" | "maintenance" | "retired"
-  location: string
+  brand: string
+  store: string
+  department: string
   assignedTo: string
+  condition: "new" | "good" | "fair" | "poor" | "damaged"
+  location: string
   purchaseDate: string
   warrantyExpiry: string
   cost: string
-  vendor: string
   description: string
   serialNumber?: string
   specifications?: string
@@ -108,6 +110,14 @@ const statusColors = {
   retired: "bg-red-100 text-red-800 border-red-200",
 }
 
+const conditionColors = {
+  new: "bg-blue-100 text-blue-800 border-blue-200",
+  good: "bg-green-100 text-green-800 border-green-200",
+  fair: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  poor: "bg-orange-100 text-orange-800 border-orange-200",
+  damaged: "bg-red-100 text-red-800 border-red-200",
+}
+
 export default function NewInventoryItemPage() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
@@ -115,13 +125,15 @@ export default function NewInventoryItemPage() {
     name: "",
     type: "hardware",
     category: "",
-    status: "active",
-    location: "",
+    brand: "",
+    store: "",
+    department: "",
     assignedTo: "",
+    condition: "new",
+    location: "",
     purchaseDate: "",
     warrantyExpiry: "",
     cost: "",
-    vendor: "",
     description: "",
     serialNumber: "",
     specifications: "",
@@ -132,7 +144,14 @@ export default function NewInventoryItemPage() {
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
-        return !!(formData.name && formData.category && formData.vendor)
+        return !!(
+          formData.name &&
+          formData.category &&
+          formData.brand &&
+          formData.store &&
+          formData.department &&
+          formData.assignedTo
+        )
       case 2:
         return true // Optional fields
       case 3:
@@ -169,7 +188,7 @@ export default function NewInventoryItemPage() {
     if (!validateStep(1)) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields (Name, Category, Vendor)",
+        description: "Please fill in all required fields (Name, Category, Brand, Store, Department, Assigned To)",
         variant: "destructive",
       })
       return
@@ -269,56 +288,105 @@ export default function NewInventoryItemPage() {
                     </Select>
                   </div>
                   <div className="space-y-3">
-                    <Label htmlFor="status" className="text-base font-medium">
-                      Status
+                    <Label htmlFor="brand" className="text-base font-medium">
+                      Brand *
+                    </Label>
+                    <Input
+                      id="brand"
+                      value={formData.brand}
+                      onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                      placeholder="e.g., Dell, Microsoft, Apple"
+                      className="h-12 text-base"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label htmlFor="store" className="text-base font-medium">
+                      Store *
+                    </Label>
+                    <Input
+                      id="store"
+                      value={formData.store}
+                      onChange={(e) => setFormData({ ...formData, store: e.target.value })}
+                      placeholder="e.g., Main Office, Branch A"
+                      className="h-12 text-base"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label htmlFor="department" className="text-base font-medium">
+                      Department *
+                    </Label>
+                    <Input
+                      id="department"
+                      value={formData.department}
+                      onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                      placeholder="e.g., IT Department, Sales"
+                      className="h-12 text-base"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label htmlFor="assignedTo" className="text-base font-medium">
+                      Assigned To *
+                    </Label>
+                    <Input
+                      id="assignedTo"
+                      value={formData.assignedTo}
+                      onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                      placeholder="e.g., John Doe"
+                      className="h-12 text-base"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label htmlFor="condition" className="text-base font-medium">
+                      Condition
                     </Label>
                     <Select
-                      value={formData.status}
-                      onValueChange={(value: "active" | "inactive" | "maintenance" | "retired") =>
-                        setFormData({ ...formData, status: value })
+                      value={formData.condition}
+                      onValueChange={(value: "new" | "good" | "fair" | "poor" | "damaged") =>
+                        setFormData({ ...formData, condition: value })
                       }
                     >
                       <SelectTrigger className="h-12 text-base">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="active">
+                        <SelectItem value="new">
+                          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                            New
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="good">
                           <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                            Active
+                            Good
                           </Badge>
                         </SelectItem>
-                        <SelectItem value="inactive">
-                          <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-200">
-                            Inactive
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="maintenance">
+                        <SelectItem value="fair">
                           <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                            Maintenance
+                            Fair
                           </Badge>
                         </SelectItem>
-                        <SelectItem value="retired">
+                        <SelectItem value="poor">
+                          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+                            Poor
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="damaged">
                           <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-                            Retired
+                            Damaged
                           </Badge>
                         </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Label htmlFor="vendor" className="text-base font-medium">
-                    Vendor *
-                  </Label>
-                  <Input
-                    id="vendor"
-                    value={formData.vendor}
-                    onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
-                    placeholder="e.g., Dell, Microsoft, Apple"
-                    className="h-12 text-base"
-                    required
-                  />
                 </div>
 
                 <div className="space-y-3">
@@ -346,39 +414,24 @@ export default function NewInventoryItemPage() {
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
                 <MapPin className="h-8 w-8 text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold">Location & Assignment</h2>
-              <p className="text-muted-foreground">Where is this item located and who is responsible for it?</p>
+              <h2 className="text-2xl font-bold">Location Details</h2>
+              <p className="text-muted-foreground">Specify the physical location of this item</p>
             </div>
 
             <Card className="border-2 border-dashed border-green-200 bg-green-50/30">
               <CardContent className="p-8 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <Label htmlFor="location" className="text-base font-medium">
-                      Physical Location
-                    </Label>
-                    <Input
-                      id="location"
-                      value={formData.location}
-                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                      placeholder="e.g., Office Floor 2, Room 201"
-                      className="h-12 text-base"
-                    />
-                    <p className="text-sm text-muted-foreground">Specify the physical location of this item</p>
-                  </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="assignedTo" className="text-base font-medium">
-                      Assigned To
-                    </Label>
-                    <Input
-                      id="assignedTo"
-                      value={formData.assignedTo}
-                      onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
-                      placeholder="e.g., John Doe, IT Department"
-                      className="h-12 text-base"
-                    />
-                    <p className="text-sm text-muted-foreground">Person or team responsible for this item</p>
-                  </div>
+                <div className="space-y-3">
+                  <Label htmlFor="location" className="text-base font-medium">
+                    Physical Location
+                  </Label>
+                  <Input
+                    id="location"
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    placeholder="e.g., Office Floor 2, Room 201"
+                    className="h-12 text-base"
+                  />
+                  <p className="text-sm text-muted-foreground">Specify the exact physical location of this item</p>
                 </div>
               </CardContent>
             </Card>
@@ -541,8 +594,8 @@ export default function NewInventoryItemPage() {
                 <CardTitle className="flex items-center space-x-2">
                   <Package className="h-5 w-5" />
                   <span>{formData.name || "Unnamed Item"}</span>
-                  <Badge variant="outline" className={cn("ml-auto", statusColors[formData.status])}>
-                    {formData.status}
+                  <Badge variant="outline" className={cn("ml-auto", conditionColors[formData.condition])}>
+                    {formData.condition}
                   </Badge>
                 </CardTitle>
                 <CardDescription>{formData.description || "No description provided"}</CardDescription>
@@ -566,26 +619,36 @@ export default function NewInventoryItemPage() {
                           <span className="text-sm text-muted-foreground">{formData.category || "Not specified"}</span>
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Vendor:</span>
-                          <span className="text-sm text-muted-foreground">{formData.vendor || "Not specified"}</span>
+                          <span className="text-sm font-medium">Brand:</span>
+                          <span className="text-sm text-muted-foreground">{formData.brand || "Not specified"}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-muted">
+                          <span className="text-sm font-medium">Store:</span>
+                          <span className="text-sm text-muted-foreground">{formData.store || "Not specified"}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-muted">
+                          <span className="text-sm font-medium">Department:</span>
+                          <span className="text-sm text-muted-foreground">
+                            {formData.department || "Not specified"}
+                          </span>
                         </div>
                       </div>
                     </div>
 
                     <div>
                       <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                        Location & Assignment
+                        Assignment & Location
                       </h4>
                       <div className="space-y-3">
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Location:</span>
-                          <span className="text-sm text-muted-foreground">{formData.location || "Not specified"}</span>
-                        </div>
                         <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Assigned To:</span>
                           <span className="text-sm text-muted-foreground">
                             {formData.assignedTo || "Not specified"}
                           </span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-muted">
+                          <span className="text-sm font-medium">Location:</span>
+                          <span className="text-sm text-muted-foreground">{formData.location || "Not specified"}</span>
                         </div>
                       </div>
                     </div>
