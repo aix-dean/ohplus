@@ -27,7 +27,7 @@ import {
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs, addDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
 
@@ -171,6 +171,7 @@ export default function NewInventoryItemPage() {
   const [currentStep, setCurrentStep] = useState(1)
   const [users, setUsers] = useState<User[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState<FormData>({
     name: "",
     type: "hardware",
@@ -293,7 +294,7 @@ export default function NewInventoryItemPage() {
     }
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateStep(1)) {
       toast({
         title: "Validation Error",
@@ -303,12 +304,71 @@ export default function NewInventoryItemPage() {
       return
     }
 
-    toast({
-      title: "Item Created Successfully",
-      description: `${formData.name} has been added to the inventory`,
-    })
+    if (!userData?.company_id) {
+      toast({
+        title: "Error",
+        description: "User company information not found",
+        variant: "destructive",
+      })
+      return
+    }
 
-    router.push("/it/inventory")
+    setIsSubmitting(true)
+
+    try {
+      // Prepare the data to be saved
+      const itemData = {
+        name: formData.name,
+        type: formData.type,
+        category: formData.category,
+        brand: formData.brand,
+        department: formData.department,
+        assignedTo: formData.assignedTo || "unassigned",
+        condition: formData.condition,
+        vendorType: formData.vendorType,
+        storeName: formData.storeName || "",
+        storeLocation: formData.storeLocation || "",
+        websiteName: formData.websiteName || "",
+        websiteUrl: formData.websiteUrl || "",
+        purchaseDate: formData.purchaseDate || "",
+        warrantyExpiry: formData.warrantyExpiry || "",
+        cost: formData.cost ? Number.parseFloat(formData.cost) : 0,
+        currency: formData.currency || "USD",
+        description: formData.description || "",
+        serialNumber: formData.serialNumber || "",
+        specifications: formData.specifications || "",
+        licenseKey: formData.licenseKey || "",
+        version: formData.version || "",
+        status: "active", // Default status
+        company_id: userData.company_id,
+        created_by: userData.uid,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      }
+
+      console.log("Saving item data:", itemData)
+
+      // Save to Firestore
+      const docRef = await addDoc(collection(db, "itInventory"), itemData)
+
+      console.log("Document written with ID: ", docRef.id)
+
+      toast({
+        title: "Item Created Successfully",
+        description: `${formData.name} has been added to the inventory`,
+      })
+
+      router.push("/it/inventory")
+    } catch (error) {
+      console.error("Error adding document: ", error)
+      toast({
+        title: "Error",
+        description: "Failed to create inventory item. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleCancel = () => {
@@ -1482,9 +1542,14 @@ export default function NewInventoryItemPage() {
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
             ) : (
-              <Button type="button" onClick={handleSubmit} className="shadow-sm bg-green-600 hover:bg-green-700">
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="shadow-sm bg-green-600 hover:bg-green-700"
+              >
                 <Save className="h-4 w-4 mr-2" />
-                Create Item
+                {isSubmitting ? "Creating..." : "Create Item"}
               </Button>
             )}
           </div>
