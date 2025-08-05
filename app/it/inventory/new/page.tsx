@@ -47,6 +47,7 @@ interface FormData {
   purchaseDate: string
   warrantyExpiry: string
   cost: string
+  currency?: string
   description: string
   serialNumber?: string
   specifications?: string
@@ -186,6 +187,7 @@ export default function NewInventoryItemPage() {
     purchaseDate: "",
     warrantyExpiry: "",
     cost: "",
+    currency: "USD",
     description: "",
     serialNumber: "",
     specifications: "",
@@ -672,8 +674,46 @@ export default function NewInventoryItemPage() {
                     <Label htmlFor="cost" className="text-base font-medium">
                       Purchase Cost
                     </Label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <div className="relative flex">
+                      <Select
+                        value={formData.currency || "USD"}
+                        onValueChange={(value) => setFormData({ ...formData, currency: value })}
+                      >
+                        <SelectTrigger className="h-12 w-24 rounded-r-none border-r-0">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">USD</SelectItem>
+                          <SelectItem value="EUR">EUR</SelectItem>
+                          <SelectItem value="GBP">GBP</SelectItem>
+                          <SelectItem value="JPY">JPY</SelectItem>
+                          <SelectItem value="CAD">CAD</SelectItem>
+                          <SelectItem value="AUD">AUD</SelectItem>
+                          <SelectItem value="CHF">CHF</SelectItem>
+                          <SelectItem value="CNY">CNY</SelectItem>
+                          <SelectItem value="INR">INR</SelectItem>
+                          <SelectItem value="KRW">KRW</SelectItem>
+                          <SelectItem value="SGD">SGD</SelectItem>
+                          <SelectItem value="HKD">HKD</SelectItem>
+                          <SelectItem value="NOK">NOK</SelectItem>
+                          <SelectItem value="SEK">SEK</SelectItem>
+                          <SelectItem value="DKK">DKK</SelectItem>
+                          <SelectItem value="PLN">PLN</SelectItem>
+                          <SelectItem value="CZK">CZK</SelectItem>
+                          <SelectItem value="HUF">HUF</SelectItem>
+                          <SelectItem value="RUB">RUB</SelectItem>
+                          <SelectItem value="BRL">BRL</SelectItem>
+                          <SelectItem value="MXN">MXN</SelectItem>
+                          <SelectItem value="ZAR">ZAR</SelectItem>
+                          <SelectItem value="TRY">TRY</SelectItem>
+                          <SelectItem value="NZD">NZD</SelectItem>
+                          <SelectItem value="PHP">PHP</SelectItem>
+                          <SelectItem value="THB">THB</SelectItem>
+                          <SelectItem value="MYR">MYR</SelectItem>
+                          <SelectItem value="IDR">IDR</SelectItem>
+                          <SelectItem value="VND">VND</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <Input
                         id="cost"
                         type="number"
@@ -681,7 +721,7 @@ export default function NewInventoryItemPage() {
                         value={formData.cost}
                         onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
                         placeholder="0.00"
-                        className="h-12 text-base pl-10"
+                        className="h-12 text-base rounded-l-none flex-1"
                       />
                     </div>
                   </div>
@@ -928,7 +968,9 @@ export default function NewInventoryItemPage() {
                         <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Cost:</span>
                           <span className="text-sm text-muted-foreground">
-                            {formData.cost ? `$${Number.parseFloat(formData.cost).toLocaleString()}` : "Not specified"}
+                            {formData.cost
+                              ? `${formData.currency || "USD"} ${Number.parseFloat(formData.cost).toLocaleString()}`
+                              : "Not specified"}
                           </span>
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-muted">
