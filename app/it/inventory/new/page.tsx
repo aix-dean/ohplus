@@ -48,6 +48,16 @@ interface FormData {
   version?: string
 }
 
+interface User {
+  id: string
+  uid: string
+  first_name: string
+  last_name: string
+  email: string
+  company_id?: string
+  license_key?: string
+}
+
 const categories = [
   "Desktop Computer",
   "Laptop",
@@ -114,7 +124,10 @@ const statusColors = {
 
 export default function NewInventoryItemPage() {
   const router = useRouter()
+  const { userData } = useAuth()
   const [currentStep, setCurrentStep] = useState(1)
+  const [users, setUsers] = useState<User[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
   const [formData, setFormData] = useState<FormData>({
     name: "",
     type: "hardware",
@@ -134,39 +147,40 @@ export default function NewInventoryItemPage() {
     version: "",
   })
 
-  // Remove the mock users state and replace with:
-  const { userData } = useAuth()
-  const [users, setUsers] = useState<Array<{ id: string; displayName: string; email: string; department?: string }>>([])
-  const [loadingUsers, setLoadingUsers] = useState(false)
-
-  // Add useEffect to fetch users
+  // Fetch users by company_id
   useEffect(() => {
-    async function fetchUsers() {
-      if (!userData?.license_key) return
+    const fetchUsers = async () => {
+      if (!userData?.company_id) return
 
+      setLoadingUsers(true)
       try {
-        setLoadingUsers(true)
+        console.log("Fetching users for company_id:", userData.company_id)
+
         const usersRef = collection(db, "iboard_users")
-        const q = query(usersRef, where("license_key", "==", userData.license_key))
+        const q = query(usersRef, where("company_id", "==", userData.company_id))
         const querySnapshot = await getDocs(q)
 
-        const fetchedUsers: Array<{ id: string; displayName: string; email: string; department?: string }> = []
+        const fetchedUsers: User[] = []
         querySnapshot.forEach((doc) => {
-          const user = doc.data()
+          const data = doc.data()
           fetchedUsers.push({
             id: doc.id,
-            displayName: user.displayName || user.email || "Unknown User",
-            email: user.email || "",
-            department: user.department || "Not specified",
+            uid: data.uid,
+            first_name: data.first_name || "",
+            last_name: data.last_name || "",
+            email: data.email || "",
+            company_id: data.company_id,
+            license_key: data.license_key,
           })
         })
 
+        console.log("Fetched users:", fetchedUsers)
         setUsers(fetchedUsers)
       } catch (error) {
         console.error("Error fetching users:", error)
         toast({
           title: "Error",
-          description: "Failed to load users. Please try again.",
+          description: "Failed to load users",
           variant: "destructive",
         })
       } finally {
@@ -175,7 +189,7 @@ export default function NewInventoryItemPage() {
     }
 
     fetchUsers()
-  }, [userData])
+  }, [userData?.company_id])
 
   const validateStep = (step: number): boolean => {
     switch (step) {
@@ -367,13 +381,14 @@ export default function NewInventoryItemPage() {
                         <SelectValue placeholder={loadingUsers ? "Loading users..." : "Select a user"} />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="">
+                          <span className="text-muted-foreground">Unassigned</span>
+                        </SelectItem>
                         {users.map((user) => (
-                          <SelectItem key={user.id} value={user.displayName}>
+                          <SelectItem key={user.uid} value={`${user.first_name} ${user.last_name}`.trim()}>
                             <div className="flex flex-col">
-                              <span>{user.displayName}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {user.email} • {user.department}
-                              </span>
+                              <span>{`${user.first_name} ${user.last_name}`.trim() || user.email}</span>
+                              <span className="text-xs text-muted-foreground">{user.email}</span>
                             </div>
                           </SelectItem>
                         ))}
@@ -470,21 +485,6 @@ export default function NewInventoryItemPage() {
                     />
                     <p className="text-sm text-muted-foreground">Specify the physical location of this item</p>
                   </div>
-                  {/*
-                  <div className="space-y-3">
-                    <Label htmlFor="assignedTo" className="text-base font-medium">
-                      Assigned To
-                    </Label>
-                    <Input
-                      id="assignedTo"
-                      value={formData.assignedTo}
-                      onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
-                      placeholder="e.g., John Doe, IT Department"
-                      className="h-12 text-base"
-                    />
-                    <p className="text-sm text-muted-foreground">Person or team responsible for this item</p>
-                  </div>
-                  */}
                 </div>
               </CardContent>
             </Card>
@@ -647,9 +647,6 @@ export default function NewInventoryItemPage() {
                 <CardTitle className="flex items-center space-x-2">
                   <Package className="h-5 w-5" />
                   <span>{formData.name || "Unnamed Item"}</span>
-                  {/*<Badge variant="outline" className={cn("ml-auto", statusColors[formData.status])}>
-                    {formData.status}
-                  </Badge>*/}
                 </CardTitle>
                 <CardDescription>{formData.description || "No description provided"}</CardDescription>
               </CardHeader>
@@ -710,9 +707,7 @@ export default function NewInventoryItemPage() {
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Assigned To:</span>
-                          <span className="text-sm text-muted-foreground">
-                            {formData.assignedTo || "Not specified"}
-                          </span>
+                          <span className="text-sm text-muted-foreground">{formData.assignedTo || "Unassigned"}</span>
                         </div>
                       </div>
                     </div>
