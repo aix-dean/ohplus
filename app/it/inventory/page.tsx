@@ -7,18 +7,6 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -29,10 +17,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Search, Edit, Trash2, Monitor, Smartphone, Printer, Wifi, HardDrive, Shield, Package, Server, Laptop, Loader2 } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, orderBy } from "firebase/firestore"
+import { collection, query, where, getDocs, deleteDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 interface InventoryItem {
@@ -75,48 +64,6 @@ interface User {
   license_key?: string
 }
 
-const hardwareCategories = [
-  "Desktop Computer",
-  "Laptop",
-  "Server",
-  "Printer",
-  "Network Switch",
-  "Router",
-  "Firewall",
-  "Monitor",
-  "Smartphone",
-  "Tablet",
-  "Storage Device",
-  "Keyboard",
-  "Mouse",
-  "Webcam",
-  "Headset",
-  "Projector",
-  "Scanner",
-  "UPS",
-  "Cable",
-  "Docking Station",
-]
-
-const softwareCategories = [
-  "Operating System",
-  "Productivity Suite",
-  "Design Software",
-  "Security Software",
-  "Database Software",
-  "Development Tools",
-  "Antivirus",
-  "Backup Software",
-  "Communication Software",
-  "Project Management",
-  "Accounting Software",
-  "CRM Software",
-  "ERP Software",
-  "Media Software",
-  "Browser",
-  "Utility Software",
-]
-
 const statusColors = {
   active: "bg-green-100 text-green-800",
   inactive: "bg-gray-100 text-gray-800",
@@ -153,11 +100,6 @@ export default function ITInventoryPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
-  const [formData, setFormData] = useState<Partial<InventoryItem>>({
-    type: "hardware",
-    status: "active",
-  })
 
   // Fetch users by company_id
   useEffect(() => {
@@ -279,52 +221,8 @@ export default function ITInventoryPage() {
     return { total, active, maintenance, totalValue }
   }, [inventory])
 
-  const handleEdit = (item: InventoryItem) => {
-    setEditingItem(item)
-    setFormData(item)
-  }
-
-  const handleUpdate = async () => {
-    if (!editingItem || !formData.name || !formData.category || !formData.brand) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      const itemRef = doc(db, "itInventory", editingItem.id)
-      const updatedData = {
-        ...formData,
-        updated_at: new Date(),
-      }
-
-      await updateDoc(itemRef, updatedData)
-
-      const updatedItem: InventoryItem = {
-        ...editingItem,
-        ...formData,
-      } as InventoryItem
-
-      setInventory(inventory.map((item) => (item.id === editingItem.id ? updatedItem : item)))
-
-      setEditingItem(null)
-      setFormData({ type: "hardware", status: "active" })
-
-      toast({
-        title: "Success",
-        description: "Inventory item updated successfully",
-      })
-    } catch (error) {
-      console.error("Error updating item:", error)
-      toast({
-        title: "Error",
-        description: "Failed to update inventory item",
-        variant: "destructive",
-      })
-    }
+  const handleEdit = (itemId: string) => {
+    router.push(`/it/inventory/edit/${itemId}`)
   }
 
   const handleDelete = async (id: string) => {
@@ -492,289 +390,9 @@ export default function ITInventoryPage() {
                     </div>
                   </div>
                   <div className="flex space-x-1">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(item)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                          <DialogTitle>Edit Inventory Item</DialogTitle>
-                          <DialogDescription>Update the inventory item details</DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-name">Name *</Label>
-                              <Input
-                                id="edit-name"
-                                value={formData.name || ""}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                placeholder="Enter item name"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-type">Type *</Label>
-                              <Select
-                                value={formData.type}
-                                onValueChange={(value) =>
-                                  setFormData({ ...formData, type: value as "hardware" | "software" })
-                                }
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="hardware">Hardware</SelectItem>
-                                  <SelectItem value="software">Software</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-category">Category *</Label>
-                              <Select
-                                value={formData.category}
-                                onValueChange={(value) => setFormData({ ...formData, category: value })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select category" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {(formData.type === "hardware" ? hardwareCategories : softwareCategories).map((category) => (
-                                    <SelectItem key={category} value={category}>
-                                      {category}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-brand">Brand *</Label>
-                              <Input
-                                id="edit-brand"
-                                value={formData.brand || ""}
-                                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                                placeholder="Enter brand name"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-department">Department *</Label>
-                              <Select
-                                value={formData.department}
-                                onValueChange={(value) => setFormData({ ...formData, department: value })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select department" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="IT">IT Department</SelectItem>
-                                  <SelectItem value="HR">Human Resources</SelectItem>
-                                  <SelectItem value="Finance">Finance</SelectItem>
-                                  <SelectItem value="Marketing">Marketing</SelectItem>
-                                  <SelectItem value="Sales">Sales</SelectItem>
-                                  <SelectItem value="Operations">Operations</SelectItem>
-                                  <SelectItem value="Administration">Administration</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-assignedTo">Assigned To</Label>
-                              <Select
-                                value={formData.assignedTo}
-                                onValueChange={(value) => setFormData({ ...formData, assignedTo: value })}
-                                disabled={loadingUsers}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder={loadingUsers ? "Loading users..." : "Select a user"} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="unassigned">
-                                    <span className="text-muted-foreground">Unassigned</span>
-                                  </SelectItem>
-                                  {users.map((user) => (
-                                    <SelectItem key={user.uid} value={user.uid}>
-                                      <div className="flex flex-col">
-                                        <span>{`${user.first_name} ${user.last_name}`.trim() || user.email}</span>
-                                        <span className="text-xs text-muted-foreground">{user.email}</span>
-                                      </div>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-status">Status</Label>
-                              <Select
-                                value={formData.status}
-                                onValueChange={(value) => setFormData({ ...formData, status: value as any })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="active">Active</SelectItem>
-                                  <SelectItem value="inactive">Inactive</SelectItem>
-                                  <SelectItem value="maintenance">Maintenance</SelectItem>
-                                  <SelectItem value="retired">Retired</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-condition">Condition</Label>
-                              <Select
-                                value={formData.condition}
-                                onValueChange={(value) => setFormData({ ...formData, condition: value as any })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="excellent">Excellent</SelectItem>
-                                  <SelectItem value="good">Good</SelectItem>
-                                  <SelectItem value="fair">Fair</SelectItem>
-                                  <SelectItem value="poor">Poor</SelectItem>
-                                  <SelectItem value="damaged">Damaged</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-purchaseDate">Purchase Date</Label>
-                              <Input
-                                id="edit-purchaseDate"
-                                type="date"
-                                value={formData.purchaseDate || ""}
-                                onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-warrantyExpiry">Warranty Expiry</Label>
-                              <Input
-                                id="edit-warrantyExpiry"
-                                type="date"
-                                value={formData.warrantyExpiry || ""}
-                                onChange={(e) => setFormData({ ...formData, warrantyExpiry: e.target.value })}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-cost">Cost</Label>
-                              <div className="flex">
-                                <Select
-                                  value={formData.currency || "USD"}
-                                  onValueChange={(value) => setFormData({ ...formData, currency: value })}
-                                >
-                                  <SelectTrigger className="w-20 rounded-r-none border-r-0">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="USD">USD</SelectItem>
-                                    <SelectItem value="PHP">PHP</SelectItem>
-                                    <SelectItem value="EUR">EUR</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <Input
-                                  id="edit-cost"
-                                  type="number"
-                                  value={formData.cost || ""}
-                                  onChange={(e) =>
-                                    setFormData({ ...formData, cost: Number.parseFloat(e.target.value) || 0 })
-                                  }
-                                  placeholder="Enter cost"
-                                  className="rounded-l-none"
-                                />
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-storeName">Store Name</Label>
-                              <Input
-                                id="edit-storeName"
-                                value={formData.storeName || ""}
-                                onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
-                                placeholder="Enter store name"
-                              />
-                            </div>
-                          </div>
-
-                          {formData.type === "hardware" && (
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="edit-serialNumber">Serial Number</Label>
-                                <Input
-                                  id="edit-serialNumber"
-                                  value={formData.serialNumber || ""}
-                                  onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
-                                  placeholder="Enter serial number"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="edit-specifications">Specifications</Label>
-                                <Input
-                                  id="edit-specifications"
-                                  value={formData.specifications || ""}
-                                  onChange={(e) => setFormData({ ...formData, specifications: e.target.value })}
-                                  placeholder="Enter specifications"
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {formData.type === "software" && (
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="edit-licenseKey">License Key</Label>
-                                <Input
-                                  id="edit-licenseKey"
-                                  value={formData.licenseKey || ""}
-                                  onChange={(e) => setFormData({ ...formData, licenseKey: e.target.value })}
-                                  placeholder="Enter license key"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="edit-version">Version</Label>
-                                <Input
-                                  id="edit-version"
-                                  value={formData.version || ""}
-                                  onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-                                  placeholder="Enter version"
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="space-y-2">
-                            <Label htmlFor="edit-description">Description</Label>
-                            <Textarea
-                              id="edit-description"
-                              value={formData.description || ""}
-                              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                              placeholder="Enter description"
-                              rows={3}
-                            />
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setEditingItem(null)}>
-                            Cancel
-                          </Button>
-                          <Button onClick={handleUpdate}>Update Item</Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                    <Button variant="outline" size="sm" onClick={() => handleEdit(item.id)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
 
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
