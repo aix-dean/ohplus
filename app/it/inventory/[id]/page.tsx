@@ -83,10 +83,25 @@ export default function InventoryItemDetailPage() {
 
   const itemId = params.id as string
 
+  // Handle case where "new" is passed as ID (routing conflict)
+  if (itemId === "new") {
+    router.push("/it/inventory/new")
+    return null
+  }
+
+  // Handle case where "edit" is passed as ID (routing conflict)  
+  if (itemId === "edit") {
+    router.push("/it/inventory")
+    return null
+  }
+
   // Fetch item details
   useEffect(() => {
     const fetchItem = async () => {
       if (!itemId || !userData?.company_id) return
+    
+      // Prevent fetching if itemId is a route segment
+      if (itemId === "new" || itemId === "edit") return
 
       try {
         const itemDoc = await getDoc(doc(db, "itInventory", itemId))
