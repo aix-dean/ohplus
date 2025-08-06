@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, Eye, Package, HardDrive, Monitor, Loader2, AlertCircle } from 'lucide-react'
+import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, Eye, Package, HardDrive, Monitor, Loader2, AlertCircle, X, Check } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
@@ -26,7 +26,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 
 interface InventoryItem {
   id: string
@@ -87,19 +86,10 @@ export default function ITInventoryPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [departmentFilter, setDepartmentFilter] = useState<string>("all")
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null)
   
-  // Use ref to track deletion state to prevent race conditions
-  const deletionInProgress = useRef(false)
-  const mountedRef = useRef(true)
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false
-    }
-  }, [])
+  // Track which item is in delete confirmation mode
+  const [itemInDeleteMode, setItemInDeleteMode] = useState<string | null>(null)
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
 
   // Fetch inventory items (only non-deleted ones)
   useEffect(() => {
@@ -111,7 +101,7 @@ export default function ITInventoryPage() {
         const q = query(
           itemsRef, 
           where("company_id", "==", userData.company_id),
-          where("deleted", "==", false), // Only fetch non-deleted items
+          where("deleted", "==", false),
           orderBy("created_at", "desc")
         )
         const querySnapshot = await getDocs(q)
@@ -145,22 +135,16 @@ export default function ITInventoryPage() {
           })
         })
 
-        if (mountedRef.current) {
-          setItems(fetchedItems)
-        }
+        setItems(fetchedItems)
       } catch (error) {
         console.error("Error fetching items:", error)
-        if (mountedRef.current) {
-          toast({
-            title: "Error",
-            description: "Failed to load inventory items",
-            variant: "destructive",
-          })
-        }
+        toast({
+          title: "Error",
+          description: "Failed to load inventory items",
+          variant: "destructive",
+        })
       } finally {
-        if (mountedRef.current) {
-          setLoading(false)
-        }
+        setLoading(false)
       }
     }
 
@@ -190,9 +174,7 @@ export default function ITInventoryPage() {
           })
         })
 
-        if (mountedRef.current) {
-          setUsers(fetchedUsers)
-        }
+        setUsers(fetchedUsers)
       } catch (error) {
         console.error("Error fetching users:", error)
       }
@@ -225,78 +207,58 @@ export default function ITInventoryPage() {
   })
 
   const handleEdit = useCallback((item: InventoryItem) => {
-    if (deletionInProgress.current) return
     router.push(`/it/inventory/edit/${item.id}`)
   }, [router])
 
   const handleView = useCallback((item: InventoryItem) => {
-    if (deletionInProgress.current) return
     router.push(`/it/inventory/details/${item.id}`)
   }, [router])
 
-  const handleDelete = useCallback((item: InventoryItem) => {
-    if (deletionInProgress.current) return
-    setItemToDelete(item)
-    setDeleteDialogOpen(true)
+  const handleDeleteClick = useCallback((item: InventoryItem) => {
+    setItemInDeleteMode(item.id)
   }, [])
 
-  const handleDeleteConfirm = useCallback(async () => {
-    if (!itemToDelete || deletionInProgress.current) return
+  const handleDeleteCancel = useCallback(() => {
+    setItemInDeleteMode(null)
+  }, [])
 
-    deletionInProgress.current = true
+  const handleDeleteConfirm = useCallback(async (item: InventoryItem) => {
+    setDeletingItemId(item.id)
     
     try {
-      // Store item details before deletion
-      const itemId = itemToDelete.id
-      const itemName = itemToDelete.name
-
       // Perform the soft delete
-      const itemRef = doc(db, "itInventory", itemId)
+      const itemRef = doc(db, "itInventory", item.id)
       await updateDoc(itemRef, {
         deleted: true,
         deleted_at: serverTimestamp(),
         updated_at: serverTimestamp(),
       })
 
-      // Only update state if component is still mounted
-      if (mountedRef.current) {
-        // Remove item from local state immediately
-        setItems(prevItems => prevItems.filter(item => item.id !== itemId))
-        
-        // Close dialog
-        setDeleteDialogOpen(false)
-        setItemToDelete(null)
-        
-        // Show success toast
-        toast({
-          title: "Item Deleted",
-          description: `${itemName} has been deleted from inventory`,
-        })
-      }
+      // Remove item from local state
+      setItems(prevItems => prevItems.filter(i => i.id !== item.id))
+      
+      // Reset states
+      setItemInDeleteMode(null)
+      setDeletingItemId(null)
+      
+      // Show success toast
+      toast({
+        title: "Item Deleted",
+        description: `${item.name} has been deleted from inventory`,
+      })
 
     } catch (error) {
       console.error("Error deleting item:", error)
-      
-      if (mountedRef.current) {
-        toast({
-          title: "Error",
-          description: "Failed to delete item. Please try again.",
-          variant: "destructive",
-        })
-      }
-    } finally {
-      deletionInProgress.current = false
+      setDeletingItemId(null)
+      toast({
+        title: "Error",
+        description: "Failed to delete item. Please try again.",
+        variant: "destructive",
+      })
     }
-  }, [itemToDelete])
-
-  const handleDeleteCancel = useCallback(() => {
-    if (deletionInProgress.current) return
-    setDeleteDialogOpen(false)
-    setItemToDelete(null)
   }, [])
 
   const handleAddNew = useCallback(() => {
-    if (deletionInProgress.current) return
     router.push("/it/inventory/new")
   }, [router])
 
@@ -331,7 +293,7 @@ export default function ITInventoryPage() {
             <h1 className="text-3xl font-bold text-slate-900">IT Inventory</h1>
             <p className="text-slate-600">Manage your IT assets and equipment</p>
           </div>
-          <Button onClick={handleAddNew} className="shadow-sm" disabled={deletionInProgress.current}>
+          <Button onClick={handleAddNew} className="shadow-sm">
             <Plus className="h-4 w-4 mr-2" />
             Add New Item
           </Button>
@@ -349,12 +311,11 @@ export default function ITInventoryPage() {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
-                    disabled={deletionInProgress.current}
                   />
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Select value={typeFilter} onValueChange={setTypeFilter} disabled={deletionInProgress.current}>
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
                   <SelectTrigger className="w-full sm:w-[140px]">
                     <SelectValue placeholder="Type" />
                   </SelectTrigger>
@@ -364,7 +325,7 @@ export default function ITInventoryPage() {
                     <SelectItem value="software">Software</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={statusFilter} onValueChange={setStatusFilter} disabled={deletionInProgress.current}>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-full sm:w-[140px]">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -376,7 +337,7 @@ export default function ITInventoryPage() {
                     <SelectItem value="retired">Retired</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={departmentFilter} onValueChange={setDepartmentFilter} disabled={deletionInProgress.current}>
+                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                   <SelectTrigger className="w-full sm:w-[160px]">
                     <SelectValue placeholder="Department" />
                   </SelectTrigger>
@@ -406,7 +367,6 @@ export default function ITInventoryPage() {
               variant="outline"
               size="sm"
               onClick={clearFilters}
-              disabled={deletionInProgress.current}
             >
               Clear Filters
             </Button>
@@ -431,7 +391,7 @@ export default function ITInventoryPage() {
                   </p>
                 </div>
                 {items.length === 0 && (
-                  <Button onClick={handleAddNew} disabled={deletionInProgress.current}>
+                  <Button onClick={handleAddNew}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add First Item
                   </Button>
@@ -442,115 +402,159 @@ export default function ITInventoryPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredItems.map((item) => (
-              <Card key={item.id} className={cn(
-                "hover:shadow-lg transition-shadow",
-                deletionInProgress.current && "opacity-50 pointer-events-none"
-              )}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-2">
-                      {item.type === "hardware" ? (
-                        <HardDrive className="h-5 w-5 text-blue-600" />
-                      ) : (
-                        <Monitor className="h-5 w-5 text-green-600" />
+              <Card key={item.id} className="hover:shadow-lg transition-shadow">
+                {/* Normal Card Content */}
+                {itemInDeleteMode !== item.id && (
+                  <>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center space-x-2">
+                          {item.type === "hardware" ? (
+                            <HardDrive className="h-5 w-5 text-blue-600" />
+                          ) : (
+                            <Monitor className="h-5 w-5 text-green-600" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-lg truncate">{item.name}</CardTitle>
+                            <CardDescription className="truncate">
+                              {item.brand} • {item.category}
+                            </CardDescription>
+                          </div>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleView(item)}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEdit(item)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteClick(item)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline" className={cn(statusColors[item.status])}>
+                          {item.status}
+                        </Badge>
+                        <Badge variant="outline" className={cn(conditionColors[item.condition])}>
+                          {item.condition}
+                        </Badge>
+                      </div>
+
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Department:</span>
+                          <span className="font-medium">{item.department}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Assigned to:</span>
+                          <span className="font-medium truncate ml-2">
+                            {getUserDisplayName(item.assignedTo)}
+                          </span>
+                        </div>
+                        {item.cost > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Cost:</span>
+                            <span className="font-medium">
+                              {item.currency} {item.cost.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                        {item.serialNumber && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Serial:</span>
+                            <span className="font-mono text-xs">{item.serialNumber}</span>
+                          </div>
+                        )}
+                        {item.version && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Version:</span>
+                            <span className="font-medium">{item.version}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {item.description && (
+                        <div className="pt-2 border-t">
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {item.description}
+                          </p>
+                        </div>
                       )}
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-lg truncate">{item.name}</CardTitle>
-                        <CardDescription className="truncate">
-                          {item.brand} • {item.category}
-                        </CardDescription>
+                    </CardContent>
+                  </>
+                )}
+
+                {/* Delete Confirmation Content */}
+                {itemInDeleteMode === item.id && (
+                  <div className="p-6">
+                    <div className="flex flex-col items-center space-y-4 text-center">
+                      <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                        <AlertCircle className="h-6 w-6 text-red-600" />
                       </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" disabled={deletionInProgress.current}>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleView(item)}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEdit(item)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleDelete(item)}
-                          className="text-red-600"
+                      <div className="space-y-2">
+                        <h3 className="font-semibold text-lg">Delete Item?</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Are you sure you want to delete <span className="font-medium">"{item.name}"</span>?
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          This will move the item to trash and remove it from your inventory list.
+                        </p>
+                      </div>
+                      <div className="flex space-x-3 w-full">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleDeleteCancel}
+                          className="flex-1"
+                          disabled={deletingItemId === item.id}
                         >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline" className={cn(statusColors[item.status])}>
-                      {item.status}
-                    </Badge>
-                    <Badge variant="outline" className={cn(conditionColors[item.condition])}>
-                      {item.condition}
-                    </Badge>
-                  </div>
-
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Department:</span>
-                      <span className="font-medium">{item.department}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Assigned to:</span>
-                      <span className="font-medium truncate ml-2">
-                        {getUserDisplayName(item.assignedTo)}
-                      </span>
-                    </div>
-                    {item.cost > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Cost:</span>
-                        <span className="font-medium">
-                          {item.currency} {item.cost.toLocaleString()}
-                        </span>
+                          <X className="h-4 w-4 mr-2" />
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleDeleteConfirm(item)}
+                          className="flex-1"
+                          disabled={deletingItemId === item.id}
+                        >
+                          {deletingItemId === item.id ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Deleting...
+                            </>
+                          ) : (
+                            <>
+                              <Check className="h-4 w-4 mr-2" />
+                              Delete
+                            </>
+                          )}
+                        </Button>
                       </div>
-                    )}
-                    {item.serialNumber && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Serial:</span>
-                        <span className="font-mono text-xs">{item.serialNumber}</span>
-                      </div>
-                    )}
-                    {item.version && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Version:</span>
-                        <span className="font-medium">{item.version}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {item.description && (
-                    <div className="pt-2 border-t">
-                      <p className="text-sm text-muted-foreground line-clamp-2">
-                        {item.description}
-                      </p>
                     </div>
-                  )}
-                </CardContent>
+                  </div>
+                )}
               </Card>
             ))}
           </div>
         )}
-
-        {/* Delete Confirmation Dialog */}
-        <DeleteConfirmationDialog
-          isOpen={deleteDialogOpen}
-          onClose={handleDeleteCancel}
-          onConfirm={handleDeleteConfirm}
-          title="Delete Inventory Item"
-          itemName={itemToDelete?.name}
-        />
       </div>
     </div>
   )
