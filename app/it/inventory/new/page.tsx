@@ -342,7 +342,7 @@ export default function NewInventoryItemPage() {
         version: formData.version || "",
         categorySpecs: formData.categorySpecs || {},
         status: "active", // Default status
-        deleted: false, // Add soft delete field
+        deleted: false, // Add this line for soft delete
         company_id: userData.company_id,
         created_by: userData.uid,
         created_at: serverTimestamp(),
