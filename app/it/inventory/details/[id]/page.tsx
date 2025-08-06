@@ -6,12 +6,22 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, Edit, Trash2, Package, HardDrive, Monitor, Globe, MapPin, DollarSign, Calendar, Settings, User, Building, AlertCircle, Loader2, ExternalLink, X, Check } from 'lucide-react'
+import { ArrowLeft, Edit, Trash2, Package, HardDrive, Monitor, Globe, MapPin, DollarSign, Calendar, Settings, User, Building, AlertCircle, Loader2, ExternalLink } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface InventoryItem {
   id: string
@@ -76,7 +86,7 @@ export default function InventoryDetailsPage() {
   const [item, setItem] = useState<InventoryItem | null>(null)
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
   // Fetch item details
@@ -190,12 +200,12 @@ export default function InventoryDetailsPage() {
   }, [userData?.company_id])
 
   // Helper function to get user display name
-  const getUserDisplayName = useCallback((uid: string) => {
+  const getUserDisplayName = (uid: string) => {
     if (uid === "unassigned") return "Unassigned"
     const user = users.find((u) => u.uid === uid)
     if (!user) return "Unknown User"
     return `${user.first_name} ${user.last_name}`.trim() || user.email
-  }, [users])
+  }
 
   const handleEdit = useCallback(() => {
     if (item) {
@@ -203,24 +213,22 @@ export default function InventoryDetailsPage() {
     }
   }, [item, router])
 
-  const handleDeleteClick = useCallback(() => {
-    setShowDeleteConfirmation(true)
+  const handleDelete = useCallback(() => {
+    setDeleteDialogOpen(true)
   }, [])
 
-  const handleDeleteCancel = useCallback(() => {
-    setShowDeleteConfirmation(false)
+  const resetDeleteState = useCallback(() => {
+    setDeleteDialogOpen(false)
+    setIsDeleting(false)
   }, [])
 
-  const handleDeleteConfirm = useCallback(async () => {
+  const confirmDelete = useCallback(async () => {
     if (!item || isDeleting) return
 
     setIsDeleting(true)
     
     try {
-      // Store item details before deletion
-      const itemName = item.name
-
-      // Perform the soft delete
+      // Soft delete: update the deleted field to true instead of actually deleting the document
       const itemRef = doc(db, "itInventory", item.id)
       await updateDoc(itemRef, {
         deleted: true,
@@ -228,25 +236,39 @@ export default function InventoryDetailsPage() {
         updated_at: serverTimestamp(),
       })
 
+      // Store item name for toast before resetting state
+      const deletedItemName = item.name
+      
+      // Reset delete state
+      resetDeleteState()
+
       // Show success toast
       toast({
         title: "Item Deleted",
-        description: `${itemName} has been deleted from inventory`,
+        description: `${deletedItemName} has been deleted from inventory`,
       })
 
       // Navigate back to inventory list
       router.push("/it/inventory")
-
     } catch (error) {
       console.error("Error deleting item:", error)
-      setIsDeleting(false)
+      
+      // Reset state on error
+      resetDeleteState()
+      
       toast({
         title: "Error",
         description: "Failed to delete item. Please try again.",
         variant: "destructive",
       })
     }
-  }, [item, isDeleting, router])
+  }, [item, isDeleting, resetDeleteState, router])
+
+  const handleDeleteDialogOpenChange = useCallback((open: boolean) => {
+    if (!open && !isDeleting) {
+      resetDeleteState()
+    }
+  }, [isDeleting, resetDeleteState])
 
   const handleBack = useCallback(() => {
     router.push("/it/inventory")
@@ -289,54 +311,6 @@ export default function InventoryDetailsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="container mx-auto p-6 max-w-6xl">
-        {/* Delete Confirmation Banner */}
-        {showDeleteConfirmation && (
-          <Card className="mb-6 border-red-200 bg-red-50">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <AlertCircle className="h-6 w-6 text-red-600" />
-                  <div>
-                    <h3 className="font-semibold text-red-900">Delete "{item.name}"?</h3>
-                    <p className="text-sm text-red-700">
-                      This will permanently remove the item from your inventory. This action cannot be undone.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDeleteCancel}
-                    disabled={isDeleting}
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleDeleteConfirm}
-                    disabled={isDeleting}
-                  >
-                    {isDeleting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Deleting...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="h-4 w-4 mr-2" />
-                        Delete Item
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-4">
@@ -355,11 +329,7 @@ export default function InventoryDetailsPage() {
               <Edit className="h-4 w-4 mr-2" />
               Edit Item
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleDeleteClick} 
-              className="shadow-sm text-red-600 hover:text-red-700 hover:bg-red-50"
-            >
+            <Button variant="outline" onClick={handleDelete} className="shadow-sm text-red-600 hover:text-red-700 hover:bg-red-50">
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
             </Button>
@@ -631,7 +601,7 @@ export default function InventoryDetailsPage() {
                   Edit Item Details
                 </Button>
                 <Button 
-                  onClick={handleDeleteClick} 
+                  onClick={handleDelete} 
                   className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50" 
                   variant="outline"
                 >
@@ -667,6 +637,38 @@ export default function InventoryDetailsPage() {
             </Card>
           </div>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogOpenChange}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center space-x-2">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <span>Delete Inventory Item</span>
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete "{item.name}"? This action will move the item to trash and it won't be visible in your inventory list.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete Item"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   )

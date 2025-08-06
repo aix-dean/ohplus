@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, Eye, Package, HardDrive, Monitor, Loader2, AlertCircle, X, Check } from 'lucide-react'
+import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, Eye, Package, HardDrive, Monitor, Loader2, AlertCircle } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
@@ -19,6 +19,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   Select,
   SelectContent,
@@ -86,10 +96,9 @@ export default function ITInventoryPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [departmentFilter, setDepartmentFilter] = useState<string>("all")
-  
-  // Track which item is in delete confirmation mode
-  const [itemInDeleteMode, setItemInDeleteMode] = useState<string | null>(null)
-  const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Fetch inventory items (only non-deleted ones)
   useEffect(() => {
@@ -101,7 +110,7 @@ export default function ITInventoryPage() {
         const q = query(
           itemsRef, 
           where("company_id", "==", userData.company_id),
-          where("deleted", "==", false),
+          where("deleted", "==", false), // Only fetch non-deleted items
           orderBy("created_at", "desc")
         )
         const querySnapshot = await getDocs(q)
@@ -184,12 +193,12 @@ export default function ITInventoryPage() {
   }, [userData?.company_id])
 
   // Helper function to get user display name
-  const getUserDisplayName = useCallback((uid: string) => {
+  const getUserDisplayName = (uid: string) => {
     if (uid === "unassigned") return "Unassigned"
     const user = users.find((u) => u.uid === uid)
     if (!user) return "Unknown User"
     return `${user.first_name} ${user.last_name}`.trim() || user.email
-  }, [users])
+  }
 
   // Filter items based on search and filters
   const filteredItems = items.filter((item) => {
@@ -214,60 +223,68 @@ export default function ITInventoryPage() {
     router.push(`/it/inventory/details/${item.id}`)
   }, [router])
 
-  const handleDeleteClick = useCallback((item: InventoryItem) => {
-    setItemInDeleteMode(item.id)
+  const handleDelete = useCallback((item: InventoryItem) => {
+    setItemToDelete(item)
+    setDeleteDialogOpen(true)
   }, [])
 
-  const handleDeleteCancel = useCallback(() => {
-    setItemInDeleteMode(null)
+  const resetDeleteState = useCallback(() => {
+    setDeleteDialogOpen(false)
+    setItemToDelete(null)
+    setIsDeleting(false)
   }, [])
 
-  const handleDeleteConfirm = useCallback(async (item: InventoryItem) => {
-    setDeletingItemId(item.id)
+  const confirmDelete = useCallback(async () => {
+    if (!itemToDelete || isDeleting) return
+
+    setIsDeleting(true)
     
     try {
-      // Perform the soft delete
-      const itemRef = doc(db, "itInventory", item.id)
+      // Soft delete: update the deleted field to true instead of actually deleting the document
+      const itemRef = doc(db, "itInventory", itemToDelete.id)
       await updateDoc(itemRef, {
         deleted: true,
         deleted_at: serverTimestamp(),
         updated_at: serverTimestamp(),
       })
 
-      // Remove item from local state
-      setItems(prevItems => prevItems.filter(i => i.id !== item.id))
+      // Update local state to remove the item
+      setItems(prevItems => prevItems.filter(item => item.id !== itemToDelete.id))
       
-      // Reset states
-      setItemInDeleteMode(null)
-      setDeletingItemId(null)
+      // Store item name for toast before resetting state
+      const deletedItemName = itemToDelete.name
+      
+      // Reset all delete-related state
+      resetDeleteState()
       
       // Show success toast
       toast({
         title: "Item Deleted",
-        description: `${item.name} has been deleted from inventory`,
+        description: `${deletedItemName} has been deleted from inventory`,
       })
-
     } catch (error) {
       console.error("Error deleting item:", error)
-      setDeletingItemId(null)
+      
+      // Reset state on error
+      resetDeleteState()
+      
       toast({
         title: "Error",
         description: "Failed to delete item. Please try again.",
         variant: "destructive",
       })
     }
-  }, [])
+  }, [itemToDelete, isDeleting, resetDeleteState])
+
+  const handleDeleteDialogOpenChange = useCallback((open: boolean) => {
+    if (!open && !isDeleting) {
+      resetDeleteState()
+    }
+  }, [isDeleting, resetDeleteState])
 
   const handleAddNew = useCallback(() => {
     router.push("/it/inventory/new")
   }, [router])
-
-  const clearFilters = useCallback(() => {
-    setSearchTerm("")
-    setTypeFilter("all")
-    setStatusFilter("all")
-    setDepartmentFilter("all")
-  }, [])
 
   if (loading) {
     return (
@@ -366,7 +383,12 @@ export default function ITInventoryPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={clearFilters}
+              onClick={() => {
+                setSearchTerm("")
+                setTypeFilter("all")
+                setStatusFilter("all")
+                setDepartmentFilter("all")
+              }}
             >
               Clear Filters
             </Button>
@@ -403,158 +425,134 @@ export default function ITInventoryPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredItems.map((item) => (
               <Card key={item.id} className="hover:shadow-lg transition-shadow">
-                {/* Normal Card Content */}
-                {itemInDeleteMode !== item.id && (
-                  <>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center space-x-2">
-                          {item.type === "hardware" ? (
-                            <HardDrive className="h-5 w-5 text-blue-600" />
-                          ) : (
-                            <Monitor className="h-5 w-5 text-green-600" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <CardTitle className="text-lg truncate">{item.name}</CardTitle>
-                            <CardDescription className="truncate">
-                              {item.brand} • {item.category}
-                            </CardDescription>
-                          </div>
-                        </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleView(item)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEdit(item)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleDeleteClick(item)}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <Badge variant="outline" className={cn(statusColors[item.status])}>
-                          {item.status}
-                        </Badge>
-                        <Badge variant="outline" className={cn(conditionColors[item.condition])}>
-                          {item.condition}
-                        </Badge>
-                      </div>
-
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Department:</span>
-                          <span className="font-medium">{item.department}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Assigned to:</span>
-                          <span className="font-medium truncate ml-2">
-                            {getUserDisplayName(item.assignedTo)}
-                          </span>
-                        </div>
-                        {item.cost > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Cost:</span>
-                            <span className="font-medium">
-                              {item.currency} {item.cost.toLocaleString()}
-                            </span>
-                          </div>
-                        )}
-                        {item.serialNumber && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Serial:</span>
-                            <span className="font-mono text-xs">{item.serialNumber}</span>
-                          </div>
-                        )}
-                        {item.version && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Version:</span>
-                            <span className="font-medium">{item.version}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {item.description && (
-                        <div className="pt-2 border-t">
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {item.description}
-                          </p>
-                        </div>
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-2">
+                      {item.type === "hardware" ? (
+                        <HardDrive className="h-5 w-5 text-blue-600" />
+                      ) : (
+                        <Monitor className="h-5 w-5 text-green-600" />
                       )}
-                    </CardContent>
-                  </>
-                )}
-
-                {/* Delete Confirmation Content */}
-                {itemInDeleteMode === item.id && (
-                  <div className="p-6">
-                    <div className="flex flex-col items-center space-y-4 text-center">
-                      <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                        <AlertCircle className="h-6 w-6 text-red-600" />
-                      </div>
-                      <div className="space-y-2">
-                        <h3 className="font-semibold text-lg">Delete Item?</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Are you sure you want to delete <span className="font-medium">"{item.name}"</span>?
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          This will move the item to trash and remove it from your inventory list.
-                        </p>
-                      </div>
-                      <div className="flex space-x-3 w-full">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleDeleteCancel}
-                          className="flex-1"
-                          disabled={deletingItemId === item.id}
-                        >
-                          <X className="h-4 w-4 mr-2" />
-                          Cancel
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleDeleteConfirm(item)}
-                          className="flex-1"
-                          disabled={deletingItemId === item.id}
-                        >
-                          {deletingItemId === item.id ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Deleting...
-                            </>
-                          ) : (
-                            <>
-                              <Check className="h-4 w-4 mr-2" />
-                              Delete
-                            </>
-                          )}
-                        </Button>
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-lg truncate">{item.name}</CardTitle>
+                        <CardDescription className="truncate">
+                          {item.brand} • {item.category}
+                        </CardDescription>
                       </div>
                     </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleView(item)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEdit(item)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleDelete(item)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                )}
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline" className={cn(statusColors[item.status])}>
+                      {item.status}
+                    </Badge>
+                    <Badge variant="outline" className={cn(conditionColors[item.condition])}>
+                      {item.condition}
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Department:</span>
+                      <span className="font-medium">{item.department}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Assigned to:</span>
+                      <span className="font-medium truncate ml-2">
+                        {getUserDisplayName(item.assignedTo)}
+                      </span>
+                    </div>
+                    {item.cost > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Cost:</span>
+                        <span className="font-medium">
+                          {item.currency} {item.cost.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    {item.serialNumber && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Serial:</span>
+                        <span className="font-mono text-xs">{item.serialNumber}</span>
+                      </div>
+                    )}
+                    {item.version && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Version:</span>
+                        <span className="font-medium">{item.version}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {item.description && (
+                    <div className="pt-2 border-t">
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {item.description}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
               </Card>
             ))}
           </div>
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogOpenChange}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center space-x-2">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <span>Delete Inventory Item</span>
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete "{itemToDelete?.name}"? This action will move the item to trash and it won't be visible in your inventory list.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   )
