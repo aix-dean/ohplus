@@ -217,7 +217,7 @@ export default function ITInventoryPage() {
   }
 
   const handleView = (item: InventoryItem) => {
-    router.push(`/it/inventory/${item.id}`)
+    router.push(`/it/inventory/details/${item.id}`)
   }
 
   const handleDelete = (item: InventoryItem) => {
