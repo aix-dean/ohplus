@@ -14,7 +14,7 @@ import { ArrowLeft, ArrowRight, Save, Check, Package, MapPin, DollarSign, Settin
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, getDocs, doc, updateDoc, getDoc, serverTimestamp } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
 
@@ -155,7 +155,7 @@ export default function EditInventoryItemPage() {
   const [loadingUsers, setLoadingUsers] = useState(false)
   const [loadingItem, setLoadingItem] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [itemId] = useState(params.id as string)
+  const [notFound, setNotFound] = useState(false)
   const [formData, setFormData] = useState<FormData>({
     name: "",
     type: "hardware",
@@ -181,66 +181,68 @@ export default function EditInventoryItemPage() {
     status: "active",
   })
 
+  const itemId = params.id as string
   const visibleSteps = getVisibleSteps(formData.type)
 
-  // Fetch the existing item data
+  // Fetch item data
   useEffect(() => {
     const fetchItem = async () => {
-      if (!itemId) return
+      if (!itemId || !userData?.company_id) return
 
       try {
         const itemRef = doc(db, "itInventory", itemId)
         const itemSnap = await getDoc(itemRef)
 
         if (itemSnap.exists()) {
-          const data = itemSnap.data()
-          setFormData({
-            name: data.name || "",
-            type: data.type || "hardware",
-            category: data.category || "",
-            brand: data.brand || "",
-            department: data.department || "",
-            assignedTo: data.assignedTo || "",
-            condition: data.condition || "excellent",
-            vendorType: data.vendorType || "physical",
-            storeName: data.storeName || "",
-            storeLocation: data.storeLocation || "",
-            websiteName: data.websiteName || "",
-            websiteUrl: data.websiteUrl || "",
-            purchaseDate: data.purchaseDate || "",
-            warrantyExpiry: data.warrantyExpiry || "",
-            cost: data.cost ? data.cost.toString() : "",
-            currency: data.currency || "USD",
-            description: data.description || "",
-            serialNumber: data.serialNumber || "",
-            specifications: data.specifications || "",
-            licenseKey: data.licenseKey || "",
-            version: data.version || "",
-            status: data.status || "active",
-          })
+          const itemData = itemSnap.data()
+          
+          // Check if user has access to this item (same company)
+          if (itemData.company_id === userData.company_id) {
+            setFormData({
+              name: itemData.name || "",
+              type: itemData.type || "hardware",
+              category: itemData.category || "",
+              brand: itemData.brand || "",
+              department: itemData.department || "",
+              assignedTo: itemData.assignedTo || "",
+              condition: itemData.condition || "excellent",
+              vendorType: itemData.vendorType || "physical",
+              storeName: itemData.storeName || "",
+              storeLocation: itemData.storeLocation || "",
+              websiteName: itemData.websiteName || "",
+              websiteUrl: itemData.websiteUrl || "",
+              purchaseDate: itemData.purchaseDate || "",
+              warrantyExpiry: itemData.warrantyExpiry || "",
+              cost: itemData.cost ? itemData.cost.toString() : "",
+              currency: itemData.currency || "USD",
+              description: itemData.description || "",
+              serialNumber: itemData.serialNumber || "",
+              specifications: itemData.specifications || "",
+              licenseKey: itemData.licenseKey || "",
+              version: itemData.version || "",
+              status: itemData.status || "active",
+            })
+          } else {
+            setNotFound(true)
+          }
         } else {
-          toast({
-            title: "Error",
-            description: "Item not found",
-            variant: "destructive",
-          })
-          router.push("/it/inventory")
+          setNotFound(true)
         }
       } catch (error) {
         console.error("Error fetching item:", error)
         toast({
           title: "Error",
-          description: "Failed to load item data",
+          description: "Failed to fetch item details",
           variant: "destructive",
         })
-        router.push("/it/inventory")
+        setNotFound(true)
       } finally {
         setLoadingItem(false)
       }
     }
 
     fetchItem()
-  }, [itemId, router])
+  }, [itemId, userData?.company_id])
 
   // Fetch users by company_id
   useEffect(() => {
@@ -249,8 +251,6 @@ export default function EditInventoryItemPage() {
 
       setLoadingUsers(true)
       try {
-        console.log("Fetching users for company_id:", userData.company_id)
-
         const usersRef = collection(db, "iboard_users")
         const q = query(usersRef, where("company_id", "==", userData.company_id))
         const querySnapshot = await getDocs(q)
@@ -269,7 +269,6 @@ export default function EditInventoryItemPage() {
           })
         })
 
-        console.log("Fetched users:", fetchedUsers)
         setUsers(fetchedUsers)
       } catch (error) {
         console.error("Error fetching users:", error)
@@ -361,7 +360,7 @@ export default function EditInventoryItemPage() {
 
     try {
       // Prepare the data to be updated
-      const itemData = {
+      const updateData = {
         name: formData.name,
         type: formData.type,
         category: formData.category,
@@ -387,20 +386,16 @@ export default function EditInventoryItemPage() {
         updated_at: serverTimestamp(),
       }
 
-      console.log("Updating item data:", itemData)
-
       // Update in Firestore
       const itemRef = doc(db, "itInventory", itemId)
-      await updateDoc(itemRef, itemData)
-
-      console.log("Document updated successfully")
+      await updateDoc(itemRef, updateData)
 
       toast({
         title: "Item Updated Successfully",
         description: `${formData.name} has been updated in the inventory`,
       })
 
-      router.push("/it/inventory")
+      router.push(`/it/inventory/${itemId}`)
     } catch (error) {
       console.error("Error updating document: ", error)
       toast({
@@ -414,22 +409,7 @@ export default function EditInventoryItemPage() {
   }
 
   const handleCancel = () => {
-    router.push("/it/inventory")
-  }
-
-  if (loadingItem) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <div className="container mx-auto p-6 max-w-5xl">
-          <div className="flex justify-center items-center min-h-[400px]">
-            <div className="flex flex-col items-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin" />
-              <p className="text-muted-foreground">Loading item data...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+    router.push(`/it/inventory/${itemId}`)
   }
 
   const renderStepContent = () => {
@@ -693,7 +673,7 @@ export default function EditInventoryItemPage() {
                 <MapPin className="h-8 w-8 text-green-600" />
               </div>
               <h2 className="text-2xl font-bold">Vendor Information</h2>
-              <p className="text-muted-foreground">Update vendor and store information</p>
+              <p className="text-muted-foreground">Update vendor and purchase location details</p>
             </div>
 
             <Card className="border-2 border-dashed border-green-200 bg-green-50/30">
@@ -1038,6 +1018,20 @@ export default function EditInventoryItemPage() {
                           </span>
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-muted">
+                          <span className="text-sm font-medium">Status:</span>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              formData.status === "active" && "bg-green-100 text-green-800 border-green-200",
+                              formData.status === "inactive" && "bg-gray-100 text-gray-800 border-gray-200",
+                              formData.status === "maintenance" && "bg-yellow-100 text-yellow-800 border-yellow-200",
+                              formData.status === "retired" && "bg-red-100 text-red-800 border-red-200",
+                            )}
+                          >
+                            {formData.status}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Condition:</span>
                           <Badge
                             variant="outline"
@@ -1050,20 +1044,6 @@ export default function EditInventoryItemPage() {
                             )}
                           >
                             {formData.condition}
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Status:</span>
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              formData.status === "active" && "bg-green-100 text-green-800 border-green-200",
-                              formData.status === "inactive" && "bg-gray-100 text-gray-800 border-gray-200",
-                              formData.status === "maintenance" && "bg-yellow-100 text-yellow-800 border-yellow-200",
-                              formData.status === "retired" && "bg-red-100 text-red-800 border-red-200",
-                            )}
-                          >
-                            {formData.status}
                           </Badge>
                         </div>
                       </div>
@@ -1208,6 +1188,46 @@ export default function EditInventoryItemPage() {
     }
   }
 
+  if (loadingItem) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="container mx-auto p-6 max-w-5xl">
+          <div className="flex justify-center items-center min-h-[400px]">
+            <div className="flex flex-col items-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <p className="text-muted-foreground">Loading item details...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (notFound) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="container mx-auto p-6 max-w-5xl">
+          <div className="flex items-center justify-between mb-8">
+            <Button variant="outline" size="sm" onClick={handleCancel} className="shadow-sm bg-transparent">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Inventory
+            </Button>
+          </div>
+          
+          <Card className="max-w-md mx-auto">
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Package className="h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Item not found</h3>
+              <p className="text-muted-foreground text-center">
+                The inventory item you're looking for doesn't exist or you don't have access to it.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="container mx-auto p-6 max-w-5xl">
@@ -1216,7 +1236,7 @@ export default function EditInventoryItemPage() {
           <div className="flex items-center space-x-4">
             <Button variant="outline" size="sm" onClick={handleCancel} className="shadow-sm bg-transparent">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Inventory
+              Back to Item Details
             </Button>
             <Separator orientation="vertical" className="h-6" />
             <div>
