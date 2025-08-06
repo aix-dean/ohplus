@@ -80,7 +80,7 @@ const navigationItems = [
       { title: "Support Tickets", href: "/it/support", icon: AlertTriangle },
       { title: "Network Management", href: "/it/network", icon: Wifi },
       { title: "Security Center", href: "/it/security", icon: ShieldCheck },
-      { title: "Device Management", href: "/it/devices", icon: Package },
+      { title: "Hardware", href: "/it/inventory", icon: Package }, // Updated item
     ],
   },
   {
@@ -585,7 +585,7 @@ export function SideNavigation() {
                   { title: "Support Tickets", href: "/it/support", icon: AlertTriangle },
                   { title: "Network Management", href: "/it/network", icon: Wifi },
                   { title: "Security Center", href: "/it/security", icon: ShieldCheck },
-                  { title: "Hardware", href: "/it/inventory", icon: Package },
+                  { title: "Hardware", href: "/it/inventory", icon: Package }, // Updated item
                   { title: "Server Management", href: "/it/servers", icon: Monitor },
                   { title: "Backup & Recovery", href: "/it/backup", icon: HardDrive },
                 ].map((item) => {
@@ -915,3 +915,4 @@ export function SideNavigation() {
     </div>
   )
 }
+</merged_code>
