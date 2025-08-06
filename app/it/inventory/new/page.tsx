@@ -1454,8 +1454,6 @@ export default function NewInventoryItemPage() {
                             <Input 
                               placeholder="e.g., 24 ports, 48 ports" 
                               className="h-12 text-base"
-                              value={formData.categorySp
-                              className="h-12 text-base"
                               value={formData.categorySpecs?.portCount || ""}
                               onChange={(e) => updateCategorySpec("portCount", e.target.value)}
                             />
