@@ -53,7 +53,6 @@ interface InventoryItem {
   updated_at: any
   created_by: string
   company_id: string
-  deleted: boolean // Add this line
 }
 
 interface User {
@@ -170,7 +169,6 @@ export default function InventoryItemDetails() {
             updated_at: itemData.updated_at,
             created_by: itemData.created_by || "",
             company_id: itemData.company_id || "",
-            deleted: itemData.deleted || false, // Add this line
           })
         } else {
           toast({
@@ -233,12 +231,13 @@ export default function InventoryItemDetails() {
 
     setIsDeleting(true)
     try {
-      // Soft delete: update the deleted field to true
+      // Soft delete: update the deleted field to true instead of removing the document
       await updateDoc(doc(db, "itInventory", item.id), {
         deleted: true,
+        deleted_at: serverTimestamp(),
         updated_at: serverTimestamp()
       })
-    
+      
       toast({
         title: "Item Deleted",
         description: `${item.name} has been deleted from inventory`,

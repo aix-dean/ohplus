@@ -11,7 +11,7 @@ import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, Eye, Package, HardD
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, getDocs, doc, deleteDoc, orderBy, updateDoc, serverTimestamp } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, deleteDoc, orderBy, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import {
   DropdownMenu,
@@ -36,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { serverTimestamp } from "firebase/firestore"
 
 interface InventoryItem {
   id: string
@@ -59,7 +60,8 @@ interface InventoryItem {
   updated_at: any
   created_by: string
   company_id: string
-  deleted: boolean // Add this line
+  deleted?: boolean
+  deleted_at?: any
 }
 
 interface User {
@@ -110,7 +112,7 @@ export default function ITInventoryPage() {
         const q = query(
           itemsRef, 
           where("company_id", "==", userData.company_id),
-          where("deleted", "==", false), // Add this line
+          where("deleted", "==", false), // Filter out deleted items
           orderBy("created_at", "desc")
         )
         const querySnapshot = await getDocs(q)
@@ -141,6 +143,7 @@ export default function ITInventoryPage() {
             created_by: data.created_by || "",
             company_id: data.company_id || "",
             deleted: data.deleted || false,
+            deleted_at: data.deleted_at || null,
           })
         })
 
@@ -233,9 +236,10 @@ export default function ITInventoryPage() {
 
     setIsDeleting(true)
     try {
-      // Soft delete: update the deleted field to true
+      // Soft delete: update the deleted field to true instead of removing the document
       await updateDoc(doc(db, "itInventory", itemToDelete.id), {
         deleted: true,
+        deleted_at: serverTimestamp(),
         updated_at: serverTimestamp()
       })
     

@@ -42,7 +42,6 @@ interface FormData {
   version?: string
   status: "active" | "inactive" | "maintenance" | "retired"
   categorySpecs?: Record<string, any>
-  deleted: boolean // Add this line
 }
 
 interface User {
@@ -146,7 +145,6 @@ const getVisibleSteps = (itemType: "hardware" | "software") => {
   return getAllSteps()
     .filter((step) => !step.showFor || step.showFor === itemType)
     .map((step, index) => ({ ...step, id: index + 1 })) // Renumber steps
-
 }
 
 export default function EditInventoryItemPage() {
@@ -182,7 +180,6 @@ export default function EditInventoryItemPage() {
     version: "",
     status: "active",
     categorySpecs: {},
-    deleted: false, // Add this line
   })
 
   const visibleSteps = getVisibleSteps(formData.type)
@@ -222,7 +219,6 @@ export default function EditInventoryItemPage() {
             version: data.version || "",
             status: data.status || "active",
             categorySpecs: data.categorySpecs || {},
-            deleted: data.deleted || false, // Add this line
           })
         } else {
           toast({
