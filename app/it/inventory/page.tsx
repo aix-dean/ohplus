@@ -11,7 +11,7 @@ import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, Eye, Package, HardD
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, getDocs, doc, deleteDoc, orderBy } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, deleteDoc, orderBy, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import {
   DropdownMenu,
@@ -59,6 +59,8 @@ interface InventoryItem {
   updated_at: any
   created_by: string
   company_id: string
+  deleted?: boolean
+  deleted_at?: any
 }
 
 interface User {
@@ -109,6 +111,7 @@ export default function ITInventoryPage() {
         const q = query(
           itemsRef, 
           where("company_id", "==", userData.company_id),
+          where("deleted", "==", false), // Filter out deleted items
           orderBy("created_at", "desc")
         )
         const querySnapshot = await getDocs(q)
@@ -230,7 +233,13 @@ export default function ITInventoryPage() {
 
     setIsDeleting(true)
     try {
-      await deleteDoc(doc(db, "itInventory", itemToDelete.id))
+      // Soft delete: update the deleted field to true
+      await updateDoc(doc(db, "itInventory", itemToDelete.id), {
+        deleted: true,
+        deleted_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      })
+    
       setItems(items.filter(item => item.id !== itemToDelete.id))
       toast({
         title: "Item Deleted",

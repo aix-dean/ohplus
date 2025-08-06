@@ -11,7 +11,7 @@ import { ArrowLeft, Edit, Trash2, Calendar, MapPin, User, Package, Zap, Monitor,
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
-import { doc, getDoc, collection, query, where, getDocs, deleteDoc } from "firebase/firestore"
+import { doc, getDoc, collection, query, where, getDocs, deleteDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import {
   AlertDialog,
@@ -53,6 +53,8 @@ interface InventoryItem {
   updated_at: any
   created_by: string
   company_id: string
+  deleted?: boolean
+  deleted_at?: any
 }
 
 interface User {
@@ -140,6 +142,18 @@ export default function InventoryItemDetails() {
 
         if (itemSnap.exists()) {
           const itemData = itemSnap.data()
+        
+          // Check if item is deleted
+          if (itemData.deleted === true) {
+            toast({
+              title: "Error",
+              description: "This item has been deleted",
+              variant: "destructive",
+            })
+            router.push("/it/inventory")
+            return
+          }
+
           setItem({
             id: itemSnap.id,
             name: itemData.name || "",
@@ -231,7 +245,13 @@ export default function InventoryItemDetails() {
 
     setIsDeleting(true)
     try {
-      await deleteDoc(doc(db, "itInventory", item.id))
+      // Soft delete: update the deleted field to true
+      await updateDoc(doc(db, "itInventory", item.id), {
+        deleted: true,
+        deleted_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      })
+      
       toast({
         title: "Item Deleted",
         description: `${item.name} has been deleted from inventory`,
