@@ -11,7 +11,7 @@ import { ArrowLeft, Edit, Trash2, Calendar, MapPin, User, Package, Zap, Monitor,
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
-import { doc, getDoc, collection, query, where, getDocs, deleteDoc, updateDoc, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import {
   AlertDialog,
@@ -54,7 +54,6 @@ interface InventoryItem {
   created_by: string
   company_id: string
   deleted?: boolean
-  deleted_at?: any
 }
 
 interface User {
@@ -142,18 +141,18 @@ export default function InventoryItemDetails() {
 
         if (itemSnap.exists()) {
           const itemData = itemSnap.data()
-        
-          // Check if item is deleted
+          
+          // Check if item is soft deleted
           if (itemData.deleted === true) {
             toast({
               title: "Error",
-              description: "This item has been deleted",
+              description: "Item not found",
               variant: "destructive",
             })
             router.push("/it/inventory")
             return
           }
-
+          
           setItem({
             id: itemSnap.id,
             name: itemData.name || "",
@@ -183,6 +182,7 @@ export default function InventoryItemDetails() {
             updated_at: itemData.updated_at,
             created_by: itemData.created_by || "",
             company_id: itemData.company_id || "",
+            deleted: itemData.deleted || false,
           })
         } else {
           toast({
@@ -245,11 +245,10 @@ export default function InventoryItemDetails() {
 
     setIsDeleting(true)
     try {
-      // Soft delete: update the deleted field to true
+      // Soft delete: update deleted field to true instead of deleting document
       await updateDoc(doc(db, "itInventory", item.id), {
         deleted: true,
-        deleted_at: serverTimestamp(),
-        updated_at: serverTimestamp(),
+        updated_at: serverTimestamp()
       })
       
       toast({
