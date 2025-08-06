@@ -195,18 +195,6 @@ export default function EditInventoryItemPage() {
 
         if (itemSnap.exists()) {
           const data = itemSnap.data()
-          
-          // Check if item is deleted
-          if (data.deleted === true) {
-            toast({
-              title: "Error",
-              description: "This item has been deleted and cannot be edited",
-              variant: "destructive",
-            })
-            router.push("/it/inventory")
-            return
-          }
-
           setFormData({
             name: data.name || "",
             type: data.type || "hardware",

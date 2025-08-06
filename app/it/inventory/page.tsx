@@ -11,7 +11,7 @@ import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, Eye, Package, HardD
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, getDocs, doc, deleteDoc, orderBy, updateDoc, serverTimestamp } from "firebase/firestore"
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, orderBy, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import {
   DropdownMenu,
@@ -59,8 +59,6 @@ interface InventoryItem {
   updated_at: any
   created_by: string
   company_id: string
-  deleted?: boolean
-  deleted_at?: any
 }
 
 interface User {
@@ -111,8 +109,8 @@ export default function ITInventoryPage() {
         const q = query(
           itemsRef, 
           where("company_id", "==", userData.company_id),
-          where("deleted", "!=", true), // Filter out deleted items
-          orderBy("deleted", "asc"), // Add this to handle the != query
+          where("deleted", "!=", true),
+          orderBy("deleted", "asc"),
           orderBy("created_at", "desc")
         )
         const querySnapshot = await getDocs(q)
@@ -121,7 +119,7 @@ export default function ITInventoryPage() {
         querySnapshot.forEach((doc) => {
           const data = doc.data()
           // Additional client-side filter as backup
-          if (!data.deleted) {
+          if (data.deleted !== true) {
             fetchedItems.push({
               id: doc.id,
               name: data.name || "",
@@ -237,11 +235,11 @@ export default function ITInventoryPage() {
 
     setIsDeleting(true)
     try {
-      // Soft delete: update the document with deleted: true instead of deleting it
+      // Soft delete by setting deleted field to true
       await updateDoc(doc(db, "itInventory", itemToDelete.id), {
         deleted: true,
         deleted_at: serverTimestamp(),
-        updated_at: serverTimestamp(),
+        updated_at: serverTimestamp()
       })
       
       setItems(items.filter(item => item.id !== itemToDelete.id))

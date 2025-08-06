@@ -342,7 +342,6 @@ export default function NewInventoryItemPage() {
         version: formData.version || "",
         categorySpecs: formData.categorySpecs || {},
         status: "active", // Default status
-        deleted: false, // Explicitly set deleted to false for new items
         company_id: userData.company_id,
         created_by: userData.uid,
         created_at: serverTimestamp(),
@@ -892,9 +891,7 @@ export default function NewInventoryItemPage() {
                             />
                           </div>
                           <div className="space-y-3">
-                            <Label className="text-base font-medium">Storage
-</cut_off_point>
-</Label>
+                            <Label className="text-base font-medium">Storage</Label>
                             <Input 
                               placeholder="e.g., 512GB NVMe SSD + 1TB HDD" 
                               className="h-12 text-base"
