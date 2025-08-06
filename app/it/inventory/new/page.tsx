@@ -40,6 +40,8 @@ interface FormData {
   specifications?: string
   licenseKey?: string
   version?: string
+  // Category-specific fields
+  categorySpecs?: Record<string, any>
 }
 
 interface User {
@@ -181,6 +183,7 @@ export default function NewInventoryItemPage() {
     specifications: "",
     licenseKey: "",
     version: "",
+    categorySpecs: {},
   })
 
   const visibleSteps = getVisibleSteps(formData.type)
@@ -243,6 +246,17 @@ export default function NewInventoryItemPage() {
     const user = users.find((u) => u.uid === uid)
     if (!user) return "Unknown User"
     return `${user.first_name} ${user.last_name}`.trim() || user.email
+  }
+
+  // Helper function to update category-specific specs
+  const updateCategorySpec = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      categorySpecs: {
+        ...prev.categorySpecs,
+        [field]: value
+      }
+    }))
   }
 
   const validateStep = (step: number): boolean => {
@@ -326,6 +340,7 @@ export default function NewInventoryItemPage() {
         specifications: formData.specifications || "",
         licenseKey: formData.licenseKey || "",
         version: formData.version || "",
+        categorySpecs: formData.categorySpecs || {},
         status: "active", // Default status
         company_id: userData.company_id,
         created_by: userData.uid,
@@ -402,7 +417,7 @@ export default function NewInventoryItemPage() {
                     <Select
                       value={formData.type}
                       onValueChange={(value: "hardware" | "software") =>
-                        setFormData({ ...formData, type: value, category: "" })
+                        setFormData({ ...formData, type: value, category: "", categorySpecs: {} })
                       }
                     >
                       <SelectTrigger className="h-12 text-base">
@@ -433,7 +448,7 @@ export default function NewInventoryItemPage() {
                     </Label>
                     <Select
                       value={formData.category}
-                      onValueChange={(value) => setFormData({ ...formData, category: value })}
+                      onValueChange={(value) => setFormData({ ...formData, category: value, categorySpecs: {} })}
                     >
                       <SelectTrigger className="h-12 text-base">
                         <SelectValue placeholder={`Select a ${formData.type} category`} />
@@ -859,35 +874,75 @@ export default function NewInventoryItemPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Processor</Label>
-                            <Input placeholder="e.g., Intel Core i7-12700K, 3.6GHz" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., Intel Core i7-12700K, 3.6GHz" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.processor || ""}
+                              onChange={(e) => updateCategorySpec("processor", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">RAM</Label>
-                            <Input placeholder="e.g., 16GB DDR4-3200" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 16GB DDR4-3200" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.ram || ""}
+                              onChange={(e) => updateCategorySpec("ram", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Storage</Label>
-                            <Input placeholder="e.g., 512GB NVMe SSD + 1TB HDD" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 512GB NVMe SSD + 1TB HDD" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.storage || ""}
+                              onChange={(e) => updateCategorySpec("storage", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Graphics Card</Label>
-                            <Input placeholder="e.g., NVIDIA RTX 3060, 12GB VRAM" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., NVIDIA RTX 3060, 12GB VRAM" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.graphics || ""}
+                              onChange={(e) => updateCategorySpec("graphics", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Motherboard</Label>
-                            <Input placeholder="e.g., ASUS PRIME B660M-A" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., ASUS PRIME B660M-A" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.motherboard || ""}
+                              onChange={(e) => updateCategorySpec("motherboard", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Power Supply</Label>
-                            <Input placeholder="e.g., 650W 80+ Gold" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 650W 80+ Gold" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.powerSupply || ""}
+                              onChange={(e) => updateCategorySpec("powerSupply", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Operating System</Label>
-                            <Input placeholder="e.g., Windows 11 Pro 64-bit" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., Windows 11 Pro 64-bit" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.operatingSystem || ""}
+                              onChange={(e) => updateCategorySpec("operatingSystem", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Optical Drive</Label>
-                            <Input placeholder="e.g., DVD-RW, Blu-ray, None" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., DVD-RW, Blu-ray, None" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.opticalDrive || ""}
+                              onChange={(e) => updateCategorySpec("opticalDrive", e.target.value)}
+                            />
                           </div>
                         </div>
                         <div className="mt-6">
@@ -896,6 +951,8 @@ export default function NewInventoryItemPage() {
                             placeholder="e.g., 2x PCIe x16, 1x PCIe x1, 4x RAM slots"
                             className="mt-2 text-base resize-none"
                             rows={2}
+                            value={formData.categorySpecs?.expansionSlots || ""}
+                            onChange={(e) => updateCategorySpec("expansionSlots", e.target.value)}
                           />
                         </div>
                       </div>
@@ -910,35 +967,75 @@ export default function NewInventoryItemPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Processor</Label>
-                            <Input placeholder="e.g., Intel Core i7-1260P, 2.1GHz" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., Intel Core i7-1260P, 2.1GHz" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.processor || ""}
+                              onChange={(e) => updateCategorySpec("processor", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">RAM</Label>
-                            <Input placeholder="e.g., 16GB LPDDR5-4800" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 16GB LPDDR5-4800" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.ram || ""}
+                              onChange={(e) => updateCategorySpec("ram", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Storage</Label>
-                            <Input placeholder="e.g., 512GB PCIe 4.0 NVMe SSD" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 512GB PCIe 4.0 NVMe SSD" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.storage || ""}
+                              onChange={(e) => updateCategorySpec("storage", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Display</Label>
-                            <Input placeholder="e.g., 14-inch FHD IPS, 1920×1080" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 14-inch FHD IPS, 1920×1080" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.display || ""}
+                              onChange={(e) => updateCategorySpec("display", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Graphics</Label>
-                            <Input placeholder="e.g., Intel Iris Xe Graphics" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., Intel Iris Xe Graphics" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.graphics || ""}
+                              onChange={(e) => updateCategorySpec("graphics", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Battery</Label>
-                            <Input placeholder="e.g., 70Wh Li-ion, up to 10 hours" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 70Wh Li-ion, up to 10 hours" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.battery || ""}
+                              onChange={(e) => updateCategorySpec("battery", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Keyboard</Label>
-                            <Input placeholder="e.g., Backlit, Full-size, Numeric pad" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., Backlit, Full-size, Numeric pad" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.keyboard || ""}
+                              onChange={(e) => updateCategorySpec("keyboard", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Webcam</Label>
-                            <Input placeholder="e.g., 720p HD, IR for Windows Hello" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 720p HD, IR for Windows Hello" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.webcam || ""}
+                              onChange={(e) => updateCategorySpec("webcam", e.target.value)}
+                            />
                           </div>
                         </div>
                         <div className="mt-6">
@@ -947,6 +1044,8 @@ export default function NewInventoryItemPage() {
                             placeholder="e.g., 2x USB-A 3.2, 2x USB-C Thunderbolt 4, HDMI 2.0, 3.5mm audio, Wi-Fi 6E, Bluetooth 5.2"
                             className="mt-2 text-base resize-none"
                             rows={2}
+                            value={formData.categorySpecs?.connectivity || ""}
+                            onChange={(e) => updateCategorySpec("connectivity", e.target.value)}
                           />
                         </div>
                       </div>
@@ -961,35 +1060,75 @@ export default function NewInventoryItemPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Screen Size</Label>
-                            <Input placeholder="e.g., 27 inches (diagonal)" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 27 inches (diagonal)" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.screenSize || ""}
+                              onChange={(e) => updateCategorySpec("screenSize", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Resolution</Label>
-                            <Input placeholder="e.g., 2560×1440 (QHD)" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 2560×1440 (QHD)" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.resolution || ""}
+                              onChange={(e) => updateCategorySpec("resolution", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Panel Type</Label>
-                            <Input placeholder="e.g., IPS, VA, TN, OLED" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., IPS, VA, TN, OLED" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.panelType || ""}
+                              onChange={(e) => updateCategorySpec("panelType", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Refresh Rate</Label>
-                            <Input placeholder="e.g., 144Hz, 165Hz, 240Hz" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 144Hz, 165Hz, 240Hz" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.refreshRate || ""}
+                              onChange={(e) => updateCategorySpec("refreshRate", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Response Time</Label>
-                            <Input placeholder="e.g., 1ms GTG, 5ms" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 1ms GTG, 5ms" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.responseTime || ""}
+                              onChange={(e) => updateCategorySpec("responseTime", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Brightness</Label>
-                            <Input placeholder="e.g., 400 nits, 1000 nits HDR" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 400 nits, 1000 nits HDR" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.brightness || ""}
+                              onChange={(e) => updateCategorySpec("brightness", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Contrast Ratio</Label>
-                            <Input placeholder="e.g., 1000:1, 3000:1" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 1000:1, 3000:1" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.contrastRatio || ""}
+                              onChange={(e) => updateCategorySpec("contrastRatio", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Color Gamut</Label>
-                            <Input placeholder="e.g., 99% sRGB, 95% DCI-P3" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 99% sRGB, 95% DCI-P3" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.colorGamut || ""}
+                              onChange={(e) => updateCategorySpec("colorGamut", e.target.value)}
+                            />
                           </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
@@ -999,6 +1138,8 @@ export default function NewInventoryItemPage() {
                               placeholder="e.g., HDMI 2.1, DisplayPort 1.4, USB-C with 90W PD, USB hub"
                               className="text-base resize-none"
                               rows={2}
+                              value={formData.categorySpecs?.connectivity || ""}
+                              onChange={(e) => updateCategorySpec("connectivity", e.target.value)}
                             />
                           </div>
                           <div className="space-y-3">
@@ -1007,6 +1148,8 @@ export default function NewInventoryItemPage() {
                               placeholder="e.g., Height, Tilt, Swivel, Pivot, VESA 100×100"
                               className="text-base resize-none"
                               rows={2}
+                              value={formData.categorySpecs?.adjustability || ""}
+                              onChange={(e) => updateCategorySpec("adjustability", e.target.value)}
                             />
                           </div>
                         </div>
@@ -1022,35 +1165,75 @@ export default function NewInventoryItemPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Print Technology</Label>
-                            <Input placeholder="e.g., Laser, Inkjet, Thermal" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., Laser, Inkjet, Thermal" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.printTechnology || ""}
+                              onChange={(e) => updateCategorySpec("printTechnology", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Print Speed (Black)</Label>
-                            <Input placeholder="e.g., 30 ppm, 45 ppm" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 30 ppm, 45 ppm" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.printSpeedBlack || ""}
+                              onChange={(e) => updateCategorySpec("printSpeedBlack", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Print Speed (Color)</Label>
-                            <Input placeholder="e.g., 25 ppm, 40 ppm" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 25 ppm, 40 ppm" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.printSpeedColor || ""}
+                              onChange={(e) => updateCategorySpec("printSpeedColor", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Print Resolution</Label>
-                            <Input placeholder="e.g., 1200×1200 dpi, 4800×1200 dpi" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 1200×1200 dpi, 4800×1200 dpi" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.printResolution || ""}
+                              onChange={(e) => updateCategorySpec("printResolution", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Paper Capacity</Label>
-                            <Input placeholder="e.g., 250 sheets input, 100 sheets output" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 250 sheets input, 100 sheets output" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.paperCapacity || ""}
+                              onChange={(e) => updateCategorySpec("paperCapacity", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Paper Sizes</Label>
-                            <Input placeholder="e.g., A4, Letter, Legal, A3" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., A4, Letter, Legal, A3" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.paperSizes || ""}
+                              onChange={(e) => updateCategorySpec("paperSizes", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Monthly Duty Cycle</Label>
-                            <Input placeholder="e.g., 50,000 pages, 100,000 pages" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 50,000 pages, 100,000 pages" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.dutyCycle || ""}
+                              onChange={(e) => updateCategorySpec("dutyCycle", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Memory</Label>
-                            <Input placeholder="e.g., 512MB, 1GB RAM" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 512MB, 1GB RAM" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.memory || ""}
+                              onChange={(e) => updateCategorySpec("memory", e.target.value)}
+                            />
                           </div>
                         </div>
                         <div className="mt-6">
@@ -1059,6 +1242,8 @@ export default function NewInventoryItemPage() {
                             placeholder="e.g., Duplex printing, Scan, Copy, Fax, ADF, Touchscreen"
                             className="mt-2 text-base resize-none"
                             rows={2}
+                            value={formData.categorySpecs?.features || ""}
+                            onChange={(e) => updateCategorySpec("features", e.target.value)}
                           />
                         </div>
                       </div>
@@ -1073,35 +1258,75 @@ export default function NewInventoryItemPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Port Count</Label>
-                            <Input placeholder="e.g., 24 ports, 48 ports" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 24 ports, 48 ports" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.portCount || ""}
+                              onChange={(e) => updateCategorySpec("portCount", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Port Speed</Label>
-                            <Input placeholder="e.g., Gigabit Ethernet, 10GbE" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., Gigabit Ethernet, 10GbE" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.portSpeed || ""}
+                              onChange={(e) => updateCategorySpec("portSpeed", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Switching Capacity</Label>
-                            <Input placeholder="e.g., 48 Gbps, 176 Gbps" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 48 Gbps, 176 Gbps" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.switchingCapacity || ""}
+                              onChange={(e) => updateCategorySpec("switchingCapacity", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Forwarding Rate</Label>
-                            <Input placeholder="e.g., 35.7 Mpps, 130.9 Mpps" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 35.7 Mpps, 130.9 Mpps" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.forwardingRate || ""}
+                              onChange={(e) => updateCategorySpec("forwardingRate", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">MAC Address Table</Label>
-                            <Input placeholder="e.g., 8K entries, 16K entries" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 8K entries, 16K entries" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.macTable || ""}
+                              onChange={(e) => updateCategorySpec("macTable", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Power Consumption</Label>
-                            <Input placeholder="e.g., 25W, 45W, 180W" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 25W, 45W, 180W" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.powerConsumption || ""}
+                              onChange={(e) => updateCategorySpec("powerConsumption", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">PoE Support</Label>
-                            <Input placeholder="e.g., PoE+, PoE++, 370W budget" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., PoE+, PoE++, 370W budget" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.poeSupport || ""}
+                              onChange={(e) => updateCategorySpec("poeSupport", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Management</Label>
-                            <Input placeholder="e.g., Managed, Unmanaged, Smart" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., Managed, Unmanaged, Smart" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.management || ""}
+                              onChange={(e) => updateCategorySpec("management", e.target.value)}
+                            />
                           </div>
                         </div>
                         <div className="mt-6">
@@ -1110,6 +1335,8 @@ export default function NewInventoryItemPage() {
                             placeholder="e.g., VLAN support, QoS, SNMP, Link aggregation, Spanning tree"
                             className="mt-2 text-base resize-none"
                             rows={2}
+                            value={formData.categorySpecs?.features || ""}
+                            onChange={(e) => updateCategorySpec("features", e.target.value)}
                           />
                         </div>
                       </div>
@@ -1124,35 +1351,75 @@ export default function NewInventoryItemPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Processor</Label>
-                            <Input placeholder="e.g., Intel Xeon Silver 4314, 2.4GHz" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., Intel Xeon Silver 4314, 2.4GHz" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.processor || ""}
+                              onChange={(e) => updateCategorySpec("processor", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">CPU Sockets</Label>
-                            <Input placeholder="e.g., 1 socket, 2 sockets" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 1 socket, 2 sockets" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.cpuSockets || ""}
+                              onChange={(e) => updateCategorySpec("cpuSockets", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">RAM</Label>
-                            <Input placeholder="e.g., 64GB DDR4 ECC, 128GB" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 64GB DDR4 ECC, 128GB" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.ram || ""}
+                              onChange={(e) => updateCategorySpec("ram", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Max RAM Capacity</Label>
-                            <Input placeholder="e.g., 512GB, 1TB, 2TB" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 512GB, 1TB, 2TB" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.maxRam || ""}
+                              onChange={(e) => updateCategorySpec("maxRam", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Storage Bays</Label>
-                            <Input placeholder="e.g., 8x 2.5-inch, 4x 3.5-inch" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 8x 2.5-inch, 4x 3.5-inch" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.storageBays || ""}
+                              onChange={(e) => updateCategorySpec("storageBays", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">RAID Controller</Label>
-                            <Input placeholder="e.g., Hardware RAID 0/1/5/10" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., Hardware RAID 0/1/5/10" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.raidController || ""}
+                              onChange={(e) => updateCategorySpec("raidController", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Network Ports</Label>
-                            <Input placeholder="e.g., 4x 1GbE, 2x 10GbE" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 4x 1GbE, 2x 10GbE" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.networkPorts || ""}
+                              onChange={(e) => updateCategorySpec("networkPorts", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Power Supply</Label>
-                            <Input placeholder="e.g., 750W Redundant, 1200W" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 750W Redundant, 1200W" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.powerSupply || ""}
+                              onChange={(e) => updateCategorySpec("powerSupply", e.target.value)}
+                            />
                           </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
@@ -1162,6 +1429,8 @@ export default function NewInventoryItemPage() {
                               placeholder="e.g., 3x PCIe 4.0 x16, 2x PCIe 4.0 x8"
                               className="text-base resize-none"
                               rows={2}
+                              value={formData.categorySpecs?.expansionSlots || ""}
+                              onChange={(e) => updateCategorySpec("expansionSlots", e.target.value)}
                             />
                           </div>
                           <div className="space-y-3">
@@ -1170,6 +1439,8 @@ export default function NewInventoryItemPage() {
                               placeholder="e.g., iDRAC, iLO, IPMI, Remote console"
                               className="text-base resize-none"
                               rows={2}
+                              value={formData.categorySpecs?.management || ""}
+                              onChange={(e) => updateCategorySpec("management", e.target.value)}
                             />
                           </div>
                         </div>
@@ -1185,35 +1456,75 @@ export default function NewInventoryItemPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Processor</Label>
-                            <Input placeholder="e.g., Snapdragon 8 Gen 2, A16 Bionic" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., Snapdragon 8 Gen 2, A16 Bionic" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.processor || ""}
+                              onChange={(e) => updateCategorySpec("processor", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">RAM</Label>
-                            <Input placeholder="e.g., 8GB, 12GB LPDDR5" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 8GB, 12GB LPDDR5" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.ram || ""}
+                              onChange={(e) => updateCategorySpec("ram", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Storage</Label>
-                            <Input placeholder="e.g., 256GB, 512GB UFS 4.0" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 256GB, 512GB UFS 4.0" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.storage || ""}
+                              onChange={(e) => updateCategorySpec("storage", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Display Size</Label>
-                            <Input placeholder="e.g., 6.7-inch, 6.1-inch" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 6.7-inch, 6.1-inch" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.displaySize || ""}
+                              onChange={(e) => updateCategorySpec("displaySize", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Display Type</Label>
-                            <Input placeholder="e.g., AMOLED, Super Retina XDR" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., AMOLED, Super Retina XDR" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.displayType || ""}
+                              onChange={(e) => updateCategorySpec("displayType", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Resolution</Label>
-                            <Input placeholder="e.g., 2796×1290, 1080×2400" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 2796×1290, 1080×2400" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.resolution || ""}
+                              onChange={(e) => updateCategorySpec("resolution", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Battery Capacity</Label>
-                            <Input placeholder="e.g., 5000mAh, 4323mAh" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 5000mAh, 4323mAh" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.batteryCapacity || ""}
+                              onChange={(e) => updateCategorySpec("batteryCapacity", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Charging Speed</Label>
-                            <Input placeholder="e.g., 67W fast charging, 20W MagSafe" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., 67W fast charging, 20W MagSafe" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.chargingSpeed || ""}
+                              onChange={(e) => updateCategorySpec("chargingSpeed", e.target.value)}
+                            />
                           </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
@@ -1223,6 +1534,8 @@ export default function NewInventoryItemPage() {
                               placeholder="e.g., 108MP main, 12MP ultrawide, 10MP telephoto, 32MP front"
                               className="text-base resize-none"
                               rows={2}
+                              value={formData.categorySpecs?.cameraSystem || ""}
+                              onChange={(e) => updateCategorySpec("cameraSystem", e.target.value)}
                             />
                           </div>
                           <div className="space-y-3">
@@ -1231,6 +1544,8 @@ export default function NewInventoryItemPage() {
                               placeholder="e.g., 5G, Wi-Fi 6E, Bluetooth 5.3, NFC, USB-C"
                               className="text-base resize-none"
                               rows={2}
+                              value={formData.categorySpecs?.connectivity || ""}
+                              onChange={(e) => updateCategorySpec("connectivity", e.target.value)}
                             />
                           </div>
                         </div>
@@ -1278,27 +1593,57 @@ export default function NewInventoryItemPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">
                           <Label className="text-base font-medium">License Type</Label>
-                          <Input placeholder="e.g., Perpetual, Subscription, Volume" className="h-12 text-base" />
+                          <Input 
+                            placeholder="e.g., Perpetual, Subscription, Volume" 
+                            className="h-12 text-base"
+                            value={formData.categorySpecs?.licenseType || ""}
+                            onChange={(e) => updateCategorySpec("licenseType", e.target.value)}
+                          />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">User Licenses</Label>
-                          <Input placeholder="e.g., Single user, 5 users, Unlimited" className="h-12 text-base" />
+                          <Input 
+                            placeholder="e.g., Single user, 5 users, Unlimited" 
+                            className="h-12 text-base"
+                            value={formData.categorySpecs?.userLicenses || ""}
+                            onChange={(e) => updateCategorySpec("userLicenses", e.target.value)}
+                          />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Installation Media</Label>
-                          <Input placeholder="e.g., Download, DVD, USB, Cloud" className="h-12 text-base" />
+                          <Input 
+                            placeholder="e.g., Download, DVD, USB, Cloud" 
+                            className="h-12 text-base"
+                            value={formData.categorySpecs?.installationMedia || ""}
+                            onChange={(e) => updateCategorySpec("installationMedia", e.target.value)}
+                          />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Language</Label>
-                          <Input placeholder="e.g., English, Multi-language" className="h-12 text-base" />
+                          <Input 
+                            placeholder="e.g., English, Multi-language" 
+                            className="h-12 text-base"
+                            value={formData.categorySpecs?.language || ""}
+                            onChange={(e) => updateCategorySpec("language", e.target.value)}
+                          />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Architecture</Label>
-                          <Input placeholder="e.g., 64-bit, 32-bit, Universal" className="h-12 text-base" />
+                          <Input 
+                            placeholder="e.g., 64-bit, 32-bit, Universal" 
+                            className="h-12 text-base"
+                            value={formData.categorySpecs?.architecture || ""}
+                            onChange={(e) => updateCategorySpec("architecture", e.target.value)}
+                          />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">File Size</Label>
-                          <Input placeholder="e.g., 2.5 GB, 500 MB" className="h-12 text-base" />
+                          <Input 
+                            placeholder="e.g., 2.5 GB, 500 MB" 
+                            className="h-12 text-base"
+                            value={formData.categorySpecs?.fileSize || ""}
+                            onChange={(e) => updateCategorySpec("fileSize", e.target.value)}
+                          />
                         </div>
                       </div>
                     </div>
@@ -1312,27 +1657,57 @@ export default function NewInventoryItemPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Operating System</Label>
-                          <Input placeholder="e.g., Windows 10/11, macOS 12+, Linux" className="h-12 text-base" />
+                          <Input 
+                            placeholder="e.g., Windows 10/11, macOS 12+, Linux" 
+                            className="h-12 text-base"
+                            value={formData.categorySpecs?.operatingSystem || ""}
+                            onChange={(e) => updateCategorySpec("operatingSystem", e.target.value)}
+                          />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Minimum RAM</Label>
-                          <Input placeholder="e.g., 4GB, 8GB, 16GB" className="h-12 text-base" />
+                          <Input 
+                            placeholder="e.g., 4GB, 8GB, 16GB" 
+                            className="h-12 text-base"
+                            value={formData.categorySpecs?.minRam || ""}
+                            onChange={(e) => updateCategorySpec("minRam", e.target.value)}
+                          />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Recommended RAM</Label>
-                          <Input placeholder="e.g., 8GB, 16GB, 32GB" className="h-12 text-base" />
+                          <Input 
+                            placeholder="e.g., 8GB, 16GB, 32GB" 
+                            className="h-12 text-base"
+                            value={formData.categorySpecs?.recommendedRam || ""}
+                            onChange={(e) => updateCategorySpec("recommendedRam", e.target.value)}
+                          />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Storage Space</Label>
-                          <Input placeholder="e.g., 2GB, 10GB, 50GB available" className="h-12 text-base" />
+                          <Input 
+                            placeholder="e.g., 2GB, 10GB, 50GB available" 
+                            className="h-12 text-base"
+                            value={formData.categorySpecs?.storageSpace || ""}
+                            onChange={(e) => updateCategorySpec("storageSpace", e.target.value)}
+                          />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Processor</Label>
-                          <Input placeholder="e.g., Intel i5 or equivalent, M1 chip" className="h-12 text-base" />
+                          <Input 
+                            placeholder="e.g., Intel i5 or equivalent, M1 chip" 
+                            className="h-12 text-base"
+                            value={formData.categorySpecs?.processor || ""}
+                            onChange={(e) => updateCategorySpec("processor", e.target.value)}
+                          />
                         </div>
                         <div className="space-y-3">
                           <Label className="text-base font-medium">Graphics</Label>
-                          <Input placeholder="e.g., DirectX 11, OpenGL 4.0" className="h-12 text-base" />
+                          <Input 
+                            placeholder="e.g., DirectX 11, OpenGL 4.0" 
+                            className="h-12 text-base"
+                            value={formData.categorySpecs?.graphics || ""}
+                            onChange={(e) => updateCategorySpec("graphics", e.target.value)}
+                          />
                         </div>
                       </div>
                       <div className="mt-6">
@@ -1341,6 +1716,8 @@ export default function NewInventoryItemPage() {
                           placeholder="e.g., Internet connection for activation, .NET Framework 4.8, specific drivers"
                           className="mt-2 text-base resize-none"
                           rows={2}
+                          value={formData.categorySpecs?.additionalRequirements || ""}
+                          onChange={(e) => updateCategorySpec("additionalRequirements", e.target.value)}
                         />
                       </div>
                     </div>
@@ -1358,6 +1735,8 @@ export default function NewInventoryItemPage() {
                             placeholder="e.g., Document editing, Cloud sync, Collaboration tools, Advanced analytics"
                             className="text-base resize-none"
                             rows={3}
+                            value={formData.categorySpecs?.includedFeatures || ""}
+                            onChange={(e) => updateCategorySpec("includedFeatures", e.target.value)}
                           />
                         </div>
                         <div className="space-y-3">
@@ -1366,16 +1745,28 @@ export default function NewInventoryItemPage() {
                             placeholder="e.g., Premium templates, Advanced reporting, API access, Mobile app"
                             className="text-base resize-none"
                             rows={2}
+                            value={formData.categorySpecs?.optionalModules || ""}
+                            onChange={(e) => updateCategorySpec("optionalModules", e.target.value)}
                           />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Support Level</Label>
-                            <Input placeholder="e.g., Basic, Premium, Enterprise" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., Basic, Premium, Enterprise" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.supportLevel || ""}
+                              onChange={(e) => updateCategorySpec("supportLevel", e.target.value)}
+                            />
                           </div>
                           <div className="space-y-3">
                             <Label className="text-base font-medium">Update Policy</Label>
-                            <Input placeholder="e.g., Free updates, Paid upgrades" className="h-12 text-base" />
+                            <Input 
+                              placeholder="e.g., Free updates, Paid upgrades" 
+                              className="h-12 text-base"
+                              value={formData.categorySpecs?.updatePolicy || ""}
+                              onChange={(e) => updateCategorySpec("updatePolicy", e.target.value)}
+                            />
                           </div>
                         </div>
                       </div>
@@ -1579,6 +1970,30 @@ export default function NewInventoryItemPage() {
                         )}
                       </div>
                     </div>
+
+                    {/* Category-specific specs preview */}
+                    {formData.categorySpecs && Object.keys(formData.categorySpecs).length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
+                          Category Specifications
+                        </h4>
+                        <div className="space-y-3">
+                          {Object.entries(formData.categorySpecs).map(([key, value]) => {
+                            if (!value) return null
+                            return (
+                              <div key={key} className="flex justify-between items-start py-2 border-b border-muted">
+                                <span className="text-sm font-medium capitalize">
+                                  {key.replace(/([A-Z])/g, ' $1').trim()}:
+                                </span>
+                                <span className="text-sm text-muted-foreground text-right max-w-xs">
+                                  {value}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
