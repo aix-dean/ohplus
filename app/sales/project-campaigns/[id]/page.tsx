@@ -198,7 +198,7 @@ export default function CampaignDetailsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full justify-start hover:bg-gray-50 hover:border-gray-200 transition-colors"
+                  className="justify-start hover:bg-gray-50 hover:border-gray-200 transition-colors mb-2"
                   onClick={() => router.push("/sales/project-campaigns")}
                 >
                   <ArrowLeft className="h-3 w-3 mr-2" />
