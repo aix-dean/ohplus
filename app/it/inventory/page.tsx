@@ -120,30 +120,38 @@ export default function ITInventoryPage() {
   // Fetch inventory data from Firestore
   useEffect(() => {
     const fetchInventory = async () => {
-      if (!user?.company_id) {
-        setLoading(false)
-        return
-      }
-
       try {
+        console.log("Current user:", user)
+        console.log("User company_id:", user?.company_id)
+        
         const inventoryRef = collection(db, "itInventory")
-        const q = query(
-          inventoryRef,
-          where("company_id", "==", user.company_id),
-          orderBy("created_at", "desc")
-        )
         
-        const querySnapshot = await getDocs(q)
-        const inventoryData: InventoryItem[] = []
+        // First, try to fetch all documents to debug
+        const allDocsQuery = query(inventoryRef)
+        const allDocsSnapshot = await getDocs(allDocsQuery)
         
-        querySnapshot.forEach((doc) => {
-          inventoryData.push({
+        console.log("Total documents in itInventory:", allDocsSnapshot.size)
+        
+        const allInventoryData: InventoryItem[] = []
+        allDocsSnapshot.forEach((doc) => {
+          const data = doc.data()
+          console.log("Document data:", { id: doc.id, ...data })
+          allInventoryData.push({
             id: doc.id,
-            ...doc.data(),
+            ...data,
           } as InventoryItem)
         })
         
-        setInventory(inventoryData)
+        // If user has company_id, filter by it, otherwise show all for debugging
+        let filteredData = allInventoryData
+        if (user?.company_id) {
+          filteredData = allInventoryData.filter(item => item.company_id === user.company_id)
+          console.log("Filtered by company_id:", filteredData.length)
+        } else {
+          console.log("No company_id found, showing all items for debugging")
+        }
+        
+        setInventory(filteredData)
       } catch (error) {
         console.error("Error fetching inventory:", error)
         toast({
@@ -157,16 +165,16 @@ export default function ITInventoryPage() {
     }
 
     fetchInventory()
-  }, [user?.company_id])
+  }, [user])
 
   const filteredInventory = useMemo(() => {
     return inventory.filter((item) => {
       const matchesSearch =
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.vendor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.assignedTo.toLowerCase().includes(searchTerm.toLowerCase())
+        item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.vendor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.assignedTo?.toLowerCase().includes(searchTerm.toLowerCase())
 
       const matchesType = typeFilter === "all" || item.type === typeFilter
       const matchesStatus = statusFilter === "all" || item.status === statusFilter
@@ -179,7 +187,7 @@ export default function ITInventoryPage() {
     const total = inventory.length
     const active = inventory.filter((item) => item.status === "active").length
     const maintenance = inventory.filter((item) => item.status === "maintenance").length
-    const totalValue = inventory.reduce((sum, item) => sum + item.cost, 0)
+    const totalValue = inventory.reduce((sum, item) => sum + (item.cost || 0), 0)
 
     return { total, active, maintenance, totalValue }
   }, [inventory])
@@ -279,6 +287,21 @@ export default function ITInventoryPage() {
           Add Item
         </Button>
       </div>
+
+      {/* Debug Info */}
+      {process.env.NODE_ENV === 'development' && (
+        <Card className="bg-yellow-50 border-yellow-200">
+          <CardHeader>
+            <CardTitle className="text-sm">Debug Info</CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs">
+            <p>User ID: {user?.uid || 'Not logged in'}</p>
+            <p>Company ID: {user?.company_id || 'No company_id'}</p>
+            <p>Total inventory items: {inventory.length}</p>
+            <p>Filtered items: {filteredInventory.length}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -617,20 +640,20 @@ export default function ITInventoryPage() {
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between">
                   <Badge className={statusColors[item.status]}>
-                    {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                    {item.status?.charAt(0).toUpperCase() + item.status?.slice(1)}
                   </Badge>
-                  <span className="text-sm font-medium">${item.cost.toLocaleString()}</span>
+                  <span className="text-sm font-medium">${(item.cost || 0).toLocaleString()}</span>
                 </div>
 
                 <div className="space-y-1 text-sm text-muted-foreground">
                   <div>
-                    <strong>Location:</strong> {item.location}
+                    <strong>Location:</strong> {item.location || 'N/A'}
                   </div>
                   <div>
-                    <strong>Assigned to:</strong> {item.assignedTo}
+                    <strong>Assigned to:</strong> {item.assignedTo || 'N/A'}
                   </div>
                   <div>
-                    <strong>Vendor:</strong> {item.vendor}
+                    <strong>Vendor:</strong> {item.vendor || 'N/A'}
                   </div>
                   {item.serialNumber && (
                     <div>
