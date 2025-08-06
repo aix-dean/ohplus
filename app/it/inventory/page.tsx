@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -215,55 +215,64 @@ export default function ITInventoryPage() {
     return matchesSearch && matchesType && matchesStatus && matchesDepartment
   })
 
-  const handleEdit = (item: InventoryItem) => {
+  const handleEdit = useCallback((item: InventoryItem) => {
     router.push(`/it/inventory/edit/${item.id}`)
-  }
+  }, [router])
 
-  const handleView = (item: InventoryItem) => {
+  const handleView = useCallback((item: InventoryItem) => {
     router.push(`/it/inventory/details/${item.id}`)
-  }
+  }, [router])
 
-  const handleDelete = (item: InventoryItem) => {
+  const handleDelete = useCallback((item: InventoryItem) => {
     setItemToDelete(item)
     setDeleteDialogOpen(true)
-  }
+  }, [])
 
-  const confirmDelete = async () => {
-    if (!itemToDelete) return
+  const resetDeleteState = useCallback(() => {
+    setDeleteDialogOpen(false)
+    setItemToDelete(null)
+    setIsDeleting(false)
+  }, [])
+
+  const confirmDelete = useCallback(async () => {
+    if (!itemToDelete || isDeleting) return
 
     setIsDeleting(true)
+    
     try {
-      // Soft delete: update the deleted field to true instead of actually deleting the document
-      const itemRef = doc(db, "itInventory", itemToDelete.id)
+      // Store item details before deletion
+      const itemId = itemToDelete.id
+      const itemName = itemToDelete.name
+
+      // Perform the soft delete
+      const itemRef = doc(db, "itInventory", itemId)
       await updateDoc(itemRef, {
         deleted: true,
         deleted_at: serverTimestamp(),
         updated_at: serverTimestamp(),
       })
 
-      // Store item name for toast before clearing state
-      const deletedItemName = itemToDelete.name
+      // Use React's flushSync to ensure state updates are synchronous
+      import('react-dom').then(({ flushSync }) => {
+        flushSync(() => {
+          // Remove item from local state
+          setItems(prevItems => prevItems.filter(item => item.id !== itemId))
+          // Reset dialog state
+          resetDeleteState()
+        })
 
-      // Clear all dialog states immediately
-      setDeleteDialogOpen(false)
-      setItemToDelete(null)
-      setIsDeleting(false)
-
-      // Remove from local state
-      setItems(prevItems => prevItems.filter(item => item.id !== itemToDelete.id))
-      
-      // Show success toast after state cleanup
-      toast({
-        title: "Item Deleted",
-        description: `${deletedItemName} has been deleted from inventory`,
+        // Show success toast after state is updated
+        toast({
+          title: "Item Deleted",
+          description: `${itemName} has been deleted from inventory`,
+        })
       })
+
     } catch (error) {
       console.error("Error deleting item:", error)
       
-      // Reset all states on error
-      setIsDeleting(false)
-      setDeleteDialogOpen(false)
-      setItemToDelete(null)
+      // Reset state on error
+      resetDeleteState()
       
       toast({
         title: "Error",
@@ -271,19 +280,18 @@ export default function ITInventoryPage() {
         variant: "destructive",
       })
     }
-  }
+  }, [itemToDelete, isDeleting, resetDeleteState])
 
-  const handleAddNew = () => {
-    router.push("/it/inventory/new")
-  }
-
-  const handleDeleteDialogClose = () => {
+  const handleDeleteDialogClose = useCallback((open: boolean) => {
     // Only allow closing if not currently deleting
-    if (!isDeleting) {
-      setDeleteDialogOpen(false)
-      setItemToDelete(null)
+    if (!open && !isDeleting) {
+      resetDeleteState()
     }
-  }
+  }, [isDeleting, resetDeleteState])
+
+  const handleAddNew = useCallback(() => {
+    router.push("/it/inventory/new")
+  }, [router])
 
   if (loading) {
     return (

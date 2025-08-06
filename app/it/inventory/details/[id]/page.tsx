@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -207,22 +207,31 @@ export default function InventoryDetailsPage() {
     return `${user.first_name} ${user.last_name}`.trim() || user.email
   }
 
-  const handleEdit = () => {
+  const handleEdit = useCallback(() => {
     if (item) {
       router.push(`/it/inventory/edit/${item.id}`)
     }
-  }
+  }, [item, router])
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     setDeleteDialogOpen(true)
-  }
+  }, [])
 
-  const confirmDelete = async () => {
-    if (!item) return
+  const resetDeleteState = useCallback(() => {
+    setDeleteDialogOpen(false)
+    setIsDeleting(false)
+  }, [])
+
+  const confirmDelete = useCallback(async () => {
+    if (!item || isDeleting) return
 
     setIsDeleting(true)
+    
     try {
-      // Soft delete: update the deleted field to true instead of actually deleting the document
+      // Store item details before deletion
+      const itemName = item.name
+
+      // Perform the soft delete
       const itemRef = doc(db, "itInventory", item.id)
       await updateDoc(itemRef, {
         deleted: true,
@@ -230,27 +239,28 @@ export default function InventoryDetailsPage() {
         updated_at: serverTimestamp(),
       })
 
-      // Store item name for toast before navigation
-      const deletedItemName = item.name
+      // Use React's flushSync to ensure state updates are synchronous
+      import('react-dom').then(({ flushSync }) => {
+        flushSync(() => {
+          // Reset dialog state
+          resetDeleteState()
+        })
 
-      // Clear dialog states immediately
-      setDeleteDialogOpen(false)
-      setIsDeleting(false)
+        // Show success toast
+        toast({
+          title: "Item Deleted",
+          description: `${itemName} has been deleted from inventory`,
+        })
 
-      // Show success toast
-      toast({
-        title: "Item Deleted",
-        description: `${deletedItemName} has been deleted from inventory`,
+        // Navigate back to inventory list
+        router.push("/it/inventory")
       })
 
-      // Navigate back immediately
-      router.push("/it/inventory")
     } catch (error) {
       console.error("Error deleting item:", error)
       
-      // Reset states on error
-      setIsDeleting(false)
-      setDeleteDialogOpen(false)
+      // Reset state on error
+      resetDeleteState()
       
       toast({
         title: "Error",
@@ -258,11 +268,18 @@ export default function InventoryDetailsPage() {
         variant: "destructive",
       })
     }
-  }
+  }, [item, isDeleting, resetDeleteState, router])
 
-  const handleBack = () => {
+  const handleDeleteDialogClose = useCallback((open: boolean) => {
+    // Only allow closing if not currently deleting
+    if (!open && !isDeleting) {
+      resetDeleteState()
+    }
+  }, [isDeleting, resetDeleteState])
+
+  const handleBack = useCallback(() => {
     router.push("/it/inventory")
-  }
+  }, [router])
 
   if (loading) {
     return (
@@ -296,13 +313,6 @@ export default function InventoryDetailsPage() {
         </div>
       </div>
     )
-  }
-
-  const handleDeleteDialogClose = () => {
-    // Only allow closing if not currently deleting
-    if (!isDeleting) {
-      setDeleteDialogOpen(false)
-    }
   }
 
   return (
