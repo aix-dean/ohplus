@@ -992,7 +992,7 @@ export default function EditInventoryItemPage() {
                       </div>
                     </div>
 
-                    {/* Category-specific specifications - same as new page */}
+                    {/* Category-specific specifications */}
                     {formData.category === "Desktop Computer" && (
                       <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
                         <h3 className="text-lg font-semibold mb-4 flex items-center">
@@ -1044,8 +1044,56 @@ export default function EditInventoryItemPage() {
                       </div>
                     )}
 
-                    {/* Include all other category-specific sections from the new page... */}
-                    {/* For brevity, I'll include just a few key ones, but in practice you'd include all */}
+                    {formData.category === "Laptop" && (
+                      <div className="bg-green-50 rounded-lg p-6 border border-green-200">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center">
+                          <Monitor className="h-5 w-5 mr-2" />
+                          Laptop Specifications
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Processor</Label>
+                            <Input placeholder="e.g., Intel Core i7-1260P, 2.1GHz" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">RAM</Label>
+                            <Input placeholder="e.g., 16GB LPDDR5-4800" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Storage</Label>
+                            <Input placeholder="e.g., 512GB PCIe 4.0 NVMe SSD" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Display</Label>
+                            <Input placeholder="e.g., 14-inch FHD IPS, 1920×1080" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Graphics</Label>
+                            <Input placeholder="e.g., Intel Iris Xe Graphics" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Battery</Label>
+                            <Input placeholder="e.g., 70Wh Li-ion, up to 10 hours" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Keyboard</Label>
+                            <Input placeholder="e.g., Backlit, Full-size, Numeric pad" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Webcam</Label>
+                            <Input placeholder="e.g., 720p HD, IR for Windows Hello" className="h-12 text-base" />
+                          </div>
+                        </div>
+                        <div className="mt-6">
+                          <Label className="text-base font-medium">Ports & Connectivity</Label>
+                          <Textarea 
+                            placeholder="e.g., 2x USB-A 3.2, 2x USB-C Thunderbolt 4, HDMI 2.0, 3.5mm audio, Wi-Fi 6E, Bluetooth 5.2"
+                            className="mt-2 text-base resize-none"
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     {formData.category === "Monitor" && (
                       <div className="bg-indigo-50 rounded-lg p-6 border border-indigo-200">
@@ -1108,6 +1156,230 @@ export default function EditInventoryItemPage() {
                       </div>
                     )}
 
+                    {formData.category === "Printer" && (
+                      <div className="bg-yellow-50 rounded-lg p-6 border border-yellow-200">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center">
+                          <Package className="h-5 w-5 mr-2" />
+                          Printer Specifications
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Print Technology</Label>
+                            <Input placeholder="e.g., Laser, Inkjet, Thermal" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Print Speed (Black)</Label>
+                            <Input placeholder="e.g., 30 ppm, 45 ppm" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Print Speed (Color)</Label>
+                            <Input placeholder="e.g., 25 ppm, 40 ppm" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Print Resolution</Label>
+                            <Input placeholder="e.g., 1200×1200 dpi, 4800×1200 dpi" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Paper Capacity</Label>
+                            <Input placeholder="e.g., 250 sheets input, 100 sheets output" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Paper Sizes</Label>
+                            <Input placeholder="e.g., A4, Letter, Legal, A3" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Monthly Duty Cycle</Label>
+                            <Input placeholder="e.g., 50,000 pages, 100,000 pages" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Memory</Label>
+                            <Input placeholder="e.g., 512MB, 1GB RAM" className="h-12 text-base" />
+                          </div>
+                        </div>
+                        <div className="mt-6">
+                          <Label className="text-base font-medium">Features</Label>
+                          <Textarea 
+                            placeholder="e.g., Duplex printing, Scan, Copy, Fax, ADF, Touchscreen"
+                            className="mt-2 text-base resize-none"
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.category === "Network Switch" && (
+                      <div className="bg-cyan-50 rounded-lg p-6 border border-cyan-200">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center">
+                          <Globe className="h-5 w-5 mr-2" />
+                          Network Switch Specifications
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Port Count</Label>
+                            <Input placeholder="e.g., 24 ports, 48 ports" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Port Speed</Label>
+                            <Input placeholder="e.g., Gigabit Ethernet, 10GbE" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Switching Capacity</Label>
+                            <Input placeholder="e.g., 48 Gbps, 176 Gbps" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Forwarding Rate</Label>
+                            <Input placeholder="e.g., 35.7 Mpps, 130.9 Mpps" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">MAC Address Table</Label>
+                            <Input placeholder="e.g., 8K entries, 16K entries" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Power Consumption</Label>
+                            <Input placeholder="e.g., 25W, 45W, 180W" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">PoE Support</Label>
+                            <Input placeholder="e.g., PoE+, PoE++, 370W budget" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Management</Label>
+                            <Input placeholder="e.g., Managed, Unmanaged, Smart" className="h-12 text-base" />
+                          </div>
+                        </div>
+                        <div className="mt-6">
+                          <Label className="text-base font-medium">Features</Label>
+                          <Textarea 
+                            placeholder="e.g., VLAN support, QoS, SNMP, Link aggregation, Spanning tree"
+                            className="mt-2 text-base resize-none"
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.category === "Server" && (
+                      <div className="bg-red-50 rounded-lg p-6 border border-red-200">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center">
+                          <HardDrive className="h-5 w-5 mr-2" />
+                          Server Specifications
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Processor</Label>
+                            <Input placeholder="e.g., Intel Xeon Silver 4314, 2.4GHz" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">CPU Sockets</Label>
+                            <Input placeholder="e.g., 1 socket, 2 sockets" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">RAM</Label>
+                            <Input placeholder="e.g., 64GB DDR4 ECC, 128GB" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Max RAM Capacity</Label>
+                            <Input placeholder="e.g., 512GB, 1TB, 2TB" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Storage Bays</Label>
+                            <Input placeholder="e.g., 8x 2.5-inch, 4x 3.5-inch" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">RAID Controller</Label>
+                            <Input placeholder="e.g., Hardware RAID 0/1/5/10" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Network Ports</Label>
+                            <Input placeholder="e.g., 4x 1GbE, 2x 10GbE" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Power Supply</Label>
+                            <Input placeholder="e.g., 750W Redundant, 1200W" className="h-12 text-base" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Expansion Slots</Label>
+                            <Textarea 
+                              placeholder="e.g., 3x PCIe 4.0 x16, 2x PCIe 4.0 x8"
+                              className="text-base resize-none"
+                              rows={2}
+                            />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Management</Label>
+                            <Textarea 
+                              placeholder="e.g., iDRAC, iLO, IPMI, Remote console"
+                              className="text-base resize-none"
+                              rows={2}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {formData.category === "Smartphone" && (
+                      <div className="bg-pink-50 rounded-lg p-6 border border-pink-200">
+                        <h3 className="text-lg font-semibold mb-4 flex items-center">
+                          <Monitor className="h-5 w-5 mr-2" />
+                          Smartphone Specifications
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Processor</Label>
+                            <Input placeholder="e.g., Snapdragon 8 Gen 2, A16 Bionic" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">RAM</Label>
+                            <Input placeholder="e.g., 8GB, 12GB LPDDR5" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Storage</Label>
+                            <Input placeholder="e.g., 256GB, 512GB UFS 4.0" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Display Size</Label>
+                            <Input placeholder="e.g., 6.7-inch, 6.1-inch" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Display Type</Label>
+                            <Input placeholder="e.g., AMOLED, Super Retina XDR" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Resolution</Label>
+                            <Input placeholder="e.g., 2796×1290, 1080×2400" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Battery Capacity</Label>
+                            <Input placeholder="e.g., 5000mAh, 4323mAh" className="h-12 text-base" />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Charging Speed</Label>
+                            <Input placeholder="e.g., 67W fast charging, 20W MagSafe" className="h-12 text-base" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Camera System</Label>
+                            <Textarea 
+                              placeholder="e.g., 108MP main, 12MP ultrawide, 10MP telephoto, 32MP front"
+                              className="text-base resize-none"
+                              rows={2}
+                            />
+                          </div>
+                          <div className="space-y-3">
+                            <Label className="text-base font-medium">Connectivity</Label>
+                            <Textarea 
+                              placeholder="e.g., 5G, Wi-Fi 6E, Bluetooth 5.3, NFC, USB-C"
+                              className="text-base resize-none"
+                              rows={2}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Environmental Specifications */}
                     <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
                       <h3 className="text-lg font-semibold mb-4 flex items-center">
@@ -1135,7 +1407,7 @@ export default function EditInventoryItemPage() {
                     </div>
                   </div>
                 ) : (
-                  // Software specifications - same as new page
+                  // Software specifications
                   <div className="space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-3">
