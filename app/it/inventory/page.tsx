@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -215,23 +215,30 @@ export default function ITInventoryPage() {
     return matchesSearch && matchesType && matchesStatus && matchesDepartment
   })
 
-  const handleEdit = (item: InventoryItem) => {
+  const handleEdit = useCallback((item: InventoryItem) => {
     router.push(`/it/inventory/edit/${item.id}`)
-  }
+  }, [router])
 
-  const handleView = (item: InventoryItem) => {
+  const handleView = useCallback((item: InventoryItem) => {
     router.push(`/it/inventory/details/${item.id}`)
-  }
+  }, [router])
 
-  const handleDelete = (item: InventoryItem) => {
+  const handleDelete = useCallback((item: InventoryItem) => {
     setItemToDelete(item)
     setDeleteDialogOpen(true)
-  }
+  }, [])
 
-  const confirmDelete = async () => {
-    if (!itemToDelete) return
+  const resetDeleteState = useCallback(() => {
+    setDeleteDialogOpen(false)
+    setItemToDelete(null)
+    setIsDeleting(false)
+  }, [])
+
+  const confirmDelete = useCallback(async () => {
+    if (!itemToDelete || isDeleting) return
 
     setIsDeleting(true)
+    
     try {
       // Soft delete: update the deleted field to true instead of actually deleting the document
       const itemRef = doc(db, "itInventory", itemToDelete.id)
@@ -241,30 +248,43 @@ export default function ITInventoryPage() {
         updated_at: serverTimestamp(),
       })
 
-      // Remove from local state
-      setItems(items.filter(item => item.id !== itemToDelete.id))
+      // Update local state to remove the item
+      setItems(prevItems => prevItems.filter(item => item.id !== itemToDelete.id))
       
+      // Store item name for toast before resetting state
+      const deletedItemName = itemToDelete.name
+      
+      // Reset all delete-related state
+      resetDeleteState()
+      
+      // Show success toast
       toast({
         title: "Item Deleted",
-        description: `${itemToDelete.name} has been deleted from inventory`,
+        description: `${deletedItemName} has been deleted from inventory`,
       })
     } catch (error) {
       console.error("Error deleting item:", error)
+      
+      // Reset state on error
+      resetDeleteState()
+      
       toast({
         title: "Error",
         description: "Failed to delete item. Please try again.",
         variant: "destructive",
       })
-    } finally {
-      setIsDeleting(false)
-      setDeleteDialogOpen(false)
-      setItemToDelete(null)
     }
-  }
+  }, [itemToDelete, isDeleting, resetDeleteState])
 
-  const handleAddNew = () => {
+  const handleDeleteDialogOpenChange = useCallback((open: boolean) => {
+    if (!open && !isDeleting) {
+      resetDeleteState()
+    }
+  }, [isDeleting, resetDeleteState])
+
+  const handleAddNew = useCallback(() => {
     router.push("/it/inventory/new")
-  }
+  }, [router])
 
   if (loading) {
     return (
@@ -503,7 +523,7 @@ export default function ITInventoryPage() {
         )}
 
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogOpenChange}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center space-x-2">
