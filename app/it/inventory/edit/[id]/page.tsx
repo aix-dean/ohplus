@@ -1,638 +1,376 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useParams, useRouter } from "next/navigation"
+import { doc, getDoc, updateDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Skeleton } from "@/components/ui/skeleton"
-import { ArrowLeft, ArrowRight, Save, Check, Package, MapPin, DollarSign, Settings, Eye, HardDrive, Monitor, Globe, Loader2 } from 'lucide-react'
-import { toast } from "@/hooks/use-toast"
-import { cn } from "@/lib/utils"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ArrowLeft, Loader2 } from 'lucide-react'
+import { toast } from "@/components/ui/use-toast"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
 
-interface FormData {
-  name: string
-  type: "hardware" | "software"
-  category: string
-  brand: string
-  department: string
-  assignedTo: string
-  condition: "excellent" | "good" | "fair" | "poor" | "damaged"
-  vendorType: "physical" | "online"
-  storeName: string
-  storeLocation: string
-  websiteName: string
-  websiteUrl: string
-  purchaseDate: string
-  warrantyExpiry: string
-  cost: string
-  currency?: string
-  description: string
-  serialNumber?: string
-  specifications?: string
-  licenseKey?: string
-  version?: string
-}
-
-interface User {
-  id: string
-  uid: string
-  first_name: string
-  last_name: string
-  email: string
-  company_id?: string
-  license_key?: string
-}
-
-interface InventoryItem {
+interface ITInventoryItem {
   id: string
   name: string
-  type: "hardware" | "software"
-  category: string
-  brand: string
-  department: string
-  assignedTo: string
-  condition: "excellent" | "good" | "fair" | "poor" | "damaged"
-  vendorType: "physical" | "online"
-  storeName: string
-  storeLocation: string
-  websiteName: string
-  websiteUrl: string
-  purchaseDate: string
-  warrantyExpiry: string
-  cost: number
-  currency: string
   description: string
-  serialNumber: string
-  specifications: string
-  licenseKey: string
-  version: string
+  category: string
   status: string
-  company_id: string
-  created_by: string
-  created_at: any
-  updated_at: any
+  location: string
+  serialNumber: string
+  purchaseDate: string
+  purchasePrice: number
+  supplier: string
+  warrantyExpiry: string
+  assignedTo: string
+  notes: string
+  createdAt: any
+  updatedAt: any
+  createdBy: string
 }
 
-const hardwareCategories = [
-  "Desktop Computer",
-  "Laptop",
-  "Server",
-  "Printer",
-  "Network Switch",
-  "Router",
-  "Firewall",
-  "Monitor",
-  "Smartphone",
-  "Tablet",
-  "Storage Device",
-  "Keyboard",
-  "Mouse",
-  "Webcam",
-  "Headset",
-  "Projector",
-  "Scanner",
-  "UPS",
-  "Cable",
-  "Docking Station",
+const CATEGORIES = [
+  "Computer Hardware",
+  "Network Equipment",
+  "Software",
+  "Mobile Devices",
+  "Peripherals",
+  "Storage",
+  "Security Equipment",
+  "Other"
 ]
 
-const softwareCategories = [
-  "Operating System",
-  "Productivity Suite",
-  "Design Software",
-  "Security Software",
-  "Database Software",
-  "Development Tools",
-  "Antivirus",
-  "Backup Software",
-  "Communication Software",
-  "Project Management",
-  "Accounting Software",
-  "CRM Software",
-  "ERP Software",
-  "Media Software",
-  "Browser",
-  "Utility Software",
+const STATUSES = [
+  "Active",
+  "Inactive",
+  "Under Maintenance",
+  "Retired",
+  "Lost",
+  "Damaged"
 ]
 
-// Helper function to get categories based on item type
-const getCategoriesForType = (type: "hardware" | "software") => {
-  return type === "hardware" ? hardwareCategories : softwareCategories
-}
-
-// Replace the static steps array with this dynamic one
-const getAllSteps = () => [
-  {
-    id: 1,
-    title: "Basic Info",
-    description: "Item details",
-    icon: Package,
-    color: "bg-blue-500",
-  },
-  {
-    id: 2,
-    title: "Vendor Information",
-    description: "Store details",
-    icon: MapPin,
-    color: "bg-green-500",
-  },
-  {
-    id: 3,
-    title: "Financial",
-    description: "Cost & warranty",
-    icon: DollarSign,
-    color: "bg-yellow-500",
-  },
-  {
-    id: 4,
-    title: "Technical",
-    description: "Specifications",
-    icon: Settings,
-    color: "bg-purple-500",
-    showFor: "hardware", // Only show for hardware
-  },
-  {
-    id: 5,
-    title: "Review",
-    description: "Final check",
-    icon: Eye,
-    color: "bg-indigo-500",
-  },
-]
-
-const getVisibleSteps = (itemType: "hardware" | "software") => {
-  return getAllSteps()
-    .filter((step) => !step.showFor || step.showFor === itemType)
-    .map((step, index) => ({ ...step, id: index + 1 })) // Renumber steps
-}
-
-export default function EditInventoryItemPage() {
-  const router = useRouter()
+export default function ITInventoryEditPage() {
   const params = useParams()
-  const { userData } = useAuth()
-  const [currentStep, setCurrentStep] = useState(1)
-  const [users, setUsers] = useState<User[]>([])
-  const [loadingUsers, setLoadingUsers] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [item, setItem] = useState<InventoryItem | null>(null)
-  const [formData, setFormData] = useState<FormData>({
+  const router = useRouter()
+  const { user } = useAuth()
+  const [loading, setLoading] = useState(false)
+  const [isLoadingItem, setIsLoadingItem] = useState(true)
+  const [item, setItem] = useState<ITInventoryItem | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const [formData, setFormData] = useState({
     name: "",
-    type: "hardware",
-    category: "",
-    brand: "",
-    department: "",
-    assignedTo: "",
-    condition: "excellent",
-    vendorType: "physical",
-    storeName: "",
-    storeLocation: "",
-    websiteName: "",
-    websiteUrl: "",
-    purchaseDate: "",
-    warrantyExpiry: "",
-    cost: "",
-    currency: "USD",
     description: "",
+    category: "",
+    status: "",
+    location: "",
     serialNumber: "",
-    specifications: "",
-    licenseKey: "",
-    version: "",
+    purchaseDate: "",
+    purchasePrice: "",
+    supplier: "",
+    warrantyExpiry: "",
+    assignedTo: "",
+    notes: ""
   })
 
-  const visibleSteps = getVisibleSteps(formData.type)
-
-  // Fetch the inventory item
+  // Fetch item data
   useEffect(() => {
-    const fetchItem = async () => {
-      if (!params.id || !userData?.company_id) return
+    async function fetchItem() {
+      if (!params.id) return
 
-      setIsLoading(true)
+      const itemId = Array.isArray(params.id) ? params.id[0] : params.id
+
       try {
-        const itemDoc = await getDoc(doc(db, "itInventory", params.id as string))
-        
+        setIsLoadingItem(true)
+        const itemDoc = await getDoc(doc(db, "it_inventory", itemId))
+
         if (!itemDoc.exists()) {
-          toast({
-            title: "Item Not Found",
-            description: "The inventory item you're looking for doesn't exist.",
-            variant: "destructive",
-          })
-          router.push("/it/inventory")
+          setError("Item not found")
           return
         }
 
-        const itemData = { id: itemDoc.id, ...itemDoc.data() } as InventoryItem
-
-        // Check if user has access to this item (same company)
-        if (itemData.company_id !== userData.company_id) {
-          toast({
-            title: "Access Denied",
-            description: "You don't have permission to edit this item.",
-            variant: "destructive",
-          })
-          router.push("/it/inventory")
-          return
-        }
-
+        const itemData = { id: itemDoc.id, ...itemDoc.data() } as ITInventoryItem
         setItem(itemData)
-        
-        // Pre-populate form data
+
+        // Initialize form data
         setFormData({
           name: itemData.name || "",
-          type: itemData.type || "hardware",
-          category: itemData.category || "",
-          brand: itemData.brand || "",
-          department: itemData.department || "",
-          assignedTo: itemData.assignedTo || "",
-          condition: itemData.condition || "excellent",
-          vendorType: itemData.vendorType || "physical",
-          storeName: itemData.storeName || "",
-          storeLocation: itemData.storeLocation || "",
-          websiteName: itemData.websiteName || "",
-          websiteUrl: itemData.websiteUrl || "",
-          purchaseDate: itemData.purchaseDate || "",
-          warrantyExpiry: itemData.warrantyExpiry || "",
-          cost: itemData.cost ? itemData.cost.toString() : "",
-          currency: itemData.currency || "USD",
           description: itemData.description || "",
+          category: itemData.category || "",
+          status: itemData.status || "",
+          location: itemData.location || "",
           serialNumber: itemData.serialNumber || "",
-          specifications: itemData.specifications || "",
-          licenseKey: itemData.licenseKey || "",
-          version: itemData.version || "",
+          purchaseDate: itemData.purchaseDate || "",
+          purchasePrice: itemData.purchasePrice ? String(itemData.purchasePrice) : "",
+          supplier: itemData.supplier || "",
+          warrantyExpiry: itemData.warrantyExpiry || "",
+          assignedTo: itemData.assignedTo || "",
+          notes: itemData.notes || ""
         })
       } catch (error) {
         console.error("Error fetching item:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load inventory item.",
-          variant: "destructive",
-        })
-        router.push("/it/inventory")
+        setError("Failed to load item data")
       } finally {
-        setIsLoading(false)
+        setIsLoadingItem(false)
       }
     }
 
     fetchItem()
-  }, [params.id, userData?.company_id, router])
+  }, [params.id])
 
-  // Fetch users by company_id
-  useEffect(() => {
-    const fetchUsers = async () => {
-      if (!userData?.company_id) return
-
-      setLoadingUsers(true)
-      try {
-        console.log("Fetching users for company_id:", userData.company_id)
-
-        const usersRef = collection(db, "iboard_users")
-        const q = query(usersRef, where("company_id", "==", userData.company_id))
-        const querySnapshot = await getDocs(q)
-
-        const fetchedUsers: User[] = []
-        querySnapshot.forEach((doc) => {
-          const data = doc.data()
-          fetchedUsers.push({
-            id: doc.id,
-            uid: data.uid,
-            first_name: data.first_name || "",
-            last_name: data.last_name || "",
-            email: data.email || "",
-            company_id: data.company_id,
-            license_key: data.license_key,
-          })
-        })
-
-        console.log("Fetched users:", fetchedUsers)
-        setUsers(fetchedUsers)
-      } catch (error) {
-        console.error("Error fetching users:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load users",
-          variant: "destructive",
-        })
-      } finally {
-        setLoadingUsers(false)
-      }
-    }
-
-    fetchUsers()
-  }, [userData?.company_id])
-
-  // Add this useEffect after the existing useEffect
-  useEffect(() => {
-    // Reset to step 1 when item type changes to avoid being on a non-existent step
-    if (currentStep > getVisibleSteps(formData.type).length) {
-      setCurrentStep(1)
-    }
-  }, [formData.type, currentStep])
-
-  // Helper function to get user display name from uid
-  const getUserDisplayName = (uid: string) => {
-    if (uid === "unassigned") return "Unassigned"
-    const user = users.find((u) => u.uid === uid)
-    if (!user) return "Unknown User"
-    return `${user.first_name} ${user.last_name}`.trim() || user.email
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
   }
 
-  const validateStep = (step: number): boolean => {
-    switch (step) {
-      case 1:
-        return !!(formData.name && formData.category && formData.brand && formData.department)
-      case 2:
-        return true // Optional fields
-      case 3:
-        return true // Optional fields
-      case 4:
-        return true // Optional fields
-      default:
-        return true
-    }
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
   }
 
-  const handleNext = () => {
-    if (!validateStep(currentStep)) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!user || !item) {
       toast({
-        title: "Missing Required Fields",
-        description: "Please fill in all required fields before proceeding",
+        title: "Authentication Error",
+        description: "User not authenticated or item not found.",
         variant: "destructive",
       })
       return
     }
 
-    if (currentStep < visibleSteps.length) {
-      setCurrentStep(currentStep + 1)
-    }
-  }
-
-  const handlePrevious = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1)
-    }
-  }
-
-  const handleSubmit = async () => {
-    if (!validateStep(1)) {
+    // Validation
+    if (!formData.name.trim()) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields (Name, Category, Brand, Department)",
+        description: "Item name is required.",
         variant: "destructive",
       })
       return
     }
 
-    if (!userData?.company_id || !item) {
+    if (!formData.category) {
       toast({
-        title: "Error",
-        description: "Item or user information not found",
+        title: "Validation Error",
+        description: "Category is required.",
         variant: "destructive",
       })
       return
     }
 
-    setIsSubmitting(true)
+    if (!formData.status) {
+      toast({
+        title: "Validation Error",
+        description: "Status is required.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setLoading(true)
+    setError(null)
 
     try {
-      // Prepare the data to be updated
       const updateData = {
-        name: formData.name,
-        type: formData.type,
+        name: formData.name.trim(),
+        description: formData.description.trim(),
         category: formData.category,
-        brand: formData.brand,
-        department: formData.department,
-        assignedTo: formData.assignedTo || "unassigned",
-        condition: formData.condition,
-        vendorType: formData.vendorType,
-        storeName: formData.storeName || "",
-        storeLocation: formData.storeLocation || "",
-        websiteName: formData.websiteName || "",
-        websiteUrl: formData.websiteUrl || "",
-        purchaseDate: formData.purchaseDate || "",
-        warrantyExpiry: formData.warrantyExpiry || "",
-        cost: formData.cost ? Number.parseFloat(formData.cost) : 0,
-        currency: formData.currency || "USD",
-        description: formData.description || "",
-        serialNumber: formData.serialNumber || "",
-        specifications: formData.specifications || "",
-        licenseKey: formData.licenseKey || "",
-        version: formData.version || "",
-        updated_at: serverTimestamp(),
+        status: formData.status,
+        location: formData.location.trim(),
+        serialNumber: formData.serialNumber.trim(),
+        purchaseDate: formData.purchaseDate,
+        purchasePrice: formData.purchasePrice ? parseFloat(formData.purchasePrice) : 0,
+        supplier: formData.supplier.trim(),
+        warrantyExpiry: formData.warrantyExpiry,
+        assignedTo: formData.assignedTo.trim(),
+        notes: formData.notes.trim(),
+        updatedAt: new Date(),
       }
 
-      console.log("Updating item data:", updateData)
-
-      // Update in Firestore
-      await updateDoc(doc(db, "itInventory", item.id), updateData)
-
-      console.log("Document updated successfully")
+      await updateDoc(doc(db, "it_inventory", item.id), updateData)
 
       toast({
-        title: "Item Updated Successfully",
-        description: `${formData.name} has been updated in the inventory`,
+        title: "Item updated",
+        description: "IT inventory item has been updated successfully.",
       })
 
       router.push("/it/inventory")
     } catch (error) {
-      console.error("Error updating document: ", error)
+      console.error("Error updating item:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to update item. Please try again."
+      setError(errorMessage)
       toast({
         title: "Error",
-        description: "Failed to update inventory item. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
-      setIsSubmitting(false)
+      setLoading(false)
     }
   }
 
-  const handleCancel = () => {
-    router.push("/it/inventory")
+  const handleBack = () => {
+    router.back()
   }
 
-  // Loading state
-  if (isLoading) {
+  if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <div className="container mx-auto p-6 max-w-5xl">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center space-x-4">
-              <Skeleton className="h-9 w-32" />
-              <Separator orientation="vertical" className="h-6" />
-              <div>
-                <Skeleton className="h-8 w-48 mb-2" />
-                <Skeleton className="h-4 w-64" />
-              </div>
-            </div>
-            <Skeleton className="h-6 w-20" />
-          </div>
-          
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
-              <p className="text-muted-foreground">Loading inventory item...</p>
-            </div>
+      <div className="flex min-h-[calc(100vh-theme(spacing.16))] flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8 md:p-10">
+        <div className="mx-auto grid w-full max-w-6xl gap-2">
+          <h1 className="text-3xl font-semibold">Authentication Required</h1>
+          <p className="text-muted-foreground">Please log in to edit IT inventory items.</p>
+        </div>
+        <div className="mx-auto w-full max-w-6xl flex justify-center">
+          <Button onClick={() => router.push("/login")}>Log In</Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (isLoadingItem) {
+    return (
+      <div className="flex min-h-[calc(100vh-theme(spacing.16))] flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8 md:p-10">
+        <div className="mx-auto grid w-full max-w-6xl gap-2">
+          <Button variant="ghost" onClick={handleBack} className="mb-6 w-fit">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+          <h1 className="text-3xl font-semibold">Edit IT Inventory Item</h1>
+          <p className="text-muted-foreground">Loading item data...</p>
+        </div>
+
+        <div className="mx-auto w-full max-w-6xl flex justify-center">
+          <div className="grid gap-6 w-full max-w-2xl">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Loading Item Data
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="h-8 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-32 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-8 bg-gray-200 rounded animate-pulse" />
+                  <div className="h-8 bg-gray-200 rounded animate-pulse" />
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
     )
   }
 
-  const renderStepContent = () => {
-    const currentStepData = visibleSteps[currentStep - 1]
-    if (!currentStepData) return null
+  if (!item || error) {
+    return (
+      <div className="flex min-h-[calc(100vh-theme(spacing.16))] flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8 md:p-10">
+        <div className="mx-auto grid w-full max-w-6xl gap-2">
+          <Button variant="ghost" onClick={handleBack} className="mb-6 w-fit">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to IT Inventory
+          </Button>
+          <h1 className="text-3xl font-semibold">Item Not Found</h1>
+          <p className="text-muted-foreground">The IT inventory item you're trying to edit could not be found.</p>
+        </div>
 
-    // Map the step title to the appropriate content
-    switch (currentStepData.title) {
-      case "Basic Info":
-        return (
-          <div className="space-y-8">
-            <div className="text-center space-y-2">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4">
-                <Package className="h-8 w-8 text-blue-600" />
-              </div>
-              <h2 className="text-2xl font-bold">Basic Information</h2>
-              <p className="text-muted-foreground">Update the essential details of your inventory item</p>
-            </div>
+        <div className="mx-auto w-full max-w-6xl flex justify-center">
+          <div className="grid gap-6 w-full max-w-2xl">
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-gray-500 mb-6">The item you're trying to edit could not be found.</p>
+                <Button onClick={() => router.push("/it/inventory")}>Return to IT Inventory</Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
-            <Card className="border-2 border-dashed border-blue-200 bg-blue-50/30">
-              <CardContent className="p-8 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <Label htmlFor="name" className="text-base font-medium">
-                      Item Name *
-                    </Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="e.g., Dell OptiPlex 7090"
-                      className="h-12 text-base"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="type" className="text-base font-medium">
-                      Item Type *
-                    </Label>
-                    <Select
-                      value={formData.type}
-                      onValueChange={(value: "hardware" | "software") =>
-                        setFormData({ ...formData, type: value, category: "" })
-                      }
-                    >
-                      <SelectTrigger className="h-12 text-base">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="hardware">
-                          <div className="flex items-center space-x-2">
-                            <HardDrive className="h-4 w-4" />
-                            <span>Hardware</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="software">
-                          <div className="flex items-center space-x-2">
-                            <Monitor className="h-4 w-4" />
-                            <span>Software</span>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+  return (
+    <div className="flex min-h-[calc(100vh-theme(spacing.16))] flex-1 flex-col gap-4 bg-muted/40 p-4 md:gap-8 md:p-10">
+      <div className="mx-auto grid w-full max-w-6xl gap-2">
+        <Button variant="ghost" onClick={handleBack} className="mb-6 w-fit">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to IT Inventory
+        </Button>
+        <h1 className="text-3xl font-semibold">Edit IT Inventory Item: {item.name}</h1>
+        <p className="text-muted-foreground">Update the details of this IT inventory item.</p>
+      </div>
+
+      <div className="mx-auto w-full max-w-6xl flex justify-center">
+        <div className="grid gap-6 w-full max-w-2xl">
+          <form onSubmit={handleSubmit}>
+            <Card>
+              <CardHeader>
+                <CardTitle>Item Details</CardTitle>
+                <CardDescription>Update the information for this IT inventory item.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Item Name *</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    type="text"
+                    placeholder="e.g., Dell OptiPlex 7090"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                  />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <Label htmlFor="category" className="text-base font-medium">
-                      Category *
-                    </Label>
-                    <Select
-                      value={formData.category}
-                      onValueChange={(value) => setFormData({ ...formData, category: value })}
-                    >
-                      <SelectTrigger className="h-12 text-base">
-                        <SelectValue placeholder={`Select a ${formData.type} category`} />
+                <div className="grid gap-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    name="description"
+                    placeholder="Brief description of the item..."
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="category">Category *</Label>
+                    <Select value={formData.category} onValueChange={(value) => handleSelectChange("category", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        {getCategoriesForType(formData.type).map((category) => (
+                        {CATEGORIES.map((category) => (
                           <SelectItem key={category} value={category}>
                             {category}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-sm text-muted-foreground">Choose from {formData.type} specific categories</p>
                   </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="brand" className="text-base font-medium">
-                      Brand *
-                    </Label>
-                    <Input
-                      id="brand"
-                      value={formData.brand}
-                      onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                      placeholder="e.g., Dell, Microsoft, Apple"
-                      className="h-12 text-base"
-                      required
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <Label htmlFor="department" className="text-base font-medium">
-                      Department *
-                    </Label>
-                    <Select
-                      value={formData.department}
-                      onValueChange={(value) => setFormData({ ...formData, department: value })}
-                    >
-                      <SelectTrigger className="h-12 text-base">
-                        <SelectValue placeholder="Select a department" />
+                  <div className="grid gap-2">
+                    <Label htmlFor="status">Status *</Label>
+                    <Select value={formData.status} onValueChange={(value) => handleSelectChange("status", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="IT">IT Department</SelectItem>
-                        <SelectItem value="HR">Human Resources</SelectItem>
-                        <SelectItem value="Finance">Finance</SelectItem>
-                        <SelectItem value="Marketing">Marketing</SelectItem>
-                        <SelectItem value="Sales">Sales</SelectItem>
-                        <SelectItem value="Operations">Operations</SelectItem>
-                        <SelectItem value="Administration">Administration</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="assignedTo" className="text-base font-medium">
-                      Assigned To
-                    </Label>
-                    <Select
-                      value={formData.assignedTo}
-                      onValueChange={(value) => setFormData({ ...formData, assignedTo: value })}
-                      disabled={loadingUsers}
-                    >
-                      <SelectTrigger className="h-12 text-base">
-                        <SelectValue placeholder={loadingUsers ? "Loading users..." : "Select a user"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">
-                          <span className="text-muted-foreground">Unassigned</span>
-                        </SelectItem>
-                        {users.map((user) => (
-                          <SelectItem key={user.uid} value={user.uid}>
-                            <div className="flex flex-col">
-                              <span>{`${user.first_name} ${user.last_name}`.trim() || user.email}</span>
-                              <span className="text-xs text-muted-foreground">{user.email}</span>
-                            </div>
+                        {STATUSES.map((status) => (
+                          <SelectItem key={status} value={status}>
+                            {status}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -640,693 +378,131 @@ export default function EditInventoryItemPage() {
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <Label htmlFor="condition" className="text-base font-medium">
-                    Condition
-                  </Label>
-                  <Select
-                    value={formData.condition}
-                    onValueChange={(value: "excellent" | "good" | "fair" | "poor" | "damaged") =>
-                      setFormData({ ...formData, condition: value })
-                    }
-                  >
-                    <SelectTrigger className="h-12 text-base">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="excellent">
-                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                          Excellent
-                        </Badge>
-                      </SelectItem>
-                      <SelectItem value="good">
-                        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                          Good
-                        </Badge>
-                      </SelectItem>
-                      <SelectItem value="fair">
-                        <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                          Fair
-                        </Badge>
-                      </SelectItem>
-                      <SelectItem value="poor">
-                        <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
-                          Poor
-                        </Badge>
-                      </SelectItem>
-                      <SelectItem value="damaged">
-                        <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-                          Damaged
-                        </Badge>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-3">
-                  <Label htmlFor="description" className="text-base font-medium">
-                    Description
-                  </Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Provide additional details about this item..."
-                    rows={4}
-                    className="text-base resize-none"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )
-
-      case "Vendor Information":
-        return (
-          <div className="space-y-8">
-            <div className="text-center space-y-2">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
-                <MapPin className="h-8 w-8 text-green-600" />
-              </div>
-              <h2 className="text-2xl font-bold">Vendor Information</h2>
-              <p className="text-muted-foreground">Update vendor and purchase information</p>
-            </div>
-
-            <Card className="border-2 border-dashed border-green-200 bg-green-50/30">
-              <CardContent className="p-8 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <Label htmlFor="vendorType" className="text-base font-medium">
-                      Store Type
-                    </Label>
-                    <Select
-                      value={formData.vendorType}
-                      onValueChange={(value: "physical" | "online") =>
-                        setFormData({
-                          ...formData,
-                          vendorType: value,
-                          storeLocation: value === "online" ? "" : formData.storeLocation,
-                          websiteName: value === "physical" ? "" : formData.websiteName,
-                          websiteUrl: value === "physical" ? "" : formData.websiteUrl,
-                        })
-                      }
-                    >
-                      <SelectTrigger className="h-12 text-base">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="physical">
-                          <div className="flex items-center space-x-2">
-                            <MapPin className="h-4 w-4" />
-                            <span>Physical Store</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="online">
-                          <div className="flex items-center space-x-2">
-                            <Globe className="h-4 w-4" />
-                            <span>Online Store</span>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-sm text-muted-foreground">
-                      Choose whether you purchased from a physical or online store
-                    </p>
-                  </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="storeName" className="text-base font-medium">
-                      Store Name
-                    </Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="location">Location</Label>
                     <Input
-                      id="storeName"
-                      value={formData.storeName}
-                      onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
-                      placeholder="e.g., Best Buy, Amazon, CDR King"
-                      className="h-12 text-base"
+                      id="location"
+                      name="location"
+                      type="text"
+                      placeholder="e.g., Office Floor 2"
+                      value={formData.location}
+                      onChange={handleInputChange}
                     />
-                    <p className="text-sm text-muted-foreground">Name of the store or vendor</p>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="serialNumber">Serial Number</Label>
+                    <Input
+                      id="serialNumber"
+                      name="serialNumber"
+                      type="text"
+                      placeholder="e.g., SN123456789"
+                      value={formData.serialNumber}
+                      onChange={handleInputChange}
+                    />
                   </div>
                 </div>
 
-                {formData.vendorType === "physical" && (
-                  <div className="space-y-3">
-                    <Label htmlFor="storeLocation" className="text-base font-medium">
-                      Store Location
-                    </Label>
-                    <div className="space-y-2">
-                      <GooglePlacesAutocomplete
-                        value={formData.storeLocation}
-                        onChange={(value) => setFormData({ ...formData, storeLocation: value })}
-                        placeholder="Search for store location..."
-                        className="h-12 text-base"
-                        enableMap={true}
-                        mapHeight="300px"
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        Search and select the exact location of the store on the map
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {formData.vendorType === "online" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <Label htmlFor="websiteName" className="text-base font-medium">
-                        Website Name
-                      </Label>
-                      <Input
-                        id="websiteName"
-                        value={formData.websiteName}
-                        onChange={(e) => setFormData({ ...formData, websiteName: e.target.value })}
-                        placeholder="e.g., Amazon, eBay, Shopee"
-                        className="h-12 text-base"
-                      />
-                      <p className="text-sm text-muted-foreground">Name of the online store or marketplace</p>
-                    </div>
-                    <div className="space-y-3">
-                      <Label htmlFor="websiteUrl" className="text-base font-medium">
-                        Website URL
-                      </Label>
-                      <div className="relative">
-                        <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                        <Input
-                          id="websiteUrl"
-                          type="url"
-                          value={formData.websiteUrl}
-                          onChange={(e) => setFormData({ ...formData, websiteUrl: e.target.value })}
-                          placeholder="https://www.example.com"
-                          className="h-12 text-base pl-10"
-                        />
-                      </div>
-                      <p className="text-sm text-muted-foreground">Full URL of the online store</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )
-
-      case "Financial":
-        return (
-          <div className="space-y-8">
-            <div className="text-center space-y-2">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-100 mb-4">
-                <DollarSign className="h-8 w-8 text-yellow-600" />
-              </div>
-              <h2 className="text-2xl font-bold">Financial & Warranty</h2>
-              <p className="text-muted-foreground">Update the financial aspects and warranty information</p>
-            </div>
-
-            <Card className="border-2 border-dashed border-yellow-200 bg-yellow-50/30">
-              <CardContent className="p-8 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="space-y-3">
-                    <Label htmlFor="cost" className="text-base font-medium">
-                      Purchase Cost
-                    </Label>
-                    <div className="relative flex">
-                      <Select
-                        value={formData.currency || "USD"}
-                        onValueChange={(value) => setFormData({ ...formData, currency: value })}
-                      >
-                        <SelectTrigger className="h-12 w-24 rounded-r-none border-r-0">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="USD">USD</SelectItem>
-                          <SelectItem value="EUR">EUR</SelectItem>
-                          <SelectItem value="GBP">GBP</SelectItem>
-                          <SelectItem value="JPY">JPY</SelectItem>
-                          <SelectItem value="CAD">CAD</SelectItem>
-                          <SelectItem value="AUD">AUD</SelectItem>
-                          <SelectItem value="CHF">CHF</SelectItem>
-                          <SelectItem value="CNY">CNY</SelectItem>
-                          <SelectItem value="INR">INR</SelectItem>
-                          <SelectItem value="KRW">KRW</SelectItem>
-                          <SelectItem value="SGD">SGD</SelectItem>
-                          <SelectItem value="HKD">HKD</SelectItem>
-                          <SelectItem value="NOK">NOK</SelectItem>
-                          <SelectItem value="SEK">SEK</SelectItem>
-                          <SelectItem value="DKK">DKK</SelectItem>
-                          <SelectItem value="PLN">PLN</SelectItem>
-                          <SelectItem value="CZK">CZK</SelectItem>
-                          <SelectItem value="HUF">HUF</SelectItem>
-                          <SelectItem value="RUB">RUB</SelectItem>
-                          <SelectItem value="BRL">BRL</SelectItem>
-                          <SelectItem value="MXN">MXN</SelectItem>
-                          <SelectItem value="ZAR">ZAR</SelectItem>
-                          <SelectItem value="TRY">TRY</SelectItem>
-                          <SelectItem value="NZD">NZD</SelectItem>
-                          <SelectItem value="PHP">PHP</SelectItem>
-                          <SelectItem value="THB">THB</SelectItem>
-                          <SelectItem value="MYR">MYR</SelectItem>
-                          <SelectItem value="IDR">IDR</SelectItem>
-                          <SelectItem value="VND">VND</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        id="cost"
-                        type="number"
-                        step="0.01"
-                        value={formData.cost}
-                        onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
-                        placeholder="0.00"
-                        className="h-12 text-base rounded-l-none flex-1"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="purchaseDate" className="text-base font-medium">
-                      Purchase Date
-                    </Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="purchaseDate">Purchase Date</Label>
                     <Input
                       id="purchaseDate"
+                      name="purchaseDate"
                       type="date"
                       value={formData.purchaseDate}
-                      onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
-                      className="h-12 text-base"
+                      onChange={handleInputChange}
                     />
                   </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="warrantyExpiry" className="text-base font-medium">
-                      Warranty Expiry
-                    </Label>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="purchasePrice">Purchase Price</Label>
                     <Input
-                      id="warrantyExpiry"
-                      type="date"
-                      value={formData.warrantyExpiry}
-                      onChange={(e) => setFormData({ ...formData, warrantyExpiry: e.target.value })}
-                      className="h-12 text-base"
+                      id="purchasePrice"
+                      name="purchasePrice"
+                      type="number"
+                      placeholder="0.00"
+                      value={formData.purchasePrice}
+                      onChange={handleInputChange}
+                      step="0.01"
+                      min="0"
                     />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )
 
-      case "Technical":
-        return (
-          <div className="space-y-8">
-            <div className="text-center space-y-2">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-purple-100 mb-4">
-                <Settings className="h-8 w-8 text-purple-600" />
-              </div>
-              <h2 className="text-2xl font-bold">Technical Specifications</h2>
-              <p className="text-muted-foreground">
-                Update {formData.type === "hardware" ? "hardware" : "software"}-specific technical details
-              </p>
-            </div>
-
-            <Card className="border-2 border-dashed border-purple-200 bg-purple-50/30">
-              <CardContent className="p-8 space-y-6">
-                {formData.type === "hardware" ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <Label htmlFor="serialNumber" className="text-base font-medium">
-                        Serial Number
-                      </Label>
-                      <Input
-                        id="serialNumber"
-                        value={formData.serialNumber || ""}
-                        onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
-                        placeholder="e.g., SN123456789"
-                        className="h-12 text-base font-mono"
-                      />
-                      <p className="text-sm text-muted-foreground">Unique identifier for this hardware</p>
-                    </div>
-                    <div className="space-y-3">
-                      <Label htmlFor="specifications" className="text-base font-medium">
-                        General Specifications
-                      </Label>
-                      <Input
-                        id="specifications"
-                        value={formData.specifications || ""}
-                        onChange={(e) => setFormData({ ...formData, specifications: e.target.value })}
-                        placeholder="e.g., Intel i7, 16GB RAM, 512GB SSD"
-                        className="h-12 text-base"
-                      />
-                      <p className="text-sm text-muted-foreground">Key technical specifications</p>
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="supplier">Supplier</Label>
+                    <Input
+                      id="supplier"
+                      name="supplier"
+                      type="text"
+                      placeholder="e.g., Dell Technologies"
+                      value={formData.supplier}
+                      onChange={handleInputChange}
+                    />
                   </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <Label htmlFor="licenseKey" className="text-base font-medium">
-                        License Key
-                      </Label>
-                      <Input
-                        id="licenseKey"
-                        value={formData.licenseKey || ""}
-                        onChange={(e) => setFormData({ ...formData, licenseKey: e.target.value })}
-                        placeholder="e.g., XXXXX-XXXXX-XXXXX-XXXXX"
-                        className="h-12 text-base font-mono"
-                      />
-                      <p className="text-sm text-muted-foreground">Software license or activation key</p>
-                    </div>
-                    <div className="space-y-3">
-                      <Label htmlFor="version" className="text-base font-medium">
-                        Version
-                      </Label>
-                      <Input
-                        id="version"
-                        value={formData.version || ""}
-                        onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-                        placeholder="e.g., 2024.1.0"
-                        className="h-12 text-base"
-                      />
-                      <p className="text-sm text-muted-foreground">Current software version</p>
-                    </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="warrantyExpiry">Warranty Expiry</Label>
+                    <Input
+                      id="warrantyExpiry"
+                      name="warrantyExpiry"
+                      type="date"
+                      value={formData.warrantyExpiry}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="assignedTo">Assigned To</Label>
+                  <Input
+                    id="assignedTo"
+                    name="assignedTo"
+                    type="text"
+                    placeholder="e.g., John Doe"
+                    value={formData.assignedTo}
+                    onChange={handleInputChange}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    name="notes"
+                    placeholder="Additional notes or comments..."
+                    value={formData.notes}
+                    onChange={handleInputChange}
+                    rows={3}
+                  />
+                </div>
+
+                {error && (
+                  <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-800">
+                    <p className="text-sm">{error}</p>
                   </div>
                 )}
               </CardContent>
+              <CardFooter className="flex justify-between">
+                <Button type="button" variant="outline" onClick={handleBack}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Update Item"
+                  )}
+                </Button>
+              </CardFooter>
             </Card>
-          </div>
-        )
-
-      case "Review":
-        return (
-          <div className="space-y-8">
-            <div className="text-center space-y-2">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-100 mb-4">
-                <Eye className="h-8 w-8 text-indigo-600" />
-              </div>
-              <h2 className="text-2xl font-bold">Review & Update</h2>
-              <p className="text-muted-foreground">Please review all changes before updating the inventory item</p>
-            </div>
-
-            <Card className="border-2 border-indigo-200">
-              <CardHeader className="bg-indigo-50">
-                <CardTitle className="flex items-center space-x-2">
-                  <Package className="h-5 w-5" />
-                  <span>{formData.name || "Unnamed Item"}</span>
-                </CardTitle>
-                <CardDescription>{formData.description || "No description provided"}</CardDescription>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-6">
-                    <div>
-                      <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                        Basic Information
-                      </h4>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Type:</span>
-                          <Badge variant="secondary" className="capitalize">
-                            {formData.type}
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Category:</span>
-                          <span className="text-sm text-muted-foreground">{formData.category || "Not specified"}</span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Brand:</span>
-                          <span className="text-sm text-muted-foreground">{formData.brand || "Not specified"}</span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Department:</span>
-                          <span className="text-sm text-muted-foreground">
-                            {formData.department || "Not specified"}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Condition:</span>
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              formData.condition === "excellent" && "bg-green-100 text-green-800 border-green-200",
-                              formData.condition === "good" && "bg-blue-100 text-blue-800 border-blue-200",
-                              formData.condition === "fair" && "bg-yellow-100 text-yellow-800 border-yellow-200",
-                              formData.condition === "poor" && "bg-orange-100 text-orange-800 border-orange-200",
-                              formData.condition === "damaged" && "bg-red-100 text-red-800 border-red-200",
-                            )}
-                          >
-                            {formData.condition}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                        Vendor & Assignment
-                      </h4>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Store Type:</span>
-                          <Badge variant="secondary" className="capitalize">
-                            {formData.vendorType === "physical" ? "Physical Store" : "Online Store"}
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Store Name:</span>
-                          <span className="text-sm text-muted-foreground">{formData.storeName || "Not specified"}</span>
-                        </div>
-                        {formData.vendorType === "physical" && (
-                          <div className="flex justify-between items-start py-2 border-b border-muted">
-                            <span className="text-sm font-medium">Store Location:</span>
-                            <span className="text-sm text-muted-foreground text-right max-w-xs">
-                              {formData.storeLocation || "Not specified"}
-                            </span>
-                          </div>
-                        )}
-                        {formData.vendorType === "online" && (
-                          <>
-                            <div className="flex justify-between items-center py-2 border-b border-muted">
-                              <span className="text-sm font-medium">Website Name:</span>
-                              <span className="text-sm text-muted-foreground">
-                                {formData.websiteName || "Not specified"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-start py-2 border-b border-muted">
-                              <span className="text-sm font-medium">Website URL:</span>
-                              <span className="text-sm text-muted-foreground text-right max-w-xs break-all">
-                                {formData.websiteUrl ? (
-                                  <a
-                                    href={formData.websiteUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-blue-600 hover:text-blue-800 underline"
-                                  >
-                                    {formData.websiteUrl}
-                                  </a>
-                                ) : (
-                                  "Not specified"
-                                )}
-                              </span>
-                            </div>
-                          </>
-                        )}
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Assigned To:</span>
-                          <span className="text-sm text-muted-foreground">
-                            {getUserDisplayName(formData.assignedTo) || "Unassigned"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-6">
-                    <div>
-                      <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                        Financial & Warranty
-                      </h4>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Cost:</span>
-                          <span className="text-sm text-muted-foreground">
-                            {formData.cost
-                              ? `${formData.currency || "USD"} ${Number.parseFloat(formData.cost).toLocaleString()}`
-                              : "Not specified"}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Purchase Date:</span>
-                          <span className="text-sm text-muted-foreground">
-                            {formData.purchaseDate || "Not specified"}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Warranty Expiry:</span>
-                          <span className="text-sm text-muted-foreground">
-                            {formData.warrantyExpiry || "Not specified"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-                        Technical Details
-                      </h4>
-                      <div className="space-y-3">
-                        {formData.type === "hardware" ? (
-                          <>
-                            <div className="flex justify-between items-center py-2 border-b border-muted">
-                              <span className="text-sm font-medium">Serial Number:</span>
-                              <span className="text-sm text-muted-foreground font-mono">
-                                {formData.serialNumber || "Not specified"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center py-2 border-b border-muted">
-                              <span className="text-sm font-medium">Specifications:</span>
-                              <span className="text-sm text-muted-foreground">
-                                {formData.specifications || "Not specified"}
-                              </span>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="flex justify-between items-center py-2 border-b border-muted">
-                              <span className="text-sm font-medium">License Key:</span>
-                              <span className="text-sm text-muted-foreground font-mono">
-                                {formData.licenseKey || "Not specified"}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center py-2 border-b border-muted">
-                              <span className="text-sm font-medium">Version:</span>
-                              <span className="text-sm text-muted-foreground">
-                                {formData.version || "Not specified"}
-                              </span>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )
-
-      default:
-        return null
-    }
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="container mx-auto p-6 max-w-5xl">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" onClick={handleCancel} className="shadow-sm bg-transparent">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Inventory
-            </Button>
-            <Separator orientation="vertical" className="h-6" />
-            <div>
-              <h1 className="text-3xl font-bold text-slate-900">Edit Item</h1>
-              <p className="text-slate-600">Update inventory item in {visibleSteps.length} simple steps</p>
-            </div>
-          </div>
-          <Badge variant="outline" className="text-sm px-3 py-1">
-            Step {currentStep} of {visibleSteps.length}
-          </Badge>
-        </div>
-
-        {/* Modern Stepper */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between relative">
-            {/* Progress Line */}
-            <div className="absolute top-8 left-8 right-8 h-0.5 bg-slate-200 -z-10">
-              <div
-                className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500 ease-out"
-                style={{ width: `${((currentStep - 1) / (visibleSteps.length - 1)) * 100}%` }}
-              />
-            </div>
-
-            {visibleSteps.map((step, index) => {
-              const Icon = step.icon
-              const isCompleted = currentStep > step.id
-              const isCurrent = currentStep === step.id
-              const isUpcoming = currentStep < step.id
-
-              return (
-                <div key={step.id} className="flex flex-col items-center relative">
-                  <div
-                    className={cn(
-                      "flex items-center justify-center w-16 h-16 rounded-full border-4 transition-all duration-300 shadow-lg",
-                      isCompleted && "bg-gradient-to-r from-green-500 to-emerald-500 border-green-500 text-white",
-                      isCurrent && `${step.color} border-white text-white shadow-xl scale-110`,
-                      isUpcoming && "bg-white border-slate-300 text-slate-400",
-                    )}
-                  >
-                    {isCompleted ? (
-                      <Check className="h-7 w-7" />
-                    ) : (
-                      <Icon className={cn("h-7 w-7", isCurrent && "animate-pulse")} />
-                    )}
-                  </div>
-                  <div className="mt-4 text-center max-w-24">
-                    <p
-                      className={cn(
-                        "text-sm font-semibold transition-colors",
-                        (isCompleted || isCurrent) && "text-slate-900",
-                        isUpcoming && "text-slate-500",
-                      )}
-                    >
-                      {step.title}
-                    </p>
-                    <p
-                      className={cn(
-                        "text-xs mt-1 transition-colors",
-                        (isCompleted || isCurrent) && "text-slate-600",
-                        isUpcoming && "text-slate-400",
-                      )}
-                    >
-                      {step.description}
-                    </p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Step Content */}
-        <div className="mb-8">{renderStepContent()}</div>
-
-        {/* Navigation */}
-        <div className="flex justify-between items-center bg-white rounded-lg p-6 shadow-sm border">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handlePrevious}
-            disabled={currentStep === 1}
-            className="shadow-sm bg-transparent"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Previous
-          </Button>
-
-          <div className="flex items-center space-x-3">
-            <Button type="button" variant="ghost" onClick={handleCancel}>
-              Cancel
-            </Button>
-            {currentStep < visibleSteps.length ? (
-              <Button type="button" onClick={handleNext} className="shadow-sm">
-                Next Step
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="shadow-sm bg-blue-600 hover:bg-blue-700"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {isSubmitting ? "Updating..." : "Update Item"}
-              </Button>
-            )}
-          </div>
+          </form>
         </div>
       </div>
     </div>
