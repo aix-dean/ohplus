@@ -1,23 +1,24 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, Eye, Package, HardDrive, Monitor, Loader2, AlertCircle } from 'lucide-react'
+import { toast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
+import { useAuth } from "@/contexts/auth-context"
+import { collection, query, where, getDocs, doc, deleteDoc, orderBy } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,654 +28,500 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import {
-  Plus,
-  Search,
-  Edit,
-  Trash2,
-  Monitor,
-  Smartphone,
-  Printer,
-  Wifi,
-  HardDrive,
-  Shield,
-  Package,
-  Server,
-  Laptop,
-} from "lucide-react"
-import { toast } from "@/hooks/use-toast"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface InventoryItem {
   id: string
   name: string
   type: "hardware" | "software"
   category: string
-  status: "active" | "inactive" | "maintenance" | "retired"
-  location: string
+  brand: string
+  department: string
   assignedTo: string
+  condition: "excellent" | "good" | "fair" | "poor" | "damaged"
+  status: "active" | "inactive" | "maintenance" | "retired"
+  cost: number
+  currency: string
   purchaseDate: string
   warrantyExpiry: string
-  cost: number
-  vendor: string
-  description: string
   serialNumber?: string
-  specifications?: string
   licenseKey?: string
   version?: string
+  description: string
+  created_at: any
+  updated_at: any
+  created_by: string
+  company_id: string
 }
 
-const initialInventory: InventoryItem[] = [
-  {
-    id: "1",
-    name: "Dell OptiPlex 7090",
-    type: "hardware",
-    category: "Desktop Computer",
-    status: "active",
-    location: "Office Floor 2",
-    assignedTo: "John Doe",
-    purchaseDate: "2023-01-15",
-    warrantyExpiry: "2026-01-15",
-    cost: 1200,
-    vendor: "Dell Technologies",
-    description: "High-performance desktop computer for office work",
-    serialNumber: "DL7090-001",
-    specifications: "Intel i7-11700, 16GB RAM, 512GB SSD",
-  },
-  {
-    id: "2",
-    name: "Microsoft Office 365",
-    type: "software",
-    category: "Productivity Suite",
-    status: "active",
-    location: "Cloud",
-    assignedTo: "All Users",
-    purchaseDate: "2023-03-01",
-    warrantyExpiry: "2024-03-01",
-    cost: 2400,
-    vendor: "Microsoft",
-    description: "Office productivity suite with cloud services",
-    licenseKey: "XXXXX-XXXXX-XXXXX-XXXXX",
-    version: "2023",
-  },
-  {
-    id: "3",
-    name: "HP LaserJet Pro 404n",
-    type: "hardware",
-    category: "Printer",
-    status: "active",
-    location: "Office Floor 1",
-    assignedTo: "Shared",
-    purchaseDate: "2023-02-10",
-    warrantyExpiry: "2025-02-10",
-    cost: 350,
-    vendor: "HP Inc.",
-    description: "Network laser printer for office documents",
-    serialNumber: "HP404N-002",
-    specifications: "Monochrome, 38ppm, Ethernet",
-  },
-  {
-    id: "4",
-    name: "Cisco Catalyst 2960",
-    type: "hardware",
-    category: "Network Switch",
-    status: "active",
-    location: "Server Room",
-    assignedTo: "IT Department",
-    purchaseDate: "2022-11-20",
-    warrantyExpiry: "2025-11-20",
-    cost: 800,
-    vendor: "Cisco Systems",
-    description: "24-port managed network switch",
-    serialNumber: "CS2960-003",
-    specifications: "24x 1Gb ports, 2x SFP+ uplinks",
-  },
-  {
-    id: "5",
-    name: "Adobe Creative Suite",
-    type: "software",
-    category: "Design Software",
-    status: "active",
-    location: "Design Workstations",
-    assignedTo: "Design Team",
-    purchaseDate: "2023-04-15",
-    warrantyExpiry: "2024-04-15",
-    cost: 1800,
-    vendor: "Adobe Inc.",
-    description: "Professional design and creative software suite",
-    licenseKey: "ADOBE-XXXXX-XXXXX",
-    version: "2023",
-  },
-]
-
-const categories = [
-  "Desktop Computer",
-  "Laptop",
-  "Server",
-  "Printer",
-  "Network Switch",
-  "Router",
-  "Firewall",
-  "Monitor",
-  "Smartphone",
-  "Tablet",
-  "Operating System",
-  "Productivity Suite",
-  "Design Software",
-  "Security Software",
-  "Database Software",
-  "Development Tools",
-]
+interface User {
+  id: string
+  uid: string
+  first_name: string
+  last_name: string
+  email: string
+  company_id?: string
+}
 
 const statusColors = {
-  active: "bg-green-100 text-green-800",
-  inactive: "bg-gray-100 text-gray-800",
-  maintenance: "bg-yellow-100 text-yellow-800",
-  retired: "bg-red-100 text-red-800",
+  active: "bg-green-100 text-green-800 border-green-200",
+  inactive: "bg-gray-100 text-gray-800 border-gray-200",
+  maintenance: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  retired: "bg-red-100 text-red-800 border-red-200",
 }
 
-const categoryIcons = {
-  "Desktop Computer": Monitor,
-  Laptop: Laptop,
-  Server: Server,
-  Printer: Printer,
-  "Network Switch": Wifi,
-  Router: Wifi,
-  Firewall: Shield,
-  Monitor: Monitor,
-  Smartphone: Smartphone,
-  Tablet: Smartphone,
-  "Operating System": HardDrive,
-  "Productivity Suite": Package,
-  "Design Software": Package,
-  "Security Software": Shield,
-  "Database Software": HardDrive,
-  "Development Tools": Package,
+const conditionColors = {
+  excellent: "bg-green-100 text-green-800 border-green-200",
+  good: "bg-blue-100 text-blue-800 border-blue-200",
+  fair: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  poor: "bg-orange-100 text-orange-800 border-orange-200",
+  damaged: "bg-red-100 text-red-800 border-red-200",
 }
 
 export default function ITInventoryPage() {
   const router = useRouter()
-  const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory)
+  const { userData } = useAuth()
+  const [items, setItems] = useState<InventoryItem[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
-  const [formData, setFormData] = useState<Partial<InventoryItem>>({
-    type: "hardware",
-    status: "active",
-  })
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all")
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
-  const filteredInventory = useMemo(() => {
-    return inventory.filter((item) => {
-      const matchesSearch =
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.vendor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.assignedTo.toLowerCase().includes(searchTerm.toLowerCase())
+  // Fetch inventory items
+  useEffect(() => {
+    const fetchItems = async () => {
+      if (!userData?.company_id) return
 
-      const matchesType = typeFilter === "all" || item.type === typeFilter
-      const matchesStatus = statusFilter === "all" || item.status === statusFilter
+      try {
+        const itemsRef = collection(db, "itInventory")
+        const q = query(
+          itemsRef, 
+          where("company_id", "==", userData.company_id),
+          orderBy("created_at", "desc")
+        )
+        const querySnapshot = await getDocs(q)
 
-      return matchesSearch && matchesType && matchesStatus
-    })
-  }, [inventory, searchTerm, typeFilter, statusFilter])
+        const fetchedItems: InventoryItem[] = []
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          fetchedItems.push({
+            id: doc.id,
+            name: data.name || "",
+            type: data.type || "hardware",
+            category: data.category || "",
+            brand: data.brand || "",
+            department: data.department || "",
+            assignedTo: data.assignedTo || "unassigned",
+            condition: data.condition || "excellent",
+            status: data.status || "active",
+            cost: data.cost || 0,
+            currency: data.currency || "USD",
+            purchaseDate: data.purchaseDate || "",
+            warrantyExpiry: data.warrantyExpiry || "",
+            serialNumber: data.serialNumber || "",
+            licenseKey: data.licenseKey || "",
+            version: data.version || "",
+            description: data.description || "",
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+            created_by: data.created_by || "",
+            company_id: data.company_id || "",
+          })
+        })
 
-  const stats = useMemo(() => {
-    const total = inventory.length
-    const active = inventory.filter((item) => item.status === "active").length
-    const maintenance = inventory.filter((item) => item.status === "maintenance").length
-    const totalValue = inventory.reduce((sum, item) => sum + item.cost, 0)
-
-    return { total, active, maintenance, totalValue }
-  }, [inventory])
-
-  const handleEdit = (item: InventoryItem) => {
-    setEditingItem(item)
-    setFormData(item)
-  }
-
-  const handleUpdate = () => {
-    if (!editingItem || !formData.name || !formData.category || !formData.vendor) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      })
-      return
+        setItems(fetchedItems)
+      } catch (error) {
+        console.error("Error fetching items:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load inventory items",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
     }
 
-    const updatedItem: InventoryItem = {
-      ...editingItem,
-      ...formData,
-    } as InventoryItem
+    fetchItems()
+  }, [userData?.company_id])
 
-    setInventory(inventory.map((item) => (item.id === editingItem.id ? updatedItem : item)))
+  // Fetch users for display names
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!userData?.company_id) return
 
-    setEditingItem(null)
-    setFormData({ type: "hardware", status: "active" })
+      try {
+        const usersRef = collection(db, "iboard_users")
+        const q = query(usersRef, where("company_id", "==", userData.company_id))
+        const querySnapshot = await getDocs(q)
 
-    toast({
-      title: "Success",
-      description: "Inventory item updated successfully",
-    })
+        const fetchedUsers: User[] = []
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          fetchedUsers.push({
+            id: doc.id,
+            uid: data.uid,
+            first_name: data.first_name || "",
+            last_name: data.last_name || "",
+            email: data.email || "",
+            company_id: data.company_id,
+          })
+        })
+
+        setUsers(fetchedUsers)
+      } catch (error) {
+        console.error("Error fetching users:", error)
+      }
+    }
+
+    fetchUsers()
+  }, [userData?.company_id])
+
+  // Helper function to get user display name
+  const getUserDisplayName = (uid: string) => {
+    if (uid === "unassigned") return "Unassigned"
+    const user = users.find((u) => u.uid === uid)
+    if (!user) return "Unknown User"
+    return `${user.first_name} ${user.last_name}`.trim() || user.email
   }
 
-  const handleDelete = (id: string) => {
-    setInventory(inventory.filter((item) => item.id !== id))
-    toast({
-      title: "Success",
-      description: "Inventory item deleted successfully",
-    })
+  // Filter items based on search and filters
+  const filteredItems = items.filter((item) => {
+    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.serialNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         item.description.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesType = typeFilter === "all" || item.type === typeFilter
+    const matchesStatus = statusFilter === "all" || item.status === statusFilter
+    const matchesDepartment = departmentFilter === "all" || item.department === departmentFilter
+
+    return matchesSearch && matchesType && matchesStatus && matchesDepartment
+  })
+
+  const handleEdit = (item: InventoryItem) => {
+    router.push(`/it/inventory/edit/${item.id}`)
+  }
+
+  const handleView = (item: InventoryItem) => {
+    router.push(`/it/inventory/${item.id}`)
+  }
+
+  const handleDelete = (item: InventoryItem) => {
+    setItemToDelete(item)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!itemToDelete) return
+
+    setIsDeleting(true)
+    try {
+      await deleteDoc(doc(db, "itInventory", itemToDelete.id))
+      setItems(items.filter(item => item.id !== itemToDelete.id))
+      toast({
+        title: "Item Deleted",
+        description: `${itemToDelete.name} has been deleted from inventory`,
+      })
+    } catch (error) {
+      console.error("Error deleting item:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete item. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeleting(false)
+      setDeleteDialogOpen(false)
+      setItemToDelete(null)
+    }
   }
 
   const handleAddNew = () => {
     router.push("/it/inventory/new")
   }
 
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">IT Inventory Management</h1>
-          <p className="text-muted-foreground">Manage your hardware and software assets</p>
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="container mx-auto p-6">
+          <div className="flex justify-center items-center min-h-[400px]">
+            <div className="flex flex-col items-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <p className="text-muted-foreground">Loading inventory...</p>
+            </div>
+          </div>
         </div>
-        <Button onClick={handleAddNew}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Item
-        </Button>
       </div>
+    )
+  }
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Items</CardTitle>
-            <Monitor className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.active}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Maintenance</CardTitle>
-            <HardDrive className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{stats.maintenance}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${stats.totalValue.toLocaleString()}</div>
-          </CardContent>
-        </Card>
-      </div>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="container mx-auto p-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 space-y-4 md:space-y-0">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">IT Inventory</h1>
+            <p className="text-slate-600">Manage your IT assets and equipment</p>
+          </div>
+          <Button onClick={handleAddNew} className="shadow-sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Add New Item
+          </Button>
+        </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Search & Filter</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name, category, vendor, location, or assigned person..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+        {/* Filters and Search */}
+        <Card className="mb-6">
+          <CardContent className="p-6">
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search items by name, brand, category, or serial number..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="w-full sm:w-[140px]">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="hardware">Hardware</SelectItem>
+                    <SelectItem value="software">Software</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full sm:w-[140px]">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="maintenance">Maintenance</SelectItem>
+                    <SelectItem value="retired">Retired</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                  <SelectTrigger className="w-full sm:w-[160px]">
+                    <SelectValue placeholder="Department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    <SelectItem value="IT">IT Department</SelectItem>
+                    <SelectItem value="HR">Human Resources</SelectItem>
+                    <SelectItem value="Finance">Finance</SelectItem>
+                    <SelectItem value="Marketing">Marketing</SelectItem>
+                    <SelectItem value="Sales">Sales</SelectItem>
+                    <SelectItem value="Operations">Operations</SelectItem>
+                    <SelectItem value="Administration">Administration</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="hardware">Hardware</SelectItem>
-                <SelectItem value="software">Software</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="maintenance">Maintenance</SelectItem>
-                <SelectItem value="retired">Retired</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Inventory List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredInventory.map((item) => {
-          const IconComponent = categoryIcons[item.category as keyof typeof categoryIcons] || Package
-
-          return (
-            <Card key={item.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-2">
-                    <IconComponent className="h-5 w-5 text-muted-foreground" />
-                    <div>
-                      <CardTitle className="text-lg">{item.name}</CardTitle>
-                      <CardDescription>{item.category}</CardDescription>
-                    </div>
-                  </div>
-                  <div className="flex space-x-1">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(item)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                          <DialogTitle>Edit Inventory Item</DialogTitle>
-                          <DialogDescription>Update the inventory item details</DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-name">Name *</Label>
-                              <Input
-                                id="edit-name"
-                                value={formData.name || ""}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                placeholder="Enter item name"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-type">Type *</Label>
-                              <Select
-                                value={formData.type}
-                                onValueChange={(value) =>
-                                  setFormData({ ...formData, type: value as "hardware" | "software" })
-                                }
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="hardware">Hardware</SelectItem>
-                                  <SelectItem value="software">Software</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-category">Category *</Label>
-                              <Select
-                                value={formData.category}
-                                onValueChange={(value) => setFormData({ ...formData, category: value })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select category" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {categories.map((category) => (
-                                    <SelectItem key={category} value={category}>
-                                      {category}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-status">Status</Label>
-                              <Select
-                                value={formData.status}
-                                onValueChange={(value) => setFormData({ ...formData, status: value as any })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="active">Active</SelectItem>
-                                  <SelectItem value="inactive">Inactive</SelectItem>
-                                  <SelectItem value="maintenance">Maintenance</SelectItem>
-                                  <SelectItem value="retired">Retired</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-location">Location</Label>
-                              <Input
-                                id="edit-location"
-                                value={formData.location || ""}
-                                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                                placeholder="Enter location"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-assignedTo">Assigned To</Label>
-                              <Input
-                                id="edit-assignedTo"
-                                value={formData.assignedTo || ""}
-                                onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
-                                placeholder="Enter assigned person/team"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-purchaseDate">Purchase Date</Label>
-                              <Input
-                                id="edit-purchaseDate"
-                                type="date"
-                                value={formData.purchaseDate || ""}
-                                onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-warrantyExpiry">Warranty Expiry</Label>
-                              <Input
-                                id="edit-warrantyExpiry"
-                                type="date"
-                                value={formData.warrantyExpiry || ""}
-                                onChange={(e) => setFormData({ ...formData, warrantyExpiry: e.target.value })}
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-cost">Cost ($)</Label>
-                              <Input
-                                id="edit-cost"
-                                type="number"
-                                value={formData.cost || ""}
-                                onChange={(e) =>
-                                  setFormData({ ...formData, cost: Number.parseFloat(e.target.value) || 0 })
-                                }
-                                placeholder="Enter cost"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-vendor">Vendor *</Label>
-                              <Input
-                                id="edit-vendor"
-                                value={formData.vendor || ""}
-                                onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
-                                placeholder="Enter vendor name"
-                              />
-                            </div>
-                          </div>
-
-                          {formData.type === "hardware" && (
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="edit-serialNumber">Serial Number</Label>
-                                <Input
-                                  id="edit-serialNumber"
-                                  value={formData.serialNumber || ""}
-                                  onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
-                                  placeholder="Enter serial number"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="edit-specifications">Specifications</Label>
-                                <Input
-                                  id="edit-specifications"
-                                  value={formData.specifications || ""}
-                                  onChange={(e) => setFormData({ ...formData, specifications: e.target.value })}
-                                  placeholder="Enter specifications"
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {formData.type === "software" && (
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="edit-licenseKey">License Key</Label>
-                                <Input
-                                  id="edit-licenseKey"
-                                  value={formData.licenseKey || ""}
-                                  onChange={(e) => setFormData({ ...formData, licenseKey: e.target.value })}
-                                  placeholder="Enter license key"
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="edit-version">Version</Label>
-                                <Input
-                                  id="edit-version"
-                                  value={formData.version || ""}
-                                  onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-                                  placeholder="Enter version"
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="space-y-2">
-                            <Label htmlFor="edit-description">Description</Label>
-                            <Textarea
-                              id="edit-description"
-                              value={formData.description || ""}
-                              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                              placeholder="Enter description"
-                              rows={3}
-                            />
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setEditingItem(null)}>
-                            Cancel
-                          </Button>
-                          <Button onClick={handleUpdate}>Update Item</Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the inventory item "{item.name}".
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(item.id)}>Delete</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Badge className={statusColors[item.status]}>
-                    {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                  </Badge>
-                  <span className="text-sm font-medium">${item.cost.toLocaleString()}</span>
-                </div>
-
-                <div className="space-y-1 text-sm text-muted-foreground">
-                  <div>
-                    <strong>Location:</strong> {item.location}
-                  </div>
-                  <div>
-                    <strong>Assigned to:</strong> {item.assignedTo}
-                  </div>
-                  <div>
-                    <strong>Vendor:</strong> {item.vendor}
-                  </div>
-                  {item.serialNumber && (
-                    <div>
-                      <strong>Serial:</strong> {item.serialNumber}
-                    </div>
-                  )}
-                  {item.licenseKey && (
-                    <div>
-                      <strong>License:</strong> {item.licenseKey}
-                    </div>
-                  )}
-                  {item.warrantyExpiry && (
-                    <div>
-                      <strong>Warranty:</strong> {new Date(item.warrantyExpiry).toLocaleDateString()}
-                    </div>
-                  )}
-                </div>
-
-                {item.description && <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>}
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
-
-      {filteredInventory.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Package className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No items found</h3>
-            <p className="text-muted-foreground text-center">
-              {searchTerm || typeFilter !== "all" || statusFilter !== "all"
-                ? "Try adjusting your search or filters"
-                : "Get started by adding your first inventory item"}
-            </p>
           </CardContent>
         </Card>
-      )}
+
+        {/* Results Summary */}
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-sm text-muted-foreground">
+            Showing {filteredItems.length} of {items.length} items
+          </p>
+          {(searchTerm || typeFilter !== "all" || statusFilter !== "all" || departmentFilter !== "all") && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSearchTerm("")
+                setTypeFilter("all")
+                setStatusFilter("all")
+                setDepartmentFilter("all")
+              }}
+            >
+              Clear Filters
+            </Button>
+          )}
+        </div>
+
+        {/* Items Grid */}
+        {filteredItems.length === 0 ? (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <div className="flex flex-col items-center space-y-4">
+                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
+                  <Package className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold">No items found</h3>
+                  <p className="text-muted-foreground">
+                    {items.length === 0 
+                      ? "Get started by adding your first inventory item"
+                      : "Try adjusting your search or filter criteria"
+                    }
+                  </p>
+                </div>
+                {items.length === 0 && (
+                  <Button onClick={handleAddNew}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add First Item
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredItems.map((item) => (
+              <Card key={item.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-2">
+                      {item.type === "hardware" ? (
+                        <HardDrive className="h-5 w-5 text-blue-600" />
+                      ) : (
+                        <Monitor className="h-5 w-5 text-green-600" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-lg truncate">{item.name}</CardTitle>
+                        <CardDescription className="truncate">
+                          {item.brand} • {item.category}
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleView(item)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEdit(item)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={() => handleDelete(item)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline" className={cn(statusColors[item.status])}>
+                      {item.status}
+                    </Badge>
+                    <Badge variant="outline" className={cn(conditionColors[item.condition])}>
+                      {item.condition}
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Department:</span>
+                      <span className="font-medium">{item.department}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Assigned to:</span>
+                      <span className="font-medium truncate ml-2">
+                        {getUserDisplayName(item.assignedTo)}
+                      </span>
+                    </div>
+                    {item.cost > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Cost:</span>
+                        <span className="font-medium">
+                          {item.currency} {item.cost.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    {item.serialNumber && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Serial:</span>
+                        <span className="font-mono text-xs">{item.serialNumber}</span>
+                      </div>
+                    )}
+                    {item.version && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Version:</span>
+                        <span className="font-medium">{item.version}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {item.description && (
+                    <div className="pt-2 border-t">
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {item.description}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center space-x-2">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <span>Delete Inventory Item</span>
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete "{itemToDelete?.name}"? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                disabled={isDeleting}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     </div>
   )
 }
