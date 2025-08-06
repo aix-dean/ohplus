@@ -195,6 +195,18 @@ export default function EditInventoryItemPage() {
 
         if (itemSnap.exists()) {
           const data = itemSnap.data()
+          
+          // Check if item is deleted
+          if (data.deleted === true) {
+            toast({
+              title: "Item Not Found",
+              description: "This item has been deleted or does not exist",
+              variant: "destructive",
+            })
+            router.push("/it/inventory")
+            return
+          }
+
           setFormData({
             name: data.name || "",
             type: data.type || "hardware",

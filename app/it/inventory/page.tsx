@@ -11,7 +11,7 @@ import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, Eye, Package, HardD
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, getDocs, doc, deleteDoc, orderBy } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, updateDoc, orderBy, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import {
   DropdownMenu,
@@ -59,6 +59,7 @@ interface InventoryItem {
   updated_at: any
   created_by: string
   company_id: string
+  deleted: boolean
 }
 
 interface User {
@@ -99,7 +100,7 @@ export default function ITInventoryPage() {
   const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
-  // Fetch inventory items
+  // Fetch inventory items (only non-deleted ones)
   useEffect(() => {
     const fetchItems = async () => {
       if (!userData?.company_id) return
@@ -109,6 +110,7 @@ export default function ITInventoryPage() {
         const q = query(
           itemsRef, 
           where("company_id", "==", userData.company_id),
+          where("deleted", "==", false), // Only fetch non-deleted items
           orderBy("created_at", "desc")
         )
         const querySnapshot = await getDocs(q)
@@ -138,6 +140,7 @@ export default function ITInventoryPage() {
             updated_at: data.updated_at,
             created_by: data.created_by || "",
             company_id: data.company_id || "",
+            deleted: data.deleted || false,
           })
         })
 
@@ -230,8 +233,17 @@ export default function ITInventoryPage() {
 
     setIsDeleting(true)
     try {
-      await deleteDoc(doc(db, "itInventory", itemToDelete.id))
+      // Soft delete: update the deleted field to true instead of actually deleting the document
+      const itemRef = doc(db, "itInventory", itemToDelete.id)
+      await updateDoc(itemRef, {
+        deleted: true,
+        deleted_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      })
+
+      // Remove from local state
       setItems(items.filter(item => item.id !== itemToDelete.id))
+      
       toast({
         title: "Item Deleted",
         description: `${itemToDelete.name} has been deleted from inventory`,
@@ -499,7 +511,7 @@ export default function ITInventoryPage() {
                 <span>Delete Inventory Item</span>
               </AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete "{itemToDelete?.name}"? This action cannot be undone.
+                Are you sure you want to delete "{itemToDelete?.name}"? This action will move the item to trash and it won't be visible in your inventory list.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

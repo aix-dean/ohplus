@@ -10,7 +10,7 @@ import { ArrowLeft, Edit, Trash2, Package, HardDrive, Monitor, Globe, MapPin, Do
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
-import { collection, query, where, getDocs, doc, getDoc, deleteDoc } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import {
   AlertDialog,
@@ -52,6 +52,7 @@ interface InventoryItem {
   updated_at: any
   created_by: string
   company_id: string
+  deleted: boolean
 }
 
 interface User {
@@ -99,6 +100,18 @@ export default function InventoryDetailsPage() {
 
         if (itemSnap.exists()) {
           const data = itemSnap.data()
+          
+          // Check if item is deleted
+          if (data.deleted === true) {
+            toast({
+              title: "Item Not Found",
+              description: "This item has been deleted or does not exist",
+              variant: "destructive",
+            })
+            router.push("/it/inventory")
+            return
+          }
+
           setItem({
             id: itemSnap.id,
             name: data.name || "",
@@ -128,6 +141,7 @@ export default function InventoryDetailsPage() {
             updated_at: data.updated_at,
             created_by: data.created_by || "",
             company_id: data.company_id || "",
+            deleted: data.deleted || false,
           })
         } else {
           toast({
@@ -208,7 +222,14 @@ export default function InventoryDetailsPage() {
 
     setIsDeleting(true)
     try {
-      await deleteDoc(doc(db, "itInventory", item.id))
+      // Soft delete: update the deleted field to true instead of actually deleting the document
+      const itemRef = doc(db, "itInventory", item.id)
+      await updateDoc(itemRef, {
+        deleted: true,
+        deleted_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      })
+
       toast({
         title: "Item Deleted",
         description: `${item.name} has been deleted from inventory`,
@@ -604,7 +625,7 @@ export default function InventoryDetailsPage() {
                 <span>Delete Inventory Item</span>
               </AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete "{item.name}"? This action cannot be undone and will permanently remove this item from your inventory.
+                Are you sure you want to delete "{item.name}"? This action will move the item to trash and it won't be visible in your inventory list.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
