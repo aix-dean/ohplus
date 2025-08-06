@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -200,33 +200,27 @@ export default function InventoryDetailsPage() {
   }, [userData?.company_id])
 
   // Helper function to get user display name
-  const getUserDisplayName = useCallback((uid: string) => {
+  const getUserDisplayName = (uid: string) => {
     if (uid === "unassigned") return "Unassigned"
     const user = users.find((u) => u.uid === uid)
     if (!user) return "Unknown User"
     return `${user.first_name} ${user.last_name}`.trim() || user.email
-  }, [users])
+  }
 
-  const handleEdit = useCallback(() => {
+  const handleEdit = () => {
     if (item) {
       router.push(`/it/inventory/edit/${item.id}`)
     }
-  }, [item, router])
+  }
 
-  const handleDelete = useCallback(() => {
+  const handleDelete = () => {
     setDeleteDialogOpen(true)
-  }, [])
+  }
 
-  const resetDeleteState = useCallback(() => {
-    setDeleteDialogOpen(false)
-    setIsDeleting(false)
-  }, [])
-
-  const confirmDelete = useCallback(async () => {
-    if (!item || isDeleting) return
+  const confirmDelete = async () => {
+    if (!item) return
 
     setIsDeleting(true)
-    
     try {
       // Soft delete: update the deleted field to true instead of actually deleting the document
       const itemRef = doc(db, "itInventory", item.id)
@@ -236,33 +230,39 @@ export default function InventoryDetailsPage() {
         updated_at: serverTimestamp(),
       })
 
-      // Reset dialog state first
-      resetDeleteState()
+      // Store item name for toast before navigation
+      const deletedItemName = item.name
+
+      // Clear dialog states immediately
+      setDeleteDialogOpen(false)
+      setIsDeleting(false)
 
       // Show success toast
       toast({
         title: "Item Deleted",
-        description: `${item.name} has been deleted from inventory`,
+        description: `${deletedItemName} has been deleted from inventory`,
       })
 
-      // Navigate back to inventory list
+      // Navigate back immediately
       router.push("/it/inventory")
-      
     } catch (error) {
       console.error("Error deleting item:", error)
+      
+      // Reset states on error
+      setIsDeleting(false)
+      setDeleteDialogOpen(false)
+      
       toast({
         title: "Error",
         description: "Failed to delete item. Please try again.",
         variant: "destructive",
       })
-      // Reset states on error
-      resetDeleteState()
     }
-  }, [item, isDeleting, resetDeleteState, router])
+  }
 
-  const handleBack = useCallback(() => {
+  const handleBack = () => {
     router.push("/it/inventory")
-  }, [router])
+  }
 
   if (loading) {
     return (
@@ -296,6 +296,13 @@ export default function InventoryDetailsPage() {
         </div>
       </div>
     )
+  }
+
+  const handleDeleteDialogClose = () => {
+    // Only allow closing if not currently deleting
+    if (!isDeleting) {
+      setDeleteDialogOpen(false)
+    }
   }
 
   return (
@@ -629,11 +636,7 @@ export default function InventoryDetailsPage() {
         </div>
 
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
-          if (!open && !isDeleting) {
-            resetDeleteState()
-          }
-        }}>
+        <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogClose}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center space-x-2">
@@ -645,9 +648,7 @@ export default function InventoryDetailsPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting} onClick={resetDeleteState}>
-                Cancel
-              </AlertDialogCancel>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={confirmDelete}
                 disabled={isDeleting}

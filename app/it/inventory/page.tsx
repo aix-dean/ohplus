@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -193,12 +193,12 @@ export default function ITInventoryPage() {
   }, [userData?.company_id])
 
   // Helper function to get user display name
-  const getUserDisplayName = useCallback((uid: string) => {
+  const getUserDisplayName = (uid: string) => {
     if (uid === "unassigned") return "Unassigned"
     const user = users.find((u) => u.uid === uid)
     if (!user) return "Unknown User"
     return `${user.first_name} ${user.last_name}`.trim() || user.email
-  }, [users])
+  }
 
   // Filter items based on search and filters
   const filteredItems = items.filter((item) => {
@@ -215,30 +215,23 @@ export default function ITInventoryPage() {
     return matchesSearch && matchesType && matchesStatus && matchesDepartment
   })
 
-  const handleEdit = useCallback((item: InventoryItem) => {
+  const handleEdit = (item: InventoryItem) => {
     router.push(`/it/inventory/edit/${item.id}`)
-  }, [router])
+  }
 
-  const handleView = useCallback((item: InventoryItem) => {
+  const handleView = (item: InventoryItem) => {
     router.push(`/it/inventory/details/${item.id}`)
-  }, [router])
+  }
 
-  const handleDelete = useCallback((item: InventoryItem) => {
+  const handleDelete = (item: InventoryItem) => {
     setItemToDelete(item)
     setDeleteDialogOpen(true)
-  }, [])
+  }
 
-  const resetDeleteState = useCallback(() => {
-    setDeleteDialogOpen(false)
-    setItemToDelete(null)
-    setIsDeleting(false)
-  }, [])
-
-  const confirmDelete = useCallback(async () => {
-    if (!itemToDelete || isDeleting) return
+  const confirmDelete = async () => {
+    if (!itemToDelete) return
 
     setIsDeleting(true)
-    
     try {
       // Soft delete: update the deleted field to true instead of actually deleting the document
       const itemRef = doc(db, "itInventory", itemToDelete.id)
@@ -248,40 +241,49 @@ export default function ITInventoryPage() {
         updated_at: serverTimestamp(),
       })
 
-      // Remove from local state immediately
+      // Store item name for toast before clearing state
+      const deletedItemName = itemToDelete.name
+
+      // Clear all dialog states immediately
+      setDeleteDialogOpen(false)
+      setItemToDelete(null)
+      setIsDeleting(false)
+
+      // Remove from local state
       setItems(prevItems => prevItems.filter(item => item.id !== itemToDelete.id))
       
-      // Show success toast
+      // Show success toast after state cleanup
       toast({
         title: "Item Deleted",
-        description: `${itemToDelete.name} has been deleted from inventory`,
+        description: `${deletedItemName} has been deleted from inventory`,
       })
-
-      // Reset all delete-related state
-      resetDeleteState()
-      
     } catch (error) {
       console.error("Error deleting item:", error)
+      
+      // Reset all states on error
+      setIsDeleting(false)
+      setDeleteDialogOpen(false)
+      setItemToDelete(null)
+      
       toast({
         title: "Error",
         description: "Failed to delete item. Please try again.",
         variant: "destructive",
       })
-      // Reset states on error
-      resetDeleteState()
     }
-  }, [itemToDelete, isDeleting, resetDeleteState])
+  }
 
-  const handleAddNew = useCallback(() => {
+  const handleAddNew = () => {
     router.push("/it/inventory/new")
-  }, [router])
+  }
 
-  const handleClearFilters = useCallback(() => {
-    setSearchTerm("")
-    setTypeFilter("all")
-    setStatusFilter("all")
-    setDepartmentFilter("all")
-  }, [])
+  const handleDeleteDialogClose = () => {
+    // Only allow closing if not currently deleting
+    if (!isDeleting) {
+      setDeleteDialogOpen(false)
+      setItemToDelete(null)
+    }
+  }
 
   if (loading) {
     return (
@@ -380,7 +382,12 @@ export default function ITInventoryPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleClearFilters}
+              onClick={() => {
+                setSearchTerm("")
+                setTypeFilter("all")
+                setStatusFilter("all")
+                setDepartmentFilter("all")
+              }}
             >
               Clear Filters
             </Button>
@@ -515,11 +522,7 @@ export default function ITInventoryPage() {
         )}
 
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => {
-          if (!open && !isDeleting) {
-            resetDeleteState()
-          }
-        }}>
+        <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogClose}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center space-x-2">
@@ -531,9 +534,7 @@ export default function ITInventoryPage() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting} onClick={resetDeleteState}>
-                Cancel
-              </AlertDialogCancel>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={confirmDelete}
                 disabled={isDeleting}
