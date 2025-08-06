@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,22 +29,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import {
-  Plus,
-  Search,
-  Edit,
-  Trash2,
-  Monitor,
-  Smartphone,
-  Printer,
-  Wifi,
-  HardDrive,
-  Shield,
-  Package,
-  Server,
-  Laptop,
-} from "lucide-react"
+import { Plus, Search, Edit, Trash2, Monitor, Smartphone, Printer, Wifi, HardDrive, Shield, Package, Server, Laptop, Loader2 } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
+import { useAuth } from "@/contexts/auth-context"
+import { collection, query, where, getDocs, doc, updateDoc, deleteDoc, orderBy } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 interface InventoryItem {
   id: string
@@ -63,90 +52,11 @@ interface InventoryItem {
   specifications?: string
   licenseKey?: string
   version?: string
+  company_id?: string
+  created_by?: string
+  created_at?: any
+  updated_at?: any
 }
-
-const initialInventory: InventoryItem[] = [
-  {
-    id: "1",
-    name: "Dell OptiPlex 7090",
-    type: "hardware",
-    category: "Desktop Computer",
-    status: "active",
-    location: "Office Floor 2",
-    assignedTo: "John Doe",
-    purchaseDate: "2023-01-15",
-    warrantyExpiry: "2026-01-15",
-    cost: 1200,
-    vendor: "Dell Technologies",
-    description: "High-performance desktop computer for office work",
-    serialNumber: "DL7090-001",
-    specifications: "Intel i7-11700, 16GB RAM, 512GB SSD",
-  },
-  {
-    id: "2",
-    name: "Microsoft Office 365",
-    type: "software",
-    category: "Productivity Suite",
-    status: "active",
-    location: "Cloud",
-    assignedTo: "All Users",
-    purchaseDate: "2023-03-01",
-    warrantyExpiry: "2024-03-01",
-    cost: 2400,
-    vendor: "Microsoft",
-    description: "Office productivity suite with cloud services",
-    licenseKey: "XXXXX-XXXXX-XXXXX-XXXXX",
-    version: "2023",
-  },
-  {
-    id: "3",
-    name: "HP LaserJet Pro 404n",
-    type: "hardware",
-    category: "Printer",
-    status: "active",
-    location: "Office Floor 1",
-    assignedTo: "Shared",
-    purchaseDate: "2023-02-10",
-    warrantyExpiry: "2025-02-10",
-    cost: 350,
-    vendor: "HP Inc.",
-    description: "Network laser printer for office documents",
-    serialNumber: "HP404N-002",
-    specifications: "Monochrome, 38ppm, Ethernet",
-  },
-  {
-    id: "4",
-    name: "Cisco Catalyst 2960",
-    type: "hardware",
-    category: "Network Switch",
-    status: "active",
-    location: "Server Room",
-    assignedTo: "IT Department",
-    purchaseDate: "2022-11-20",
-    warrantyExpiry: "2025-11-20",
-    cost: 800,
-    vendor: "Cisco Systems",
-    description: "24-port managed network switch",
-    serialNumber: "CS2960-003",
-    specifications: "24x 1Gb ports, 2x SFP+ uplinks",
-  },
-  {
-    id: "5",
-    name: "Adobe Creative Suite",
-    type: "software",
-    category: "Design Software",
-    status: "active",
-    location: "Design Workstations",
-    assignedTo: "Design Team",
-    purchaseDate: "2023-04-15",
-    warrantyExpiry: "2024-04-15",
-    cost: 1800,
-    vendor: "Adobe Inc.",
-    description: "Professional design and creative software suite",
-    licenseKey: "ADOBE-XXXXX-XXXXX",
-    version: "2023",
-  },
-]
 
 const categories = [
   "Desktop Computer",
@@ -195,7 +105,9 @@ const categoryIcons = {
 
 export default function ITInventoryPage() {
   const router = useRouter()
-  const [inventory, setInventory] = useState<InventoryItem[]>(initialInventory)
+  const { user } = useAuth()
+  const [inventory, setInventory] = useState<InventoryItem[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -204,6 +116,48 @@ export default function ITInventoryPage() {
     type: "hardware",
     status: "active",
   })
+
+  // Fetch inventory data from Firestore
+  useEffect(() => {
+    const fetchInventory = async () => {
+      if (!user?.company_id) {
+        setLoading(false)
+        return
+      }
+
+      try {
+        const inventoryRef = collection(db, "itInventory")
+        const q = query(
+          inventoryRef,
+          where("company_id", "==", user.company_id),
+          orderBy("created_at", "desc")
+        )
+        
+        const querySnapshot = await getDocs(q)
+        const inventoryData: InventoryItem[] = []
+        
+        querySnapshot.forEach((doc) => {
+          inventoryData.push({
+            id: doc.id,
+            ...doc.data(),
+          } as InventoryItem)
+        })
+        
+        setInventory(inventoryData)
+      } catch (error) {
+        console.error("Error fetching inventory:", error)
+        toast({
+          title: "Error",
+          description: "Failed to fetch inventory data",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchInventory()
+  }, [user?.company_id])
 
   const filteredInventory = useMemo(() => {
     return inventory.filter((item) => {
@@ -235,7 +189,7 @@ export default function ITInventoryPage() {
     setFormData(item)
   }
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!editingItem || !formData.name || !formData.category || !formData.vendor) {
       toast({
         title: "Error",
@@ -245,32 +199,72 @@ export default function ITInventoryPage() {
       return
     }
 
-    const updatedItem: InventoryItem = {
-      ...editingItem,
-      ...formData,
-    } as InventoryItem
+    try {
+      const itemRef = doc(db, "itInventory", editingItem.id)
+      const updatedData = {
+        ...formData,
+        updated_at: new Date(),
+      }
 
-    setInventory(inventory.map((item) => (item.id === editingItem.id ? updatedItem : item)))
+      await updateDoc(itemRef, updatedData)
 
-    setEditingItem(null)
-    setFormData({ type: "hardware", status: "active" })
+      const updatedItem: InventoryItem = {
+        ...editingItem,
+        ...formData,
+      } as InventoryItem
 
-    toast({
-      title: "Success",
-      description: "Inventory item updated successfully",
-    })
+      setInventory(inventory.map((item) => (item.id === editingItem.id ? updatedItem : item)))
+
+      setEditingItem(null)
+      setFormData({ type: "hardware", status: "active" })
+
+      toast({
+        title: "Success",
+        description: "Inventory item updated successfully",
+      })
+    } catch (error) {
+      console.error("Error updating item:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update inventory item",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handleDelete = (id: string) => {
-    setInventory(inventory.filter((item) => item.id !== id))
-    toast({
-      title: "Success",
-      description: "Inventory item deleted successfully",
-    })
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "itInventory", id))
+      setInventory(inventory.filter((item) => item.id !== id))
+      toast({
+        title: "Success",
+        description: "Inventory item deleted successfully",
+      })
+    } catch (error) {
+      console.error("Error deleting item:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete inventory item",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleAddNew = () => {
     router.push("/it/inventory/new")
+  }
+
+  if (loading) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex justify-center items-center min-h-[400px]">
+          <div className="flex flex-col items-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin" />
+            <p className="text-muted-foreground">Loading inventory...</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
