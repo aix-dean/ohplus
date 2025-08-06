@@ -18,7 +18,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Edit, Trash2, Monitor, Smartphone, Printer, Wifi, HardDrive, Shield, Package, Server, Laptop, Loader2 } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Monitor, Smartphone, Printer, Wifi, HardDrive, Shield, Package, Server, Laptop, Loader2, Eye } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, getDocs, deleteDoc, doc } from "firebase/firestore"
@@ -221,6 +221,10 @@ export default function ITInventoryPage() {
     return { total, active, maintenance, totalValue }
   }, [inventory])
 
+  const handleView = (itemId: string) => {
+    router.push(`/it/inventory/${itemId}`)
+  }
+
   const handleEdit = (itemId: string) => {
     router.push(`/it/inventory/edit/${itemId}`)
   }
@@ -379,7 +383,7 @@ export default function ITInventoryPage() {
           const IconComponent = categoryIcons[item.category as keyof typeof categoryIcons] || Package
 
           return (
-            <Card key={item.id} className="hover:shadow-md transition-shadow">
+            <Card key={item.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => handleView(item.id)}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-2">
@@ -389,7 +393,10 @@ export default function ITInventoryPage() {
                       <CardDescription>{item.category}</CardDescription>
                     </div>
                   </div>
-                  <div className="flex space-x-1">
+                  <div className="flex space-x-1" onClick={(e) => e.stopPropagation()}>
+                    <Button variant="outline" size="sm" onClick={() => handleView(item.id)}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => handleEdit(item.id)}>
                       <Edit className="h-4 w-4" />
                     </Button>
