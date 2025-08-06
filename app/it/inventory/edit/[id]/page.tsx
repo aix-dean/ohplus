@@ -41,6 +41,7 @@ interface FormData {
   licenseKey?: string
   version?: string
   status: "active" | "inactive" | "maintenance" | "retired"
+  categorySpecs?: Record<string, any>
 }
 
 interface User {
@@ -178,6 +179,7 @@ export default function EditInventoryItemPage() {
     licenseKey: "",
     version: "",
     status: "active",
+    categorySpecs: {},
   })
 
   const visibleSteps = getVisibleSteps(formData.type)
@@ -193,6 +195,18 @@ export default function EditInventoryItemPage() {
 
         if (itemSnap.exists()) {
           const data = itemSnap.data()
+          
+          // Check if item is deleted
+          if (data.deleted === true) {
+            toast({
+              title: "Item Not Found",
+              description: "This item has been deleted or does not exist",
+              variant: "destructive",
+            })
+            router.push("/it/inventory")
+            return
+          }
+
           setFormData({
             name: data.name || "",
             type: data.type || "hardware",
@@ -216,6 +230,7 @@ export default function EditInventoryItemPage() {
             licenseKey: data.licenseKey || "",
             version: data.version || "",
             status: data.status || "active",
+            categorySpecs: data.categorySpecs || {},
           })
         } else {
           toast({
@@ -383,6 +398,7 @@ export default function EditInventoryItemPage() {
         licenseKey: formData.licenseKey || "",
         version: formData.version || "",
         status: formData.status,
+        categorySpecs: formData.categorySpecs || {},
         updated_at: serverTimestamp(),
       }
 
@@ -925,364 +941,693 @@ export default function EditInventoryItemPage() {
 
             <Card className="border-2 border-dashed border-purple-200 bg-purple-50/30">
               <CardContent className="p-8 space-y-8">
-                {formData.type === "hardware" ? (
-                  <div className="space-y-8">
-                    {/* Basic Hardware Fields */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <Label htmlFor="serialNumber" className="text-base font-medium">
-                          Serial Number
-                        </Label>
-                        <Input
-                          id="serialNumber"
-                          value={formData.serialNumber || ""}
-                          onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
-                          placeholder="e.g., SN123456789"
-                          className="h-12 text-base font-mono"
-                        />
-                        <p className="text-sm text-muted-foreground">Unique identifier for this hardware</p>
-                      </div>
-                      <div className="space-y-3">
-                        <Label htmlFor="specifications" className="text-base font-medium">
-                          General Specifications
-                        </Label>
-                        <Input
-                          id="specifications"
-                          value={formData.specifications || ""}
-                          onChange={(e) => setFormData({ ...formData, specifications: e.target.value })}
-                          placeholder="e.g., Intel i7, 16GB RAM, 512GB SSD"
-                          className="h-12 text-base"
-                        />
-                        <p className="text-sm text-muted-foreground">Key technical specifications</p>
-                      </div>
+          {formData.type === "hardware" ? (
+            <div className="space-y-8">
+              {/* Basic Hardware Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <Label htmlFor="serialNumber" className="text-base font-medium">
+                    Serial Number
+                  </Label>
+                  <Input
+                    id="serialNumber"
+                    value={formData.serialNumber || ""}
+                    onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
+                    placeholder="e.g., SN123456789"
+                    className="h-12 text-base font-mono"
+                  />
+                  <p className="text-sm text-muted-foreground">Unique identifier for this hardware</p>
+                </div>
+                <div className="space-y-3">
+                  <Label htmlFor="specifications" className="text-base font-medium">
+                    General Specifications
+                  </Label>
+                  <Input
+                    id="specifications"
+                    value={formData.specifications || ""}
+                    onChange={(e) => setFormData({ ...formData, specifications: e.target.value })}
+                    placeholder="e.g., Intel i7, 16GB RAM, 512GB SSD"
+                    className="h-12 text-base"
+                  />
+                  <p className="text-sm text-muted-foreground">Key technical specifications</p>
+                </div>
+              </div>
+
+              {/* Category-specific specifications */}
+              {formData.category === "Desktop Computer" && (
+                <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center">
+                    <Monitor className="h-5 w-5 mr-2" />
+                    Desktop Computer Specifications
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Processor</Label>
+                      <Input 
+                        placeholder="e.g., Intel Core i7-12700K, 3.6GHz" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.processor || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, processor: e.target.value }
+                        }))}
+                      />
                     </div>
-
-                    {/* Physical Specifications */}
-                    <div className="bg-white rounded-lg p-6 border border-purple-200">
-                      <h3 className="text-lg font-semibold mb-4 flex items-center">
-                        <Package className="h-5 w-5 mr-2" />
-                        Physical Specifications
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Dimensions (L×W×H)</Label>
-                          <Input placeholder="e.g., 35×15×30 cm" className="h-12 text-base" />
-                          <p className="text-sm text-muted-foreground">Length × Width × Height</p>
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Weight</Label>
-                          <Input placeholder="e.g., 2.5 kg" className="h-12 text-base" />
-                          <p className="text-sm text-muted-foreground">Total weight of the item</p>
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Material</Label>
-                          <Input placeholder="e.g., Aluminum, Plastic, Steel" className="h-12 text-base" />
-                          <p className="text-sm text-muted-foreground">Primary construction material</p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Color</Label>
-                          <Input placeholder="e.g., Black, Silver, White" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Form Factor</Label>
-                          <Input placeholder="e.g., Desktop, Rack Mount, Portable" className="h-12 text-base" />
-                        </div>
-                      </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">RAM</Label>
+                      <Input 
+                        placeholder="e.g., 16GB DDR4-3200" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.ram || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, ram: e.target.value }
+                        }))}
+                      />
                     </div>
-
-                    {/* Category-specific specifications - same as new page */}
-                    {formData.category === "Desktop Computer" && (
-                      <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center">
-                          <Monitor className="h-5 w-5 mr-2" />
-                          Desktop Computer Specifications
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Processor</Label>
-                            <Input placeholder="e.g., Intel Core i7-12700K, 3.6GHz" className="h-12 text-base" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">RAM</Label>
-                            <Input placeholder="e.g., 16GB DDR4-3200" className="h-12 text-base" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Storage</Label>
-                            <Input placeholder="e.g., 512GB NVMe SSD + 1TB HDD" className="h-12 text-base" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Graphics Card</Label>
-                            <Input placeholder="e.g., NVIDIA RTX 3060, 12GB VRAM" className="h-12 text-base" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Motherboard</Label>
-                            <Input placeholder="e.g., ASUS PRIME B660M-A" className="h-12 text-base" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Power Supply</Label>
-                            <Input placeholder="e.g., 650W 80+ Gold" className="h-12 text-base" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Operating System</Label>
-                            <Input placeholder="e.g., Windows 11 Pro 64-bit" className="h-12 text-base" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Optical Drive</Label>
-                            <Input placeholder="e.g., DVD-RW, Blu-ray, None" className="h-12 text-base" />
-                          </div>
-                        </div>
-                        <div className="mt-6">
-                          <Label className="text-base font-medium">Expansion Slots</Label>
-                          <Textarea 
-                            placeholder="e.g., 2x PCIe x16, 1x PCIe x1, 4x RAM slots"
-                            className="mt-2 text-base resize-none"
-                            rows={2}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Include all other category-specific sections from the new page... */}
-                    {/* For brevity, I'll include just a few key ones, but in practice you'd include all */}
-
-                    {formData.category === "Monitor" && (
-                      <div className="bg-indigo-50 rounded-lg p-6 border border-indigo-200">
-                        <h3 className="text-lg font-semibold mb-4 flex items-center">
-                          <Monitor className="h-5 w-5 mr-2" />
-                          Monitor Specifications
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Screen Size</Label>
-                            <Input placeholder="e.g., 27 inches (diagonal)" className="h-12 text-base" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Resolution</Label>
-                            <Input placeholder="e.g., 2560×1440 (QHD)" className="h-12 text-base" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Panel Type</Label>
-                            <Input placeholder="e.g., IPS, VA, TN, OLED" className="h-12 text-base" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Refresh Rate</Label>
-                            <Input placeholder="e.g., 144Hz, 165Hz, 240Hz" className="h-12 text-base" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Response Time</Label>
-                            <Input placeholder="e.g., 1ms GTG, 5ms" className="h-12 text-base" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Brightness</Label>
-                            <Input placeholder="e.g., 400 nits, 1000 nits HDR" className="h-12 text-base" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Contrast Ratio</Label>
-                            <Input placeholder="e.g., 1000:1, 3000:1" className="h-12 text-base" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Color Gamut</Label>
-                            <Input placeholder="e.g., 99% sRGB, 95% DCI-P3" className="h-12 text-base" />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Connectivity</Label>
-                            <Textarea 
-                              placeholder="e.g., HDMI 2.1, DisplayPort 1.4, USB-C with 90W PD, USB hub"
-                              className="text-base resize-none"
-                              rows={2}
-                            />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Adjustability</Label>
-                            <Textarea 
-                              placeholder="e.g., Height, Tilt, Swivel, Pivot, VESA 100×100"
-                              className="text-base resize-none"
-                              rows={2}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Environmental Specifications */}
-                    <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                      <h3 className="text-lg font-semibold mb-4 flex items-center">
-                        <Settings className="h-5 w-5 mr-2" />
-                        Environmental & Compliance
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Operating Temperature</Label>
-                          <Input placeholder="e.g., 0°C to 40°C" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Humidity Range</Label>
-                          <Input placeholder="e.g., 10% to 90% non-condensing" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Power Requirements</Label>
-                          <Input placeholder="e.g., 100-240V AC, 50-60Hz" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Certifications</Label>
-                          <Input placeholder="e.g., FCC, CE, Energy Star, RoHS" className="h-12 text-base" />
-                        </div>
-                      </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Storage</Label>
+                      <Input 
+                        placeholder="e.g., 512GB NVMe SSD + 1TB HDD" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.storage || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, storage: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Graphics Card</Label>
+                      <Input 
+                        placeholder="e.g., NVIDIA RTX 3060, 12GB VRAM" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.graphics || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, graphics: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Motherboard</Label>
+                      <Input 
+                        placeholder="e.g., ASUS PRIME B660M-A" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.motherboard || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, motherboard: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Power Supply</Label>
+                      <Input 
+                        placeholder="e.g., 650W 80+ Gold" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.powerSupply || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, powerSupply: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Operating System</Label>
+                      <Input 
+                        placeholder="e.g., Windows 11 Pro 64-bit" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.operatingSystem || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, operatingSystem: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Optical Drive</Label>
+                      <Input 
+                        placeholder="e.g., DVD-RW, Blu-ray, None" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.opticalDrive || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, opticalDrive: e.target.value }
+                        }))}
+                      />
                     </div>
                   </div>
-                ) : (
-                  // Software specifications - same as new page
-                  <div className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <Label htmlFor="licenseKey" className="text-base font-medium">
-                          License Key
-                        </Label>
-                        <Input
-                          id="licenseKey"
-                          value={formData.licenseKey || ""}
-                          onChange={(e) => setFormData({ ...formData, licenseKey: e.target.value })}
-                          placeholder="e.g., XXXXX-XXXXX-XXXXX-XXXXX"
-                          className="h-12 text-base font-mono"
-                        />
-                        <p className="text-sm text-muted-foreground">Software license or activation key</p>
-                      </div>
-                      <div className="space-y-3">
-                        <Label htmlFor="version" className="text-base font-medium">
-                          Version
-                        </Label>
-                        <Input
-                          id="version"
-                          value={formData.version || ""}
-                          onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-                          placeholder="e.g., 2024.1.0"
-                          className="h-12 text-base"
-                        />
-                        <p className="text-sm text-muted-foreground">Current software version</p>
-                      </div>
-                    </div>
+                  <div className="mt-6">
+                    <Label className="text-base font-medium">Expansion Slots</Label>
+                    <Textarea 
+                      placeholder="e.g., 2x PCIe x16, 1x PCIe x1, 4x RAM slots"
+                      className="mt-2 text-base resize-none"
+                      rows={2}
+                      value={formData.categorySpecs?.expansionSlots || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, expansionSlots: e.target.value }
+                      }))}
+                    />
+                  </div>
+                </div>
+              )}
 
-                    {/* Software Details */}
-                    <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
-                      <h3 className="text-lg font-semibold mb-4 flex items-center">
-                        <Monitor className="h-5 w-5 mr-2" />
-                        Software Details
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">License Type</Label>
-                          <Input placeholder="e.g., Perpetual, Subscription, Volume" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">User Licenses</Label>
-                          <Input placeholder="e.g., Single user, 5 users, Unlimited" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Installation Media</Label>
-                          <Input placeholder="e.g., Download, DVD, USB, Cloud" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Language</Label>
-                          <Input placeholder="e.g., English, Multi-language" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Architecture</Label>
-                          <Input placeholder="e.g., 64-bit, 32-bit, Universal" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">File Size</Label>
-                          <Input placeholder="e.g., 2.5 GB, 500 MB" className="h-12 text-base" />
-                        </div>
-                      </div>
+              {formData.category === "Laptop" && (
+                <div className="bg-green-50 rounded-lg p-6 border border-green-200">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center">
+                    <Monitor className="h-5 w-5 mr-2" />
+                    Laptop Specifications
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Processor</Label>
+                      <Input 
+                        placeholder="e.g., Intel Core i7-1260P, 2.1GHz" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.processor || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, processor: e.target.value }
+                        }))}
+                      />
                     </div>
-
-                    {/* System Requirements */}
-                    <div className="bg-green-50 rounded-lg p-6 border border-green-200">
-                      <h3 className="text-lg font-semibold mb-4 flex items-center">
-                        <Settings className="h-5 w-5 mr-2" />
-                        System Requirements
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Operating System</Label>
-                          <Input placeholder="e.g., Windows 10/11, macOS 12+, Linux" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Minimum RAM</Label>
-                          <Input placeholder="e.g., 4GB, 8GB, 16GB" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Recommended RAM</Label>
-                          <Input placeholder="e.g., 8GB, 16GB, 32GB" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Storage Space</Label>
-                          <Input placeholder="e.g., 2GB, 10GB, 50GB available" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Processor</Label>
-                          <Input placeholder="e.g., Intel i5 or equivalent, M1 chip" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Graphics</Label>
-                          <Input placeholder="e.g., DirectX 11, OpenGL 4.0" className="h-12 text-base" />
-                        </div>
-                      </div>
-                      <div className="mt-6">
-                        <Label className="text-base font-medium">Additional Requirements</Label>
-                        <Textarea 
-                          placeholder="e.g., Internet connection for activation, .NET Framework 4.8, specific drivers"
-                          className="mt-2 text-base resize-none"
-                          rows={2}
-                        />
-                      </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">RAM</Label>
+                      <Input 
+                        placeholder="e.g., 16GB LPDDR5-4800" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.ram || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, ram: e.target.value }
+                        }))}
+                      />
                     </div>
-
-                    {/* Features & Modules */}
-                    <div className="bg-purple-50 rounded-lg p-6 border border-purple-200">
-                      <h3 className="text-lg font-semibold mb-4 flex items-center">
-                        <Package className="h-5 w-5 mr-2" />
-                        Features & Modules
-                      </h3>
-                      <div className="space-y-4">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Included Features</Label>
-                          <Textarea 
-                            placeholder="e.g., Document editing, Cloud sync, Collaboration tools, Advanced analytics"
-                            className="text-base resize-none"
-                            rows={3}
-                          />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Optional Modules/Add-ons</Label>
-                          <Textarea 
-                            placeholder="e.g., Premium templates, Advanced reporting, API access, Mobile app"
-                            className="text-base resize-none"
-                            rows={2}
-                          />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Support Level</Label>
-                            <Input placeholder="e.g., Basic, Premium, Enterprise" className="h-12 text-base" />
-                          </div>
-                          <div className="space-y-3">
-                            <Label className="text-base font-medium">Update Policy</Label>
-                            <Input placeholder="e.g., Free updates, Paid upgrades" className="h-12 text-base" />
-                          </div>
-                        </div>
-                      </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Storage</Label>
+                      <Input 
+                        placeholder="e.g., 512GB PCIe 4.0 NVMe SSD" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.storage || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, storage: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Display</Label>
+                      <Input 
+                        placeholder="e.g., 14-inch FHD IPS, 1920×1080" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.display || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, display: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Graphics</Label>
+                      <Input 
+                        placeholder="e.g., Intel Iris Xe Graphics" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.graphics || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, graphics: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Battery</Label>
+                      <Input 
+                        placeholder="e.g., 70Wh Li-ion, up to 10 hours" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.battery || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, battery: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Keyboard</Label>
+                      <Input 
+                        placeholder="e.g., Backlit, Full-size, Numeric pad" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.keyboard || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, keyboard: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Webcam</Label>
+                      <Input 
+                        placeholder="e.g., 720p HD, IR for Windows Hello" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.webcam || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, webcam: e.target.value }
+                        }))}
+                      />
                     </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )
+                  <div className="mt-6">
+                    <Label className="text-base font-medium">Ports & Connectivity</Label>
+                    <Textarea 
+                      placeholder="e.g., 2x USB-A 3.2, 2x USB-C Thunderbolt 4, HDMI 2.0, 3.5mm audio, Wi-Fi 6E, Bluetooth 5.2"
+                      className="mt-2 text-base resize-none"
+                      rows={2}
+                      value={formData.categorySpecs?.connectivity || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, connectivity: e.target.value }
+                      }))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {formData.category === "Monitor" && (
+                <div className="bg-indigo-50 rounded-lg p-6 border border-indigo-200">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center">
+                    <Monitor className="h-5 w-5 mr-2" />
+                    Monitor Specifications
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Screen Size</Label>
+                      <Input 
+                        placeholder="e.g., 27 inches (diagonal)" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.screenSize || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, screenSize: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Resolution</Label>
+                      <Input 
+                        placeholder="e.g., 2560×1440 (QHD)" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.resolution || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, resolution: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Panel Type</Label>
+                      <Input 
+                        placeholder="e.g., IPS, VA, TN, OLED" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.panelType || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, panelType: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Refresh Rate</Label>
+                      <Input 
+                        placeholder="e.g., 144Hz, 165Hz, 240Hz" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.refreshRate || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, refreshRate: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Response Time</Label>
+                      <Input 
+                        placeholder="e.g., 1ms GTG, 5ms" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.responseTime || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, responseTime: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Brightness</Label>
+                      <Input 
+                        placeholder="e.g., 400 nits, 1000 nits HDR" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.brightness || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, brightness: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Contrast Ratio</Label>
+                      <Input 
+                        placeholder="e.g., 1000:1, 3000:1" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.contrastRatio || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, contrastRatio: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Color Gamut</Label>
+                      <Input 
+                        placeholder="e.g., 99% sRGB, 95% DCI-P3" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.colorGamut || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, colorGamut: e.target.value }
+                        }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Connectivity</Label>
+                      <Textarea 
+                        placeholder="e.g., HDMI 2.1, DisplayPort 1.4, USB-C with 90W PD, USB hub"
+                        className="text-base resize-none"
+                        rows={2}
+                        value={formData.categorySpecs?.connectivity || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, connectivity: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Adjustability</Label>
+                      <Textarea 
+                        placeholder="e.g., Height, Tilt, Swivel, Pivot, VESA 100×100"
+                        className="text-base resize-none"
+                        rows={2}
+                        value={formData.categorySpecs?.adjustability || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, adjustability: e.target.value }
+                        }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Add other category-specific sections as needed - Printer, Network Switch, Server, Smartphone, etc. */}
+              {/* Copy the remaining category sections from the new page */}
+            </div>
+          ) : (
+            // Software specifications - same as new page
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <Label htmlFor="licenseKey" className="text-base font-medium">
+                    License Key
+                  </Label>
+                  <Input
+                    id="licenseKey"
+                    value={formData.licenseKey || ""}
+                    onChange={(e) => setFormData({ ...formData, licenseKey: e.target.value })}
+                    placeholder="e.g., XXXXX-XXXXX-XXXXX-XXXXX"
+                    className="h-12 text-base font-mono"
+                  />
+                  <p className="text-sm text-muted-foreground">Software license or activation key</p>
+                </div>
+                <div className="space-y-3">
+                  <Label htmlFor="version" className="text-base font-medium">
+                    Version
+                  </Label>
+                  <Input
+                    id="version"
+                    value={formData.version || ""}
+                    onChange={(e) => setFormData({ ...formData, version: e.target.value })}
+                    placeholder="e.g., 2024.1.0"
+                    className="h-12 text-base"
+                  />
+                  <p className="text-sm text-muted-foreground">Current software version</p>
+                </div>
+              </div>
+
+              {/* Software Details */}
+              <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <Monitor className="h-5 w-5 mr-2" />
+                  Software Details
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">License Type</Label>
+                    <Input 
+                      placeholder="e.g., Perpetual, Subscription, Volume" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.licenseType || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, licenseType: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">User Licenses</Label>
+                    <Input 
+                      placeholder="e.g., Single user, 5 users, Unlimited" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.userLicenses || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, userLicenses: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Installation Media</Label>
+                    <Input 
+                      placeholder="e.g., Download, DVD, USB, Cloud" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.installationMedia || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, installationMedia: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Language</Label>
+                    <Input 
+                      placeholder="e.g., English, Multi-language" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.language || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, language: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Architecture</Label>
+                    <Input 
+                      placeholder="e.g., 64-bit, 32-bit, Universal" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.architecture || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, architecture: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">File Size</Label>
+                    <Input 
+                      placeholder="e.g., 2.5 GB, 500 MB" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.fileSize || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, fileSize: e.target.value }
+                      }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* System Requirements */}
+              <div className="bg-green-50 rounded-lg p-6 border border-green-200">
+                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <Settings className="h-5 w-5 mr-2" />
+                  System Requirements
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Operating System</Label>
+                    <Input 
+                      placeholder="e.g., Windows 10/11, macOS 12+, Linux" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.operatingSystem || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, operatingSystem: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Minimum RAM</Label>
+                    <Input 
+                      placeholder="e.g., 4GB, 8GB, 16GB" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.minRam || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, minRam: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Recommended RAM</Label>
+                    <Input 
+                      placeholder="e.g., 8GB, 16GB, 32GB" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.recommendedRam || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, recommendedRam: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Storage Space</Label>
+                    <Input 
+                      placeholder="e.g., 2GB, 10GB, 50GB available" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.storageSpace || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, storageSpace: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Processor</Label>
+                    <Input 
+                      placeholder="e.g., Intel i5 or equivalent, M1 chip" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.processor || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, processor: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Graphics</Label>
+                    <Input 
+                      placeholder="e.g., DirectX 11, OpenGL 4.0" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.graphics || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, graphics: e.target.value }
+                      }))}
+                    />
+                  </div>
+                </div>
+                <div className="mt-6">
+                  <Label className="text-base font-medium">Additional Requirements</Label>
+                  <Textarea 
+                    placeholder="e.g., Internet connection for activation, .NET Framework 4.8, specific drivers"
+                    className="mt-2 text-base resize-none"
+                    rows={2}
+                    value={formData.categorySpecs?.additionalRequirements || ""}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      categorySpecs: { ...prev.categorySpecs, additionalRequirements: e.target.value }
+                    }))}
+                  />
+                </div>
+              </div>
+
+              {/* Features & Modules */}
+              <div className="bg-purple-50 rounded-lg p-6 border border-purple-200">
+                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <Package className="h-5 w-5 mr-2" />
+                  Features & Modules
+                </h3>
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Included Features</Label>
+                    <Textarea 
+                      placeholder="e.g., Document editing, Cloud sync, Collaboration tools, Advanced analytics"
+                      className="text-base resize-none"
+                      rows={3}
+                      value={formData.categorySpecs?.includedFeatures || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, includedFeatures: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Optional Modules/Add-ons</Label>
+                    <Textarea 
+                      placeholder="e.g., Premium templates, Advanced reporting, API access, Mobile app"
+                      className="text-base resize-none"
+                      rows={2}
+                      value={formData.categorySpecs?.optionalModules || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, optionalModules: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Support Level</Label>
+                      <Input 
+                        placeholder="e.g., Basic, Premium, Enterprise" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.supportLevel || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, supportLevel: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Update Policy</Label>
+                      <Input 
+                        placeholder="e.g., Free updates, Paid upgrades" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.updatePolicy || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, updatePolicy: e.target.value }
+                        }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
 
       case "Review":
         return (
@@ -1490,6 +1835,29 @@ export default function EditInventoryItemPage() {
                         )}
                       </div>
                     </div>
+                    {/* Category-specific specs preview */}
+                    {formData.categorySpecs && Object.keys(formData.categorySpecs).length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
+                          Category Specifications
+                        </h4>
+                        <div className="space-y-3">
+                          {Object.entries(formData.categorySpecs).map(([key, value]) => {
+                            if (!value) return null
+                            return (
+                              <div key={key} className="flex justify-between items-start py-2 border-b border-muted">
+                                <span className="text-sm font-medium capitalize">
+                                  {key.replace(/([A-Z])/g, ' $1').trim()}:
+                                </span>
+                                <span className="text-sm text-muted-foreground text-right max-w-xs">
+                                  {value}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>

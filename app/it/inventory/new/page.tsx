@@ -346,6 +346,7 @@ export default function NewInventoryItemPage() {
         created_by: userData.uid,
         created_at: serverTimestamp(),
         updated_at: serverTimestamp(),
+        deleted: false, // Add deleted field set to false by default
       }
 
       console.log("Saving item data:", itemData)
