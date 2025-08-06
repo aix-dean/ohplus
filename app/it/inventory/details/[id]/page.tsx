@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,16 +12,7 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 
 interface InventoryItem {
   id: string
@@ -87,7 +78,17 @@ export default function InventoryDetailsPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
+  
+  // Use ref to track deletion state and component mount
+  const deletionInProgress = useRef(false)
+  const mountedRef = useRef(true)
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   // Fetch item details
   useEffect(() => {
@@ -103,64 +104,74 @@ export default function InventoryDetailsPage() {
           
           // Check if item is deleted
           if (data.deleted === true) {
-            toast({
-              title: "Item Not Found",
-              description: "This item has been deleted or does not exist",
-              variant: "destructive",
-            })
-            router.push("/it/inventory")
+            if (mountedRef.current) {
+              toast({
+                title: "Item Not Found",
+                description: "This item has been deleted or does not exist",
+                variant: "destructive",
+              })
+              router.push("/it/inventory")
+            }
             return
           }
 
-          setItem({
-            id: itemSnap.id,
-            name: data.name || "",
-            type: data.type || "hardware",
-            category: data.category || "",
-            brand: data.brand || "",
-            department: data.department || "",
-            assignedTo: data.assignedTo || "unassigned",
-            condition: data.condition || "excellent",
-            status: data.status || "active",
-            cost: data.cost || 0,
-            currency: data.currency || "USD",
-            purchaseDate: data.purchaseDate || "",
-            warrantyExpiry: data.warrantyExpiry || "",
-            serialNumber: data.serialNumber || "",
-            licenseKey: data.licenseKey || "",
-            version: data.version || "",
-            description: data.description || "",
-            vendorType: data.vendorType || "physical",
-            storeName: data.storeName || "",
-            storeLocation: data.storeLocation || "",
-            websiteName: data.websiteName || "",
-            websiteUrl: data.websiteUrl || "",
-            specifications: data.specifications || "",
-            categorySpecs: data.categorySpecs || {},
-            created_at: data.created_at,
-            updated_at: data.updated_at,
-            created_by: data.created_by || "",
-            company_id: data.company_id || "",
-            deleted: data.deleted || false,
-          })
+          if (mountedRef.current) {
+            setItem({
+              id: itemSnap.id,
+              name: data.name || "",
+              type: data.type || "hardware",
+              category: data.category || "",
+              brand: data.brand || "",
+              department: data.department || "",
+              assignedTo: data.assignedTo || "unassigned",
+              condition: data.condition || "excellent",
+              status: data.status || "active",
+              cost: data.cost || 0,
+              currency: data.currency || "USD",
+              purchaseDate: data.purchaseDate || "",
+              warrantyExpiry: data.warrantyExpiry || "",
+              serialNumber: data.serialNumber || "",
+              licenseKey: data.licenseKey || "",
+              version: data.version || "",
+              description: data.description || "",
+              vendorType: data.vendorType || "physical",
+              storeName: data.storeName || "",
+              storeLocation: data.storeLocation || "",
+              websiteName: data.websiteName || "",
+              websiteUrl: data.websiteUrl || "",
+              specifications: data.specifications || "",
+              categorySpecs: data.categorySpecs || {},
+              created_at: data.created_at,
+              updated_at: data.updated_at,
+              created_by: data.created_by || "",
+              company_id: data.company_id || "",
+              deleted: data.deleted || false,
+            })
+          }
         } else {
+          if (mountedRef.current) {
+            toast({
+              title: "Error",
+              description: "Item not found",
+              variant: "destructive",
+            })
+            router.push("/it/inventory")
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching item:", error)
+        if (mountedRef.current) {
           toast({
             title: "Error",
-            description: "Item not found",
+            description: "Failed to load item details",
             variant: "destructive",
           })
           router.push("/it/inventory")
         }
-      } catch (error) {
-        console.error("Error fetching item:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load item details",
-          variant: "destructive",
-        })
-        router.push("/it/inventory")
       } finally {
-        setLoading(false)
+        if (mountedRef.current) {
+          setLoading(false)
+        }
       }
     }
 
@@ -190,7 +201,9 @@ export default function InventoryDetailsPage() {
           })
         })
 
-        setUsers(fetchedUsers)
+        if (mountedRef.current) {
+          setUsers(fetchedUsers)
+        }
       } catch (error) {
         console.error("Error fetching users:", error)
       }
@@ -200,32 +213,28 @@ export default function InventoryDetailsPage() {
   }, [userData?.company_id])
 
   // Helper function to get user display name
-  const getUserDisplayName = (uid: string) => {
+  const getUserDisplayName = useCallback((uid: string) => {
     if (uid === "unassigned") return "Unassigned"
     const user = users.find((u) => u.uid === uid)
     if (!user) return "Unknown User"
     return `${user.first_name} ${user.last_name}`.trim() || user.email
-  }
+  }, [users])
 
   const handleEdit = useCallback(() => {
-    if (item) {
+    if (item && !deletionInProgress.current) {
       router.push(`/it/inventory/edit/${item.id}`)
     }
   }, [item, router])
 
   const handleDelete = useCallback(() => {
+    if (deletionInProgress.current) return
     setDeleteDialogOpen(true)
   }, [])
 
-  const resetDeleteState = useCallback(() => {
-    setDeleteDialogOpen(false)
-    setIsDeleting(false)
-  }, [])
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!item || deletionInProgress.current) return
 
-  const confirmDelete = useCallback(async () => {
-    if (!item || isDeleting) return
-
-    setIsDeleting(true)
+    deletionInProgress.current = true
     
     try {
       // Store item details before deletion
@@ -239,13 +248,11 @@ export default function InventoryDetailsPage() {
         updated_at: serverTimestamp(),
       })
 
-      // Use React's flushSync to ensure state updates are synchronous
-      import('react-dom').then(({ flushSync }) => {
-        flushSync(() => {
-          // Reset dialog state
-          resetDeleteState()
-        })
-
+      // Only update state if component is still mounted
+      if (mountedRef.current) {
+        // Close dialog
+        setDeleteDialogOpen(false)
+        
         // Show success toast
         toast({
           title: "Item Deleted",
@@ -254,30 +261,30 @@ export default function InventoryDetailsPage() {
 
         // Navigate back to inventory list
         router.push("/it/inventory")
-      })
+      }
 
     } catch (error) {
       console.error("Error deleting item:", error)
       
-      // Reset state on error
-      resetDeleteState()
-      
-      toast({
-        title: "Error",
-        description: "Failed to delete item. Please try again.",
-        variant: "destructive",
-      })
+      if (mountedRef.current) {
+        toast({
+          title: "Error",
+          description: "Failed to delete item. Please try again.",
+          variant: "destructive",
+        })
+      }
+    } finally {
+      deletionInProgress.current = false
     }
-  }, [item, isDeleting, resetDeleteState, router])
+  }, [item, router])
 
-  const handleDeleteDialogClose = useCallback((open: boolean) => {
-    // Only allow closing if not currently deleting
-    if (!open && !isDeleting) {
-      resetDeleteState()
-    }
-  }, [isDeleting, resetDeleteState])
+  const handleDeleteCancel = useCallback(() => {
+    if (deletionInProgress.current) return
+    setDeleteDialogOpen(false)
+  }, [])
 
   const handleBack = useCallback(() => {
+    if (deletionInProgress.current) return
     router.push("/it/inventory")
   }, [router])
 
@@ -316,12 +323,21 @@ export default function InventoryDetailsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className={cn(
+      "min-h-screen bg-gradient-to-br from-slate-50 to-slate-100",
+      deletionInProgress.current && "pointer-events-none opacity-75"
+    )}>
       <div className="container mx-auto p-6 max-w-6xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" onClick={handleBack} className="shadow-sm">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleBack} 
+              className="shadow-sm"
+              disabled={deletionInProgress.current}
+            >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Inventory
             </Button>
@@ -332,11 +348,21 @@ export default function InventoryDetailsPage() {
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <Button variant="outline" onClick={handleEdit} className="shadow-sm">
+            <Button 
+              variant="outline" 
+              onClick={handleEdit} 
+              className="shadow-sm"
+              disabled={deletionInProgress.current}
+            >
               <Edit className="h-4 w-4 mr-2" />
               Edit Item
             </Button>
-            <Button variant="outline" onClick={handleDelete} className="shadow-sm text-red-600 hover:text-red-700 hover:bg-red-50">
+            <Button 
+              variant="outline" 
+              onClick={handleDelete} 
+              className="shadow-sm text-red-600 hover:text-red-700 hover:bg-red-50"
+              disabled={deletionInProgress.current}
+            >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
             </Button>
@@ -603,7 +629,12 @@ export default function InventoryDetailsPage() {
                 <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button onClick={handleEdit} className="w-full justify-start" variant="outline">
+                <Button 
+                  onClick={handleEdit} 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  disabled={deletionInProgress.current}
+                >
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Item Details
                 </Button>
@@ -611,6 +642,7 @@ export default function InventoryDetailsPage() {
                   onClick={handleDelete} 
                   className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50" 
                   variant="outline"
+                  disabled={deletionInProgress.current}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   Delete Item
@@ -646,36 +678,13 @@ export default function InventoryDetailsPage() {
         </div>
 
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogClose}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center space-x-2">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                <span>Delete Inventory Item</span>
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete "{item.name}"? This action will move the item to trash and it won't be visible in your inventory list.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmDelete}
-                disabled={isDeleting}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                {isDeleting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  "Delete Item"
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <DeleteConfirmationDialog
+          isOpen={deleteDialogOpen}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Inventory Item"
+          itemName={item.name}
+        />
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,22 +20,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 
 interface InventoryItem {
   id: string
@@ -98,7 +89,17 @@ export default function ITInventoryPage() {
   const [departmentFilter, setDepartmentFilter] = useState<string>("all")
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<InventoryItem | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
+  
+  // Use ref to track deletion state to prevent race conditions
+  const deletionInProgress = useRef(false)
+  const mountedRef = useRef(true)
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   // Fetch inventory items (only non-deleted ones)
   useEffect(() => {
@@ -144,16 +145,22 @@ export default function ITInventoryPage() {
           })
         })
 
-        setItems(fetchedItems)
+        if (mountedRef.current) {
+          setItems(fetchedItems)
+        }
       } catch (error) {
         console.error("Error fetching items:", error)
-        toast({
-          title: "Error",
-          description: "Failed to load inventory items",
-          variant: "destructive",
-        })
+        if (mountedRef.current) {
+          toast({
+            title: "Error",
+            description: "Failed to load inventory items",
+            variant: "destructive",
+          })
+        }
       } finally {
-        setLoading(false)
+        if (mountedRef.current) {
+          setLoading(false)
+        }
       }
     }
 
@@ -183,7 +190,9 @@ export default function ITInventoryPage() {
           })
         })
 
-        setUsers(fetchedUsers)
+        if (mountedRef.current) {
+          setUsers(fetchedUsers)
+        }
       } catch (error) {
         console.error("Error fetching users:", error)
       }
@@ -193,12 +202,12 @@ export default function ITInventoryPage() {
   }, [userData?.company_id])
 
   // Helper function to get user display name
-  const getUserDisplayName = (uid: string) => {
+  const getUserDisplayName = useCallback((uid: string) => {
     if (uid === "unassigned") return "Unassigned"
     const user = users.find((u) => u.uid === uid)
     if (!user) return "Unknown User"
     return `${user.first_name} ${user.last_name}`.trim() || user.email
-  }
+  }, [users])
 
   // Filter items based on search and filters
   const filteredItems = items.filter((item) => {
@@ -216,28 +225,25 @@ export default function ITInventoryPage() {
   })
 
   const handleEdit = useCallback((item: InventoryItem) => {
+    if (deletionInProgress.current) return
     router.push(`/it/inventory/edit/${item.id}`)
   }, [router])
 
   const handleView = useCallback((item: InventoryItem) => {
+    if (deletionInProgress.current) return
     router.push(`/it/inventory/details/${item.id}`)
   }, [router])
 
   const handleDelete = useCallback((item: InventoryItem) => {
+    if (deletionInProgress.current) return
     setItemToDelete(item)
     setDeleteDialogOpen(true)
   }, [])
 
-  const resetDeleteState = useCallback(() => {
-    setDeleteDialogOpen(false)
-    setItemToDelete(null)
-    setIsDeleting(false)
-  }, [])
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!itemToDelete || deletionInProgress.current) return
 
-  const confirmDelete = useCallback(async () => {
-    if (!itemToDelete || isDeleting) return
-
-    setIsDeleting(true)
+    deletionInProgress.current = true
     
     try {
       // Store item details before deletion
@@ -252,46 +258,54 @@ export default function ITInventoryPage() {
         updated_at: serverTimestamp(),
       })
 
-      // Use React's flushSync to ensure state updates are synchronous
-      import('react-dom').then(({ flushSync }) => {
-        flushSync(() => {
-          // Remove item from local state
-          setItems(prevItems => prevItems.filter(item => item.id !== itemId))
-          // Reset dialog state
-          resetDeleteState()
-        })
-
-        // Show success toast after state is updated
+      // Only update state if component is still mounted
+      if (mountedRef.current) {
+        // Remove item from local state immediately
+        setItems(prevItems => prevItems.filter(item => item.id !== itemId))
+        
+        // Close dialog
+        setDeleteDialogOpen(false)
+        setItemToDelete(null)
+        
+        // Show success toast
         toast({
           title: "Item Deleted",
           description: `${itemName} has been deleted from inventory`,
         })
-      })
+      }
 
     } catch (error) {
       console.error("Error deleting item:", error)
       
-      // Reset state on error
-      resetDeleteState()
-      
-      toast({
-        title: "Error",
-        description: "Failed to delete item. Please try again.",
-        variant: "destructive",
-      })
+      if (mountedRef.current) {
+        toast({
+          title: "Error",
+          description: "Failed to delete item. Please try again.",
+          variant: "destructive",
+        })
+      }
+    } finally {
+      deletionInProgress.current = false
     }
-  }, [itemToDelete, isDeleting, resetDeleteState])
+  }, [itemToDelete])
 
-  const handleDeleteDialogClose = useCallback((open: boolean) => {
-    // Only allow closing if not currently deleting
-    if (!open && !isDeleting) {
-      resetDeleteState()
-    }
-  }, [isDeleting, resetDeleteState])
+  const handleDeleteCancel = useCallback(() => {
+    if (deletionInProgress.current) return
+    setDeleteDialogOpen(false)
+    setItemToDelete(null)
+  }, [])
 
   const handleAddNew = useCallback(() => {
+    if (deletionInProgress.current) return
     router.push("/it/inventory/new")
   }, [router])
+
+  const clearFilters = useCallback(() => {
+    setSearchTerm("")
+    setTypeFilter("all")
+    setStatusFilter("all")
+    setDepartmentFilter("all")
+  }, [])
 
   if (loading) {
     return (
@@ -317,7 +331,7 @@ export default function ITInventoryPage() {
             <h1 className="text-3xl font-bold text-slate-900">IT Inventory</h1>
             <p className="text-slate-600">Manage your IT assets and equipment</p>
           </div>
-          <Button onClick={handleAddNew} className="shadow-sm">
+          <Button onClick={handleAddNew} className="shadow-sm" disabled={deletionInProgress.current}>
             <Plus className="h-4 w-4 mr-2" />
             Add New Item
           </Button>
@@ -335,11 +349,12 @@ export default function ITInventoryPage() {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
+                    disabled={deletionInProgress.current}
                   />
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <Select value={typeFilter} onValueChange={setTypeFilter} disabled={deletionInProgress.current}>
                   <SelectTrigger className="w-full sm:w-[140px]">
                     <SelectValue placeholder="Type" />
                   </SelectTrigger>
@@ -349,7 +364,7 @@ export default function ITInventoryPage() {
                     <SelectItem value="software">Software</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <Select value={statusFilter} onValueChange={setStatusFilter} disabled={deletionInProgress.current}>
                   <SelectTrigger className="w-full sm:w-[140px]">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -361,7 +376,7 @@ export default function ITInventoryPage() {
                     <SelectItem value="retired">Retired</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                <Select value={departmentFilter} onValueChange={setDepartmentFilter} disabled={deletionInProgress.current}>
                   <SelectTrigger className="w-full sm:w-[160px]">
                     <SelectValue placeholder="Department" />
                   </SelectTrigger>
@@ -390,12 +405,8 @@ export default function ITInventoryPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                setSearchTerm("")
-                setTypeFilter("all")
-                setStatusFilter("all")
-                setDepartmentFilter("all")
-              }}
+              onClick={clearFilters}
+              disabled={deletionInProgress.current}
             >
               Clear Filters
             </Button>
@@ -420,7 +431,7 @@ export default function ITInventoryPage() {
                   </p>
                 </div>
                 {items.length === 0 && (
-                  <Button onClick={handleAddNew}>
+                  <Button onClick={handleAddNew} disabled={deletionInProgress.current}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add First Item
                   </Button>
@@ -431,7 +442,10 @@ export default function ITInventoryPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredItems.map((item) => (
-              <Card key={item.id} className="hover:shadow-lg transition-shadow">
+              <Card key={item.id} className={cn(
+                "hover:shadow-lg transition-shadow",
+                deletionInProgress.current && "opacity-50 pointer-events-none"
+              )}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-2">
@@ -449,7 +463,7 @@ export default function ITInventoryPage() {
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" disabled={deletionInProgress.current}>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -530,36 +544,13 @@ export default function ITInventoryPage() {
         )}
 
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogClose}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center space-x-2">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                <span>Delete Inventory Item</span>
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete "{itemToDelete?.name}"? This action will move the item to trash and it won't be visible in your inventory list.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmDelete}
-                disabled={isDeleting}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                {isDeleting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  "Delete"
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <DeleteConfirmationDialog
+          isOpen={deleteDialogOpen}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Inventory Item"
+          itemName={itemToDelete?.name}
+        />
       </div>
     </div>
   )
