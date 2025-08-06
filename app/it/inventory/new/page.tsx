@@ -849,41 +849,6 @@ export default function NewInventoryItemPage() {
                       </div>
                     </div>
 
-                    {/* Physical Specifications */}
-                    <div className="bg-white rounded-lg p-6 border border-purple-200">
-                      <h3 className="text-lg font-semibold mb-4 flex items-center">
-                        <Package className="h-5 w-5 mr-2" />
-                        Physical Specifications
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Dimensions (L×W×H)</Label>
-                          <Input placeholder="e.g., 35×15×30 cm" className="h-12 text-base" />
-                          <p className="text-sm text-muted-foreground">Length × Width × Height</p>
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Weight</Label>
-                          <Input placeholder="e.g., 2.5 kg" className="h-12 text-base" />
-                          <p className="text-sm text-muted-foreground">Total weight of the item</p>
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Material</Label>
-                          <Input placeholder="e.g., Aluminum, Plastic, Steel" className="h-12 text-base" />
-                          <p className="text-sm text-muted-foreground">Primary construction material</p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Color</Label>
-                          <Input placeholder="e.g., Black, Silver, White" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Form Factor</Label>
-                          <Input placeholder="e.g., Desktop, Rack Mount, Portable" className="h-12 text-base" />
-                        </div>
-                      </div>
-                    </div>
-
                     {/* Category-specific specifications */}
                     {formData.category === "Desktop Computer" && (
                       <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
@@ -1271,32 +1236,6 @@ export default function NewInventoryItemPage() {
                         </div>
                       </div>
                     )}
-
-                    {/* Environmental Specifications */}
-                    <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                      <h3 className="text-lg font-semibold mb-4 flex items-center">
-                        <Settings className="h-5 w-5 mr-2" />
-                        Environmental & Compliance
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Operating Temperature</Label>
-                          <Input placeholder="e.g., 0°C to 40°C" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Humidity Range</Label>
-                          <Input placeholder="e.g., 10% to 90% non-condensing" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Power Requirements</Label>
-                          <Input placeholder="e.g., 100-240V AC, 50-60Hz" className="h-12 text-base" />
-                        </div>
-                        <div className="space-y-3">
-                          <Label className="text-base font-medium">Certifications</Label>
-                          <Input placeholder="e.g., FCC, CE, Energy Star, RoHS" className="h-12 text-base" />
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 ) : (
                   // Software specifications
