@@ -861,7 +861,7 @@ export default function EditInventoryItemPage() {
                           <SelectItem value="CZK">CZK</SelectItem>
                           <SelectItem value="HUF">HUF</SelectItem>
                           <SelectItem value="RUB">RUB</SelectItem>
-                          <SelectItem value="BRL">BRL</BRL>
+                          <SelectItem value="BRL">BRL</SelectItem>
                           <SelectItem value="MXN">MXN</SelectItem>
                           <SelectItem value="ZAR">ZAR</SelectItem>
                           <SelectItem value="TRY">TRY</SelectItem>
@@ -1823,6 +1823,29 @@ export default function EditInventoryItemPage() {
                         )}
                       </div>
                     </div>
+                    {/* Category-specific specs preview */}
+                    {formData.categorySpecs && Object.keys(formData.categorySpecs).length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
+                          Category Specifications
+                        </h4>
+                        <div className="space-y-3">
+                          {Object.entries(formData.categorySpecs).map(([key, value]) => {
+                            if (!value) return null
+                            return (
+                              <div key={key} className="flex justify-between items-start py-2 border-b border-muted">
+                                <span className="text-sm font-medium capitalize">
+                                  {key.replace(/([A-Z])/g, ' $1').trim()}:
+                                </span>
+                                <span className="text-sm text-muted-foreground text-right max-w-xs">
+                                  {value}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -1830,42 +1853,9 @@ export default function EditInventoryItemPage() {
           </div>
         )
 
-        {/* Category-Specific Specifications */}
-        {formData.categorySpecs && Object.keys(formData.categorySpecs).length > 0 && (
-          <div>
-            <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
-              {formData.category} Specifications
-            </h4>
-            <div className="space-y-3">
-              {Object.entries(formData.categorySpecs).map(([key, value]) => {
-                if (!value || value === "") return null;
-                
-                // Format the key to be more readable
-                const formatKey = (key: string) => {
-                  return key
-                    .replace(/([A-Z])/g, ' $1')
-                    .replace(/^./, str => str.toUpperCase())
-                    .replace(/\b\w/g, l => l.toUpperCase());
-                };
-
-                return (
-                  <div key={key} className="flex justify-between items-start py-2 border-b border-muted">
-                    <span className="text-sm font-medium">{formatKey(key)}:</span>
-                    <span className="text-sm text-muted-foreground text-right max-w-xs">
-                      {typeof value === 'string' && value.length > 50 ? (
-                        <span className="break-words">{value}</span>
-                      ) : (
-                        value
-                      )}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    )
+      default:
+        return null
+    }
   }
 
   return (
@@ -1990,4 +1980,3 @@ export default function EditInventoryItemPage() {
     </div>
   )
 }
-</merged_code>
