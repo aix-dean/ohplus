@@ -864,7 +864,7 @@ export default function EditInventoryItemPage() {
                           <SelectItem value="BRL">BRL</SelectItem>
                           <SelectItem value="MXN">MXN</SelectItem>
                           <SelectItem value="ZAR">ZAR</SelectItem>
-                          <SelectItem value="TRY">TRY</SelectItem>
+                          <SelectItem value="TRY">TRY</TRY>
                           <SelectItem value="NZD">NZD</SelectItem>
                           <SelectItem value="PHP">PHP</SelectItem>
                           <SelectItem value="THB">THB</SelectItem>
@@ -1830,9 +1830,42 @@ export default function EditInventoryItemPage() {
           </div>
         )
 
-      default:
-        return null
-    }
+        {/* Category-Specific Specifications */}
+        {formData.categorySpecs && Object.keys(formData.categorySpecs).length > 0 && (
+          <div>
+            <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
+              {formData.category} Specifications
+            </h4>
+            <div className="space-y-3">
+              {Object.entries(formData.categorySpecs).map(([key, value]) => {
+                if (!value || value === "") return null;
+                
+                // Format the key to be more readable
+                const formatKey = (key: string) => {
+                  return key
+                    .replace(/([A-Z])/g, ' $1')
+                    .replace(/^./, str => str.toUpperCase())
+                    .replace(/\b\w/g, l => l.toUpperCase());
+                };
+
+                return (
+                  <div key={key} className="flex justify-between items-start py-2 border-b border-muted">
+                    <span className="text-sm font-medium">{formatKey(key)}:</span>
+                    <span className="text-sm text-muted-foreground text-right max-w-xs">
+                      {typeof value === 'string' && value.length > 50 ? (
+                        <span className="break-words">{value}</span>
+                      ) : (
+                        value
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -1957,3 +1990,4 @@ export default function EditInventoryItemPage() {
     </div>
   )
 }
+</merged_code>
