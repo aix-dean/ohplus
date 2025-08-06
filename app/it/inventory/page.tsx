@@ -40,25 +40,42 @@ interface InventoryItem {
   name: string
   type: "hardware" | "software"
   category: string
-  status: "active" | "inactive" | "maintenance" | "retired"
-  location: string
+  brand: string
+  department: string
   assignedTo: string
+  condition: "excellent" | "good" | "fair" | "poor" | "damaged"
+  vendorType: "physical" | "online"
+  storeName: string
+  storeLocation: string
+  websiteName: string
+  websiteUrl: string
   purchaseDate: string
   warrantyExpiry: string
   cost: number
-  vendor: string
+  currency: string
   description: string
-  serialNumber?: string
-  specifications?: string
-  licenseKey?: string
-  version?: string
-  company_id?: string
-  created_by?: string
-  created_at?: any
-  updated_at?: any
+  serialNumber: string
+  specifications: string
+  licenseKey: string
+  version: string
+  status: "active" | "inactive" | "maintenance" | "retired"
+  company_id: string
+  created_by: string
+  created_at: any
+  updated_at: any
 }
 
-const categories = [
+interface User {
+  id: string
+  uid: string
+  first_name: string
+  last_name: string
+  email: string
+  company_id?: string
+  license_key?: string
+}
+
+const hardwareCategories = [
   "Desktop Computer",
   "Laptop",
   "Server",
@@ -69,12 +86,35 @@ const categories = [
   "Monitor",
   "Smartphone",
   "Tablet",
+  "Storage Device",
+  "Keyboard",
+  "Mouse",
+  "Webcam",
+  "Headset",
+  "Projector",
+  "Scanner",
+  "UPS",
+  "Cable",
+  "Docking Station",
+]
+
+const softwareCategories = [
   "Operating System",
   "Productivity Suite",
   "Design Software",
   "Security Software",
   "Database Software",
   "Development Tools",
+  "Antivirus",
+  "Backup Software",
+  "Communication Software",
+  "Project Management",
+  "Accounting Software",
+  "CRM Software",
+  "ERP Software",
+  "Media Software",
+  "Browser",
+  "Utility Software",
 ]
 
 const statusColors = {
@@ -105,9 +145,11 @@ const categoryIcons = {
 
 export default function ITInventoryPage() {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, userData } = useAuth()
   const [inventory, setInventory] = useState<InventoryItem[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingUsers, setLoadingUsers] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -117,12 +159,56 @@ export default function ITInventoryPage() {
     status: "active",
   })
 
+  // Fetch users by company_id
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!userData?.company_id) return
+
+      setLoadingUsers(true)
+      try {
+        const usersRef = collection(db, "iboard_users")
+        const q = query(usersRef, where("company_id", "==", userData.company_id))
+        const querySnapshot = await getDocs(q)
+
+        const fetchedUsers: User[] = []
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          fetchedUsers.push({
+            id: doc.id,
+            uid: data.uid,
+            first_name: data.first_name || "",
+            last_name: data.last_name || "",
+            email: data.email || "",
+            company_id: data.company_id,
+            license_key: data.license_key,
+          })
+        })
+
+        setUsers(fetchedUsers)
+      } catch (error) {
+        console.error("Error fetching users:", error)
+      } finally {
+        setLoadingUsers(false)
+      }
+    }
+
+    fetchUsers()
+  }, [userData?.company_id])
+
+  // Helper function to get user display name from uid
+  const getUserDisplayName = (uid: string) => {
+    if (uid === "unassigned" || !uid) return "Unassigned"
+    const user = users.find((u) => u.uid === uid)
+    if (!user) return "Unknown User"
+    return `${user.first_name} ${user.last_name}`.trim() || user.email
+  }
+
   // Fetch inventory data from Firestore
   useEffect(() => {
     const fetchInventory = async () => {
       try {
         console.log("Current user:", user)
-        console.log("User company_id:", user?.company_id)
+        console.log("User company_id:", userData?.company_id)
         
         const inventoryRef = collection(db, "itInventory")
         
@@ -144,8 +230,8 @@ export default function ITInventoryPage() {
         
         // If user has company_id, filter by it, otherwise show all for debugging
         let filteredData = allInventoryData
-        if (user?.company_id) {
-          filteredData = allInventoryData.filter(item => item.company_id === user.company_id)
+        if (userData?.company_id) {
+          filteredData = allInventoryData.filter(item => item.company_id === userData.company_id)
           console.log("Filtered by company_id:", filteredData.length)
         } else {
           console.log("No company_id found, showing all items for debugging")
@@ -165,23 +251,24 @@ export default function ITInventoryPage() {
     }
 
     fetchInventory()
-  }, [user])
+  }, [user, userData])
 
   const filteredInventory = useMemo(() => {
     return inventory.filter((item) => {
       const matchesSearch =
         item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.vendor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.assignedTo?.toLowerCase().includes(searchTerm.toLowerCase())
+        item.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.storeName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.storeLocation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        getUserDisplayName(item.assignedTo)?.toLowerCase().includes(searchTerm.toLowerCase())
 
       const matchesType = typeFilter === "all" || item.type === typeFilter
       const matchesStatus = statusFilter === "all" || item.status === statusFilter
 
       return matchesSearch && matchesType && matchesStatus
     })
-  }, [inventory, searchTerm, typeFilter, statusFilter])
+  }, [inventory, searchTerm, typeFilter, statusFilter, users])
 
   const stats = useMemo(() => {
     const total = inventory.length
@@ -198,7 +285,7 @@ export default function ITInventoryPage() {
   }
 
   const handleUpdate = async () => {
-    if (!editingItem || !formData.name || !formData.category || !formData.vendor) {
+    if (!editingItem || !formData.name || !formData.category || !formData.brand) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -296,9 +383,10 @@ export default function ITInventoryPage() {
           </CardHeader>
           <CardContent className="text-xs">
             <p>User ID: {user?.uid || 'Not logged in'}</p>
-            <p>Company ID: {user?.company_id || 'No company_id'}</p>
+            <p>Company ID: {userData?.company_id || 'No company_id'}</p>
             <p>Total inventory items: {inventory.length}</p>
             <p>Filtered items: {filteredInventory.length}</p>
+            <p>Users loaded: {users.length}</p>
           </CardContent>
         </Card>
       )}
@@ -354,7 +442,7 @@ export default function ITInventoryPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name, category, vendor, location, or assigned person..."
+                  placeholder="Search by name, category, brand, store, location, or assigned person..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -456,7 +544,7 @@ export default function ITInventoryPage() {
                                   <SelectValue placeholder="Select category" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {categories.map((category) => (
+                                  {(formData.type === "hardware" ? hardwareCategories : softwareCategories).map((category) => (
                                     <SelectItem key={category} value={category}>
                                       {category}
                                     </SelectItem>
@@ -464,6 +552,66 @@ export default function ITInventoryPage() {
                                 </SelectContent>
                               </Select>
                             </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="edit-brand">Brand *</Label>
+                              <Input
+                                id="edit-brand"
+                                value={formData.brand || ""}
+                                onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                                placeholder="Enter brand name"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="edit-department">Department *</Label>
+                              <Select
+                                value={formData.department}
+                                onValueChange={(value) => setFormData({ ...formData, department: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select department" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="IT">IT Department</SelectItem>
+                                  <SelectItem value="HR">Human Resources</SelectItem>
+                                  <SelectItem value="Finance">Finance</SelectItem>
+                                  <SelectItem value="Marketing">Marketing</SelectItem>
+                                  <SelectItem value="Sales">Sales</SelectItem>
+                                  <SelectItem value="Operations">Operations</SelectItem>
+                                  <SelectItem value="Administration">Administration</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="edit-assignedTo">Assigned To</Label>
+                              <Select
+                                value={formData.assignedTo}
+                                onValueChange={(value) => setFormData({ ...formData, assignedTo: value })}
+                                disabled={loadingUsers}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={loadingUsers ? "Loading users..." : "Select a user"} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="unassigned">
+                                    <span className="text-muted-foreground">Unassigned</span>
+                                  </SelectItem>
+                                  {users.map((user) => (
+                                    <SelectItem key={user.uid} value={user.uid}>
+                                      <div className="flex flex-col">
+                                        <span>{`${user.first_name} ${user.last_name}`.trim() || user.email}</span>
+                                        <span className="text-xs text-muted-foreground">{user.email}</span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                               <Label htmlFor="edit-status">Status</Label>
                               <Select
@@ -481,26 +629,23 @@ export default function ITInventoryPage() {
                                 </SelectContent>
                               </Select>
                             </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label htmlFor="edit-location">Location</Label>
-                              <Input
-                                id="edit-location"
-                                value={formData.location || ""}
-                                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                                placeholder="Enter location"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-assignedTo">Assigned To</Label>
-                              <Input
-                                id="edit-assignedTo"
-                                value={formData.assignedTo || ""}
-                                onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
-                                placeholder="Enter assigned person/team"
-                              />
+                              <Label htmlFor="edit-condition">Condition</Label>
+                              <Select
+                                value={formData.condition}
+                                onValueChange={(value) => setFormData({ ...formData, condition: value as any })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="excellent">Excellent</SelectItem>
+                                  <SelectItem value="good">Good</SelectItem>
+                                  <SelectItem value="fair">Fair</SelectItem>
+                                  <SelectItem value="poor">Poor</SelectItem>
+                                  <SelectItem value="damaged">Damaged</SelectItem>
+                                </SelectContent>
+                              </Select>
                             </div>
                           </div>
 
@@ -527,24 +672,40 @@ export default function ITInventoryPage() {
 
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label htmlFor="edit-cost">Cost ($)</Label>
-                              <Input
-                                id="edit-cost"
-                                type="number"
-                                value={formData.cost || ""}
-                                onChange={(e) =>
-                                  setFormData({ ...formData, cost: Number.parseFloat(e.target.value) || 0 })
-                                }
-                                placeholder="Enter cost"
-                              />
+                              <Label htmlFor="edit-cost">Cost</Label>
+                              <div className="flex">
+                                <Select
+                                  value={formData.currency || "USD"}
+                                  onValueChange={(value) => setFormData({ ...formData, currency: value })}
+                                >
+                                  <SelectTrigger className="w-20 rounded-r-none border-r-0">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="USD">USD</SelectItem>
+                                    <SelectItem value="PHP">PHP</SelectItem>
+                                    <SelectItem value="EUR">EUR</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <Input
+                                  id="edit-cost"
+                                  type="number"
+                                  value={formData.cost || ""}
+                                  onChange={(e) =>
+                                    setFormData({ ...formData, cost: Number.parseFloat(e.target.value) || 0 })
+                                  }
+                                  placeholder="Enter cost"
+                                  className="rounded-l-none"
+                                />
+                              </div>
                             </div>
                             <div className="space-y-2">
-                              <Label htmlFor="edit-vendor">Vendor *</Label>
+                              <Label htmlFor="edit-storeName">Store Name</Label>
                               <Input
-                                id="edit-vendor"
-                                value={formData.vendor || ""}
-                                onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
-                                placeholder="Enter vendor name"
+                                id="edit-storeName"
+                                value={formData.storeName || ""}
+                                onChange={(e) => setFormData({ ...formData, storeName: e.target.value })}
+                                placeholder="Enter store name"
                               />
                             </div>
                           </div>
@@ -642,19 +803,29 @@ export default function ITInventoryPage() {
                   <Badge className={statusColors[item.status]}>
                     {item.status?.charAt(0).toUpperCase() + item.status?.slice(1)}
                   </Badge>
-                  <span className="text-sm font-medium">${(item.cost || 0).toLocaleString()}</span>
+                  <span className="text-sm font-medium">
+                    {item.currency} {(item.cost || 0).toLocaleString()}
+                  </span>
                 </div>
 
                 <div className="space-y-1 text-sm text-muted-foreground">
                   <div>
-                    <strong>Location:</strong> {item.location || 'N/A'}
+                    <strong>Brand:</strong> {item.brand || 'N/A'}
                   </div>
                   <div>
-                    <strong>Assigned to:</strong> {item.assignedTo || 'N/A'}
+                    <strong>Department:</strong> {item.department || 'N/A'}
                   </div>
                   <div>
-                    <strong>Vendor:</strong> {item.vendor || 'N/A'}
+                    <strong>Assigned to:</strong> {getUserDisplayName(item.assignedTo)}
                   </div>
+                  <div>
+                    <strong>Store:</strong> {item.storeName || 'N/A'}
+                  </div>
+                  {item.storeLocation && (
+                    <div>
+                      <strong>Location:</strong> {item.storeLocation}
+                    </div>
+                  )}
                   {item.serialNumber && (
                     <div>
                       <strong>Serial:</strong> {item.serialNumber}
@@ -670,6 +841,21 @@ export default function ITInventoryPage() {
                       <strong>Warranty:</strong> {new Date(item.warrantyExpiry).toLocaleDateString()}
                     </div>
                   )}
+                  <div>
+                    <strong>Condition:</strong> 
+                    <Badge 
+                      variant="outline" 
+                      className={`ml-1 ${
+                        item.condition === "excellent" ? "bg-green-100 text-green-800 border-green-200" :
+                        item.condition === "good" ? "bg-blue-100 text-blue-800 border-blue-200" :
+                        item.condition === "fair" ? "bg-yellow-100 text-yellow-800 border-yellow-200" :
+                        item.condition === "poor" ? "bg-orange-100 text-orange-800 border-orange-200" :
+                        "bg-red-100 text-red-800 border-red-200"
+                      }`}
+                    >
+                      {item.condition?.charAt(0).toUpperCase() + item.condition?.slice(1)}
+                    </Badge>
+                  </div>
                 </div>
 
                 {item.description && <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>}
