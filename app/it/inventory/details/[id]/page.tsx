@@ -230,11 +230,20 @@ export default function InventoryDetailsPage() {
         updated_at: serverTimestamp(),
       })
 
+      // Close dialog and reset state first
+      setDeleteDialogOpen(false)
+      setIsDeleting(false)
+
+      // Show success toast
       toast({
         title: "Item Deleted",
         description: `${item.name} has been deleted from inventory`,
       })
-      router.push("/it/inventory")
+
+      // Navigate back to inventory list after a short delay
+      setTimeout(() => {
+        router.push("/it/inventory")
+      }, 1000)
     } catch (error) {
       console.error("Error deleting item:", error)
       toast({
@@ -242,7 +251,7 @@ export default function InventoryDetailsPage() {
         description: "Failed to delete item. Please try again.",
         variant: "destructive",
       })
-    } finally {
+      // Reset states on error
       setIsDeleting(false)
       setDeleteDialogOpen(false)
     }
@@ -284,6 +293,12 @@ export default function InventoryDetailsPage() {
         </div>
       </div>
     )
+  }
+
+  const handleDeleteDialogClose = () => {
+    if (!isDeleting) {
+      setDeleteDialogOpen(false)
+    }
   }
 
   return (
@@ -617,7 +632,7 @@ export default function InventoryDetailsPage() {
         </div>
 
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogClose}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center space-x-2">

@@ -241,9 +241,15 @@ export default function ITInventoryPage() {
         updated_at: serverTimestamp(),
       })
 
-      // Remove from local state
-      setItems(items.filter(item => item.id !== itemToDelete.id))
+      // Remove from local state immediately
+      setItems(prevItems => prevItems.filter(item => item.id !== itemToDelete.id))
       
+      // Close dialog and reset state first
+      setDeleteDialogOpen(false)
+      setItemToDelete(null)
+      setIsDeleting(false)
+      
+      // Show success toast after state is cleaned up
       toast({
         title: "Item Deleted",
         description: `${itemToDelete.name} has been deleted from inventory`,
@@ -255,7 +261,7 @@ export default function ITInventoryPage() {
         description: "Failed to delete item. Please try again.",
         variant: "destructive",
       })
-    } finally {
+      // Reset states on error
       setIsDeleting(false)
       setDeleteDialogOpen(false)
       setItemToDelete(null)
@@ -279,6 +285,13 @@ export default function ITInventoryPage() {
         </div>
       </div>
     )
+  }
+
+  const handleDeleteDialogClose = () => {
+    if (!isDeleting) {
+      setDeleteDialogOpen(false)
+      setItemToDelete(null)
+    }
   }
 
   return (
@@ -503,7 +516,7 @@ export default function ITInventoryPage() {
         )}
 
         {/* Delete Confirmation Dialog */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialog open={deleteDialogOpen} onOpenChange={handleDeleteDialogClose}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center space-x-2">
