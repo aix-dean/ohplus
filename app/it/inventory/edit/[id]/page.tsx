@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, ArrowRight, Save, Check, Package, MapPin, DollarSign, Settings, Eye, HardDrive, Monitor, Globe, Loader2, AlertCircle } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Save, Check, Package, MapPin, DollarSign, Settings, Eye, HardDrive, Monitor, Globe, Loader2 } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
@@ -40,6 +40,7 @@ interface FormData {
   specifications?: string
   licenseKey?: string
   version?: string
+  status: "active" | "inactive" | "maintenance" | "retired"
   categorySpecs?: Record<string, any>
 }
 
@@ -95,10 +96,12 @@ const softwareCategories = [
   "Utility Software",
 ]
 
+// Helper function to get categories based on item type
 const getCategoriesForType = (type: "hardware" | "software") => {
   return type === "hardware" ? hardwareCategories : softwareCategories
 }
 
+// Replace the static steps array with this dynamic one
 const getAllSteps = () => [
   {
     id: 1,
@@ -127,7 +130,7 @@ const getAllSteps = () => [
     description: "Specifications",
     icon: Settings,
     color: "bg-purple-500",
-    showFor: "hardware",
+    showFor: "hardware", // Only show for hardware
   },
   {
     id: 5,
@@ -141,12 +144,12 @@ const getAllSteps = () => [
 const getVisibleSteps = (itemType: "hardware" | "software") => {
   return getAllSteps()
     .filter((step) => !step.showFor || step.showFor === itemType)
-    .map((step, index) => ({ ...step, id: index + 1 }))
+    .map((step, index) => ({ ...step, id: index + 1 })) // Renumber steps
 }
 
 export default function EditInventoryItemPage() {
-  const params = useParams()
   const router = useRouter()
+  const params = useParams()
   const { userData } = useAuth()
   const [currentStep, setCurrentStep] = useState(1)
   const [users, setUsers] = useState<User[]>([])
@@ -175,33 +178,26 @@ export default function EditInventoryItemPage() {
     specifications: "",
     licenseKey: "",
     version: "",
+    status: "active",
     categorySpecs: {},
   })
 
-  // Check if this is the "new" route and redirect appropriately
-  useEffect(() => {
-    if (params.id === "new") {
-      router.replace("/it/inventory/new")
-      return
-    }
-  }, [params.id, router])
-
   const visibleSteps = getVisibleSteps(formData.type)
 
-  // Fetch existing item data
+  // Load existing item data
   useEffect(() => {
-    const fetchItem = async () => {
-      if (!params.id || typeof params.id !== 'string' || !userData?.company_id || params.id === "new") return
+    const loadItem = async () => {
+      if (!params.id || typeof params.id !== 'string') return
 
       try {
         const itemRef = doc(db, "itInventory", params.id)
         const itemSnap = await getDoc(itemRef)
 
         if (itemSnap.exists()) {
-          const itemData = itemSnap.data()
+          const data = itemSnap.data()
           
           // Check if item is deleted
-          if (itemData.deleted === true) {
+          if (data.deleted === true) {
             toast({
               title: "Error",
               description: "This item has been deleted and cannot be edited",
@@ -212,28 +208,29 @@ export default function EditInventoryItemPage() {
           }
 
           setFormData({
-            name: itemData.name || "",
-            type: itemData.type || "hardware",
-            category: itemData.category || "",
-            brand: itemData.brand || "",
-            department: itemData.department || "",
-            assignedTo: itemData.assignedTo || "unassigned",
-            condition: itemData.condition || "excellent",
-            vendorType: itemData.vendorType || "physical",
-            storeName: itemData.storeName || "",
-            storeLocation: itemData.storeLocation || "",
-            websiteName: itemData.websiteName || "",
-            websiteUrl: itemData.websiteUrl || "",
-            purchaseDate: itemData.purchaseDate || "",
-            warrantyExpiry: itemData.warrantyExpiry || "",
-            cost: itemData.cost ? itemData.cost.toString() : "",
-            currency: itemData.currency || "USD",
-            description: itemData.description || "",
-            serialNumber: itemData.serialNumber || "",
-            specifications: itemData.specifications || "",
-            licenseKey: itemData.licenseKey || "",
-            version: itemData.version || "",
-            categorySpecs: itemData.categorySpecs || {},
+            name: data.name || "",
+            type: data.type || "hardware",
+            category: data.category || "",
+            brand: data.brand || "",
+            department: data.department || "",
+            assignedTo: data.assignedTo || "",
+            condition: data.condition || "excellent",
+            vendorType: data.vendorType || "physical",
+            storeName: data.storeName || "",
+            storeLocation: data.storeLocation || "",
+            websiteName: data.websiteName || "",
+            websiteUrl: data.websiteUrl || "",
+            purchaseDate: data.purchaseDate || "",
+            warrantyExpiry: data.warrantyExpiry || "",
+            cost: data.cost ? data.cost.toString() : "",
+            currency: data.currency || "USD",
+            description: data.description || "",
+            serialNumber: data.serialNumber || "",
+            specifications: data.specifications || "",
+            licenseKey: data.licenseKey || "",
+            version: data.version || "",
+            status: data.status || "active",
+            categorySpecs: data.categorySpecs || {},
           })
         } else {
           toast({
@@ -242,22 +239,22 @@ export default function EditInventoryItemPage() {
             variant: "destructive",
           })
           router.push("/it/inventory")
-          return
         }
       } catch (error) {
-        console.error("Error fetching item:", error)
+        console.error("Error loading item:", error)
         toast({
           title: "Error",
-          description: "Failed to load item details",
+          description: "Failed to load item data",
           variant: "destructive",
         })
+        router.push("/it/inventory")
       } finally {
         setLoadingItem(false)
       }
     }
 
-    fetchItem()
-  }, [params.id, userData?.company_id, router])
+    loadItem()
+  }, [params.id, router])
 
   // Fetch users by company_id
   useEffect(() => {
@@ -266,6 +263,8 @@ export default function EditInventoryItemPage() {
 
       setLoadingUsers(true)
       try {
+        console.log("Fetching users for company_id:", userData.company_id)
+
         const usersRef = collection(db, "iboard_users")
         const q = query(usersRef, where("company_id", "==", userData.company_id))
         const querySnapshot = await getDocs(q)
@@ -284,6 +283,7 @@ export default function EditInventoryItemPage() {
           })
         })
 
+        console.log("Fetched users:", fetchedUsers)
         setUsers(fetchedUsers)
       } catch (error) {
         console.error("Error fetching users:", error)
@@ -300,12 +300,15 @@ export default function EditInventoryItemPage() {
     fetchUsers()
   }, [userData?.company_id])
 
+  // Add this useEffect after the existing useEffect
   useEffect(() => {
+    // Reset to step 1 when item type changes to avoid being on a non-existent step
     if (currentStep > getVisibleSteps(formData.type).length) {
       setCurrentStep(1)
     }
   }, [formData.type, currentStep])
 
+  // Helper function to get user display name from uid
   const getUserDisplayName = (uid: string) => {
     if (uid === "unassigned") return "Unassigned"
     const user = users.find((u) => u.uid === uid)
@@ -313,26 +316,16 @@ export default function EditInventoryItemPage() {
     return `${user.first_name} ${user.last_name}`.trim() || user.email
   }
 
-  const updateCategorySpec = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      categorySpecs: {
-        ...prev.categorySpecs,
-        [field]: value
-      }
-    }))
-  }
-
   const validateStep = (step: number): boolean => {
     switch (step) {
       case 1:
         return !!(formData.name && formData.category && formData.brand && formData.department)
       case 2:
-        return true
+        return true // Optional fields
       case 3:
-        return true
+        return true // Optional fields
       case 4:
-        return true
+        return true // Optional fields
       default:
         return true
     }
@@ -381,6 +374,7 @@ export default function EditInventoryItemPage() {
     setIsSubmitting(true)
 
     try {
+      // Prepare the data to be updated
       const itemData = {
         name: formData.name,
         type: formData.type,
@@ -403,11 +397,18 @@ export default function EditInventoryItemPage() {
         specifications: formData.specifications || "",
         licenseKey: formData.licenseKey || "",
         version: formData.version || "",
+        status: formData.status,
         categorySpecs: formData.categorySpecs || {},
         updated_at: serverTimestamp(),
       }
 
-      await updateDoc(doc(db, "itInventory", params.id), itemData)
+      console.log("Updating item data:", itemData)
+
+      // Update in Firestore
+      const itemRef = doc(db, "itInventory", params.id)
+      await updateDoc(itemRef, itemData)
+
+      console.log("Document updated successfully")
 
       toast({
         title: "Item Updated Successfully",
@@ -431,11 +432,6 @@ export default function EditInventoryItemPage() {
     router.push("/it/inventory")
   }
 
-  // Don't render anything if this is the "new" route
-  if (params.id === "new") {
-    return null
-  }
-
   if (loadingItem) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -443,7 +439,7 @@ export default function EditInventoryItemPage() {
           <div className="flex justify-center items-center min-h-[400px]">
             <div className="flex flex-col items-center space-y-4">
               <Loader2 className="h-8 w-8 animate-spin" />
-              <p className="text-muted-foreground">Loading item details...</p>
+              <p className="text-muted-foreground">Loading item data...</p>
             </div>
           </div>
         </div>
@@ -455,6 +451,7 @@ export default function EditInventoryItemPage() {
     const currentStepData = visibleSteps[currentStep - 1]
     if (!currentStepData) return null
 
+    // Map the step title to the appropriate content
     switch (currentStepData.title) {
       case "Basic Info":
         return (
@@ -490,7 +487,7 @@ export default function EditInventoryItemPage() {
                     <Select
                       value={formData.type}
                       onValueChange={(value: "hardware" | "software") =>
-                        setFormData({ ...formData, type: value, category: "", categorySpecs: {} })
+                        setFormData({ ...formData, type: value, category: "" })
                       }
                     >
                       <SelectTrigger className="h-12 text-base">
@@ -521,7 +518,7 @@ export default function EditInventoryItemPage() {
                     </Label>
                     <Select
                       value={formData.category}
-                      onValueChange={(value) => setFormData({ ...formData, category: value, categorySpecs: {} })}
+                      onValueChange={(value) => setFormData({ ...formData, category: value })}
                     >
                       <SelectTrigger className="h-12 text-base">
                         <SelectValue placeholder={`Select a ${formData.type} category`} />
@@ -534,6 +531,7 @@ export default function EditInventoryItemPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-sm text-muted-foreground">Choose from {formData.type} specific categories</p>
                   </div>
                   <div className="space-y-3">
                     <Label htmlFor="brand" className="text-base font-medium">
@@ -602,47 +600,86 @@ export default function EditInventoryItemPage() {
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <Label htmlFor="condition" className="text-base font-medium">
-                    Condition
-                  </Label>
-                  <Select
-                    value={formData.condition}
-                    onValueChange={(value: "excellent" | "good" | "fair" | "poor" | "damaged") =>
-                      setFormData({ ...formData, condition: value })
-                    }
-                  >
-                    <SelectTrigger className="h-12 text-base">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="excellent">
-                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                          Excellent
-                        </Badge>
-                      </SelectItem>
-                      <SelectItem value="good">
-                        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                          Good
-                        </Badge>
-                      </SelectItem>
-                      <SelectItem value="fair">
-                        <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                          Fair
-                        </Badge>
-                      </SelectItem>
-                      <SelectItem value="poor">
-                        <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
-                          Poor
-                        </Badge>
-                      </SelectItem>
-                      <SelectItem value="damaged">
-                        <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-                          Damaged
-                        </Badge>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label htmlFor="condition" className="text-base font-medium">
+                      Condition
+                    </Label>
+                    <Select
+                      value={formData.condition}
+                      onValueChange={(value: "excellent" | "good" | "fair" | "poor" | "damaged") =>
+                        setFormData({ ...formData, condition: value })
+                      }
+                    >
+                      <SelectTrigger className="h-12 text-base">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="excellent">
+                          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+                            Excellent
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="good">
+                          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                            Good
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="fair">
+                          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                            Fair
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="poor">
+                          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+                            Poor
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="damaged">
+                          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                            Damaged
+                          </Badge>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-3">
+                    <Label htmlFor="status" className="text-base font-medium">
+                      Status
+                    </Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(value: "active" | "inactive" | "maintenance" | "retired") =>
+                        setFormData({ ...formData, status: value })
+                      }
+                    >
+                      <SelectTrigger className="h-12 text-base">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">
+                          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+                            Active
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="inactive">
+                          <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-200">
+                            Inactive
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="maintenance">
+                          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                            Maintenance
+                          </Badge>
+                        </SelectItem>
+                        <SelectItem value="retired">
+                          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                            Retired
+                          </Badge>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -711,6 +748,9 @@ export default function EditInventoryItemPage() {
                         </SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="text-sm text-muted-foreground">
+                      Choose whether you purchased from a physical or online store
+                    </p>
                   </div>
                   <div className="space-y-3">
                     <Label htmlFor="storeName" className="text-base font-medium">
@@ -723,6 +763,7 @@ export default function EditInventoryItemPage() {
                       placeholder="e.g., Best Buy, Amazon, CDR King"
                       className="h-12 text-base"
                     />
+                    <p className="text-sm text-muted-foreground">Name of the store or vendor</p>
                   </div>
                 </div>
 
@@ -731,14 +772,19 @@ export default function EditInventoryItemPage() {
                     <Label htmlFor="storeLocation" className="text-base font-medium">
                       Store Location
                     </Label>
-                    <GooglePlacesAutocomplete
-                      value={formData.storeLocation}
-                      onChange={(value) => setFormData({ ...formData, storeLocation: value })}
-                      placeholder="Search for store location..."
-                      className="h-12 text-base"
-                      enableMap={true}
-                      mapHeight="300px"
-                    />
+                    <div className="space-y-2">
+                      <GooglePlacesAutocomplete
+                        value={formData.storeLocation}
+                        onChange={(value) => setFormData({ ...formData, storeLocation: value })}
+                        placeholder="Search for store location..."
+                        className="h-12 text-base"
+                        enableMap={true}
+                        mapHeight="300px"
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        Search and select the exact location of the store on the map
+                      </p>
+                    </div>
                   </div>
                 )}
 
@@ -755,6 +801,7 @@ export default function EditInventoryItemPage() {
                         placeholder="e.g., Amazon, eBay, Shopee"
                         className="h-12 text-base"
                       />
+                      <p className="text-sm text-muted-foreground">Name of the online store or marketplace</p>
                     </div>
                     <div className="space-y-3">
                       <Label htmlFor="websiteUrl" className="text-base font-medium">
@@ -771,6 +818,7 @@ export default function EditInventoryItemPage() {
                           className="h-12 text-base pl-10"
                         />
                       </div>
+                      <p className="text-sm text-muted-foreground">Full URL of the online store</p>
                     </div>
                   </div>
                 )}
@@ -787,7 +835,7 @@ export default function EditInventoryItemPage() {
                 <DollarSign className="h-8 w-8 text-yellow-600" />
               </div>
               <h2 className="text-2xl font-bold">Financial & Warranty</h2>
-              <p className="text-muted-foreground">Update financial and warranty information</p>
+              <p className="text-muted-foreground">Update financial aspects and warranty information</p>
             </div>
 
             <Card className="border-2 border-dashed border-yellow-200 bg-yellow-50/30">
@@ -886,74 +934,700 @@ export default function EditInventoryItemPage() {
                 <Settings className="h-8 w-8 text-purple-600" />
               </div>
               <h2 className="text-2xl font-bold">Technical Specifications</h2>
-              <p className="text-muted-foreground">Update technical details and specifications</p>
+              <p className="text-muted-foreground">
+                Update {formData.type === "hardware" ? "hardware" : "software"}-specific technical details
+              </p>
             </div>
 
             <Card className="border-2 border-dashed border-purple-200 bg-purple-50/30">
               <CardContent className="p-8 space-y-8">
-                {formData.type === "hardware" ? (
-                  <div className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <Label htmlFor="serialNumber" className="text-base font-medium">
-                          Serial Number
-                        </Label>
-                        <Input
-                          id="serialNumber"
-                          value={formData.serialNumber || ""}
-                          onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
-                          placeholder="e.g., SN123456789"
-                          className="h-12 text-base font-mono"
-                        />
-                      </div>
-                      <div className="space-y-3">
-                        <Label htmlFor="specifications" className="text-base font-medium">
-                          General Specifications
-                        </Label>
-                        <Input
-                          id="specifications"
-                          value={formData.specifications || ""}
-                          onChange={(e) => setFormData({ ...formData, specifications: e.target.value })}
-                          placeholder="e.g., Intel i7, 16GB RAM, 512GB SSD"
-                          className="h-12 text-base"
-                        />
-                      </div>
+          {formData.type === "hardware" ? (
+            <div className="space-y-8">
+              {/* Basic Hardware Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <Label htmlFor="serialNumber" className="text-base font-medium">
+                    Serial Number
+                  </Label>
+                  <Input
+                    id="serialNumber"
+                    value={formData.serialNumber || ""}
+                    onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
+                    placeholder="e.g., SN123456789"
+                    className="h-12 text-base font-mono"
+                  />
+                  <p className="text-sm text-muted-foreground">Unique identifier for this hardware</p>
+                </div>
+                <div className="space-y-3">
+                  <Label htmlFor="specifications" className="text-base font-medium">
+                    General Specifications
+                  </Label>
+                  <Input
+                    id="specifications"
+                    value={formData.specifications || ""}
+                    onChange={(e) => setFormData({ ...formData, specifications: e.target.value })}
+                    placeholder="e.g., Intel i7, 16GB RAM, 512GB SSD"
+                    className="h-12 text-base"
+                  />
+                  <p className="text-sm text-muted-foreground">Key technical specifications</p>
+                </div>
+              </div>
+
+              {/* Category-specific specifications */}
+              {formData.category === "Desktop Computer" && (
+                <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center">
+                    <Monitor className="h-5 w-5 mr-2" />
+                    Desktop Computer Specifications
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Processor</Label>
+                      <Input 
+                        placeholder="e.g., Intel Core i7-12700K, 3.6GHz" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.processor || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, processor: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">RAM</Label>
+                      <Input 
+                        placeholder="e.g., 16GB DDR4-3200" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.ram || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, ram: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Storage</Label>
+                      <Input 
+                        placeholder="e.g., 512GB NVMe SSD + 1TB HDD" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.storage || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, storage: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Graphics Card</Label>
+                      <Input 
+                        placeholder="e.g., NVIDIA RTX 3060, 12GB VRAM" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.graphics || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, graphics: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Motherboard</Label>
+                      <Input 
+                        placeholder="e.g., ASUS PRIME B660M-A" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.motherboard || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, motherboard: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Power Supply</Label>
+                      <Input 
+                        placeholder="e.g., 650W 80+ Gold" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.powerSupply || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, powerSupply: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Operating System</Label>
+                      <Input 
+                        placeholder="e.g., Windows 11 Pro 64-bit" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.operatingSystem || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, operatingSystem: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Optical Drive</Label>
+                      <Input 
+                        placeholder="e.g., DVD-RW, Blu-ray, None" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.opticalDrive || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, opticalDrive: e.target.value }
+                        }))}
+                      />
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <Label htmlFor="licenseKey" className="text-base font-medium">
-                          License Key
-                        </Label>
-                        <Input
-                          id="licenseKey"
-                          value={formData.licenseKey || ""}
-                          onChange={(e) => setFormData({ ...formData, licenseKey: e.target.value })}
-                          placeholder="e.g., XXXXX-XXXXX-XXXXX-XXXXX"
-                          className="h-12 text-base font-mono"
-                        />
-                      </div>
-                      <div className="space-y-3">
-                        <Label htmlFor="version" className="text-base font-medium">
-                          Version
-                        </Label>
-                        <Input
-                          id="version"
-                          value={formData.version || ""}
-                          onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-                          placeholder="e.g., 2024.1.0"
-                          className="h-12 text-base"
-                        />
-                      </div>
+                  <div className="mt-6">
+                    <Label className="text-base font-medium">Expansion Slots</Label>
+                    <Textarea 
+                      placeholder="e.g., 2x PCIe x16, 1x PCIe x1, 4x RAM slots"
+                      className="mt-2 text-base resize-none"
+                      rows={2}
+                      value={formData.categorySpecs?.expansionSlots || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, expansionSlots: e.target.value }
+                      }))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {formData.category === "Laptop" && (
+                <div className="bg-green-50 rounded-lg p-6 border border-green-200">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center">
+                    <Monitor className="h-5 w-5 mr-2" />
+                    Laptop Specifications
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Processor</Label>
+                      <Input 
+                        placeholder="e.g., Intel Core i7-1260P, 2.1GHz" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.processor || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, processor: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">RAM</Label>
+                      <Input 
+                        placeholder="e.g., 16GB LPDDR5-4800" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.ram || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, ram: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Storage</Label>
+                      <Input 
+                        placeholder="e.g., 512GB PCIe 4.0 NVMe SSD" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.storage || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, storage: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Display</Label>
+                      <Input 
+                        placeholder="e.g., 14-inch FHD IPS, 1920×1080" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.display || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, display: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Graphics</Label>
+                      <Input 
+                        placeholder="e.g., Intel Iris Xe Graphics" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.graphics || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, graphics: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Battery</Label>
+                      <Input 
+                        placeholder="e.g., 70Wh Li-ion, up to 10 hours" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.battery || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, battery: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Keyboard</Label>
+                      <Input 
+                        placeholder="e.g., Backlit, Full-size, Numeric pad" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.keyboard || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, keyboard: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Webcam</Label>
+                      <Input 
+                        placeholder="e.g., 720p HD, IR for Windows Hello" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.webcam || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, webcam: e.target.value }
+                        }))}
+                      />
                     </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )
+                  <div className="mt-6">
+                    <Label className="text-base font-medium">Ports & Connectivity</Label>
+                    <Textarea 
+                      placeholder="e.g., 2x USB-A 3.2, 2x USB-C Thunderbolt 4, HDMI 2.0, 3.5mm audio, Wi-Fi 6E, Bluetooth 5.2"
+                      className="mt-2 text-base resize-none"
+                      rows={2}
+                      value={formData.categorySpecs?.connectivity || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, connectivity: e.target.value }
+                      }))}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {formData.category === "Monitor" && (
+                <div className="bg-indigo-50 rounded-lg p-6 border border-indigo-200">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center">
+                    <Monitor className="h-5 w-5 mr-2" />
+                    Monitor Specifications
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Screen Size</Label>
+                      <Input 
+                        placeholder="e.g., 27 inches (diagonal)" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.screenSize || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, screenSize: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Resolution</Label>
+                      <Input 
+                        placeholder="e.g., 2560×1440 (QHD)" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.resolution || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, resolution: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Panel Type</Label>
+                      <Input 
+                        placeholder="e.g., IPS, VA, TN, OLED" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.panelType || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, panelType: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Refresh Rate</Label>
+                      <Input 
+                        placeholder="e.g., 144Hz, 165Hz, 240Hz" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.refreshRate || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, refreshRate: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Response Time</Label>
+                      <Input 
+                        placeholder="e.g., 1ms GTG, 5ms" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.responseTime || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, responseTime: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Brightness</Label>
+                      <Input 
+                        placeholder="e.g., 400 nits, 1000 nits HDR" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.brightness || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, brightness: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Contrast Ratio</Label>
+                      <Input 
+                        placeholder="e.g., 1000:1, 3000:1" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.contrastRatio || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, contrastRatio: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Color Gamut</Label>
+                      <Input 
+                        placeholder="e.g., 99% sRGB, 95% DCI-P3" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.colorGamut || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, colorGamut: e.target.value }
+                        }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Connectivity</Label>
+                      <Textarea 
+                        placeholder="e.g., HDMI 2.1, DisplayPort 1.4, USB-C with 90W PD, USB hub"
+                        className="text-base resize-none"
+                        rows={2}
+                        value={formData.categorySpecs?.connectivity || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, connectivity: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Adjustability</Label>
+                      <Textarea 
+                        placeholder="e.g., Height, Tilt, Swivel, Pivot, VESA 100×100"
+                        className="text-base resize-none"
+                        rows={2}
+                        value={formData.categorySpecs?.adjustability || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, adjustability: e.target.value }
+                        }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Add other category-specific sections as needed - Printer, Network Switch, Server, Smartphone, etc. */}
+              {/* Copy the remaining category sections from the new page */}
+            </div>
+          ) : (
+            // Software specifications - same as new page
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <Label htmlFor="licenseKey" className="text-base font-medium">
+                    License Key
+                  </Label>
+                  <Input
+                    id="licenseKey"
+                    value={formData.licenseKey || ""}
+                    onChange={(e) => setFormData({ ...formData, licenseKey: e.target.value })}
+                    placeholder="e.g., XXXXX-XXXXX-XXXXX-XXXXX"
+                    className="h-12 text-base font-mono"
+                  />
+                  <p className="text-sm text-muted-foreground">Software license or activation key</p>
+                </div>
+                <div className="space-y-3">
+                  <Label htmlFor="version" className="text-base font-medium">
+                    Version
+                  </Label>
+                  <Input
+                    id="version"
+                    value={formData.version || ""}
+                    onChange={(e) => setFormData({ ...formData, version: e.target.value })}
+                    placeholder="e.g., 2024.1.0"
+                    className="h-12 text-base"
+                  />
+                  <p className="text-sm text-muted-foreground">Current software version</p>
+                </div>
+              </div>
+
+              {/* Software Details */}
+              <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <Monitor className="h-5 w-5 mr-2" />
+                  Software Details
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">License Type</Label>
+                    <Input 
+                      placeholder="e.g., Perpetual, Subscription, Volume" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.licenseType || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, licenseType: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">User Licenses</Label>
+                    <Input 
+                      placeholder="e.g., Single user, 5 users, Unlimited" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.userLicenses || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, userLicenses: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Installation Media</Label>
+                    <Input 
+                      placeholder="e.g., Download, DVD, USB, Cloud" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.installationMedia || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, installationMedia: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Language</Label>
+                    <Input 
+                      placeholder="e.g., English, Multi-language" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.language || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, language: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Architecture</Label>
+                    <Input 
+                      placeholder="e.g., 64-bit, 32-bit, Universal" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.architecture || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, architecture: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">File Size</Label>
+                    <Input 
+                      placeholder="e.g., 2.5 GB, 500 MB" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.fileSize || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, fileSize: e.target.value }
+                      }))}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* System Requirements */}
+              <div className="bg-green-50 rounded-lg p-6 border border-green-200">
+                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <Settings className="h-5 w-5 mr-2" />
+                  System Requirements
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Operating System</Label>
+                    <Input 
+                      placeholder="e.g., Windows 10/11, macOS 12+, Linux" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.operatingSystem || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, operatingSystem: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Minimum RAM</Label>
+                    <Input 
+                      placeholder="e.g., 4GB, 8GB, 16GB" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.minRam || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, minRam: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Recommended RAM</Label>
+                    <Input 
+                      placeholder="e.g., 8GB, 16GB, 32GB" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.recommendedRam || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, recommendedRam: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Storage Space</Label>
+                    <Input 
+                      placeholder="e.g., 2GB, 10GB, 50GB available" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.storageSpace || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, storageSpace: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Processor</Label>
+                    <Input 
+                      placeholder="e.g., Intel i5 or equivalent, M1 chip" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.processor || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, processor: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Graphics</Label>
+                    <Input 
+                      placeholder="e.g., DirectX 11, OpenGL 4.0" 
+                      className="h-12 text-base"
+                      value={formData.categorySpecs?.graphics || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, graphics: e.target.value }
+                      }))}
+                    />
+                  </div>
+                </div>
+                <div className="mt-6">
+                  <Label className="text-base font-medium">Additional Requirements</Label>
+                  <Textarea 
+                    placeholder="e.g., Internet connection for activation, .NET Framework 4.8, specific drivers"
+                    className="mt-2 text-base resize-none"
+                    rows={2}
+                    value={formData.categorySpecs?.additionalRequirements || ""}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      categorySpecs: { ...prev.categorySpecs, additionalRequirements: e.target.value }
+                    }))}
+                  />
+                </div>
+              </div>
+
+              {/* Features & Modules */}
+              <div className="bg-purple-50 rounded-lg p-6 border border-purple-200">
+                <h3 className="text-lg font-semibold mb-4 flex items-center">
+                  <Package className="h-5 w-5 mr-2" />
+                  Features & Modules
+                </h3>
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Included Features</Label>
+                    <Textarea 
+                      placeholder="e.g., Document editing, Cloud sync, Collaboration tools, Advanced analytics"
+                      className="text-base resize-none"
+                      rows={3}
+                      value={formData.categorySpecs?.includedFeatures || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, includedFeatures: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-medium">Optional Modules/Add-ons</Label>
+                    <Textarea 
+                      placeholder="e.g., Premium templates, Advanced reporting, API access, Mobile app"
+                      className="text-base resize-none"
+                      rows={2}
+                      value={formData.categorySpecs?.optionalModules || ""}
+                      onChange={(e) => setFormData(prev => ({
+                        ...prev,
+                        categorySpecs: { ...prev.categorySpecs, optionalModules: e.target.value }
+                      }))}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Support Level</Label>
+                      <Input 
+                        placeholder="e.g., Basic, Premium, Enterprise" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.supportLevel || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, supportLevel: e.target.value }
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-base font-medium">Update Policy</Label>
+                      <Input 
+                        placeholder="e.g., Free updates, Paid upgrades" 
+                        className="h-12 text-base"
+                        value={formData.categorySpecs?.updatePolicy || ""}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          categorySpecs: { ...prev.categorySpecs, updatePolicy: e.target.value }
+                        }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
 
       case "Review":
         return (
@@ -963,7 +1637,7 @@ export default function EditInventoryItemPage() {
                 <Eye className="h-8 w-8 text-indigo-600" />
               </div>
               <h2 className="text-2xl font-bold">Review & Update</h2>
-              <p className="text-muted-foreground">Please review all changes before updating the inventory item</p>
+              <p className="text-muted-foreground">Please review all information before updating the inventory item</p>
             </div>
 
             <Card className="border-2 border-indigo-200">
@@ -1003,6 +1677,20 @@ export default function EditInventoryItemPage() {
                           </span>
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-muted">
+                          <span className="text-sm font-medium">Status:</span>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              formData.status === "active" && "bg-green-100 text-green-800 border-green-200",
+                              formData.status === "inactive" && "bg-gray-100 text-gray-800 border-gray-200",
+                              formData.status === "maintenance" && "bg-yellow-100 text-yellow-800 border-yellow-200",
+                              formData.status === "retired" && "bg-red-100 text-red-800 border-red-200",
+                            )}
+                          >
+                            {formData.status}
+                          </Badge>
+                        </div>
+                        <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Condition:</span>
                           <Badge
                             variant="outline"
@@ -1035,6 +1723,41 @@ export default function EditInventoryItemPage() {
                           <span className="text-sm font-medium">Store Name:</span>
                           <span className="text-sm text-muted-foreground">{formData.storeName || "Not specified"}</span>
                         </div>
+                        {formData.vendorType === "physical" && (
+                          <div className="flex justify-between items-start py-2 border-b border-muted">
+                            <span className="text-sm font-medium">Store Location:</span>
+                            <span className="text-sm text-muted-foreground text-right max-w-xs">
+                              {formData.storeLocation || "Not specified"}
+                            </span>
+                          </div>
+                        )}
+                        {formData.vendorType === "online" && (
+                          <>
+                            <div className="flex justify-between items-center py-2 border-b border-muted">
+                              <span className="text-sm font-medium">Website Name:</span>
+                              <span className="text-sm text-muted-foreground">
+                                {formData.websiteName || "Not specified"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-start py-2 border-b border-muted">
+                              <span className="text-sm font-medium">Website URL:</span>
+                              <span className="text-sm text-muted-foreground text-right max-w-xs break-all">
+                                {formData.websiteUrl ? (
+                                  <a
+                                    href={formData.websiteUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-blue-600 hover:text-blue-800 underline"
+                                  >
+                                    {formData.websiteUrl}
+                                  </a>
+                                ) : (
+                                  "Not specified"
+                                )}
+                              </span>
+                            </div>
+                          </>
+                        )}
                         <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Assigned To:</span>
                           <span className="text-sm text-muted-foreground">
@@ -1112,6 +1835,29 @@ export default function EditInventoryItemPage() {
                         )}
                       </div>
                     </div>
+                    {/* Category-specific specs preview */}
+                    {formData.categorySpecs && Object.keys(formData.categorySpecs).length > 0 && (
+                      <div>
+                        <h4 className="font-semibold text-sm text-muted-foreground mb-3 uppercase tracking-wide">
+                          Category Specifications
+                        </h4>
+                        <div className="space-y-3">
+                          {Object.entries(formData.categorySpecs).map(([key, value]) => {
+                            if (!value) return null
+                            return (
+                              <div key={key} className="flex justify-between items-start py-2 border-b border-muted">
+                                <span className="text-sm font-medium capitalize">
+                                  {key.replace(/([A-Z])/g, ' $1').trim()}:
+                                </span>
+                                <span className="text-sm text-muted-foreground text-right max-w-xs">
+                                  {value}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -1234,7 +1980,7 @@ export default function EditInventoryItemPage() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="shadow-sm bg-green-600 hover:bg-green-700"
+                className="shadow-sm bg-blue-600 hover:bg-blue-700"
               >
                 <Save className="h-4 w-4 mr-2" />
                 {isSubmitting ? "Updating..." : "Update Item"}
