@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
 import { ArrowLeft, ArrowRight, Save, Check, Package, MapPin, DollarSign, Settings, Eye, HardDrive, Monitor, Globe, Loader2 } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -40,7 +41,6 @@ interface FormData {
   specifications?: string
   licenseKey?: string
   version?: string
-  status: "active" | "inactive" | "maintenance" | "retired"
 }
 
 interface User {
@@ -51,6 +51,36 @@ interface User {
   email: string
   company_id?: string
   license_key?: string
+}
+
+interface InventoryItem {
+  id: string
+  name: string
+  type: "hardware" | "software"
+  category: string
+  brand: string
+  department: string
+  assignedTo: string
+  condition: "excellent" | "good" | "fair" | "poor" | "damaged"
+  vendorType: "physical" | "online"
+  storeName: string
+  storeLocation: string
+  websiteName: string
+  websiteUrl: string
+  purchaseDate: string
+  warrantyExpiry: string
+  cost: number
+  currency: string
+  description: string
+  serialNumber: string
+  specifications: string
+  licenseKey: string
+  version: string
+  status: string
+  company_id: string
+  created_by: string
+  created_at: any
+  updated_at: any
 }
 
 const hardwareCategories = [
@@ -153,9 +183,9 @@ export default function EditInventoryItemPage() {
   const [currentStep, setCurrentStep] = useState(1)
   const [users, setUsers] = useState<User[]>([])
   const [loadingUsers, setLoadingUsers] = useState(false)
-  const [loadingItem, setLoadingItem] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [notFound, setNotFound] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [item, setItem] = useState<InventoryItem | null>(null)
   const [formData, setFormData] = useState<FormData>({
     name: "",
     type: "hardware",
@@ -178,71 +208,83 @@ export default function EditInventoryItemPage() {
     specifications: "",
     licenseKey: "",
     version: "",
-    status: "active",
   })
 
-  const itemId = params.id as string
   const visibleSteps = getVisibleSteps(formData.type)
 
-  // Fetch item data
+  // Fetch the inventory item
   useEffect(() => {
     const fetchItem = async () => {
-      if (!itemId || !userData?.company_id) return
+      if (!params.id || !userData?.company_id) return
 
+      setIsLoading(true)
       try {
-        const itemRef = doc(db, "itInventory", itemId)
-        const itemSnap = await getDoc(itemRef)
-
-        if (itemSnap.exists()) {
-          const itemData = itemSnap.data()
-          
-          // Check if user has access to this item (same company)
-          if (itemData.company_id === userData.company_id) {
-            setFormData({
-              name: itemData.name || "",
-              type: itemData.type || "hardware",
-              category: itemData.category || "",
-              brand: itemData.brand || "",
-              department: itemData.department || "",
-              assignedTo: itemData.assignedTo || "",
-              condition: itemData.condition || "excellent",
-              vendorType: itemData.vendorType || "physical",
-              storeName: itemData.storeName || "",
-              storeLocation: itemData.storeLocation || "",
-              websiteName: itemData.websiteName || "",
-              websiteUrl: itemData.websiteUrl || "",
-              purchaseDate: itemData.purchaseDate || "",
-              warrantyExpiry: itemData.warrantyExpiry || "",
-              cost: itemData.cost ? itemData.cost.toString() : "",
-              currency: itemData.currency || "USD",
-              description: itemData.description || "",
-              serialNumber: itemData.serialNumber || "",
-              specifications: itemData.specifications || "",
-              licenseKey: itemData.licenseKey || "",
-              version: itemData.version || "",
-              status: itemData.status || "active",
-            })
-          } else {
-            setNotFound(true)
-          }
-        } else {
-          setNotFound(true)
+        const itemDoc = await getDoc(doc(db, "itInventory", params.id as string))
+        
+        if (!itemDoc.exists()) {
+          toast({
+            title: "Item Not Found",
+            description: "The inventory item you're looking for doesn't exist.",
+            variant: "destructive",
+          })
+          router.push("/it/inventory")
+          return
         }
+
+        const itemData = { id: itemDoc.id, ...itemDoc.data() } as InventoryItem
+
+        // Check if user has access to this item (same company)
+        if (itemData.company_id !== userData.company_id) {
+          toast({
+            title: "Access Denied",
+            description: "You don't have permission to edit this item.",
+            variant: "destructive",
+          })
+          router.push("/it/inventory")
+          return
+        }
+
+        setItem(itemData)
+        
+        // Pre-populate form data
+        setFormData({
+          name: itemData.name || "",
+          type: itemData.type || "hardware",
+          category: itemData.category || "",
+          brand: itemData.brand || "",
+          department: itemData.department || "",
+          assignedTo: itemData.assignedTo || "",
+          condition: itemData.condition || "excellent",
+          vendorType: itemData.vendorType || "physical",
+          storeName: itemData.storeName || "",
+          storeLocation: itemData.storeLocation || "",
+          websiteName: itemData.websiteName || "",
+          websiteUrl: itemData.websiteUrl || "",
+          purchaseDate: itemData.purchaseDate || "",
+          warrantyExpiry: itemData.warrantyExpiry || "",
+          cost: itemData.cost ? itemData.cost.toString() : "",
+          currency: itemData.currency || "USD",
+          description: itemData.description || "",
+          serialNumber: itemData.serialNumber || "",
+          specifications: itemData.specifications || "",
+          licenseKey: itemData.licenseKey || "",
+          version: itemData.version || "",
+        })
       } catch (error) {
         console.error("Error fetching item:", error)
         toast({
           title: "Error",
-          description: "Failed to fetch item details",
+          description: "Failed to load inventory item.",
           variant: "destructive",
         })
-        setNotFound(true)
+        router.push("/it/inventory")
       } finally {
-        setLoadingItem(false)
+        setIsLoading(false)
       }
     }
 
     fetchItem()
-  }, [itemId, userData?.company_id])
+  }, [params.id, userData?.company_id, router])
 
   // Fetch users by company_id
   useEffect(() => {
@@ -251,6 +293,8 @@ export default function EditInventoryItemPage() {
 
       setLoadingUsers(true)
       try {
+        console.log("Fetching users for company_id:", userData.company_id)
+
         const usersRef = collection(db, "iboard_users")
         const q = query(usersRef, where("company_id", "==", userData.company_id))
         const querySnapshot = await getDocs(q)
@@ -269,6 +313,7 @@ export default function EditInventoryItemPage() {
           })
         })
 
+        console.log("Fetched users:", fetchedUsers)
         setUsers(fetchedUsers)
       } catch (error) {
         console.error("Error fetching users:", error)
@@ -347,10 +392,10 @@ export default function EditInventoryItemPage() {
       return
     }
 
-    if (!userData?.company_id) {
+    if (!userData?.company_id || !item) {
       toast({
         title: "Error",
-        description: "User company information not found",
+        description: "Item or user information not found",
         variant: "destructive",
       })
       return
@@ -382,20 +427,22 @@ export default function EditInventoryItemPage() {
         specifications: formData.specifications || "",
         licenseKey: formData.licenseKey || "",
         version: formData.version || "",
-        status: formData.status,
         updated_at: serverTimestamp(),
       }
 
+      console.log("Updating item data:", updateData)
+
       // Update in Firestore
-      const itemRef = doc(db, "itInventory", itemId)
-      await updateDoc(itemRef, updateData)
+      await updateDoc(doc(db, "itInventory", item.id), updateData)
+
+      console.log("Document updated successfully")
 
       toast({
         title: "Item Updated Successfully",
         description: `${formData.name} has been updated in the inventory`,
       })
 
-      router.push(`/it/inventory/${itemId}`)
+      router.push("/it/inventory")
     } catch (error) {
       console.error("Error updating document: ", error)
       toast({
@@ -409,7 +456,35 @@ export default function EditInventoryItemPage() {
   }
 
   const handleCancel = () => {
-    router.push(`/it/inventory/${itemId}`)
+    router.push("/it/inventory")
+  }
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+        <div className="container mx-auto p-6 max-w-5xl">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center space-x-4">
+              <Skeleton className="h-9 w-32" />
+              <Separator orientation="vertical" className="h-6" />
+              <div>
+                <Skeleton className="h-8 w-48 mb-2" />
+                <Skeleton className="h-4 w-64" />
+              </div>
+            </div>
+            <Skeleton className="h-6 w-20" />
+          </div>
+          
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-blue-600" />
+              <p className="text-muted-foreground">Loading inventory item...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const renderStepContent = () => {
@@ -565,86 +640,47 @@ export default function EditInventoryItemPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <Label htmlFor="condition" className="text-base font-medium">
-                      Condition
-                    </Label>
-                    <Select
-                      value={formData.condition}
-                      onValueChange={(value: "excellent" | "good" | "fair" | "poor" | "damaged") =>
-                        setFormData({ ...formData, condition: value })
-                      }
-                    >
-                      <SelectTrigger className="h-12 text-base">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="excellent">
-                          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                            Excellent
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="good">
-                          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
-                            Good
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="fair">
-                          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                            Fair
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="poor">
-                          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
-                            Poor
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="damaged">
-                          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-                            Damaged
-                          </Badge>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-3">
-                    <Label htmlFor="status" className="text-base font-medium">
-                      Status
-                    </Label>
-                    <Select
-                      value={formData.status}
-                      onValueChange={(value: "active" | "inactive" | "maintenance" | "retired") =>
-                        setFormData({ ...formData, status: value })
-                      }
-                    >
-                      <SelectTrigger className="h-12 text-base">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">
-                          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-                            Active
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="inactive">
-                          <Badge variant="outline" className="bg-gray-100 text-gray-800 border-gray-200">
-                            Inactive
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="maintenance">
-                          <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                            Maintenance
-                          </Badge>
-                        </SelectItem>
-                        <SelectItem value="retired">
-                          <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
-                            Retired
-                          </Badge>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-3">
+                  <Label htmlFor="condition" className="text-base font-medium">
+                    Condition
+                  </Label>
+                  <Select
+                    value={formData.condition}
+                    onValueChange={(value: "excellent" | "good" | "fair" | "poor" | "damaged") =>
+                      setFormData({ ...formData, condition: value })
+                    }
+                  >
+                    <SelectTrigger className="h-12 text-base">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="excellent">
+                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+                          Excellent
+                        </Badge>
+                      </SelectItem>
+                      <SelectItem value="good">
+                        <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
+                          Good
+                        </Badge>
+                      </SelectItem>
+                      <SelectItem value="fair">
+                        <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">
+                          Fair
+                        </Badge>
+                      </SelectItem>
+                      <SelectItem value="poor">
+                        <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+                          Poor
+                        </Badge>
+                      </SelectItem>
+                      <SelectItem value="damaged">
+                        <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                          Damaged
+                        </Badge>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-3">
@@ -673,7 +709,7 @@ export default function EditInventoryItemPage() {
                 <MapPin className="h-8 w-8 text-green-600" />
               </div>
               <h2 className="text-2xl font-bold">Vendor Information</h2>
-              <p className="text-muted-foreground">Update vendor and purchase location details</p>
+              <p className="text-muted-foreground">Update vendor and purchase information</p>
             </div>
 
             <Card className="border-2 border-dashed border-green-200 bg-green-50/30">
@@ -923,7 +959,7 @@ export default function EditInventoryItemPage() {
                     </div>
                     <div className="space-y-3">
                       <Label htmlFor="specifications" className="text-base font-medium">
-                        Specifications
+                        General Specifications
                       </Label>
                       <Input
                         id="specifications"
@@ -1016,20 +1052,6 @@ export default function EditInventoryItemPage() {
                           <span className="text-sm text-muted-foreground">
                             {formData.department || "Not specified"}
                           </span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 border-b border-muted">
-                          <span className="text-sm font-medium">Status:</span>
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              formData.status === "active" && "bg-green-100 text-green-800 border-green-200",
-                              formData.status === "inactive" && "bg-gray-100 text-gray-800 border-gray-200",
-                              formData.status === "maintenance" && "bg-yellow-100 text-yellow-800 border-yellow-200",
-                              formData.status === "retired" && "bg-red-100 text-red-800 border-red-200",
-                            )}
-                          >
-                            {formData.status}
-                          </Badge>
                         </div>
                         <div className="flex justify-between items-center py-2 border-b border-muted">
                           <span className="text-sm font-medium">Condition:</span>
@@ -1188,46 +1210,6 @@ export default function EditInventoryItemPage() {
     }
   }
 
-  if (loadingItem) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <div className="container mx-auto p-6 max-w-5xl">
-          <div className="flex justify-center items-center min-h-[400px]">
-            <div className="flex flex-col items-center space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin" />
-              <p className="text-muted-foreground">Loading item details...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (notFound) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-        <div className="container mx-auto p-6 max-w-5xl">
-          <div className="flex items-center justify-between mb-8">
-            <Button variant="outline" size="sm" onClick={handleCancel} className="shadow-sm bg-transparent">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Inventory
-            </Button>
-          </div>
-          
-          <Card className="max-w-md mx-auto">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <Package className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Item not found</h3>
-              <p className="text-muted-foreground text-center">
-                The inventory item you're looking for doesn't exist or you don't have access to it.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="container mx-auto p-6 max-w-5xl">
@@ -1236,7 +1218,7 @@ export default function EditInventoryItemPage() {
           <div className="flex items-center space-x-4">
             <Button variant="outline" size="sm" onClick={handleCancel} className="shadow-sm bg-transparent">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Item Details
+              Back to Inventory
             </Button>
             <Separator orientation="vertical" className="h-6" />
             <div>
@@ -1338,7 +1320,7 @@ export default function EditInventoryItemPage() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
-                className="shadow-sm bg-green-600 hover:bg-green-700"
+                className="shadow-sm bg-blue-600 hover:bg-blue-700"
               >
                 <Save className="h-4 w-4 mr-2" />
                 {isSubmitting ? "Updating..." : "Update Item"}
